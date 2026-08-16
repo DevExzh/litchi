@@ -75,8 +75,6 @@ impl MiniFatBuilder {
         if data.is_empty() {
             return Ok(ENDOFCHAIN);
         }
-        // MS-CFB 2.2/2.4 require streams at or above the 4,096-byte cutoff
-        // to use regular FAT sectors, never MiniFAT sectors.
         if data.len() >= MINI_STREAM_CUTOFF {
             return Err(OleError::InvalidData(
                 "CFB streams at or above the MiniFAT cutoff must use regular FAT sectors"
@@ -89,12 +87,76 @@ impl MiniFatBuilder {
             ));
         }
 
-        let num_mini_sectors = data.len().div_ceil(self.mini_sector_size);
+        let padded_size = data
+            .len()
+            .div_ceil(self.mini_sector_size)
+            .checked_mul(self.mini_sector_size)
+            .ok_or_else(|| {
+                OleError::InvalidData("CFB ministream size overflows usize".to_string())
+            })?;
+        let reserved_ministream_len = self
+            .ministream_data
+            .len()
+            .checked_add(padded_size)
+            .ok_or_else(|| {
+                OleError::InvalidData("CFB ministream offset overflows usize".to_string())
+            })?;
+        // Reserve payload space before committing MiniFAT metadata, preserving
+        // the legacy builder's failure-atomic allocation behavior.
+        self.ministream_data
+            .try_reserve_exact(reserved_ministream_len - self.ministream_data.len())
+            .map_err(|source| OleError::allocation("ministream data", source))?;
+        let start_mini_sector = self.allocate_mini_chain_len(data.len())?;
+        let current_offset = usize::try_from(start_mini_sector)
+            .map_err(|_err| {
+                OleError::InvalidData("CFB mini sector index does not fit usize".to_string())
+            })?
+            .checked_mul(self.mini_sector_size)
+            .ok_or_else(|| {
+                OleError::InvalidData("CFB ministream offset overflows usize".to_string())
+            })?;
+        let data_end = current_offset.checked_add(data.len()).ok_or_else(|| {
+            OleError::InvalidData("CFB ministream data range overflows usize".to_string())
+        })?;
+        let new_ministream_len = current_offset.checked_add(padded_size).ok_or_else(|| {
+            OleError::InvalidData("CFB ministream size overflows usize".to_string())
+        })?;
+        self.ministream_data.resize(new_ministream_len, 0);
+
+        let destination = self
+            .ministream_data
+            .get_mut(current_offset..data_end)
+            .ok_or_else(|| {
+                OleError::InvalidData("CFB ministream destination is unavailable".to_string())
+            })?;
+        destination.copy_from_slice(data);
+        Ok(start_mini_sector)
+    }
+
+    /// Reserve a chain for a small stream without retaining its payload.
+    pub(super) fn allocate_mini_chain_len(&mut self, len: usize) -> Result<u32, OleError> {
+        if len == 0 {
+            return Ok(ENDOFCHAIN);
+        }
+        // MS-CFB 2.2/2.4 require streams at or above the 4,096-byte cutoff
+        // to use regular FAT sectors, never MiniFAT sectors.
+        if len >= MINI_STREAM_CUTOFF {
+            return Err(OleError::InvalidData(
+                "CFB streams at or above the MiniFAT cutoff must use regular FAT sectors"
+                    .to_string(),
+            ));
+        }
+        if self.mini_sector_size == 0 {
+            return Err(OleError::InvalidData(
+                "CFB mini sector size must be nonzero".to_string(),
+            ));
+        }
+
+        let num_mini_sectors = len.div_ceil(self.mini_sector_size);
         let sector_count = u32::try_from(num_mini_sectors).map_err(|_err| {
             OleError::InvalidData("CFB mini sector count exceeds u32".to_string())
         })?;
         let end_mini_sector = checked_end(self.next_mini_sector, sector_count)?;
-
         let start_mini_sector = self.next_mini_sector;
         let start_index = usize::try_from(start_mini_sector).map_err(|_err| {
             OleError::InvalidData("CFB mini sector index does not fit usize".to_string())
@@ -102,35 +164,16 @@ impl MiniFatBuilder {
         let new_minifat_len = usize::try_from(end_mini_sector).map_err(|_err| {
             OleError::InvalidData("CFB MiniFAT length does not fit usize".to_string())
         })?;
-        let padded_size = num_mini_sectors
-            .checked_mul(self.mini_sector_size)
-            .ok_or_else(|| {
-                OleError::InvalidData("CFB ministream size overflows usize".to_string())
-            })?;
-        let current_offset = self.ministream_data.len();
-        let new_ministream_len = current_offset.checked_add(padded_size).ok_or_else(|| {
-            OleError::InvalidData("CFB ministream offset overflows usize".to_string())
-        })?;
-        let data_end = current_offset.checked_add(data.len()).ok_or_else(|| {
-            OleError::InvalidData("CFB ministream data range overflows usize".to_string())
-        })?;
 
-        // Reserve both buffers before mutating either chain, so an allocation
-        // failure cannot leave partially committed MiniFAT metadata.
+        // Reserve the table before mutating the chain.  The forward-only
+        // writer intentionally does not reserve or retain payload bytes.
         if new_minifat_len > self.minifat.len() {
             self.minifat
                 .try_reserve_exact(new_minifat_len - self.minifat.len())
                 .map_err(|source| OleError::allocation("MiniFAT entries", source))?;
         }
-        if new_ministream_len > self.ministream_data.len() {
-            self.ministream_data
-                .try_reserve_exact(new_ministream_len - self.ministream_data.len())
-                .map_err(|source| OleError::allocation("ministream data", source))?;
-        }
         self.minifat.resize(new_minifat_len, FREESECT);
-        self.ministream_data.resize(new_ministream_len, 0);
 
-        // Allocate mini sectors and link them
         let last_mini_sector = end_mini_sector - 1;
         for (index, current_mini_sector) in
             (start_index..new_minifat_len).zip(start_mini_sector..end_mini_sector)
@@ -143,16 +186,6 @@ impl MiniFatBuilder {
             self.minifat[index] = next_value;
         }
         self.next_mini_sector = end_mini_sector;
-
-        // Add data to ministream (padded to mini sector boundary)
-        let destination = self
-            .ministream_data
-            .get_mut(current_offset..data_end)
-            .ok_or_else(|| {
-                OleError::InvalidData("CFB ministream destination is unavailable".to_string())
-            })?;
-        destination.copy_from_slice(data);
-
         Ok(start_mini_sector)
     }
 
@@ -166,9 +199,11 @@ impl MiniFatBuilder {
 
     /// Get the ministream size
     pub(super) fn ministream_size(&self) -> Result<u64, OleError> {
-        u64::try_from(self.ministream_data.len()).map_err(|_err| {
-            OleError::InvalidData("CFB ministream size does not fit u64".to_string())
-        })
+        u64::from(self.next_mini_sector)
+            .checked_mul(u64::try_from(self.mini_sector_size).map_err(|_err| {
+                OleError::InvalidData("CFB mini sector size does not fit u64".to_string())
+            })?)
+            .ok_or_else(|| OleError::InvalidData("CFB ministream size overflows u64".to_string()))
     }
 
     /// Generate `MiniFAT` sectors as bytes

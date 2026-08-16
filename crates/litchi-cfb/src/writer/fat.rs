@@ -82,11 +82,21 @@ impl FatBuilder {
     /// This method pre-allocates all FAT entries needed for the chain,
     /// avoiding repeated vector resizing.
     pub(super) fn allocate_chain(&mut self, size: usize) -> Result<u32, OleError> {
+        self.allocate_chain_u64(u64::try_from(size).map_err(|_err| {
+            OleError::InvalidData("CFB stream size does not fit u64".to_string())
+        })?)
+    }
+
+    /// Allocate a chain from a predeclared byte length without narrowing it
+    /// through `usize` first.
+    pub(super) fn allocate_chain_u64(&mut self, size: u64) -> Result<u32, OleError> {
         if size == 0 {
             return Ok(ENDOFCHAIN);
         }
 
-        let num_sectors = size.div_ceil(self.sector_size);
+        let num_sectors = size.div_ceil(u64::try_from(self.sector_size).map_err(|_err| {
+            OleError::InvalidData("CFB sector size does not fit u64".to_string())
+        })?);
         let sector_count = u32::try_from(num_sectors).map_err(|_err| {
             OleError::InvalidData("CFB sector count exceeds MAXREGSECT".to_string())
         })?;

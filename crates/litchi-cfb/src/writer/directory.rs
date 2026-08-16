@@ -58,10 +58,64 @@
 use super::super::consts::{DIRENTRY_SIZE, NOSTREAM, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM};
 use super::super::file::OleError;
 use crate::directory_name::{DirectoryNameData, directory_name_data as parse_directory_name};
-use fixedbitset::FixedBitSet;
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+
+const DIRECTORY_BITSET_WORD_BITS: usize = u64::BITS as usize;
+
+/// Fallible compact membership tracking for directory-tree validation.
+///
+/// The bounded writer must not let a validation bitmap allocation panic after
+/// planning has accepted a finite directory.  This is intentionally local to
+/// the writer so the established reader and writer share no mutable state.
+#[derive(Debug)]
+struct DirectoryBitSet {
+    words: Vec<u64>,
+    bit_len: usize,
+}
+
+impl DirectoryBitSet {
+    fn try_with_capacity(bit_len: usize) -> Result<Self, OleError> {
+        let word_count = bit_len.div_ceil(DIRECTORY_BITSET_WORD_BITS);
+        let mut words = Vec::new();
+        words
+            .try_reserve_exact(word_count)
+            .map_err(|source| OleError::allocation("directory validation bitmap", source))?;
+        words.resize(word_count, 0);
+        Ok(Self { words, bit_len })
+    }
+
+    #[inline]
+    fn contains(&self, bit: usize) -> bool {
+        if bit >= self.bit_len {
+            return false;
+        }
+        let word = bit / DIRECTORY_BITSET_WORD_BITS;
+        let mask = 1_u64 << (bit % DIRECTORY_BITSET_WORD_BITS);
+        self.words.get(word).is_some_and(|value| value & mask != 0)
+    }
+
+    #[inline]
+    fn insert(&mut self, bit: usize) -> Result<(), OleError> {
+        if bit >= self.bit_len {
+            return Err(OleError::InvalidData(
+                "CFB directory validation bit index is out of range".to_string(),
+            ));
+        }
+        let word = bit / DIRECTORY_BITSET_WORD_BITS;
+        let mask = 1_u64 << (bit % DIRECTORY_BITSET_WORD_BITS);
+        self.words[word] |= mask;
+        Ok(())
+    }
+
+    fn count_ones(&self) -> usize {
+        self.words
+            .iter()
+            .map(|word| usize::try_from(word.count_ones()).unwrap_or(usize::MAX))
+            .sum()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -249,6 +303,33 @@ pub(crate) struct DirectoryBuilder {
     reason = "builder API kept complete for symmetry and future use"
 )]
 impl DirectoryBuilder {
+    /// Fallible constructor used by bounded writers.
+    pub(crate) fn try_new(ministream_start: u32, ministream_size: u64) -> Result<Self, OleError> {
+        let root = DirectoryEntryBuilder::root(ministream_start, ministream_size);
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(1)
+            .map_err(|source| OleError::allocation("directory entries", source))?;
+        entries.push(root);
+
+        let mut path_to_sid = HashMap::new();
+        path_to_sid
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory path index", source))?;
+        path_to_sid.insert(Vec::new(), 0);
+
+        let mut children = HashMap::new();
+        children
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory child index", source))?;
+        children.insert(0, Vec::new());
+        Ok(Self {
+            entries,
+            path_to_sid,
+            children,
+        })
+    }
+
     /// Create a new directory builder with root entry
     pub(crate) fn new(ministream_start: u32, ministream_size: u64) -> Self {
         let root = DirectoryEntryBuilder::root(ministream_start, ministream_size);
@@ -295,25 +376,51 @@ impl DirectoryBuilder {
         let mut parent_sid = 0u32;
 
         for component in path {
-            current_path.push(component.clone());
+            current_path
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory current path", source))?;
+            current_path.push(clone_string(component, "directory path component")?);
             if let Some(&sid) = self.path_to_sid.get(&current_path) {
                 parent_sid = sid;
                 continue;
             }
 
             // create new storage
-            let entry = DirectoryEntryBuilder::storage(component.clone())?;
+            let entry =
+                DirectoryEntryBuilder::storage(clone_string(component, "directory storage name")?)?;
             self.ensure_unique_child(parent_sid, &entry)?;
             let sid = u32::try_from(self.entries.len()).map_err(|_err| {
                 OleError::InvalidData("CFB directory contains too many entries".to_string())
             })?;
+            let key = clone_path(&current_path, "directory path index")?;
+            self.entries
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory entries", source))?;
+            self.path_to_sid
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory path index", source))?;
+            self.children
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory child index", source))?;
+            self.children
+                .get_mut(&parent_sid)
+                .ok_or_else(|| {
+                    OleError::InvalidData("CFB directory parent is missing".to_string())
+                })?
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory sibling list", source))?;
             self.entries.push(entry);
-            self.path_to_sid.insert(current_path.clone(), sid);
+            self.path_to_sid.insert(key, sid);
 
             // register as child of previous parent
-            self.children.entry(parent_sid).or_default().push(sid);
+            self.children
+                .get_mut(&parent_sid)
+                .ok_or_else(|| {
+                    OleError::InvalidData("CFB directory parent is missing".to_string())
+                })?
+                .push(sid);
             // initialize its children vec
-            self.children.entry(sid).or_default();
+            self.children.insert(sid, Vec::new());
 
             parent_sid = sid;
         }
@@ -339,18 +446,33 @@ impl DirectoryBuilder {
             0
         };
 
-        let Some(name) = full_path.last().cloned() else {
+        let Some(name) = full_path.last() else {
             return Err(OleError::InvalidData(
                 "CFB stream path must not be empty".to_string(),
             ));
         };
-        let entry = DirectoryEntryBuilder::stream(name, start_sector, size)?;
+        let entry = DirectoryEntryBuilder::stream(
+            clone_string(name, "directory stream name")?,
+            start_sector,
+            size,
+        )?;
         self.ensure_unique_child(parent_sid, &entry)?;
         let sid = u32::try_from(self.entries.len()).map_err(|_err| {
             OleError::InvalidData("CFB directory contains too many entries".to_string())
         })?;
+        self.entries
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory entries", source))?;
+        self.children
+            .get_mut(&parent_sid)
+            .ok_or_else(|| OleError::InvalidData("CFB directory parent is missing".to_string()))?
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory sibling list", source))?;
         self.entries.push(entry);
-        self.children.entry(parent_sid).or_default().push(sid);
+        self.children
+            .get_mut(&parent_sid)
+            .ok_or_else(|| OleError::InvalidData("CFB directory parent is missing".to_string()))?
+            .push(sid);
         Ok(sid)
     }
 
@@ -380,9 +502,23 @@ impl DirectoryBuilder {
         let sid = u32::try_from(self.entries.len()).map_err(|_err| {
             OleError::InvalidData("CFB directory contains too many entries".to_string())
         })?;
+        self.entries
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory entries", source))?;
+        self.children
+            .get_mut(&0)
+            .ok_or_else(|| OleError::InvalidData("CFB directory root is missing".to_string()))?
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory sibling list", source))?;
+        self.children
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory child index", source))?;
         self.entries.push(entry);
-        self.children.entry(0).or_default().push(sid);
-        self.children.entry(sid).or_default();
+        self.children
+            .get_mut(&0)
+            .ok_or_else(|| OleError::InvalidData("CFB directory root is missing".to_string()))?
+            .push(sid);
+        self.children.insert(sid, Vec::new());
         Ok(sid)
     }
 
@@ -589,7 +725,34 @@ impl DirectoryBuilder {
             return Ok(());
         }
 
-        let mut parents = vec![NOSTREAM; entries.len()];
+        let mut parents = Vec::new();
+        parents
+            .try_reserve_exact(entries.len())
+            .map_err(|source| OleError::allocation("directory tree parents", source))?;
+        parents.resize(entries.len(), NOSTREAM);
+
+        // Prepare every fallible validation allocation before changing any
+        // sibling links.  A bounded allocation failure must leave the
+        // builder's tree unchanged for callers that retry serialization.
+        let mut members = DirectoryBitSet::try_with_capacity(entries.len())?;
+        for &sid in child_sids {
+            let index = usize::try_from(sid).unwrap_or(usize::MAX);
+            if index >= entries.len() || members.contains(index) {
+                return Err(OleError::InvalidData(
+                    "CFB sibling list contains an invalid or duplicate SID".to_string(),
+                ));
+            }
+            members.insert(index)?;
+        }
+        let mut visited = DirectoryBitSet::try_with_capacity(entries.len())?;
+        let stack_capacity = child_sids.len().checked_add(1).ok_or_else(|| {
+            OleError::InvalidData("CFB sibling stack size overflows usize".to_string())
+        })?;
+        let mut stack = Vec::new();
+        stack
+            .try_reserve_exact(stack_capacity)
+            .map_err(|source| OleError::allocation("directory validation stack", source))?;
+
         let mut root = NOSTREAM;
         for &sid in child_sids {
             entries[sid as usize].sid_left = NOSTREAM;
@@ -625,33 +788,24 @@ impl DirectoryBuilder {
         }
 
         entries[parent_sid as usize].sid_child = root;
-        Self::validate_child_tree(root, child_sids, entries)
+        Self::validate_child_tree(root, entries, &members, &mut visited, &mut stack)
     }
 
     fn validate_child_tree(
         root: u32,
-        child_sids: &[u32],
         entries: &[DirectoryEntryBuilder],
+        members: &DirectoryBitSet,
+        visited: &mut DirectoryBitSet,
+        stack: &mut Vec<(u32, Option<u32>, Option<u32>, usize)>,
     ) -> Result<(), OleError> {
         if Self::color(entries, root) != NodeColor::Black {
             return Err(OleError::InvalidData(
                 "CFB sibling-tree root must be black".to_string(),
             ));
         }
-
-        let mut members = FixedBitSet::with_capacity(entries.len());
-        for &sid in child_sids {
-            if sid as usize >= entries.len() || members.contains(sid as usize) {
-                return Err(OleError::InvalidData(
-                    "CFB sibling list contains an invalid or duplicate SID".to_string(),
-                ));
-            }
-            members.insert(sid as usize);
-        }
-
-        let mut visited = FixedBitSet::with_capacity(entries.len());
         let mut expected_black_depth = None;
-        let mut stack = vec![(root, None, None, 0usize)];
+        stack.clear();
+        stack.push((root, None, None, 0usize));
         while let Some((sid, lower, upper, black_depth)) = stack.pop() {
             if sid == NOSTREAM {
                 let leaf_depth = black_depth + 1;
@@ -671,7 +825,7 @@ impl DirectoryBuilder {
                     "CFB sibling tree contains an invalid, foreign, or repeated SID".to_string(),
                 ));
             }
-            visited.insert(index);
+            visited.insert(index)?;
             let entry = &entries[index];
             if lower.is_some_and(|bound: u32| {
                 Self::compare_entries(&entries[bound as usize], entry) != Ordering::Less
@@ -694,7 +848,7 @@ impl DirectoryBuilder {
             stack.push((entry.sid_right, Some(sid), upper, child_black_depth));
             stack.push((entry.sid_left, lower, Some(sid), child_black_depth));
         }
-        if visited.count_ones(..) != child_sids.len() {
+        if visited.count_ones() != members.count_ones() {
             return Err(OleError::InvalidData(
                 "CFB sibling tree does not reach every child".to_string(),
             ));
@@ -716,6 +870,26 @@ fn directory_name_data(name: &str) -> Result<(SmallVec<[u16; 32]>, SmallVec<[u16
     let DirectoryNameData { utf16, comparison } =
         parse_directory_name(name).map_err(|error| OleError::InvalidData(error.to_string()))?;
     Ok((utf16, comparison))
+}
+
+fn clone_string(value: &str, resource: &'static str) -> Result<String, OleError> {
+    let mut cloned = String::new();
+    cloned
+        .try_reserve(value.len())
+        .map_err(|source| OleError::allocation(resource, source))?;
+    cloned.push_str(value);
+    Ok(cloned)
+}
+
+fn clone_path(path: &[String], resource: &'static str) -> Result<Vec<String>, OleError> {
+    let mut cloned = Vec::new();
+    cloned
+        .try_reserve_exact(path.len())
+        .map_err(|source| OleError::allocation(resource, source))?;
+    for component in path {
+        cloned.push(clone_string(component, resource)?);
+    }
+    Ok(cloned)
 }
 
 #[cfg(test)]

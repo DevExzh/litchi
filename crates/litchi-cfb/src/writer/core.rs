@@ -1250,6 +1250,7 @@ pub(crate) fn create_sibling_temp_file(path: &Path) -> Result<(PathBuf, File), O
         let temporary_path = parent.join(temporary_name);
 
         match OpenOptions::new()
+            .read(true)
             .write(true)
             .create_new(true)
             .open(&temporary_path)

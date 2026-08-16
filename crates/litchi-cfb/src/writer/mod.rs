@@ -29,6 +29,9 @@ mod header;
 mod core;
 pub(crate) use core::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};
 
+/// Predeclared-layout, forward-only OLE writer.
+mod sequential;
+
 /// Integration tests for OLE writer
 #[cfg(test)]
 mod tests;
@@ -39,3 +42,7 @@ mod tests;
     reason = "`OleWriter` is the established public API name; renaming it would break downstream crates"
 )]
 pub use core::{OleWriter, StorageMoveLimits};
+pub use sequential::{
+    SequentialOleWriter, SequentialWriteError, SequentialWriteProgress, SequentialWriteReport,
+    SequentialWriterLimits, SequentialWriterOptions,
+};

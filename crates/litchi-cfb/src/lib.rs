@@ -36,7 +36,10 @@ pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
 pub use splice::{SameLengthStreamSplice, StreamSpliceLimits};
 pub use stream_move::{ExistingStreamMove, StreamMoveLimits, ValidatedStreamMovePlan};
 pub use validation::{CfbValidationError, validate_source, validate_source_with_limits};
-pub use writer::OleWriter;
+pub use writer::{
+    OleWriter, SequentialOleWriter, SequentialWriteError, SequentialWriteProgress,
+    SequentialWriteReport, SequentialWriterLimits, SequentialWriterOptions,
+};
 
 #[cfg(test)]
 mod allocation_validation_tests;
