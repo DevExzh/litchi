@@ -97,6 +97,26 @@ benchmark selector or performance artifact and makes no latency, allocation,
 RSS/peak-memory, copy, decompression, cold-I/O, total-memory, hardware, or
 real-producer claim.
 
+## CFB same-target MiniFAT single-flight release ABBA (change 0152)
+
+[Change 0152](changes/0152-cfb-same-target-singleflight-release-abba.md)
+compares the final same-target MiniFAT single-flight revision `f46381c6f`
+(introduced by `c270c8f3b`) with clean control `e486e4b1` in strict CPU-2
+`A1 control, B1 candidate, B2 candidate, A2 control` order. Each leg used 20
+warmups and 500 samples across 24 records, retaining 48,000 samples. All
+correctness and logical source-event invariants passed. Existing concurrent
+scenarios recorded 6,473 candidate versus 8,000 control logical source calls,
+19.09% fewer.
+
+Only this named source-event/correctness scope is accepted. The 291-name
+selector matrix is unchanged: no runtime selector was added; only `cfg(test)`
+source-event acceptance and tests changed. Local or generic latency,
+allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
+decompression, native semantic, OOXML, ODF, RTF, and iWork claims are
+withheld. The root MiniStream cache and resource-accounting boundaries remain,
+as do broader performance gaps. See the
+[machine-readable summary](results/cfb-singleflight-abba-0152-summary.json).
+
 | Change | Current evidence | Scope / limitation |
 |---|---|---|
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |
@@ -1111,6 +1131,21 @@ bulk, concurrent, allocation/RSS, physical-I/O, cold/network/device, native-
 format, or generic claim is accepted. See the
 [release record](changes/0149-cfb-same-target-repeat-release-abba.md) and
 [machine-readable summary](results/cfb-repeat-abba-0149-summary.json).
+
+Change 0152 supplies the final clean release ABBA for same-target MiniFAT
+single-flight: control `e486e4b1` versus candidate `f46381c6` (introduced by
+`c270c8f3b`) on CPU 2, with 20 warmups, 500 samples, 24 records per leg, and
+48,000 retained samples. All correctness/source-event invariants pass, and
+existing concurrent scenarios record 6,473 candidate versus 8,000 control
+logical source calls (19.09% fewer). This accepts source-event/correctness
+evidence only. The 291-name matrix is unchanged; no runtime selector was
+added, only `cfg(test)` source-event acceptance and tests changed. Root
+MiniStream cache/resource-accounting boundaries and broader performance gaps
+remain, while local/generic latency, allocation/RSS/peak memory, physical
+I/O/syscalls, cold-cache/device/network, decompression, native semantic,
+OOXML/ODF/RTF/iWork claims are withheld. See the
+[0152 release record](changes/0152-cfb-same-target-singleflight-release-abba.md)
+and [summary](results/cfb-singleflight-abba-0152-summary.json).
 
 Change 0119 adds three opt-in native PPT selected-shape controls and preserves
 the 36-case / 198-record default. The query-only and fresh-open-plus-query

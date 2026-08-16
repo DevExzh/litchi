@@ -246,6 +246,22 @@ triggers. See the
 [`0149` release record](../../docs/performance/changes/0149-cfb-same-target-repeat-release-abba.md)
 and [summary](../../docs/performance/results/cfb-repeat-abba-0149-summary.json).
 
+Change 0152 supplies the final clean release ABBA for same-target MiniFAT
+single-flight, introduced by `c270c8f3b` and finalized in `f46381c6f`, against
+clean control `e486e4b1` on CPU 2. The four legs used 20 warmups and 500 samples
+across 24 records per leg (48,000 retained samples); all correctness/source-
+event invariants passed. Existing concurrent scenarios recorded 6,473
+candidate versus 8,000 control logical source calls, 19.09% fewer. This is
+accepted only as source-event/correctness evidence. The 291-name selector
+matrix is unchanged: no runtime selector was added; only `cfg(test)`
+source-event acceptance and tests changed. Root MiniStream cache and
+resource-accounting boundaries and broader performance gaps remain. Local or
+generic latency, allocation/RSS/peak memory, physical I/O/syscalls,
+cold-cache/device/network, decompression, native semantic, OOXML, ODF, RTF,
+and iWork claims are withheld. See the
+[`0152` release record](../../docs/performance/changes/0152-cfb-same-target-singleflight-release-abba.md)
+and [summary](../../docs/performance/results/cfb-singleflight-abba-0152-summary.json).
+
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
 

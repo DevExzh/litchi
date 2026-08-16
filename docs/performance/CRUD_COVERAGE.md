@@ -1099,6 +1099,21 @@ physical-I/O, cold/network/device, native-format, cross-format, and iWork
 claims. See
 [`0149`](changes/0149-cfb-same-target-repeat-release-abba.md).
 
+Change 0152 adds no CRUD surface or runtime selector. The final same-target
+MiniFAT single-flight revision (`c270c8f3b` plus `f46381c6f`) was compared with
+clean control `e486e4b1` on CPU 2 using 20 warmups, 500 samples, and 24 records
+per leg (48,000 retained samples). All correctness/source-event invariants
+passed; existing concurrent scenarios recorded 6,473 candidate versus 8,000
+control logical source calls (19.09% fewer). The 291-name matrix is unchanged:
+only `cfg(test)` source-event acceptance and tests changed. This is
+source-event/correctness evidence only. Root MiniStream cache and
+resource-accounting boundaries and broader performance gaps remain; local or
+generic latency, allocation/RSS/peak memory, physical I/O/syscalls,
+cold-cache/device/network, decompression, native semantic, OOXML, ODF, RTF,
+and iWork claims are withheld. See the
+[`0152` release record](changes/0152-cfb-same-target-singleflight-release-abba.md)
+and [summary](results/cfb-singleflight-abba-0152-summary.json).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
