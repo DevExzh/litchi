@@ -33,7 +33,7 @@ use litchi_core::patch::{
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Bounded undo/redo history over immutable DOC snapshots.
 pub type History = litchi_core::patch::History<Snapshot>;
@@ -524,11 +524,28 @@ where
 }
 
 /// Immutable, exact-source snapshot for the body-text transaction seam.
-#[derive(Clone)]
 pub struct Snapshot {
     source: Arc<[u8]>,
+    fingerprint_cache: OnceLock<u64>,
     limits: Limits,
     transaction_limits: TransactionLimits,
+}
+
+impl Clone for Snapshot {
+    fn clone(&self) -> Self {
+        let fingerprint_cache = OnceLock::new();
+        if let Some(value) = self.fingerprint_cache.get() {
+            if fingerprint_cache.set(*value).is_err() {
+                unreachable!("a fresh fingerprint cache must accept its cloned value");
+            }
+        }
+        Self {
+            source: Arc::clone(&self.source),
+            fingerprint_cache,
+            limits: self.limits,
+            transaction_limits: self.transaction_limits,
+        }
+    }
 }
 
 impl Snapshot {
@@ -560,6 +577,7 @@ impl Snapshot {
         package.document().map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
+            fingerprint_cache: OnceLock::new(),
             limits,
             transaction_limits,
         })
@@ -607,6 +625,7 @@ impl Snapshot {
         })?;
         Ok(Self {
             source,
+            fingerprint_cache: OnceLock::new(),
             limits,
             transaction_limits,
         })
@@ -643,9 +662,16 @@ impl Snapshot {
     }
 
     /// Stable first-stage fingerprint for diagnostics and stale-source checks.
+    ///
+    /// The FNV-1a pass is lazy. Opening, cloning, and constructing an
+    /// in-memory patch do not scan the complete artifact solely to populate
+    /// this diagnostic value. A clone copies an already initialized value;
+    /// otherwise each immutable snapshot may initialize its own cache.
     #[must_use]
     pub fn fingerprint(&self) -> u64 {
-        fingerprint(&self.source)
+        *self
+            .fingerprint_cache
+            .get_or_init(|| fingerprint(&self.source))
     }
 
     /// Configured finite semantic-operation and text-payload bounds.
@@ -1724,16 +1750,12 @@ impl Commit {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
-    before_fingerprint: u64,
-    after_fingerprint: u64,
     changes: Vec<Change>,
 }
 
 impl Patch {
     fn new(before: Snapshot, after: Snapshot, changes: Vec<Change>) -> Self {
         Self {
-            before_fingerprint: before.fingerprint(),
-            after_fingerprint: after.fingerprint(),
             before,
             after,
             changes,
@@ -1759,21 +1781,30 @@ impl Patch {
     }
 
     /// Fast stale-source precheck; exact bytes remain authoritative.
+    ///
+    /// This accessor is intentionally non-`const`: the first call may lazily
+    /// populate the snapshot fingerprint cache. The former accessor
+    /// was `const`, but no public constructor could produce a `Patch` in a
+    /// const context.
     #[must_use]
-    pub const fn source_fingerprint(&self) -> u64 {
-        self.before_fingerprint
+    pub fn source_fingerprint(&self) -> u64 {
+        self.before.fingerprint()
     }
 
     /// Target diagnostic fingerprint.
+    ///
+    /// See [`Self::source_fingerprint`] for the lazy-cache and const-accessor
+    /// compatibility note.
     #[must_use]
-    pub const fn target_fingerprint(&self) -> u64 {
-        self.after_fingerprint
+    pub fn target_fingerprint(&self) -> u64 {
+        self.after.fingerprint()
     }
 
     /// Whether this patch preserves the exact artifact.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.before.bytes() == self.after.bytes()
+        same_source_allocation(&self.before.source, &self.after.source)
+            || self.before.bytes() == self.after.bytes()
     }
 
     /// Applies only to the exact source artifact.
@@ -1783,7 +1814,15 @@ impl Patch {
     /// Returns [`Error::Conflict`] unless `source` has byte-for-byte equality
     /// with this patch's captured source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.fingerprint() != self.before_fingerprint || source.bytes() != self.before.bytes()
+        if same_source_allocation(&source.source, &self.before.source) {
+            return Ok(if self.is_noop() {
+                source.clone()
+            } else {
+                self.after.clone()
+            });
+        }
+        if source.fingerprint() != self.before.fingerprint()
+            || source.bytes() != self.before.bytes()
         {
             return Err(Error::Conflict);
         }
@@ -1800,8 +1839,6 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
-            before_fingerprint: self.after_fingerprint,
-            after_fingerprint: self.before_fingerprint,
             changes: self.changes.iter().rev().map(Change::inverse).collect(),
         }
     }
@@ -3754,6 +3791,10 @@ fn fingerprint(bytes: &[u8]) -> u64 {
     value
 }
 
+fn same_source_allocation(left: &Arc<[u8]>, right: &Arc<[u8]>) -> bool {
+    Arc::ptr_eq(left, right) && left.len() == right.len()
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -3764,7 +3805,7 @@ mod tests {
 
     use super::{
         CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
-        Snapshot, Story, TextTarget, TransactionLimits,
+        Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
     };
     #[cfg(feature = "performance-diagnostics")]
     use super::{DiagnosticEvent, DiagnosticOutcome, DiagnosticPhase, observe_phase};
@@ -3782,7 +3823,7 @@ mod tests {
     };
     use litchi_ole_common::object::{Editor as PackageEditor, Targets};
     use std::io::Cursor;
-    use std::sync::Arc;
+    use std::sync::{Arc, OnceLock};
 
     fn doc(paragraphs: &[&str]) -> Vec<u8> {
         let mut writer = Writer::new();
@@ -4253,6 +4294,111 @@ mod tests {
 
         let other = Snapshot::open(doc(&["other"]), Limits::default()).expect("other source");
         assert!(matches!(commit.patch().apply(&other), Err(Error::Conflict)));
+    }
+
+    #[test]
+    fn patch_construction_and_same_lineage_apply_keep_fingerprint_lazy() {
+        let source = Snapshot::from_bytes(doc(&["alpha", "bravo"]))
+            .expect("source should open without fingerprinting");
+        assert!(source.fingerprint_cache.get().is_none());
+
+        let mut edit = source.edit().expect("edit should open");
+        edit.replace_paragraph(Position::new(0), "omega")
+            .expect("replacement should stage");
+        let commit = edit.commit().expect("commit should reopen");
+        let patch = commit.patch();
+        assert!(patch.before.fingerprint_cache.get().is_none());
+        assert!(patch.after.fingerprint_cache.get().is_none());
+
+        let applied = patch
+            .apply(&source)
+            .expect("same-lineage application should use allocation identity");
+        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+        assert!(source.fingerprint_cache.get().is_none());
+        assert!(patch.before.fingerprint_cache.get().is_none());
+        assert!(patch.after.fingerprint_cache.get().is_none());
+
+        let source_fingerprint = patch.source_fingerprint();
+        let target_fingerprint = patch.target_fingerprint();
+        assert_eq!(source_fingerprint, fingerprint(patch.before.bytes()));
+        assert_eq!(target_fingerprint, fingerprint(patch.after.bytes()));
+        assert_eq!(fingerprint(b""), 0xcbf2_9ce4_8422_2325);
+        assert_eq!(fingerprint(b"hello"), 0xa430_d846_80aa_bd0b);
+        assert!(patch.before.fingerprint_cache.get().is_some());
+        assert!(patch.after.fingerprint_cache.get().is_some());
+    }
+
+    #[test]
+    fn independently_reopened_identical_source_uses_fingerprint_then_exact_bytes() {
+        let source = Snapshot::from_bytes(doc(&["alpha", "bravo"])).expect("source");
+        let mut edit = source.edit().expect("edit");
+        edit.replace_paragraph(Position::new(0), "omega")
+            .expect("replacement");
+        let commit = edit.commit().expect("commit");
+        let patch = commit.patch();
+        let reopened = Snapshot::from_bytes(source.finish()).expect("reopened source");
+        assert!(!Arc::ptr_eq(
+            &source.bytes_shared(),
+            &reopened.bytes_shared()
+        ));
+        assert_eq!(reopened.fingerprint(), patch.source_fingerprint());
+
+        let applied = patch
+            .apply(&reopened)
+            .expect("identical independently reopened source should apply");
+        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+
+        let mut different_limits = Limits::default();
+        different_limits.max_streams = Limits::default().max_streams - 1;
+        let differently_limited = Snapshot::open(source.finish(), different_limits)
+            .expect("same source should open under a different limit profile");
+        assert_eq!(differently_limited.bytes(), source.bytes());
+        assert_eq!(
+            differently_limited.fingerprint(),
+            patch.source_fingerprint()
+        );
+        assert_eq!(
+            patch
+                .apply(&differently_limited)
+                .expect("byte-identical source with different limits should apply")
+                .bytes(),
+            commit.snapshot().bytes()
+        );
+    }
+
+    #[test]
+    fn snapshot_clone_copies_initialized_fingerprint_without_extra_cache_allocation() {
+        let source = Snapshot::from_bytes(doc(&["alpha"])).expect("source");
+        let uninitialized_clone = source.clone();
+        assert!(source.fingerprint_cache.get().is_none());
+        assert!(uninitialized_clone.fingerprint_cache.get().is_none());
+
+        let expected = source.fingerprint();
+        let initialized_clone = source.clone();
+        assert_eq!(initialized_clone.fingerprint_cache.get(), Some(&expected));
+        assert_eq!(initialized_clone.fingerprint(), expected);
+    }
+
+    #[test]
+    fn equal_fingerprint_collision_still_requires_exact_source_bytes() {
+        let source = Snapshot::from_bytes(doc(&["alpha", "bravo"])).expect("source");
+        let mut edit = source.edit().expect("edit");
+        edit.replace_paragraph(Position::new(0), "omega")
+            .expect("replacement");
+        let commit = edit.commit().expect("commit");
+        let patch = commit.patch();
+        let source_fingerprint = patch.source_fingerprint();
+
+        let mut collision = Snapshot::from_bytes(doc(&["other"])).expect("collision source");
+        assert_ne!(fingerprint(collision.bytes()), source_fingerprint);
+        let cache = OnceLock::new();
+        cache
+            .set(source_fingerprint)
+            .expect("test cache should be initialized once");
+        collision.fingerprint_cache = cache;
+        assert_eq!(collision.fingerprint(), source_fingerprint);
+        assert_ne!(collision.bytes(), patch.before.bytes());
+        assert!(matches!(patch.apply(&collision), Err(Error::Conflict)));
     }
 
     #[test]
