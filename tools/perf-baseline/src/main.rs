@@ -119,6 +119,7 @@ const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1"
 const XLSX_STREAMING_CORPUS_GENERATOR: &str = "litchi-xlsx-streaming-create-v1";
 const RTF_STREAMING_CORPUS_GENERATOR: &str = "litchi-rtf-streaming-create-v1";
 const RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES: usize = 16 * 1024;
+const ODF_CONTENT_COW_SINK_WINDOW_BYTES: usize = 16 * 1024;
 const XLSX_STREAMING_ROW_BYTES: u64 = 4 * 1024;
 const RTF_STREAMING_SCRATCH_BYTES: u64 = 37;
 const XLS_COMMENTS_EDIT_CORPUS_GENERATOR: &str = "litchi-xls-comments-opaque-heavy-v1";
@@ -794,6 +795,8 @@ enum Case {
     OdtMediaRemoveParagraphEditSave,
     OdtEmbeddedResourceScalarReplaceSave,
     OdtEmbeddedResourceBatchReplaceSave,
+    OdtContentCowOwnedRebuild,
+    OdtContentCowPositional,
     OdsSemanticOpen,
     OdsSemanticListSheets,
     OdsSemanticOneCell,
@@ -804,6 +807,8 @@ enum Case {
     OdsSemanticOneEditSave,
     OdsSemanticOnePercentEditSave,
     OdsMediaOneEditSave,
+    OdsContentCowOwnedRebuild,
+    OdsContentCowPositional,
     OdpSemanticOpen,
     OdpSemanticListSlides,
     OdpSemanticOneSlide,
@@ -814,6 +819,8 @@ enum Case {
     OdpMediaTextBoxEditSave,
     OdpMediaTextBoxScalarReplaceSave,
     OdpMediaTextBoxBatchReplaceSave,
+    OdpContentCowOwnedRebuild,
+    OdpContentCowPositional,
     OdpMediaEagerOpen,
     OdpMediaSourceBackedOpen,
     OdpMediaEagerOneSlide,
@@ -1207,6 +1214,8 @@ impl Case {
                 "odt_embedded_resource_scalar_replace_save"
             },
             Self::OdtEmbeddedResourceBatchReplaceSave => "odt_embedded_resource_batch_replace_save",
+            Self::OdtContentCowOwnedRebuild => "odt_content_cow_owned_rebuild",
+            Self::OdtContentCowPositional => "odt_content_cow_positional",
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
             Self::OdsSemanticOneCell => "ods_semantic_one_cell",
@@ -1217,6 +1226,8 @@ impl Case {
             Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
             Self::OdsSemanticOnePercentEditSave => "ods_semantic_one_percent_edit_save",
             Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
+            Self::OdsContentCowOwnedRebuild => "ods_content_cow_owned_rebuild",
+            Self::OdsContentCowPositional => "ods_content_cow_positional",
             Self::OdpSemanticOpen => "odp_semantic_open",
             Self::OdpSemanticListSlides => "odp_semantic_list_slides",
             Self::OdpSemanticOneSlide => "odp_semantic_one_slide",
@@ -1227,6 +1238,8 @@ impl Case {
             Self::OdpMediaTextBoxEditSave => "odp_media_textbox_edit_save",
             Self::OdpMediaTextBoxScalarReplaceSave => "odp_media_textbox_scalar_replace_save",
             Self::OdpMediaTextBoxBatchReplaceSave => "odp_media_textbox_batch_replace_save",
+            Self::OdpContentCowOwnedRebuild => "odp_content_cow_owned_rebuild",
+            Self::OdpContentCowPositional => "odp_content_cow_positional",
             Self::OdpMediaEagerOpen => "odp_media_eager_open",
             Self::OdpMediaSourceBackedOpen => "odp_media_source_backed_open",
             Self::OdpMediaEagerOneSlide => "odp_media_eager_one_slide",
@@ -1556,6 +1569,13 @@ impl Case {
         )
     }
 
+    const fn uses_odf_content_cow_odt(self) -> bool {
+        matches!(
+            self,
+            Self::OdtContentCowOwnedRebuild | Self::OdtContentCowPositional
+        )
+    }
+
     const fn uses_semantic_ods(self) -> bool {
         matches!(
             self,
@@ -1631,6 +1651,26 @@ impl Case {
 
     const fn uses_ods_media(self) -> bool {
         matches!(self, Self::OdsMediaOneEditSave)
+    }
+
+    const fn uses_odf_content_cow_ods(self) -> bool {
+        matches!(
+            self,
+            Self::OdsContentCowOwnedRebuild | Self::OdsContentCowPositional
+        )
+    }
+
+    const fn uses_odf_content_cow_odp(self) -> bool {
+        matches!(
+            self,
+            Self::OdpContentCowOwnedRebuild | Self::OdpContentCowPositional
+        )
+    }
+
+    const fn uses_odf_content_cow(self) -> bool {
+        self.uses_odf_content_cow_odt()
+            || self.uses_odf_content_cow_ods()
+            || self.uses_odf_content_cow_odp()
     }
 
     const fn is_semantic_create_small(self) -> bool {
@@ -2526,6 +2566,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_cell_batch_sweep: Option<OdsCellBatchSweepSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    odf_content_cow: Option<OdfContentCowSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
 }
 
@@ -2836,6 +2878,53 @@ struct OdsCellBatchSweepSummary {
     sweep_stored_cell_counts: Vec<usize>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     sweep_cell_digest_sha256: Vec<String>,
+}
+
+/// Matched ODF content-only publication evidence. Preparation, exact no-op,
+/// limit/cancellation gates, semantic reopen, raw-member comparison, and the
+/// instrumented source replay are outside the timed publication interval.
+/// Source counters are logical `ReadAt` overlap evidence, not physical I/O.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdfContentCowSummary {
+    implementation: &'static str,
+    family: &'static str,
+    performance_claim: &'static str,
+    timing_scope: &'static str,
+    source_evidence_scope: &'static str,
+    sink_scope: &'static str,
+    sink_window_bytes: u64,
+    retained_complete_candidate_bytes: u64,
+    publication_internal_hashes_output: &'static str,
+    sink_hashes_output: bool,
+    source_archive_sha256: String,
+    source_content_sha256: String,
+    candidate_content_sha256: String,
+    expected_output_sha256: String,
+    output_bytes: u64,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    source_read_range_overlap_bytes: Vec<u64>,
+    ordinary_payload_source_read_calls: Vec<u64>,
+    ordinary_payload_source_read_bytes: Vec<u64>,
+    content_source_read_calls: Vec<u64>,
+    content_source_read_bytes: Vec<u64>,
+    untouched_source_read_calls: Vec<u64>,
+    untouched_source_read_bytes: Vec<u64>,
+    pictures_source_read_calls: Vec<u64>,
+    pictures_source_read_bytes: Vec<u64>,
+    content_compressed_range_bytes: u64,
+    untouched_compressed_range_bytes: u64,
+    pictures_compressed_range_bytes: u64,
+    positional_raw_untouched_member_count: usize,
+    positional_raw_untouched_order_and_identity_verified: bool,
+    matched_outputs_exact_content_verified: bool,
+    matched_outputs_semantic_reopen_verified: bool,
+    positional_source_immutability_verified: bool,
+    positional_exact_noop_gate_verified: bool,
+    positional_replacement_limit_gate_verified: bool,
+    positional_output_limit_gate_verified: bool,
+    positional_cancellation_gate_verified: bool,
+    sink_summary: Option<SinkSummary>,
 }
 
 /// Untimed correctness counters paired with the ODT mixed model-content
@@ -3202,6 +3291,13 @@ struct XlsxSourceSnapshot {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct OdfSourceSnapshot {
+    content: RangeSnapshot,
+    untouched: RangeSnapshot,
+    pictures: RangeSnapshot,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct SourceSnapshot {
     read_calls: u64,
     read_bytes: u64,
@@ -3213,6 +3309,7 @@ struct SourceSnapshot {
     ordinary_payload_read_bytes: u64,
     max_in_flight_reads: u64,
     xlsx: XlsxSourceSnapshot,
+    odf: OdfSourceSnapshot,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -3222,6 +3319,13 @@ struct XlsxTrackedRanges {
     unselected_worksheets: Vec<Range<u64>>,
     shared_strings: Vec<Range<u64>>,
     styles: Vec<Range<u64>>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct OdfTrackedRanges {
+    content: Vec<Range<u64>>,
+    untouched: Vec<Range<u64>>,
+    pictures: Vec<Range<u64>>,
 }
 
 #[derive(Debug, Default)]
@@ -3236,6 +3340,7 @@ struct InstrumentedSource {
     version: SourceVersion,
     ordinary_payload_ranges: Vec<Range<u64>>,
     xlsx_ranges: XlsxTrackedRanges,
+    odf_ranges: OdfTrackedRanges,
     track_read_ranges: bool,
     read_calls: AtomicU64,
     read_bytes: AtomicU64,
@@ -3251,6 +3356,9 @@ struct InstrumentedSource {
     xlsx_unselected_worksheets: AtomicRangeCounter,
     xlsx_shared_strings: AtomicRangeCounter,
     xlsx_styles: AtomicRangeCounter,
+    odf_content: AtomicRangeCounter,
+    odf_untouched: AtomicRangeCounter,
+    odf_pictures: AtomicRangeCounter,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -4328,6 +4436,24 @@ impl InstrumentedSource {
         Self::new_xlsx(bytes, ordinary_payload_ranges, XlsxTrackedRanges::default())
     }
 
+    fn new_odf(
+        bytes: Vec<u8>,
+        content_ranges: Vec<Range<u64>>,
+        untouched_ranges: Vec<Range<u64>>,
+        picture_ranges: Vec<Range<u64>>,
+    ) -> Self {
+        let mut ordinary_payload_ranges = untouched_ranges.clone();
+        ordinary_payload_ranges.extend(picture_ranges.iter().cloned());
+        let mut source = Self::new(bytes, ordinary_payload_ranges);
+        source.odf_ranges = OdfTrackedRanges {
+            content: content_ranges,
+            untouched: untouched_ranges,
+            pictures: picture_ranges,
+        };
+        source.track_read_ranges = true;
+        source
+    }
+
     fn new_xlsx(
         bytes: Vec<u8>,
         ordinary_payload_ranges: Vec<Range<u64>>,
@@ -4341,6 +4467,7 @@ impl InstrumentedSource {
             ),
             ordinary_payload_ranges,
             xlsx_ranges,
+            odf_ranges: OdfTrackedRanges::default(),
             track_read_ranges: false,
             read_calls: AtomicU64::new(0),
             read_bytes: AtomicU64::new(0),
@@ -4356,6 +4483,9 @@ impl InstrumentedSource {
             xlsx_unselected_worksheets: AtomicRangeCounter::default(),
             xlsx_shared_strings: AtomicRangeCounter::default(),
             xlsx_styles: AtomicRangeCounter::default(),
+            odf_content: AtomicRangeCounter::default(),
+            odf_untouched: AtomicRangeCounter::default(),
+            odf_pictures: AtomicRangeCounter::default(),
         }
     }
 
@@ -4379,6 +4509,11 @@ impl InstrumentedSource {
                 unselected_worksheets: self.xlsx_unselected_worksheets.snapshot(),
                 shared_strings: self.xlsx_shared_strings.snapshot(),
                 styles: self.xlsx_styles.snapshot(),
+            },
+            odf: OdfSourceSnapshot {
+                content: self.odf_content.snapshot(),
+                untouched: self.odf_untouched.snapshot(),
+                pictures: self.odf_pictures.snapshot(),
             },
         }
     }
@@ -4404,6 +4539,9 @@ impl InstrumentedSource {
         self.xlsx_unselected_worksheets.reset();
         self.xlsx_shared_strings.reset();
         self.xlsx_styles.reset();
+        self.odf_content.reset();
+        self.odf_untouched.reset();
+        self.odf_pictures.reset();
     }
 }
 
@@ -4543,6 +4681,12 @@ impl ReadAt for InstrumentedSource {
         ));
         self.xlsx_styles
             .observe(range_overlap_bytes(&self.xlsx_ranges.styles, offset, end));
+        self.odf_content
+            .observe(range_overlap_bytes(&self.odf_ranges.content, offset, end));
+        self.odf_untouched
+            .observe(range_overlap_bytes(&self.odf_ranges.untouched, offset, end));
+        self.odf_pictures
+            .observe(range_overlap_bytes(&self.odf_ranges.pictures, offset, end));
         Ok(count)
     }
 
@@ -5348,6 +5492,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_odt()
                     && !case.uses_odt_media()
                     && !case.uses_odt_resource_batch()
+                    && !case.uses_odf_content_cow()
                     && !case.uses_semantic_ods()
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
@@ -6125,6 +6270,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.uses_odf_content_cow_odt())
+    {
+        let corpus = build_odt_media_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.uses_odf_content_cow_odt())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.uses_odt_resource_batch())
     {
         let corpus = build_odt_resource_batch_corpus()?;
@@ -6156,6 +6323,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odf_content_cow_ods())
+    {
+        let corpus = build_ods_media_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.uses_odf_content_cow_ods())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     if options.cases.iter().any(|case| case.uses_semantic_odp()) {
         for shape in &options.semantic_shapes {
             let corpus = build_semantic_odp_corpus(*shape)?;
@@ -6179,6 +6368,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         for case in options.cases.iter().filter(|case| case.uses_odp_media()) {
             results.push(run_case_with_config(
                 *case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_odf_content_cow_odp())
+    {
+        let corpus = build_odp_media_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.uses_odf_content_cow_odp())
+        {
+            results.push(run_case_with_config(
+                case,
                 &corpus,
                 options.warmup_iterations,
                 options.samples,
@@ -7007,6 +7218,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_embedded_resource_batch_replace_save" => {
             Some(Case::OdtEmbeddedResourceBatchReplaceSave)
         },
+        "odt_content_cow_owned_rebuild" => Some(Case::OdtContentCowOwnedRebuild),
+        "odt_content_cow_positional" => Some(Case::OdtContentCowPositional),
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
@@ -7017,6 +7230,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
         "ods_semantic_one_percent_edit_save" => Some(Case::OdsSemanticOnePercentEditSave),
         "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
+        "ods_content_cow_owned_rebuild" => Some(Case::OdsContentCowOwnedRebuild),
+        "ods_content_cow_positional" => Some(Case::OdsContentCowPositional),
         "odp_semantic_open" => Some(Case::OdpSemanticOpen),
         "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
         "odp_semantic_one_slide" => Some(Case::OdpSemanticOneSlide),
@@ -7027,6 +7242,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_media_textbox_edit_save" => Some(Case::OdpMediaTextBoxEditSave),
         "odp_media_textbox_scalar_replace_save" => Some(Case::OdpMediaTextBoxScalarReplaceSave),
         "odp_media_textbox_batch_replace_save" => Some(Case::OdpMediaTextBoxBatchReplaceSave),
+        "odp_content_cow_owned_rebuild" => Some(Case::OdpContentCowOwnedRebuild),
+        "odp_content_cow_positional" => Some(Case::OdpContentCowPositional),
         "odp_media_eager_open" => Some(Case::OdpMediaEagerOpen),
         "odp_media_source_backed_open" => Some(Case::OdpMediaSourceBackedOpen),
         "odp_media_eager_one_slide" => Some(Case::OdpMediaEagerOneSlide),
@@ -7306,6 +7523,7 @@ fn print_usage() {
                                        odt_media_remove_paragraph_edit_save,\n\
                                        odt_embedded_resource_scalar_replace_save,\n\
                                        odt_embedded_resource_batch_replace_save,\n\
+                                       odt_content_cow_owned_rebuild,odt_content_cow_positional,\n\
                                        ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
                                        ods_semantic_cell_sweep,\n\
@@ -7313,12 +7531,14 @@ fn print_usage() {
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
                                        ods_semantic_one_percent_edit_save,\n\
                                        ods_media_one_edit_save,\n\
+                                       ods_content_cow_owned_rebuild,ods_content_cow_positional,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
                                        odp_semantic_one_edit_save,odp_media_textbox_edit_save,\n\
                                        odp_media_textbox_scalar_replace_save,\n\
                                        odp_media_textbox_batch_replace_save,\n\
+                                       odp_content_cow_owned_rebuild,odp_content_cow_positional,\n\
                                        odp_media_eager_open,odp_media_source_backed_open,\n\
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
                                        odp_file_eager_open,odp_file_source_open,\n\
@@ -12435,6 +12655,9 @@ fn run_case_with_config(
         Case::OdtEmbeddedResourceScalarReplaceSave | Case::OdtEmbeddedResourceBatchReplaceSave => {
             run_odt_embedded_resource_publication(case, corpus, warmup_iterations, samples)
         },
+        Case::OdtContentCowOwnedRebuild | Case::OdtContentCowPositional => {
+            run_odf_content_cow(case, corpus, warmup_iterations, samples)
+        },
         Case::OdsSemanticOpen
         | Case::OdsSemanticListSheets
         | Case::OdsSemanticOneCell
@@ -12448,6 +12671,9 @@ fn run_case_with_config(
         },
         Case::OdsMediaOneEditSave => {
             run_ods_media_one_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::OdsContentCowOwnedRebuild | Case::OdsContentCowPositional => {
+            run_odf_content_cow(case, corpus, warmup_iterations, samples)
         },
         Case::OdpSemanticOpen
         | Case::OdpSemanticListSlides
@@ -12463,6 +12689,9 @@ fn run_case_with_config(
         },
         Case::OdpMediaTextBoxScalarReplaceSave | Case::OdpMediaTextBoxBatchReplaceSave => {
             run_odp_text_box_model_publication(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdpContentCowOwnedRebuild | Case::OdpContentCowPositional => {
+            run_odf_content_cow(case, corpus, warmup_iterations, samples)
         },
         Case::OdpMediaEagerOpen
         | Case::OdpMediaSourceBackedOpen
@@ -18186,6 +18415,661 @@ fn run_odt_mixed_model_content(
     };
     let mut measured = result_with_source(case, corpus, elapsed, source);
     measured.output_sha256 = output_sha256.first().cloned();
+    Ok(measured)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OdfContentCowFamily {
+    Odt,
+    Ods,
+    Odp,
+}
+
+impl OdfContentCowFamily {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Odt => "odt",
+            Self::Ods => "ods",
+            Self::Odp => "odp",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OdfContentCowImplementation {
+    OwnedRebuild,
+    Positional,
+}
+
+impl OdfContentCowImplementation {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::OwnedRebuild => "owned_rebuild",
+            Self::Positional => "source_positional",
+        }
+    }
+}
+
+struct OdfContentCowPrepared {
+    family: OdfContentCowFamily,
+    implementation: OdfContentCowImplementation,
+    source_content: String,
+    candidate_content: String,
+    owned_source: litchi_odf_common::core::OwnedPackage,
+    positional_source: litchi_odf_common::core::SourceBackedPackage,
+    instrumented_source: Arc<InstrumentedSource>,
+    instrumented_package: litchi_odf_common::core::SourceBackedPackage,
+    output_len: u64,
+    expected_output_sha256: String,
+    positional_output_len: u64,
+    positional_output_sha256: String,
+    content_compressed_range_bytes: u64,
+    untouched_compressed_range_bytes: u64,
+    pictures_compressed_range_bytes: u64,
+    raw_untouched_member_count: usize,
+    raw_untouched_identity_verified: bool,
+    exact_content_verified: bool,
+    semantic_reopen_verified: bool,
+    source_immutability_verified: bool,
+    exact_noop_gate_verified: bool,
+    replacement_limit_gate_verified: bool,
+    output_limit_gate_verified: bool,
+    cancellation_gate_verified: bool,
+    source_archive_sha256: String,
+}
+
+fn odf_content_cow_case(
+    case: Case,
+) -> Result<(OdfContentCowFamily, OdfContentCowImplementation), Box<dyn Error>> {
+    match case {
+        Case::OdtContentCowOwnedRebuild => Ok((
+            OdfContentCowFamily::Odt,
+            OdfContentCowImplementation::OwnedRebuild,
+        )),
+        Case::OdtContentCowPositional => Ok((
+            OdfContentCowFamily::Odt,
+            OdfContentCowImplementation::Positional,
+        )),
+        Case::OdsContentCowOwnedRebuild => Ok((
+            OdfContentCowFamily::Ods,
+            OdfContentCowImplementation::OwnedRebuild,
+        )),
+        Case::OdsContentCowPositional => Ok((
+            OdfContentCowFamily::Ods,
+            OdfContentCowImplementation::Positional,
+        )),
+        Case::OdpContentCowOwnedRebuild => Ok((
+            OdfContentCowFamily::Odp,
+            OdfContentCowImplementation::OwnedRebuild,
+        )),
+        Case::OdpContentCowPositional => Ok((
+            OdfContentCowFamily::Odp,
+            OdfContentCowImplementation::Positional,
+        )),
+        _ => Err("non-ODF content-COW case passed to the content-COW runner".into()),
+    }
+}
+
+fn odf_content_xml(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(ArchiveReader::new(bytes)?.read("content.xml")?)
+}
+
+fn odf_content_cow_candidate(
+    family: OdfContentCowFamily,
+    corpus: &Corpus,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    match family {
+        OdfContentCowFamily::Odt => {
+            let target = SemanticShape::Medium.docx_paragraphs() / 2;
+            let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+            let mut edit = source.edit();
+            edit.replace_paragraph(Position::new(target), semantic_odt_text(target, true))?;
+            Ok(edit.commit()?.snapshot().as_bytes().to_vec())
+        },
+        OdfContentCowFamily::Ods => {
+            let shape = SemanticShape::Medium;
+            let sheet = shape.ods_sheet_count() / 2;
+            let row = shape.ods_rows_per_sheet() / 2;
+            let column = shape.ods_columns_per_sheet() / 2;
+            let sheet_name = semantic_ods_sheet_name(sheet);
+            let source = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
+            let mut edit = source.edit();
+            let text = semantic_ods_text(sheet, row, column, true);
+            edit.worksheets(|worksheets| {
+                worksheets
+                    .set_cell(
+                        sheet_name.as_str(),
+                        row,
+                        column,
+                        litchi_ods::Cell::new(litchi_ods::CellValue::Text(text.clone()), text),
+                    )?
+                    .ok_or_else(|| {
+                        litchi_core::Error::InvalidFormat(
+                            "media-rich ODS selected sheet is missing".to_owned(),
+                        )
+                    })?;
+                Ok(())
+            })?;
+            Ok(edit.commit()?.snapshot().as_bytes().to_vec())
+        },
+        OdfContentCowFamily::Odp => {
+            let text_box = litchi_odp::content::TextBox::new(
+                ODP_MEDIA_TEXT_BOX_NAME,
+                litchi_odp::content::RichText::plain(odp_media_text())?,
+            )?;
+            let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
+            let mut transaction = source.transaction()?;
+            transaction.add_text_box(0usize, &text_box)?;
+            Ok(transaction.commit()?.snapshot().bytes().to_vec())
+        },
+    }
+}
+
+fn verify_odf_content_cow_output(
+    family: OdfContentCowFamily,
+    bytes: &[u8],
+) -> Result<bool, Box<dyn Error>> {
+    match family {
+        OdfContentCowFamily::Odt => verify_odt_media_archive(bytes, true)?,
+        OdfContentCowFamily::Ods => verify_ods_media_archive(bytes, true)?,
+        OdfContentCowFamily::Odp => verify_odp_media_archive(bytes, true)?,
+    }
+    Ok(true)
+}
+
+fn odf_content_cow_member_inventory(bytes: &[u8]) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    Ok(ArchiveReader::new(bytes)?
+        .file_names()
+        .map(str::to_owned)
+        .collect())
+}
+
+fn odf_content_cow_member_orders(
+    bytes: &[u8],
+) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), Box<dyn Error>> {
+    let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
+    let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let index = PreservationIndex::new(&archive, &mut buffer)?;
+    let central = index
+        .entries()
+        .iter()
+        .map(|entry| entry.raw_name_bytes().to_vec())
+        .collect::<Vec<_>>();
+    let mut physical = index.entries().iter().collect::<Vec<_>>();
+    physical.sort_unstable_by_key(|entry| entry.local_span().start);
+    let physical = physical
+        .into_iter()
+        .map(|entry| entry.raw_name_bytes().to_vec())
+        .collect();
+    Ok((physical, central))
+}
+
+fn odf_content_cow_ranges(
+    archive: &[u8],
+) -> Result<
+    (
+        Range<u64>,
+        Vec<Range<u64>>,
+        Vec<Range<u64>>,
+        BTreeSet<String>,
+    ),
+    Box<dyn Error>,
+> {
+    let mut content = None;
+    let mut untouched = Vec::new();
+    let mut pictures = Vec::new();
+    let mut untouched_names = BTreeSet::new();
+    for (name, range) in zip_member_ranges(archive)? {
+        if name == "content.xml" {
+            if content.replace(range).is_some() {
+                return Err("ODF content-COW corpus has duplicate content.xml members".into());
+            }
+        } else if name.starts_with("Pictures/") {
+            pictures.push(range);
+            untouched_names.insert(name);
+        } else {
+            untouched.push(range);
+            untouched_names.insert(name);
+        }
+    }
+    let content = content.ok_or("ODF content-COW corpus has no content.xml member")?;
+    Ok((content, untouched, pictures, untouched_names))
+}
+
+fn odf_range_bytes(ranges: &[Range<u64>]) -> u64 {
+    ranges
+        .iter()
+        .map(|range| range.end.saturating_sub(range.start))
+        .sum()
+}
+
+fn prepare_odf_content_cow(
+    case: Case,
+    corpus: &Corpus,
+) -> Result<OdfContentCowPrepared, Box<dyn Error>> {
+    let (family, implementation) = odf_content_cow_case(case)?;
+    let source_content_bytes = odf_content_xml(&corpus.archive)?;
+    let candidate_archive = odf_content_cow_candidate(family, corpus)?;
+    let candidate_content_bytes = odf_content_xml(&candidate_archive)?;
+    if source_content_bytes == candidate_content_bytes {
+        return Err("ODF content-COW candidate did not change content.xml".into());
+    }
+    let source_content = String::from_utf8(source_content_bytes.clone())?;
+    let candidate_content = String::from_utf8(candidate_content_bytes.clone())?;
+    let owned_source = litchi_odf_common::core::OwnedPackage::from_bytes(corpus.archive.clone())?;
+    let eager_output = litchi_odf_common::package::rebuild_package(
+        &owned_source,
+        &candidate_content,
+        Vec::new(),
+        Vec::new(),
+        Vec::<String>::new(),
+        Vec::<String>::new(),
+    )?;
+    let positional_source = litchi_odf_common::core::SourceBackedPackage::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    let mut positional_output = Vec::new();
+    let positional_report = positional_source
+        .write_content_xml_to_stream(&mut positional_output, candidate_content.as_bytes())?;
+    if positional_report.is_no_op()
+        || positional_report.bytes() != u64::try_from(positional_output.len())?
+    {
+        return Err(
+            "ODF positional content-COW preflight reported an invalid changed output".into(),
+        );
+    }
+
+    let eager_semantic_reopen_verified = verify_odf_content_cow_output(family, &eager_output)?;
+    let positional_semantic_reopen_verified =
+        verify_odf_content_cow_output(family, &positional_output)?;
+    let eager_content_matches = odf_content_xml(&eager_output)? == candidate_content_bytes;
+    let positional_content_matches =
+        odf_content_xml(&positional_output)? == candidate_content_bytes;
+    if !eager_content_matches || !positional_content_matches {
+        return Err("ODF content-COW output content.xml differs from the candidate".into());
+    }
+
+    let source_inventory = odf_content_cow_member_inventory(&corpus.archive)?;
+    if odf_content_cow_member_inventory(&eager_output)? != source_inventory
+        || odf_content_cow_member_inventory(&positional_output)? != source_inventory
+    {
+        return Err("ODF content-COW publication changed the package member inventory".into());
+    }
+    let source_orders = odf_content_cow_member_orders(&corpus.archive)?;
+    let positional_order_preserved =
+        odf_content_cow_member_orders(&positional_output)? == source_orders;
+    if !positional_order_preserved {
+        return Err("ODF positional content-COW changed physical or central member order".into());
+    }
+
+    let (content_range, untouched_ranges, picture_ranges, untouched_names) =
+        odf_content_cow_ranges(&corpus.archive)?;
+    let positional_identical =
+        litchi_odf_common::package::raw_identical_members(&corpus.archive, &positional_output)
+            .ok_or("ODF positional content-COW raw-member comparison was unavailable")?;
+    if positional_identical != untouched_names {
+        return Err("ODF positional content-COW did not preserve every untouched member".into());
+    }
+
+    let no_op_output = {
+        let mut output = Vec::new();
+        let report = positional_source
+            .write_content_xml_to_stream(&mut output, source_content.as_bytes())?;
+        if !report.is_no_op() || output != corpus.archive {
+            return Err("ODF content-COW exact no-op gate failed".into());
+        }
+        output
+    };
+    drop(no_op_output);
+
+    let replacement_limit_gate_verified = {
+        let maximum = u64::try_from(candidate_content.len())?.saturating_sub(1);
+        let mut output = Vec::new();
+        let error = positional_source.write_content_xml_to_stream_with_options(
+            &mut output,
+            candidate_content.as_bytes(),
+            litchi_odf_common::core::SourceContentPublicationOptions::new()
+                .with_max_replacement_bytes(maximum),
+        );
+        matches!(
+            error,
+            Err(litchi_odf_common::core::SourceContentPublicationError::LimitExceeded { .. })
+        ) && output.is_empty()
+    };
+    if !replacement_limit_gate_verified {
+        return Err("ODF content-COW replacement limit gate was not typed or untouched".into());
+    }
+
+    let output_limit_gate_verified = {
+        let maximum = u64::try_from(positional_output.len())?.saturating_sub(1);
+        let mut output = Vec::new();
+        let error = positional_source
+            .write_content_xml_to_stream_with_options(
+                &mut output,
+                candidate_content.as_bytes(),
+                litchi_odf_common::core::SourceContentPublicationOptions::new()
+                    .with_max_output_bytes(maximum),
+            )
+            .expect_err("one-byte-under ODF content-COW output ceiling must fail");
+        let accepted = usize::try_from(error.written())?;
+        matches!(
+            &error,
+            litchi_odf_common::core::SourceContentPublicationError::LimitExceeded { .. }
+        ) && accepted == output.len()
+            && !output.is_empty()
+            && positional_output.starts_with(&output)
+    };
+    if !output_limit_gate_verified {
+        return Err("ODF content-COW output limit gate was not typed".into());
+    }
+
+    let cancellation_gate_verified = {
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        cancellation_source.cancel();
+        let mut output = Vec::new();
+        let error = positional_source.write_content_xml_to_stream_with_options(
+            &mut output,
+            candidate_content.as_bytes(),
+            litchi_odf_common::core::SourceContentPublicationOptions::new()
+                .with_cancellation(cancellation),
+        );
+        matches!(
+            error,
+            Err(litchi_odf_common::core::SourceContentPublicationError::Cancelled { .. })
+        ) && output.is_empty()
+    };
+    if !cancellation_gate_verified {
+        return Err("ODF content-COW cancellation gate was not typed or untouched".into());
+    }
+
+    let instrumented_source = Arc::new(InstrumentedSource::new_odf(
+        corpus.archive.clone(),
+        vec![content_range.clone()],
+        untouched_ranges.clone(),
+        picture_ranges.clone(),
+    ));
+    let instrumented_read_at: Arc<dyn ReadAt> = instrumented_source.clone();
+    let instrumented_package =
+        litchi_odf_common::core::SourceBackedPackage::from_read_at(instrumented_read_at)?;
+    instrumented_source.reset();
+
+    let (output_len, expected_output_sha256) = match implementation {
+        OdfContentCowImplementation::OwnedRebuild => (
+            u64::try_from(eager_output.len())?,
+            sha256_hex(&eager_output),
+        ),
+        OdfContentCowImplementation::Positional => (
+            u64::try_from(positional_output.len())?,
+            sha256_hex(&positional_output),
+        ),
+    };
+    drop(eager_output);
+    let positional_output_len = u64::try_from(positional_output.len())?;
+    let positional_output_sha256 = sha256_hex(&positional_output);
+    let exact_content_verified = eager_content_matches && positional_content_matches;
+    let semantic_reopen_verified =
+        eager_semantic_reopen_verified && positional_semantic_reopen_verified;
+    let source_archive_sha256 = sha256_hex(&corpus.archive);
+    let source_immutability_verified =
+        sha256_hex(instrumented_source.bytes.as_slice()) == source_archive_sha256;
+
+    Ok(OdfContentCowPrepared {
+        family,
+        implementation,
+        source_content,
+        candidate_content,
+        owned_source,
+        positional_source,
+        instrumented_source,
+        instrumented_package,
+        output_len,
+        expected_output_sha256,
+        positional_output_len,
+        positional_output_sha256,
+        content_compressed_range_bytes: odf_range_bytes(std::slice::from_ref(&content_range)),
+        untouched_compressed_range_bytes: odf_range_bytes(&untouched_ranges),
+        pictures_compressed_range_bytes: odf_range_bytes(&picture_ranges),
+        raw_untouched_member_count: untouched_names.len(),
+        raw_untouched_identity_verified: positional_identical == untouched_names
+            && positional_order_preserved,
+        exact_content_verified,
+        semantic_reopen_verified,
+        source_immutability_verified,
+        exact_noop_gate_verified: true,
+        replacement_limit_gate_verified,
+        output_limit_gate_verified,
+        cancellation_gate_verified,
+        source_archive_sha256,
+    })
+}
+
+fn run_odf_content_cow(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let prepared = prepare_odf_content_cow(case, corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut output_digests = Vec::with_capacity(samples);
+    let mut source_read_calls = Vec::new();
+    let mut source_read_bytes = Vec::new();
+    let mut source_read_overlap_bytes = Vec::new();
+    let mut ordinary_read_calls = Vec::new();
+    let mut ordinary_read_bytes = Vec::new();
+    let mut content_read_calls = Vec::new();
+    let mut content_read_bytes = Vec::new();
+    let mut untouched_read_calls = Vec::new();
+    let mut untouched_read_bytes = Vec::new();
+    let mut pictures_read_calls = Vec::new();
+    let mut pictures_read_bytes = Vec::new();
+    let positional_source_evidence =
+        prepared.implementation == OdfContentCowImplementation::Positional;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink =
+            WindowedHashingSink::new(prepared.output_len, ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
+        let started = Instant::now();
+        match prepared.implementation {
+            OdfContentCowImplementation::OwnedRebuild => {
+                let output = litchi_odf_common::package::rebuild_package(
+                    &prepared.owned_source,
+                    &prepared.candidate_content,
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::<String>::new(),
+                    Vec::<String>::new(),
+                )?;
+                if u64::try_from(output.len())? != prepared.output_len {
+                    return Err("ODF eager rebuild output length changed during timing".into());
+                }
+                sink.write_all(&output)?;
+                std::hint::black_box(&output);
+            },
+            OdfContentCowImplementation::Positional => {
+                let report = prepared
+                    .positional_source
+                    .write_content_xml_to_stream_with_options(
+                        &mut sink,
+                        prepared.candidate_content.as_bytes(),
+                        litchi_odf_common::core::SourceContentPublicationOptions::new()
+                            .with_max_output_bytes(prepared.output_len),
+                    )?;
+                if report.is_no_op() || report.bytes() != prepared.output_len {
+                    return Err(
+                        "ODF positional timed publication report disagrees with output".into(),
+                    );
+                }
+            },
+        }
+        let duration = started.elapsed();
+        let (summary, digest) = sink.finish();
+        if summary.accepted_bytes != prepared.output_len
+            || summary.retained_output_bytes != Some(0)
+            || summary.retained_authoring_window_bytes
+                != Some(u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?)
+            || summary.largest_write > u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?
+            || digest != prepared.expected_output_sha256
+        {
+            return Err(
+                "ODF content-COW timed sink evidence disagrees with the prepared output".into(),
+            );
+        }
+        if iteration >= warmup_iterations {
+            sink_summaries.push(summary);
+            output_digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    // Keep the logical source-read replay out of the timed loop.  In particular,
+    // replaying immediately before a positional sample would warm the source
+    // and CPU caches asymmetrically relative to the owned-rebuild control.
+    if positional_source_evidence {
+        for _sample in 0..samples {
+            prepared.instrumented_source.reset();
+            let mut replay_sink =
+                HashingDiscardSink::without_authoring_window(prepared.positional_output_len);
+            let replay_report = prepared
+                .instrumented_package
+                .write_content_xml_to_stream_with_options(
+                    &mut replay_sink,
+                    prepared.candidate_content.as_bytes(),
+                    litchi_odf_common::core::SourceContentPublicationOptions::new()
+                        .with_max_output_bytes(prepared.positional_output_len),
+                )?;
+            let (_replay_summary, replay_digest) = replay_sink.finish();
+            let replay_snapshot = prepared.instrumented_source.snapshot();
+            if replay_report.bytes() != prepared.positional_output_len
+                || replay_digest != prepared.positional_output_sha256
+                || replay_snapshot.read_calls == 0
+                || replay_snapshot.read_bytes == 0
+                || replay_snapshot.read_range_overlap_bytes > replay_snapshot.read_bytes
+                || replay_snapshot.odf.content.read_calls == 0
+                || replay_snapshot.odf.content.read_bytes == 0
+                || replay_snapshot.odf.untouched.read_calls == 0
+                || replay_snapshot.odf.untouched.read_bytes == 0
+                || replay_snapshot.odf.pictures.read_calls == 0
+                || replay_snapshot.odf.pictures.read_bytes == 0
+            {
+                return Err(
+                    "ODF content-COW source replay counters failed their logical-range gates"
+                        .into(),
+                );
+            }
+            source_read_calls.push(replay_snapshot.read_calls);
+            source_read_bytes.push(replay_snapshot.read_bytes);
+            source_read_overlap_bytes.push(replay_snapshot.read_range_overlap_bytes);
+            ordinary_read_calls.push(replay_snapshot.ordinary_payload_read_calls);
+            ordinary_read_bytes.push(replay_snapshot.ordinary_payload_read_bytes);
+            content_read_calls.push(replay_snapshot.odf.content.read_calls);
+            content_read_bytes.push(replay_snapshot.odf.content.read_bytes);
+            untouched_read_calls.push(replay_snapshot.odf.untouched.read_calls);
+            untouched_read_bytes.push(replay_snapshot.odf.untouched.read_bytes);
+            pictures_read_calls.push(replay_snapshot.odf.pictures.read_calls);
+            pictures_read_bytes.push(replay_snapshot.odf.pictures.read_bytes);
+        }
+    }
+
+    let sink_summary = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if output_digests
+        .iter()
+        .any(|digest| digest != &prepared.expected_output_sha256)
+    {
+        return Err("ODF content-COW output digest changed across measured samples".into());
+    }
+    if positional_source_evidence
+        && [
+            source_read_calls.len(),
+            source_read_bytes.len(),
+            source_read_overlap_bytes.len(),
+            ordinary_read_calls.len(),
+            ordinary_read_bytes.len(),
+            content_read_calls.len(),
+            content_read_bytes.len(),
+            untouched_read_calls.len(),
+            untouched_read_bytes.len(),
+            pictures_read_calls.len(),
+            pictures_read_bytes.len(),
+        ]
+        .iter()
+        .any(|length| *length != samples)
+    {
+        return Err(
+            "ODF content-COW positional source evidence has an incomplete sample vector".into(),
+        );
+    }
+    let source_immutability_verified = prepared.source_immutability_verified
+        && sha256_hex(prepared.instrumented_source.bytes.as_slice())
+            == prepared.source_archive_sha256;
+    if !source_immutability_verified {
+        return Err("ODF content-COW source changed during the evidence replay".into());
+    }
+
+    let odf_summary = OdfContentCowSummary {
+        implementation: prepared.implementation.name(),
+        family: prepared.family.name(),
+        performance_claim: "publication-only correctness evidence; no speedup claim",
+        timing_scope: "prepared owner and candidate; rebuild or source-positional publication plus bounded non-seek sink",
+        source_evidence_scope: if positional_source_evidence {
+            "untimed InstrumentedSource replay after owner preparation; logical ReadAt range overlap only"
+        } else {
+            "not applicable to owned rebuild"
+        },
+        sink_scope: "fixed 16 KiB non-seek hashing sink; zero retained output",
+        sink_window_bytes: u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?,
+        retained_complete_candidate_bytes: if prepared.implementation
+            == OdfContentCowImplementation::OwnedRebuild
+        {
+            prepared.output_len
+        } else {
+            0
+        },
+        publication_internal_hashes_output: "not exposed by the current public API",
+        sink_hashes_output: true,
+        source_archive_sha256: sha256_hex(&corpus.archive),
+        source_content_sha256: sha256_hex(prepared.source_content.as_bytes()),
+        candidate_content_sha256: sha256_hex(prepared.candidate_content.as_bytes()),
+        expected_output_sha256: prepared.expected_output_sha256.clone(),
+        output_bytes: prepared.output_len,
+        source_read_calls,
+        source_read_bytes,
+        source_read_range_overlap_bytes: source_read_overlap_bytes,
+        ordinary_payload_source_read_calls: ordinary_read_calls,
+        ordinary_payload_source_read_bytes: ordinary_read_bytes,
+        content_source_read_calls: content_read_calls,
+        content_source_read_bytes: content_read_bytes,
+        untouched_source_read_calls: untouched_read_calls,
+        untouched_source_read_bytes: untouched_read_bytes,
+        pictures_source_read_calls: pictures_read_calls,
+        pictures_source_read_bytes: pictures_read_bytes,
+        content_compressed_range_bytes: prepared.content_compressed_range_bytes,
+        untouched_compressed_range_bytes: prepared.untouched_compressed_range_bytes,
+        pictures_compressed_range_bytes: prepared.pictures_compressed_range_bytes,
+        positional_raw_untouched_member_count: prepared.raw_untouched_member_count,
+        positional_raw_untouched_order_and_identity_verified: prepared
+            .raw_untouched_identity_verified,
+        matched_outputs_exact_content_verified: prepared.exact_content_verified,
+        matched_outputs_semantic_reopen_verified: prepared.semantic_reopen_verified,
+        positional_source_immutability_verified: source_immutability_verified,
+        positional_exact_noop_gate_verified: prepared.exact_noop_gate_verified,
+        positional_replacement_limit_gate_verified: prepared.replacement_limit_gate_verified,
+        positional_output_limit_gate_verified: prepared.output_limit_gate_verified,
+        positional_cancellation_gate_verified: prepared.cancellation_gate_verified,
+        sink_summary: Some(sink_summary),
+    };
+    let source = SourceSummary {
+        read_calls: odf_summary.source_read_calls.clone(),
+        read_bytes: odf_summary.source_read_bytes.clone(),
+        ordinary_payload_read_calls: odf_summary.ordinary_payload_source_read_calls.clone(),
+        ordinary_payload_read_bytes: odf_summary.ordinary_payload_source_read_bytes.clone(),
+        odf_content_cow: Some(odf_summary),
+        ..SourceSummary::default()
+    };
+    let mut measured = result_with_source(case, corpus, elapsed, source);
+    measured.sink = Some(sink_summary);
+    measured.output_sha256 = Some(prepared.expected_output_sha256);
     Ok(measured)
 }
 
@@ -31310,9 +32194,10 @@ mod tests {
         opc_overlay_replacement_payload, parse_case, payload_bytes, resolve_execution_workers,
         run_case, run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
         run_cfb_selective_read, run_cfb_selective_simulated_read,
-        run_docx_source_backed_one_edit_save, run_opc_source_cache_budget_boundary,
-        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save, run_ppt_pictures,
-        run_pptx_batch_edit_save, run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
+        run_docx_source_backed_one_edit_save, run_odf_content_cow,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
+        run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_one_edit_save, run_scaling_case, run_streaming_creation,
         run_xls_comments_edit_save, run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
@@ -31720,7 +32605,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 295);
+        assert_eq!(selectable_count, 301);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -36068,6 +36953,129 @@ mod tests {
             summary.write_size_buckets.total(),
             Some(summary.write_calls)
         );
+    }
+
+    #[test]
+    fn odf_content_cow_selectors_are_opt_in_and_parse_to_stable_names() {
+        let cases = [
+            (
+                "odt_content_cow_owned_rebuild",
+                Case::OdtContentCowOwnedRebuild,
+            ),
+            ("odt_content_cow_positional", Case::OdtContentCowPositional),
+            (
+                "ods_content_cow_owned_rebuild",
+                Case::OdsContentCowOwnedRebuild,
+            ),
+            ("ods_content_cow_positional", Case::OdsContentCowPositional),
+            (
+                "odp_content_cow_owned_rebuild",
+                Case::OdpContentCowOwnedRebuild,
+            ),
+            ("odp_content_cow_positional", Case::OdpContentCowPositional),
+        ];
+        for (name, case) in cases {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(case.uses_odf_content_cow());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn odf_content_cow_selectors_execute_with_exact_bounded_evidence() {
+        let corpora = [
+            (
+                build_odt_media_corpus().unwrap(),
+                [
+                    Case::OdtContentCowOwnedRebuild,
+                    Case::OdtContentCowPositional,
+                ],
+            ),
+            (
+                build_ods_media_corpus().unwrap(),
+                [
+                    Case::OdsContentCowOwnedRebuild,
+                    Case::OdsContentCowPositional,
+                ],
+            ),
+            (
+                build_odp_media_corpus().unwrap(),
+                [
+                    Case::OdpContentCowOwnedRebuild,
+                    Case::OdpContentCowPositional,
+                ],
+            ),
+        ];
+
+        for (corpus, cases) in corpora {
+            for case in cases {
+                let measured = run_odf_content_cow(case, &corpus, 0, 1).unwrap();
+                assert_eq!(measured.elapsed_ns.samples.len(), 1);
+                let sink = measured.sink.as_ref().unwrap();
+                let source = measured.source.as_ref().unwrap();
+                let evidence = source.odf_content_cow.as_ref().unwrap();
+                assert_eq!(sink.accepted_bytes, evidence.output_bytes);
+                assert_eq!(sink.retained_output_bytes, Some(0));
+                assert_eq!(sink.retained_authoring_window_bytes, Some(16 * 1024));
+                assert!(sink.largest_write <= 16 * 1024);
+                assert_eq!(
+                    measured.output_sha256.as_deref(),
+                    Some(evidence.expected_output_sha256.as_str())
+                );
+                assert!(evidence.performance_claim.contains("no speedup claim"));
+                assert!(evidence.positional_raw_untouched_member_count > 0);
+                assert!(evidence.positional_raw_untouched_order_and_identity_verified);
+                assert!(evidence.matched_outputs_exact_content_verified);
+                assert!(evidence.matched_outputs_semantic_reopen_verified);
+                assert!(evidence.positional_source_immutability_verified);
+                assert!(evidence.positional_exact_noop_gate_verified);
+                assert!(evidence.positional_replacement_limit_gate_verified);
+                assert!(evidence.positional_output_limit_gate_verified);
+                assert!(evidence.positional_cancellation_gate_verified);
+                assert!(evidence.sink_hashes_output);
+
+                if case.name().ends_with("_positional") {
+                    assert_eq!(evidence.retained_complete_candidate_bytes, 0);
+                    for vector in [
+                        &evidence.source_read_calls,
+                        &evidence.source_read_bytes,
+                        &evidence.ordinary_payload_source_read_calls,
+                        &evidence.ordinary_payload_source_read_bytes,
+                        &evidence.content_source_read_calls,
+                        &evidence.content_source_read_bytes,
+                        &evidence.untouched_source_read_calls,
+                        &evidence.untouched_source_read_bytes,
+                        &evidence.pictures_source_read_calls,
+                        &evidence.pictures_source_read_bytes,
+                    ] {
+                        assert_eq!(vector.len(), 1);
+                        assert!(vector[0] > 0);
+                    }
+                    assert_eq!(evidence.source_read_range_overlap_bytes.len(), 1);
+                    assert!(
+                        evidence.source_read_range_overlap_bytes[0]
+                            <= evidence.source_read_bytes[0]
+                    );
+                } else {
+                    assert_eq!(
+                        evidence.retained_complete_candidate_bytes,
+                        evidence.output_bytes
+                    );
+                    assert!(evidence.source_read_calls.is_empty());
+                    assert!(evidence.source_read_bytes.is_empty());
+                    assert!(evidence.ordinary_payload_source_read_calls.is_empty());
+                    assert!(evidence.ordinary_payload_source_read_bytes.is_empty());
+                    assert!(evidence.content_source_read_calls.is_empty());
+                    assert!(evidence.content_source_read_bytes.is_empty());
+                    assert!(evidence.untouched_source_read_calls.is_empty());
+                    assert!(evidence.untouched_source_read_bytes.is_empty());
+                    assert!(evidence.pictures_source_read_calls.is_empty());
+                    assert!(evidence.pictures_source_read_bytes.is_empty());
+                }
+            }
+        }
     }
 
     #[test]
