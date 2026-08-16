@@ -79,13 +79,16 @@ conversion for other formats remain.
 
 ## Highest-return next cases
 
-1. Use a future clean release distribution from change 0160's explicit native
-   DOC owner/public-reader phase evidence to identify and then target dominant
-   work without weakening either independent validation layer. The new
-   diagnostic selector preserves the complete
-   lifecycle and reports strict-owner, public-reader, retention, authoring,
-   in-memory finish, patch, and output-materialization intervals independently;
-   it makes no optimization or release-performance claim.
+1. Use change 0160's accepted clean release distribution to evaluate a private
+   native DOC sharing/copy-elision mechanism without weakening either
+   independent validation layer. On the exact deterministic distribution,
+   combined initial/final complete public-reader validation is the largest
+   grouped named phase for large and payload-heavy, while patch fingerprinting
+   leads tiny. The diagnostic selector preserves the complete lifecycle and
+   reports strict-owner, public-reader, retention, authoring, in-memory finish,
+   patch, and output-materialization intervals independently. This is an
+   attribution baseline only; a mechanism still needs balanced clean release
+   control/candidate evidence before any optimization or speedup is accepted.
    Continue final owner/public-reader work after the accepted native
    XLS editor reuse and fixed-width inventory carry-forward, DOC batched stream
    publication, PPT root-open reuse and
@@ -1174,10 +1177,16 @@ CFB streams are untimed gates. Successful event order/cardinality is checked
 after each named outer interval but before the lifecycle timer stops, so that
 recorder validation remains visible in checked unattributed time. Separate
 format tests bind balanced error events. The production feature emits ordered,
-content-free events and owns no clock. This is attribution/correctness evidence
-only; synchronous observer overhead is disclosed, and no speedup, physical-I/O,
-allocation/RSS, cold-cache, real-producer, or optimization claim is accepted.
-See [`0160`](changes/0160-doc-owner-public-phase-attribution.md).
+content-free events and owns no clock. A clean CPU-2 release run at revision
+`ab333008d3` retained 800 samples per shape across four fresh processes:
+lifecycle p50 was 0.081/1.157/44.227 ms and combined complete public-reader
+validation p50 was 0.016/0.598/20.721 ms for tiny/large/payload-heavy. This
+accepts only the exact attribution distribution; synchronous observer overhead
+and the two tiny subphase mean spread triggers are disclosed, and no
+speedup, physical-I/O, allocation/RSS, cold-cache, real-producer, or
+optimization claim is accepted. See
+[`0160`](changes/0160-doc-owner-public-phase-attribution.md) and the
+[summary](results/doc-owner-public-phases-0160-summary.json).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

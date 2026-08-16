@@ -625,10 +625,21 @@ All semantic, no-op, patch/inverse/stale, malformed/typed-refusal, hash, and
 untouched-stream checks are outside timing. Successful event-order/cardinality
 validation follows the named outer interval but remains inside the complete
 lifecycle timer and therefore its checked unattributed remainder. Separate
-format tests bind balanced error events. The current
-three-shape debug smoke is correctness evidence only; no latency, optimization,
-physical-I/O, allocation/RSS, cold-cache, or real-producer result is accepted.
-See [`0160`](changes/0160-doc-owner-public-phase-attribution.md).
+format tests bind balanced error events. A clean release run at exact revision
+`ab333008d3`, pinned to CPU 2 on the named AMD EPYC 9575F host, used four fresh
+processes per shape, 20 warmups and 200 retained samples per process. Lifecycle
+p50 was 0.081 ms tiny, 1.157 ms large, and 44.227 ms payload-heavy. The grouped
+initial-plus-final complete public-reader validation p50 was 0.016, 0.598, and
+20.721 ms respectively; patch p50 was 0.026, 0.165, and 8.413 ms. Every untimed
+case-level gate passed in all 12 reports, and all 2,400 timed samples passed
+arithmetic, event, and output checks. Lifecycle p50/mean spread across
+processes remained below 3.0%/3.8%; two tiny subphase means crossed the 5%
+review trigger without changing rank. This accepts only
+the exact phase distribution, not an optimization or speedup. Physical-I/O,
+allocation/RSS, cold-cache, and real-producer results remain open. See
+[`0160`](changes/0160-doc-owner-public-phase-attribution.md), the
+[summary](results/doc-owner-public-phases-0160-summary.json), and the
+[raw-artifact manifest](results/doc-owner-public-phases-0160.sha256).
 
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32

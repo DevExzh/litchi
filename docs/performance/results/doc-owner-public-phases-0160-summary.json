@@ -1,0 +1,1556 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "multi-process-clean-release-phase-distribution",
+  "status": "accepted-attribution-baseline-only",
+  "claim_boundary": "The exact named deterministic DOC distribution is accepted for phase attribution. It is not a control/candidate comparison and makes no optimization, speedup, physical-I/O, allocation, peak-heap, RSS, cold-cache, filesystem, or real-producer claim.",
+  "source_revision": "ab333008d31b1f63ee0a84c6087fee0de48895d1",
+  "source_worktree_dirty": false,
+  "binary": {
+    "sha256": "4ebdfec6c70e4a5d40936824a8e1acc80a3579fa04dfd3bd3054ad9955466c61",
+    "bytes": 41748520,
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "build_command": "CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=<isolated-target> cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml"
+  },
+  "source_identity": {
+    "harness_main_sha256": "a3680c2c09b30e70624d5d8b180a84d8f707b040b7eee60807407e732af52cd7",
+    "litchi_doc_body_text_sha256": "ab9c8e3be87cb6515de534cc8aba0dbebbcdec26494bedbe411d7feebd8f4940",
+    "harness_manifest_sha256": "6cee16e3fe778880c4f314507a3d1feedb70c894021183a9e8686e8f30ca1084",
+    "harness_cargo_lock_sha256": "8a4f02cdf936c7c3456984406b71d49b6461de3a15811618fdc0fdb2b5430344"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "ab333008d31b1f63ee0a84c6087fee0de48895d1",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "total_memory_bytes": 33605935104,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "environment_capture": {
+    "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc_verbose": "rustc 1.95.0 (59807616e 2026-04-14); host x86_64-unknown-linux-gnu; LLVM 22.1.2",
+    "affinity_visible_logical_cpus_before_pin": 12,
+    "pinned_report_logical_cpus_available": 1,
+    "cpu_governor": null,
+    "cpu_governor_note": "No cpufreq scaling_governor was exposed for CPU 2 in this virtual host.",
+    "rustflags": null,
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": "1",
+    "page_size_bytes": 4096,
+    "total_memory_bytes": 33605935104
+  },
+  "runner": {
+    "command_template": "taskset -c 2 litchi-perf-baseline --case doc_owner_public_phases --writer-shape <shape> --shape tiny --payload compressible --semantic-shape tiny --rtf-variant plain --workers 1 --warmup 20 --samples 200 --json <raw-result>",
+    "process_legs_per_shape": 4,
+    "shape_order_per_leg": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "warmup_iterations_per_leg": 20,
+    "retained_samples_per_leg": 200,
+    "total_retained_samples": 2400,
+    "synchronous_observer_overhead_included": true
+  },
+  "artifacts": {
+    "raw_result_pattern": "doc-owner-public-phases-0160-r{1..4}-{tiny,large,payload-heavy}.json.zst",
+    "sha256_manifest": "doc-owner-public-phases-0160.sha256",
+    "reports": [
+      {
+        "leg": 1,
+        "shape": "tiny",
+        "file": "doc-owner-public-phases-0160-r1-tiny.json.zst",
+        "uncompressed_sha256": "f80db490f87550ed07e5a7fa68ad372e9555d23df073c7b1e26dcf3fe78173ad",
+        "uncompressed_bytes": 98534,
+        "compressed_sha256": "a3d601d653ee6950f9b5a2b0a6c4a2800ee0736c51e7782ce4433fb659ea1533",
+        "compressed_bytes": 10310
+      },
+      {
+        "leg": 1,
+        "shape": "large",
+        "file": "doc-owner-public-phases-0160-r1-large.json.zst",
+        "uncompressed_sha256": "515a76dde7d58245f9c4054b4522e26011429bae42702710d4ea3a4a46164126",
+        "uncompressed_bytes": 103679,
+        "compressed_sha256": "afb96deed0e646fb322f7638029b5d58e6cd0c8fcbed1dc2f3b8a6b38184e935",
+        "compressed_bytes": 12268
+      },
+      {
+        "leg": 1,
+        "shape": "payload-heavy",
+        "file": "doc-owner-public-phases-0160-r1-payload-heavy.json.zst",
+        "uncompressed_sha256": "bbcd4dc6b746ed7284dfa699b7a7a6f967a9c4f19a1e0a82bb2d7dd67b8aab52",
+        "uncompressed_bytes": 109977,
+        "compressed_sha256": "e96f56c353650d68b1c06e38c5fa4504b1cf769219e76fb9551b31f4d64e3d32",
+        "compressed_bytes": 15170
+      },
+      {
+        "leg": 2,
+        "shape": "tiny",
+        "file": "doc-owner-public-phases-0160-r2-tiny.json.zst",
+        "uncompressed_sha256": "207af2cf883987412f506ce172f0715938fd7b53dd94301b145a8e549e31d367",
+        "uncompressed_bytes": 98544,
+        "compressed_sha256": "5592184da911c088876a8ec6cf4bf8005d6034f634d9fdf519227aac6fb5e710",
+        "compressed_bytes": 10566
+      },
+      {
+        "leg": 2,
+        "shape": "large",
+        "file": "doc-owner-public-phases-0160-r2-large.json.zst",
+        "uncompressed_sha256": "05630a2720cc8b5a42d3db2d133703737e70d610e8c6cff8baaaad1910ce23c6",
+        "uncompressed_bytes": 103678,
+        "compressed_sha256": "9ff96c25f06d62c067f0400e10057f8c577383380b2d81480cccf37032fbc51a",
+        "compressed_bytes": 12325
+      },
+      {
+        "leg": 2,
+        "shape": "payload-heavy",
+        "file": "doc-owner-public-phases-0160-r2-payload-heavy.json.zst",
+        "uncompressed_sha256": "4f04623072955f2d1e2c40da8db260e73616cbfefb3a79d4c1eedcbe21a4bb8d",
+        "uncompressed_bytes": 109963,
+        "compressed_sha256": "f8cd15c462aa4717fb8b9923d341181f047be7d885d8a3d270d15f3b0d742cd8",
+        "compressed_bytes": 15156
+      },
+      {
+        "leg": 3,
+        "shape": "tiny",
+        "file": "doc-owner-public-phases-0160-r3-tiny.json.zst",
+        "uncompressed_sha256": "1e70446d46e530d0bed9c0bed7429c9068d4cd2e47fff3c3e1f9806a0b8c7bac",
+        "uncompressed_bytes": 98489,
+        "compressed_sha256": "5637659b25fc60af56371259cff240a13fb1c91b13dabbed9dbe2fe924e0f050",
+        "compressed_bytes": 9996
+      },
+      {
+        "leg": 3,
+        "shape": "large",
+        "file": "doc-owner-public-phases-0160-r3-large.json.zst",
+        "uncompressed_sha256": "a430307fb21e1820be0b8d70a155c83860155296b706ec1601cddfb67292aed9",
+        "uncompressed_bytes": 103675,
+        "compressed_sha256": "58b47d36094e9d8ffe47e6d1066caf72588cd263c18e2fe477608031742245d5",
+        "compressed_bytes": 12425
+      },
+      {
+        "leg": 3,
+        "shape": "payload-heavy",
+        "file": "doc-owner-public-phases-0160-r3-payload-heavy.json.zst",
+        "uncompressed_sha256": "6c677adee149c85184a8f2f9dcb16cb1283d80365655c3875893be7fd252e157",
+        "uncompressed_bytes": 109965,
+        "compressed_sha256": "9216e4fd03293159a28d799f4212c8dca3c429692648661c4664223e6ce88e16",
+        "compressed_bytes": 15639
+      },
+      {
+        "leg": 4,
+        "shape": "tiny",
+        "file": "doc-owner-public-phases-0160-r4-tiny.json.zst",
+        "uncompressed_sha256": "1cebfacfb70bd0079fdd812ba0821f3e67e50ff3384e728348c01b548e016bea",
+        "uncompressed_bytes": 98546,
+        "compressed_sha256": "5d01e18eb69e3702f864379b3c6429a51ff94e9df61e674a996fdceda8e95028",
+        "compressed_bytes": 10529
+      },
+      {
+        "leg": 4,
+        "shape": "large",
+        "file": "doc-owner-public-phases-0160-r4-large.json.zst",
+        "uncompressed_sha256": "7220f0d9e740f9aada33846377dc377fddc3c44b49b8d3563b1e761bf15e9a64",
+        "uncompressed_bytes": 103700,
+        "compressed_sha256": "fc18266e0d897b1fef2501208af339d05f53c5b220d3c9542c7c3cbfc710aa3d",
+        "compressed_bytes": 12593
+      },
+      {
+        "leg": 4,
+        "shape": "payload-heavy",
+        "file": "doc-owner-public-phases-0160-r4-payload-heavy.json.zst",
+        "uncompressed_sha256": "26cc93d4132fe548bbda61779908a11d422a1e3131b30ab093f2a12b8f3f64b7",
+        "uncompressed_bytes": 109957,
+        "compressed_sha256": "78357b10d67a06db8f48444e05fbc759dd4eebbb8e2124e584b22e7355a5f41c",
+        "compressed_bytes": 15043
+      }
+    ]
+  },
+  "phase_statistic_method": {
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "mean": "arithmetic mean",
+    "pooled": "concatenate the four same-shape process vectors before statistics",
+    "phase_share": "use chronologically aligned phase and measured_total vectors; compute phase/measured-lifecycle percentage per sample before statistics",
+    "stability_review_trigger": "report any same-implementation per-leg p50 or mean spread above 5 percent; do not pool different shapes"
+  },
+  "shapes": [
+    {
+      "shape": "tiny",
+      "corpus": {
+        "name": "doc-tiny",
+        "generator": "litchi-legacy-writer-v1",
+        "archive_bytes": 15360,
+        "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+        "candidate_bytes": 16896,
+        "output_sha256": "838050ed6cf58507379f3d53a9024e8496d10cf44f545c9801ca9a5603c842c1"
+      },
+      "legs": [
+        {
+          "leg": 1,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 76976,
+            "p50_ns": 80661,
+            "p95_ns": 97093,
+            "p99_ns": 126725,
+            "max_ns": 137170,
+            "mean_ns": 83639.815
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 15602,
+            "p50_ns": 16371,
+            "p95_ns": 21108,
+            "p99_ns": 26887,
+            "max_ns": 35298,
+            "mean_ns": 17234.655
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 25665,
+            "p50_ns": 25755,
+            "p95_ns": 25995,
+            "p99_ns": 35999,
+            "max_ns": 63837,
+            "mean_ns": 26251.705
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 12317,
+            "p50_ns": 13548,
+            "p95_ns": 19497,
+            "p99_ns": 29741,
+            "max_ns": 36841,
+            "mean_ns": 14603.16
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 2,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 76625,
+            "p50_ns": 82068,
+            "p95_ns": 99196,
+            "p99_ns": 108079,
+            "max_ns": 177725,
+            "mean_ns": 84801.685
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 15611,
+            "p50_ns": 16427,
+            "p95_ns": 22531,
+            "p99_ns": 25195,
+            "max_ns": 109150,
+            "mean_ns": 17929.64
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 25705,
+            "p50_ns": 25765,
+            "p95_ns": 26056,
+            "p99_ns": 32665,
+            "max_ns": 37211,
+            "mean_ns": 25979.56
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 12216,
+            "p50_ns": 13898,
+            "p95_ns": 20528,
+            "p99_ns": 25264,
+            "max_ns": 34748,
+            "mean_ns": 14936.305
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 3,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 76827,
+            "p50_ns": 80109,
+            "p95_ns": 91806,
+            "p99_ns": 111323,
+            "max_ns": 174190,
+            "mean_ns": 82472.095
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 15731,
+            "p50_ns": 16407,
+            "p95_ns": 19186,
+            "p99_ns": 22181,
+            "max_ns": 23132,
+            "mean_ns": 16843.13
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 25695,
+            "p50_ns": 25775,
+            "p95_ns": 25995,
+            "p99_ns": 33175,
+            "max_ns": 58781,
+            "mean_ns": 26061.895
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 12297,
+            "p50_ns": 13503,
+            "p95_ns": 17754,
+            "p99_ns": 25584,
+            "max_ns": 37361,
+            "mean_ns": 14294.61
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 4,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 76665,
+            "p50_ns": 81677,
+            "p95_ns": 100278,
+            "p99_ns": 109730,
+            "max_ns": 116770,
+            "mean_ns": 84788.875
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 15652,
+            "p50_ns": 16588,
+            "p95_ns": 22101,
+            "p99_ns": 27979,
+            "max_ns": 29270,
+            "mean_ns": 17518.35
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 25695,
+            "p50_ns": 25915,
+            "p95_ns": 32434,
+            "p99_ns": 40355,
+            "max_ns": 54236,
+            "mean_ns": 26666.485
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 12216,
+            "p50_ns": 14014,
+            "p95_ns": 20348,
+            "p99_ns": 31684,
+            "max_ns": 34257,
+            "mean_ns": 15091.085
+          },
+          "all_gates_true": true
+        }
+      ],
+      "pooled": {
+        "lifecycle": {
+          "samples": 800,
+          "min_ns": 76625,
+          "p50_ns": 81167,
+          "p95_ns": 98234,
+          "p99_ns": 111794,
+          "max_ns": 177725,
+          "mean_ns": 83925.6175
+        },
+        "phases": {
+          "open_owner": {
+            "samples": 800,
+            "min_ns": 5337,
+            "p50_ns": 5737,
+            "p95_ns": 8311,
+            "p99_ns": 9162,
+            "max_ns": 23242,
+            "mean_ns": 6117.195
+          },
+          "open_public": {
+            "samples": 800,
+            "min_ns": 7610,
+            "p50_ns": 8031,
+            "p95_ns": 11636,
+            "p99_ns": 14611,
+            "max_ns": 100438,
+            "mean_ns": 8595.11375
+          },
+          "open_retain": {
+            "samples": 800,
+            "min_ns": 210,
+            "p50_ns": 301,
+            "p95_ns": 390,
+            "p99_ns": 450,
+            "max_ns": 7010,
+            "mean_ns": 317.895
+          },
+          "open_outer": {
+            "samples": 800,
+            "min_ns": 13729,
+            "p50_ns": 14464,
+            "p95_ns": 20769,
+            "p99_ns": 25074,
+            "max_ns": 107147,
+            "mean_ns": 15445.70875
+          },
+          "edit_new": {
+            "samples": 800,
+            "min_ns": 5348,
+            "p50_ns": 5647,
+            "p95_ns": 8081,
+            "p99_ns": 12497,
+            "max_ns": 50109,
+            "mean_ns": 5993.5175
+          },
+          "edit_replacement": {
+            "samples": 800,
+            "min_ns": 12216,
+            "p50_ns": 13718,
+            "p95_ns": 20178,
+            "p99_ns": 31403,
+            "max_ns": 37361,
+            "mean_ns": 14731.29
+          },
+          "edit_authoring": {
+            "samples": 800,
+            "min_ns": 17674,
+            "p50_ns": 19386,
+            "p95_ns": 27749,
+            "p99_ns": 37651,
+            "max_ns": 67913,
+            "mean_ns": 20724.8075
+          },
+          "edit_finish": {
+            "samples": 800,
+            "min_ns": 4006,
+            "p50_ns": 4437,
+            "p95_ns": 6198,
+            "p99_ns": 6769,
+            "max_ns": 18455,
+            "mean_ns": 4671.08625
+          },
+          "edit_final_owner": {
+            "samples": 800,
+            "min_ns": 5877,
+            "p50_ns": 6348,
+            "p95_ns": 9073,
+            "p99_ns": 10245,
+            "max_ns": 18996,
+            "mean_ns": 6681.80125
+          },
+          "edit_final_public": {
+            "samples": 800,
+            "min_ns": 7831,
+            "p50_ns": 8341,
+            "p95_ns": 11966,
+            "p99_ns": 13860,
+            "max_ns": 27267,
+            "mean_ns": 8786.33
+          },
+          "edit_final_retain": {
+            "samples": 800,
+            "min_ns": 260,
+            "p50_ns": 350,
+            "p95_ns": 490,
+            "p99_ns": 1322,
+            "max_ns": 94791,
+            "mean_ns": 506.56375
+          },
+          "edit_patch": {
+            "samples": 800,
+            "min_ns": 25665,
+            "p50_ns": 25775,
+            "p95_ns": 26256,
+            "p99_ns": 37662,
+            "max_ns": 63837,
+            "mean_ns": 26239.91125
+          },
+          "edit_commit_outer": {
+            "samples": 800,
+            "min_ns": 44281,
+            "p50_ns": 45862,
+            "p95_ns": 54776,
+            "p99_ns": 60353,
+            "max_ns": 140073,
+            "mean_ns": 47352.56125
+          },
+          "edit_output_materialization": {
+            "samples": 800,
+            "min_ns": 121,
+            "p50_ns": 161,
+            "p95_ns": 280,
+            "p99_ns": 350,
+            "max_ns": 591,
+            "mean_ns": 180.4475
+          },
+          "edit_total": {
+            "samples": 800,
+            "min_ns": 62595,
+            "p50_ns": 65845,
+            "p95_ns": 79559,
+            "p99_ns": 95382,
+            "max_ns": 159270,
+            "mean_ns": 68257.81625
+          },
+          "attributed_total": {
+            "samples": 800,
+            "min_ns": 75644,
+            "p50_ns": 80044,
+            "p95_ns": 97044,
+            "p99_ns": 110315,
+            "max_ns": 176486,
+            "mean_ns": 82821.15125
+          },
+          "measured_total": {
+            "samples": 800,
+            "min_ns": 76625,
+            "p50_ns": 81167,
+            "p95_ns": 98234,
+            "p99_ns": 111794,
+            "max_ns": 177725,
+            "mean_ns": 83925.6175
+          },
+          "unattributed": {
+            "samples": 800,
+            "min_ns": 920,
+            "p50_ns": 1052,
+            "p95_ns": 1340,
+            "p99_ns": 1494,
+            "max_ns": 8228,
+            "mean_ns": 1104.46625
+          },
+          "complete_public_reader_validation": {
+            "samples": 800,
+            "min_ns": 15602,
+            "p50_ns": 16433,
+            "p95_ns": 21549,
+            "p99_ns": 26317,
+            "max_ns": 109150,
+            "mean_ns": 17381.44375
+          },
+          "strict_owner_validation": {
+            "samples": 800,
+            "min_ns": 11396,
+            "p50_ns": 12156,
+            "p95_ns": 15352,
+            "p99_ns": 21540,
+            "max_ns": 29791,
+            "mean_ns": 12798.99625
+          },
+          "exact_source_retention": {
+            "samples": 800,
+            "min_ns": 501,
+            "p50_ns": 660,
+            "p95_ns": 821,
+            "p99_ns": 1943,
+            "max_ns": 95101,
+            "mean_ns": 824.45875
+          }
+        },
+        "phase_share_percent": {
+          "complete_public_reader_validation": {
+            "samples": 800,
+            "min_percent": 9.519490211837649,
+            "p50_percent": 20.433607410402388,
+            "p95_percent": 23.518489343026264,
+            "p99_percent": 26.92964952673318,
+            "max_percent": 61.41510761007174,
+            "mean_percent": 20.67573987689585
+          },
+          "edit_patch": {
+            "samples": 800,
+            "min_percent": 14.503868335912223,
+            "p50_percent": 32.069733858834574,
+            "p95_percent": 33.45977967158595,
+            "p99_percent": 40.09239361518749,
+            "max_percent": 46.91483163464839,
+            "mean_percent": 31.420023667007978
+          },
+          "edit_replacement": {
+            "samples": 800,
+            "min_percent": 7.582524829209484,
+            "p50_percent": 16.89865406764026,
+            "p95_percent": 21.38046558588327,
+            "p99_percent": 29.071611757743145,
+            "max_percent": 33.560899364911116,
+            "mean_percent": 17.490187883234498
+          }
+        }
+      },
+      "same_implementation_spread": {
+        "lifecycle_p50": {
+          "min": 80109,
+          "max": 82068,
+          "percent_of_min": 2.445418117814478,
+          "review_trigger_above_5_percent": false
+        },
+        "lifecycle_mean": {
+          "min": 82472.095,
+          "max": 84801.685,
+          "percent_of_min": 2.824700888221642,
+          "review_trigger_above_5_percent": false
+        },
+        "complete_public_reader_validation_p50": {
+          "min": 16371,
+          "max": 16588,
+          "percent_of_min": 1.3255146295278235,
+          "review_trigger_above_5_percent": false
+        },
+        "complete_public_reader_validation_mean": {
+          "min": 16843.13,
+          "max": 17929.64,
+          "percent_of_min": 6.450760636532511,
+          "review_trigger_above_5_percent": true
+        },
+        "edit_patch_p50": {
+          "min": 25755,
+          "max": 25915,
+          "percent_of_min": 0.62123859444768,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_patch_mean": {
+          "min": 25979.56,
+          "max": 26666.485,
+          "percent_of_min": 2.6440978985017423,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_replacement_p50": {
+          "min": 13503,
+          "max": 14014,
+          "percent_of_min": 3.784344219803007,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_replacement_mean": {
+          "min": 14294.61,
+          "max": 15091.085,
+          "percent_of_min": 5.571855405638898,
+          "review_trigger_above_5_percent": true
+        }
+      },
+      "all_gates_true": true
+    },
+    {
+      "shape": "large",
+      "corpus": {
+        "name": "doc-large",
+        "generator": "litchi-legacy-writer-v1",
+        "archive_bytes": 97792,
+        "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+        "candidate_bytes": 108032,
+        "output_sha256": "0431135835e409f7eff13a9ced95e193e1379586d2b421f34c2ab7faaf8c318d"
+      },
+      "legs": [
+        {
+          "leg": 1,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 1106863,
+            "p50_ns": 1141746,
+            "p95_ns": 1238173,
+            "p99_ns": 1281313,
+            "max_ns": 1320396,
+            "mean_ns": 1152497.69
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 564167,
+            "p50_ns": 589271,
+            "p95_ns": 645658,
+            "p99_ns": 694586,
+            "max_ns": 713122,
+            "mean_ns": 595995.56
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 163956,
+            "p50_ns": 164646,
+            "p95_ns": 171265,
+            "p99_ns": 173598,
+            "max_ns": 183963,
+            "mean_ns": 165935.07
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 164477,
+            "p50_ns": 173814,
+            "p95_ns": 198353,
+            "p99_ns": 209928,
+            "max_ns": 224669,
+            "mean_ns": 176602.92
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 2,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 1106182,
+            "p50_ns": 1157897,
+            "p95_ns": 1205177,
+            "p99_ns": 1246514,
+            "max_ns": 1426252,
+            "mean_ns": 1161919.105
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 560742,
+            "p50_ns": 598173,
+            "p95_ns": 636414,
+            "p99_ns": 677061,
+            "max_ns": 719770,
+            "mean_ns": 600272.205
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 164175,
+            "p50_ns": 164797,
+            "p95_ns": 185876,
+            "p99_ns": 191173,
+            "max_ns": 197331,
+            "mean_ns": 169144.765
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 166159,
+            "p50_ns": 174685,
+            "p95_ns": 195980,
+            "p99_ns": 204982,
+            "max_ns": 256253,
+            "mean_ns": 177531.95
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 3,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 1107793,
+            "p50_ns": 1156065,
+            "p95_ns": 1246556,
+            "p99_ns": 1268174,
+            "max_ns": 1301310,
+            "mean_ns": 1163463.36
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 566198,
+            "p50_ns": 596120,
+            "p95_ns": 658855,
+            "p99_ns": 668479,
+            "max_ns": 693064,
+            "mean_ns": 602479.755
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 164276,
+            "p50_ns": 165162,
+            "p95_ns": 174320,
+            "p99_ns": 180839,
+            "max_ns": 318569,
+            "mean_ns": 167397.185
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 166060,
+            "p50_ns": 174289,
+            "p95_ns": 207496,
+            "p99_ns": 218931,
+            "max_ns": 272455,
+            "mean_ns": 178688.06
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 4,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 1116526,
+            "p50_ns": 1175757,
+            "p95_ns": 1287321,
+            "p99_ns": 1640887,
+            "max_ns": 1674003,
+            "mean_ns": 1195777.18
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 574240,
+            "p50_ns": 609418,
+            "p95_ns": 720540,
+            "p99_ns": 898094,
+            "max_ns": 938751,
+            "mean_ns": 624488.175
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 164406,
+            "p50_ns": 165023,
+            "p95_ns": 185295,
+            "p99_ns": 199454,
+            "max_ns": 203291,
+            "mean_ns": 168589.4
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 166659,
+            "p50_ns": 175266,
+            "p95_ns": 235783,
+            "p99_ns": 268699,
+            "max_ns": 280326,
+            "mean_ns": 183857.285
+          },
+          "all_gates_true": true
+        }
+      ],
+      "pooled": {
+        "lifecycle": {
+          "samples": 800,
+          "min_ns": 1106182,
+          "p50_ns": 1156751,
+          "p95_ns": 1246164,
+          "p99_ns": 1426252,
+          "max_ns": 1674003,
+          "mean_ns": 1168414.33375
+        },
+        "phases": {
+          "open_owner": {
+            "samples": 800,
+            "min_ns": 56027,
+            "p50_ns": 58835,
+            "p95_ns": 73551,
+            "p99_ns": 85828,
+            "max_ns": 99557,
+            "mean_ns": 61210.6025
+          },
+          "open_public": {
+            "samples": 800,
+            "min_ns": 270221,
+            "p50_ns": 286279,
+            "p95_ns": 325447,
+            "p99_ns": 391678,
+            "max_ns": 437422,
+            "mean_ns": 291648.46375
+          },
+          "open_retain": {
+            "samples": 800,
+            "min_ns": 1572,
+            "p50_ns": 1833,
+            "p95_ns": 2163,
+            "p99_ns": 2403,
+            "max_ns": 7510,
+            "mean_ns": 1881.06125
+          },
+          "open_outer": {
+            "samples": 800,
+            "min_ns": 333239,
+            "p50_ns": 353782,
+            "p95_ns": 397687,
+            "p99_ns": 455236,
+            "max_ns": 529248,
+            "mean_ns": 359680.13375
+          },
+          "edit_new": {
+            "samples": 800,
+            "min_ns": 55958,
+            "p50_ns": 58625,
+            "p95_ns": 71358,
+            "p99_ns": 82153,
+            "max_ns": 110182,
+            "mean_ns": 60727.88625
+          },
+          "edit_replacement": {
+            "samples": 800,
+            "min_ns": 164477,
+            "p50_ns": 174455,
+            "p95_ns": 206814,
+            "p99_ns": 254671,
+            "max_ns": 280326,
+            "mean_ns": 179170.05375
+          },
+          "edit_authoring": {
+            "samples": 800,
+            "min_ns": 222476,
+            "p50_ns": 235187,
+            "p95_ns": 272585,
+            "p99_ns": 316065,
+            "max_ns": 383418,
+            "mean_ns": 239897.94
+          },
+          "edit_finish": {
+            "samples": 800,
+            "min_ns": 13218,
+            "p50_ns": 15241,
+            "p95_ns": 19046,
+            "p99_ns": 24134,
+            "max_ns": 47696,
+            "mean_ns": 15721.685
+          },
+          "edit_final_owner": {
+            "samples": 800,
+            "min_ns": 57079,
+            "p50_ns": 59161,
+            "p95_ns": 74302,
+            "p99_ns": 86820,
+            "max_ns": 113696,
+            "mean_ns": 61663.39125
+          },
+          "edit_final_public": {
+            "samples": 800,
+            "min_ns": 289058,
+            "p50_ns": 308309,
+            "p95_ns": 348910,
+            "p99_ns": 415851,
+            "max_ns": 501329,
+            "mean_ns": 314160.46
+          },
+          "edit_final_retain": {
+            "samples": 800,
+            "min_ns": 1832,
+            "p50_ns": 2063,
+            "p95_ns": 2493,
+            "p99_ns": 2794,
+            "max_ns": 17564,
+            "mean_ns": 2152.12375
+          },
+          "edit_patch": {
+            "samples": 800,
+            "min_ns": 163956,
+            "p50_ns": 164897,
+            "p95_ns": 180389,
+            "p99_ns": 191173,
+            "max_ns": 318569,
+            "mean_ns": 167766.605
+          },
+          "edit_commit_outer": {
+            "samples": 800,
+            "min_ns": 534245,
+            "p50_ns": 560526,
+            "p95_ns": 606183,
+            "p99_ns": 701506,
+            "max_ns": 781506,
+            "mean_ns": 566838.12625
+          },
+          "edit_output_materialization": {
+            "samples": 800,
+            "min_ns": 1301,
+            "p50_ns": 1542,
+            "p95_ns": 1803,
+            "p99_ns": 2092,
+            "max_ns": 7310,
+            "mean_ns": 1596.6025
+          },
+          "edit_total": {
+            "samples": 800,
+            "min_ns": 761849,
+            "p50_ns": 798603,
+            "p95_ns": 861735,
+            "p99_ns": 1007096,
+            "max_ns": 1153918,
+            "mean_ns": 808332.66875
+          },
+          "attributed_total": {
+            "samples": 800,
+            "min_ns": 1095024,
+            "p50_ns": 1146219,
+            "p95_ns": 1234257,
+            "p99_ns": 1411263,
+            "max_ns": 1659692,
+            "mean_ns": 1157698.935
+          },
+          "measured_total": {
+            "samples": 800,
+            "min_ns": 1106182,
+            "p50_ns": 1156751,
+            "p95_ns": 1246164,
+            "p99_ns": 1426252,
+            "max_ns": 1674003,
+            "mean_ns": 1168414.33375
+          },
+          "unattributed": {
+            "samples": 800,
+            "min_ns": 5578,
+            "p50_ns": 10775,
+            "p95_ns": 13626,
+            "p99_ns": 20969,
+            "max_ns": 53924,
+            "mean_ns": 10715.39875
+          },
+          "complete_public_reader_validation": {
+            "samples": 800,
+            "min_ns": 560742,
+            "p50_ns": 597988,
+            "p95_ns": 658145,
+            "p99_ns": 730746,
+            "max_ns": 938751,
+            "mean_ns": 605808.92375
+          },
+          "strict_owner_validation": {
+            "samples": 800,
+            "min_ns": 113566,
+            "p50_ns": 119409,
+            "p95_ns": 140174,
+            "p99_ns": 165127,
+            "max_ns": 187910,
+            "mean_ns": 122873.99375
+          },
+          "exact_source_retention": {
+            "samples": 800,
+            "min_ns": 3513,
+            "p50_ns": 3940,
+            "p95_ns": 4535,
+            "p99_ns": 4917,
+            "max_ns": 19357,
+            "mean_ns": 4033.185
+          }
+        },
+        "phase_share_percent": {
+          "complete_public_reader_validation": {
+            "samples": 800,
+            "min_percent": 46.070229600079486,
+            "p50_percent": 51.84673739280632,
+            "p95_percent": 53.76334192914859,
+            "p99_percent": 55.172673075890216,
+            "max_percent": 57.12337726687147,
+            "mean_percent": 51.83326450166378
+          },
+          "edit_patch": {
+            "samples": 800,
+            "min_percent": 9.877341916352599,
+            "p50_percent": 14.39586282247514,
+            "p95_percent": 15.3496570453675,
+            "p99_percent": 16.231846795159665,
+            "max_percent": 24.923660926990664,
+            "mean_percent": 14.380987452743673
+          },
+          "edit_replacement": {
+            "samples": 800,
+            "min_percent": 13.08893355312519,
+            "p50_percent": 15.102122166159628,
+            "p95_percent": 16.96393287590441,
+            "p99_percent": 18.0773459160711,
+            "max_percent": 22.41262158284744,
+            "mean_percent": 15.326981681373761
+          }
+        }
+      },
+      "same_implementation_spread": {
+        "lifecycle_p50": {
+          "min": 1141746,
+          "max": 1175757,
+          "percent_of_min": 2.9788586953665703,
+          "review_trigger_above_5_percent": false
+        },
+        "lifecycle_mean": {
+          "min": 1152497.69,
+          "max": 1195777.18,
+          "percent_of_min": 3.7552778088431564,
+          "review_trigger_above_5_percent": false
+        },
+        "complete_public_reader_validation_p50": {
+          "min": 589271,
+          "max": 609418,
+          "percent_of_min": 3.4189702191351685,
+          "review_trigger_above_5_percent": false
+        },
+        "complete_public_reader_validation_mean": {
+          "min": 595995.56,
+          "max": 624488.175,
+          "percent_of_min": 4.780675715100963,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_patch_p50": {
+          "min": 164646,
+          "max": 165162,
+          "percent_of_min": 0.313399657446886,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_patch_mean": {
+          "min": 165935.07,
+          "max": 169144.765,
+          "percent_of_min": 1.9343077988275816,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_replacement_p50": {
+          "min": 173814,
+          "max": 175266,
+          "percent_of_min": 0.8353757464876247,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_replacement_mean": {
+          "min": 176602.92,
+          "max": 183857.285,
+          "percent_of_min": 4.10772653136199,
+          "review_trigger_above_5_percent": false
+        }
+      },
+      "all_gates_true": true
+    },
+    {
+      "shape": "payload-heavy",
+      "corpus": {
+        "name": "doc-payload-heavy",
+        "generator": "litchi-legacy-writer-v1",
+        "archive_bytes": 5179904,
+        "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+        "candidate_bytes": 5183488,
+        "output_sha256": "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4"
+      },
+      "legs": [
+        {
+          "leg": 1,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 42750427,
+            "p50_ns": 44174269,
+            "p95_ns": 47269763,
+            "p99_ns": 50001120,
+            "max_ns": 50688766,
+            "mean_ns": 44438385.585
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 19831879,
+            "p50_ns": 20694442,
+            "p95_ns": 22394874,
+            "p99_ns": 23639619,
+            "max_ns": 25014949,
+            "mean_ns": 20870206.84
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 8344298,
+            "p50_ns": 8398727,
+            "p95_ns": 8621160,
+            "p99_ns": 8803209,
+            "max_ns": 9325618,
+            "mean_ns": 8431263.825
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 7144729,
+            "p50_ns": 7461288,
+            "p95_ns": 8342536,
+            "p99_ns": 8692016,
+            "max_ns": 9754499,
+            "mean_ns": 7539225.945
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 2,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 42636740,
+            "p50_ns": 44217786,
+            "p95_ns": 46477875,
+            "p99_ns": 49921081,
+            "max_ns": 80727510,
+            "mean_ns": 44664124.51
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 19815537,
+            "p50_ns": 20688839,
+            "p95_ns": 21701953,
+            "p99_ns": 25598093,
+            "max_ns": 54576876,
+            "mean_ns": 21010776.105
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 8327987,
+            "p50_ns": 8404461,
+            "p95_ns": 8591348,
+            "p99_ns": 8786285,
+            "max_ns": 8905450,
+            "mean_ns": 8431720.98
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 7153090,
+            "p50_ns": 7493313,
+            "p95_ns": 8056703,
+            "p99_ns": 8558103,
+            "max_ns": 11380305,
+            "mean_ns": 7562934.57
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 3,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 43194690,
+            "p50_ns": 44430800,
+            "p95_ns": 46957246,
+            "p99_ns": 48817544,
+            "max_ns": 50217289,
+            "mean_ns": 44688488.84
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 19916638,
+            "p50_ns": 20688370,
+            "p95_ns": 21999504,
+            "p99_ns": 22565101,
+            "max_ns": 25258296,
+            "mean_ns": 20832876.27
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 8344078,
+            "p50_ns": 8406379,
+            "p95_ns": 8708238,
+            "p99_ns": 9115008,
+            "max_ns": 9128397,
+            "mean_ns": 8451564.105
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 7217458,
+            "p50_ns": 7539721,
+            "p95_ns": 8243269,
+            "p99_ns": 8776493,
+            "max_ns": 9734620,
+            "mean_ns": 7624108.785
+          },
+          "all_gates_true": true
+        },
+        {
+          "leg": 4,
+          "lifecycle": {
+            "samples": 200,
+            "min_ns": 42562170,
+            "p50_ns": 44080394,
+            "p95_ns": 45274661,
+            "p99_ns": 46047375,
+            "max_ns": 51024682,
+            "mean_ns": 44168957.96
+          },
+          "complete_public_reader_validation": {
+            "samples": 200,
+            "min_ns": 19902871,
+            "p50_ns": 20834785,
+            "p95_ns": 21789204,
+            "p99_ns": 22277346,
+            "max_ns": 25901961,
+            "mean_ns": 20893547.675
+          },
+          "edit_patch": {
+            "samples": 200,
+            "min_ns": 8344799,
+            "p50_ns": 8434222,
+            "p95_ns": 8556802,
+            "p99_ns": 8713626,
+            "max_ns": 8746811,
+            "mean_ns": 8448110.96
+          },
+          "edit_replacement": {
+            "samples": 200,
+            "min_ns": 7082884,
+            "p50_ns": 7413879,
+            "p95_ns": 7817474,
+            "p99_ns": 8133679,
+            "max_ns": 8244912,
+            "mean_ns": 7451163.245
+          },
+          "all_gates_true": true
+        }
+      ],
+      "pooled": {
+        "lifecycle": {
+          "samples": 800,
+          "min_ns": 42562170,
+          "p50_ns": 44227025,
+          "p95_ns": 46711777,
+          "p99_ns": 49826781,
+          "max_ns": 80727510,
+          "mean_ns": 44489989.22375
+        },
+        "phases": {
+          "open_owner": {
+            "samples": 800,
+            "min_ns": 706442,
+            "p50_ns": 822110,
+            "p95_ns": 953021,
+            "p99_ns": 1067258,
+            "max_ns": 2578157,
+            "mean_ns": 837519.13625
+          },
+          "open_public": {
+            "samples": 800,
+            "min_ns": 10867478,
+            "p50_ns": 11471921,
+            "p95_ns": 12270841,
+            "p99_ns": 13387255,
+            "max_ns": 44920273,
+            "mean_ns": 11600875.77375
+          },
+          "open_retain": {
+            "samples": 800,
+            "min_ns": 232110,
+            "p50_ns": 255296,
+            "p95_ns": 288727,
+            "p99_ns": 312300,
+            "max_ns": 406239,
+            "mean_ns": 259362.205
+          },
+          "open_outer": {
+            "samples": 800,
+            "min_ns": 11883816,
+            "p50_ns": 12574487,
+            "p95_ns": 13467455,
+            "p99_ns": 14642662,
+            "max_ns": 47816707,
+            "mean_ns": 12703429.84375
+          },
+          "edit_new": {
+            "samples": 800,
+            "min_ns": 701935,
+            "p50_ns": 778631,
+            "p95_ns": 884957,
+            "p99_ns": 976192,
+            "max_ns": 1248827,
+            "mean_ns": 789501.095
+          },
+          "edit_replacement": {
+            "samples": 800,
+            "min_ns": 7082884,
+            "p50_ns": 7469835,
+            "p95_ns": 8048261,
+            "p99_ns": 8692016,
+            "max_ns": 11380305,
+            "mean_ns": 7544358.13625
+          },
+          "edit_authoring": {
+            "samples": 800,
+            "min_ns": 7836400,
+            "p50_ns": 8261469,
+            "p95_ns": 8877791,
+            "p99_ns": 9545571,
+            "max_ns": 12293010,
+            "mean_ns": 8333859.23125
+          },
+          "edit_finish": {
+            "samples": 800,
+            "min_ns": 488471,
+            "p50_ns": 576428,
+            "p95_ns": 663983,
+            "p99_ns": 718318,
+            "max_ns": 839585,
+            "mean_ns": 581848.52625
+          },
+          "edit_final_owner": {
+            "samples": 800,
+            "min_ns": 726810,
+            "p50_ns": 798328,
+            "p95_ns": 885888,
+            "p99_ns": 953742,
+            "max_ns": 1149311,
+            "mean_ns": 805724.59125
+          },
+          "edit_final_public": {
+            "samples": 800,
+            "min_ns": 8658290,
+            "p50_ns": 9229416,
+            "p95_ns": 9922760,
+            "p99_ns": 10495997,
+            "max_ns": 14161101,
+            "mean_ns": 9300975.94875
+          },
+          "edit_final_retain": {
+            "samples": 800,
+            "min_ns": 2717919,
+            "p50_ns": 3157643,
+            "p95_ns": 3405705,
+            "p99_ns": 3601063,
+            "max_ns": 4112488,
+            "mean_ns": 3155853.7875
+          },
+          "edit_patch": {
+            "samples": 800,
+            "min_ns": 8327987,
+            "p50_ns": 8413069,
+            "p95_ns": 8601543,
+            "p99_ns": 8896618,
+            "max_ns": 9325618,
+            "mean_ns": 8440664.9675
+          },
+          "edit_commit_outer": {
+            "samples": 800,
+            "min_ns": 21345344,
+            "p50_ns": 22188827,
+            "p95_ns": 23183521,
+            "p99_ns": 23960370,
+            "max_ns": 27974063,
+            "mean_ns": 22292209.145
+          },
+          "edit_output_materialization": {
+            "samples": 800,
+            "min_ns": 980509,
+            "p50_ns": 1149436,
+            "p95_ns": 1278257,
+            "p99_ns": 1384505,
+            "max_ns": 1677107,
+            "mean_ns": 1155110.30125
+          },
+          "edit_total": {
+            "samples": 800,
+            "min_ns": 30379723,
+            "p50_ns": 31607500,
+            "p95_ns": 33316321,
+            "p99_ns": 34604592,
+            "max_ns": 38824046,
+            "mean_ns": 31781178.6775
+          },
+          "attributed_total": {
+            "samples": 800,
+            "min_ns": 42542996,
+            "p50_ns": 44207765,
+            "p95_ns": 46690416,
+            "p99_ns": 49805324,
+            "max_ns": 80705120,
+            "mean_ns": 44471794.46875
+          },
+          "measured_total": {
+            "samples": 800,
+            "min_ns": 42562170,
+            "p50_ns": 44227025,
+            "p95_ns": 46711777,
+            "p99_ns": 49826781,
+            "max_ns": 80727510,
+            "mean_ns": 44489989.22375
+          },
+          "unattributed": {
+            "samples": 800,
+            "min_ns": 12076,
+            "p50_ns": 17774,
+            "p95_ns": 22321,
+            "p99_ns": 30452,
+            "max_ns": 47484,
+            "mean_ns": 18194.755
+          },
+          "complete_public_reader_validation": {
+            "samples": 800,
+            "min_ns": 19815537,
+            "p50_ns": 20721135,
+            "p95_ns": 22116625,
+            "p99_ns": 23639619,
+            "max_ns": 54576876,
+            "mean_ns": 20901851.7225
+          },
+          "strict_owner_validation": {
+            "samples": 800,
+            "min_ns": 1439209,
+            "p50_ns": 1628771,
+            "p95_ns": 1832672,
+            "p99_ns": 1942581,
+            "max_ns": 3489622,
+            "mean_ns": 1643243.7275
+          },
+          "exact_source_retention": {
+            "samples": 800,
+            "min_ns": 2970006,
+            "p50_ns": 3415974,
+            "p95_ns": 3682376,
+            "p99_ns": 3875281,
+            "max_ns": 4366988,
+            "mean_ns": 3415215.9925
+          }
+        },
+        "phase_share_percent": {
+          "complete_public_reader_validation": {
+            "samples": 800,
+            "min_percent": 44.722552124792635,
+            "p50_percent": 46.83017794654008,
+            "p95_percent": 48.06514196059162,
+            "p99_percent": 49.22835528484162,
+            "max_percent": 67.60629183285846,
+            "mean_percent": 46.95423907017959
+          },
+          "edit_patch": {
+            "samples": 800,
+            "min_percent": 10.642404305545904,
+            "p50_percent": 19.061744563166485,
+            "p95_percent": 19.530542688655288,
+            "p99_percent": 19.815736976550813,
+            "max_percent": 20.2306174987124,
+            "mean_percent": 18.991239530872086
+          },
+          "edit_replacement": {
+            "samples": 800,
+            "min_percent": 9.54980030970855,
+            "p50_percent": 16.90498958466566,
+            "p95_percent": 17.755433748630047,
+            "p99_percent": 18.387757305812432,
+            "max_percent": 20.092089571453926,
+            "mean_percent": 16.962191861774368
+          }
+        }
+      },
+      "same_implementation_spread": {
+        "lifecycle_p50": {
+          "min": 44080394,
+          "max": 44430800,
+          "percent_of_min": 0.7949248366518684,
+          "review_trigger_above_5_percent": false
+        },
+        "lifecycle_mean": {
+          "min": 44168957.96,
+          "max": 44688488.84,
+          "percent_of_min": 1.1762353109405406,
+          "review_trigger_above_5_percent": false
+        },
+        "complete_public_reader_validation_p50": {
+          "min": 20688370,
+          "max": 20834785,
+          "percent_of_min": 0.7077164609875016,
+          "review_trigger_above_5_percent": false
+        },
+        "complete_public_reader_validation_mean": {
+          "min": 20832876.27,
+          "max": 21010776.105,
+          "percent_of_min": 0.853937942578684,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_patch_p50": {
+          "min": 8398727,
+          "max": 8434222,
+          "percent_of_min": 0.4226235714055237,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_patch_mean": {
+          "min": 8431263.825,
+          "max": 8451564.105,
+          "percent_of_min": 0.24077386761173014,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_replacement_p50": {
+          "min": 7413879,
+          "max": 7539721,
+          "percent_of_min": 1.6973840549596237,
+          "review_trigger_above_5_percent": false
+        },
+        "edit_replacement_mean": {
+          "min": 7451163.245,
+          "max": 7624108.785,
+          "percent_of_min": 2.3210542342640625,
+          "review_trigger_above_5_percent": false
+        }
+      },
+      "all_gates_true": true
+    }
+  ]
+}
