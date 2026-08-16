@@ -178,7 +178,7 @@ misses the direct handoff. These are logical positional-source events and
 their scheduling patterns, not physical read, syscall, device, or storage
 traffic counts.
 
-Summing the recorded `logical_read_calls` across the four overlap selectors
+Summing the recorded `logical_read_calls` across the four concurrent records
 and both control legs gives 8,000 calls; the two candidate legs give 6,473,
 19.09% fewer. Per candidate leg and shape/target cell, the reduction spans
 9.2% to 28.7%. This is an accepted source-event accounting result for this
@@ -247,7 +247,7 @@ RSS, peak-memory, or whole-reader bounded-memory claim.
 
 The [machine-readable summary](../results/cfb-singleflight-abba-0152-summary.json)
 has SHA-256
-`83acb616e6de05b119b0e52fc39ed9eb669171519a1a0779d7d0f1b84877cc36`.
+`2b112ec9cc6ca7c6ebd15bf0c67b8ea9546ad46c537f1f7fc6d985a095165da5`.
 The complete final raw reports are retained as:
 
 - [A1 control](../results/cfb-singleflight-a1-control-0152.json.zst),

@@ -559,7 +559,7 @@
     "accepted": [
       "Across all 48,000 retained samples, the selected CFB target payloads preserve output hashes, exact returned lengths, source-version checks, and typed-refusal invariants.",
       "The candidate concurrent same-target logical source vectors are D or D,D, while control permits D,D or C,D/D,C; non-concurrent one-shot, repeat, different-SID, and bulk formulas remain D, D...; D,C,E; and C respectively.",
-      "Across the eight concurrent records per ABBA direction, pooled logical source calls are 8,000 control versus 6,473 candidate: 1,527 fewer calls, a 19.09% reduction."
+      "Across four concurrent records per leg and 500 samples per record, pooled across the A1/A2 control and B1/B2 candidate legs, logical source calls are 8,000 control versus 6,473 candidate: 1,527 fewer calls, a 19.09% reduction."
     ],
     "withheld": [
       "No local elapsed, open, operation, or source-total latency improvement claim: paired ABBA timing contains greater-than-5-percent regressions and same-implementation drift in the retained matrix.",
@@ -24181,7 +24181,7 @@
     }
   ],
   "source_event_call_totals": {
-    "scope": "eight concurrent records per leg × 500 samples; pooled ABBA directions",
+    "scope": "four concurrent records per leg × 500 samples; pooled across A1/A2 control and B1/B2 candidate legs",
     "control_logical_calls": 8000,
     "candidate_logical_calls": 6473,
     "fewer_calls": 1527,
