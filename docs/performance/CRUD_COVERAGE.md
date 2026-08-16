@@ -1,8 +1,8 @@
 # Performance CRUD coverage
 
-Date: 2026-08-16
+Date: 2026-08-17
 
-This is a coverage map, not a completion claim. It compares the 305 selectable
+This is a coverage map, not a completion claim. It compares the 309 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -119,9 +119,11 @@ conversion for other formats remain.
    selectors cover one cell, `ceil(1%)`, and exact-256 set publication over
    deterministic media-rich multi-sheet corpora; change 0096 accepts the
    source-backed provenance-reuse result without an eager, I/O, allocation or
-   RSS claim. Scalar-cell clear/physical-remove and row visibility remain
-   source-backed correctness coverage, while conditional-formatting replacement
-   is selectable without an ABBA claim and tab visibility remains unmeasured.
+   RSS claim. Scalar-cell clear/physical-remove now have selectable
+   phase/counter/correctness evidence (change 0163), while row visibility
+   remains source-backed correctness coverage; no durable-source-patch or
+   performance claim is made. Conditional-formatting replacement is selectable
+   without an ABBA claim and tab visibility remains unmeasured.
    Direct writer-local action regrouping was measured and rejected
    in change 0030; broader coverage must not present that immaterial prototype
    as a solution.
@@ -1135,7 +1137,7 @@ matrix was unchanged; change 0153 adds four RTF selectors measured at the
 pre-staged publication-call interval,
 making that matrix 295. Change 0154 adds six ODF content-COW publication
 selectors, making that matrix 301; change 0159 made it 302, change 0160 made
-it 303, and change 0162 makes it 305. Only `cfg(test)` source-event acceptance and
+it 303, change 0162 made it 305, and change 0163 makes it 309. Only `cfg(test)` source-event acceptance and
 tests changed in 0152. This is
 source-event/correctness evidence only. Root MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain; local or
@@ -1199,11 +1201,24 @@ PNG/JPEG corpus per tiny/medium/large shape, an independent exact source splice,
 and complete semantic/no-op/volatile-patch/durable-patch/stale/foreign/refusal/
 partial-sink gates. Replacement preserves mixed-case hexadecimal transport,
 whitespace and at least one unselected group; removal preserves every retained
-group and surrounding byte exactly. The harness now has 305 selectable names;
+group and surrounding byte exactly. At change 0162 the harness had 305
+selectable names;
 the historical default remains 36 cases / 198 records. This is not insertion,
 image rendering, compressed/binary/nested/shape picture support, real-producer
 coverage or a release performance result. See
 [`0162`](changes/0162-rtf-picture-crud-evidence.md).
+
+Change 0163 adds four opt-in XLSX eager/source-backed scalar-cell clear/remove
+selectors over the existing medium and dense/sparse numeric four-sheet corpus.
+They target one existing `Sheet1!A1` owner: clear retains an empty `<c>` owner,
+while remove deletes it. Open, planning/staging, commit, sequential
+publication, lifecycle, generic logical source/materialization counters, and
+source raw-unselected preservation are recorded in their narrow scopes. The
+default remains 36 cases / 198 records; the matrix now has 309 selectable names.
+This is debug correctness/phase/counter evidence only, with no latency,
+allocation/RSS, physical-I/O, cold-cache, decompression, durable-source-patch,
+or real-producer claim. See
+[`0163`](changes/0163-xlsx-cell-clear-remove-evidence.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

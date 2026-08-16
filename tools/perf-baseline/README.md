@@ -3,7 +3,8 @@
 `litchi-perf-baseline` is an isolated, reproducible measurement tool for the
 ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, matched opt-in XLSX scalar-cell
-eager/source-backed and managed source-backed publication controls, and opt-in DOC/XLS/PPT,
+eager/source-backed and managed source-backed publication controls, one-cell
+eager/source-backed clear/remove lifecycle controls, and opt-in DOC/XLS/PPT,
 DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including the opt-in RTF logical-tail
 append transaction, bounded RTF/XLS/DOCX/PPTX/ODF validation reports, and a
 source-backed DOCX section inventory. It creates every corpus in memory; it also exercises
@@ -59,7 +60,8 @@ two matched XLSX sheet-protection publication cases,
 two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
-two XLSX merge/unmerge commit-plus-save cases, six matched eager/source-backed
+two XLSX merge/unmerge commit-plus-save cases, four matched eager/source-backed
+XLSX scalar-cell clear/remove lifecycle cases, six matched eager/source-backed
 XLSX scalar-cell publication cases (one cell, `ceil(1%)`, and the exact 256-cell
 bound), one bounded unmanaged source-backed two-worksheet case, and four
 managed source-backed scalar-cell cases (one cell, `ceil(1%)`, exact 256, and
@@ -80,9 +82,10 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 305
+provide their source-read counters. The current `Case` matrix exposes 309
 selectable case names in total, including two opt-in RTF standalone-picture
-CRUD selectors. Eight additional
+CRUD selectors and four opt-in XLSX scalar-cell clear/remove lifecycle
+selectors. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
@@ -277,7 +280,7 @@ accepted only as source-event/correctness evidence. At the 0152 revision the
 measured at the pre-staged publication-call interval, making that matrix 295.
 Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
 matrix 301 at that revision; change 0159 made it 302, change 0160 made it 303,
-and change 0162 makes it 305. No runtime selector was added
+change 0162 made it 305, and change 0163 makes it 309. No runtime selector was added
 to 0152; only `cfg(test)` source-event acceptance and tests changed. Root
 MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain. Local or
@@ -431,6 +434,37 @@ output and preserves the source version. Declared `Work` remains separate
 from decompressed/read bytes. The tranche does not claim allocations, RSS/
 peak memory, hardware/CPU pinning, cold I/O, decompression, or real-producer
 breadth.
+
+Measure the matched one-cell XLSX clear/remove lifecycle controls on the same
+media-rich four-sheet corpora:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 \
+  --case xlsx_eager_cell_clear_edit_save,\
+xlsx_source_backed_cell_clear_edit_save,\
+xlsx_eager_cell_remove_edit_save,\
+xlsx_source_backed_cell_remove_edit_save \
+  --xlsx-cell-crud-shape medium,dense-sparse \
+  --json target/perf/xlsx-cell-lifecycle-crud.json
+```
+
+Each selector targets one existing numeric owner from the deterministic
+medium or dense/sparse inventory. `clear` retains an empty owner while
+`remove` deletes that owner; neither selector claims formula, rich metadata,
+missing-cell, or third-party-producer parity. Eager controls use the public
+`WorksheetEdit` API; source-backed controls use the positional value editor.
+Open, selector planning/staging, commit, and publication are reported as
+separate phase vectors. Timed publication uses a fixed-memory SHA-256 sink
+with zero retained output. Complete semantic/reopen, package/raw-member,
+exact-hash, and sink gates run outside the timed samples. The shared
+source-backed lifecycle preflight supplies exact no-op, clear/remove owner,
+volatile-patch, and stale-source gates; eager controls retain their own
+semantic/package checks. Source-backed results report generic positional
+`ReadAt` calls/bytes and successful cached OPC payload materializations; the
+source-backed clear/remove pair is correctness/counter evidence only, with no
+durable-patch, allocation, RSS, physical-I/O, cold-cache, decompression, or
+speedup claim.
 
 Measure the opt-in OPC source-cache Budget boundary and controlled contention
 matrix on one fixed many-small incompressible corpus:
@@ -1731,6 +1765,18 @@ to 303 names without changing the default 36 cases / 198 records.
   semantics, unrelated-cell retention, exact durable patch apply/inverse, and
   stale-source refusal are checked outside timing. These cases make no latency
   claim without controlled ABBA evidence.
+- `xlsx_{eager,source_backed}_cell_{clear,remove}_edit_save`: on the fixed
+  media-rich four-sheet scalar corpus, clear or remove one existing numeric
+  owner. Eager controls use `WorksheetEdit`; source-backed controls use the
+  positional value editor. The timed interval records open, selector
+  planning/staging, commit, and publication separately, with a fixed-memory
+  zero-retained SHA-256 sink. Reopen, semantic owner/value state, package and
+  source raw-member preservation, exact hashes, and sink gates are preflight or
+  postflight checks. The source-backed lifecycle preflight additionally checks
+  exact no-op, volatile patch, and stale-source behavior. These are
+  correctness/counter selectors only and do not claim durable source patches,
+  formula/metadata/third-party-producer parity, allocation/RSS, physical I/O,
+  cold-cache behavior, decompression, or speedup.
 - `cfb_open`: parse the complete generated container into `litchi_cfb::OleFile`.
 - `cfb_list_streams`: enumerate and materialize all stream paths from an
   already-open CFB container.
@@ -2098,7 +2144,7 @@ bandwidth, and maximum physical range. `configuration.execution_workers`
 records the resolved, capped, deduplicated scaling points in deterministic
 ascending order.
 
-The twenty-three positional cases add a `source` object; older cases omit it. Its
+The twenty-seven positional cases add a `source` object; older cases omit it. Its
 arrays contain one value for every measured iteration and record `read_calls`,
 `read_bytes`, compressed ordinary-OPC-payload range overlap, and
 `max_in_flight_reads`. Applicable OPC cases also record a semantic per-sample
@@ -2171,12 +2217,13 @@ and compressed-range overlap vectors are named
 `selected_media_read_compressed_range_overlap_bytes`. Source open and
 one-slide query vectors remain separate from that explicit media-read replay.
 
-Positional XLSX records additionally contain `source.xlsx` arrays for physical
+Positional XLSX query records additionally contain `source.xlsx` arrays for physical
 overlap with the workbook, selected worksheet, all unselected worksheets,
 shared strings, and styles compressed member ranges. These overlap counters
 are intentionally truthful about ZIP read amplification and therefore are not
-semantic materialization counters. No XLSX materialization count is emitted,
-because the production API does not directly expose one. Instead, each case
+semantic materialization counters. Those query cases emit no XLSX
+materialization count because their production APIs do not directly expose
+one. Instead, each case
 enforces its semantic deferral claim with a fresh post-timing worksheet access
 that must add I/O for that worksheet's exact compressed member range.
 
@@ -2320,6 +2367,16 @@ eager/source-backed materialization counts are twelve and three, respectively,
 because both controls validate the styles relationship needed by authored
 color/DXF filters and sorts; their complete typed readback and output hashes
 are required to match.
+
+The four XLSX scalar-cell clear/remove lifecycle selectors expose the same
+`source.xlsx_cell_values` phase vectors as the existing scalar-cell controls:
+`open_ns`, `plan_ns`, `commit_ns`, `publication_ns`, and `reopen_ns`, plus
+exact output and semantic hashes. Eager records intentionally report zero
+source reads/materializations; source-backed records report generic positional
+`ReadAt` calls/bytes and successful cached OPC payload materializations. The clear
+semantic hash requires the target owner to remain with an empty payload, while
+the remove hash requires that owner to be absent and all other numeric owners
+unchanged. Their publication sink reports `retained_output_bytes: 0`.
 
 ### Native DOC owner/public phase evidence
 
