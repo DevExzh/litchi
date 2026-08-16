@@ -2,11 +2,14 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0151`](changes/0151-xlsx-managed-source-editors.md)
-(0151 is a production managed-XLSX correctness/resource freeze and adds no
-performance result; the latest accepted performance result remains the
-configured-simulator CFB repeat evidence in
-[`change 0149`](changes/0149-cfb-same-target-repeat-release-abba.md)).
+Evidence through: [`change 0152`](changes/0152-cfb-same-target-singleflight-release-abba.md)
+(0152 is a final clean release ABBA for same-target MiniFAT single-flight;
+all correctness/source-event invariants passed and the existing concurrent
+scenarios recorded 6,473 versus 8,000 logical source calls, but only that
+source-event/correctness scope is accepted. Change 0151 is a production
+managed-XLSX correctness/resource freeze and adds no performance result; the
+latest accepted timing result remains the configured-simulator CFB repeat
+evidence in [`change 0149`](changes/0149-cfb-same-target-repeat-release-abba.md)).
 (the newest accepted semantic-format optimization remains limited to four repeated
 source-backed ODP full-text projections; the latest release CFB selective-range
 evidence is the configured simulator result in
@@ -771,6 +774,20 @@ Confirmed source facts:
   concurrent, allocation/RSS, physical-I/O, and native-format claims remain
   withheld. See
   [`0149`](changes/0149-cfb-same-target-repeat-release-abba.md).
+- Change 0152 compares the final same-target MiniFAT single-flight revision
+  (`c270c8f3b` plus `f46381c6f`) with clean control `e486e4b1` in a CPU-2
+  release ABBA: 20 warmups and 500 samples across 24 records per leg (48,000
+  retained samples). All correctness/source-event invariants passed; existing
+  concurrent scenarios recorded 6,473 candidate versus 8,000 control logical
+  source calls (19.09% fewer). Only this source-event/correctness scope is
+  accepted. The 291-name matrix is unchanged: no runtime selector was added;
+  only `cfg(test)` source-event acceptance and tests changed. Root
+  MiniStream cache and resource-accounting boundaries, broader performance
+  gaps, and local/generic latency, allocation/RSS/peak-memory, physical
+  I/O/syscall, cold-cache/device/network, decompression, native semantic,
+  OOXML/ODF/RTF/iWork claims remain outside scope. See the
+  [`0152` release record](changes/0152-cfb-same-target-singleflight-release-abba.md)
+  and [summary](results/cfb-singleflight-abba-0152-summary.json).
 - Change 0126 adds eight ordinary-root DOCX filesystem selectors over the
   unchanged 200-paragraph/eight-incompressible-2 MiB-media corpus. The eager
   control times `fs::read` plus `Document::from_bytes`; the source control

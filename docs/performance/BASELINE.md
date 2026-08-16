@@ -370,6 +370,26 @@ the [release record](changes/0149-cfb-same-target-repeat-release-abba.md),
 [summary](results/cfb-repeat-abba-0149-summary.json), and retained compressed
 raw legs.
 
+## CFB same-target MiniFAT single-flight release ABBA (change 0152)
+
+The final same-target MiniFAT single-flight revision `f46381c6f` (introduced by
+`c270c8f3b`) was compared with clean control `e486e4b1` in strict CPU-2
+`A1 control, B1 candidate, B2 candidate, A2 control` order. Each leg used 20
+warmups and 500 samples across 24 records, retaining 48,000 samples. All
+correctness and logical source-event invariants passed. In the existing
+concurrent scenarios, the candidate recorded 6,473 logical source calls versus
+8,000 for control, a 19.09% reduction.
+
+This accepts only the named source-event/correctness result. The existing
+291-name selector matrix is unchanged: no runtime selector was added; only
+`cfg(test)` source-event acceptance and tests changed. Local or generic
+latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
+network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
+claims are withheld. The root MiniStream cache and resource-accounting
+boundaries remain, as do broader performance gaps. See the
+[change record](changes/0152-cfb-same-target-singleflight-release-abba.md) and
+[machine-readable summary](results/cfb-singleflight-abba-0152-summary.json).
+
 ## CFB MiniFAT physical-run boundary evidence (change 0125)
 
 The current harness adds a matched 4095-byte MiniFAT boundary pair over the
