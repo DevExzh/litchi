@@ -33,8 +33,8 @@ use litchi_cfb::{
     OleError, OleFile, OleWriter, SharedOleBulkError, SharedOleFile, SharedOleFileLimits,
 };
 use litchi_core::{
-    Budget, CancellationSource, CheckStatus, ExecutionContext, ExecutionError, ExecutionLimits,
-    Limits, ReadAt, SourceVersion, ValidateReport,
+    Budget, CancellationSource, CancellationToken, CheckStatus, ExecutionContext, ExecutionError,
+    ExecutionLimits, Limits, ReadAt, SourceVersion, ValidateReport,
 };
 use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
@@ -294,6 +294,10 @@ impl RtfSemanticVariant {
                     | Case::RtfSemanticMoveParagraphSave
                     | Case::RtfLogicalTailAppend
                     | Case::RtfLogicalTailNoopSave
+                    | Case::RtfLogicalTailCommitAppend
+                    | Case::RtfLogicalTailPlanAppend
+                    | Case::RtfLogicalTailCommitNoopSave
+                    | Case::RtfLogicalTailPlanNoopSave
             ) || matches!(self, Self::Plain))
             && (!matches!(case, Case::RtfSemanticTextToSink) || !matches!(self, Self::Watermark))
     }
@@ -745,6 +749,10 @@ enum Case {
     RtfSemanticMoveParagraphSave,
     RtfLogicalTailAppend,
     RtfLogicalTailNoopSave,
+    RtfLogicalTailCommitAppend,
+    RtfLogicalTailPlanAppend,
+    RtfLogicalTailCommitNoopSave,
+    RtfLogicalTailPlanNoopSave,
     RtfValidationReport,
     RtfStreamingCreate,
     DocxSemanticOpen,
@@ -1152,6 +1160,10 @@ impl Case {
             Self::RtfSemanticMoveParagraphSave => "rtf_semantic_move_paragraph_save",
             Self::RtfLogicalTailAppend => "rtf_logical_tail_append",
             Self::RtfLogicalTailNoopSave => "rtf_logical_tail_noop_save",
+            Self::RtfLogicalTailCommitAppend => "rtf_logical_tail_commit_append",
+            Self::RtfLogicalTailPlanAppend => "rtf_logical_tail_plan_append",
+            Self::RtfLogicalTailCommitNoopSave => "rtf_logical_tail_commit_noop_save",
+            Self::RtfLogicalTailPlanNoopSave => "rtf_logical_tail_plan_noop_save",
             Self::RtfValidationReport => "rtf_validation_report",
             Self::RtfStreamingCreate => "rtf_streaming_create",
             Self::DocxSemanticOpen => "docx_semantic_open",
@@ -1469,6 +1481,10 @@ impl Case {
                 | Self::RtfSemanticMoveParagraphSave
                 | Self::RtfLogicalTailAppend
                 | Self::RtfLogicalTailNoopSave
+                | Self::RtfLogicalTailCommitAppend
+                | Self::RtfLogicalTailPlanAppend
+                | Self::RtfLogicalTailCommitNoopSave
+                | Self::RtfLogicalTailPlanNoopSave
         )
     }
 
@@ -1482,7 +1498,12 @@ impl Case {
     const fn is_rtf_logical_tail(self) -> bool {
         matches!(
             self,
-            Self::RtfLogicalTailAppend | Self::RtfLogicalTailNoopSave
+            Self::RtfLogicalTailAppend
+                | Self::RtfLogicalTailNoopSave
+                | Self::RtfLogicalTailCommitAppend
+                | Self::RtfLogicalTailPlanAppend
+                | Self::RtfLogicalTailCommitNoopSave
+                | Self::RtfLogicalTailPlanNoopSave
         )
     }
 
@@ -2504,6 +2525,35 @@ struct SourceSummary {
     ods_cell_sweep: Option<OdsCellSweepSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_cell_batch_sweep: Option<OdsCellBatchSweepSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rtf_tail_publication: Option<RtfTailPublicationSummary>,
+}
+
+/// Separate phase evidence for the matched existing-document RTF tail
+/// publication controls. Only `publication_ns` is the selector's timed
+/// interval. `planning_ns` and `publication_ns` have one entry per retained
+/// sample; `reopen_ns` and `lifecycle_ns` are one-element preflight-only
+/// vectors. The expensive correctness gates are intentionally collected once
+/// outside the sample loop rather than repeated for every sample, so those
+/// vectors do not have per-sample cardinality.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct RtfTailPublicationSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    planning_scope: &'static str,
+    publication_scope: &'static str,
+    reopen_scope: &'static str,
+    lifecycle_scope: &'static str,
+    publication_boundary: &'static str,
+    performance_claim: &'static str,
+    source_retained_bytes: u64,
+    candidate_retained_bytes: u64,
+    publication_window_bytes: u64,
+    planning_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    reopen_ns: Vec<u64>,
+    lifecycle_ns: Vec<u64>,
+    expected_output_sha256: String,
 }
 
 /// Positional-read evidence for the native PPT lazy `Pictures` selectors.
@@ -3848,8 +3898,12 @@ impl SinkSummary {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 struct RtfTailAppendSummary {
+    implementation: &'static str,
+    publication_boundary: &'static str,
     operation: &'static str,
     source_bytes: u64,
+    source_retained_bytes: u64,
+    candidate_retained_bytes: u64,
     input_bytes: u64,
     inserted_bytes: u64,
     output_bytes: u64,
@@ -4125,6 +4179,101 @@ impl Write for WindowedHashingSink {
 
         self.summary.commit_write(prepared);
         self.digest.update(window);
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// A fixed-window, non-retaining sink for the timed RTF publication interval.
+/// Digesting and semantic verification run separately after publication so the
+/// timed control/candidate boundary contains only sink acceptance and the
+/// public publication operation.
+#[derive(Debug)]
+struct WindowedCountingSink {
+    summary: SinkSummary,
+    maximum: u64,
+    window: usize,
+}
+
+impl WindowedCountingSink {
+    fn new(maximum: u64, window: usize) -> io::Result<Self> {
+        if window == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "logical-tail sink window must be non-zero",
+            ));
+        }
+        Ok(Self {
+            summary: SinkSummary {
+                retained_output_bytes: Some(0),
+                retained_authoring_window_bytes: Some(u64::try_from(window).map_err(|_error| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "logical-tail sink window does not fit u64",
+                    )
+                })?),
+                ..SinkSummary::default()
+            },
+            maximum,
+            window,
+        })
+    }
+
+    fn finish(self) -> SinkSummary {
+        self.summary
+    }
+}
+
+impl Write for WindowedCountingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let count = bytes.len().min(self.window);
+        let length = u64::try_from(count)
+            .map_err(|_error| io::Error::other("logical-tail write length does not fit u64"))?;
+        let window = bytes.get(..count).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "logical-tail sink window is outside the write buffer",
+            )
+        })?;
+        let prepared = self.summary.prepare_write(length)?;
+        if prepared.accepted_bytes > self.maximum {
+            return Err(io::Error::other("logical-tail output ceiling exceeded"));
+        }
+
+        std::hint::black_box(window);
+        self.summary.commit_write(prepared);
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Untimed failure-path sink used by the RTF publication-plan correctness
+/// gates.  It accepts a bounded prefix in short writes, then reports a typed
+/// broken-pipe failure so the plan's exact partial-progress contract is
+/// exercised without contaminating publication timing.
+#[derive(Debug)]
+struct RtfTailPublicationPartialSink {
+    remaining: usize,
+    accepted: usize,
+}
+
+impl Write for RtfTailPublicationPartialSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.remaining == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "RTF publication-plan test sink",
+            ));
+        }
+        let count = bytes.len().min(self.remaining).min(3);
+        self.remaining -= count;
+        self.accepted = self.accepted.saturating_add(count);
         Ok(count)
     }
 
@@ -6807,6 +6956,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "rtf_semantic_move_paragraph_save" => Some(Case::RtfSemanticMoveParagraphSave),
         "rtf_logical_tail_append" => Some(Case::RtfLogicalTailAppend),
         "rtf_logical_tail_noop_save" => Some(Case::RtfLogicalTailNoopSave),
+        "rtf_logical_tail_commit_append" => Some(Case::RtfLogicalTailCommitAppend),
+        "rtf_logical_tail_plan_append" => Some(Case::RtfLogicalTailPlanAppend),
+        "rtf_logical_tail_commit_noop_save" => Some(Case::RtfLogicalTailCommitNoopSave),
+        "rtf_logical_tail_plan_noop_save" => Some(Case::RtfLogicalTailPlanNoopSave),
         "rtf_validation_report" => Some(Case::RtfValidationReport),
         "rtf_streaming_create" => Some(Case::RtfStreamingCreate),
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
@@ -8479,10 +8632,15 @@ fn verify_rtf_logical_tail_projection(
             "RTF logical-tail reopen paragraph projection differs from specification".into(),
         );
     }
-    let mut expected_text = expected.join("\n");
-    if !expected.is_empty() {
-        expected_text.push('\n');
-    }
+    let expected_text = if appended.is_empty() {
+        source.text().to_owned()
+    } else {
+        let mut text = expected.join("\n");
+        if !expected.is_empty() {
+            text.push('\n');
+        }
+        text
+    };
     if document.text() != expected_text {
         return Err("RTF logical-tail reopen text differs from specification".into());
     }
@@ -8513,7 +8671,7 @@ fn verify_rtf_logical_tail_gates(
 
     let mut published = Vec::new();
     changed.write_to(&mut published, limits)?;
-    if published != expected {
+    if published != expected || sha256_hex(&published) != sha256_hex(expected) {
         return Err("RTF logical-tail sequential publication differs from candidate".into());
     }
     verify_rtf_logical_tail_projection(
@@ -8569,6 +8727,19 @@ fn verify_rtf_logical_tail_gates(
         Err(litchi_rtf::TailAppendError::PatchConflict)
     ) {
         return Err("RTF logical-tail source-conflict gate accepted a foreign source".into());
+    }
+
+    let mut stale_edit = source.edit();
+    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
+    let stale = stale_edit.commit()?.into_snapshot();
+    if !matches!(
+        changed.patch().apply(&stale),
+        Err(litchi_rtf::TailAppendError::PatchConflict)
+    ) || !matches!(
+        decoded.apply(&stale),
+        Err(litchi_rtf::TailAppendError::PatchConflict)
+    ) {
+        return Err("RTF logical-tail stale-source gate accepted a changed source".into());
     }
     Ok(())
 }
@@ -12193,6 +12364,12 @@ fn run_case_with_config(
         Case::RtfValidationReport => run_rtf_validation_report(corpus, warmup_iterations, samples),
         Case::RtfLogicalTailAppend | Case::RtfLogicalTailNoopSave => {
             run_rtf_logical_tail_append(case, corpus, warmup_iterations, samples)
+        },
+        Case::RtfLogicalTailCommitAppend
+        | Case::RtfLogicalTailPlanAppend
+        | Case::RtfLogicalTailCommitNoopSave
+        | Case::RtfLogicalTailPlanNoopSave => {
+            run_rtf_logical_tail_publication(case, corpus, warmup_iterations, samples)
         },
         Case::DocxSemanticOpen
         | Case::DocxSemanticListParagraphs
@@ -16172,12 +16349,20 @@ fn run_rtf_logical_tail_append(
             return Err("RTF logical-tail sink digest differs from expected output".into());
         }
         summary.rtf_tail_append = Some(RtfTailAppendSummary {
+            implementation: "tail_append_commit",
+            publication_boundary: "historical TailAppendCommit append/no-op save; staging and commit remain inside the timed interval",
             operation: if case == Case::RtfLogicalTailAppend {
                 "append"
             } else {
                 "exact_noop"
             },
             source_bytes,
+            source_retained_bytes: source_bytes,
+            candidate_retained_bytes: if case == Case::RtfLogicalTailAppend {
+                expected_written
+            } else {
+                0
+            },
             input_bytes: if case == Case::RtfLogicalTailAppend {
                 u64::try_from(input_bytes)?
             } else {
@@ -16225,6 +16410,560 @@ fn run_rtf_logical_tail_append(
     } else {
         corpus.manifest.archive_sha256.clone()
     });
+    Ok(result)
+}
+
+enum RtfTailPrepared {
+    Commit(litchi_rtf::TailAppendCommit),
+    Plan {
+        plan: litchi_rtf::TailAppendPublicationPlan,
+        context: ExecutionContext,
+    },
+}
+
+fn rtf_tail_publication_parameters(
+    case: Case,
+) -> Result<(&'static str, bool, bool), Box<dyn Error>> {
+    match case {
+        Case::RtfLogicalTailCommitAppend => Ok(("tail_append_commit", true, false)),
+        Case::RtfLogicalTailPlanAppend => Ok(("tail_append_publication_plan", true, true)),
+        Case::RtfLogicalTailCommitNoopSave => Ok(("tail_append_commit", false, false)),
+        Case::RtfLogicalTailPlanNoopSave => Ok(("tail_append_publication_plan", false, true)),
+        _ => Err("non-publication RTF tail case passed to parameter resolver".into()),
+    }
+}
+
+fn rtf_tail_publication_context(
+    output_bytes: u64,
+    inserted_bytes: u64,
+) -> Result<ExecutionContext, Box<dyn Error>> {
+    let in_flight_bytes = output_bytes
+        .checked_add(inserted_bytes)
+        .ok_or("RTF publication context memory bound overflows u64")?
+        .max(1);
+    let limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).ok_or("RTF publication worker count is zero")?,
+        NonZeroUsize::new(1).ok_or("RTF publication task count is zero")?,
+        NonZeroU64::new(in_flight_bytes).ok_or("RTF publication byte bound is zero")?,
+        0,
+    )?;
+    let memory = in_flight_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("RTF publication memory budget overflows u64")?;
+    let input = output_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("RTF publication input budget overflows u64")?;
+    let work = output_bytes
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("RTF publication work budget overflows u64")?;
+    let (_cancellation, token) = CancellationSource::pair();
+    Ok(ExecutionContext::new(
+        Budget::root(
+            "litchi-perf-rtf-tail-publication",
+            Limits::new(memory, input, output_bytes.max(1), 1_024, 1_024, work),
+        ),
+        token,
+        limits,
+    ))
+}
+
+fn rtf_tail_publication_context_with_token(
+    output_bytes: u64,
+    inserted_bytes: u64,
+    cancellation: CancellationToken,
+) -> Result<ExecutionContext, Box<dyn Error>> {
+    let in_flight_bytes = output_bytes
+        .checked_add(inserted_bytes)
+        .ok_or("RTF publication context memory bound overflows u64")?
+        .max(1);
+    let limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).ok_or("RTF publication worker count is zero")?,
+        NonZeroUsize::new(1).ok_or("RTF publication task count is zero")?,
+        NonZeroU64::new(in_flight_bytes).ok_or("RTF publication byte bound is zero")?,
+        0,
+    )?;
+    let memory = in_flight_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("RTF publication memory budget overflows u64")?;
+    let input = output_bytes
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("RTF publication input budget overflows u64")?;
+    let work = output_bytes
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(64 * 1024))
+        .ok_or("RTF publication work budget overflows u64")?;
+    let budget = Budget::root(
+        "litchi-perf-rtf-tail-publication",
+        Limits::new(memory, input, output_bytes.max(1), 1_024, 1_024, work),
+    );
+    Ok(ExecutionContext::new(budget, cancellation, limits))
+}
+
+fn stage_rtf_tail_prepared(
+    source: &litchi_rtf::Document,
+    paragraphs: &[&str],
+    limits: litchi_rtf::TailAppendLimits,
+    publication_limits: litchi_rtf::TailAppendPublicationLimits,
+    plan_based: bool,
+    expected_output_bytes: u64,
+    inserted_bytes: u64,
+) -> Result<(RtfTailPrepared, u64), Box<dyn Error>> {
+    let started = Instant::now();
+    let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    edit.append_text_paragraphs(paragraphs)?;
+    let prepared = if plan_based {
+        let context = rtf_tail_publication_context(expected_output_bytes, inserted_bytes)?;
+        let plan = edit.publication_plan_with_limits_and_context(publication_limits, &context)?;
+        RtfTailPrepared::Plan { plan, context }
+    } else {
+        RtfTailPrepared::Commit(edit.commit()?)
+    };
+    Ok((prepared, elapsed_ns(started.elapsed())?))
+}
+
+fn publish_rtf_tail_prepared<W: Write>(
+    prepared: &RtfTailPrepared,
+    sink: &mut W,
+    limits: litchi_rtf::TailAppendLimits,
+) -> Result<usize, Box<dyn Error>> {
+    match prepared {
+        RtfTailPrepared::Commit(commit) => Ok(commit.write_to(sink, limits)?),
+        RtfTailPrepared::Plan { plan, context } => Ok(plan.write_to(sink, context)?.bytes()),
+    }
+}
+
+fn digest_rtf_tail_prepared(
+    prepared: &RtfTailPrepared,
+    sink: &mut WindowedHashingSink,
+    limits: litchi_rtf::TailAppendLimits,
+    output_bytes: u64,
+    inserted_bytes: u64,
+) -> Result<usize, Box<dyn Error>> {
+    match prepared {
+        RtfTailPrepared::Commit(commit) => Ok(commit.write_to(sink, limits)?),
+        RtfTailPrepared::Plan { plan, .. } => {
+            let context = rtf_tail_publication_context(output_bytes, inserted_bytes)?;
+            Ok(plan.write_to(sink, &context)?.bytes())
+        },
+    }
+}
+
+fn verify_rtf_tail_reopen_phase(
+    expected: &[u8],
+    source: &litchi_rtf::Document,
+    appended: &[String],
+) -> Result<u64, Box<dyn Error>> {
+    let started = Instant::now();
+    let reopened = litchi_rtf::Document::from_bytes(expected)?;
+    verify_rtf_logical_tail_projection(&reopened, source, appended)?;
+    if appended.is_empty() && reopened.to_bytes()? != source.to_bytes()? {
+        return Err("RTF publication-plan no-op reopen changed exact source bytes".into());
+    }
+    elapsed_ns(started.elapsed())
+}
+
+fn verify_rtf_tail_publication_plan_gates(
+    source: &litchi_rtf::Document,
+    plan: &litchi_rtf::TailAppendPublicationPlan,
+    expected: &[u8],
+    expected_digest: &str,
+    limits: litchi_rtf::TailAppendLimits,
+    publication_limits: litchi_rtf::TailAppendPublicationLimits,
+    appended: &[String],
+) -> Result<(), Box<dyn Error>> {
+    if !plan.source().same_snapshot(source) {
+        return Err("RTF publication plan did not retain the exact source snapshot".into());
+    }
+    if plan.is_noop() != appended.is_empty() || plan.output_bytes() != expected.len() {
+        return Err("RTF publication plan diagnostics differ from expected operation".into());
+    }
+
+    let context = rtf_tail_publication_context(
+        u64::try_from(expected.len())?,
+        u64::try_from(plan.inserted_bytes())?,
+    )?;
+    let mut published = Vec::new();
+    let report = plan.write_to(&mut published, &context)?;
+    if published != expected
+        || report.bytes() != expected.len()
+        || report.source_bytes() != source.to_bytes()?.len()
+        || report.inserted_bytes() != plan.inserted_bytes()
+        || sha256_hex(&published) != expected_digest
+    {
+        return Err("RTF publication plan output differs from the exact candidate".into());
+    }
+    verify_rtf_logical_tail_projection(
+        &litchi_rtf::Document::from_bytes(&published)?,
+        source,
+        appended,
+    )?;
+
+    let foreign = litchi_rtf::Document::from_bytes(&source.to_bytes()?)?;
+    let foreign_context = rtf_tail_publication_context(
+        u64::try_from(expected.len())?,
+        u64::try_from(plan.inserted_bytes())?,
+    )?;
+    let mut foreign_output = Vec::new();
+    if !matches!(
+        plan.write_to_source(&foreign, &mut foreign_output, &foreign_context),
+        Err(litchi_rtf::TailAppendPublicationError::SourceVersionChanged { .. })
+    ) || !foreign_output.is_empty()
+    {
+        return Err("RTF publication plan accepted a foreign source version".into());
+    }
+
+    let mut stale_edit = source.edit();
+    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-publication-stale")?;
+    let stale = stale_edit.commit()?.into_snapshot();
+    let stale_context = rtf_tail_publication_context(
+        u64::try_from(expected.len())?,
+        u64::try_from(plan.inserted_bytes())?,
+    )?;
+    let mut stale_output = Vec::new();
+    if !matches!(
+        plan.write_to_source(&stale, &mut stale_output, &stale_context),
+        Err(litchi_rtf::TailAppendPublicationError::SourceVersionChanged { .. })
+    ) || !stale_output.is_empty()
+    {
+        return Err("RTF publication plan accepted a stale source version".into());
+    }
+
+    let partial_limit = expected.len().saturating_sub(1).clamp(1, 7);
+    let partial_context = rtf_tail_publication_context(
+        u64::try_from(expected.len())?,
+        u64::try_from(plan.inserted_bytes())?,
+    )?;
+    let mut partial = RtfTailPublicationPartialSink {
+        remaining: partial_limit,
+        accepted: 0,
+    };
+    let partial_error = match plan.write_to(&mut partial, &partial_context) {
+        Ok(_) => {
+            return Err("RTF publication plan partial sink unexpectedly completed".into());
+        },
+        Err(error) => error,
+    };
+    if !matches!(
+        partial_error.progress(),
+        Some(litchi_rtf::TailAppendOutputProgress::Prefix { accepted, expected: total })
+            if accepted > 0 && accepted < total
+    ) || partial.accepted == 0
+    {
+        return Err("RTF publication plan lost exact partial sink progress".into());
+    }
+
+    let (cancellation_source, cancellation_token) = CancellationSource::pair();
+    let cancelled_context = rtf_tail_publication_context_with_token(
+        u64::try_from(expected.len())?,
+        u64::try_from(plan.inserted_bytes())?,
+        cancellation_token,
+    )?;
+    cancellation_source.cancel();
+    let mut cancelled_output = Vec::new();
+    if !matches!(
+        plan.write_to(&mut cancelled_output, &cancelled_context),
+        Err(litchi_rtf::TailAppendPublicationError::Execution {
+            error: ExecutionError::Cancelled,
+            written: 0,
+        })
+    ) || !cancelled_output.is_empty()
+    {
+        return Err("RTF publication plan did not honor pre-publication cancellation".into());
+    }
+
+    let mut bounded_limits = limits;
+    bounded_limits.max_output_bytes = expected.len().saturating_sub(1);
+    let mut bounded_edit =
+        source.tail_append_with_limits(litchi_rtf::TailSelector::Body, bounded_limits);
+    bounded_edit
+        .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
+    let bounded_context = rtf_tail_publication_context(
+        u64::try_from(expected.len())?,
+        u64::try_from(plan.inserted_bytes())?,
+    )?;
+    if !matches!(
+        bounded_edit
+            .publication_plan_with_limits_and_context(publication_limits, &bounded_context,),
+        Err(litchi_rtf::TailAppendPublicationError::Plan(
+            litchi_rtf::TailAppendError::LimitExceeded {
+                resource: "output bytes",
+                ..
+            }
+        ))
+    ) {
+        return Err("RTF publication plan did not enforce the output limit gate".into());
+    }
+
+    let mut invalid_edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    invalid_edit
+        .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
+    let invalid_context = rtf_tail_publication_context(
+        u64::try_from(expected.len())?,
+        u64::try_from(plan.inserted_bytes())?,
+    )?;
+    if !matches!(
+        invalid_edit.publication_plan_with_limits_and_context(
+            litchi_rtf::TailAppendPublicationLimits::new(0, 0),
+            &invalid_context,
+        ),
+        Err(litchi_rtf::TailAppendPublicationError::InvalidLimits(_))
+    ) {
+        return Err("RTF publication plan did not enforce publication-window limits".into());
+    }
+    Ok(())
+}
+
+fn verify_rtf_tail_publication_lifecycle(
+    source: &litchi_rtf::Document,
+    changed: &litchi_rtf::TailAppendCommit,
+    noop: &litchi_rtf::TailAppendCommit,
+    plan: &litchi_rtf::TailAppendPublicationPlan,
+    changed_appended: &[String],
+    plan_appended: &[String],
+    limits: litchi_rtf::TailAppendLimits,
+    publication_limits: litchi_rtf::TailAppendPublicationLimits,
+    changed_expected: &[u8],
+    expected: &[u8],
+    expected_digest: &str,
+) -> Result<u64, Box<dyn Error>> {
+    let started = Instant::now();
+    verify_rtf_logical_tail_gates(
+        source,
+        changed,
+        noop,
+        changed_appended,
+        limits,
+        changed_expected,
+    )?;
+    verify_rtf_tail_publication_plan_gates(
+        source,
+        plan,
+        expected,
+        expected_digest,
+        limits,
+        publication_limits,
+        plan_appended,
+    )?;
+    elapsed_ns(started.elapsed())
+}
+
+fn run_rtf_logical_tail_publication(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !matches!(semantic_rtf_variant(corpus)?, RtfSemanticVariant::Plain) {
+        return Err(
+            "RTF logical-tail publication cases require the plain uncompressed corpus".into(),
+        );
+    }
+    let (implementation, append, plan_based) = rtf_tail_publication_parameters(case)?;
+    let shape = semantic_shape(corpus)?;
+    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let changed_appended = (0..rtf_logical_tail_paragraph_count(shape))
+        .map(|index| rtf_logical_tail_text(shape, index))
+        .collect::<Vec<_>>();
+    let appended = if append {
+        changed_appended.clone()
+    } else {
+        Vec::new()
+    };
+    let changed_inputs = changed_appended
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let paragraph_inputs = appended.iter().map(String::as_str).collect::<Vec<_>>();
+    let changed_input_bytes = changed_appended.iter().try_fold(0usize, |total, text| {
+        total
+            .checked_add(text.len())
+            .ok_or("RTF logical-tail input byte count overflows usize")
+    })?;
+    let input_bytes = appended.iter().try_fold(0usize, |total, text| {
+        total
+            .checked_add(text.len())
+            .ok_or("RTF logical-tail operation input byte count overflows usize")
+    })?;
+    let limits = rtf_logical_tail_limits(
+        corpus.archive.len(),
+        changed_input_bytes,
+        changed_appended.len(),
+    )?;
+    let publication_limits = litchi_rtf::TailAppendPublicationLimits::new(
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+    );
+    let changed = stage_rtf_logical_tail(&source, &changed_inputs, limits)?;
+    let noop = {
+        let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        edit.commit()?
+    };
+    let expected_changed = changed.snapshot().to_bytes()?;
+    let expected_output = if append {
+        expected_changed.clone()
+    } else {
+        source.to_bytes()?
+    };
+    let expected_digest = sha256_hex(&expected_output);
+    let source_bytes = u64::try_from(corpus.archive.len())?;
+    let output_bytes = u64::try_from(expected_output.len())?;
+    let inserted_bytes = output_bytes
+        .checked_sub(source_bytes)
+        .ok_or("RTF publication output is smaller than its source")?;
+
+    let correctness_plan = {
+        let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        edit.append_text_paragraphs(&paragraph_inputs)?;
+        edit.publication_plan_with_limits(publication_limits)?
+    };
+    let lifecycle_duration = verify_rtf_tail_publication_lifecycle(
+        &source,
+        &changed,
+        &noop,
+        &correctness_plan,
+        &changed_appended,
+        &appended,
+        limits,
+        publication_limits,
+        &expected_changed,
+        &expected_output,
+        &expected_digest,
+    )?;
+    let reopen_duration = verify_rtf_tail_reopen_phase(&expected_output, &source, &appended)?;
+
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summaries = Vec::with_capacity(samples);
+    let mut planning_ns = Vec::with_capacity(samples);
+    let mut publication_ns = Vec::with_capacity(samples);
+    let reopen_ns = vec![reopen_duration];
+    let lifecycle_ns = vec![lifecycle_duration];
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (prepared, planning_duration) = stage_rtf_tail_prepared(
+            &source,
+            &paragraph_inputs,
+            limits,
+            publication_limits,
+            plan_based,
+            output_bytes,
+            inserted_bytes,
+        )?;
+        let mut sink = WindowedCountingSink::new(output_bytes, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?;
+        let started = Instant::now();
+        let written = publish_rtf_tail_prepared(&prepared, &mut sink, limits)?;
+        let publication_duration = started.elapsed();
+        let mut summary = sink.finish();
+        if u64::try_from(written)? != output_bytes || summary.accepted_bytes != output_bytes {
+            return Err(
+                "RTF matched tail publication output differs from the exact candidate".into(),
+            );
+        }
+        let mut digest_sink =
+            WindowedHashingSink::new(output_bytes, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?;
+        let digest_written = digest_rtf_tail_prepared(
+            &prepared,
+            &mut digest_sink,
+            limits,
+            output_bytes,
+            inserted_bytes,
+        )?;
+        let (digest_summary, digest) = digest_sink.finish();
+        if u64::try_from(digest_written)? != output_bytes
+            || digest_summary.accepted_bytes != output_bytes
+            || digest != expected_digest
+        {
+            return Err(
+                "RTF matched tail publication sample digest differs from the exact candidate"
+                    .into(),
+            );
+        }
+        let (operation, operation_input, operation_inserted, operation_paragraphs) = if append {
+            (
+                "append",
+                u64::try_from(input_bytes)?,
+                inserted_bytes,
+                u64::try_from(appended.len())?,
+            )
+        } else {
+            ("exact_noop", 0, 0, 0)
+        };
+        let candidate_retained_bytes = if plan_based || !append {
+            0
+        } else {
+            output_bytes
+        };
+        summary.rtf_tail_append = Some(RtfTailAppendSummary {
+            implementation,
+            publication_boundary: "pre-staged publication-call interval: elapsed_ns wraps exactly TailAppendCommit::write_to or TailAppendPublicationPlan::write_to after staging and sink initialization; Commit and PublicationPlan have intentionally asymmetric validation and publication work",
+            operation,
+            source_bytes,
+            source_retained_bytes: source_bytes,
+            candidate_retained_bytes,
+            input_bytes: operation_input,
+            inserted_bytes: operation_inserted,
+            output_bytes,
+            paragraphs: operation_paragraphs,
+            runs: operation_paragraphs,
+            sink_window_bytes: u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?,
+            exact_noop_verified: true,
+            in_memory_patch_verified: true,
+            durable_patch_verified: true,
+            reopen_verified: true,
+            source_conflict_verified: true,
+        });
+        if iteration >= warmup_iterations {
+            summaries.push(summary);
+            planning_ns.push(planning_duration);
+            let publication = elapsed_ns(publication_duration)?;
+            publication_ns.push(publication);
+        }
+        record_elapsed(
+            &mut elapsed,
+            iteration,
+            warmup_iterations,
+            publication_duration,
+        )?;
+    }
+    let sink = deterministic_sink_summary(&summaries, case.name())?;
+    if sink.retained_output_bytes != Some(0)
+        || sink.retained_authoring_window_bytes
+            != Some(u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?)
+        || sink.largest_write > u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?
+    {
+        return Err("RTF matched tail publication exceeded its fixed sink window".into());
+    }
+    let source_summary = SourceSummary {
+        rtf_tail_publication: Some(RtfTailPublicationSummary {
+            implementation,
+            timing_scope: "pre-staged publication-call interval: elapsed_ns wraps exactly TailAppendCommit::write_to or TailAppendPublicationPlan::write_to after staging and sink initialization; no end-to-end edit/save timing",
+            planning_scope: "planning_ns has one entry per retained sample: tail input staging plus TailAppendCommit or TailAppendPublicationPlan construction, measured separately and excluded from elapsed_ns",
+            publication_scope: "publication_ns has one entry per retained sample; elapsed_ns is exactly the pre-staged publication-call interval; Commit::write_to and PublicationPlan::write_to intentionally have different validation, digest/source-version, budget, window, and final-verification work, so this is not a symmetric-work claim",
+            reopen_scope: "reopen_ns is a one-element preflight-only vector: exact output bytes, digest, semantic paragraphs, and no-op identity are checked once outside the sample loop and excluded from elapsed_ns",
+            lifecycle_scope: "lifecycle_ns is a one-element preflight-only vector: durable patch apply/inverse/stale/foreign, cancellation, sink failure/partial progress, limits, and source-version gates are checked once outside the sample loop and excluded from elapsed_ns",
+            publication_boundary: "pre-staged publication-call interval; Commit::write_to emits its retained candidate, while PublicationPlan::write_to rechecks source/version/fingerprint/limits, reserves execution budget, emits bounded source/insertion windows, and performs final verification; no symmetric-work claim",
+            performance_claim: "none: no end-to-end, rich-format, allocation/RSS, physical-I/O, or ABBA latency claim",
+            source_retained_bytes: source_bytes,
+            candidate_retained_bytes: if plan_based || !append {
+                0
+            } else {
+                output_bytes
+            },
+            publication_window_bytes: u64::try_from(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?,
+            planning_ns,
+            publication_ns,
+            reopen_ns,
+            lifecycle_ns,
+            expected_output_sha256: expected_digest.clone(),
+        }),
+        ..SourceSummary::default()
+    };
+    let mut result = result_with_source(case, corpus, elapsed, source_summary);
+    result.sink = Some(sink);
+    result.output_sha256 = Some(expected_digest);
     Ok(result)
 }
 
@@ -30981,7 +31720,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 291);
+        assert_eq!(selectable_count, 295);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -32834,6 +33573,10 @@ mod tests {
             Case::RtfSemanticMoveParagraphSave,
             Case::RtfLogicalTailAppend,
             Case::RtfLogicalTailNoopSave,
+            Case::RtfLogicalTailCommitAppend,
+            Case::RtfLogicalTailPlanAppend,
+            Case::RtfLogicalTailCommitNoopSave,
+            Case::RtfLogicalTailPlanNoopSave,
         ];
 
         for variant in RtfSemanticVariant::ALL {
@@ -32913,17 +33656,32 @@ mod tests {
                 .flat_map(|variant| cases.iter().map(move |case| (*variant, *case)))
                 .filter(|(variant, case)| variant.supports_case(*case))
                 .count(),
-            41
+            45
         );
     }
 
     #[test]
     fn semantic_rtf_logical_tail_is_bounded_reopenable_and_reversible() {
-        for shape in [SemanticShape::Tiny, SemanticShape::Large] {
+        for shape in [
+            SemanticShape::Tiny,
+            SemanticShape::Medium,
+            SemanticShape::Large,
+        ] {
             let corpus = build_rtf_lifecycle_corpus(shape).unwrap();
             let append = run_case(Case::RtfLogicalTailAppend, &corpus, 0, 1).unwrap();
             let noop = run_case(Case::RtfLogicalTailNoopSave, &corpus, 0, 1).unwrap();
-            for result in [append, noop] {
+            let commit_append = run_case(Case::RtfLogicalTailCommitAppend, &corpus, 0, 1).unwrap();
+            let plan_append = run_case(Case::RtfLogicalTailPlanAppend, &corpus, 0, 1).unwrap();
+            let commit_noop = run_case(Case::RtfLogicalTailCommitNoopSave, &corpus, 0, 1).unwrap();
+            let plan_noop = run_case(Case::RtfLogicalTailPlanNoopSave, &corpus, 0, 1).unwrap();
+            for result in [
+                append,
+                noop,
+                commit_append,
+                plan_append,
+                commit_noop,
+                plan_noop,
+            ] {
                 assert_eq!(result.elapsed_ns.samples.len(), 1);
                 assert!(result.output_sha256.is_some());
                 let sink = result.sink.unwrap();
@@ -32933,12 +33691,76 @@ mod tests {
                 assert!(tail.durable_patch_verified);
                 assert!(tail.reopen_verified);
                 assert!(tail.source_conflict_verified);
+                assert!(!tail.implementation.is_empty());
+                assert!(tail.source_retained_bytes > 0);
+                assert!(
+                    tail.publication_boundary.contains("TailAppendCommit")
+                        || tail
+                            .publication_boundary
+                            .contains("pre-staged publication-call interval")
+                );
+                if matches!(
+                    result.case,
+                    "rtf_logical_tail_commit_append"
+                        | "rtf_logical_tail_plan_append"
+                        | "rtf_logical_tail_commit_noop_save"
+                        | "rtf_logical_tail_plan_noop_save"
+                ) {
+                    let evidence = result
+                        .source
+                        .unwrap()
+                        .rtf_tail_publication
+                        .expect("matched RTF publication phase evidence");
+                    assert_eq!(evidence.planning_ns.len(), 1);
+                    assert_eq!(evidence.publication_ns.len(), 1);
+                    assert_eq!(evidence.reopen_ns.len(), 1);
+                    assert_eq!(evidence.lifecycle_ns.len(), 1);
+                    assert_eq!(evidence.publication_ns, result.elapsed_ns.samples);
+                    assert!(
+                        evidence
+                            .publication_boundary
+                            .contains("pre-staged publication-call interval")
+                    );
+                    assert!(evidence.performance_claim.starts_with("none:"));
+                    assert_eq!(
+                        evidence.candidate_retained_bytes,
+                        if evidence.implementation == "tail_append_publication_plan"
+                            || tail.operation == "exact_noop"
+                        {
+                            0
+                        } else {
+                            evidence.source_retained_bytes + tail.inserted_bytes
+                        }
+                    );
+                }
                 assert_eq!(sink.retained_output_bytes, Some(0));
                 assert_eq!(
                     sink.retained_authoring_window_bytes,
                     Some(RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES as u64)
                 );
                 assert!(sink.largest_write <= RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES as u64);
+            }
+
+            if matches!(shape, SemanticShape::Tiny) {
+                let multi_sample = run_case(Case::RtfLogicalTailPlanAppend, &corpus, 0, 2).unwrap();
+                assert_eq!(multi_sample.elapsed_ns.samples.len(), 2);
+                let evidence = multi_sample
+                    .source
+                    .unwrap()
+                    .rtf_tail_publication
+                    .expect("matched multi-sample RTF publication phase evidence");
+                assert_eq!(evidence.planning_ns.len(), 2);
+                assert_eq!(evidence.publication_ns.len(), 2);
+                assert_eq!(evidence.reopen_ns.len(), 1);
+                assert_eq!(evidence.lifecycle_ns.len(), 1);
+                assert_ne!(evidence.publication_ns.len(), evidence.reopen_ns.len());
+                assert_ne!(evidence.publication_ns.len(), evidence.lifecycle_ns.len());
+                assert!(evidence.reopen_scope.contains("one-element preflight-only"));
+                assert!(
+                    evidence
+                        .lifecycle_scope
+                        .contains("one-element preflight-only")
+                );
             }
         }
     }

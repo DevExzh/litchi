@@ -70,15 +70,15 @@ four matched native XLS existing-comment publication cases,
 six matched native XLS fixed-width numeric publication cases,
 four matched native XLS worksheet-visibility publication cases,
 four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 16
-DOCX/PPTX semantic cases, 15 RTF semantic cases (13 transport/read/edit
-cases plus two logical-tail publication cases), 38 ODF semantic cases, and one
+DOCX/PPTX semantic cases, 19 RTF semantic cases (13 transport/read/edit
+cases plus six logical-tail publication cases), 38 ODF semantic cases, and one
 ODF `mimetype` repair-plan case are opt-in. Eight additional native PPT
 `Pictures` selectors are available for matched eager/source-backed open,
 cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 291
+provide their source-read counters. The current `Case` matrix exposes 295
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -218,7 +218,7 @@ selectors for different-SID A-B-A, public bulk A-B-A, and overlapping
 same-target calls at the 36-byte and 4095-byte targets:
 `cfb_open_stream_mini_shared_{different_sid,bulk,concurrent}` and
 `cfb_open_stream_mini_4095_shared_{different_sid,bulk,concurrent}`. The
-selectable matrix is now 291 names; the default remains 36 cases / 198
+selectable matrix is now 295 names; the default remains 36 cases / 198
 records. The runner accepts the control root-only vector, the prior
 direct-then-root vector, and the target-aware same-SID repeat vector, while
 recording ordered workload names, exact positional ranges, output hashes,
@@ -252,9 +252,12 @@ clean control `e486e4b1` on CPU 2. The four legs used 20 warmups and 500 samples
 across 24 records per leg (48,000 retained samples); all correctness/source-
 event invariants passed. Existing concurrent scenarios recorded 6,473
 candidate versus 8,000 control logical source calls, 19.09% fewer. This is
-accepted only as source-event/correctness evidence. The 291-name selector
-matrix is unchanged: no runtime selector was added; only `cfg(test)`
-source-event acceptance and tests changed. Root MiniStream cache and
+accepted only as source-event/correctness evidence. At the 0152 revision the
+291-name selector matrix was unchanged; change 0153 adds four RTF selectors
+measured at the pre-staged publication-call interval, making the current
+matrix 295. No runtime selector was added
+to 0152; only `cfg(test)` source-event acceptance and tests changed. Root
+MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain. Local or
 generic latency, allocation/RSS/peak memory, physical I/O/syscalls,
 cold-cache/device/network, decompression, native semantic, OOXML, ODF, RTF,
@@ -1064,6 +1067,33 @@ paragraph/run counts, the fixed sink window, and boolean gate results. This is
 selectable baseline evidence only; it makes no speedup or latency claim until
 a frozen release-build CPU-pinned ABBA comparison exists.
 
+The matched RTF tail publication-call controls are separate opt-in selectors:
+`rtf_logical_tail_commit_append`, `rtf_logical_tail_plan_append`,
+`rtf_logical_tail_commit_noop_save`, and `rtf_logical_tail_plan_noop_save`.
+They use the same tiny/medium/large plain uncompressed lifecycle corpus and
+the same changed-append/exact-no-op inputs. Commit and publication-plan
+construction is pre-staged before the timed interval; `elapsed_ns` is exactly
+the pre-staged publication-call interval around `TailAppendCommit::write_to`
+or `TailAppendPublicationPlan::write_to` to the fixed 16 KiB non-seek sink.
+These calls intentionally perform different validation, digest/source-version,
+budget, window, and final-verification work; this is not a symmetric-work
+comparison. The
+`source.rtf_tail_publication` object keeps planning, publication, reopen, and
+lifecycle vectors separate and explicitly reports source-retained,
+complete-candidate-retained, and publication-window bytes. Exact output bytes,
+digest, semantic paragraph projection, no-op identity, durable patch
+apply/inverse/stale/foreign checks, cancellation, sink failure/partial
+progress, limits, and source-version gates are untimed correctness checks.
+This tranche makes no end-to-end, rich-format, allocation/RSS, physical-I/O,
+or ABBA latency claim.
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --semantic-shape tiny,medium,large \
+  --case rtf_logical_tail_commit_append,rtf_logical_tail_plan_append,rtf_logical_tail_commit_noop_save,rtf_logical_tail_plan_noop_save \
+  --json target/perf/rtf-tail-publication-plan.json
+```
+
 Exercise deterministic high-latency, range-bounded positional I/O without a
 network. Every upstream logical read is split into physical requests no larger
 than the selected maximum:
@@ -1223,9 +1253,10 @@ owned-byte open, lazy paragraph enumeration, one middle paragraph, first
 complete-text materialization, bounded semantic-text output to a forward-only
 sink, exact source streaming, exact empty-edit publication, and
 capability-bounded one-paragraph and `ceil(1%)` paragraph edit/save. The two
-`rtf_logical_tail_*` cases are a separate existing-document append tranche;
-they do not reuse the streaming-creation path and are restricted to the
-matched plain lifecycle corpus.
+historical `rtf_logical_tail_*` cases and four matched Commit/PublicationPlan
+controls are a separate existing-document append tranche; they do not reuse
+the streaming-creation path and are restricted to the matched plain lifecycle
+corpus.
 The two lifecycle cases use a matched default-formatted plain corpus because
 the read/edit corpus's explicit font formatting is outside their changed
 publication closure.
@@ -1233,7 +1264,7 @@ publication closure.
 
 | Variant | Source | Shapes | Supported cases |
 |---|---|---|---|
-| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 15, including logical-tail append/no-op |
+| `plain` | Deterministic direct ASCII RTF | tiny, medium, large | All 19, including six logical-tail selectors |
 | `byte1252` | Deterministic raw CP-1252 bytes containing literal `0xe9` | tiny, medium, large | The original 13 open/read/text-to-sink/stream/no-op cases; changed splice and logical tail are excluded because candidate validation refuses this byte layout |
 | `lzfu` | Deterministic LZFu compression of the plain bytes | tiny, medium, large | The original 13 open/read/text-to-sink/stream/no-op cases; changed transport and logical-tail rewrites are explicitly unsupported |
 | `watermark` | Content-addressed real-producer `test-data/rtf/watermark.rtf` | tiny selector only | The original open/read/stream/no-op cases; semantic body-text output and logical-tail publication are excluded because the meaningful content is header drawing metadata rather than editable body text |
@@ -2030,12 +2061,27 @@ including at the exact boundary values. They do not measure syscalls, disk
 I/O, memory copies, compression, or performance.
 
 Logical-tail RTF cases also emit `output_sha256`. Their `sink.rtf_tail_append`
-object records the operation (`append` or `exact_noop`), source, caller-input,
-inserted, and published output bytes, appended paragraph/run counts, the 16 KiB
-sink window, and boolean exact-no-op, in-memory patch, durable patch, reopen,
-and source-conflict gates. `retained_output_bytes: 0` describes only the timed
-sink; the append API intentionally retains its validated candidate snapshot,
-so the window is not a process-RSS or transaction-memory claim.
+object records the implementation, operation (`append` or `exact_noop`),
+source/source-retained, candidate-retained, caller-input, inserted, and
+published output bytes, appended paragraph/run counts, the 16 KiB sink window,
+and boolean exact-no-op, in-memory patch, durable patch, reopen, and
+source-conflict gates. The historical pair retains its historical timing
+boundary (staging/commit remain inside `elapsed_ns`) and uses
+`WindowedHashingSink`; it is not publication-only evidence. All four new
+Commit/PublicationPlan selectors are measured at the pre-staged
+publication-call interval using `WindowedCountingSink` and additionally emit
+`source.rtf_tail_publication` with separate planning/publication/reopen/lifecycle
+vectors and an explicit `performance_claim` withholding end-to-end,
+rich-format, allocation/RSS, physical-I/O, and ABBA latency claims.
+`planning_ns` and `publication_ns` have one entry per retained sample;
+`reopen_ns` and `lifecycle_ns` are one-element preflight-only vectors because
+the expensive correctness gates run once outside the sample loop rather than
+repeating for every sample. Their cardinality therefore intentionally differs
+from the per-sample timing vectors.
+`retained_output_bytes: 0` describes only the timed sink. The changed Commit
+selector retains a complete candidate; the PublicationPlan retains source plus
+bounded insertion; exact-no-op selectors report zero distinct target-candidate
+retention. None of these fields is a process-RSS or transaction-memory claim.
 
 Native XLS comment cases emit `output_sha256` and a `source.xls_comments`
 object with the explicit owned-source counter scope, source-backed flag,
