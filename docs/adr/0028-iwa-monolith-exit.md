@@ -3108,3 +3108,31 @@ sheet/table/data values, and the independent locked-table oracle retains its
 negative behavior. Because those app-authored artifacts do not contain a
 pivot or volatile-name dependency, native UI evidence does not replace the
 synthetic malformed/guard matrix for the new refusal branches.
+
+## 2026-08-17 amendment: Numbers rich-text envelope projection
+
+The focused Numbers table extractor now consumes the strict raw-wire
+projection of its type-6218 rich-text payload directly. The projection requires
+one canonical local storage reference and one cell-owner field, validates the
+nested reference, and passes the resulting storage identifier into the shared
+bounded text-wire owner. The former generated Prost
+`RichTextPayloadArchive::decode` was only used to recover and parity-check that
+same identifier; it is removed from production, so the selected path no longer
+allocates a complete generated envelope before its text/storage budgets are
+applied.
+
+This is a focused duplicate-parse and allocation cut. Unknown component and
+protobuf bytes remain source-backed, and the existing malformed-candidate,
+aggregate text, reference, field, nesting, wire-work, and failure-atomicity
+contracts remain in force. It does not transfer the table model, tile/BNC
+cells, list/formula/comment/AST graph, Numbers host editor, or any public raw
+identifier surface. The `litchi-iwa -> litchi-numbers` edge and ordered debt
+015 therefore remain open; all 14 ordered monolith debts are unchanged.
+
+The focused all-feature Numbers suite currently passes 298 tests with four
+ignored, including nine focused rich-text projection tests; document-reader
+integration passes 16/16, and the boundary suite passes 267/267 while the live
+graph remains 64 packages and 239 internal
+declarations. Existing native Numbers basic and formula/rich-text fixtures
+continue to provide application semantic acceptance; this read-only
+implementation change introduces no native save/reopen or performance claim.

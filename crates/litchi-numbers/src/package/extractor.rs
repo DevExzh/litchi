@@ -1225,14 +1225,12 @@ impl<'a> TableDataExtractor<'a> {
                 preflight_rich_text_payload(&payload_message.data)?;
             budget.charge_wire_preflight(payload_report)?;
             budget.charge_references(1)?;
-            let payload = tst::RichTextPayloadArchive::decode(payload_message.data.as_slice())
-                .map_err(Error::protobuf)?;
-            if payload.storage.identifier != projected_storage {
-                return Err(Error::InvalidFormat(
-                    "Numbers rich-text payload failed strict reference parity".to_owned(),
-                ));
-            }
-            let text = self.extract_rich_text(payload.storage.identifier, budget)?;
+            // The bounded preflight above is the authoritative projection of this
+            // payload.  Do not decode the complete RichTextPayloadArchive here:
+            // it is a tiny envelope whose only parse-relevant value is the local
+            // storage reference, and a generated decode would allocate an entire
+            // archive before the text-wire budgets have been applied.
+            let text = self.extract_rich_text(projected_storage, budget)?;
             result
                 .try_reserve(1)
                 .map_err(|_| allocation_error("Numbers rich-text sidecar", result.len() + 1))?;
@@ -2638,6 +2636,7 @@ fn preflight_rich_text_payload(
                         "invalid rich-text storage reference".to_owned(),
                     ));
                 }
+                visit.field().validate_canonical_framing()?;
                 storage = Some(names::preflight_local_reference(visit.field().payload())?);
             },
             3 => {
@@ -2646,6 +2645,7 @@ fn preflight_rich_text_payload(
                         "invalid rich-text cell owner".to_owned(),
                     ));
                 }
+                visit.field().validate_canonical_framing()?;
                 cell = true;
             },
             _ => {},
@@ -4972,7 +4972,7 @@ mod tests {
     };
     use litchi_iwa_archive::Limits;
     use litchi_iwa_common::comment::Comment;
-    use litchi_iwa_common::wire::append_length_delimited_field;
+    use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
     use litchi_iwa_protos::{tn, tsce, tsp, tst};
@@ -5829,4 +5829,6 @@ mod tests {
             }) if observed == MAX_FORMULA_WIRE_BYTES + 1
         ));
     }
+
+    include!("extractor_rich_text_tests.rs");
 }

@@ -8964,6 +8964,85 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_extractor_no_eager_rich_text_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::TableDataList::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tst::RichTextPayloadArchive::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_rich_text_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_rich_text_rejects_production_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::RichTextPayloadArchive::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_extractor_no_eager_rich_text_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "focused litchi-numbers extractor production source uses "
+                "RichTextPayloadArchive::decode: "
+                "crates/litchi-numbers/src/package/extractor.rs:2",
+                violations,
+            )
+
+    def test_focused_numbers_extractor_no_eager_rich_text_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tst::RichTextPayloadArchive::decode\n"
+                'const NOTE: &str = "RichTextPayloadArchive::decode";\n'
+                "/* tst::RichTextPayloadArchive::decode */\n"
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_rich_text_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_focused_numbers_names_package_no_eager_prost_allows_test_only_usage(
         self,
     ) -> None:
