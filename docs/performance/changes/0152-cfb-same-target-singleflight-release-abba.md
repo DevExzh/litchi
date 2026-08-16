@@ -247,7 +247,7 @@ RSS, peak-memory, or whole-reader bounded-memory claim.
 
 The [machine-readable summary](../results/cfb-singleflight-abba-0152-summary.json)
 has SHA-256
-`2b112ec9cc6ca7c6ebd15bf0c67b8ea9546ad46c537f1f7fc6d985a095165da5`.
+`fd0a032fe2a94f2de3447c53f14f7c45dbbbccf9d0b6fde712101786ffc7d805`.
 The complete final raw reports are retained as:
 
 - [A1 control](../results/cfb-singleflight-a1-control-0152.json.zst),
