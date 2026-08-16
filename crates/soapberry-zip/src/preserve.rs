@@ -129,6 +129,8 @@ impl RegeneratedEntry {
 pub enum PreservationAction {
     /// Copy the validated local span and raw central record for this entry.
     Copy(PreservationEntryId),
+    /// Omit this source entry from the rewritten archive.
+    Omit(PreservationEntryId),
     /// Replace this entry using the existing ZIP writer's ordinary semantics.
     Regenerate {
         id: PreservationEntryId,
@@ -141,10 +143,13 @@ pub enum PreservationAction {
 /// A plan must mention every source ID exactly once. The action list itself is
 /// not an ordering control: raw local spans retain source physical order and
 /// central records retain source central-directory order, even when those two
-/// orders differ.
+/// orders differ. Appended local records are emitted after all source local
+/// records and before the central directory; appended central records are
+/// emitted after all source central records.
 #[derive(Debug, Clone, Default)]
 pub struct PreservationPlan {
     actions: Vec<PreservationAction>,
+    appended: Vec<RegeneratedEntry>,
 }
 
 impl PreservationPlan {
@@ -162,6 +167,7 @@ impl PreservationPlan {
                 .iter()
                 .map(|entry| PreservationAction::Copy(entry.id))
                 .collect(),
+            appended: Vec::new(),
         }
     }
 
@@ -177,8 +183,38 @@ impl PreservationPlan {
         self.actions.try_reserve_exact(additional)
     }
 
+    /// Fallibly reserve capacity for appended generated members.
+    pub fn try_reserve_appended(
+        &mut self,
+        additional: usize,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.appended.try_reserve_exact(additional)
+    }
+
+    /// Append one generated member in the order it should appear after all
+    /// source local records and before the central directory, with its central
+    /// record after all source central records.
+    ///
+    /// The source action list remains separate and must still mention every
+    /// source ID exactly once. Appended members are generated before the sink
+    /// sees any bytes, so a member-generation failure cannot leave partial
+    /// output behind.
+    pub fn try_append(
+        &mut self,
+        entry: RegeneratedEntry,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.appended.try_reserve(1)?;
+        self.appended.push(entry);
+        Ok(())
+    }
+
     pub fn actions(&self) -> &[PreservationAction] {
         &self.actions
+    }
+
+    /// Generated members in their requested append order.
+    pub fn appended(&self) -> &[RegeneratedEntry] {
+        &self.appended
     }
 }
 
@@ -354,12 +390,35 @@ where
 
         let mut local_offsets = Vec::new();
         local_offsets
-            .try_reserve_exact(self.entries.len())
+            .try_reserve_exact(prepared.len())
             .map_err(|source| allocation("preservation local offsets", source))?;
-        local_offsets.resize(self.entries.len(), 0_u64);
+        local_offsets.resize(prepared.len(), 0_u64);
         let mut output_offset = 0u64;
         let mut copy_buffer = [0u8; COPY_CHUNK_SIZE];
         for &index in &self.local_order {
+            if prepared[index].omitted {
+                continue;
+            }
+            local_offsets[index] = output_offset;
+            match &prepared[index].local {
+                PreparedLocal::Copy(range) => {
+                    copy_range(self.source, range.clone(), &mut sink, &mut copy_buffer)?;
+                    output_offset = output_offset
+                        .checked_add(range.end - range.start)
+                        .ok_or_else(|| unsupported("output offset overflow"))?;
+                },
+                PreparedLocal::Generated(bytes) => {
+                    sink.write_all(bytes)?;
+                    output_offset = output_offset
+                        .checked_add(bytes.len() as u64)
+                        .ok_or_else(|| unsupported("output offset overflow"))?;
+                },
+            }
+        }
+        for index in self.entries.len()..prepared.len() {
+            if prepared[index].omitted {
+                continue;
+            }
             local_offsets[index] = output_offset;
             match &prepared[index].local {
                 PreparedLocal::Copy(range) => {
@@ -379,6 +438,9 @@ where
 
         let central_start = output_offset;
         for (index, entry) in prepared.iter().enumerate() {
+            if entry.omitted {
+                continue;
+            }
             let local_offset = u32::try_from(local_offsets[index])
                 .map_err(|_| unsupported("ZIP64 output promotion"))?;
             let central = entry.central.bytes(&self.entries);
@@ -391,15 +453,27 @@ where
         }
         let central_size = output_offset - central_start;
 
-        let entry_count =
-            u16::try_from(self.entries.len()).map_err(|_| unsupported("ZIP64 output promotion"))?;
+        let entry_count = u16::try_from(retained_entry_count(&prepared))
+            .map_err(|_| unsupported("ZIP64 output promotion"))?;
         let mut eocd = [0u8; EndOfCentralDirectoryRecordFixed::SIZE];
         eocd[..4].copy_from_slice(&0x0605_4b50u32.to_le_bytes());
         eocd[8..10].copy_from_slice(&entry_count.to_le_bytes());
         eocd[10..12].copy_from_slice(&entry_count.to_le_bytes());
-        eocd[12..16].copy_from_slice(&(central_size as u32).to_le_bytes());
-        eocd[16..20].copy_from_slice(&(central_start as u32).to_le_bytes());
-        eocd[20..22].copy_from_slice(&(self.archive_comment.len() as u16).to_le_bytes());
+        eocd[12..16].copy_from_slice(
+            &u32::try_from(central_size)
+                .map_err(|_| unsupported("ZIP64 output promotion"))?
+                .to_le_bytes(),
+        );
+        eocd[16..20].copy_from_slice(
+            &u32::try_from(central_start)
+                .map_err(|_| unsupported("ZIP64 output promotion"))?
+                .to_le_bytes(),
+        );
+        eocd[20..22].copy_from_slice(
+            &u16::try_from(self.archive_comment.len())
+                .map_err(|_| unsupported("ZIP64 output promotion"))?
+                .to_le_bytes(),
+        );
         sink.write_all(&eocd)?;
         sink.write_all(&self.archive_comment)?;
         sink.flush()?;
@@ -417,9 +491,10 @@ where
             .map_err(|source| allocation("preservation plan", source))?;
         prepared.resize_with(self.entries.len(), || None);
         for action in &plan.actions {
-            let (id, generated) = match action {
-                PreservationAction::Copy(id) => (*id, None),
-                PreservationAction::Regenerate { id, entry } => (*id, Some(entry)),
+            let (id, generated, omitted) = match action {
+                PreservationAction::Copy(id) => (*id, None, false),
+                PreservationAction::Omit(id) => (*id, None, true),
+                PreservationAction::Regenerate { id, entry } => (*id, Some(entry), false),
             };
             let index = usize::try_from(id.0).map_err(|_| unsupported("invalid entry ID"))?;
             let Some(source_entry) = self.entries.get(index) else {
@@ -429,23 +504,40 @@ where
                 return Err(unsupported("duplicate entry ID in plan"));
             }
 
-            prepared[index] = Some(match generated {
-                None => PreparedEntry {
-                    local: PreparedLocal::Copy(source_entry.local_span.clone()),
-                    central: PreparedCentral::Copy(index),
-                },
-                Some(entry) => generated_entry(entry)?,
+            prepared[index] = Some(if omitted {
+                PreparedEntry {
+                    local: PreparedLocal::Generated(Vec::new()),
+                    central: PreparedCentral::Generated(Vec::new()),
+                    omitted: true,
+                }
+            } else {
+                match generated {
+                    None => PreparedEntry {
+                        local: PreparedLocal::Copy(source_entry.local_span.clone()),
+                        central: PreparedCentral::Copy(index),
+                        omitted: false,
+                    },
+                    Some(entry) => generated_entry(entry)?,
+                }
             });
         }
 
+        let complete_len = self
+            .entries
+            .len()
+            .checked_add(plan.appended.len())
+            .ok_or_else(|| unsupported("prepared preservation plan length"))?;
         let mut complete = Vec::new();
         complete
-            .try_reserve_exact(self.entries.len())
+            .try_reserve_exact(complete_len)
             .map_err(|source| allocation("prepared preservation plan", source))?;
         for entry in prepared {
             complete.push(
                 entry.ok_or_else(|| unsupported("plan does not cover every entry exactly once"))?,
             );
+        }
+        for entry in &plan.appended {
+            complete.push(generated_entry(entry)?);
         }
         Ok(complete)
     }
@@ -453,21 +545,37 @@ where
     fn validate_output_layout(&self, prepared: &[PreparedEntry]) -> Result<(), Error> {
         let mut local_size = 0u64;
         for &index in &self.local_order {
+            if prepared[index].omitted {
+                continue;
+            }
             local_size = local_size
                 .checked_add(prepared[index].local.len())
                 .ok_or_else(|| unsupported("output offset overflow"))?;
         }
+        for entry in &prepared[self.entries.len()..] {
+            if entry.omitted {
+                continue;
+            }
+            local_size = local_size
+                .checked_add(entry.local.len())
+                .ok_or_else(|| unsupported("output offset overflow"))?;
+        }
         let central_size = prepared.iter().try_fold(0u64, |size, entry| {
+            if entry.omitted {
+                return Ok(size);
+            }
             size.checked_add(entry.central.bytes(&self.entries).len() as u64)
                 .ok_or_else(|| unsupported("output offset overflow"))
         })?;
+        let output_size = local_size
+            .checked_add(central_size)
+            .and_then(|size| size.checked_add(EndOfCentralDirectoryRecordFixed::SIZE as u64))
+            .and_then(|size| size.checked_add(self.archive_comment.len() as u64))
+            .ok_or_else(|| unsupported("output offset overflow"))?;
         if local_size > u64::from(u32::MAX)
             || central_size > u64::from(u32::MAX)
-            || local_size
-                .checked_add(central_size)
-                .ok_or_else(|| unsupported("output offset overflow"))?
-                > u64::from(u32::MAX)
-            || self.entries.len() > u16::MAX as usize
+            || output_size > u64::from(u32::MAX)
+            || retained_entry_count(prepared) >= u16::MAX as usize
             || self.archive_comment.len() > u16::MAX as usize
         {
             return Err(unsupported("ZIP64 output promotion"));
@@ -479,6 +587,11 @@ where
 struct PreparedEntry {
     local: PreparedLocal,
     central: PreparedCentral,
+    omitted: bool,
+}
+
+fn retained_entry_count(prepared: &[PreparedEntry]) -> usize {
+    prepared.iter().filter(|entry| !entry.omitted).count()
 }
 
 enum PreparedCentral {
@@ -511,9 +624,14 @@ impl PreparedLocal {
 
 fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
     let payload_len = entry.data.as_slice().len();
+    let name_bytes = entry
+        .name
+        .len()
+        .checked_mul(2)
+        .ok_or_else(|| unsupported("generated member allocation size"))?;
     let capacity = payload_len
         .checked_add(payload_len / 8)
-        .and_then(|size| size.checked_add(entry.name.len()))
+        .and_then(|size| size.checked_add(name_bytes))
         .and_then(|size| size.checked_add(4 * 1024))
         .ok_or_else(|| unsupported("generated member allocation size"))?;
     let mut generated = Vec::new();
@@ -572,6 +690,7 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
     Ok(PreparedEntry {
         local: PreparedLocal::Generated(bytes),
         central: PreparedCentral::Generated(central),
+        omitted: false,
     })
 }
 
@@ -765,6 +884,47 @@ mod tests {
     fn indexed(data: &[u8]) -> (ZipArchive<Cursor<&[u8]>>, Vec<u8>) {
         let archive = ZipArchive::from_slice(data).unwrap().into_zip_archive();
         (archive, vec![0; crate::RECOMMENDED_BUFFER_SIZE])
+    }
+
+    fn central_records(data: &[u8]) -> Vec<Vec<u8>> {
+        let archive = ZipArchive::from_slice(data).unwrap();
+        archive
+            .entries()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                let start = usize::try_from(entry.central_directory_offset()).unwrap();
+                let length =
+                    ZipFileHeaderFixed::SIZE + usize::try_from(entry.metadata_size_hint()).unwrap();
+                data[start..start + length].to_vec()
+            })
+            .collect()
+    }
+
+    fn central_record_without_offset(mut record: Vec<u8>) -> Vec<u8> {
+        record[CENTRAL_LOCAL_HEADER_OFFSET].fill(0);
+        record
+    }
+
+    fn with_comment(mut data: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        data[eocd + 20..eocd + 22].copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        data.extend_from_slice(comment);
+        data
+    }
+
+    fn with_reordered_central(mut data: Vec<u8>) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = usize::try_from(archive.directory_offset()).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        let first_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&data[central..])
+                .unwrap()
+                .variable_length();
+        let first = data[central..central + first_len].to_vec();
+        let rest = data[central + first_len..eocd].to_vec();
+        data[central..eocd].copy_from_slice(&[rest, first].concat());
+        data
     }
 
     #[test]
@@ -982,6 +1142,326 @@ mod tests {
         assert_eq!(central_header.local_header_offset, 0);
         assert_eq!(central_header.uncompressed_size as usize, data.len());
         assert_eq!(Arc::strong_count(&data), 2);
+    }
+
+    #[test]
+    fn generated_entry_reserves_both_long_member_name_copies() {
+        let name = "n".repeat(u16::MAX as usize);
+        let entry = RegeneratedEntry::new(name.clone(), Vec::new());
+        let prepared = generated_entry(&entry).unwrap();
+        let PreparedLocal::Generated(bytes) = prepared.local else {
+            panic!("generated entry must retain generated local bytes");
+        };
+        let expected_capacity = name
+            .len()
+            .checked_mul(2)
+            .and_then(|size| size.checked_add(4 * 1024))
+            .unwrap();
+        assert!(bytes.capacity() >= expected_capacity);
+        assert!(bytes.len() <= expected_capacity);
+    }
+
+    #[test]
+    fn appends_store_and_deflate_members_after_preserved_source_order() {
+        let source = with_comment(
+            with_reordered_central(ordinary_archive()),
+            b"append comment",
+        );
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let source_local_spans: Vec<_> = index
+            .entries()
+            .iter()
+            .map(|entry| {
+                let span = entry.local_span();
+                (
+                    span.clone(),
+                    source[span.start as usize..span.end as usize].to_vec(),
+                )
+            })
+            .collect();
+        let source_central = central_records(&source)
+            .into_iter()
+            .map(central_record_without_offset)
+            .collect::<Vec<_>>();
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.try_reserve_appended(2).unwrap();
+        plan.try_append(RegeneratedEntry::new(
+            "appended-store.bin",
+            b"stored".to_vec(),
+        ))
+        .unwrap();
+        plan.try_append(
+            RegeneratedEntry::new("appended-deflate.bin", b"deflated".to_vec())
+                .compression_method(CompressionMethod::Deflate),
+        )
+        .unwrap();
+        assert_eq!(plan.appended().len(), 2);
+
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        let output_names: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap().file_path().as_ref().to_vec())
+            .collect();
+        let mut expected_names: Vec<_> = ZipArchive::from_slice(&source)
+            .unwrap()
+            .entries()
+            .map(|entry| entry.unwrap().file_path().as_ref().to_vec())
+            .collect();
+        expected_names.extend([
+            b"appended-store.bin".to_vec(),
+            b"appended-deflate.bin".to_vec(),
+        ]);
+        assert_eq!(output_names, expected_names);
+
+        for (span, bytes) in source_local_spans {
+            assert_eq!(&output[span.start as usize..span.end as usize], bytes);
+        }
+        let output_central = central_records(&output);
+        assert_eq!(
+            output_central[..source_central.len()]
+                .iter()
+                .cloned()
+                .map(central_record_without_offset)
+                .collect::<Vec<_>>(),
+            source_central
+        );
+        assert_eq!(output_archive.comment().as_bytes(), b"append comment");
+
+        let output_entries: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap())
+            .collect();
+        let appended_start = output_entries.len() - 2;
+        let source_local_end = index
+            .entries()
+            .iter()
+            .map(|entry| entry.local_span().end)
+            .max()
+            .unwrap_or_default();
+        assert!(
+            output_entries[appended_start].local_header_offset()
+                < output_entries[appended_start + 1].local_header_offset()
+        );
+        assert!(output_entries[appended_start].local_header_offset() >= source_local_end);
+        let output_reader = crate::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(
+            output_reader
+                .read(
+                    std::str::from_utf8(output_entries[appended_start].file_path().as_ref())
+                        .unwrap()
+                )
+                .unwrap(),
+            b"stored"
+        );
+        assert_eq!(
+            output_reader
+                .read(
+                    std::str::from_utf8(output_entries[appended_start + 1].file_path().as_ref(),)
+                        .unwrap(),
+                )
+                .unwrap(),
+            b"deflated"
+        );
+    }
+
+    #[test]
+    fn omitting_an_appended_suffix_restores_the_exact_source_archive() {
+        let source = with_comment(
+            with_reordered_central(ordinary_archive()),
+            b"append then omit",
+        );
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+
+        let mut append_plan = PreservationPlan::copy_all(&index);
+        append_plan
+            .try_append(RegeneratedEntry::new(
+                "appended-store.bin",
+                b"stored".to_vec(),
+            ))
+            .unwrap();
+        append_plan
+            .try_append(
+                RegeneratedEntry::new("appended-deflate.bin", b"deflated".to_vec())
+                    .compression_method(CompressionMethod::Deflate),
+            )
+            .unwrap();
+        let appended = index.write_to(&append_plan, Vec::new()).unwrap();
+
+        let (appended_archive, mut appended_buffer) = indexed(&appended);
+        let appended_index = PreservationIndex::new(&appended_archive, &mut appended_buffer)
+            .expect("appended archive remains preservable");
+        let mut restore_plan = PreservationPlan::copy_all(&appended_index);
+        for entry in appended_index.entries() {
+            if matches!(
+                entry.raw_name_bytes(),
+                b"appended-store.bin" | b"appended-deflate.bin"
+            ) {
+                let id = entry.id();
+                restore_plan.actions[usize::try_from(id.0).unwrap()] = PreservationAction::Omit(id);
+            }
+        }
+
+        let restored = appended_index.write_to(&restore_plan, Vec::new()).unwrap();
+        assert_eq!(restored, source);
+    }
+
+    #[test]
+    fn omitting_a_middle_source_member_reopens_and_preserves_retained_raw_records() {
+        let source = with_comment(ordinary_archive(), b"middle omit");
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let omitted_id = index.entries()[1].id();
+        let omitted_name = index.entries()[1].raw_name_bytes().to_vec();
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[1] = PreservationAction::Omit(omitted_id);
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        let output_names: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap().file_path().as_ref().to_vec())
+            .collect();
+        assert!(!output_names.iter().any(|name| name == &omitted_name));
+        assert_eq!(output_archive.comment().as_bytes(), b"middle omit");
+
+        let (output_archive, mut output_buffer) = indexed(&output);
+        let output_index = PreservationIndex::new(&output_archive, &mut output_buffer).unwrap();
+        for source_entry in index
+            .entries()
+            .iter()
+            .filter(|entry| entry.id() != omitted_id)
+        {
+            let output_entry = output_index
+                .entries()
+                .iter()
+                .find(|entry| entry.raw_name_bytes() == source_entry.raw_name_bytes())
+                .expect("retained member remains present");
+            let source_span = source_entry.local_span();
+            let output_span = output_entry.local_span();
+            assert_eq!(
+                &source[usize::try_from(source_span.start).unwrap()
+                    ..usize::try_from(source_span.end).unwrap()],
+                &output[usize::try_from(output_span.start).unwrap()
+                    ..usize::try_from(output_span.end).unwrap()]
+            );
+            assert_eq!(
+                central_record_without_offset(
+                    source[usize::try_from(source_entry.central_record().start).unwrap()
+                        ..usize::try_from(source_entry.central_record().end).unwrap()]
+                        .to_vec()
+                ),
+                central_record_without_offset(
+                    output[usize::try_from(output_entry.central_record().start).unwrap()
+                        ..usize::try_from(output_entry.central_record().end).unwrap()]
+                        .to_vec()
+                )
+            );
+        }
+        let output_reader = crate::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(output_reader.read("first.bin").unwrap(), b"stored data");
+    }
+
+    #[test]
+    fn replacement_then_append_patches_source_and_appended_offsets() {
+        let source = ordinary_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("replaced.bin", vec![b'x'; 128 * 1024])
+                .compression_method(CompressionMethod::Deflate),
+        };
+        plan.try_append(RegeneratedEntry::new("tail.bin", b"tail".to_vec()))
+            .unwrap();
+
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        let entries: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap())
+            .collect();
+        let names: Vec<_> = entries
+            .iter()
+            .map(|entry| entry.file_path().as_ref().to_vec())
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                b"replaced.bin".to_vec(),
+                b"second.bin".to_vec(),
+                b"folder/".to_vec(),
+                b"tail.bin".to_vec(),
+            ]
+        );
+        assert!(entries[1].local_header_offset() > entries[0].local_header_offset());
+        assert!(entries[3].local_header_offset() > entries[2].local_header_offset());
+
+        let reader = crate::office::ArchiveReader::new(&output).unwrap();
+        assert_eq!(reader.read("replaced.bin").unwrap(), vec![b'x'; 128 * 1024]);
+        assert_eq!(reader.read("tail.bin").unwrap(), b"tail");
+    }
+
+    #[test]
+    fn incomplete_or_unrepresentable_append_plan_leaves_sink_untouched() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+
+        let mut incomplete_sink = b"untouched".to_vec();
+        let incomplete = PreservationPlan::new();
+        let error = index
+            .write_to(&incomplete, &mut incomplete_sink)
+            .expect_err("incomplete source coverage must fail before output");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(incomplete_sink, b"untouched");
+
+        let mut unsupported_sink = b"untouched".to_vec();
+        let mut unsupported = PreservationPlan::copy_all(&index);
+        unsupported
+            .try_append(
+                RegeneratedEntry::new("unsupported.bin", b"payload".to_vec())
+                    .compression_method(CompressionMethod::Bzip2),
+            )
+            .unwrap();
+        let error = index
+            .write_to(&unsupported, &mut unsupported_sink)
+            .expect_err("unsupported generated compression must fail before output");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(unsupported_sink, b"untouched");
+    }
+
+    #[test]
+    fn rejects_the_zip32_entry_count_sentinel() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+
+        let mut prepared = Vec::with_capacity(u16::MAX as usize);
+        prepared.resize_with(u16::MAX as usize, || PreparedEntry {
+            local: PreparedLocal::Generated(Vec::new()),
+            central: PreparedCentral::Generated(Vec::new()),
+            omitted: false,
+        });
+        let error = index
+            .validate_output_layout(&prepared)
+            .expect_err("0xffff entries require ZIP64");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
     }
 
     #[test]

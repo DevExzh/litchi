@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use litchi_opc::{BlobPart, PackURI, TargetMode};
+use sha2::{Digest, Sha256};
 
 use super::{
     CrossSlideCopyPatch, History, Limits, Patch, Resolution, ShapeTextReplacement,
@@ -260,6 +261,120 @@ fn cross_slide_copy_authorizes_known_noncanonical_source_archives() -> Result<()
             ..
         })
     ));
+    Ok(())
+}
+
+#[test]
+fn cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse() -> Result<()> {
+    let mut authored_source = opened_plain_slide_package()?;
+    let source_bytes = authored_source.to_bytes()?;
+    let mut source = Package::from_vec(source_bytes.clone())?;
+    let source_states_before = part_states(&source);
+
+    let mut authored_destination = opened_plain_slides_package(2)?;
+    rename_slide(&mut authored_destination, 0, "destination-first")?;
+    rename_slide(&mut authored_destination, 1, "destination-second")?;
+    let canonical_destination = authored_destination.to_bytes()?;
+    let destination_before = with_eocd_comment(canonical_destination, b"cross raw destination")?;
+    let before_archive = raw_zip_archive(&destination_before)?;
+    let mut destination = Package::from_vec(destination_before.clone())?;
+
+    let source_snapshot = source.opened_presentation()?;
+    let destination_snapshot = destination.opened_presentation()?;
+    let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 1, 1)?;
+    assert_eq!(plan.parts().len(), 1);
+    let copied_part = plan.parts()[0].target().membername().to_owned();
+    let copied_relationships = plan.parts()[0]
+        .target()
+        .rels_uri()
+        .map_err(Error::Invalid)?
+        .membername()
+        .to_owned();
+    let appended = [copied_part.clone(), copied_relationships.clone()];
+    let changed = [
+        "[Content_Types].xml",
+        "ppt/presentation.xml",
+        "ppt/_rels/presentation.xml.rels",
+    ];
+
+    destination.apply_cross_slide_copy_plan(&source, &plan)?;
+    let published_bytes = destination.to_bytes()?;
+    let published_archive = raw_zip_archive(&published_bytes)?;
+
+    assert_eq!(published_archive.comment, before_archive.comment);
+    assert_eq!(part_states(&source), source_states_before);
+    assert_eq!(source.to_bytes()?, source_bytes);
+    assert_eq!(
+        &published_archive.local_order[published_archive
+            .local_order
+            .len()
+            .saturating_sub(appended.len())..],
+        appended.as_slice()
+    );
+    assert_eq!(
+        &published_archive.central_order[published_archive
+            .central_order
+            .len()
+            .saturating_sub(appended.len())..],
+        appended.as_slice()
+    );
+
+    let mut expected_names = before_archive.members.keys().cloned().collect::<Vec<_>>();
+    expected_names.extend(appended.iter().cloned());
+    expected_names.sort_unstable();
+    let mut actual_names = published_archive
+        .members
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    actual_names.sort_unstable();
+    assert_eq!(actual_names, expected_names);
+
+    for name in &before_archive.local_order {
+        if changed.contains(&name.as_str()) {
+            continue;
+        }
+        assert_eq!(
+            published_archive.members[name].local, before_archive.members[name].local,
+            "untouched local member changed: {name}"
+        );
+    }
+    for name in &before_archive.central_order {
+        if changed.contains(&name.as_str()) {
+            continue;
+        }
+        assert_eq!(
+            published_archive.members[name].central, before_archive.members[name].central,
+            "untouched central member changed: {name}"
+        );
+    }
+
+    let source_slide = plan.parts()[0].source().membername();
+    assert_eq!(
+        zip_member(&published_bytes, &copied_part)?,
+        zip_member(&source_bytes, source_slide)?
+    );
+    assert_eq!(
+        cross_physical_revision(&published_bytes),
+        plan.target_physical_revision()
+    );
+    let reopened = Package::from_vec(published_bytes.clone())?;
+    assert_eq!(reopened.opened_presentation()?.slides().len(), 3);
+    assert_eq!(
+        reopened.opened_presentation()?.slides()[1].name(),
+        "Slide 256"
+    );
+
+    let serialized_inverse = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?
+        .inverse()
+        .to_bytes()?;
+    let inverse = CrossSlideCopyPatch::from_bytes(&serialized_inverse)?;
+    destination.apply_cross_slide_copy_patch(&source, &inverse)?;
+    assert_eq!(destination.to_bytes()?, destination_before);
+
+    let mut reopened_candidate = Package::from_vec(published_bytes)?;
+    reopened_candidate.apply_cross_slide_copy_patch(&source, &inverse)?;
+    assert_eq!(reopened_candidate.to_bytes()?, destination_before);
     Ok(())
 }
 
@@ -758,6 +873,94 @@ fn zip_member(data: &[u8], name: &str) -> Result<Vec<u8>> {
     archive
         .read(name)
         .map_err(|error| Error::Invalid(format!("cannot read test ZIP member {name}: {error}")))
+}
+
+struct RawZipArchive {
+    members: BTreeMap<String, RawZipMember>,
+    local_order: Vec<String>,
+    central_order: Vec<String>,
+    comment: Vec<u8>,
+}
+
+struct RawZipMember {
+    local: Vec<u8>,
+    central: Vec<u8>,
+}
+
+fn raw_zip_archive(data: &[u8]) -> Result<RawZipArchive> {
+    let slice = soapberry_zip::ZipArchive::from_slice(data)
+        .map_err(|error| Error::Invalid(format!("cannot index raw test ZIP: {error}")))?;
+    let comment = slice.comment().as_bytes().to_vec();
+    let archive = slice.into_zip_archive();
+    let mut scratch = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+    let index = soapberry_zip::PreservationIndex::new(&archive, &mut scratch)
+        .map_err(|error| Error::Invalid(format!("cannot preserve raw test ZIP: {error}")))?;
+    let mut members = BTreeMap::new();
+    let mut local_order = Vec::with_capacity(index.entries().len());
+    let mut central_order = Vec::with_capacity(index.entries().len());
+    let mut local_positions = Vec::with_capacity(index.entries().len());
+    for entry in index.entries() {
+        let name = std::str::from_utf8(entry.raw_name_bytes())
+            .map_err(|error| Error::Invalid(format!("raw ZIP member is not UTF-8: {error}")))?
+            .to_owned();
+        let local = entry.local_span();
+        let central = entry.central_record();
+        let local_start = usize::try_from(local.start)
+            .map_err(|_| Error::Invalid("raw ZIP local offset exceeds usize".into()))?;
+        let local_end = usize::try_from(local.end)
+            .map_err(|_| Error::Invalid("raw ZIP local end exceeds usize".into()))?;
+        let central_start = usize::try_from(central.start)
+            .map_err(|_| Error::Invalid("raw ZIP central offset exceeds usize".into()))?;
+        let central_end = usize::try_from(central.end)
+            .map_err(|_| Error::Invalid("raw ZIP central end exceeds usize".into()))?;
+        let local_bytes = data
+            .get(local_start..local_end)
+            .ok_or_else(|| Error::Invalid("raw ZIP local span is out of bounds".into()))?
+            .to_vec();
+        let mut central_bytes = data
+            .get(central_start..central_end)
+            .ok_or_else(|| Error::Invalid("raw ZIP central span is out of bounds".into()))?
+            .to_vec();
+        if central_bytes.len() < 46 {
+            return Err(Error::Invalid("raw ZIP central record is too short".into()));
+        }
+        // Local-header offsets are the only central-directory bytes that must
+        // move when an earlier member is regenerated or a suffix is appended.
+        central_bytes[42..46].fill(0);
+        if members
+            .insert(
+                name.clone(),
+                RawZipMember {
+                    local: local_bytes,
+                    central: central_bytes,
+                },
+            )
+            .is_some()
+        {
+            return Err(Error::Invalid(format!(
+                "raw ZIP contains duplicate member {name}"
+            )));
+        }
+        central_order.push(name.clone());
+        local_positions.push((local.start, name));
+    }
+    local_positions.sort_unstable_by_key(|(offset, _)| *offset);
+    local_order.extend(local_positions.into_iter().map(|(_, name)| name));
+    Ok(RawZipArchive {
+        members,
+        local_order,
+        central_order,
+        comment,
+    })
+}
+
+fn cross_physical_revision(data: &[u8]) -> [u8; 32] {
+    let archive_digest = Sha256::digest(data);
+    let mut digest = Sha256::new();
+    digest.update(b"litchi-pptx-cross-physical-v2");
+    digest.update((data.len() as u64).to_le_bytes());
+    digest.update(archive_digest);
+    digest.finalize().into()
 }
 
 fn rename_slide(package: &mut Package, index: usize, name: &str) -> Result<()> {
@@ -1606,7 +1809,12 @@ fn slide_copy_plan_applies_atomically_rewrites_ownership_and_reopens() -> Result
         vec![9, 9, 8, 8],
     )))?;
 
-    let source_bytes = authored.to_bytes()?;
+    // Borrowed ingress intentionally has no physical-source provenance. Make
+    // the fixture canonical first so this remains the semantic borrowed-source
+    // copy/inverse regression; owned raw-topology behavior is covered by
+    // `cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse`.
+    let authored_bytes = authored.to_bytes()?;
+    let source_bytes = Package::from_bytes(&authored_bytes)?.to_bytes()?;
     let mut package = Package::from_bytes(&source_bytes)?;
     let before = part_states(&package);
     let plan = package.opened_presentation()?.plan_slide_copy(0_usize, 1)?;
