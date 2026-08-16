@@ -45,8 +45,9 @@ substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
 case, one source-backed DOCX semantic publication case, one source-backed
 media-rich PPTX semantic publication case, four matched same-slide/multi-slide
-PPTX batch cases, two opt-in PPTX cross-presentation slide-copy evidence
-selectors, two matched cross-slide ODP text-box publication cases, one
+PPTX batch cases, two owned-source PPTX cross-presentation slide-copy evidence
+selectors plus one opt-in source-backed plain cross-copy selector, two matched
+cross-slide ODP text-box publication cases, one
 matched ODT embedded-resource publication pair, one matched ODT mixed
 model-content publication pair, one XLSX commit/read attribution case,
 two matched XLSX calculation-metadata publication cases, two matched XLSX
@@ -79,7 +80,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 301
+provide their source-read counters. The current `Case` matrix exposes 302
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -195,6 +196,20 @@ speedup, allocation, RSS, release-ABBA, or physical-I/O claim at the 0145
 revision. Change 0158 now accepts the later owned-source additive-topology
 publisher on these exact selectors at the bounded prepared-operation scope.
 
+Change 0159 adds the independent opt-in
+`pptx_source_backed_cross_copy_plain` selector over the exact same plain
+three-slide-source/two-slide-destination bytes. It calls the public
+`SourceBackedPresentationEditor::plan_cross_slide_copy` and
+`publish_cross_slide_copy_to_stream` APIs; source-backed publication's
+internal rerun/verification/topology work therefore remains part of the
+publication phase. Only plan and public publication durations are reported;
+setup, reopen, raw/topology/semantic gates, typed stale/foreign refusals, and
+source-read checks are outside timing. The schema records separate source and
+destination logical `ReadAt` call/byte counters, with no cache, allocation,
+RSS, physical-I/O, eager/source speedup, ABBA, or media-rich claim. This
+selector brings the current selectable matrix to 302 names while leaving the
+default 36 cases / 198 records unchanged.
+
 Change 0146 adds 12 shared CFB MiniFAT `open_stream` evidence selectors:
 36-byte and 4095-byte targets across `many-small` and `wide-root`, with
 one-shot, repeat-3, and sequential repeat-8 operations plus matched
@@ -221,7 +236,8 @@ selectors for different-SID A-B-A, public bulk A-B-A, and overlapping
 same-target calls at the 36-byte and 4095-byte targets:
 `cfb_open_stream_mini_shared_{different_sid,bulk,concurrent}` and
 `cfb_open_stream_mini_4095_shared_{different_sid,bulk,concurrent}`. The
-selectable matrix was 291 names at that revision; the current matrix is 301.
+selectable matrix was 291 names at that revision; change 0154 later made it
+301, and change 0159 now makes it 302.
 The default remains 36 cases / 198 records. The runner accepts the control root-only vector, the prior
 direct-then-root vector, and the target-aware same-SID repeat vector, while
 recording ordered workload names, exact positional ranges, output hashes,
@@ -259,7 +275,7 @@ accepted only as source-event/correctness evidence. At the 0152 revision the
 291-name selector matrix was unchanged; change 0153 adds four RTF selectors
 measured at the pre-staged publication-call interval, making that matrix 295.
 Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
-current matrix 301. No runtime selector was added
+matrix 301 at that revision; change 0159 now makes it 302. No runtime selector was added
 to 0152; only `cfg(test)` source-event acceptance and tests changed. Root
 MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain. Local or
@@ -294,6 +310,16 @@ decompression, real-producer, generic OPC/PPTX, and iWork claims remain open.
 See the
 [`0158` record](../../docs/performance/changes/0158-pptx-additive-topology-release-abba.md)
 and [summary](../../docs/performance/results/pptx-additive-topology-abba-0158-summary.json).
+
+Change 0159 adds one source-backed plain PPTX cross-copy selector. It is
+correctness/counter evidence only over the matched existing plain corpus:
+`plan_ns` and `publication_ns` are separated, setup/reopen/gates are untimed,
+and source/destination logical `ReadAt` call/byte counters are reported
+separately. The public source-backed publication includes its preparation
+rerun and topology publication work; no eager/source speedup, cache,
+allocation/RSS, physical-I/O, media-rich, real-producer, or release-ABBA claim
+is made. See the
+[`0159` record](../../docs/performance/changes/0159-pptx-source-backed-cross-copy-evidence.md).
 
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:
@@ -597,6 +623,26 @@ publication phases separately; setup, reopen, semantic/package/closure,
 source-immutability, collision, durable-patch, stale/foreign/refusal, and
 output-hash checks remain untimed. This is correctness/evidence only and makes
 no performance claim.
+
+Measure the independent source-backed plain cross-copy evidence selector:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 \
+  --case pptx_source_backed_cross_copy_plain \
+  --json target/perf/pptx-source-backed-cross-slide-copy.json
+```
+
+This selector uses the exact plain corpus bytes from `pptx_cross_copy_plain`
+and copies source slide 3 into destination slide 2 at zero-based position 1.
+The public source-backed publisher reruns preparation and topology checks
+before writing the sequential output, so the reported phases are only
+`plan_ns` and `publication_ns`; there is no synthetic commit phase. Reopen,
+raw ZIP member/order/comment preservation, semantic/dependency gates, typed
+source/destination revision refusal, and foreign-editor refusal are untimed.
+The output is correctness/counter evidence only and does not compare eager
+and source-backed speed or claim cache, physical-I/O, allocation, RSS,
+media-rich, or real-producer behavior.
 
 Measure the matched XLSX calculation-metadata publication controls:
 
