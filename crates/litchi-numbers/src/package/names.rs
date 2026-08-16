@@ -26,8 +26,9 @@ use litchi_iwa_common::{
     },
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
-use litchi_iwa_protos::{numbers_names_codec, table_info_codec, tn, tsce, tst};
-use prost::Message;
+use litchi_iwa_protos::{
+    numbers_names_codec, numbers_table_cell_dependency_codec as dependency_codec, table_info_codec,
+};
 use thiserror::Error as ThisError;
 
 use super::{
@@ -1061,19 +1062,21 @@ fn validate_name_volatile_dependencies(
                 .ok_or(Error::InvalidSource)?;
         let object = resolved_object(source, resolved)?;
         validate_message_metadata(object, message_index)?;
-        let owner = tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())
-            .map_err(|_error| Error::InvalidSource)?;
-        if let Some(owner_reference) = owner.formula_owner.as_ref() {
+        let owner = dependency_codec::decode_formula_owner_dependencies(
+            message.data.as_slice(),
+            dependency_decode_options(&message.data),
+        )
+        .map_err(map_dependency_codec_error)?;
+        if let Some(owner_reference) = owner.formula_owner() {
             require_local_reference(
                 singular_length_payload(&message.data, 11)?,
-                owner_reference.identifier,
+                owner_reference.identifier(),
             )?;
         }
-        let nonempty = owner
-            .volatile_dependencies
-            .as_ref()
-            .and_then(|dependencies| dependencies.volatile_sheet_table_name_cells.as_ref())
-            .is_some_and(|cells| !cells.column_entries.is_empty());
+        let nonempty = match owner.volatile_dependencies() {
+            Some(payload) => volatile_sheet_table_name_cells_present(payload)?,
+            None => false,
+        };
         if nonempty {
             return Err(Error::UnsupportedDependency { path });
         }
@@ -1102,25 +1105,23 @@ fn rooted_formula_dependency_identifiers(source: &Package) -> Result<HashSet<u64
         unique_message_index(&document_object.messages, DOCUMENT_MESSAGE_TYPE)?
             .ok_or(Error::InvalidSource)?;
     validate_message_metadata(document_object, document_index)?;
-    let document = tn::DocumentArchive::decode(document_message.data.as_slice())
-        .map_err(|_error| Error::InvalidSource)?;
-    let Some(calculation_engine) = document.calculation_engine.as_ref() else {
+    let calculation_engine_payload = optional_length_payload(&document_message.data, 3)?;
+    let Some(calculation_engine_payload) = calculation_engine_payload else {
         return Ok(HashSet::new());
     };
-    require_local_reference(
-        singular_length_payload(&document_message.data, 3)?,
-        calculation_engine.identifier,
-    )?;
+    let calculation_engine_identifier =
+        local_reference_identifier_common(calculation_engine_payload).map_err(map_wire_error)?;
+    require_local_reference(calculation_engine_payload, calculation_engine_identifier)?;
     require_declared_reference(
         document_object,
         document_index,
-        calculation_engine.identifier,
+        calculation_engine_identifier,
         &[3],
     )?;
     let resolved = source
         .state
         .index
-        .resolve_ref_id(&source.state.components, calculation_engine.identifier)
+        .resolve_ref_id(&source.state.components, calculation_engine_identifier)
         .map_err(map_read_error)?
         .ok_or(Error::InvalidSource)?;
     let (engine_index, engine_message) =
@@ -1128,24 +1129,26 @@ fn rooted_formula_dependency_identifiers(source: &Package) -> Result<HashSet<u64
             .ok_or(Error::InvalidSource)?;
     let engine_object = resolved_object(source, resolved)?;
     validate_message_metadata(engine_object, engine_index)?;
-    let engine = tsce::CalculationEngineArchive::decode(engine_message.data.as_slice())
-        .map_err(|_error| Error::InvalidSource)?;
-    let references = engine.dependency_tracker.formula_owner_dependencies;
-    let tracker = singular_length_payload(&engine_message.data, 2)?;
+    let engine = dependency_codec::decode_calculation_engine(
+        engine_message.data.as_slice(),
+        dependency_decode_options(&engine_message.data),
+    )
+    .map_err(map_dependency_codec_error)?;
+    let tracker = engine.dependency_tracker();
+    dependency_codec::decode_dependency_tracker(tracker, dependency_decode_options(tracker))
+        .map_err(map_dependency_codec_error)?;
     let raw_references = repeated_length_payloads(tracker, 6)?;
-    if raw_references.len() != references.len() {
-        return Err(Error::InvalidSource);
-    }
     let mut identifiers = HashSet::new();
     identifiers
-        .try_reserve(references.len())
+        .try_reserve(raw_references.len())
         .map_err(|_allocation| Error::Allocation {
-            amount: references.len(),
+            amount: raw_references.len(),
         })?;
-    for (reference, raw) in references.iter().zip(raw_references) {
-        require_local_reference(raw, reference.identifier)?;
-        require_declared_reference(engine_object, engine_index, reference.identifier, &[2, 6])?;
-        if !identifiers.insert(reference.identifier) {
+    for raw in raw_references {
+        let identifier = local_reference_identifier_common(raw).map_err(map_wire_error)?;
+        require_local_reference(raw, identifier)?;
+        require_declared_reference(engine_object, engine_index, identifier, &[2, 6])?;
+        if !identifiers.insert(identifier) {
             return Err(Error::InvalidSource);
         }
     }
@@ -1222,9 +1225,7 @@ fn validate_rooted_pivot_dependencies(
     for (sheet_position, sheet) in source.document().sheets().iter().enumerate() {
         for table_position in 0..sheet.table_count() {
             let target = resolve_native_table(source, sheet_position, table_position)?;
-            let model = tst::TableModelArchive::decode(target.model_message.data.as_slice())
-                .map_err(|_error| Error::InvalidSource)?;
-            if model.pivot_owner.is_some() {
+            if pivot_owner_present(&target.model_message.data)? {
                 return Err(Error::UnsupportedDependency { path });
             }
         }
@@ -1346,15 +1347,14 @@ fn validate_root_document(source: &Package) -> Result<(), Error> {
     let (message_index, message) = unique_message_index(&object.messages, DOCUMENT_MESSAGE_TYPE)?
         .ok_or(Error::InvalidSource)?;
     validate_message_metadata(object, message_index)?;
-    let document = tn::DocumentArchive::decode(message.data.as_slice())
-        .map_err(|_error| Error::InvalidSource)?;
+    let document = Package::root_document(&source.state.components).map_err(map_read_error)?;
     let references = repeated_length_payloads(&message.data, 1)?;
-    if references.len() != document.sheets.len() {
+    if references.len() != document.sheet_references().len() {
         return Err(Error::InvalidSource);
     }
-    for (payload, reference) in references.into_iter().zip(document.sheets) {
-        require_local_reference(payload, reference.identifier)?;
-        require_declared_reference(object, message_index, reference.identifier, &[1])?;
+    for (payload, reference) in references.into_iter().zip(document.sheet_references()) {
+        require_local_reference(payload, reference.identifier())?;
+        require_declared_reference(object, message_index, reference.identifier(), &[1])?;
     }
     Ok(())
 }
@@ -1659,12 +1659,74 @@ fn repeated_length_payloads(source: &[u8], field_number: u32) -> Result<Vec<&[u8
     Ok(values)
 }
 
+fn optional_length_payload(source: &[u8], field_number: u32) -> Result<Option<&[u8]>, Error> {
+    let values = repeated_length_payloads(source, field_number)?;
+    match values.as_slice() {
+        [] => Ok(None),
+        [value] => Ok(Some(*value)),
+        _ => Err(Error::InvalidSource),
+    }
+}
+
 fn singular_length_payload(source: &[u8], field_number: u32) -> Result<&[u8], Error> {
     let values = repeated_length_payloads(source, field_number)?;
     match values.as_slice() {
         [value] => Ok(*value),
         _ => Err(Error::InvalidSource),
     }
+}
+
+fn volatile_sheet_table_name_cells_present(source: &[u8]) -> Result<bool, Error> {
+    // `TSCE.VolatileDependenciesExpandedArchive` is intentionally kept out of
+    // the generated-free dependency sidecar. Its field 4 is an optional
+    // opaque `CellCoordSetArchive`; we only need presence for the volatile-name
+    // dependency guard, while the enclosing dependency codec has already
+    // validated the owner payload and this nested message's framing.
+    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let mut seen = false;
+    let mut present = false;
+    for field in view.fields() {
+        if field.number() != 4 {
+            continue;
+        }
+        if seen || field.wire_type() != 2 {
+            return Err(Error::InvalidSource);
+        }
+        seen = true;
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        // `column_entries` is field 1 of the nested CellCoordSetArchive. An
+        // empty envelope is semantically empty in the generated model, so
+        // merely seeing the outer optional field is not sufficient.
+        let nested = WireView::parse(field.payload()).map_err(map_wire_error)?;
+        let mut has_column_entry = false;
+        for nested_field in nested.fields() {
+            if nested_field.number() != 1 {
+                continue;
+            }
+            if nested_field.wire_type() != 2 {
+                return Err(Error::InvalidSource);
+            }
+            nested_field
+                .validate_canonical_framing()
+                .map_err(map_wire_error)?;
+            WireView::parse(nested_field.payload()).map_err(map_wire_error)?;
+            has_column_entry = true;
+        }
+        present = has_column_entry;
+    }
+    Ok(present)
+}
+
+fn pivot_owner_present(source: &[u8]) -> Result<bool, Error> {
+    let payload = optional_length_payload(source, 85)?;
+    let Some(payload) = payload else {
+        return Ok(false);
+    };
+    // The selected field is a TSP.Reference. Validate its complete canonical
+    // envelope, but do not traverse or allocate the unrelated table datastore
+    // graph merely to answer the pivot dependency guard.
+    let _ = local_reference_identifier_common(payload).map_err(map_wire_error)?;
+    Ok(true)
 }
 
 fn sheet_drawable_payloads(message_type: u32, source: &[u8]) -> Result<Vec<&[u8]>, Error> {
@@ -2354,6 +2416,26 @@ fn names_decode_options(source: &[u8]) -> numbers_names_codec::DecodeOptions {
     )
 }
 
+fn dependency_decode_options(source: &[u8]) -> dependency_codec::DecodeOptions {
+    let bytes = source.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let fields = source
+        .len()
+        .saturating_mul(8)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let work = source
+        .len()
+        .saturating_mul(128)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    dependency_codec::DecodeOptions::new(
+        bytes,
+        fields,
+        work,
+        u32::try_from(WireLimits::MAX_NESTING).unwrap_or(u32::MAX),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        bytes,
+    )
+}
+
 fn decode_sheet_name(message_type: u32, source: &[u8]) -> Result<&str, Error> {
     let options = names_decode_options(source);
     let snapshot = match message_type {
@@ -2459,6 +2541,49 @@ fn map_names_codec_error(error: numbers_names_codec::DecodeError) -> Error {
             }
         },
         None | Some(_) => Error::InvalidSource,
+    }
+}
+
+fn map_dependency_codec_error(error: dependency_codec::DecodeError) -> Error {
+    if let Some(amount) = error.allocation_requested() {
+        return Error::Allocation { amount };
+    }
+    match error.resource_limit() {
+        Some(dependency_codec::DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(dependency_codec::DecodeLimit::References { observed, maximum }) => {
+            Error::LimitExceeded {
+                kind: LimitKind::PayloadReferences,
+                observed: usize_as_u64(observed),
+                maximum: usize_as_u64(maximum),
+            }
+        },
+        Some(dependency_codec::DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::NameBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(dependency_codec::DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireFields,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(dependency_codec::DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(dependency_codec::DecodeLimit::Nesting { observed, maximum }) => {
+            Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
+            }
+        },
+        Some(_) | None => Error::InvalidSource,
     }
 }
 

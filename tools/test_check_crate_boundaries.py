@@ -8964,6 +8964,109 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_names_package_no_eager_prost_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::{tn, tsce, tst};\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tn::DocumentArchive::decode(bytes);\n"
+                "        let _ = tsce::CalculationEngineArchive::decode(bytes);\n"
+                "        let _ = tst::TableModelArchive::decode(bytes);\n"
+                "        let _ = M::decode(bytes);\n"
+                "        let _ = decode_message::<tn::DocumentArchive>(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_package_no_eager_prost_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_names_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "prost::Message": "use prost::Message;\n",
+            "generated-message decode": (
+                "let _ = tsce::CalculationEngineArchive::decode(bytes);\n"
+            ),
+            "generated-message generic decode": "let _ = M::decode(bytes);\n",
+            "generated-message decode helper": (
+                "let _ = decode_message::<tst::TableModelArchive>(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_names_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    expected_label = (
+                        "generated-message decode"
+                        if label == "generated-message generic decode"
+                        else label
+                    )
+                    self.assertTrue(
+                        any(f"uses {expected_label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_names_package_no_eager_prost_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                'const NOTE: &str = "tsce::CalculationEngineArchive::decode";\n'
+                "/* decode_message::<tst::TableModelArchive> */\n"
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tn;\n"
+                "    use prost::Message;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_package_no_eager_prost_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_focused_pages_package_no_eager_prost_allows_test_only_usage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
