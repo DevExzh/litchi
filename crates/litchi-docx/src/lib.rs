@@ -48,6 +48,8 @@ pub mod statistics;
 /// Source-backed package-wide inventory and forward-only redaction of
 /// relationship-owned story hyperlinks.
 pub mod story_hyperlinks;
+/// Bounded, forward-only creation of plain DOCX paragraphs and runs.
+pub mod streaming;
 pub mod styles;
 pub mod table;
 pub mod template;
@@ -135,5 +137,9 @@ pub use paragraph::{
 };
 pub use run_effects::{Effect, Effects, OpaqueExtension};
 pub use section::{Emu, Margins, PageSize, Section, Sections};
+pub use streaming::{
+    StreamingDocumentError, StreamingDocumentErrorSource, StreamingDocumentLimits,
+    StreamingDocumentWriter,
+};
 pub use table::{Cell, Row, Table, VMergeState};
 pub use writer::*;
