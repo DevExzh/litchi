@@ -1938,6 +1938,24 @@ impl SourceBackedPackage {
         })
     }
 
+    /// Return the exact ZIP member names retained by the indexed source.
+    ///
+    /// This metadata-only iterator is intended for low-level physical-name
+    /// collision checks. It includes ordinary parts, relationship members,
+    /// package metadata, and non-part members without reading payload bytes.
+    pub fn physical_member_names(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.archive.file_names()
+    }
+
+    /// Whether any retained physical member declares traditional ZIP encryption.
+    ///
+    /// This is central-directory metadata captured during bounded open; it does
+    /// not read or decrypt any member payload.
+    #[must_use]
+    pub fn has_encrypted_entries(&self) -> bool {
+        self.archive.has_encrypted_entries()
+    }
+
     /// Look up one ordinary part without reading its payload.
     pub fn part(&self, partname: &PackURI) -> Result<PartView<'_>> {
         self.source.ensure_current()?;
@@ -2056,6 +2074,23 @@ impl SourceBackedPackage {
         SourceArtifact {
             snapshot: self.source.clone(),
         }
+    }
+
+    /// Validate that the located ZIP ends at the exact source boundary.
+    ///
+    /// The offset was retained by the initial positional archive locator, so
+    /// this check performs no source read, allocation, or directory rescan. It
+    /// lets a format facade refuse trailing opaque bytes before returning a
+    /// topology-changing semantic plan.
+    pub fn validate_topology_source_boundary(&self) -> Result<()> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if self.archive.archive_end_offset() != self.source.length {
+            return Err(overlay_unavailable(
+                "source ZIP archive has trailing bytes outside its located archive",
+            ));
+        }
+        Ok(())
     }
 
     /// Fully materialize this immutable view into the existing mutable package type.

@@ -159,11 +159,12 @@ pub use opened::{
 };
 pub use package::Package;
 pub use presentation::{
-    MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedPresentation,
-    SourceBackedPresentationEditor, SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit,
-    SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
-    SourceBackedSlideEdit, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage,
-    SourceImageDescriptor, SourceImageTarget, SourceSlide,
+    MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedCrossSlideCopyPlan,
+    SourceBackedCrossSlideCopySnapshot, SourceBackedPresentation, SourceBackedPresentationEditor,
+    SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
+    SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
+    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage, SourceImageDescriptor,
+    SourceImageTarget, SourceSlide,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,

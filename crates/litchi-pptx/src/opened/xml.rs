@@ -219,7 +219,9 @@ struct SlideIdElement {
     relationship_id: String,
     span: Range<usize>,
     element_name: Option<Vec<u8>>,
+    element_namespace: Option<Vec<u8>>,
     relationship_attribute_name: Option<Vec<u8>>,
+    relationship_namespace: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]
@@ -351,23 +353,62 @@ pub(crate) fn insert_slide(
     id: u32,
     relationship_id: &str,
 ) -> Result<Vec<u8>> {
-    if position > current.len() {
+    insert_slide_binding(
+        xml,
+        current
+            .iter()
+            .map(|slide| (slide.id, slide.relationship_id.as_str())),
+        position,
+        id,
+        relationship_id,
+    )
+}
+
+/// Insert one self-contained `p:sldId` entry while validating only the lexical
+/// presentation binding supplied by the caller.
+///
+/// Source-backed presentations deliberately avoid materializing opened
+/// [`Slide`] values.  This binding-based variant preserves the exact source
+/// XML ranges while remaining usable by both presentation facades.
+pub(crate) fn insert_slide_binding<'a, I>(
+    xml: &[u8],
+    current: I,
+    position: usize,
+    id: u32,
+    relationship_id: &str,
+) -> Result<Vec<u8>>
+where
+    I: ExactSizeIterator<Item = (u32, &'a str)>,
+{
+    let current_len = current.len();
+    if position > current_len {
         return Err(invalid(
             "opened-presentation slide insertion position is out of bounds",
         ));
     }
     let elements = slide_id_elements(xml, true)?;
-    if elements.len() != current.len() {
+    if elements.len() != current_len {
         return Err(invalid(
             "opened-presentation slide-order XML differs from the semantic graph",
         ));
     }
-    for (element, slide) in elements.iter().zip(current) {
-        if element.id != slide.id || element.relationship_id != slide.relationship_id {
+    let mut current = current;
+    for element in &elements {
+        let Some((expected_id, expected_relationship_id)) = current.next() else {
+            return Err(invalid(
+                "opened-presentation slide-order XML differs from the semantic graph",
+            ));
+        };
+        if element.id != expected_id || element.relationship_id != expected_relationship_id {
             return Err(invalid(
                 "opened-presentation slide-order binding changed during staging",
             ));
         }
+    }
+    if current.next().is_some() {
+        return Err(invalid(
+            "opened-presentation slide-order XML differs from the semantic graph",
+        ));
     }
     let exemplar = elements
         .first()
@@ -380,6 +421,19 @@ pub(crate) fn insert_slide(
         .relationship_attribute_name
         .as_deref()
         .ok_or_else(|| invalid("opened-presentation relationship attribute name is missing"))?;
+    let element_namespace = exemplar
+        .element_namespace
+        .as_deref()
+        .ok_or_else(|| invalid("opened-presentation slide entry namespace is missing"))?;
+    let relationship_namespace = exemplar
+        .relationship_namespace
+        .as_deref()
+        .ok_or_else(|| invalid("opened-presentation relationship namespace is missing"))?;
+    if !relationship_attribute_name.contains(&b':') {
+        return Err(invalid(
+            "opened-presentation relationship attribute has no namespace prefix",
+        ));
+    }
     let insertion = elements
         .get(position)
         .map_or_else(
@@ -391,7 +445,9 @@ pub(crate) fn insert_slide(
     let capacity = element_name
         .len()
         .checked_add(relationship_attribute_name.len())
-        .and_then(|value| value.checked_add(64))
+        .and_then(|value| value.checked_add(element_namespace.len()))
+        .and_then(|value| value.checked_add(relationship_namespace.len()))
+        .and_then(|value| value.checked_add(96))
         .ok_or_else(|| invalid("opened-presentation slide entry size overflow"))?;
     fragment
         .try_reserve_exact(capacity)
@@ -401,6 +457,12 @@ pub(crate) fn insert_slide(
         })?;
     fragment.push(b'<');
     fragment.extend_from_slice(element_name);
+    append_namespace_binding(&mut fragment, element_name, element_namespace)?;
+    append_namespace_binding(
+        &mut fragment,
+        relationship_attribute_name,
+        relationship_namespace,
+    )?;
     fragment.extend_from_slice(b" id=\"");
     fragment.extend_from_slice(id.to_string().as_bytes());
     fragment.extend_from_slice(b"\" ");
@@ -423,6 +485,21 @@ pub(crate) fn insert_slide(
     output.extend_from_slice(&fragment);
     output.extend_from_slice(&xml[insertion..]);
     Ok(output)
+}
+
+fn append_namespace_binding(output: &mut Vec<u8>, name: &[u8], namespace: &[u8]) -> Result<()> {
+    output.extend_from_slice(b" xmlns");
+    if let Some(separator) = name.iter().position(|byte| *byte == b':') {
+        if separator == 0 {
+            return Err(invalid("opened-presentation XML name has an empty prefix"));
+        }
+        output.push(b':');
+        output.extend_from_slice(&name[..separator]);
+    }
+    output.extend_from_slice(b"=\"");
+    output.extend_from_slice(namespace);
+    output.push(b'"');
+    Ok(())
 }
 
 pub(crate) fn rewrite_shape_text(
@@ -1108,6 +1185,21 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let pml_namespace = is_presentation_namespace(&namespace);
+        let captured_element_namespace = if capture_names
+            && elements.is_empty()
+            && list_depth == Some(depth)
+            && matches!(&event, Event::Empty(element) if element.local_name().as_ref() == b"sldId")
+        {
+            match &namespace {
+                ResolveResult::Bound(Namespace(value)) if pml_namespace => Some(clone_xml_name(
+                    value,
+                    "opened-presentation slide entry namespace",
+                )?),
+                _ => None,
+            }
+        } else {
+            None
+        };
         let event = event.into_owned();
         drop(namespace);
         let end = position(&reader)?;
@@ -1140,7 +1232,7 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
                     if open.is_some() {
                         return Err(invalid("opened-presentation slide IDs overlap"));
                     }
-                    let (id, relationship_id, _relationship_attribute_name) =
+                    let (id, relationship_id, _relationship_attribute_name, _) =
                         parse_slide_id(&element, &reader, false)?;
                     open = Some(OpenElement {
                         id,
@@ -1160,15 +1252,23 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
                         ));
                     }
                     let capture_element_names = capture_names && elements.is_empty();
-                    let (id, relationship_id, relationship_attribute_name) =
+                    let (id, relationship_id, relationship_attribute_name, relationship_namespace) =
                         parse_slide_id(&element, &reader, capture_element_names)?;
                     elements.push(SlideIdElement {
                         id,
                         relationship_id,
                         span: start..end,
-                        element_name: capture_element_names
-                            .then(|| element.name().as_ref().to_vec()),
+                        element_name: if capture_element_names {
+                            Some(clone_xml_name(
+                                element.name().as_ref(),
+                                "opened-presentation slide entry name",
+                            )?)
+                        } else {
+                            None
+                        },
+                        element_namespace: captured_element_namespace,
                         relationship_attribute_name,
+                        relationship_namespace,
                     });
                 }
             },
@@ -1186,7 +1286,9 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
                         relationship_id: active.relationship_id,
                         span: active.start..end,
                         element_name: None,
+                        element_namespace: None,
                         relationship_attribute_name: None,
+                        relationship_namespace: None,
                     });
                 }
                 if list_depth == Some(depth)
@@ -1231,7 +1333,7 @@ fn parse_slide_id(
     element: &BytesStart<'_>,
     reader: &NsReader<&[u8]>,
     capture_relationship_name: bool,
-) -> Result<(u32, String, Option<Vec<u8>>)> {
+) -> Result<(u32, String, Option<Vec<u8>>, Option<Vec<u8>>)> {
     let value =
         litchi_ooxml_common::xml::unqualified_attribute_value(element, b"id", reader.decoder())?
             .ok_or_else(|| invalid("opened-presentation slide ID lacks id"))?;
@@ -1241,27 +1343,36 @@ fn parse_slide_id(
     let relationship_id = crate::parts::relationship_attribute(element, reader)?
         .ok_or_else(|| invalid("opened-presentation slide ID lacks r:id"))?;
     let mut relationship_attribute_name = None;
+    let mut relationship_namespace = None;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() != b"id" {
             continue;
         }
+        let resolved = reader.resolver().resolve_attribute(attribute.key).0;
         if capture_relationship_name
-            && matches!(
-                reader.resolver().resolve_attribute(attribute.key).0,
-                ResolveResult::Bound(Namespace(value))
-                    if value == b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-                        || value == b"http://purl.oclc.org/ooxml/officeDocument/relationships"
-            )
+            && matches!(&resolved, ResolveResult::Bound(Namespace(value))
+                if *value == b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                    || *value == b"http://purl.oclc.org/ooxml/officeDocument/relationships")
         {
             if relationship_attribute_name
-                .replace(attribute.key.as_ref().to_vec())
+                .replace(clone_xml_name(
+                    attribute.key.as_ref(),
+                    "opened-presentation relationship attribute name",
+                )?)
                 .is_some()
             {
                 return Err(invalid(
                     "opened-presentation slide ID repeats its relationship attribute",
                 ));
             }
+            let ResolveResult::Bound(Namespace(value)) = resolved else {
+                unreachable!("relationship namespace was matched above");
+            };
+            relationship_namespace = Some(clone_xml_name(
+                value,
+                "opened-presentation relationship namespace",
+            )?);
         }
     }
     if capture_relationship_name && relationship_attribute_name.is_none() {
@@ -1269,7 +1380,21 @@ fn parse_slide_id(
             "opened-presentation slide ID relationship name is unresolved",
         ));
     }
-    Ok((id, relationship_id, relationship_attribute_name))
+    Ok((
+        id,
+        relationship_id,
+        relationship_attribute_name,
+        relationship_namespace,
+    ))
+}
+
+fn clone_xml_name(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.extend_from_slice(value);
+    Ok(output)
 }
 
 fn drawing_text_elements_for_owners(

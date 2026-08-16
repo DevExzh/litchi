@@ -28,17 +28,18 @@ use crate::{Error, Result};
 /// Maximum number of existing slides in one source-backed batch edit.
 pub const MAX_SOURCE_BACKED_SLIDE_BATCH: usize = 32;
 
-struct SourceSlideData {
+pub(super) struct SourceSlideData {
     position: usize,
-    part_uri: PackURI,
-    binding: SlideBinding,
+    pub(super) slide_id: u32,
+    pub(super) part_uri: PackURI,
+    pub(super) binding: SlideBinding,
 }
 
-struct SourceInner {
-    package: SourceBackedPackage,
+pub(super) struct SourceInner {
+    pub(super) package: SourceBackedPackage,
     // Retain the pinned mandatory root without relying on the OPC payload cache.
     _presentation: SourcePart,
-    slides: Box<[Arc<SourceSlideData>]>,
+    pub(super) slides: Box<[Arc<SourceSlideData>]>,
 }
 
 struct SourceCatalog {
@@ -51,7 +52,7 @@ struct SourceCatalog {
 /// Read-only PresentationML part adapter that retains the source-backed
 /// payload handle instead of escaping it as an unmanaged `Arc`.
 #[derive(Debug, Clone)]
-struct SourcePart {
+pub(super) struct SourcePart {
     partname: PackURI,
     content_type: String,
     data: PartData,
@@ -60,7 +61,7 @@ struct SourcePart {
 }
 
 impl SourcePart {
-    fn from_view(view: &PartView<'_>, data: PartData) -> Self {
+    pub(super) fn from_view(view: &PartView<'_>, data: PartData) -> Self {
         Self {
             partname: view.partname().clone(),
             content_type: view.content_type().to_string(),
@@ -121,8 +122,8 @@ struct PartBinding {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct SlideBinding {
-    slide_reference_id: String,
+pub(super) struct SlideBinding {
+    pub(super) slide_reference_id: String,
     presentation_relationship: RelationshipBinding,
     slide: PartBinding,
 }
@@ -178,7 +179,7 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 /// [`SourceSlide::text`] selects one. The type has no edit or output APIs.
 #[derive(Clone)]
 pub struct SourceBackedPresentation {
-    inner: Arc<SourceInner>,
+    pub(super) inner: Arc<SourceInner>,
 }
 
 /// A lifetime-free read-only slide handle from [`SourceBackedPresentation`].
@@ -353,10 +354,10 @@ impl SourceImage {
 /// exact source checked during editing is the source raw-copied to output.
 /// It supports no package topology or relationship changes.
 pub struct SourceBackedPresentationEditor {
-    package: SourceBackedPackage,
+    pub(super) package: SourceBackedPackage,
     _presentation: SourcePart,
-    slides: Box<[Arc<SourceSlideData>]>,
-    limits: ReadLimits,
+    pub(super) slides: Box<[Arc<SourceSlideData>]>,
+    pub(super) limits: ReadLimits,
 }
 
 /// An immutable exact-source snapshot of one slide XML part.
@@ -2372,6 +2373,7 @@ fn validate_slide_graph(
         }
         slides.push(Arc::new(SourceSlideData {
             position,
+            slide_id: reference.id(),
             part_uri: part_uri.clone(),
             binding: SlideBinding {
                 slide_reference_id: reference.relationship_id().to_string(),
