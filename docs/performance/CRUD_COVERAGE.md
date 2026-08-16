@@ -89,6 +89,10 @@ conversion for other formats remain.
    patch, and output-materialization intervals independently. This is an
    attribution baseline only; a mechanism still needs balanced clean release
    control/candidate evidence before any optimization or speedup is accepted.
+   Change 0161 tested the narrow borrowed-input clone removal and rejected it:
+   large lifecycle p50 regressed in both directions, one beyond 5%, and
+   payload-heavy directions disagreed. Do not repeat that substitution; the
+   next DOC mechanism needs a shared physical/parsed substrate or fused proof.
    Continue final owner/public-reader work after the accepted native
    XLS editor reuse and fixed-width inventory carry-forward, DOC batched stream
    publication, PPT root-open reuse and

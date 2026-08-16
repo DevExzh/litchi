@@ -641,6 +641,15 @@ allocation/RSS, cold-cache, and real-producer results remain open. See
 [summary](results/doc-owner-public-phases-0160-summary.json), and the
 [raw-artifact manifest](results/doc-owner-public-phases-0160.sha256).
 
+Change 0161 tested the smallest direct follow-up: borrow the DOC bytes during
+initial/final public-reader validation instead of cloning them. Clean release
+`A1 control, B1 candidate, B2 candidate, A2 control` processes on CPU 2 used
+20 warmups and 500 samples for all three shapes. Tiny lifecycle p50 improved
+3.20%/3.24%, but large regressed 3.06%/7.31% and payload-heavy directions were
+-0.18%/+2.52%. Large p95 regressed 37.52%/14.49%. The candidate was rejected
+and fully removed; production remains the control. See [change 0161](changes/0161-doc-public-validation-borrow-rejected.md)
+and its [summary](results/doc-public-borrow-0161-summary.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use

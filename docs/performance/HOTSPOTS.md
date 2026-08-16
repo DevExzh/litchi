@@ -904,6 +904,16 @@ changing rank. This is an attribution baseline, not an accepted optimization
 or speedup. The next native mechanism must keep both validation layers and pass
 balanced clean release comparison.
 
+Change 0161 tested and rejected the narrowest copy-elision interpretation of
+that result. Borrowing the source/candidate bytes only for complete
+public-reader validation improved tiny lifecycle p50 3.20%/3.24%, but large
+regressed 3.06%/7.31% and payload-heavy directions disagreed. The complete
+public-reader interval itself regressed 8.18%/11.54% p50 for large. The removed
+clone may have preconditioned cache/allocation state, but no cache or allocation
+claim is made. The candidate is fully absent from production. Further native
+DOC work needs a measured shared physical/parsed substrate or fused proof, not
+the same naked borrow substitution.
+
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed
 scalar and bounded-batch selectors for one-owner and 64-owner visibility edits.
