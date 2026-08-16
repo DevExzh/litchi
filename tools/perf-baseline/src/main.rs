@@ -118,6 +118,7 @@ const ODP_MEDIA_CORPUS_GENERATOR: &str = "litchi-odp-media-textbox-publication-v
 const ODP_TEXT_BOX_BATCH_CORPUS_GENERATOR: &str = "litchi-odp-cross-slide-textbox-publication-v1";
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1";
+const RTF_PICTURE_CRUD_CORPUS_GENERATOR: &str = "litchi-rtf-picture-crud-v1";
 const XLSX_STREAMING_CORPUS_GENERATOR: &str = "litchi-xlsx-streaming-create-v1";
 const RTF_STREAMING_CORPUS_GENERATOR: &str = "litchi-rtf-streaming-create-v1";
 const RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES: usize = 16 * 1024;
@@ -760,6 +761,8 @@ enum Case {
     RtfLogicalTailPlanNoopSave,
     RtfValidationReport,
     RtfStreamingCreate,
+    RtfPicturePayloadBatchReplace,
+    RtfPictureBatchRemove,
     DocxSemanticOpen,
     DocxSemanticListParagraphs,
     DocxSemanticOneParagraph,
@@ -1179,6 +1182,8 @@ impl Case {
             Self::RtfLogicalTailPlanNoopSave => "rtf_logical_tail_plan_noop_save",
             Self::RtfValidationReport => "rtf_validation_report",
             Self::RtfStreamingCreate => "rtf_streaming_create",
+            Self::RtfPicturePayloadBatchReplace => "rtf_picture_payload_batch_replace",
+            Self::RtfPictureBatchRemove => "rtf_picture_batch_remove",
             Self::DocxSemanticOpen => "docx_semantic_open",
             Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
             Self::DocxSemanticOneParagraph => "docx_semantic_one_paragraph",
@@ -1508,6 +1513,13 @@ impl Case {
                 | Self::RtfLogicalTailPlanAppend
                 | Self::RtfLogicalTailCommitNoopSave
                 | Self::RtfLogicalTailPlanNoopSave
+        )
+    }
+
+    const fn is_rtf_picture_crud(self) -> bool {
+        matches!(
+            self,
+            Self::RtfPicturePayloadBatchReplace | Self::RtfPictureBatchRemove
         )
     }
 
@@ -2650,6 +2662,8 @@ struct SourceSummary {
     odf_content_cow: Option<OdfContentCowSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rtf_picture_crud: Option<RtfPictureCrudSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     doc_owner_public_phases: Option<DocOwnerPublicPhaseSummary>,
 }
@@ -4162,6 +4176,48 @@ struct RtfTailAppendSummary {
     durable_patch_verified: bool,
     reopen_verified: bool,
     source_conflict_verified: bool,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct RtfPictureCrudSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    shape: &'static str,
+    picture_count: usize,
+    selected_count: usize,
+    selected_positions: Vec<usize>,
+    source_bytes: u64,
+    output_bytes: u64,
+    payload_bytes: usize,
+    source_sha256: String,
+    expected_output_sha256: String,
+    open_ns: Vec<u64>,
+    stage_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    lifecycle_ns: Vec<u64>,
+    publication_output_sha256: Vec<String>,
+    gates: RtfPictureCrudGateSummary,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct RtfPictureCrudGateSummary {
+    semantic_reopen_verified: bool,
+    raw_unselected_preservation_verified: bool,
+    exact_noop_verified: bool,
+    durable_forward_verified: bool,
+    durable_inverse_verified: bool,
+    durable_deterministic_verified: bool,
+    volatile_forward_verified: bool,
+    volatile_inverse_verified: bool,
+    stale_source_refusal_verified: bool,
+    foreign_source_refusal_verified: bool,
+    refusal_verified: bool,
+    partial_sink_verified: bool,
+    zero_sink_verified: bool,
+    source_hash_verified: bool,
+    output_hash_verified: bool,
 }
 
 /// A non-seekable, bounded memory sink that consumes every output byte.
@@ -5710,6 +5766,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_xlsx_cell_values()
                     && !case.uses_streaming_creation()
                     && !case.uses_semantic_rtf()
+                    && !case.is_rtf_picture_crud()
                     && !case.uses_semantic_docx()
                     && !case.uses_semantic_pptx()
                     && !case.uses_semantic_odt()
@@ -6460,6 +6517,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         if rtf_rows == 0 {
             return Err("selected RTF variants and shapes produce no supported cases".into());
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_rtf_picture_crud()) {
+        for shape in &options.semantic_shapes {
+            let corpus = build_rtf_picture_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.is_rtf_picture_crud())
+            {
+                results.push(run_rtf_picture_crud(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
         }
     }
 
@@ -7438,6 +7514,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "rtf_logical_tail_plan_noop_save" => Some(Case::RtfLogicalTailPlanNoopSave),
         "rtf_validation_report" => Some(Case::RtfValidationReport),
         "rtf_streaming_create" => Some(Case::RtfStreamingCreate),
+        "rtf_picture_payload_batch_replace" => Some(Case::RtfPicturePayloadBatchReplace),
+        "rtf_picture_batch_remove" => Some(Case::RtfPictureBatchRemove),
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
         "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
         "docx_semantic_one_paragraph" => Some(Case::DocxSemanticOneParagraph),
@@ -7768,6 +7846,7 @@ fn print_usage() {
                                        rtf_semantic_one_edit_save,rtf_semantic_one_percent_edit_save,\n\
                                        rtf_semantic_remove_paragraph_save,rtf_semantic_move_paragraph_save,\n\
                                        rtf_logical_tail_append,rtf_logical_tail_noop_save,\n\
+                                       rtf_picture_payload_batch_replace,rtf_picture_batch_remove,\n\
                                        rtf_streaming_create,\n\
                                        docx_semantic_open,docx_semantic_list_paragraphs,\n\
                                        docx_semantic_one_paragraph,docx_semantic_full_text,\n\
@@ -9044,6 +9123,137 @@ fn build_rtf_lifecycle_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
     })
 }
 
+fn rtf_picture_count(shape: SemanticShape) -> usize {
+    match shape {
+        SemanticShape::Tiny => 2,
+        SemanticShape::Medium => 8,
+        SemanticShape::Large => 64,
+    }
+}
+
+fn rtf_picture_payload(index: usize, jpeg: bool, replacement: bool) -> Vec<u8> {
+    const PAYLOAD_BYTES: usize = 16;
+    let mut payload = Vec::with_capacity(PAYLOAD_BYTES);
+    if jpeg {
+        payload.extend_from_slice(&[0xff, 0xd8]);
+    } else {
+        payload.extend_from_slice(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]);
+    }
+    let seed = (index as u8)
+        .wrapping_mul(0x31)
+        .wrapping_add(if replacement { 0xa7 } else { 0x19 });
+    let trailer = if jpeg { 2 } else { 0 };
+    while payload.len() < PAYLOAD_BYTES.saturating_sub(trailer) {
+        let offset = payload.len() as u8;
+        payload.push(seed.wrapping_add(offset.wrapping_mul(0x17)));
+    }
+    if jpeg {
+        payload.extend_from_slice(&[0xff, 0xd9]);
+    }
+    debug_assert_eq!(payload.len(), PAYLOAD_BYTES);
+    payload
+}
+
+fn rtf_picture_hex(payload: &[u8]) -> String {
+    let mut encoded = String::with_capacity(payload.len().saturating_mul(2));
+    for byte in payload {
+        use std::fmt::Write as _;
+        let _ = write!(&mut encoded, "{byte:02x}");
+    }
+    encoded
+}
+
+fn rtf_picture_hex_transport(payload: &[u8], picture_index: usize) -> String {
+    let encoded = rtf_picture_hex(payload);
+    let mut transport = String::with_capacity(encoded.len().saturating_add(encoded.len() / 8));
+    for (digit_index, digit) in encoded.bytes().enumerate() {
+        if digit_index != 0 && digit_index % 8 == 0 {
+            transport.push(if (digit_index / 8 + picture_index).is_multiple_of(2) {
+                '\n'
+            } else {
+                ' '
+            });
+        }
+        let uppercase = (digit_index + picture_index).is_multiple_of(3);
+        transport.push(if uppercase {
+            digit.to_ascii_uppercase() as char
+        } else {
+            digit as char
+        });
+    }
+    transport
+}
+
+fn build_rtf_picture_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let picture_count = rtf_picture_count(shape);
+    if picture_count == 0 || picture_count > litchi_rtf::edit::MAX_PICTURE_PAYLOAD_OPERATIONS {
+        return Err("RTF picture corpus exceeds the public batch-operation ceiling".into());
+    }
+    let mut source = String::from(r"{\rtf1\ansi ");
+    let mut expected_payloads = Vec::with_capacity(picture_count);
+    for index in 0..picture_count {
+        let jpeg = index % 2 == 1;
+        let payload = rtf_picture_payload(index, jpeg, false);
+        expected_payloads.push(payload.clone());
+        source.push_str(&format!("root{index}"));
+        source.push_str(if jpeg {
+            r"{\pict\jpegblip\picw120\pich90 "
+        } else {
+            r"{\pict\pngblip\picw120\pich90 "
+        });
+        source.push_str(&rtf_picture_hex_transport(&payload, index));
+        source.push('}');
+    }
+    source.push('}');
+    let archive = source.into_bytes();
+    if !archive.is_ascii() {
+        return Err("RTF picture corpus is not ASCII transport".into());
+    }
+    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    if document.to_bytes()? != archive {
+        return Err("RTF picture corpus lost exact source identity".into());
+    }
+    if document.pictures().len() != picture_count {
+        return Err("RTF picture corpus picture count differs from specification".into());
+    }
+    for (picture, expected) in document.pictures().iter().zip(expected_payloads.iter()) {
+        if picture.data() != expected {
+            return Err("RTF picture corpus payload differs from specification".into());
+        }
+    }
+    let target_payload = expected_payloads
+        .first()
+        .cloned()
+        .ok_or("RTF picture corpus has no target payload")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("rtf-picture-crud-{}", shape.name()),
+            generator: RTF_PICTURE_CRUD_CORPUS_GENERATOR,
+            package_format: "RTF",
+            shape: shape.name(),
+            payload_kind: "deterministic-ascii-root-mixed-case-hex-png-jpeg",
+            compression: "none",
+            entry_count: picture_count,
+            archive_member_count: 1,
+            entry_bytes: target_payload.len(),
+            uncompressed_payload_bytes: picture_count
+                .checked_mul(target_payload.len())
+                .ok_or("RTF picture payload byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "picture:0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: Some("picture-crud"),
+            xlsx: None,
+        },
+        archive,
+        target_name: "picture:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
 fn rtf_logical_tail_paragraph_count(shape: SemanticShape) -> usize {
     match shape {
         SemanticShape::Tiny => 4,
@@ -10032,8 +10242,8 @@ fn verify_pptx_source_backed_cross_copy_gates(
         &inserted_uri,
         opc_content_type::PML_SLIDE,
     )?;
-    let content_types_verified = candidate_members.get("[Content_Types].xml")
-        == Some(&expected_content_types);
+    let content_types_verified =
+        candidate_members.get("[Content_Types].xml") == Some(&expected_content_types);
     let package_topology_verified = package_relationships_verified
         && slide_bindings_verified
         && presentation_relationships_verified
@@ -10102,10 +10312,7 @@ fn verify_pptx_source_backed_cross_copy_gates(
     let destination_revision_refusal_verified =
         source_backed_cross_copy_revision_refusal(source_archive, destination_archive, false)?;
     let foreign_destination_refusal_verified =
-        source_backed_cross_copy_foreign_destination_refusal(
-            source_archive,
-            destination_archive,
-        )?;
+        source_backed_cross_copy_foreign_destination_refusal(source_archive, destination_archive)?;
 
     let gates = PptxSourceBackedCrossCopyGateSummary {
         matched_existing_plain_corpus_verified,
@@ -10269,9 +10476,9 @@ fn pptx_source_backed_expected_content_types(
         .checked_add(override_xml.len())
         .ok_or("source-backed PPTX expected content-types size overflows usize")?;
     let mut expected = Vec::new();
-    expected
-        .try_reserve_exact(total)
-        .map_err(|error| format!("source-backed PPTX expected content-types allocation: {error}"))?;
+    expected.try_reserve_exact(total).map_err(|error| {
+        format!("source-backed PPTX expected content-types allocation: {error}")
+    })?;
     expected.extend_from_slice(&source[..close]);
     expected.extend_from_slice(override_xml.as_bytes());
     expected.extend_from_slice(&source[close..]);
@@ -13430,6 +13637,9 @@ fn run_case_with_config(
             run_semantic_rtf(case, corpus, warmup_iterations, samples)
         },
         Case::RtfValidationReport => run_rtf_validation_report(corpus, warmup_iterations, samples),
+        Case::RtfPicturePayloadBatchReplace | Case::RtfPictureBatchRemove => {
+            Err("RTF picture CRUD cases use their dedicated corpus runner".into())
+        },
         Case::RtfLogicalTailAppend | Case::RtfLogicalTailNoopSave => {
             run_rtf_logical_tail_append(case, corpus, warmup_iterations, samples)
         },
@@ -15036,14 +15246,7 @@ impl DocPhaseRecorder {
 
 fn profile_doc_open(
     input: Vec<u8>,
-) -> Result<
-    (
-        litchi_doc::body_text::Snapshot,
-        DocPhaseDurations,
-        u64,
-    ),
-    Box<dyn Error>,
-> {
+) -> Result<(litchi_doc::body_text::Snapshot, DocPhaseDurations, u64), Box<dyn Error>> {
     use litchi_doc::body_text::{DiagnosticPhase, Snapshot, TransactionLimits};
 
     let expected = [
@@ -15095,8 +15298,10 @@ fn verify_doc_untouched_streams(source: &[u8], candidate: &[u8]) -> Result<(), B
         return Err("DOC publication changed the CFB stream inventory".into());
     }
     for path in source_paths {
-        if matches!(path.last().map(String::as_str), Some("WordDocument" | "0Table" | "1Table"))
-        {
+        if matches!(
+            path.last().map(String::as_str),
+            Some("WordDocument" | "0Table" | "1Table")
+        ) {
             continue;
         }
         let path_refs = path.iter().map(String::as_str).collect::<Vec<_>>();
@@ -15170,8 +15375,8 @@ fn run_doc_owner_public_phases(
         DiagnosticPhase::Patch,
     ];
     let mut no_op_recorder = DocPhaseRecorder::new(no_op_expected.len())?;
-    let no_op_profile_commit = no_op_profile_edit
-        .commit_profiled(|event| no_op_recorder.observe(event))?;
+    let no_op_profile_commit =
+        no_op_profile_edit.commit_profiled(|event| no_op_recorder.observe(event))?;
     no_op_recorder.validate(&no_op_expected)?;
     if no_op_profile_commit.changed()
         || !no_op_profile_commit.patch().is_noop()
@@ -15266,11 +15471,10 @@ fn run_doc_owner_public_phases(
         if edit_attributed_total_ns > edit_total_ns {
             return Err("DOC edit phase attribution exceeded its measured outer interval".into());
         }
-        if attributed_total_ns
-            .checked_add(unattributed_ns)
-            != Some(measured_total_ns)
-        {
-            return Err("DOC attributed and unattributed durations do not total the lifecycle".into());
+        if attributed_total_ns.checked_add(unattributed_ns) != Some(measured_total_ns) {
+            return Err(
+                "DOC attributed and unattributed durations do not total the lifecycle".into(),
+            );
         }
 
         if iteration >= warmup_iterations {
@@ -15299,7 +15503,9 @@ fn run_doc_owner_public_phases(
             summary
                 .open_attributed_total_ns
                 .push(open_attributed_total_ns);
-            summary.edit_attributed_total_ns.push(edit_attributed_total_ns);
+            summary
+                .edit_attributed_total_ns
+                .push(edit_attributed_total_ns);
             summary.open_outer_ns.push(open_outer_ns);
             summary.edit_total_ns.push(edit_total_ns);
             summary.measured_total_ns.push(measured_total_ns);
@@ -15310,7 +15516,8 @@ fn run_doc_owner_public_phases(
         std::hint::black_box(output);
     }
 
-    if summary.output_sha256
+    if summary
+        .output_sha256
         .iter()
         .any(|digest| digest != &expected_output_sha256)
     {
@@ -17843,6 +18050,605 @@ fn run_semantic_rtf(
         result.output_sha256 = Some(sha256_hex(&expected_changed));
     }
     Ok(result)
+}
+
+fn rtf_picture_group_ranges(bytes: &[u8]) -> Result<Vec<Range<usize>>, Box<dyn Error>> {
+    let marker = br"{\pict\";
+    let mut ranges = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(relative) = bytes.get(cursor..).and_then(|tail| {
+        tail.windows(marker.len())
+            .position(|window| window == marker)
+    }) {
+        let start = cursor
+            .checked_add(relative)
+            .ok_or("RTF picture group start overflows usize")?;
+        let end = bytes
+            .get(start..)
+            .and_then(|tail| tail.iter().position(|byte| *byte == b'}'))
+            .and_then(|relative_end| start.checked_add(relative_end + 1))
+            .ok_or("RTF picture group is not closed")?;
+        ranges.push(start..end);
+        cursor = end;
+    }
+    Ok(ranges)
+}
+
+fn rtf_picture_payload_spans(
+    bytes: &[u8],
+    ranges: &[Range<usize>],
+) -> Result<Vec<Range<usize>>, Box<dyn Error>> {
+    let mut spans = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        let group = bytes
+            .get(range.clone())
+            .ok_or("RTF picture payload group is outside the source")?;
+        let relative_start = group
+            .iter()
+            .position(|byte| byte.is_ascii_whitespace())
+            .ok_or("RTF picture group has no payload separator")?;
+        let mut start = relative_start.saturating_add(1);
+        while group
+            .get(start)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            start = start.saturating_add(1);
+        }
+        let mut end = group
+            .len()
+            .checked_sub(1)
+            .ok_or("RTF picture group has no closing brace")?;
+        while end > start
+            && group
+                .get(end - 1)
+                .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            end = end.saturating_sub(1);
+        }
+        if start >= end {
+            return Err("RTF picture group has an empty payload".into());
+        }
+        spans.push(
+            range
+                .start
+                .checked_add(start)
+                .ok_or("RTF picture payload start overflows usize")?
+                ..range
+                    .start
+                    .checked_add(end)
+                    .ok_or("RTF picture payload end overflows usize")?,
+        );
+    }
+    Ok(spans)
+}
+
+fn render_rtf_picture_payload(
+    source_transport: &[u8],
+    payload: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let expected_digits = payload
+        .len()
+        .checked_mul(2)
+        .ok_or("RTF picture payload digit count overflows usize")?;
+    let actual_digits = source_transport
+        .iter()
+        .filter(|byte| byte.is_ascii_hexdigit())
+        .count();
+    if actual_digits != expected_digits {
+        return Err("RTF picture payload transport has an unexpected digit count".into());
+    }
+    let upper = b"0123456789ABCDEF";
+    let lower = b"0123456789abcdef";
+    let mut rendered = source_transport.to_vec();
+    let mut nibbles = payload.iter().flat_map(|byte| [byte >> 4, byte & 0x0f]);
+    for byte in &mut rendered {
+        if byte.is_ascii_hexdigit() {
+            let nibble = nibbles
+                .next()
+                .ok_or("RTF picture payload transport ended unexpectedly")?;
+            let table = if byte.is_ascii_uppercase() {
+                upper
+            } else {
+                lower
+            };
+            *byte = table[usize::from(nibble)];
+        }
+    }
+    if nibbles.next().is_some() {
+        return Err("RTF picture payload transport has too few digit positions".into());
+    }
+    Ok(rendered)
+}
+
+fn rtf_bytes_without_picture_groups(
+    bytes: &[u8],
+    ranges: &[Range<usize>],
+    excluded: &BTreeSet<usize>,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut retained = Vec::with_capacity(bytes.len());
+    let mut cursor = 0usize;
+    for (index, range) in ranges.iter().enumerate() {
+        if range.start < cursor || range.end > bytes.len() {
+            return Err("RTF picture ranges overlap or exceed the source".into());
+        }
+        retained.extend_from_slice(
+            bytes
+                .get(cursor..range.start)
+                .ok_or("RTF picture range leaves an invalid retained span")?,
+        );
+        if !excluded.contains(&index) {
+            retained.extend_from_slice(
+                bytes
+                    .get(range.start..range.end)
+                    .ok_or("RTF picture range is outside the source")?,
+            );
+        }
+        cursor = range.end;
+    }
+    retained.extend_from_slice(
+        bytes
+            .get(cursor..)
+            .ok_or("RTF picture ranges leave an invalid trailing span")?,
+    );
+    Ok(retained)
+}
+
+fn rtf_picture_durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
+    litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(0, 0, 0),
+        4 * 1024 * 1024,
+        max_operations,
+        8,
+        512 * 1024,
+        1024 * 1024,
+    )
+}
+
+fn verify_rtf_picture_crud_gates(
+    case: Case,
+    corpus: &Corpus,
+) -> Result<(RtfPictureCrudGateSummary, Vec<u8>, Vec<usize>), Box<dyn Error>> {
+    if !case.is_rtf_picture_crud() {
+        return Err("non-picture case passed to RTF picture CRUD gates".into());
+    }
+    let shape = semantic_shape(corpus)?;
+    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let picture_count = rtf_picture_count(shape);
+    if source.pictures().len() != picture_count
+        || source.to_bytes()? != corpus.archive
+        || sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
+    {
+        return Err("RTF picture CRUD source identity differs from the corpus".into());
+    }
+    let selected_positions = if case == Case::RtfPicturePayloadBatchReplace {
+        (0..picture_count.saturating_sub(1)).collect::<Vec<_>>()
+    } else {
+        (0..picture_count).step_by(2).collect::<Vec<_>>()
+    };
+    if selected_positions.is_empty()
+        || selected_positions.len() >= picture_count
+        || selected_positions.len() > litchi_rtf::edit::MAX_PICTURE_REMOVAL_OPERATIONS
+    {
+        return Err(
+            "RTF picture CRUD selection is outside the public operation bound or has no untouched picture"
+                .into(),
+        );
+    }
+    let selected = selected_positions.iter().copied().collect::<BTreeSet<_>>();
+    let source_ranges = rtf_picture_group_ranges(&corpus.archive)?;
+    if source_ranges.len() != picture_count {
+        return Err("RTF picture CRUD source group inventory differs".into());
+    }
+    let expected_output = if case == Case::RtfPicturePayloadBatchReplace {
+        let payload_spans = rtf_picture_payload_spans(&corpus.archive, &source_ranges)?;
+        let mut expected = corpus.archive.clone();
+        for &position in &selected_positions {
+            let replacement_payload = rtf_picture_payload(position, position % 2 == 1, true);
+            if replacement_payload == rtf_picture_payload(position, position % 2 == 1, false) {
+                return Err("RTF picture CRUD replacement payload is not a change".into());
+            }
+            let span = payload_spans
+                .get(position)
+                .ok_or("RTF picture CRUD replacement span is out of range")?;
+            let source_transport = corpus
+                .archive
+                .get(span.clone())
+                .ok_or("RTF picture CRUD source payload span is outside the source")?;
+            let replacement = render_rtf_picture_payload(source_transport, &replacement_payload)?;
+            let target = expected
+                .get_mut(span.clone())
+                .ok_or("RTF picture CRUD replacement span is outside the source")?;
+            if target.len() != replacement.len() {
+                return Err("RTF picture CRUD replacement changed encoded length".into());
+            }
+            target.copy_from_slice(&replacement);
+        }
+        expected
+    } else {
+        let mut expected = corpus.archive.clone();
+        for &position in selected_positions.iter().rev() {
+            let range = source_ranges
+                .get(position)
+                .ok_or("RTF picture CRUD removal span is out of range")?;
+            expected.drain(range.clone());
+        }
+        expected
+    };
+    let api_output = if case == Case::RtfPicturePayloadBatchReplace {
+        let replacements = selected_positions
+            .iter()
+            .map(|&position| {
+                litchi_rtf::edit::PicturePayloadReplacement::new(
+                    position,
+                    rtf_picture_payload(position, position % 2 == 1, true),
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut edit = source.edit();
+        edit.replace_picture_payloads(&replacements)?;
+        edit.commit()?.snapshot().to_bytes()?
+    } else {
+        let mut edit = source.edit();
+        edit.remove_pictures(&selected_positions)?;
+        edit.commit()?.snapshot().to_bytes()?
+    };
+    if api_output != expected_output {
+        return Err(
+            "RTF picture CRUD public commit differs from the independent exact splice".into(),
+        );
+    }
+    let reopened = litchi_rtf::Document::from_bytes(&expected_output)?;
+    if reopened.text() != source.text() {
+        return Err("RTF picture CRUD semantic reopen changed visible text".into());
+    }
+    let expected_count = if case == Case::RtfPicturePayloadBatchReplace {
+        picture_count
+    } else {
+        picture_count.saturating_sub(selected_positions.len())
+    };
+    if reopened.pictures().len() != expected_count {
+        return Err("RTF picture CRUD semantic reopen picture count differs".into());
+    }
+    if case == Case::RtfPicturePayloadBatchReplace {
+        for (position, picture) in reopened.pictures().iter().enumerate() {
+            let expected = if selected.contains(&position) {
+                rtf_picture_payload(position, position % 2 == 1, true)
+            } else {
+                rtf_picture_payload(position, position % 2 == 1, false)
+            };
+            if picture.data() != expected {
+                return Err("RTF picture CRUD semantic reopen payload differs".into());
+            }
+        }
+    } else {
+        let mut retained_position = 0usize;
+        for position in 0..picture_count {
+            if selected.contains(&position) {
+                continue;
+            }
+            let picture = reopened
+                .pictures()
+                .get(retained_position)
+                .ok_or("RTF picture CRUD removal lost a retained picture")?;
+            let expected = rtf_picture_payload(position, position % 2 == 1, false);
+            if picture.data() != expected {
+                return Err("RTF picture CRUD removal retained payload differs".into());
+            }
+            retained_position = retained_position.saturating_add(1);
+        }
+    }
+
+    let output_ranges = rtf_picture_group_ranges(&expected_output)?;
+    if source_ranges.len() != picture_count || output_ranges.len() != expected_count {
+        return Err("RTF picture CRUD group inventory differs from specification".into());
+    }
+    let raw_unselected_preservation_verified = if case == Case::RtfPicturePayloadBatchReplace {
+        rtf_bytes_without_picture_groups(&corpus.archive, &source_ranges, &selected)?
+            == rtf_bytes_without_picture_groups(&expected_output, &output_ranges, &selected)?
+    } else {
+        rtf_bytes_without_picture_groups(&corpus.archive, &source_ranges, &selected)?
+            == expected_output
+    };
+    if !raw_unselected_preservation_verified {
+        return Err("RTF picture CRUD changed raw unselected source bytes".into());
+    }
+
+    let noop = if case == Case::RtfPicturePayloadBatchReplace {
+        let replacements = selected_positions
+            .iter()
+            .map(|&position| {
+                litchi_rtf::edit::PicturePayloadReplacement::new(
+                    position,
+                    rtf_picture_payload(position, position % 2 == 1, false),
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut edit = source.edit();
+        edit.replace_picture_payloads(&replacements)?;
+        edit.commit()?
+    } else {
+        source.edit().commit()?
+    };
+    let expected_noop_operations = if case == Case::RtfPicturePayloadBatchReplace {
+        selected_positions.len()
+    } else {
+        0
+    };
+    let exact_noop_verified = !noop.diagnostics().changed()
+        && noop.diagnostics().operation_count() == expected_noop_operations
+        && noop.snapshot().same_snapshot(&source)
+        && noop.snapshot().to_bytes()? == corpus.archive;
+    if !exact_noop_verified {
+        return Err("RTF picture CRUD exact no-op gate failed".into());
+    }
+
+    let mut changed_edit = source.edit();
+    if case == Case::RtfPicturePayloadBatchReplace {
+        let replacements = selected_positions
+            .iter()
+            .map(|&position| {
+                litchi_rtf::edit::PicturePayloadReplacement::new(
+                    position,
+                    rtf_picture_payload(position, position % 2 == 1, true),
+                )
+            })
+            .collect::<Vec<_>>();
+        changed_edit.replace_picture_payloads(&replacements)?;
+    } else {
+        changed_edit.remove_pictures(&selected_positions)?;
+    }
+    let commit = changed_edit.commit()?;
+    if !commit.diagnostics().changed()
+        || commit.diagnostics().operation_count() != selected_positions.len()
+        || commit.snapshot().to_bytes()? != expected_output
+    {
+        return Err("RTF picture CRUD commit diagnostics differ from expected output".into());
+    }
+    let durable_limits = rtf_picture_durable_limits(selected_positions.len());
+    let durable = commit.patch().to_durable(durable_limits)?;
+    let durable_json = durable.to_deterministic_json()?;
+    let durable_json_again = durable.to_deterministic_json()?;
+    let durable_deterministic_verified = durable_json == durable_json_again;
+    if !durable_deterministic_verified {
+        return Err("RTF picture CRUD durable serialization is not deterministic".into());
+    }
+    let decoded =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &durable_json,
+            durable_limits,
+        )?;
+    let volatile_forward = commit.patch().apply(&source)?;
+    let volatile_forward_verified = volatile_forward.to_bytes()? == expected_output;
+    let volatile_inverse = commit.patch().inverse().apply(&volatile_forward)?;
+    let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
+    let forward = source.apply_durable(&decoded)?;
+    let durable_forward_verified = forward.to_bytes()? == expected_output;
+    let inverse = forward.apply_durable(&decoded.inverse())?;
+    let durable_inverse_verified = inverse.to_bytes()? == corpus.archive;
+    if !volatile_forward_verified
+        || !volatile_inverse_verified
+        || !durable_forward_verified
+        || !durable_inverse_verified
+    {
+        return Err("RTF picture CRUD durable forward/inverse gate failed".into());
+    }
+    let mut stale_bytes = corpus.archive.clone();
+    let stale_offset = stale_bytes
+        .iter()
+        .position(|byte| *byte == b'0')
+        .ok_or("RTF picture CRUD source has no mutable stale byte")?;
+    stale_bytes[stale_offset] = b'1';
+    let stale = litchi_rtf::Document::from_bytes(&stale_bytes)?;
+    let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
+    let mut foreign_bytes = corpus.archive.clone();
+    let foreign_offset = foreign_bytes
+        .windows(5)
+        .position(|window| window == b"root0")
+        .ok_or("RTF picture CRUD source has no foreign marker")?;
+    foreign_bytes[foreign_offset + 4] = b'X';
+    let foreign = litchi_rtf::Document::from_bytes(&foreign_bytes)?;
+    let foreign_source_refusal_verified = foreign.apply_durable(&decoded).is_err();
+    if !stale_source_refusal_verified || !foreign_source_refusal_verified {
+        return Err("RTF picture CRUD stale/foreign refusal gate failed".into());
+    }
+
+    let wrong_size_verified = if case == Case::RtfPicturePayloadBatchReplace {
+        let mut edit = source.edit();
+        let mut wrong = rtf_picture_payload(0, false, true);
+        wrong.pop();
+        edit.replace_picture_payload(0, wrong).is_err() && edit.operation_count() == 0
+    } else {
+        let mut edit = source.edit();
+        edit.remove_pictures(&[picture_count]).is_err() && edit.operation_count() == 0
+    };
+    let over_limit_verified = if case == Case::RtfPicturePayloadBatchReplace {
+        let over_limit = (0..=litchi_rtf::edit::MAX_PICTURE_PAYLOAD_OPERATIONS)
+            .map(|position| {
+                litchi_rtf::edit::PicturePayloadReplacement::new(
+                    position,
+                    rtf_picture_payload(position, position % 2 == 1, true),
+                )
+            })
+            .collect::<Vec<_>>();
+        source.edit().replace_picture_payloads(&over_limit).is_err()
+    } else {
+        let over_limit = (0..=litchi_rtf::edit::MAX_PICTURE_REMOVAL_OPERATIONS).collect::<Vec<_>>();
+        source.edit().remove_pictures(&over_limit).is_err()
+    };
+    let nested = litchi_rtf::Document::parse(
+        r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a192a3b4c}}}",
+    )?;
+    let nested_refusal = if case == Case::RtfPicturePayloadBatchReplace {
+        nested
+            .edit()
+            .replace_picture_payload(0, rtf_picture_payload(0, false, true))
+            .is_err()
+    } else {
+        nested.edit().remove_picture(0).is_err()
+    };
+    let refusal_verified = wrong_size_verified && over_limit_verified && nested_refusal;
+    if !refusal_verified {
+        return Err("RTF picture CRUD refusal gate failed".into());
+    }
+
+    let mut partial = PrefixFailSink {
+        accepted: 0,
+        fail_after: 1,
+    };
+    let partial_sink_verified =
+        commit.snapshot().write_to(&mut partial).is_err() && partial.accepted == 1;
+    let mut zero = PrefixFailSink {
+        accepted: 0,
+        fail_after: 0,
+    };
+    let zero_sink_verified = commit.snapshot().write_to(&mut zero).is_err() && zero.accepted == 0;
+    if !partial_sink_verified || !zero_sink_verified {
+        return Err("RTF picture CRUD partial/zero sink gate failed".into());
+    }
+
+    let source_hash_verified = sha256_hex(&corpus.archive) == corpus.manifest.archive_sha256;
+    let output_hash_verified = sha256_hex(&reopened.to_bytes()?) == sha256_hex(&expected_output);
+    if !source_hash_verified || !output_hash_verified {
+        return Err("RTF picture CRUD source/output hash gate failed".into());
+    }
+    let gates = RtfPictureCrudGateSummary {
+        semantic_reopen_verified: true,
+        raw_unselected_preservation_verified,
+        exact_noop_verified,
+        durable_forward_verified,
+        durable_inverse_verified,
+        durable_deterministic_verified,
+        volatile_forward_verified,
+        volatile_inverse_verified,
+        stale_source_refusal_verified,
+        foreign_source_refusal_verified,
+        refusal_verified,
+        partial_sink_verified,
+        zero_sink_verified,
+        source_hash_verified,
+        output_hash_verified,
+    };
+    Ok((gates, expected_output, selected_positions))
+}
+
+fn run_rtf_picture_crud(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let picture_count = rtf_picture_count(shape);
+    let (gates, expected_output, selected_positions) = verify_rtf_picture_crud_gates(case, corpus)?;
+    let source_bytes = u64::try_from(corpus.archive.len())?;
+    let output_bytes = u64::try_from(expected_output.len())?;
+    let output_digest = sha256_hex(&expected_output);
+    let payload_bytes = corpus.manifest.entry_bytes;
+    let replacements = (case == Case::RtfPicturePayloadBatchReplace).then(|| {
+        selected_positions
+            .iter()
+            .map(|&position| {
+                litchi_rtf::edit::PicturePayloadReplacement::new(
+                    position,
+                    rtf_picture_payload(position, position % 2 == 1, true),
+                )
+            })
+            .collect::<Vec<_>>()
+    });
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut stage_ns = Vec::with_capacity(samples);
+    let mut commit_ns = Vec::with_capacity(samples);
+    let mut publication_ns = Vec::with_capacity(samples);
+    let mut lifecycle_ns = Vec::with_capacity(samples);
+    let mut publication_output_sha256 = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let lifecycle_started = Instant::now();
+        let open_started = Instant::now();
+        let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let open_duration = open_started.elapsed();
+        let stage_started = Instant::now();
+        let mut edit = source.edit();
+        if case == Case::RtfPicturePayloadBatchReplace {
+            edit.replace_picture_payloads(
+                replacements
+                    .as_deref()
+                    .ok_or("RTF picture CRUD replacement batch was not prepared")?,
+            )?;
+        } else {
+            edit.remove_pictures(&selected_positions)?;
+        }
+        let stage_duration = stage_started.elapsed();
+        let commit_started = Instant::now();
+        let commit = edit.commit()?;
+        let commit_duration = commit_started.elapsed();
+        let publication_started = Instant::now();
+        let mut sink = HashingDiscardSink::without_authoring_window(output_bytes);
+        commit.snapshot().write_to(&mut sink)?;
+        let publication_duration = publication_started.elapsed();
+        let lifecycle_duration = lifecycle_started.elapsed();
+        let (sink_summary, digest) = sink.finish();
+        if digest != output_digest || sink_summary.accepted_bytes != output_bytes {
+            return Err("RTF picture CRUD timed publication hash differs".into());
+        }
+        std::hint::black_box(commit.snapshot());
+        record_elapsed(
+            &mut elapsed,
+            iteration,
+            warmup_iterations,
+            lifecycle_duration,
+        )?;
+        if iteration >= warmup_iterations {
+            open_ns.push(elapsed_ns(open_duration)?);
+            stage_ns.push(elapsed_ns(stage_duration)?);
+            commit_ns.push(elapsed_ns(commit_duration)?);
+            publication_ns.push(elapsed_ns(publication_duration)?);
+            lifecycle_ns.push(elapsed_ns(lifecycle_duration)?);
+            publication_output_sha256.push(digest);
+            sinks.push(sink_summary);
+        }
+    }
+    let sink = deterministic_sink_summary(&sinks, "RTF picture CRUD publication")?;
+    let summary = RtfPictureCrudSummary {
+        implementation: if case == Case::RtfPicturePayloadBatchReplace {
+            "edit.replace_picture_payloads"
+        } else {
+            "edit.remove_pictures"
+        },
+        timing_scope: "one complete source open, bounded batch stage, commit, and sequential public write; correctness gates are preflight-only",
+        performance_claim: "none; correctness and phase evidence only",
+        shape: shape.name(),
+        picture_count,
+        selected_count: selected_positions.len(),
+        selected_positions,
+        source_bytes,
+        output_bytes,
+        payload_bytes,
+        source_sha256: corpus.manifest.archive_sha256.clone(),
+        expected_output_sha256: output_digest.clone(),
+        open_ns,
+        stage_ns,
+        commit_ns,
+        publication_ns,
+        lifecycle_ns,
+        publication_output_sha256,
+        gates,
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(SourceSummary {
+            rtf_picture_crud: Some(summary),
+            ..SourceSummary::default()
+        }),
+        execution: None,
+        output_sha256: Some(output_digest),
+        operation_metrics: None,
+    })
 }
 
 fn run_rtf_logical_tail_append(
@@ -33741,10 +34547,10 @@ mod tests {
         build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
         build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
         build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
-        build_rtf_lifecycle_corpus, build_semantic_docx_corpus, build_semantic_odp_corpus,
-        build_semantic_ods_corpus, build_semantic_odt_corpus, build_semantic_pptx_corpus,
-        build_semantic_rtf_corpus, build_streaming_corpus, build_writer_corpus,
-        build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
+        build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
+        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
+        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
+        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
         build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
         build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
@@ -33760,14 +34566,15 @@ mod tests {
         run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
-        run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save, run_scaling_case,
-        run_streaming_creation, run_xls_comments_edit_save, run_xls_visibility_edit_save,
-        run_xlsx_auto_filter_edit_save, run_xlsx_calculation_metadata_edit_save,
-        run_xlsx_conditional_formatting_edit_save, run_xlsx_data_validation_edit_save,
-        run_xlsx_defined_names_edit_save, run_xlsx_page_break_edit_save,
-        run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
-        run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
-        simulated_request_delay, statistics, xlsx_cell_count,
+        run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
+        run_rtf_picture_crud, run_scaling_case, run_streaming_creation, run_xls_comments_edit_save,
+        run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
+        run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
+        run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
+        run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
+        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
+        run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
+        xlsx_cell_count,
     };
 
     #[test]
@@ -34167,7 +34974,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 303);
+        assert_eq!(selectable_count, 305);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -36061,15 +36868,8 @@ mod tests {
         assert_eq!(measured.case, "doc_owner_public_phases");
         assert_eq!(measured.elapsed_ns.samples.len(), 2);
         let output_sha256 = measured.output_sha256.clone();
-        let evidence = measured
-            .source
-            .unwrap()
-            .doc_owner_public_phases
-            .unwrap();
-        assert_eq!(
-            output_sha256,
-            Some(evidence.expected_output_sha256.clone())
-        );
+        let evidence = measured.source.unwrap().doc_owner_public_phases.unwrap();
+        assert_eq!(output_sha256, Some(evidence.expected_output_sha256.clone()));
         assert_ne!(
             evidence.expected_output_sha256,
             corpus.manifest.archive_sha256
@@ -36101,8 +36901,7 @@ mod tests {
             assert!(evidence.open_attributed_total_ns[index] <= evidence.open_outer_ns[index]);
             assert!(evidence.edit_attributed_total_ns[index] <= evidence.edit_total_ns[index]);
             assert_eq!(
-                evidence.attributed_total_ns[index]
-                    .checked_add(evidence.unattributed_ns[index]),
+                evidence.attributed_total_ns[index].checked_add(evidence.unattributed_ns[index]),
                 Some(evidence.measured_total_ns[index])
             );
         }
@@ -36112,11 +36911,7 @@ mod tests {
     fn doc_owner_public_phase_case_supports_payload_heavy_corpus() {
         let corpus = build_writer_corpus(Case::DocFreshWriteTo, WriterShape::PayloadHeavy).unwrap();
         let measured = run_case(Case::DocOwnerPublicPhases, &corpus, 0, 1).unwrap();
-        let evidence = measured
-            .source
-            .unwrap()
-            .doc_owner_public_phases
-            .unwrap();
+        let evidence = measured.source.unwrap().doc_owner_public_phases.unwrap();
         assert_eq!(measured.elapsed_ns.samples.len(), 1);
         assert_eq!(evidence.source_bytes, corpus.archive.len() as u64);
         assert_eq!(evidence.output_sha256.len(), 1);
@@ -36344,6 +37139,88 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn rtf_picture_crud_selectors_are_opt_in_bounded_and_gate_complete() {
+        let cases = [
+            Case::RtfPicturePayloadBatchReplace,
+            Case::RtfPictureBatchRemove,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+            let corpus = build_rtf_picture_corpus(SemanticShape::Tiny).unwrap();
+            let again = build_rtf_picture_corpus(SemanticShape::Tiny).unwrap();
+            assert_eq!(corpus.archive, again.archive);
+            assert!(corpus.archive.iter().any(|byte| byte.is_ascii_uppercase()));
+            assert!(corpus.archive.contains(&b'\n'));
+
+            let result = run_rtf_picture_crud(case, &corpus, 0, 1).unwrap();
+            assert_eq!(result.case, case.name());
+            assert_eq!(result.elapsed_ns.samples.len(), 1);
+            assert_eq!(
+                result.output_sha256.as_deref(),
+                Some(
+                    result
+                        .source
+                        .as_ref()
+                        .unwrap()
+                        .rtf_picture_crud
+                        .as_ref()
+                        .unwrap()
+                        .expected_output_sha256
+                        .as_str(),
+                )
+            );
+            let evidence = result.source.unwrap().rtf_picture_crud.unwrap();
+            assert!(evidence.selected_count > 0);
+            assert!(evidence.selected_count <= 64);
+            assert_eq!(evidence.open_ns.len(), 1);
+            assert_eq!(evidence.stage_ns.len(), 1);
+            assert_eq!(evidence.commit_ns.len(), 1);
+            assert_eq!(evidence.publication_ns.len(), 1);
+            assert_eq!(evidence.lifecycle_ns.len(), 1);
+            assert_eq!(evidence.publication_output_sha256.len(), 1);
+            assert!(evidence.gates.semantic_reopen_verified);
+            assert!(evidence.gates.raw_unselected_preservation_verified);
+            assert!(evidence.gates.exact_noop_verified);
+            assert!(evidence.gates.volatile_forward_verified);
+            assert!(evidence.gates.volatile_inverse_verified);
+            assert!(evidence.gates.durable_forward_verified);
+            assert!(evidence.gates.durable_inverse_verified);
+            assert!(evidence.gates.durable_deterministic_verified);
+            assert!(evidence.gates.stale_source_refusal_verified);
+            assert!(evidence.gates.foreign_source_refusal_verified);
+            assert!(evidence.gates.refusal_verified);
+            assert!(evidence.gates.partial_sink_verified);
+            assert!(evidence.gates.zero_sink_verified);
+            assert!(evidence.gates.source_hash_verified);
+            assert!(evidence.gates.output_hash_verified);
+        }
+
+        let large = build_rtf_picture_corpus(SemanticShape::Large).unwrap();
+        let replacement =
+            run_rtf_picture_crud(Case::RtfPicturePayloadBatchReplace, &large, 0, 1).unwrap();
+        let removal = run_rtf_picture_crud(Case::RtfPictureBatchRemove, &large, 0, 1).unwrap();
+        assert_eq!(
+            replacement
+                .source
+                .unwrap()
+                .rtf_picture_crud
+                .unwrap()
+                .selected_count,
+            63
+        );
+        assert_eq!(
+            removal
+                .source
+                .unwrap()
+                .rtf_picture_crud
+                .unwrap()
+                .selected_count,
+            32
+        );
     }
 
     #[test]

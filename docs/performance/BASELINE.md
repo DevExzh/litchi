@@ -413,7 +413,8 @@ selector was added; only `cfg(test)` source-event acceptance and tests changed.
 Change 0153 adds four RTF selectors measured at the pre-staged
 publication-call interval, making that matrix 295. Change 0154 adds six ODF
 content-COW publication selectors, making that matrix 301; change 0159 later
-made it 302 and change 0160 makes the current matrix 303. Local or generic
+made it 302, change 0160 made it 303, and change 0162 makes the current matrix
+305. Local or generic
 latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
 network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -610,7 +611,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**303 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**305 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -649,6 +650,20 @@ initial/final public-reader validation instead of cloning them. Clean release
 -0.18%/+2.52%. Large p95 regressed 37.52%/14.49%. The candidate was rejected
 and fully removed; production remains the control. See [change 0161](changes/0161-doc-public-validation-borrow-rejected.md)
 and its [summary](results/doc-public-borrow-0161-summary.json).
+
+Change 0162 adds two opt-in RTF standalone-picture CRUD selectors over a
+dedicated generated ASCII/uncompressed corpus with 2/8/64 alternating PNG and
+JPEG groups. Replacement changes 1/7/63 same-length payloads while leaving one
+group unselected; removal deletes 1/4/32 alternating groups. Independent raw
+splices preserve mixed-case hexadecimal digit slots, whitespace, surrounding
+source and every unselected group. Open, bounded batch staging, commit,
+fixed-memory hashing-sink publication and complete lifecycle are reported
+separately. A focused test and six-record debug smoke pass semantic reopen,
+no-op, volatile/durable forward/inverse, stale/foreign, refusal, partial/zero
+sink and digest gates. This raises the selectable matrix to 305 without
+changing the default 36/198 tranche. No debug latency, allocation/RSS,
+physical-I/O, real-producer or broad RTF media claim is accepted. See
+[`0162`](changes/0162-rtf-picture-crud-evidence.md).
 
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32

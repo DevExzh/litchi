@@ -80,8 +80,9 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 303
-selectable case names in total. Eight additional
+provide their source-read counters. The current `Case` matrix exposes 305
+selectable case names in total, including two opt-in RTF standalone-picture
+CRUD selectors. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
 default 36 cases / 198 records. Two repeated native-PPT selected-shape query
@@ -275,8 +276,8 @@ accepted only as source-event/correctness evidence. At the 0152 revision the
 291-name selector matrix was unchanged; change 0153 adds four RTF selectors
 measured at the pre-staged publication-call interval, making that matrix 295.
 Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
-matrix 301 at that revision; change 0159 made it 302, and change 0160 makes it
-303. No runtime selector was added
+matrix 301 at that revision; change 0159 made it 302, change 0160 made it 303,
+and change 0162 makes it 305. No runtime selector was added
 to 0152; only `cfg(test)` source-event acceptance and tests changed. Root
 MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain. Local or
@@ -1377,6 +1378,22 @@ reports multiple bounded writes instead of one whole-document write. This
 window is a sink accounting bound, not a claim that the append transaction's
 validated candidate snapshot is memory-bounded.
 
+The standalone-picture CRUD selectors `rtf_picture_payload_batch_replace` and
+`rtf_picture_batch_remove` use a deterministic uncompressed ASCII RTF corpus
+with root-level standalone PNG/JPEG groups. Tiny, medium, and large shapes
+contain 2, 8, and 64 alternating 16-byte decoded payloads; replacement leaves
+one picture unselected and both batches stay within the public 64-operation
+ceiling. The corpus uses mixed-case hexadecimal digits with deterministic
+spaces/newlines, so the independent expected-output splice replaces only
+digit slots while preserving every source whitespace byte and each slot's
+case. Each selector reports separate open, stage, commit, publication, and
+lifecycle vectors; publication is `commit.snapshot().write_to` into a bounded
+hashing sink. Untimed gates cover semantic reopen, raw unselected preservation,
+exact no-op identity, volatile patch apply/inverse, deterministic durable JSON
+serialization plus forward/inverse/stale/foreign checks, refusal cases,
+partial/zero sinks, and source/output hashes. These selectors provide
+correctness and phase evidence only; they make no performance claim.
+
 ## Opt-in ODF semantic corpus matrix
 
 The ODF cases use the same `--semantic-shape` selection, but each format is
@@ -1990,6 +2007,14 @@ native-Office claim is made.
   with an empty batch. It measures exact no-op commit plus sequential
   publication and reports shared snapshot identity separately from the changed
   append case.
+- `rtf_picture_payload_batch_replace`: replace a bounded batch of same-length
+  standalone PNG/JPEG payloads while preserving the source's mixed-case hex
+  and whitespace transport; one trailing picture remains unselected for the
+  raw-preservation gate.
+- `rtf_picture_batch_remove`: remove a bounded batch of alternating standalone
+  PNG/JPEG groups from the same deterministic root-level corpus. Both picture
+  selectors report open/stage/commit/publication/lifecycle phase vectors and
+  keep correctness, patch, refusal, sink, and hash gates outside timing.
 
 The two lifecycle intervals include edit construction, the one staging call,
 commit, a constant-size diagnostics assertion, one shared snapshot-handle
