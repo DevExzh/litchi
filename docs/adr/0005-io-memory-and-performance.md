@@ -255,3 +255,42 @@ This is an allocation-shape and boundedness improvement, not a measured
 latency, RSS, or complete Numbers Buffa-laziness claim. Table, tile, formula,
 sidecar, and other native graph paths remain separate migration work and may
 still use generated Prost values behind their own limits.
+
+## 2026-08-16 amendment: bounded Numbers names dependency and pivot guards
+
+The focused Numbers names transaction removes its remaining production
+generated-message reads from the changed-only dependency guards. The rooted
+calculation-engine route is inspected through the existing strict
+`numbers_table_cell_dependency_codec`: its calculation-engine envelope,
+dependency tracker, and formula-owner dependency records are borrowed
+Buffa-checked snapshots. The raw field-3 root reference and the repeated
+tracker field-6 records are still cross-checked against object metadata,
+local-reference framing, and declared paths. The volatile name-dependency
+field that is intentionally opaque in the sidecar is checked with a narrow
+raw-wire presence scan; an empty coordinate set does not count as a
+dependency.
+
+The pivot guard is intentionally narrower than a table-cell read. It scans
+only `TST.TableModelArchive` field 85, requires one canonical local
+`TSP.Reference` when present, and does not force or recursively walk the table
+data-store graph merely to decide whether a rename is supported. This keeps
+the conservative native `O(T²)` rooted-table traversal, while the transaction
+charges the complete over-approximation (`selected changes × rooted topology`
+plus the quadratic table term and object term) against `WireWork` before any
+changed component is scanned or rewritten.
+
+Every selected dependency/pivot payload receives bounded input bytes, fields,
+work, references, text, and nesting options. The format maps codec resource
+errors into content-free `names::LimitKind` values, preserves fallible
+collection growth, and rejects malformed, duplicate, wrong-wire, non-local,
+or metadata-inconsistent routes before publication. The raw component remains
+the preservation authority; private Buffa views retain no unknown fields and
+never encode replacement bytes. The package-wide hard ceilings remain 512 MiB
+input/output, 1,000,000 fields, depth 64, and 16,000,000 rewrite-work units.
+
+This is a bounded allocation-shape and production-boundary result. It does not
+claim a measured latency, RSS, allocator-count, or throughput improvement,
+and it does not make the complete Numbers table/formula/sidecar graph
+generated-message-free. The ordinary Numbers manifest still retains its
+compatibility Prost paths where unrelated table extraction and editing code
+requires them.

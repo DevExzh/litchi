@@ -7,7 +7,7 @@ use litchi_iwa_common::{
     wire::{WireView, append_length_delimited_field, append_varint_field},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
-use litchi_iwa_protos::{tn, tsd, tsp, tst};
+use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst};
 use litchi_numbers::{
     MAX_MATERIALIZED_CELLS, Package, PackageReadOptions, PackageSemanticLimits, SheetSelector,
     TableSelector, cell::Value, names,
@@ -25,6 +25,8 @@ const FIRST_MODEL: u64 = 20;
 const SECOND_MODEL: u64 = 21;
 const THIRD_MODEL: u64 = 22;
 const SIDECARS: u64 = 90;
+const CALCULATION_ENGINE: u64 = 700;
+const FORMULA_OWNER_DEPENDENCIES: u64 = 701;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -217,6 +219,148 @@ fn rewrite_document(
     mutate(&mut archive)?;
     let payload = SnappyStream::compress(&archive.to_bytes()?)?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(DOCUMENT, &payload)], Limits::default())?)
+}
+
+/// Add the deprecated root calculation-engine route and one formula-owner
+/// dependency.  The names transaction must inspect this graph before
+/// publishing a changed table name, while ordinary package construction only
+/// needs the rooted sheet/sidebar projection.
+#[allow(
+    deprecated,
+    reason = "The fixture intentionally exercises the legacy calculation-engine root field."
+)]
+fn calculation_engine_package(source: &[u8], volatile: bool) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        {
+            let root = archive
+                .object_mut(1)
+                .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+            let mut document = tn::DocumentArchive::decode(root.messages[0].data.as_slice())?;
+            document.calculation_engine = Some(reference(CALCULATION_ENGINE));
+            root.replace_message_preserving_header(
+                0,
+                RawMessage {
+                    type_: 1,
+                    data: document.encode_to_vec(),
+                },
+            )?;
+            root.archive_info.message_infos[0]
+                .object_references
+                .push(CALCULATION_ENGINE);
+        }
+
+        let tracker = tsce::DependencyTrackerArchive {
+            formula_owner_dependencies: vec![reference(FORMULA_OWNER_DEPENDENCIES)],
+            ..Default::default()
+        };
+        let engine = tsce::CalculationEngineArchive {
+            dependency_tracker: tracker,
+            ..Default::default()
+        };
+        let mut engine_object = object(CALCULATION_ENGINE, 4_000, engine.encode_to_vec())?;
+        engine_object.archive_info.message_infos[0]
+            .object_references
+            .push(FORMULA_OWNER_DEPENDENCIES);
+
+        let volatile_dependencies = volatile.then(|| tsce::VolatileDependenciesExpandedArchive {
+            volatile_sheet_table_name_cells: Some(tsce::CellCoordSetArchive {
+                column_entries: vec![tsce::cell_coord_set_archive::ColumnEntry {
+                    column: 0,
+                    row_set: tsce::IndexSetArchive {
+                        entries: vec![tsce::index_set_archive::IndexSetEntry {
+                            range_begin: 0,
+                            range_end: None,
+                        }],
+                    },
+                }],
+            }),
+            ..Default::default()
+        });
+        let owner = object(
+            FORMULA_OWNER_DEPENDENCIES,
+            4_008,
+            tsce::FormulaOwnerDependenciesArchive {
+                formula_owner_uid: tsp::Uuid { lower: 1, upper: 2 },
+                internal_formula_owner_id: 1,
+                volatile_dependencies,
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        archive.objects.push(engine_object);
+        archive.objects.push(owner);
+        Ok(())
+    })
+}
+
+/// Keep the rooted calculation-engine reference valid but make its selected
+/// message malformed.  Package construction should remain usable because the
+/// dependency graph is outside the rooted sheet projection; a changed names
+/// transaction must reject it before any candidate is published.
+#[allow(
+    deprecated,
+    reason = "The fixture intentionally exercises the legacy calculation-engine root field."
+)]
+fn malformed_calculation_engine_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        {
+            let root = archive
+                .object_mut(1)
+                .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+            let mut document = tn::DocumentArchive::decode(root.messages[0].data.as_slice())?;
+            document.calculation_engine = Some(reference(CALCULATION_ENGINE));
+            root.replace_message_preserving_header(
+                0,
+                RawMessage {
+                    type_: 1,
+                    data: document.encode_to_vec(),
+                },
+            )?;
+            root.archive_info.message_infos[0]
+                .object_references
+                .push(CALCULATION_ENGINE);
+        }
+        let mut engine = object(CALCULATION_ENGINE, 4_000, vec![0xff])?;
+        engine.archive_info.message_infos[0]
+            .object_references
+            .push(FORMULA_OWNER_DEPENDENCIES);
+        archive.objects.push(engine);
+        Ok(())
+    })
+}
+
+/// Preserve a valid engine envelope but corrupt the selected formula-owner
+/// dependency.  This exercises the second strict projection and the same
+/// failure-atomic publication boundary as a malformed engine.
+fn malformed_formula_owner_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    let valid = calculation_engine_package(source, false)?;
+    rewrite_document(&valid, |archive| {
+        let owner = archive
+            .object_mut(FORMULA_OWNER_DEPENDENCIES)
+            .ok_or_else(|| io::Error::other("formula owner dependency is missing"))?;
+        owner.replace_message_preserving_header(
+            0,
+            RawMessage {
+                type_: 4_008,
+                data: vec![0xff],
+            },
+        )?;
+        Ok(())
+    })
+}
+
+/// Append a malformed optional calculation-engine reference to the rooted
+/// document.  The sheet-order codec intentionally ignores this unrelated
+/// field, so the package can be opened; the names graph validator must still
+/// reject the changed transaction without mutating its source snapshot.
+fn malformed_root_calculation_reference_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        let root = archive
+            .object_mut(1)
+            .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+        append_length_delimited_field(&mut root.messages[0].data, 3, &[0x08])?;
+        Ok(())
+    })
 }
 
 fn form_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
@@ -656,6 +800,171 @@ fn form_legacy_lock_and_pivot_dependencies_fail_closed_without_publishing() -> T
             path: names::Path::Table { sheet: 0, table: 0 }
         })
     ));
+    Ok(())
+}
+
+#[test]
+fn calculation_engine_dependencies_are_checked_after_root_projection() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+
+    // A complete engine envelope with no volatile name dependency is a valid
+    // detached graph and must not make an ordinary table rename fail.
+    let valid = Package::from_bytes(&calculation_engine_package(&source, false)?)?;
+    let valid_commit = valid
+        .edit_names()
+        .rename_table("Alpha", "One", "Engine-safe")?
+        .commit()?;
+    assert_eq!(table_name(valid_commit.package(), 0, 0), "Engine-safe");
+
+    // A non-empty volatile sheet/table-name set is deliberately outside this
+    // narrow transaction's rewrite plan.  The source snapshot must remain
+    // byte-for-byte unchanged when the guard rejects it.
+    let volatile = Package::from_bytes(&calculation_engine_package(&source, true)?)?;
+    let before = bytes(&volatile)?;
+    let error = volatile
+        .edit_names()
+        .rename_table("Alpha", "One", "Denied")?
+        .commit()
+        .expect_err("volatile formula-owner dependencies must be fail-closed");
+    assert!(matches!(
+        error,
+        names::Error::UnsupportedDependency {
+            path: names::Path::Table { sheet: 0, table: 0 }
+        }
+    ));
+    assert_eq!(bytes(&volatile)?, before);
+    Ok(())
+}
+
+#[test]
+fn malformed_calculation_engine_owner_and_root_reference_are_atomic() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+
+    for malformed in [
+        malformed_calculation_engine_package(&source)?,
+        malformed_formula_owner_package(&source)?,
+        malformed_root_calculation_reference_package(&source)?,
+    ] {
+        // These fields are outside the rooted sheet/sidebar projection, so a
+        // package can still be opened.  The changed transaction must reject
+        // the malformed dependency route before writing any candidate bytes.
+        let Ok(package) = Package::from_bytes(&malformed) else {
+            continue;
+        };
+        let before = bytes(&package)?;
+        assert!(matches!(
+            package
+                .edit_names()
+                .rename_table("Alpha", "One", "Denied")?
+                .commit(),
+            Err(names::Error::InvalidSource)
+        ));
+        assert_eq!(bytes(&package)?, before);
+    }
+    Ok(())
+}
+
+#[test]
+fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_routes() -> TestResult
+{
+    let source = rewrite_document(&package_bytes(false, false, 0)?, |archive| {
+        let root = archive
+            .object_mut(1)
+            .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+        // Unknown root data belongs to the source owner and must not be
+        // normalized by the generated-free sheet-order projection.
+        append_length_delimited_field(&mut root.messages[0].data, 90, b"root-opaque")?;
+        // Two occurrences of the optional calculation-engine route are
+        // ambiguous even though the rooted sheet projection does not select
+        // this field.
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            3,
+            &reference(CALCULATION_ENGINE).encode_to_vec(),
+        )?;
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            3,
+            &reference(CALCULATION_ENGINE + 1).encode_to_vec(),
+        )?;
+        Ok(())
+    })?;
+    let package = Package::from_bytes(&source)?;
+    let before = bytes(&package)?;
+    assert!(matches!(
+        package
+            .edit_names()
+            .rename_sheet("Alpha", "Changed")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&package)?, before);
+
+    // Remove the duplicate route while retaining the unknown field and prove
+    // that a normal sheet rename leaves the root payload exactly untouched.
+    let clean = rewrite_document(&package_bytes(false, false, 0)?, |archive| {
+        let root = archive
+            .object_mut(1)
+            .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+        append_length_delimited_field(&mut root.messages[0].data, 90, b"root-opaque")?;
+        Ok(())
+    })?;
+    let clean_package = Package::from_bytes(&clean)?;
+    let commit = clean_package
+        .edit_names()
+        .rename_sheet("Alpha", "Changed")?
+        .commit()?;
+    let source_catalog = Catalog::from_bytes(&clean)?;
+    let target_catalog = Catalog::from_bytes(&bytes(commit.package())?)?;
+    let source_archive = Archive::parse(
+        &SnappyStream::decompress(
+            source_catalog
+                .iter()
+                .find(|entry| entry.name() == DOCUMENT)
+                .unwrap()
+                .data(),
+        )?
+        .into_bytes(),
+    )?;
+    let target_archive = Archive::parse(
+        &SnappyStream::decompress(
+            target_catalog
+                .iter()
+                .find(|entry| entry.name() == DOCUMENT)
+                .unwrap()
+                .data(),
+        )?
+        .into_bytes(),
+    )?;
+    assert_eq!(
+        source_archive.object(1).unwrap().messages[0].data,
+        target_archive.object(1).unwrap().messages[0].data
+    );
+    Ok(())
+}
+
+#[test]
+fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+    let semantic = PackageSemanticLimits::default().with_formula_render_limits(1, 1)?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        PackageReadOptions::new(Limits::default(), semantic),
+    )?;
+    let before = bytes(&package)?;
+    let error = package
+        .edit_names()
+        .rename_table("Alpha", "One", "Denied")?
+        .commit()
+        .expect_err("the conservative changed-work guard must run before native rewrite");
+    assert!(matches!(
+        error,
+        names::Error::LimitExceeded {
+            kind: names::LimitKind::WireWork,
+            ..
+        }
+    ));
+    assert_eq!(bytes(&package)?, before);
     Ok(())
 }
 

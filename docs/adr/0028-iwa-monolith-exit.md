@@ -3076,3 +3076,35 @@ report the same sheet, table, text, and cell values. The tracked source remains
 unopened and exact. This is application-acceptance evidence for the selected
 reader path, not a native resave, rendering, performance, or complete Buffa
 claim.
+
+## 2026-08-16 amendment: Numbers names guard leaves generated-Prost ingress
+
+The focused Numbers names owner removes its last production generated-message
+reads from the changed-only dependency and pivot guards. Calculation-engine
+and formula-owner dependency envelopes now use the existing bounded strict
+Buffa projections, while the raw root/reference records remain the authority
+for locality, metadata, duplicate detection, and exact preservation. The
+volatile sheet/table-name dependency rule is unchanged. Pivot refusal uses a
+narrow field-85 `TSP.Reference` preflight and does not force the full table
+storage graph; its conservative rooted traversal is charged before native
+work and still refuses every changed table rename with a pivot owner.
+
+The names production-prefix boundary audit rejects `prost::Message`, generated
+archive decode calls, and generic generated decode helpers, while test-only
+fixture builders retain the canonical Prost oracle. Focused tests cover valid
+and malformed dependency routes, duplicate optional fields, empty versus
+nonempty volatile sets, pivot/lock/form/legacy behavior, strict wire and
+unknown-field preservation, work-limit refusal, source atomicity, and the
+existing selector-first transaction semantics. This is a production decode
+boundary and boundedness improvement, not a host-method retirement: no
+`litchi-iwa -> litchi-numbers` edge, ordered debt 015, or migration-host
+dependency is removed here. The complete Numbers table, tile, formula,
+sidecar, and editor graph remains outside this focused exit.
+
+The previously accepted Numbers names native oracle remains authoritative for
+semantic and application acceptance: the Rust Unicode candidate and its
+Numbers 14.4 Save As/reopen artifact retain the recorded hashes and visible
+sheet/table/data values, and the independent locked-table oracle retains its
+negative behavior. Because those app-authored artifacts do not contain a
+pivot or volatile-name dependency, native UI evidence does not replace the
+synthetic malformed/guard matrix for the new refusal branches.

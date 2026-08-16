@@ -10755,3 +10755,55 @@ must remain unopened and byte-identical. This read-only gate establishes
 application acceptance for the selected projection only; it does not claim
 native save fidelity, general rendering, performance, or retirement of the
 migration-host Numbers editor.
+
+## 2026-08-16 Numbers names dependency/pivot projection gate
+
+The focused names transaction now has a generated-free production guard for
+its changed-only dependency paths. The root calculation-engine reference is
+read with canonical raw framing and the existing strict sheet-order/root
+projection; the calculation-engine, dependency-tracker, and formula-owner
+envelopes are then checked through the bounded
+`numbers_table_cell_dependency_codec` Buffa projection. The volatile
+sheet/table-name set retains its previous semantic rule, including the
+distinction between an absent/empty set and a nonempty column-entry set. The
+pivot refusal reads only field 85 of each rooted table model and validates its
+single local reference; it does not instantiate a full table-storage view.
+
+The permanent names matrix covers successful standard and form-sheet edits,
+accepted legacy model ownership, locked-table refusal, pivot refusal, valid
+and volatile calculation-engine dependencies, malformed engine and owner
+payloads, malformed and duplicate root optional routes, strict selected-wire
+framing, unknown-byte retention, work-limit rejection before reassembly, and
+source-byte equality after every refusal. Existing selector, Unicode, final
+collision, exact no-op, inverse, conflict, concurrency, preview, and
+failure-redaction cases remain part of the same focused suite. Test-only
+generated Prost builders are retained as differential fixture material; the
+boundary ratchet rejects `prost::Message`, generated archive `decode`, and
+generic decode helpers in the production prefix of `package/names.rs`.
+
+The focused Numbers targets and strict Clippy pass, the live boundary graph
+passes 264 regression cases, and the names/host boundary audits report no
+finding. These counts include the new dependency-route and narrow-pivot
+ratchets; the broader workspace hook remains the authoritative final gate.
+
+The accepted native names oracle is unchanged because this cut changes only
+the bounded read implementation of dependency guards, not the semantic
+writer. The 136,357-byte source fixture has SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`; the
+Unicode Rust candidate is
+`22f8bc21223317318ec23ec764b8998af77a2c7800c68cbe88351abdb26b6e56`; and the
+Numbers 14.4 (7043.0.93) Save As/reopen artifact is
+`e1803b0568454a345f7962c5b4c72e8cb3d78adb2c87d5db1e6c58288a9413c4`.
+Numbers showed `Líneas 你好 🧪`, `表 Café №42`, the B2 text marker, and B3=42
+without repair, recovery, conversion, or warning UI. Equal restaging,
+no-op application, and inverse remained byte-exact at the native-resaved
+hash. The independent protection oracle
+`eb2e29c97c415c1b61ed1f8fe766e7211ed386c825c32dec056b72c9398d3e09` continues
+to prove locked-table refusal while sheet-only renames remain admissible.
+
+The native oracle contains no pivot or volatile-name dependency, so it is
+application acceptance for the unchanged semantic transaction and not proof
+that Apple Numbers exercises every new refusal branch. Those branches are
+covered by the synthetic complete-wire and malformed-wire matrices. No new
+manifest edge or host method is retired by this projection; the broader
+Numbers editor and ordered migration debt remain open.
