@@ -891,9 +891,18 @@ staging, in-memory owner rendering, candidate owner/public validation,
 source retention, patch construction, and output materialization. The format
 crate emits content-free ordered events and owns no clock. A focused test and
 three-shape unoptimized smoke establish event, arithmetic, semantic, patch,
-hash, refusal, and untouched-stream correctness only; they do not establish a
-latency ranking. The next native optimization must be selected from a
-current-revision release distribution and must keep both validation layers.
+hash, refusal, and untouched-stream correctness. The clean revision
+`ab333008d3` release distribution, pinned to CPU 2 across four fresh processes
+per shape and 800 retained samples per shape, now shows that combined
+initial/final complete public-reader validation is the largest grouped named
+phase for large (0.598 ms p50 of a 1.157 ms lifecycle) and payload-heavy
+(20.721 ms of 44.227 ms), while patch fingerprinting is largest for tiny
+(0.026 ms of 0.081 ms). Replacement staging is also material at 7.470 ms p50
+in payload-heavy. Lifecycle p50/mean spread across processes remained below
+3.0%/3.8%; two tiny subphase means crossed the 5% review trigger without
+changing rank. This is an attribution baseline, not an accepted optimization
+or speedup. The next native mechanism must keep both validation layers and pass
+balanced clean release comparison.
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

@@ -91,10 +91,24 @@ unattributed time against each measured lifecycle.
 
 The focused two-shape test and three-shape debug smoke pass exact semantic
 reopen, no-op, patch/inverse/stale, malformed/typed refusal, output-hash, event
-order/cardinality, and untouched-CFB-stream gates. The smoke is diagnostic only:
-its single unoptimized sample is not accepted latency evidence. Synchronous
-observer overhead remains included, and no speedup, optimization, physical-I/O,
-allocation/RSS, cold-cache, real-producer, or release comparison is claimed.
+order/cardinality, and untouched-CFB-stream gates. A subsequent clean release
+distribution at exact revision `ab333008d3`, pinned to CPU 2, used four fresh
+processes per shape with 20 warmups and 200 retained samples per process.
+Tiny/large/payload-heavy lifecycle p50 was 0.081/1.157/44.227 ms.
+Initial-plus-final complete public-reader validation p50 was
+0.016/0.598/20.721 ms; patch p50 was 0.026/0.165/8.413 ms, and replacement
+staging p50 was 0.014/0.174/7.470 ms. Every untimed case-level gate passed in
+all 12 reports; all 2,400 timed samples passed arithmetic, event, and output
+checks.
+Across-process lifecycle p50/mean spread was at most 2.98%/3.76%; two tiny
+subphase means crossed the 5% review trigger, but the phase rank did not change.
+
+This names the largest measured phases in the exact deterministic distribution
+but is not a control/candidate comparison. Synchronous observer overhead is
+included, and no optimization, speedup, physical-I/O, allocation/RSS,
+cold-cache, filesystem, or real-producer result is accepted. See the
+[summary](results/doc-owner-public-phases-0160-summary.json) and
+[raw-artifact manifest](results/doc-owner-public-phases-0160.sha256).
 
 ## Managed XLSX source-editor production freeze (change 0151)
 
