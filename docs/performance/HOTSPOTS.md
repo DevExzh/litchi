@@ -2,13 +2,16 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0164`](changes/0164-rtf-paragraph-split-merge-evidence.md)
+Evidence through: [`change 0165`](changes/0165-doc-lazy-fingerprint.md)
+(0165 is an accepted native-DOC lifecycle/workflow result for the exact
+deterministic corpus; it does not complete the native owner/public-reader or
+CRUD matrix.)
 (0152 is a final clean release ABBA for same-target MiniFAT single-flight;
 all correctness/source-event invariants passed and the existing concurrent
 scenarios recorded 6,473 versus 8,000 logical source calls, but only that
 source-event/correctness scope is accepted. Change 0151 is a production
 managed-XLSX correctness/resource freeze and adds no performance result; the
-latest accepted timing result remains the configured-simulator CFB repeat
+latest accepted CFB timing result remains the configured-simulator CFB repeat
 evidence in [`change 0149`](changes/0149-cfb-same-target-repeat-release-abba.md)).
 (the newest accepted semantic-format optimization remains limited to four repeated
 source-backed ODP full-text projections; the latest release CFB selective-range
@@ -958,6 +961,49 @@ or rich-RTF claim. The selector summary exposes
 remain the authority for exact boundary-byte restoration and forged-boundary
 precondition refusal.
 See [`0164`](changes/0164-rtf-paragraph-split-merge-evidence.md).
+
+Change 0165 records the narrow native-DOC lazy-fingerprint implementation found
+by the owner/public-reader phase attribution plus a bounded descriptive comparison. `Snapshot` caches its FNV-1a
+diagnostic fingerprint in an inline `OnceLock`; patch construction no longer
+eagerly scans before/after artifacts, and `Arc` identity plus length provides
+a same-lineage no-op/apply fast path. Independently reopened sources still
+perform lazy fingerprint comparison followed by exact bytes, preserving the
+full collision/stale/inverse/refusal boundary. The fingerprint accessors are
+non-`const` because their first call may initialize the cache.
+
+The established DOC lifecycle timer remains comparable. Same-lineage apply and
+first fingerprint demand are explicit post-lifecycle workflow vectors. The
+final clean control/candidate revisions are
+`d6818e290aa77fd7666b7b16ee6908319d0f332b` and
+`5dd813b1e108e253457ccb6c504c125c2becc1c6`; their binary SHA-256 values are
+`344c0504c254109ee6b4361e375599d187f8a12333abb44f207d837af259ef8c` and
+`c95e6c6004cbd725c789597566a81c0897ab6915ecd7c274deab222d134b3fd3`.
+Clean CPU-2 release ABBA used 20 warmups and 500 retained samples per tiny,
+large, and payload-heavy shape in each leg. Lifecycle p50/mean/p95 positive-faster deltas are
+`+33.78/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
+`+12.27/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
+`+17.33/+17.09/+16.58` and `+17.80/+17.75/+16.25` payload-heavy. With
+immediate fingerprint demand, workflow p50/mean/p95 positive-faster deltas are
+`+14.56/+16.34/+22.24`, `+13.90/+15.80/+21.90`,
+`+4.49/+4.82/+10.24`, `+5.82/+5.64/+4.26`,
+`+6.55/+6.41/+6.26`, and `+7.08/+7.08/+6.33` in shape/direction order.
+The isolated patch/apply extension spans about 99.6-99.99% across the reported
+statistics, while its
+deferred first scan is visible at roughly 25.7 us, 164 us, and 8.37-8.39 ms
+for the three candidate shapes.
+
+Same-implementation lifecycle p50/mean drift is control
+`-1.18%/-1.41%`, `+0.26%/-0.42%`, `+0.47%/+0.72%` and candidate
+`-0.33%/-0.75%`, `-1.51%/-1.51%`, `-0.11%/-0.08%` in tiny/large/
+payload-heavy order. The positive paired directions are not generalized beyond
+the named host/corpus. Final heaptrack records 50,677 allocation calls and
+128.28M peak heap for both revisions, with profiler RSS 145.14M versus
+142.81M; `/usr/bin/time` A1/B1/B2/A2 maximum RSS is
+138160/138024/138028/138032 KiB. These are descriptive whole-process probes
+only. No speedup, physical-I/O, cold-cache, real-producer, total-memory, operation-only
+allocator/RSS, generic-DOC, or CRUD-completion claim is attached. Remaining DOC
+work must attribute distinct validation or publication work without removing
+either independent validation layer.
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

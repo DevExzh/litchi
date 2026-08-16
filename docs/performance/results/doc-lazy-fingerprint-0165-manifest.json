@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "record": "doc-lazy-fingerprint-0165",
+  "hash_algorithm": "SHA-256",
+  "self_excluded": true,
+  "artifact_count": 39,
+  "artifacts": [
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a1-control-large.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "f53ec8dd836cc784a2b3aa9b2d0b0fea1c6c21db11ba2b826db078dd3f63a112",
+      "bytes": 30578
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a1-control-payload-heavy.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "2588f8128288a3fd43f2cbea91312643f7480baa4931a8fb0ae4ac3d36ec4486",
+      "bytes": 38094
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a1-control-resource.json",
+      "role": "resource-json",
+      "sha256": "e4588a8a39384e0b5b24c7383f537e3cf3fe68d02ce29f7e2d3537131ab388f2",
+      "bytes": 26666
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a1-control-time.txt",
+      "role": "time-v-report",
+      "sha256": "818a51c363b826b47316a9f115acc39e1f68e37e6b0df652c27caaee0bcb769e",
+      "bytes": 1011
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a1-control-tiny.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "c550c4b6f100b675f46619ab5881bca83dcbb9eea257985799cf9db5ef2606cb",
+      "bytes": 25232
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a2-control-large.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "cc732ef6e80179f9b80a96b31efe0649926c767b0723b9aa0efd663dbd670a7d",
+      "bytes": 29212
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a2-control-payload-heavy.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "3970eedb4e99a805c9e5ac3317f3a58889e9b8d532463af45b4f8350e0e0752b",
+      "bytes": 37532
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a2-control-resource.json",
+      "role": "resource-json",
+      "sha256": "e9141b889f5dcf2471865bb55f8b70b33189e65f979c9f7c3317ffdaff46a4d1",
+      "bytes": 26695
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a2-control-time.txt",
+      "role": "time-v-report",
+      "sha256": "b236f152a339d12901e5f7c2c056b75a5ea2583d82495de80687c24709fd4283",
+      "bytes": 1011
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-a2-control-tiny.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "bbcf3a2077d63671a77be181e8d52b5ef373cf20931ac723b7b6ee45f572c78a",
+      "bytes": 24789
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b1-candidate-large.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "705de3c42149bfb040ab2ec7e3111f03bb2ec4c8749e163e43739ac2a722cf64",
+      "bytes": 29433
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b1-candidate-payload-heavy.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "bbb8449db1219dd03bcde7738a2c858989f64a58467720a7188198d6b2d64976",
+      "bytes": 38792
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b1-candidate-resource.json",
+      "role": "resource-json",
+      "sha256": "fe059ec18da3981e1b089068fdbdd3d56ecc53718895021f0f378e8e9781a150",
+      "bytes": 26561
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b1-candidate-time.txt",
+      "role": "time-v-report",
+      "sha256": "03b2cc245066971af3e21eda9c141edae04b18acdea73e7573d184650d98b6a6",
+      "bytes": 1013
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b1-candidate-tiny.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "da9b0cf8e8c5bd9fc5c128595553948bc39bfa749b009d6e9b8be8cfe64d01e3",
+      "bytes": 22739
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b2-candidate-large.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "d3c9547d657338bbf167ba204a3cda053fd2e15c536e33be6c3fa75fb590afdc",
+      "bytes": 29574
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b2-candidate-payload-heavy.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "ca3e67357f0e239c031ae52c556e400e1ac00b8ba3ddabccf16f7fb06b3a1474",
+      "bytes": 38789
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b2-candidate-resource.json",
+      "role": "resource-json",
+      "sha256": "f13f161b461508c3e20bb10675acc47e7e180af3fb4c61f613d166717fc21cf2",
+      "bytes": 26590
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b2-candidate-time.txt",
+      "role": "time-v-report",
+      "sha256": "d829d913604b6fcead786bd99e50b36332792ed5b6e2e08eb3d54df36d41fa27",
+      "bytes": 1013
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-b2-candidate-tiny.json.zst",
+      "role": "primary-raw-result",
+      "sha256": "129f2af217331e64ad33a69e1e03970ac71a763db01f9467c61c2eb1faee773a",
+      "bytes": 22196
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-a1-control-large.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "6bb544d646acb69e9adc3c21dc2a3d933d8906235f64fd3c16cf172808d9bd2c",
+      "bytes": 6880
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-a1-control-tiny.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "09785d7cb642e468e29a13f0e5936eb4fecad6e454c85970b4579b172ce6f9ed",
+      "bytes": 4301
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-a2-control-large.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "ce01f7a1c657a90945952f27933b3cfb9c064d62807edf1fb8ca3524d6be0b89",
+      "bytes": 6949
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-a2-control-tiny.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "1f4ffc6d567d831c935b506d65f02c89298f826594c33693e02ef69ddf8742b2",
+      "bytes": 4227
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-b1-candidate-large.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "457f91ea41490fa45f419bde8fe3f34b56b1ee10647195dab296b533b2caa30d",
+      "bytes": 6947
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-b1-candidate-tiny.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "b64b839ef07b45facf3d5f0a91ef9b3aa39f17cd7b73f5f77d728c7bb039b3a5",
+      "bytes": 4034
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-b2-candidate-large.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "7ca7f18d8708e9c010fa28e1f325cc283339e0db2942b9e33a79c02c95379285",
+      "bytes": 7020
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-b2-candidate-tiny.json.zst",
+      "role": "guard-raw-result",
+      "sha256": "55f09c76348026a2a645992931a481f6bb96c5e7fc99571bf40d9caf7108576d",
+      "bytes": 3922
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-deltas.tsv",
+      "role": "derived-statistics",
+      "sha256": "aec6c9c5989d3632937db07d5edd860af1a215b86be593e50dde12c8d68121ee",
+      "bytes": 1186
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-guard-stats.tsv",
+      "role": "derived-statistics",
+      "sha256": "68983e0dad142dc8d6a32f75d5b53546f4d925bef659e619abe8231fc391fec9",
+      "bytes": 3338
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-heaptrack-candidate-app.json",
+      "role": "heaptrack-structured-result",
+      "sha256": "99d18dda2adb89640abe22434fa6518d08edcc773d0235214b92f8e7918abae6",
+      "bytes": 8609
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-heaptrack-candidate-app.txt",
+      "role": "heaptrack-report",
+      "sha256": "c50fb6998e9ca1780041d82c7c1b3f8dfba72e36d500bc8ec42ee64816379df4",
+      "bytes": 171916
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-heaptrack-candidate-app.zst",
+      "role": "heaptrack-raw",
+      "sha256": "7898aa9e09243d062cc79e994d9fe96f7710d35f80f08860c9628680743b2780",
+      "bytes": 105995
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-heaptrack-control-app.json",
+      "role": "heaptrack-structured-result",
+      "sha256": "1d8e6e936ceb4e57d3eb90eb94f47cd25dc65c2484261bf4fe6592b54f13bdf7",
+      "bytes": 8610
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-heaptrack-control-app.txt",
+      "role": "heaptrack-report",
+      "sha256": "5e2923b411b83401c712e483a785730594bc8000508ed205ab596a1b5db70d8f",
+      "bytes": 169553
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-heaptrack-control-app.zst",
+      "role": "heaptrack-raw",
+      "sha256": "3c5700745fab17c64d18947a00eb709b87fd6150e7a1a88d747dacd3018e8cac",
+      "bytes": 105778
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-paired-deltas.tsv",
+      "role": "derived-statistics",
+      "sha256": "d3a459a1379bfd625583f8a0b32915e5ed014b698ec7d228ef650c8b74a08077",
+      "bytes": 1627
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-primary-stats.tsv",
+      "role": "derived-statistics",
+      "sha256": "ef91cc3d397e795c749dfe70573b30efdb982d7bac8de11a67bb2e22756cc188",
+      "bytes": 10266
+    },
+    {
+      "path": "docs/performance/results/doc-lazy-fingerprint-0165-summary.json",
+      "role": "summary",
+      "sha256": "c4b38be3cbd4fabddc0814c009f0e3b9b82b0e53211b9b67a7d42434ccaa75ec",
+      "bytes": 72689
+    }
+  ]
+}

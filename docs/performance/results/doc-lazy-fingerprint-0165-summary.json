@@ -1,0 +1,2280 @@
+{
+  "schema_version": 1,
+  "record": "doc-lazy-fingerprint-0165",
+  "status": "accepted-clean-release-control-candidate-evidence",
+  "change": {
+    "id": "0165",
+    "title": "defer snapshot fingerprints until an explicit diagnostic demand",
+    "control_commit": "d6818e290aa77fd7666b7b16ee6908319d0f332b",
+    "candidate_commit": "5dd813b1e108e253457ccb6c504c125c2becc1c6",
+    "control_binary": {
+      "sha256": "344c0504c254109ee6b4361e375599d187f8a12333abb44f207d837af259ef8c",
+      "bytes": 43255776,
+      "profile": "release",
+      "legs": [
+        "a1-control",
+        "a2-control"
+      ]
+    },
+    "candidate_binary": {
+      "sha256": "c95e6c6004cbd725c789597566a81c0897ab6915ecd7c274deab222d134b3fd3",
+      "bytes": 43271480,
+      "profile": "release",
+      "legs": [
+        "b1-candidate",
+        "b2-candidate"
+      ]
+    }
+  },
+  "evidence_kind": "four-leg-clean-release-primary-plus-semantic-guard-capture",
+  "claim_boundary": {
+    "timing_scope": "measured_total_ns covers native DOC owner/public validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
+    "performance_claim": "attribution-only correctness and deferred-work accounting; measured_total_ns is the established lifecycle boundary, synchronous observer overhead is included, and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
+    "positive_faster_definition": "100 * (control - candidate) / control; positive means the candidate is faster; deferred_fingerprint remains a negative demand-cost delta when work is intentionally deferred",
+    "accepted_claim": "The retained primary vectors and guard vectors are reproducible correctness and attribution evidence for the named DOC/CFB in-memory corpus and the reported control/candidate builds."
+  },
+  "source_and_environment": {
+    "recorded_environment_git_revision_all_captures": [
+      "5dd813b1e108e253457ccb6c504c125c2becc1c6"
+    ],
+    "recorded_worktree_dirty_all_captures": [
+      false
+    ],
+    "runtime_git_revision_note": "Every raw report records the clean invoking worktree HEAD, which was the candidate revision for both control and candidate process legs. This field is not binary provenance; control/candidate binary identity is bound by binary_source_commits and the verified binary SHA-256 values in change.",
+    "environment_sha256": "f6f3736bc9940af513a0b92062e6379d0e658013e3192c127018a822d2ff46f0",
+    "fields": {
+      "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "git_revision": "5dd813b1e108e253457ccb6c504c125c2becc1c6",
+      "git_worktree_dirty": false,
+      "logical_cpus_available": 1,
+      "allocator": "Rust system allocator",
+      "rustflags": null,
+      "cargo_build_target": null,
+      "perf_event_paranoid": "1",
+      "os": "linux",
+      "kernel": "Linux 6.8.0-101-generic",
+      "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+      "total_memory_bytes": 33605935104,
+      "page_size_bytes": 4096,
+      "filesystem_type": null,
+      "source_destination_same_device": null,
+      "cpu_affinity": "2",
+      "storage_identifier": null
+    },
+    "binary_source_commits": {
+      "control": "d6818e290aa77fd7666b7b16ee6908319d0f332b",
+      "candidate": "5dd813b1e108e253457ccb6c504c125c2becc1c6"
+    }
+  },
+  "configuration": {
+    "primary_samples_per_case": 500,
+    "primary_warmup_iterations_per_case": 20,
+    "primary_retained_samples": 6000,
+    "guard_samples_per_case": 500,
+    "guard_retained_samples": 24000,
+    "execution_workers": [
+      1
+    ],
+    "primary_by_shape": {
+      "tiny": {
+        "configuration_sha256": "0d31d519d97943af31bb17870b9eb880de532b99682cc81e0f5288cfed8bb27e",
+        "writer_shape": "tiny",
+        "corpus_shape": "tiny",
+        "payload_kind": "compressible"
+      },
+      "large": {
+        "configuration_sha256": "ef44e21cedbfaba2c28677069366f28ebc41828f88e44182a8a9c3c61fc6510d",
+        "writer_shape": "large",
+        "corpus_shape": "large",
+        "payload_kind": "compressible"
+      },
+      "payload-heavy": {
+        "configuration_sha256": "4528c9dd71a9fa3b749003ce3ab2a648b8266d03e87399677dd1e16d8e13ae58",
+        "writer_shape": "payload-heavy",
+        "corpus_shape": "payload-heavy",
+        "payload_kind": "compressible"
+      }
+    },
+    "guard_by_shape": {
+      "tiny": {
+        "configuration_sha256": "8758fba2e894e3e545a71f295622eeb64fa81c2553bda9526fdce69cbe38d174",
+        "semantic_shape": "tiny",
+        "corpus_shape": "tiny",
+        "payload_kind": "compressible"
+      },
+      "large": {
+        "configuration_sha256": "f9c6f901c82a7a083be67563fe46650cb509f311f3ef6edc5a6a3d7680368abb",
+        "semantic_shape": "large",
+        "corpus_shape": "large",
+        "payload_kind": "compressible"
+      }
+    },
+    "shared": {
+      "filesystem_cache_states": [
+        "warm",
+        "cold-requested"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "range_simulation": {
+        "fixed_latency_us": 100,
+        "request_overhead_us": 25,
+        "bandwidth_bytes_per_second": 52428800,
+        "max_physical_range_bytes": 4096
+      },
+      "execution_workers": [
+        1
+      ]
+    }
+  },
+  "corpus": {
+    "package_format": "DOC/CFB",
+    "generator": "litchi-legacy-writer-v1",
+    "deterministic_in_memory_writer_corpus": true,
+    "shape_hashes": {
+      "tiny": "6ff71d46b55c89a66740eb8b1a953e35879cfda3f8f955d5a0535c573a5b721c",
+      "large": "b0e0842007aa4657b2c2102d60c682cf3b54dcf12ebcdc54b24ef6a6a9ea3925",
+      "payload-heavy": "ee02a17b4048d1d00056ab6d648c761a36a0eb71389175982f8be52ea141c36e"
+    },
+    "guard_case_corpus_hashes": {
+      "tiny": "6a902c7c60b821f0a051269f700b177654d8e52adf7dd8906239e07e11e7f7f0",
+      "large": "8237a71105f268f57a8fa0130fc910e5991c060df9eb7d2c3ea913d315a186fd"
+    },
+    "shapes": [
+      {
+        "shape": "large",
+        "corpus": {
+          "name": "doc-large",
+          "generator": "litchi-legacy-writer-v1",
+          "package_format": "DOC/CFB",
+          "shape": "large",
+          "payload_kind": "not-applicable",
+          "compression": "none",
+          "entry_count": 512,
+          "archive_member_count": 5,
+          "entry_bytes": 0,
+          "uncompressed_payload_bytes": 32256,
+          "archive_bytes": 97792,
+          "archive_sha256": "3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+          "target_entry": "WordDocument",
+          "target_payload_bytes": 81920,
+          "target_payload_sha256": "33e6cd70a45181c28d4a3e7bfa4e7817bd82d7b2e89e39437a589243abdc38eb",
+          "xlsx": null
+        }
+      },
+      {
+        "shape": "payload-heavy",
+        "corpus": {
+          "name": "doc-payload-heavy",
+          "generator": "litchi-legacy-writer-v1",
+          "package_format": "DOC/CFB",
+          "shape": "payload-heavy",
+          "payload_kind": "not-applicable",
+          "compression": "none",
+          "entry_count": 128,
+          "archive_member_count": 5,
+          "entry_bytes": 0,
+          "uncompressed_payload_bytes": 2560000,
+          "archive_bytes": 5179904,
+          "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+          "target_entry": "WordDocument",
+          "target_payload_bytes": 5128192,
+          "target_payload_sha256": "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7",
+          "xlsx": null
+        }
+      },
+      {
+        "shape": "tiny",
+        "corpus": {
+          "name": "doc-tiny",
+          "generator": "litchi-legacy-writer-v1",
+          "package_format": "DOC/CFB",
+          "shape": "tiny",
+          "payload_kind": "not-applicable",
+          "compression": "none",
+          "entry_count": 3,
+          "archive_member_count": 5,
+          "entry_bytes": 0,
+          "uncompressed_payload_bytes": 189,
+          "archive_bytes": 15360,
+          "archive_sha256": "ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b",
+          "target_entry": "WordDocument",
+          "target_payload_bytes": 4096,
+          "target_payload_sha256": "9ccb6076c72911adde4fe8519e169d0ff039f341cf719d15270880ec10942d8a",
+          "xlsx": null
+        }
+      }
+    ]
+  },
+  "primary_metrics": {
+    "metric_names": [
+      "measured_total_ns",
+      "workflow_no_diagnostic_ns",
+      "workflow_with_fingerprint_demand_ns",
+      "edit_patch_ns",
+      "same_lineage_apply_ns",
+      "deferred_fingerprint_ns"
+    ],
+    "statistic_fields": [
+      "samples",
+      "min_ns",
+      "p50_ns",
+      "mean_ns",
+      "p95_ns",
+      "p99_ns",
+      "max_ns"
+    ],
+    "per_leg": {
+      "a1-control": {
+        "shape_stats": {
+          "large": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 20,
+              "p50_ns": 20,
+              "p95_ns": 30,
+              "p99_ns": 31,
+              "max_ns": 40,
+              "mean_ns": 22.256
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 163906,
+              "p50_ns": 164408,
+              "p95_ns": 173879,
+              "p99_ns": 184255,
+              "max_ns": 222438,
+              "mean_ns": 166650.524
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 1093542,
+              "p50_ns": 1153524,
+              "p95_ns": 1269914,
+              "p99_ns": 1345420,
+              "max_ns": 1396661,
+              "mean_ns": 1161350.324
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 78548,
+              "p50_ns": 78757,
+              "p95_ns": 86679,
+              "p99_ns": 97094,
+              "max_ns": 248052,
+              "mean_ns": 80139.518
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 1175093,
+              "p50_ns": 1233465,
+              "p95_ns": 1353680,
+              "p99_ns": 1428385,
+              "max_ns": 1475419,
+              "mean_ns": 1241489.842
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 1175113,
+              "p50_ns": 1233485,
+              "p95_ns": 1353700,
+              "p99_ns": 1428416,
+              "max_ns": 1475439,
+              "mean_ns": 1241512.098
+            }
+          },
+          "payload-heavy": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 20,
+              "p50_ns": 170,
+              "p95_ns": 460,
+              "p99_ns": 621,
+              "max_ns": 1082,
+              "mean_ns": 196.116
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 8316732,
+              "p50_ns": 8363326,
+              "p95_ns": 8582910,
+              "p99_ns": 9203949,
+              "max_ns": 9714873,
+              "mean_ns": 8402355.21
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 38867332,
+              "p50_ns": 41152713,
+              "p95_ns": 43521739,
+              "p99_ns": 45575757,
+              "max_ns": 48659712,
+              "mean_ns": 41378456.84
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 4197400,
+              "p50_ns": 4241561,
+              "p95_ns": 4315013,
+              "p99_ns": 4646751,
+              "max_ns": 4728624,
+              "mean_ns": 4257857.22
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 43103155,
+              "p50_ns": 45395400,
+              "p95_ns": 47778343,
+              "p99_ns": 50196372,
+              "max_ns": 52955608,
+              "mean_ns": 45636314.06
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 43103416,
+              "p50_ns": 45395581,
+              "p95_ns": 47778924,
+              "p99_ns": 50196502,
+              "max_ns": 52955999,
+              "mean_ns": 45636510.176
+            }
+          },
+          "tiny": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 20,
+              "p50_ns": 20,
+              "p95_ns": 31,
+              "p99_ns": 31,
+              "max_ns": 131,
+              "mean_ns": 22.832
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 25686,
+              "p50_ns": 25735,
+              "p95_ns": 25997,
+              "p99_ns": 33997,
+              "max_ns": 157758,
+              "mean_ns": 26313.808
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 76426,
+              "p50_ns": 79160,
+              "p95_ns": 100689,
+              "p99_ns": 114499,
+              "max_ns": 217210,
+              "mean_ns": 82812.154
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 12337,
+              "p50_ns": 12376,
+              "p95_ns": 12508,
+              "p99_ns": 12617,
+              "max_ns": 27148,
+              "mean_ns": 12470.278
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 88793,
+              "p50_ns": 91597,
+              "p95_ns": 113036,
+              "p99_ns": 127055,
+              "max_ns": 229587,
+              "mean_ns": 95282.432
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 88823,
+              "p50_ns": 91617,
+              "p95_ns": 113056,
+              "p99_ns": 127075,
+              "max_ns": 229607,
+              "mean_ns": 95305.264
+            }
+          }
+        }
+      },
+      "a2-control": {
+        "shape_stats": {
+          "large": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 20,
+              "p50_ns": 20,
+              "p95_ns": 30,
+              "p99_ns": 31,
+              "max_ns": 40,
+              "mean_ns": 21.934
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 163786,
+              "p50_ns": 164147,
+              "p95_ns": 173909,
+              "p99_ns": 186719,
+              "max_ns": 191214,
+              "mean_ns": 165799.082
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 1109563,
+              "p50_ns": 1156497,
+              "p95_ns": 1198686,
+              "p99_ns": 1246742,
+              "max_ns": 1282402,
+              "mean_ns": 1156418.714
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 78478,
+              "p50_ns": 78659,
+              "p95_ns": 84336,
+              "p99_ns": 87821,
+              "max_ns": 98916,
+              "mean_ns": 79316.766
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 1188341,
+              "p50_ns": 1235787,
+              "p95_ns": 1277685,
+              "p99_ns": 1325461,
+              "max_ns": 1361080,
+              "mean_ns": 1235735.48
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 1188361,
+              "p50_ns": 1235807,
+              "p95_ns": 1277705,
+              "p99_ns": 1325481,
+              "max_ns": 1361100,
+              "mean_ns": 1235757.414
+            }
+          },
+          "payload-heavy": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 20,
+              "p50_ns": 40,
+              "p95_ns": 120,
+              "p99_ns": 170,
+              "max_ns": 241,
+              "mean_ns": 43.45
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 8324157,
+              "p50_ns": 8376199,
+              "p95_ns": 8517425,
+              "p99_ns": 8728828,
+              "max_ns": 9348302,
+              "mean_ns": 8397868.258
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 40035077,
+              "p50_ns": 41345455,
+              "p95_ns": 43605663,
+              "p99_ns": 44957087,
+              "max_ns": 56848675,
+              "mean_ns": 41677412.24
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 4210805,
+              "p50_ns": 4248818,
+              "p95_ns": 4318946,
+              "p99_ns": 4410341,
+              "max_ns": 4695756,
+              "mean_ns": 4258839.722
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 44262016,
+              "p50_ns": 45616058,
+              "p95_ns": 47917017,
+              "p99_ns": 49367428,
+              "max_ns": 61171937,
+              "mean_ns": 45936251.962
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 44262046,
+              "p50_ns": 45616108,
+              "p95_ns": 47917047,
+              "p99_ns": 49367448,
+              "max_ns": 61171967,
+              "mean_ns": 45936295.412
+            }
+          },
+          "tiny": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 20,
+              "p50_ns": 20,
+              "p95_ns": 30,
+              "p99_ns": 31,
+              "max_ns": 40,
+              "mean_ns": 21.974
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 25645,
+              "p50_ns": 25707,
+              "p95_ns": 25955,
+              "p99_ns": 34709,
+              "max_ns": 40215,
+              "mean_ns": 26017.776
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 75796,
+              "p50_ns": 78228,
+              "p95_ns": 96684,
+              "p99_ns": 113828,
+              "max_ns": 133455,
+              "mean_ns": 81644.876
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 12317,
+              "p50_ns": 12357,
+              "p95_ns": 12497,
+              "p99_ns": 19476,
+              "max_ns": 29411,
+              "mean_ns": 12536.1
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 88153,
+              "p50_ns": 90685,
+              "p95_ns": 109152,
+              "p99_ns": 126185,
+              "max_ns": 145812,
+              "mean_ns": 94180.976
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 88173,
+              "p50_ns": 90705,
+              "p95_ns": 109172,
+              "p99_ns": 126205,
+              "max_ns": 145832,
+              "mean_ns": 94202.95
+            }
+          }
+        }
+      },
+      "b1-candidate": {
+        "shape_stats": {
+          "large": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 163987,
+              "p50_ns": 164237,
+              "p95_ns": 174662,
+              "p99_ns": 187339,
+              "max_ns": 221045,
+              "mean_ns": 166419.848
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 29,
+              "p50_ns": 40,
+              "p95_ns": 51,
+              "p99_ns": 80,
+              "max_ns": 450,
+              "mean_ns": 41.396
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 981286,
+              "p50_ns": 1011989,
+              "p95_ns": 1047266,
+              "p99_ns": 1091308,
+              "max_ns": 1157149,
+              "mean_ns": 1015138.08
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 30,
+              "p50_ns": 40,
+              "p95_ns": 51,
+              "p99_ns": 80,
+              "max_ns": 4936,
+              "mean_ns": 53.12
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 981326,
+              "p50_ns": 1012029,
+              "p95_ns": 1047306,
+              "p99_ns": 1091348,
+              "max_ns": 1157189,
+              "mean_ns": 1015191.2
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 1147194,
+              "p50_ns": 1178058,
+              "p95_ns": 1215020,
+              "p99_ns": 1255405,
+              "max_ns": 1321536,
+              "mean_ns": 1181611.048
+            }
+          },
+          "payload-heavy": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 8309791,
+              "p50_ns": 8363825,
+              "p95_ns": 8596887,
+              "p99_ns": 8879107,
+              "max_ns": 9794110,
+              "mean_ns": 8399982.726
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 40,
+              "p50_ns": 1001,
+              "p95_ns": 1451,
+              "p99_ns": 1862,
+              "max_ns": 10245,
+              "mean_ns": 1016.486
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 32909855,
+              "p50_ns": 34020952,
+              "p95_ns": 36305331,
+              "p99_ns": 38360021,
+              "max_ns": 39464522,
+              "mean_ns": 34308167.044
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 450,
+              "p50_ns": 832,
+              "p95_ns": 1072,
+              "p99_ns": 1171,
+              "max_ns": 1192,
+              "mean_ns": 833.326
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 32910396,
+              "p50_ns": 34021883,
+              "p95_ns": 36306522,
+              "p99_ns": 38361123,
+              "max_ns": 39465453,
+              "mean_ns": 34309000.37
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 41246117,
+              "p50_ns": 42421929,
+              "p95_ns": 44786513,
+              "p99_ns": 46742603,
+              "max_ns": 47811103,
+              "mean_ns": 42708983.096
+            }
+          },
+          "tiny": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 25704,
+              "p50_ns": 25746,
+              "p95_ns": 25946,
+              "p99_ns": 33638,
+              "max_ns": 36360,
+              "mean_ns": 26021.916
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 29,
+              "p50_ns": 40,
+              "p95_ns": 40,
+              "p99_ns": 41,
+              "max_ns": 60,
+              "mean_ns": 37.468
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 50530,
+              "p50_ns": 52423,
+              "p95_ns": 61484,
+              "p99_ns": 69796,
+              "max_ns": 93219,
+              "mean_ns": 53669.044
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 29,
+              "p50_ns": 40,
+              "p95_ns": 50,
+              "p99_ns": 51,
+              "max_ns": 60,
+              "mean_ns": 40.372
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 50570,
+              "p50_ns": 52473,
+              "p95_ns": 61524,
+              "p99_ns": 69856,
+              "max_ns": 93259,
+              "mean_ns": 53709.416
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 76316,
+              "p50_ns": 78279,
+              "p95_ns": 87912,
+              "p99_ns": 95612,
+              "max_ns": 119014,
+              "mean_ns": 79731.332
+            }
+          }
+        }
+      },
+      "b2-candidate": {
+        "shape_stats": {
+          "large": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 163737,
+              "p50_ns": 164226,
+              "p95_ns": 173519,
+              "p99_ns": 184795,
+              "max_ns": 239510,
+              "mean_ns": 166207.432
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 29,
+              "p50_ns": 40,
+              "p95_ns": 50,
+              "p99_ns": 109,
+              "max_ns": 340,
+              "mean_ns": 40.222
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 950714,
+              "p50_ns": 996727,
+              "p95_ns": 1058702,
+              "p99_ns": 1129791,
+              "max_ns": 1472163,
+              "mean_ns": 999773.392
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 30,
+              "p50_ns": 40,
+              "p95_ns": 61,
+              "p99_ns": 160,
+              "max_ns": 440,
+              "mean_ns": 46.28
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 950754,
+              "p50_ns": 996767,
+              "p95_ns": 1058772,
+              "p99_ns": 1129831,
+              "max_ns": 1472603,
+              "mean_ns": 999819.672
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 1114580,
+              "p50_ns": 1163878,
+              "p95_ns": 1223320,
+              "p99_ns": 1293837,
+              "max_ns": 1652663,
+              "mean_ns": 1166027.104
+            }
+          },
+          "payload-heavy": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 8318540,
+              "p50_ns": 8379355,
+              "p95_ns": 8511768,
+              "p99_ns": 8788840,
+              "max_ns": 9349366,
+              "mean_ns": 8401042.348
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 40,
+              "p50_ns": 732,
+              "p95_ns": 1352,
+              "p99_ns": 1473,
+              "max_ns": 1742,
+              "mean_ns": 738.626
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 32721019,
+              "p50_ns": 33984945,
+              "p95_ns": 36517774,
+              "p99_ns": 38790935,
+              "max_ns": 41563574,
+              "mean_ns": 34280913.272
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 321,
+              "p50_ns": 741,
+              "p95_ns": 1012,
+              "p99_ns": 1162,
+              "max_ns": 1331,
+              "mean_ns": 758.59
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 32721730,
+              "p50_ns": 33985546,
+              "p95_ns": 36518626,
+              "p99_ns": 38792016,
+              "max_ns": 41564596,
+              "mean_ns": 34281671.862
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 41072766,
+              "p50_ns": 42387006,
+              "p95_ns": 44885903,
+              "p99_ns": 47508807,
+              "max_ns": 50072648,
+              "mean_ns": 42682714.21
+            }
+          },
+          "tiny": {
+            "deferred_fingerprint_ns": {
+              "samples": 500,
+              "min_ns": 25695,
+              "p50_ns": 25736,
+              "p95_ns": 25875,
+              "p99_ns": 31504,
+              "max_ns": 38964,
+              "mean_ns": 26013.72
+            },
+            "edit_patch_ns": {
+              "samples": 500,
+              "min_ns": 29,
+              "p50_ns": 40,
+              "p95_ns": 40,
+              "p99_ns": 41,
+              "max_ns": 41,
+              "mean_ns": 36.796
+            },
+            "measured_total_ns": {
+              "samples": 500,
+              "min_ns": 50479,
+              "p50_ns": 52252,
+              "p95_ns": 58330,
+              "p99_ns": 69155,
+              "max_ns": 93680,
+              "mean_ns": 53264.008
+            },
+            "same_lineage_apply_ns": {
+              "samples": 500,
+              "min_ns": 29,
+              "p50_ns": 40,
+              "p95_ns": 50,
+              "p99_ns": 51,
+              "max_ns": 51,
+              "mean_ns": 39.77
+            },
+            "workflow_no_diagnostic_ns": {
+              "samples": 500,
+              "min_ns": 50529,
+              "p50_ns": 52283,
+              "p95_ns": 58370,
+              "p99_ns": 69195,
+              "max_ns": 93720,
+              "mean_ns": 53303.778
+            },
+            "workflow_with_fingerprint_demand_ns": {
+              "samples": 500,
+              "min_ns": 76255,
+              "p50_ns": 78099,
+              "p95_ns": 85258,
+              "p99_ns": 94942,
+              "max_ns": 119446,
+              "mean_ns": 79317.498
+            }
+          }
+        }
+      }
+    }
+  },
+  "paired_positive_faster_deltas_percent": {
+    "large": {
+      "deferred_fingerprint_ns": {
+        "a1_to_b1_percent": {
+          "p50": -821085.00,
+          "mean": -747652.73,
+          "p95": -582106.67
+        },
+        "a2_to_b2_percent": {
+          "p50": -821030.00,
+          "mean": -757661.61,
+          "p95": -578296.67
+        }
+      },
+      "edit_patch_ns": {
+        "a1_to_b1_percent": {
+          "p50": 99.98,
+          "mean": 99.98,
+          "p95": 99.97
+        },
+        "a2_to_b2_percent": {
+          "p50": 99.98,
+          "mean": 99.98,
+          "p95": 99.97
+        }
+      },
+      "measured_total_ns": {
+        "a1_to_b1_percent": {
+          "p50": 12.27,
+          "mean": 12.59,
+          "p95": 17.53
+        },
+        "a2_to_b2_percent": {
+          "p50": 13.81,
+          "mean": 13.55,
+          "p95": 11.68
+        }
+      },
+      "same_lineage_apply_ns": {
+        "a1_to_b1_percent": {
+          "p50": 99.95,
+          "mean": 99.93,
+          "p95": 99.94
+        },
+        "a2_to_b2_percent": {
+          "p50": 99.95,
+          "mean": 99.94,
+          "p95": 99.93
+        }
+      },
+      "workflow_no_diagnostic_ns": {
+        "a1_to_b1_percent": {
+          "p50": 17.95,
+          "mean": 18.23,
+          "p95": 22.63
+        },
+        "a2_to_b2_percent": {
+          "p50": 19.34,
+          "mean": 19.09,
+          "p95": 17.13
+        }
+      },
+      "workflow_with_fingerprint_demand_ns": {
+        "a1_to_b1_percent": {
+          "p50": 4.49,
+          "mean": 4.82,
+          "p95": 10.24
+        },
+        "a2_to_b2_percent": {
+          "p50": 5.82,
+          "mean": 5.64,
+          "p95": 4.26
+        }
+      }
+    },
+    "payload-heavy": {
+      "deferred_fingerprint_ns": {
+        "a1_to_b1_percent": {
+          "p50": -4919797.06,
+          "mean": -4283070.53,
+          "p95": -1868788.48
+        },
+        "a2_to_b2_percent": {
+          "p50": -20948287.50,
+          "mean": -19334865.13,
+          "p95": -7093040.00
+        }
+      },
+      "edit_patch_ns": {
+        "a1_to_b1_percent": {
+          "p50": 99.99,
+          "mean": 99.99,
+          "p95": 99.98
+        },
+        "a2_to_b2_percent": {
+          "p50": 99.99,
+          "mean": 99.99,
+          "p95": 99.98
+        }
+      },
+      "measured_total_ns": {
+        "a1_to_b1_percent": {
+          "p50": 17.33,
+          "mean": 17.09,
+          "p95": 16.58
+        },
+        "a2_to_b2_percent": {
+          "p50": 17.80,
+          "mean": 17.75,
+          "p95": 16.25
+        }
+      },
+      "same_lineage_apply_ns": {
+        "a1_to_b1_percent": {
+          "p50": 99.98,
+          "mean": 99.98,
+          "p95": 99.98
+        },
+        "a2_to_b2_percent": {
+          "p50": 99.98,
+          "mean": 99.98,
+          "p95": 99.98
+        }
+      },
+      "workflow_no_diagnostic_ns": {
+        "a1_to_b1_percent": {
+          "p50": 25.05,
+          "mean": 24.82,
+          "p95": 24.01
+        },
+        "a2_to_b2_percent": {
+          "p50": 25.50,
+          "mean": 25.37,
+          "p95": 23.79
+        }
+      },
+      "workflow_with_fingerprint_demand_ns": {
+        "a1_to_b1_percent": {
+          "p50": 6.55,
+          "mean": 6.41,
+          "p95": 6.26
+        },
+        "a2_to_b2_percent": {
+          "p50": 7.08,
+          "mean": 7.08,
+          "p95": 6.33
+        }
+      }
+    },
+    "tiny": {
+      "deferred_fingerprint_ns": {
+        "a1_to_b1_percent": {
+          "p50": -128630.00,
+          "mean": -113871.25,
+          "p95": -83596.77
+        },
+        "a2_to_b2_percent": {
+          "p50": -128580.00,
+          "mean": -118284.09,
+          "p95": -86150.00
+        }
+      },
+      "edit_patch_ns": {
+        "a1_to_b1_percent": {
+          "p50": 99.84,
+          "mean": 99.86,
+          "p95": 99.85
+        },
+        "a2_to_b2_percent": {
+          "p50": 99.84,
+          "mean": 99.86,
+          "p95": 99.85
+        }
+      },
+      "measured_total_ns": {
+        "a1_to_b1_percent": {
+          "p50": 33.78,
+          "mean": 35.19,
+          "p95": 38.94
+        },
+        "a2_to_b2_percent": {
+          "p50": 33.21,
+          "mean": 34.76,
+          "p95": 39.67
+        }
+      },
+      "same_lineage_apply_ns": {
+        "a1_to_b1_percent": {
+          "p50": 99.68,
+          "mean": 99.68,
+          "p95": 99.60
+        },
+        "a2_to_b2_percent": {
+          "p50": 99.68,
+          "mean": 99.68,
+          "p95": 99.60
+        }
+      },
+      "workflow_no_diagnostic_ns": {
+        "a1_to_b1_percent": {
+          "p50": 42.71,
+          "mean": 43.63,
+          "p95": 45.57
+        },
+        "a2_to_b2_percent": {
+          "p50": 42.35,
+          "mean": 43.40,
+          "p95": 46.52
+        }
+      },
+      "workflow_with_fingerprint_demand_ns": {
+        "a1_to_b1_percent": {
+          "p50": 14.56,
+          "mean": 16.34,
+          "p95": 22.24
+        },
+        "a2_to_b2_percent": {
+          "p50": 13.90,
+          "mean": 15.80,
+          "p95": 21.90
+        }
+      }
+    }
+  },
+  "same_implementation_drift_percent": {
+    "tiny": {
+      "control_a1_to_a2_percent": {
+        "p50": -1.1773623041940373,
+        "mean": -1.409549134538864,
+        "p95": -3.977594374757918
+      },
+      "candidate_b1_to_b2_percent": {
+        "p50": -0.3261927016767449,
+        "mean": -0.7546920343876445,
+        "p95": -5.129789864029666
+      }
+    },
+    "large": {
+      "control_a1_to_a2_percent": {
+        "p50": 0.25773195876288657,
+        "mean": -0.4246444761830627,
+        "p95": -5.608883751183151
+      },
+      "candidate_b1_to_b2_percent": {
+        "p50": -1.5081191593979777,
+        "mean": -1.513556461205747,
+        "p95": 1.0919861811612332
+      }
+    },
+    "payload-heavy": {
+      "control_a1_to_a2_percent": {
+        "p50": 0.46835794276795306,
+        "mean": 0.7224904523529797,
+        "p95": 0.19283236821028682
+      },
+      "candidate_b1_to_b2_percent": {
+        "p50": -0.10583772023781109,
+        "mean": -0.0794381465061864,
+        "p95": 0.5851564884506906
+      }
+    }
+  },
+  "guard_metrics": {
+    "cases": [
+      "doc_semantic_open",
+      "doc_semantic_noop_edit_save",
+      "doc_semantic_one_edit_save",
+      "xls_semantic_open",
+      "xls_semantic_noop_edit_save",
+      "xls_semantic_one_edit_save"
+    ],
+    "statistic_fields": [
+      "samples",
+      "min_ns",
+      "p50_ns",
+      "mean_ns",
+      "p95_ns",
+      "p99_ns",
+      "max_ns"
+    ],
+    "per_leg": {
+      "a1-control": {
+        "shape_stats": {
+          "large": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 219884,
+              "p50_ns": 223748,
+              "p95_ns": 240172,
+              "p99_ns": 249836,
+              "max_ns": 266638,
+              "mean_ns": 226506.43599999993
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 796160,
+              "p50_ns": 825204,
+              "p95_ns": 865836,
+              "p99_ns": 988584,
+              "max_ns": 1188081,
+              "mean_ns": 832908.4379999998
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 295998,
+              "p50_ns": 324844,
+              "p95_ns": 341171,
+              "p99_ns": 348972,
+              "max_ns": 422053,
+              "mean_ns": 325547.57599999977
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 1462,
+              "p50_ns": 2152,
+              "p95_ns": 4046,
+              "p99_ns": 5417,
+              "max_ns": 23853,
+              "mean_ns": 2407.968000000001
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 1410367,
+              "p50_ns": 1477630,
+              "p95_ns": 1576737,
+              "p99_ns": 1622831,
+              "max_ns": 1826412,
+              "mean_ns": 1485724.7240000002
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 1312081,
+              "p50_ns": 1359537,
+              "p95_ns": 1487474,
+              "p99_ns": 1613839,
+              "max_ns": 1650358,
+              "mean_ns": 1377142.902000001
+            }
+          },
+          "tiny": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 30393,
+              "p50_ns": 30622,
+              "p95_ns": 33686,
+              "p99_ns": 37122,
+              "max_ns": 40475,
+              "mean_ns": 31015.53599999998
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 62016,
+              "p50_ns": 64159,
+              "p95_ns": 72401,
+              "p99_ns": 81041,
+              "max_ns": 89043,
+              "mean_ns": 65179.36999999995
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 6830,
+              "p50_ns": 7100,
+              "p95_ns": 7941,
+              "p99_ns": 13248,
+              "max_ns": 25184,
+              "mean_ns": 7329.412000000003
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 110,
+              "p50_ns": 131,
+              "p95_ns": 171,
+              "p99_ns": 251,
+              "max_ns": 301,
+              "mean_ns": 138.11800000000002
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 23914,
+              "p50_ns": 24915,
+              "p95_ns": 31324,
+              "p99_ns": 40087,
+              "max_ns": 57229,
+              "mean_ns": 25743.835999999963
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 9833,
+              "p50_ns": 10305,
+              "p95_ns": 11256,
+              "p99_ns": 17125,
+              "max_ns": 22891,
+              "mean_ns": 10594.365999999995
+            }
+          }
+        }
+      },
+      "a2-control": {
+        "shape_stats": {
+          "large": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 219574,
+              "p50_ns": 221245,
+              "p95_ns": 236186,
+              "p99_ns": 246470,
+              "max_ns": 281829,
+              "mean_ns": 224102.85199999975
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 806654,
+              "p50_ns": 828279,
+              "p95_ns": 880235,
+              "p99_ns": 945135,
+              "max_ns": 1985992,
+              "mean_ns": 839969.0000000001
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 304511,
+              "p50_ns": 320027,
+              "p95_ns": 343024,
+              "p99_ns": 358646,
+              "max_ns": 452344,
+              "mean_ns": 321898.4899999999
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 1442,
+              "p50_ns": 2233,
+              "p95_ns": 4398,
+              "p99_ns": 6108,
+              "max_ns": 9723,
+              "mean_ns": 2505.5460000000007
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 1401014,
+              "p50_ns": 1489686,
+              "p95_ns": 1645892,
+              "p99_ns": 1874188,
+              "max_ns": 2739692,
+              "mean_ns": 1509322.3120000008
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 1331889,
+              "p50_ns": 1395431,
+              "p95_ns": 1511607,
+              "p99_ns": 1579450,
+              "max_ns": 1657397,
+              "mean_ns": 1405585.749999999
+            }
+          },
+          "tiny": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 30342,
+              "p50_ns": 30622,
+              "p95_ns": 33686,
+              "p99_ns": 36730,
+              "max_ns": 42639,
+              "mean_ns": 31017.453999999987
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 62387,
+              "p50_ns": 64558,
+              "p95_ns": 73211,
+              "p99_ns": 80792,
+              "max_ns": 90174,
+              "mean_ns": 65660.60399999998
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 6819,
+              "p50_ns": 7119,
+              "p95_ns": 9283,
+              "p99_ns": 12607,
+              "max_ns": 16913,
+              "mean_ns": 7349.748
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 120,
+              "p50_ns": 131,
+              "p95_ns": 151,
+              "p99_ns": 171,
+              "max_ns": 241,
+              "mean_ns": 136.31399999999994
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 23583,
+              "p50_ns": 24443,
+              "p95_ns": 27057,
+              "p99_ns": 31074,
+              "max_ns": 40005,
+              "mean_ns": 24772.958
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 9904,
+              "p50_ns": 10234,
+              "p95_ns": 10776,
+              "p99_ns": 17525,
+              "max_ns": 19456,
+              "mean_ns": 10445.75200000001
+            }
+          }
+        }
+      },
+      "b1-candidate": {
+        "shape_stats": {
+          "large": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 63046,
+              "p50_ns": 64704,
+              "p95_ns": 76706,
+              "p99_ns": 93840,
+              "max_ns": 112124,
+              "mean_ns": 67035.07799999995
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 621239,
+              "p50_ns": 656425,
+              "p95_ns": 704914,
+              "p99_ns": 726413,
+              "max_ns": 792264,
+              "mean_ns": 660094.4800000002
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 294847,
+              "p50_ns": 323066,
+              "p95_ns": 349543,
+              "p99_ns": 369019,
+              "max_ns": 436744,
+              "mean_ns": 322545.69000000024
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 1402,
+              "p50_ns": 1832,
+              "p95_ns": 2834,
+              "p99_ns": 3845,
+              "max_ns": 19157,
+              "mean_ns": 1977.4859999999992
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 1375910,
+              "p50_ns": 1445209,
+              "p95_ns": 1598557,
+              "p99_ns": 1747292,
+              "max_ns": 1848773,
+              "mean_ns": 1465426.1619999993
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 1271325,
+              "p50_ns": 1319192,
+              "p95_ns": 1429926,
+              "p99_ns": 1536801,
+              "max_ns": 1830267,
+              "mean_ns": 1333271.8799999994
+            }
+          },
+          "tiny": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 6249,
+              "p50_ns": 6479,
+              "p95_ns": 6679,
+              "p99_ns": 10525,
+              "max_ns": 16132,
+              "mean_ns": 6568.047999999994
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 38353,
+              "p50_ns": 40275,
+              "p95_ns": 47846,
+              "p99_ns": 57779,
+              "max_ns": 66592,
+              "mean_ns": 41200.33600000002
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 7000,
+              "p50_ns": 7350,
+              "p95_ns": 7600,
+              "p99_ns": 14981,
+              "max_ns": 24143,
+              "mean_ns": 7557.454000000007
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 129,
+              "p50_ns": 150,
+              "p95_ns": 171,
+              "p99_ns": 181,
+              "max_ns": 200,
+              "mean_ns": 154.11000000000018
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 23964,
+              "p50_ns": 24964,
+              "p95_ns": 26446,
+              "p99_ns": 34236,
+              "max_ns": 45793,
+              "mean_ns": 25318.023999999998
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 10204,
+              "p50_ns": 10695,
+              "p95_ns": 11176,
+              "p99_ns": 16063,
+              "max_ns": 22040,
+              "mean_ns": 10914.74599999999
+            }
+          }
+        }
+      },
+      "b2-candidate": {
+        "shape_stats": {
+          "large": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 64248,
+              "p50_ns": 65481,
+              "p95_ns": 74593,
+              "p99_ns": 80051,
+              "max_ns": 216879,
+              "mean_ns": 66899.79599999999
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 627697,
+              "p50_ns": 664347,
+              "p95_ns": 717512,
+              "p99_ns": 759318,
+              "max_ns": 1077458,
+              "mean_ns": 669703.5459999996
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 313883,
+              "p50_ns": 325779,
+              "p95_ns": 346088,
+              "p99_ns": 368078,
+              "max_ns": 377972,
+              "mean_ns": 327808.13999999996
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 1672,
+              "p50_ns": 2823,
+              "p95_ns": 4717,
+              "p99_ns": 7171,
+              "max_ns": 42790,
+              "mean_ns": 3125.9439999999995
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 1386775,
+              "p50_ns": 1459088,
+              "p95_ns": 1569847,
+              "p99_ns": 1732241,
+              "max_ns": 2458524,
+              "mean_ns": 1472001.741999999
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 1250897,
+              "p50_ns": 1324198,
+              "p95_ns": 1501042,
+              "p99_ns": 1657448,
+              "max_ns": 1993753,
+              "mean_ns": 1347350.375999999
+            }
+          },
+          "tiny": {
+            "doc_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 5898,
+              "p50_ns": 6159,
+              "p95_ns": 6338,
+              "p99_ns": 6438,
+              "max_ns": 17435,
+              "mean_ns": 6248.228000000003
+            },
+            "doc_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 36299,
+              "p50_ns": 38213,
+              "p95_ns": 42909,
+              "p99_ns": 49168,
+              "max_ns": 56509,
+              "mean_ns": 38598.653999999995
+            },
+            "doc_semantic_open": {
+              "samples": 500,
+              "min_ns": 6880,
+              "p50_ns": 7110,
+              "p95_ns": 7350,
+              "p99_ns": 7571,
+              "max_ns": 33647,
+              "mean_ns": 7255.9320000000025
+            },
+            "xls_semantic_noop_edit_save": {
+              "samples": 500,
+              "min_ns": 120,
+              "p50_ns": 140,
+              "p95_ns": 161,
+              "p99_ns": 171,
+              "max_ns": 311,
+              "mean_ns": 144.99600000000038
+            },
+            "xls_semantic_one_edit_save": {
+              "samples": 500,
+              "min_ns": 22992,
+              "p50_ns": 23852,
+              "p95_ns": 29011,
+              "p99_ns": 34589,
+              "max_ns": 35681,
+              "mean_ns": 24379.99800000001
+            },
+            "xls_semantic_open": {
+              "samples": 500,
+              "min_ns": 9923,
+              "p50_ns": 10224,
+              "p95_ns": 10574,
+              "p99_ns": 18075,
+              "max_ns": 29150,
+              "mean_ns": 10457.586000000005
+            }
+          }
+        }
+      }
+    },
+    "paired_positive_faster_deltas_percent": {
+      "large": {
+        "doc_semantic_noop_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": 71.08,
+            "mean": 70.40,
+            "p95": 68.06,
+            "p99": 62.44
+          },
+          "a2_to_b2_percent": {
+            "p50": 70.40,
+            "mean": 70.15,
+            "p95": 68.42,
+            "p99": 67.52
+          }
+        },
+        "doc_semantic_one_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": 20.45,
+            "mean": 20.75,
+            "p95": 18.59,
+            "p99": 26.52
+          },
+          "a2_to_b2_percent": {
+            "p50": 19.79,
+            "mean": 20.27,
+            "p95": 18.49,
+            "p99": 19.66
+          }
+        },
+        "doc_semantic_open": {
+          "a1_to_b1_percent": {
+            "p50": 0.55,
+            "mean": 0.92,
+            "p95": -2.45,
+            "p99": -5.74
+          },
+          "a2_to_b2_percent": {
+            "p50": -1.80,
+            "mean": -1.84,
+            "p95": -0.89,
+            "p99": -2.63
+          }
+        },
+        "xls_semantic_noop_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": 14.87,
+            "mean": 17.88,
+            "p95": 29.96,
+            "p99": 29.02
+          },
+          "a2_to_b2_percent": {
+            "p50": -26.42,
+            "mean": -24.76,
+            "p95": -7.25,
+            "p99": -17.40
+          }
+        },
+        "xls_semantic_one_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": 2.19,
+            "mean": 1.37,
+            "p95": -1.38,
+            "p99": -7.67
+          },
+          "a2_to_b2_percent": {
+            "p50": 2.05,
+            "mean": 2.47,
+            "p95": 4.62,
+            "p99": 7.57
+          }
+        },
+        "xls_semantic_open": {
+          "a1_to_b1_percent": {
+            "p50": 2.97,
+            "mean": 3.19,
+            "p95": 3.87,
+            "p99": 4.77
+          },
+          "a2_to_b2_percent": {
+            "p50": 5.10,
+            "mean": 4.14,
+            "p95": 0.70,
+            "p99": -4.94
+          }
+        }
+      },
+      "tiny": {
+        "doc_semantic_noop_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": 78.84,
+            "mean": 78.82,
+            "p95": 80.17,
+            "p99": 71.65
+          },
+          "a2_to_b2_percent": {
+            "p50": 79.89,
+            "mean": 79.86,
+            "p95": 81.19,
+            "p99": 82.47
+          }
+        },
+        "doc_semantic_one_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": 37.23,
+            "mean": 36.79,
+            "p95": 33.92,
+            "p99": 28.70
+          },
+          "a2_to_b2_percent": {
+            "p50": 40.81,
+            "mean": 41.21,
+            "p95": 41.39,
+            "p99": 39.14
+          }
+        },
+        "doc_semantic_open": {
+          "a1_to_b1_percent": {
+            "p50": -3.52,
+            "mean": -3.11,
+            "p95": 4.29,
+            "p99": -13.08
+          },
+          "a2_to_b2_percent": {
+            "p50": 0.13,
+            "mean": 1.28,
+            "p95": 20.82,
+            "p99": 39.95
+          }
+        },
+        "xls_semantic_noop_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": -14.50,
+            "mean": -11.58,
+            "p95": 0.00,
+            "p99": 27.89
+          },
+          "a2_to_b2_percent": {
+            "p50": -6.87,
+            "mean": -6.37,
+            "p95": -6.62,
+            "p99": 0.00
+          }
+        },
+        "xls_semantic_one_edit_save": {
+          "a1_to_b1_percent": {
+            "p50": -0.20,
+            "mean": 1.65,
+            "p95": 15.57,
+            "p99": 14.60
+          },
+          "a2_to_b2_percent": {
+            "p50": 2.42,
+            "mean": 1.59,
+            "p95": -7.22,
+            "p99": -11.31
+          }
+        },
+        "xls_semantic_open": {
+          "a1_to_b1_percent": {
+            "p50": -3.78,
+            "mean": -3.02,
+            "p95": 0.71,
+            "p99": 6.20
+          },
+          "a2_to_b2_percent": {
+            "p50": 0.10,
+            "mean": -0.11,
+            "p95": 1.87,
+            "p99": -3.14
+          }
+        }
+      }
+    }
+  },
+  "correctness_gates": {
+    "primary_gate_names": [
+      "changed_semantics_verified",
+      "event_order_cardinality_verified",
+      "exact_noop_verified",
+      "independent_fingerprints_verified",
+      "inverse_round_trip_verified",
+      "malformed_source_refusal_verified",
+      "output_hash_verified",
+      "patch_round_trip_verified",
+      "reopened_source_apply_verified",
+      "same_lineage_apply_verified",
+      "source_semantics_verified",
+      "stale_source_refusal_verified",
+      "typed_edit_refusal_verified",
+      "untouched_streams_verified",
+      "workflow_arithmetic_verified"
+    ],
+    "all_primary_gates_true": true,
+    "per_leg": {
+      "a1-control": {
+        "all_true": true,
+        "shapes": {
+          "large": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "payload-heavy": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "tiny": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          }
+        }
+      },
+      "a2-control": {
+        "all_true": true,
+        "shapes": {
+          "large": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "payload-heavy": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "tiny": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          }
+        }
+      },
+      "b1-candidate": {
+        "all_true": true,
+        "shapes": {
+          "large": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "payload-heavy": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "tiny": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          }
+        }
+      },
+      "b2-candidate": {
+        "all_true": true,
+        "shapes": {
+          "large": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "payload-heavy": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          },
+          "tiny": {
+            "all_true": true,
+            "gates": {
+              "event_order_cardinality_verified": true,
+              "source_semantics_verified": true,
+              "changed_semantics_verified": true,
+              "exact_noop_verified": true,
+              "patch_round_trip_verified": true,
+              "same_lineage_apply_verified": true,
+              "reopened_source_apply_verified": true,
+              "independent_fingerprints_verified": true,
+              "workflow_arithmetic_verified": true,
+              "inverse_round_trip_verified": true,
+              "stale_source_refusal_verified": true,
+              "malformed_source_refusal_verified": true,
+              "typed_edit_refusal_verified": true,
+              "output_hash_verified": true,
+              "untouched_streams_verified": true
+            }
+          }
+        }
+      }
+    },
+    "output_hashes_by_shape": {
+      "large": [
+        "0431135835e409f7eff13a9ced95e193e1379586d2b421f34c2ab7faaf8c318d"
+      ],
+      "payload-heavy": [
+        "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4"
+      ],
+      "tiny": [
+        "838050ed6cf58507379f3d53a9024e8496d10cf44f545c9801ca9a5603c842c1"
+      ]
+    },
+    "all_output_hashes_consistent_per_shape": true,
+    "guard_files_have_six_cases_and_500_samples": true,
+    "guard_case_names_by_shape": {
+      "large": [
+        "doc_semantic_noop_edit_save",
+        "doc_semantic_one_edit_save",
+        "doc_semantic_open",
+        "xls_semantic_noop_edit_save",
+        "xls_semantic_one_edit_save",
+        "xls_semantic_open"
+      ],
+      "tiny": [
+        "doc_semantic_noop_edit_save",
+        "doc_semantic_one_edit_save",
+        "doc_semantic_open",
+        "xls_semantic_noop_edit_save",
+        "xls_semantic_one_edit_save",
+        "xls_semantic_open"
+      ]
+    }
+  },
+  "resource_evidence": {
+    "time_v": {
+      "tool": "/usr/bin/time -v",
+      "scope": "whole process and descriptive only",
+      "runs": [
+        {
+          "leg": "a1-control",
+          "command": "\"taskset -c 2 /tmp/litchi-perf-doc-fp-control-0165-final --case doc_owner_public_phases --writer-shape payload-heavy --shape tiny --payload compressible --semantic-shape tiny --rtf-variant plain --workers 1 --warmup 3 --samples 30 --json /tmp/doc-lazy-fingerprint-0165-final/resource/a1.json\"",
+          "user_seconds": 1.37,
+          "system_seconds": 0.48,
+          "cpu_percent": "99%",
+          "elapsed_wall": "0:01.85",
+          "max_rss_kib": 138160,
+          "minor_page_faults": 474564,
+          "filesystem_inputs": 0,
+          "filesystem_outputs": 56,
+          "exit_status": 0
+        },
+        {
+          "leg": "b1-candidate",
+          "command": "\"taskset -c 2 /tmp/litchi-perf-doc-fp-candidate-0165-final --case doc_owner_public_phases --writer-shape payload-heavy --shape tiny --payload compressible --semantic-shape tiny --rtf-variant plain --workers 1 --warmup 3 --samples 30 --json /tmp/doc-lazy-fingerprint-0165-final/resource/b1.json\"",
+          "user_seconds": 1.23,
+          "system_seconds": 0.49,
+          "cpu_percent": "99%",
+          "elapsed_wall": "0:01.73",
+          "max_rss_kib": 138024,
+          "minor_page_faults": 474562,
+          "filesystem_inputs": 0,
+          "filesystem_outputs": 56,
+          "exit_status": 0
+        },
+        {
+          "leg": "b2-candidate",
+          "command": "\"taskset -c 2 /tmp/litchi-perf-doc-fp-candidate-0165-final --case doc_owner_public_phases --writer-shape payload-heavy --shape tiny --payload compressible --semantic-shape tiny --rtf-variant plain --workers 1 --warmup 3 --samples 30 --json /tmp/doc-lazy-fingerprint-0165-final/resource/b2.json\"",
+          "user_seconds": 1.25,
+          "system_seconds": 0.49,
+          "cpu_percent": "99%",
+          "elapsed_wall": "0:01.75",
+          "max_rss_kib": 138028,
+          "minor_page_faults": 474563,
+          "filesystem_inputs": 0,
+          "filesystem_outputs": 56,
+          "exit_status": 0
+        },
+        {
+          "leg": "a2-control",
+          "command": "\"taskset -c 2 /tmp/litchi-perf-doc-fp-control-0165-final --case doc_owner_public_phases --writer-shape payload-heavy --shape tiny --payload compressible --semantic-shape tiny --rtf-variant plain --workers 1 --warmup 3 --samples 30 --json /tmp/doc-lazy-fingerprint-0165-final/resource/a2.json\"",
+          "user_seconds": 1.37,
+          "system_seconds": 0.48,
+          "cpu_percent": "99%",
+          "elapsed_wall": "0:01.86",
+          "max_rss_kib": 138032,
+          "minor_page_faults": 474565,
+          "filesystem_inputs": 0,
+          "filesystem_outputs": 56,
+          "exit_status": 0
+        }
+      ],
+      "reported_max_rss_kib": {
+        "a1-control": 138160,
+        "b1-candidate": 138024,
+        "b2-candidate": 138028,
+        "a2-control": 138032
+      }
+    },
+    "heaptrack": {
+      "samples": 3,
+      "preflight_included": true,
+      "operation_scoped": false,
+      "allocation_calls": {
+        "control": 50677,
+        "candidate": 50677
+      },
+      "peak_heap": {
+        "control": "128.28M",
+        "candidate": "128.28M"
+      },
+      "peak_rss_including_profiler": {
+        "control": "145.14M",
+        "candidate": "142.81M"
+      },
+      "total_memory_leaked": {
+        "control": "544B",
+        "candidate": "544B"
+      },
+      "reports": [
+        "doc-lazy-fingerprint-0165-heaptrack-control-app.txt",
+        "doc-lazy-fingerprint-0165-heaptrack-candidate-app.txt"
+      ],
+      "raw": [
+        "doc-lazy-fingerprint-0165-heaptrack-control-app.zst",
+        "doc-lazy-fingerprint-0165-heaptrack-candidate-app.zst"
+      ]
+    }
+  },
+  "artifacts": {
+    "primary_pattern": "doc-lazy-fingerprint-0165-{a1-control,b1-candidate,b2-candidate,a2-control}-{tiny,large,payload-heavy}.json.zst",
+    "guard_pattern": "doc-lazy-fingerprint-0165-guard-{a1-control,b1-candidate,b2-candidate,a2-control}-{tiny,large}.json.zst",
+    "resource_files": [
+      "doc-lazy-fingerprint-0165-a1-control-resource.json",
+      "doc-lazy-fingerprint-0165-b1-candidate-resource.json",
+      "doc-lazy-fingerprint-0165-b2-candidate-resource.json",
+      "doc-lazy-fingerprint-0165-a2-control-resource.json"
+    ],
+    "time_files": [
+      "doc-lazy-fingerprint-0165-a1-control-time.txt",
+      "doc-lazy-fingerprint-0165-b1-candidate-time.txt",
+      "doc-lazy-fingerprint-0165-b2-candidate-time.txt",
+      "doc-lazy-fingerprint-0165-a2-control-time.txt"
+    ],
+    "supporting_tables": [
+      "doc-lazy-fingerprint-0165-primary-stats.tsv",
+      "doc-lazy-fingerprint-0165-paired-deltas.tsv",
+      "doc-lazy-fingerprint-0165-guard-stats.tsv",
+      "doc-lazy-fingerprint-0165-guard-deltas.tsv"
+    ],
+    "summary": "doc-lazy-fingerprint-0165-summary.json",
+    "manifest": "doc-lazy-fingerprint-0165-manifest.json"
+  },
+  "limits": [
+    "Primary evidence retains 6,000 samples: four legs, three shapes, 500 samples per shape.",
+    "Guard evidence retains 24,000 samples: eight files, six cases, 500 samples per case.",
+    "The corpus is deterministic and generated in memory; no physical-I/O, cold-cache, or real-producer claim is made.",
+    "time/RSS values are descriptive whole-process /usr/bin/time -v observations, not operation-scoped measurements.",
+    "Heaptrack is a three-sample run with preflight included and is not operation-scoped; allocation, peak heap, and profiler RSS values are descriptive.",
+    "The retained vectors are the authority for statistics; rounded paired deltas are the final values from deltas.tsv and guard-deltas.tsv."
+  ]
+}

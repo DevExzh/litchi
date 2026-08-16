@@ -79,20 +79,38 @@ conversion for other formats remain.
 
 ## Highest-return next cases
 
-1. Use change 0160's accepted clean release distribution to evaluate a private
-   native DOC sharing/copy-elision mechanism without weakening either
-   independent validation layer. On the exact deterministic distribution,
-   combined initial/final complete public-reader validation is the largest
-   grouped named phase for large and payload-heavy, while patch fingerprinting
-   leads tiny. The diagnostic selector preserves the complete lifecycle and
-   reports strict-owner, public-reader, retention, authoring, in-memory finish,
-   patch, and output-materialization intervals independently. This is an
-   attribution baseline only; a mechanism still needs balanced clean release
-   control/candidate evidence before any optimization or speedup is accepted.
-   Change 0161 tested the narrow borrowed-input clone removal and rejected it:
-   large lifecycle p50 regressed in both directions, one beyond 5%, and
-   payload-heavy directions disagreed. Do not repeat that substitution; the
-   next DOC mechanism needs a shared physical/parsed substrate or fused proof.
+1. Change 0165 records a private native-DOC lazy/fused fingerprint proof and a
+   bounded descriptive comparison on the existing owner/public phase selector. Each immutable snapshot keeps its
+   diagnostic FNV-1a fingerprint lazy, and same-allocation patch replay may
+   reuse the exact lineage before falling back to fingerprint plus exact-byte
+   checks for an independently reopened source. A clean CPU-2 A1/B1/B2/A2
+   release at clean post-rebase revisions `d6818e290` (control) and
+   `5dd813b1e` (candidate), with 20 warmups and 500 samples per shape (6,000
+   primary samples), records paired lifecycle p50 positive-faster deltas of
+   +33.78%/+33.21% for tiny, +12.27%/+13.81% for large, and +17.33%/+17.80%
+   for payload-heavy; the immediate fingerprint-demand workflow records
+   +14.56%/+13.90%, +4.49%/+5.82%, and +6.55%/+7.08% respectively. Same-lineage
+   apply/patch work is approximately 99.6%-99.99% lower across the reported
+   statistics, while the deferred
+   fingerprint scan remains explicit. DOC guard cases pass and DOC open is
+   within the disclosed final guard deltas: noop +78.84%/+79.89% (tiny) and
+   +71.08%/+70.40% (large), one-edit +37.23%/+40.81% and +20.45%/+19.79%,
+   and open -3.52%/+0.13% and +0.55%/-1.80%. The existing
+   `measured_total_ns` lifecycle boundary is unchanged;
+   the selector count remains 311 and the default remains 36 cases / 198
+   records. The guard run retains 24,000 samples.
+   This accepts the named private lazy/fused boundary only. A larger shared
+   physical/parsed substrate or fused proof across the independent owner and
+   public-reader validation layers remains the next DOC mechanism, together
+   with broader DOC CRUD, producer, physical-I/O, cold-cache, allocation,
+   memory, and publication coverage. No speedup claim is made. Neighboring XLS one-edit/open p50
+   regressions stay below 5%; the tiny no-op nanosecond cell is directionally
+   noisy. Heaptrack's three-sample, preflight-inclusive whole-process probe
+   reports 50,677 allocation calls and a 128.28 MiB peak heap for both sides;
+   it is not operation-scoped, and RSS is descriptive only. No physical-I/O, cold-cache,
+   real-producer, or generic total-memory claim is made. Change 0161 tested
+   the narrow borrowed-input clone removal and rejected it; do not repeat that
+   substitution.
    Continue final owner/public-reader work after the accepted native
    XLS editor reuse and fixed-width inventory carry-forward, DOC batched stream
    publication, PPT root-open reuse and
@@ -1238,6 +1256,43 @@ real-producer, or rich-RTF claim. The focused harness gate is
 the historical default remains 36 cases / 198 records and the selectable
 matrix is now 311 names. See
 [`0164`](changes/0164-rtf-paragraph-split-merge-evidence.md).
+
+Change 0165 records a private native-DOC lazy/fused fingerprint implementation,
+a bounded descriptive comparison, and extends the existing `doc_owner_public_phases` record without adding a
+selector. Each immutable snapshot defers its diagnostic FNV-1a fingerprint
+until demanded; same-allocation patch replay is an explicit post-lifecycle
+workflow extension, while an independently reopened source still takes the
+fingerprint plus exact-byte authority path. The record adds independent
+expected source/target fingerprints, per-sample source/target fingerprint
+vectors, `same_lineage_apply_ns`, `deferred_fingerprint_ns`,
+`workflow_no_diagnostic_ns`, `workflow_with_fingerprint_demand_ns`, and four
+gates for same-lineage apply, reopened-source apply, independent fingerprints,
+and workflow arithmetic. The historical `measured_total_ns` lifecycle
+boundary is unchanged; the selectable matrix remains 311 names and the
+default remains 36 cases / 198 records.
+
+The final clean post-rebase CPU-2 A1/B1/B2/A2 release uses control revision
+`d6818e290` and candidate revision `5dd813b1e`, with 20 warmups and 500 samples
+per shape (6,000 primary samples) plus 24,000 guard samples. Paired lifecycle
+p50 deltas are +33.78%/+33.21% (tiny), +12.27%/+13.81% (large), and
++17.33%/+17.80% (payload-heavy); the immediate fingerprint-demand workflow
+is +14.56%/+13.90%, +4.49%/+5.82%, and +6.55%/+7.08% respectively.
+Same-lineage apply/patch work is approximately 99.6%-99.99% lower across the
+reported statistics, and the
+deferred scan is reported explicitly. Final DOC guard p50 deltas are noop
++78.84%/+79.89% (tiny) and +71.08%/+70.40% (large), one-edit
++37.23%/+40.81% and +20.45%/+19.79%, while DOC open is -3.52%/+0.13% and
++0.55%/-1.80%. Neighboring XLS one-edit/open p50 results are mostly neutral or
+improved; its tiny no-op nanosecond cell remains directionally noisy.
+Heaptrack's three-sample, preflight-inclusive whole-process probe reports 50,677
+allocation calls and a 128.28 MiB peak heap for both sides; it is not
+operation-scoped, and RSS is descriptive only. No speedup, physical-I/O,
+cold-cache, real-producer,
+or generic total-memory claim is made, and the non-`const` fingerprint accessor
+is a capability change, not a deprecation. See
+[`0165`](changes/0165-doc-lazy-fingerprint.md), the
+[summary](results/doc-lazy-fingerprint-0165-summary.json), and the
+[release manifest](results/doc-lazy-fingerprint-0165-manifest.json).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
