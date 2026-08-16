@@ -704,6 +704,62 @@ memory, allocation/RSS, physical-I/O, cold-cache, source-backed,
 real-producer, or general rich-RTF claim is accepted. See
 [`0164`](changes/0164-rtf-paragraph-split-merge-evidence.md).
 
+Change 0165 records the DOC lazy-fingerprint and same-lineage patch-replay
+implementation plus a bounded descriptive comparison on the exact deterministic
+tiny, large, and payload-heavy native DOC owner/public-reader lifecycle. `Snapshot` keeps its FNV-1a diagnostic value
+in an inline lazy `OnceLock`; patch construction no longer scans complete
+before/after artifacts, and immutable `Arc` identity plus length lets
+same-lineage no-op/apply paths return retained snapshots. Independently
+reopened sources still perform the lazy fingerprint check followed by exact
+byte comparison, so the fingerprint is not an authorization boundary. The
+`source_fingerprint` and `target_fingerprint` accessors are intentionally
+non-`const` because their first call may initialize the cache.
+
+The final clean control revision is
+`d6818e290aa77fd7666b7b16ee6908319d0f332b`; the candidate is
+`5dd813b1e108e253457ccb6c504c125c2becc1c6`. Their release binaries are
+identified by SHA-256 `344c0504c254109ee6b4361e375599d187f8a12333abb44f207d837af259ef8c`
+and `c95e6c6004cbd725c789597566a81c0897ab6915ecd7c274deab222d134b3fd3`,
+respectively. Both builds were clean exact-revision builds.
+
+The original `measured_total_ns` lifecycle boundary is unchanged. Same-lineage
+apply and the first source/target fingerprint demand are explicit workflow
+extensions. Clean CPU-2 release `A1 control, B1 candidate, B2 candidate, A2
+control` runs used 20 warmups and 500 retained samples per shape and leg, for
+6,000 lifecycle samples. Descriptive lifecycle p50/mean/p95 positive-faster deltas were
+`+33.78/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
+`+12.27/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
+`+17.33/+17.09/+16.58` and `+17.80/+17.75/+16.25` payload-heavy. With
+immediate fingerprint demand included, workflow p50/mean/p95 positive-faster deltas are
+`+14.56/+16.34/+22.24` and `+13.90/+15.80/+21.90` tiny,
+`+4.49/+4.82/+10.24` and `+5.82/+5.64/+4.26` large, and
+`+6.55/+6.41/+6.26` and `+7.08/+7.08/+6.33` payload-heavy.
+
+The isolated edit-patch/same-lineage-apply extension is approximately
+99.6-99.99% across the reported statistics versus the eager-fingerprint
+control. The deferred first
+fingerprint demand is explicit rather than hidden: roughly 20-170 ns in the
+control boundary versus 25.7 us, 164 us, and 8.37-8.39 ms for the candidate's
+tiny, large, and payload-heavy source-plus-target scans. Same-implementation
+lifecycle drift is disclosed in the change record; paired directions remain
+positive but are not generalized beyond the named host and corpora.
+
+Mandatory DOC no-op, one-edit, and open guards remain within the declared
+policy: p50 no-op is `+78.84%/+79.89%` tiny and `+71.08%/+70.40%` large;
+one-edit is `+37.23%/+40.81%` and `+20.45%/+19.79%`; open is
+`-3.52%/+0.13%` tiny and `+0.55%/-1.80%` large. Neighboring XLS one-edit
+and open guards are mostly neutral or improved, while XLS no-op remains
+directionally noisy. A representative final payload heaptrack probe records
+50,677 allocation calls and 128.28M peak heap for both revisions, with
+profiler RSS 145.14M versus 142.81M; a 30-sample `/usr/bin/time` boundary
+records `138160/138024/138028/138032 KiB` in A1/B1/B2/A2 order. These are
+descriptive whole-process probes, not operation-only allocation or total-memory
+claims. No speedup, physical-I/O, cold-cache, real-producer, generic-DOC, or
+CRUD-completeness claim is accepted. See
+[`0165`](changes/0165-doc-lazy-fingerprint.md), the
+[summary](results/doc-lazy-fingerprint-0165-summary.json), and the
+[release manifest](results/doc-lazy-fingerprint-0165-manifest.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use

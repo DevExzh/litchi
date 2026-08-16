@@ -282,6 +282,9 @@ measured at the pre-staged publication-call interval, making that matrix 295.
 Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
 matrix 301 at that revision; change 0159 made it 302, change 0160 made it 303,
 change 0162 made it 305, change 0163 made it 309, and change 0164 makes it 311.
+Change 0165 extends the existing native-DOC phase selector without adding a
+case, so the selectable matrix remains 311 names and the default remains 36
+cases / 198 records.
 No runtime selector was added to 0152; only `cfg(test)` source-event acceptance
 and tests changed. Root
 MiniStream cache and
@@ -1702,6 +1705,32 @@ materialization after commit; it is not a file save/publication operation.
 Change 0160 adds this one opt-in selector, taking the current matrix from 302
 to 303 names without changing the default 36 cases / 198 records.
 
+Change 0165 extends that existing selector with a private native-DOC lazy/fused
+fingerprint proof and a bounded descriptive comparison. It does not add a selector or change the
+historical `measured_total_ns` lifecycle boundary. Per-snapshot diagnostic
+fingerprints are lazy; same-allocation patch replay is measured as a separate
+post-lifecycle workflow extension, and the first source/target fingerprint
+demand is measured separately as deferred work. The extension also records
+independently computed expected source/target FNV-1a fingerprints and four
+additional gates. The final post-rebase comparison is clean at control
+`d6818e290` and candidate `5dd813b1e`: CPU-2 A1/B1/B2/A2 uses 20 warmups and
+500 retained samples per shape (6,000 primary samples) plus 24,000 guard
+samples. Lifecycle p50 positive-faster deltas are +33.78%/+33.21% tiny, +12.27%/+13.81%
+large, and +17.33%/+17.80% payload-heavy; immediate fingerprint-demand
+workflow p50 positive-faster deltas are +14.56%/+13.90%, +4.49%/+5.82%, and
++6.55%/+7.08%. Final DOC guards are noop +78.84%/+79.89% tiny and
++71.08%/+70.40% large, one-edit +37.23%/+40.81% and +20.45%/+19.79%, while
+DOC open is -3.52%/+0.13% and +0.55%/-1.80%. Neighboring XLS one-edit/open
+guards are mostly neutral or improved; its nanosecond noop remains noisy.
+The three-sample, preflight-inclusive whole-process Heaptrack probe records
+50,677 allocation calls and a 128.28 MiB peak heap on both sides; it is not
+operation-scoped, and RSS is descriptive only. The former `const` fingerprint accessors are
+a capability change, not a deprecation. No physical-I/O, cold-cache,
+real-producer, or generic total-memory result is claimed. See
+[`0165`](../../docs/performance/changes/0165-doc-lazy-fingerprint.md), the
+[summary](../../docs/performance/results/doc-lazy-fingerprint-0165-summary.json),
+and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0165-manifest.json).
+
 ## Cases
 
 - `zip_index`: parse the ZIP central directory and build Soapberry's index.
@@ -2400,13 +2429,23 @@ are `open_owner_ns`, `open_public_ns`, `open_retain_ns`, `edit_new_ns`,
 `edit_replacement_ns`, `edit_authoring_ns`, `edit_finish_ns`,
 `edit_final_owner_ns`, `edit_final_public_ns`, `edit_final_retain_ns`,
 `edit_patch_ns`, `edit_commit_outer_ns`, and
-`edit_output_materialization_ns`. The summary also records open/edit outer
-totals, measured lifecycle totals, attributed totals, checked unattributed
-time, source/candidate sizes and hashes, one output hash per sample, and
-boolean semantic/patch/refusal/preservation gates. The vectors retain sample
-iteration order; `elapsed_ns.samples` is sorted by the existing statistics
-helper, so comparisons use the same measured-total multiset rather than
-assuming positional alignment with the evidence vectors.
+`edit_output_materialization_ns`. Change 0165 additionally records the
+independent `expected_source_fingerprint` and `expected_target_fingerprint`
+values, per-sample `source_fingerprints` and `target_fingerprints`, and the
+post-lifecycle vectors `same_lineage_apply_ns`, `deferred_fingerprint_ns`,
+`workflow_no_diagnostic_ns`, and `workflow_with_fingerprint_demand_ns`.
+`deferred_fingerprint_ns` covers the first source/target diagnostic demand;
+the two workflow vectors are checked arithmetic extensions and are not folded
+into `measured_total_ns`. The four corresponding boolean gates are
+`same_lineage_apply_verified`, `reopened_source_apply_verified`,
+`independent_fingerprints_verified`, and `workflow_arithmetic_verified`.
+The summary also records open/edit outer totals, measured lifecycle totals,
+attributed totals, checked unattributed time, source/candidate sizes and
+hashes, one output hash per sample, and the existing semantic/patch/refusal/
+preservation gates. The vectors retain sample iteration order;
+`elapsed_ns.samples` is sorted by the existing statistics helper, so
+comparisons use the same measured-total multiset rather than assuming
+positional alignment with the evidence vectors.
 
 The feature-gated production observer is clock-free and content-free. The
 harness alone timestamps events with `Instant` using a bounded preallocated

@@ -193,6 +193,69 @@ cold-cache, source-backed, real-producer, or general rich-RTF claim. The
 literal-ASCII root-level ordinary-body closure and existing native focused
 tests remain the authority for unsupported and forged-input boundaries.
 
+## Native DOC lazy fingerprints and same-lineage patch replay (change 0165)
+
+[Change 0165](changes/0165-doc-lazy-fingerprint.md) records the inline lazy
+DOC snapshot fingerprint cache, immutable same-lineage patch fast path, and a
+bounded descriptive comparison on
+the exact deterministic tiny, large, and payload-heavy native-DOC lifecycle.
+Patch construction no longer scans complete before/after artifacts solely to
+populate the diagnostic FNV-1a values. Same-lineage no-op/apply first checks
+`Arc` allocation identity and length; independently reopened sources still do
+lazy fingerprint comparison followed by exact bytes, preserving collision,
+stale-source, inverse, and failure-atomic semantics. The fingerprint
+accessors are intentionally non-`const` because first demand may initialize
+the cache.
+
+The historical `measured_total_ns` lifecycle boundary remains unchanged.
+Same-lineage apply and first fingerprint demand are explicit workflow
+extensions. The final clean control source is
+`d6818e290aa77fd7666b7b16ee6908319d0f332b`, the candidate is
+`5dd813b1e108e253457ccb6c504c125c2becc1c6`, and their release binary
+SHA-256 values are
+`344c0504c254109ee6b4361e375599d187f8a12333abb44f207d837af259ef8c` and
+`c95e6c6004cbd725c789597566a81c0897ab6915ecd7c274deab222d134b3fd3`.
+Both builds were clean exact-revision builds. Clean CPU-2 release ABBA used
+20 warmups and 500 retained samples per shape and leg, retaining 6,000
+lifecycle samples. Descriptive lifecycle p50/mean/p95 positive-faster deltas were
+`+33.78/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
+`+12.27/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
+`+17.33/+17.09/+16.58` and `+17.80/+17.75/+16.25` payload-heavy. With
+immediate fingerprint demand included, workflow p50/mean/p95 positive-faster deltas are
+`+14.56/+16.34/+22.24` and `+13.90/+15.80/+21.90` tiny,
+`+4.49/+4.82/+10.24` and `+5.82/+5.64/+4.26` large, and
+`+6.55/+6.41/+6.26` and `+7.08/+7.08/+6.33` payload-heavy.
+
+The isolated edit-patch/same-lineage-apply extension spans approximately
+99.6-99.99% across the reported statistics versus the eager-fingerprint
+control, while the deferred
+source-plus-target scan is explicit and lands at roughly 25.7 us, 164 us, and
+8.37-8.39 ms for tiny, large, and payload-heavy candidates. Mandatory DOC
+no-op, one-edit, and open guards remain within policy: no-op p50 improves
+`+78.84%/+79.89%` tiny and `+71.08%/+70.40%` large, one-edit improves
+`+37.23%/+40.81%` and `+20.45%/+19.79%`, and open is
+`-3.52%/+0.13%` tiny and `+0.55%/-1.80%` large. Neighboring XLS one-edit
+and open guards are mostly neutral or improved; XLS no-op remains noisy.
+Representative final heaptrack and `/usr/bin/time` observations are
+descriptive whole-process boundaries: allocation calls are 50,677 in both
+revisions, peak heap is 128.28M in both, profiler RSS is 145.14M versus
+142.81M, and A1/B1/B2/A2 maximum RSS is 138160/138024/138028/138032 KiB.
+These are not operation-only attribution.
+
+The final same-implementation lifecycle p50/mean drift is control
+`-1.18%/-1.41%` tiny, `+0.26%/-0.42%` large, and `+0.47%/+0.72%`
+payload-heavy; candidate drift is `-0.33%/-0.75%`, `-1.51%/-1.51%`, and
+`-0.11%/-0.08%`, respectively. The paired directions remain positive, but
+the result is still limited to the named host and corpus.
+
+The same-implementation drift disclosure and all raw vectors are retained in
+the [machine-readable summary](results/doc-lazy-fingerprint-0165-summary.json)
+and [release manifest](results/doc-lazy-fingerprint-0165-manifest.json). The result
+is limited to this native-DOC host/corpus/workflow. It makes no speedup, physical-I/O,
+cold-cache, real-producer, generic-DOC, total-memory, operation-only
+allocation/RSS, or CRUD-completeness claim; the wider native owner/public
+validation and format matrix remain open.
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
@@ -1740,9 +1803,14 @@ Native DOC also indexes physical
 PieceTable intervals and reuses one resolved PAPX initial-style baseline after
 distinct profiles attributed 36.89% of large-open self cycles to scalar FKP
 range mapping and 6.94% to repeated style resolution/validation; full
-validation remains.
+validation remains. The highest-priority follow-up from that DOC attribution,
+the eager before/after fingerprint work in the retained patch/validation
+workflow, is accepted in change 0165: the lazy cache and same-lineage identity
+fast path preserve both independent validation layers and exact-byte
+authorization while making the deferred diagnostic demand explicit.
 Remaining native work requires new attribution inside the retained final
-owner/public-reader validation layers. The rejected XLS terminal-render
+owner/public-reader validation layers beyond that exact opportunity. The
+rejected XLS terminal-render
 handoff is not a reusable shortcut for those checks. The new opaque-heavy
 common OLE2 case rejects direct shared writer payloads (+32.02% p50), an
 editor-wide validated-render cache, and inline recapture allocation reuse. The

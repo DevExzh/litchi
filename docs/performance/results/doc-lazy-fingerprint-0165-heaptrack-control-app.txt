@@ -1,0 +1,2847 @@
+reading file "/tmp/doc-lazy-fingerprint-0165-final/resource/heaptrack-control-app.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-doc-fp-control-0165-final --case doc_owner_public_phases --writer-shape payload-heavy --shape tiny --payload compressible --semantic-shape tiny --rtf-variant plain --workers 1 --warmup 0 --samples 3 --json /tmp/doc-lazy-fingerprint-0165-final/resource/heaptrack-control-app.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+19397 calls to allocation functions with 0B peak consumption from
+litchi_doc::sprm::parse_sprms::hfe7f50ff6b695d06
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+387 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::revisions::hbed280e1b490e376
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+387 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h4afa11309ed8c14d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::revisions::hbed280e1b490e376
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::revisions::hbed280e1b490e376
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_papx::h7fcf6d2d5ecd70e8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 17471 from 147 other places
+
+5807 calls to allocation functions with 33.44M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd622da51729de758E.llvm.9583075557970961984
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+387 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+129 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 4139 from 373 other places
+
+5292 calls to allocation functions with 20.59M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h27f069c3936ef9d3E.llvm.4644171773332937171
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+1024 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1024 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1024 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::write_fresh_doc::h25d9bb2457d53182
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::build_writer_corpus::h4c08462a6c62c47d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1016 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1016 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 188 from 115 other places
+
+4900 calls to allocation functions with 0B peak consumption from
+litchi_doc::parts::fkp::PapxFkp::parse::he3bbe8a64afda5a4
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_papx::h7fcf6d2d5ecd70e8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_papx::h7fcf6d2d5ecd70e8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::edit::hc1e1402929de0119
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::codec::parse_papx::h7fcf6d2d5ecd70e8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 2980 from 70 other places
+
+2856 calls to allocation functions with 4B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6197f72551aa33d4E.llvm.4364340921313879092
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+240 calls with 0B peak consumption from:
+    litchi_cfb::writer::fat::FatBuilder::generate_fat_sectors::h045c4ddcc5e7b190
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::writer::core::OleWriter::write_to::h6ea79c76e1715d6f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::render::h464a6b8e569387d7
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::finish::hc184a608852e4157
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::finish::h229ebf49f6096223
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+240 calls with 0B peak consumption from:
+    litchi_cfb::writer::fat::FatBuilder::generate_fat_sectors::h045c4ddcc5e7b190
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::writer::core::OleWriter::write_to::h6ea79c76e1715d6f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::render::h464a6b8e569387d7
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::commit_candidate::h537f54d1738da803
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::put_streams_shared::he3d9683ec944ffa0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::commit::h20e255568758ec4d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf718849dc429bfc0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+80 calls with 0B peak consumption from:
+    litchi_cfb::writer::fat::FatBuilder::generate_fat_sectors::h045c4ddcc5e7b190
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::writer::core::OleWriter::write_to::h6ea79c76e1715d6f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::render::h464a6b8e569387d7
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::commit_candidate::h537f54d1738da803
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::put_streams_shared::he3d9683ec944ffa0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::commit::h20e255568758ec4d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf718849dc429bfc0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+80 calls with 0B peak consumption from:
+    litchi_cfb::writer::fat::FatBuilder::generate_fat_sectors::h045c4ddcc5e7b190
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::writer::core::OleWriter::write_to::h5e8e2e4b6b3088a2
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::write_to::h2f2c548e47653e25
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::write_fresh_doc::h25d9bb2457d53182
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::build_writer_corpus::h4c08462a6c62c47d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+80 calls with 0B peak consumption from:
+    litchi_cfb::writer::fat::FatBuilder::generate_fat_sectors::h045c4ddcc5e7b190
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::writer::core::OleWriter::write_to::h6ea79c76e1715d6f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::render::h464a6b8e569387d7
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::finish::hc184a608852e4157
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::finish::h229ebf49f6096223
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit::h2ba2d4fd339eb27d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 2136 from 779 other places
+
+2688 calls to allocation functions with 0B peak consumption from
+litchi_doc::tracked_revision::codec::parse_papx::h7fcf6d2d5ecd70e8
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::edit::hc1e1402929de0119
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 1280 from 10 other places
+
+1179 calls to allocation functions with 0B peak consumption from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+129 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 282 from 41 other places
+
+971 calls to allocation functions with 0B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h7d50ed4d834407aeE.llvm.2743172726431536210
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+60 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+60 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+20 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+20 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+20 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 791 from 421 other places
+
+897 calls to allocation functions with 0B peak consumption from
+_$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::ha710adff167c2ed1
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+129 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+
+896 calls to allocation functions with 2.54M peak consumption from
+litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+384 calls with 0B peak consumption from:
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 2.54M peak consumption from:
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 calls with 0B peak consumption from:
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+
+
+PEAK MEMORY CONSUMERS
+33.44M peak memory consumed over 5807 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd622da51729de758E.llvm.9583075557970961984
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+27.84M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h55f50363a8477678
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+2.54M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h55f50363a8477678
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _$LT$core..iter..adapters..map..Map$LT$I$C$F$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::fold::h13ecfb91fe1d5af5
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+2.54M consumed over 128 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h55f50363a8477678
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_runs::h95168783e9c1efd7
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::h2c95b2e7b72f1012
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+209.28K consumed over 2 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::ha5656ab275eb17e1
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+150.37K consumed over 128 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4a2f512173eb530a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_runs::h95168783e9c1efd7
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::h2c95b2e7b72f1012
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 165.57K from 373 other places
+
+20.59M peak memory consumed over 5292 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h27f069c3936ef9d3E.llvm.4644171773332937171
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+10.27M consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::writer::core::write_sector_aligned::h9bba31e6e7c2230f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::writer::core::OleWriter::write_to::h5e8e2e4b6b3088a2
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::write_to::h2f2c548e47653e25
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::write_fresh_doc::h25d9bb2457d53182
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::build_writer_corpus::h4c08462a6c62c47d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+5.13M consumed over 1 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h96a5a45da0e85d9c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hf7361e3712b9f5ee
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+5.13M consumed over 1 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h96a5a45da0e85d9c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::hf7361e3712b9f5ee
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::build_writer_corpus::h4c08462a6c62c47d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+40.96K consumed over 1 calls from:
+    litchi_cfb::file::try_vec_with_capacity::habd0b75c12fa1445
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::load_fat::h13673af5b4ed2cf1
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h34c1480c9bdd7519
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hd40e8fbb8100635a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+10.12K consumed over 1 calls from:
+    litchi_cfb::file::try_filled_vec::hf5fa988add2f07d5
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h34c1480c9bdd7519
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hd40e8fbb8100635a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 6.72K from 115 other places
+
+20.32M peak memory consumed over 2 calls from
+litchi_doc::parts::paragraph_extractor::ParagraphExtractor::new::h16a47cda18052d19
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+20.32M consumed over 1 calls from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+
+20.32M peak memory consumed over 14 calls from
+litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+20.32M consumed over 1 calls from:
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 0B from 5 other places
+
+15.55M peak memory consumed over 6 calls from
+alloc::sync::Arc$LT$T$C$A$GT$::from_box_in::h6a579f6b8c7c9cfb
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+5.18M consumed over 1 calls from:
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit::h2ba2d4fd339eb27d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+5.18M consumed over 1 calls from:
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+5.18M consumed over 1 calls from:
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 0B from 1 other places
+
+5.18M peak memory consumed over 4 calls from
+litchi_doc::body_text::Snapshot::finish::h0ef43967a2929794
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+5.18M consumed over 1 calls from:
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+
+5.13M peak memory consumed over 14 calls from
+litchi_doc::parts::fib::FileInformationBlock::parse_at::h7772947a82786cd8
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+5.13M consumed over 1 calls from:
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 0B from 5 other places
+
+2.56M peak memory consumed over 319 calls from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+2.54M consumed over 1 calls from:
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+20.00K consumed over 1 calls from:
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+36B consumed over 1 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h73e3161ab89a5ca6
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h46ff768a4cfd35d6
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h34c1480c9bdd7519
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hd40e8fbb8100635a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+10B consumed over 1 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h73e3161ab89a5ca6
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::h46ff768a4cfd35d6
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h34c1480c9bdd7519
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::package::codec::_$LT$impl$u20$litchi_doc..package..model..Package$LT$R$GT$$GT$::from_reader_with_limits::hd40e8fbb8100635a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 0B from 106 other places
+
+2.56M peak memory consumed over 768 calls from
+litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_text_range::h5e554eadd91b295e
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+2.54M consumed over 128 calls from:
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::h2c95b2e7b72f1012
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+20.00K consumed over 128 calls from:
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_runs::h95168783e9c1efd7
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::h2c95b2e7b72f1012
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1B consumed over 128 calls from:
+    litchi_doc::parts::paragraph_extractor::ParagraphExtractor::extract_paragraphs::h2c95b2e7b72f1012
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::model::semantic::layout::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::paragraphs::hefbb99c12e2551da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 0B from 1 other places
+
+2.54M peak memory consumed over 896 calls from
+litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+2.54M consumed over 128 calls from:
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+
+
+MOST TEMPORARY ALLOCATIONS
+17605 temporary allocations of 19397 allocations in total (90.76%) from
+litchi_doc::sprm::parse_sprms::hfe7f50ff6b695d06
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+387 temporary allocations of 387 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h4afa11309ed8c14d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+387 temporary allocations of 387 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::package::RevisionEditor::revisions::hbed280e1b490e376
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 temporary allocations of 384 allocations in total (100.00%) from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::expand_data_indirections::hbdcf0b2e136b9087
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 temporary allocations of 384 allocations in total (100.00%) from:
+    litchi_doc::parts::pap_bin_table::PapBinTable::expand_data_indirections::hbdcf0b2e136b9087
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+384 temporary allocations of 384 allocations in total (100.00%) from:
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$17from_sprm_context17h0c8ab03abeac6132E.llvm.16471614910628953442
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN10litchi_doc5parts3pap6parser68_$LT$impl$u20$litchi_doc..parts..pap..model..ParagraphProperties$GT$18apply_direct_sprms17h4ae99e0ad7d5701fE.llvm.16471614910628953442
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::pap_bin_table::PapBinTable::parse::hf31fe94325274a24
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 15.68K from 147 other places
+
+4987 temporary allocations of 5292 allocations in total (94.24%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h27f069c3936ef9d3E.llvm.4644171773332937171
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+1024 temporary allocations of 1024 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1016 temporary allocations of 1016 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1016 temporary allocations of 1024 allocations in total (99.22%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+1009 temporary allocations of 1016 allocations in total (99.31%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+896 temporary allocations of 1024 allocations in total (87.50%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h9a9f31ee71d4b8e4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::write_fresh_doc::h25d9bb2457d53182
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::build_writer_corpus::h4c08462a6c62c47d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 26B from 115 other places
+
+2001 temporary allocations of 5807 allocations in total (34.46%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17hd622da51729de758E.llvm.9583075557970961984
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+378 temporary allocations of 387 allocations in total (97.67%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+375 temporary allocations of 384 allocations in total (97.66%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+126 temporary allocations of 129 allocations in total (97.67%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+126 temporary allocations of 129 allocations in total (97.67%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit::h2ba2d4fd339eb27d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+126 temporary allocations of 129 allocations in total (97.67%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hbb9cae35ad0a3e8e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::piece_table::PieceTable::fc_range_to_cp_ranges::h9b794f9c26029c97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 870B from 373 other places
+
+915 temporary allocations of 2856 allocations in total (32.04%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6197f72551aa33d4E.llvm.4364340921313879092
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+36 temporary allocations of 45 allocations in total (80.00%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::hafd92c7bccd27fe6
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h3dd858a1f4c9b711
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::capture_container::h76320585fe134a4e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::capture::h4ed6a5ad70db1ee4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::open::h6060446a4899f5a4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+36 temporary allocations of 45 allocations in total (80.00%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h083938235dc4cbfc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h8401ac11b01db8ce
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::capture_container::hee3de12ccd0fa8b4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::capture::h461b6d5a13c25a68
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::commit_candidate::h537f54d1738da803
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::put_streams_shared::he3d9683ec944ffa0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::commit::h20e255568758ec4d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::replace_plain_text::hf718849dc429bfc0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+33 temporary allocations of 42 allocations in total (78.57%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::hafd92c7bccd27fe6
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h3dd858a1f4c9b711
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::capture_container::h76320585fe134a4e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::capture::h4ed6a5ad70db1ee4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::open::h6060446a4899f5a4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::edit::hc1e1402929de0119
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+33 temporary allocations of 42 allocations in total (78.57%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::hafd92c7bccd27fe6
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h3dd858a1f4c9b711
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::capture_container::h76320585fe134a4e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::codec::Package::capture::h4ed6a5ad70db1ee4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_ole_common::object::editor::Editor::open::h6060446a4899f5a4
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+33 temporary allocations of 36 allocations in total (91.67%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::read_stream_from_fat::h6ad1d42647bd5abd
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_cfb::file::OleFile$LT$R$GT$::open_stream::h3d9bd23d2b50c5f1
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 744B from 779 other places
+
+892 temporary allocations of 894 allocations in total (99.78%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+128 temporary allocations of 128 allocations in total (100.00%) from:
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::write_fresh_doc::h25d9bb2457d53182
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::build_writer_corpus::h4c08462a6c62c47d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 temporary allocations of 128 allocations in total (100.00%) from:
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+128 temporary allocations of 128 allocations in total (100.00%) from:
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+127 temporary allocations of 127 allocations in total (100.00%) from:
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+127 temporary allocations of 127 allocations in total (100.00%) from:
+    litchi_perf_baseline::writer_payload_text::h59f7956963488c37
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 254B from 14 other places
+
+841 temporary allocations of 1179 allocations in total (71.33%) from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+360 temporary allocations of 384 allocations in total (93.75%) from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+121 temporary allocations of 129 allocations in total (93.80%) from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+120 temporary allocations of 128 allocations in total (93.75%) from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+120 temporary allocations of 128 allocations in total (93.75%) from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::target_spans::h40d82c0c905ab58e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::resolve_target::h8bc04976a53d4a73
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_text::hb1eaba8a4878ac1e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::replace_paragraph::h8ba973aef33afebb
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+120 temporary allocations of 128 allocations in total (93.75%) from:
+    _ZN10litchi_doc16tracked_revision7package14RevisionEditor17decode_text_range17hdbc728db56f70e0fE.llvm.16782962975569093925
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::source_paragraphs::hf509341d15c4b288
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::paragraphs::h965bd4201079d277
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 0B from 41 other places
+
+399 temporary allocations of 971 allocations in total (41.09%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h7d50ed4d834407aeE.llvm.2743172726431536210
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+57 temporary allocations of 60 allocations in total (95.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+57 temporary allocations of 60 allocations in total (95.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+19 temporary allocations of 20 allocations in total (95.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::ha79ce634106640ff
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+19 temporary allocations of 20 allocations in total (95.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+19 temporary allocations of 20 allocations in total (95.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f2801ecb286062
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::extract_text_from_piece_descriptors::hc7ad66dad8959a3c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::text::TextExtractor::new::h461bd80f222a9167
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 228B from 421 other places
+
+128 temporary allocations of 134 allocations in total (95.52%) from
+litchi_doc::writer::fkp::PapxFkpBuilder::generate_pages::hecb930648ed11707
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+128 temporary allocations of 128 allocations in total (100.00%) from:
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::build_output_streams_with_data_prefix::h9728c2ee66bb117e
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::build_ole_writer::h260ddfee74acb382
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::writer::core::package::package::_$LT$impl$u20$litchi_doc..writer..core..model..state..Writer$GT$::write_to::h2f2c548e47653e25
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::write_fresh_doc::h25d9bb2457d53182
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::build_writer_corpus::h4c08462a6c62c47d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+
+70 temporary allocations of 140 allocations in total (50.00%) from
+litchi_doc::parts::fkp::ChpxFkp::parse::hc2ef452a77a87ce9
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h4afa11309ed8c14d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h4afa11309ed8c14d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::edit::hc1e1402929de0119
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    litchi_doc::parts::chp_bin_table::ChpBinTable::parse::h42679c55f51586da
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    litchi_doc::tracked_revision::codec::parse_chpx::h4afa11309ed8c14d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::tracked_revision::package::RevisionEditor::open::h73e9df7e304c29d0
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 40B from 45 other places
+
+30 temporary allocations of 49 allocations in total (61.22%) from
+_ZN9hashbrown3raw13RawTableInner22fallible_with_capacity17h728286725adc1881E.llvm.2743172726431536210
+  in /tmp/litchi-perf-doc-fp-control-0165-final
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h69f62a5212e63a3b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h178b211848f5597f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::semantic::validation::validate_styles::h25a1aa14d04b9f97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_data::h39b25c0ce2882b44
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_with_leniency::h1dd0538b4fee6d62
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Edit::commit_profiled::hed88991b3fd8a20d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_changed_commit::h883d6e7d1519eb22
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h69f62a5212e63a3b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h178b211848f5597f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::semantic::validation::validate_styles::h25a1aa14d04b9f97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_data::h39b25c0ce2882b44
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_with_leniency::h1dd0538b4fee6d62
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_options::hf5ee1260afef90ea
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded_profiled::h28ac7d5a94d577bc
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::profile_doc_open::hfe1e63f53d517c8b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h69f62a5212e63a3b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h178b211848f5597f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::semantic::validation::validate_styles::h25a1aa14d04b9f97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_data::h39b25c0ce2882b44
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_with_leniency::h1dd0538b4fee6d62
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::verify_semantic_doc::ha771f82a6ddea68d
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h69f62a5212e63a3b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h178b211848f5597f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::semantic::validation::validate_styles::h25a1aa14d04b9f97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_data::h39b25c0ce2882b44
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_with_leniency::h1dd0538b4fee6d62
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    hashbrown::raw::RawTable$LT$T$C$A$GT$::reserve_rehash::h69f62a5212e63a3b
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    hashbrown::map::HashMap$LT$K$C$V$C$S$C$A$GT$::insert::h178b211848f5597f
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::semantic::validation::validate_styles::h25a1aa14d04b9f97
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_data::h39b25c0ce2882b44
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::parts::styles::codec::parser::_$LT$impl$u20$litchi_doc..parts..styles..model..StyleSheet$GT$::parse_with_leniency::h1dd0538b4fee6d62
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::document::package::_$LT$impl$u20$litchi_doc..document..model..state..Document$GT$::from_ole_with_limits::h60368455b2e18dc8
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::open_bounded::h70d8c82bf79b2a0c
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_doc::body_text::Snapshot::from_bytes::h614a55d99e7c9aaa
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::run_doc_owner_public_phases::h5fa3b1c303b9a937
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    litchi_perf_baseline::main::hd28c30b56ba8e397
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    std::sys::backtrace::__rust_begin_short_backtrace::ha11112cf9602fb7a
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc1688245569c5b14E.llvm.14221860470259053721
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+    main
+      in /tmp/litchi-perf-doc-fp-control-0165-final
+  and 12B from 19 other places
+
+
+total runtime: 0.51s.
+calls to allocation functions: 50677 (98978/s)
+temporary memory allocations: 27989 (54666/s)
+peak heap memory consumption: 128.28M
+peak RSS (including heaptrack overhead): 145.14M
+total memory leaked: 544B

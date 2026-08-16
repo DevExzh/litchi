@@ -1,0 +1,12 @@
+large	doc_semantic_noop_edit_save	p50:+71.08/+70.40	mean:+70.40/+70.15	p95:+68.06/+68.42	p99:+62.44/+67.52
+large	doc_semantic_one_edit_save	p50:+20.45/+19.79	mean:+20.75/+20.27	p95:+18.59/+18.49	p99:+26.52/+19.66
+large	doc_semantic_open	p50:+0.55/-1.80	mean:+0.92/-1.84	p95:-2.45/-0.89	p99:-5.74/-2.63
+large	xls_semantic_noop_edit_save	p50:+14.87/-26.42	mean:+17.88/-24.76	p95:+29.96/-7.25	p99:+29.02/-17.40
+large	xls_semantic_one_edit_save	p50:+2.19/+2.05	mean:+1.37/+2.47	p95:-1.38/+4.62	p99:-7.67/+7.57
+large	xls_semantic_open	p50:+2.97/+5.10	mean:+3.19/+4.14	p95:+3.87/+0.70	p99:+4.77/-4.94
+tiny	doc_semantic_noop_edit_save	p50:+78.84/+79.89	mean:+78.82/+79.86	p95:+80.17/+81.19	p99:+71.65/+82.47
+tiny	doc_semantic_one_edit_save	p50:+37.23/+40.81	mean:+36.79/+41.21	p95:+33.92/+41.39	p99:+28.70/+39.14
+tiny	doc_semantic_open	p50:-3.52/+0.13	mean:-3.11/+1.28	p95:+4.29/+20.82	p99:-13.08/+39.95
+tiny	xls_semantic_noop_edit_save	p50:-14.50/-6.87	mean:-11.58/-6.37	p95:+0.00/-6.62	p99:+27.89/+0.00
+tiny	xls_semantic_one_edit_save	p50:-0.20/+2.42	mean:+1.65/+1.59	p95:+15.57/-7.22	p99:+14.60/-11.31
+tiny	xls_semantic_open	p50:-3.78/+0.10	mean:-3.02/-0.11	p95:+0.71/+1.87	p99:+6.20/-3.14

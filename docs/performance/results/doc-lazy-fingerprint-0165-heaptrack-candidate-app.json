@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "5dd813b1e108e253457ccb6c504c125c2becc1c6",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "total_memory_bytes": 33605935104,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 3,
+    "warmup_iterations_per_case": 0,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "doc_owner_public_phases"
+    ],
+    "corpus_shapes": [
+      "tiny"
+    ],
+    "payload_kinds": [
+      "compressible"
+    ],
+    "writer_shapes": [
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "semantic_shapes": [
+      "tiny"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ]
+  },
+  "results": [
+    {
+      "case": "doc_owner_public_phases",
+      "corpus": {
+        "name": "doc-payload-heavy",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "DOC/CFB",
+        "shape": "payload-heavy",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 128,
+        "archive_member_count": 5,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 2560000,
+        "archive_bytes": 5179904,
+        "archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+        "target_entry": "WordDocument",
+        "target_payload_bytes": 5128192,
+        "target_payload_sha256": "55d1f2b0a28c85af42d88f132abd905b07b6f1fcb2b243a08083a53196c9bdb7",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          33806620,
+          34545971,
+          35998075
+        ],
+        "min": 33806620,
+        "p50": 34545971,
+        "p95": 35998075,
+        "p99": 35998075,
+        "max": 35998075,
+        "mean": 34783555.333333336,
+        "standard_deviation": 1114878.240365436,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 32013820.723165613,
+          "upper": 37553289.943501055
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [],
+        "read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "ordinary_payload_read_bytes": [],
+        "max_in_flight_reads": [],
+        "doc_owner_public_phases": {
+          "implementation": "litchi-doc::body_text::Snapshot/Edit profiled owner-public seam",
+          "timing_scope": "measured_total_ns covers native DOC owner/public validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
+          "performance_claim": "attribution-only correctness and deferred-work accounting; measured_total_ns is the established lifecycle boundary, synchronous observer overhead is included, and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
+          "selected_paragraph": 64,
+          "source_bytes": 5179904,
+          "candidate_bytes": 5183488,
+          "source_archive_sha256": "707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+          "expected_output_sha256": "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4",
+          "expected_source_fingerprint": 8038895374813630357,
+          "expected_target_fingerprint": 10924298101297215626,
+          "open_owner_ns": [
+            1172669,
+            1249795,
+            2184015
+          ],
+          "open_public_ns": [
+            11123622,
+            11432459,
+            11769615
+          ],
+          "open_retain_ns": [
+            249284,
+            237298,
+            224368
+          ],
+          "edit_authoring_ns": [
+            8610984,
+            8718144,
+            8712866
+          ],
+          "edit_new_ns": [
+            1095692,
+            1149577,
+            1056609
+          ],
+          "edit_replacement_ns": [
+            7515292,
+            7568567,
+            7656257
+          ],
+          "edit_finish_ns": [
+            661974,
+            652771,
+            612776
+          ],
+          "edit_final_owner_ns": [
+            1122349,
+            1009473,
+            1125163
+          ],
+          "edit_final_public_ns": [
+            9666492,
+            9989037,
+            9446538
+          ],
+          "edit_final_retain_ns": [
+            2413160,
+            305582,
+            241894
+          ],
+          "edit_patch_ns": [
+            741,
+            351,
+            311
+          ],
+          "edit_commit_outer_ns": [
+            13891453,
+            11967748,
+            11451095
+          ],
+          "edit_output_materialization_ns": [
+            917998,
+            173148,
+            184995
+          ],
+          "open_attributed_total_ns": [
+            12545575,
+            12919552,
+            14177998
+          ],
+          "edit_attributed_total_ns": [
+            23393698,
+            20848506,
+            20324543
+          ],
+          "open_outer_ns": [
+            12553697,
+            12939439,
+            14188303
+          ],
+          "edit_total_ns": [
+            23420435,
+            20859040,
+            20348956
+          ],
+          "measured_total_ns": [
+            35998075,
+            33806620,
+            34545971
+          ],
+          "same_lineage_apply_ns": [
+            821,
+            701,
+            411
+          ],
+          "deferred_fingerprint_ns": [
+            8388138,
+            8389890,
+            8560245
+          ],
+          "workflow_no_diagnostic_ns": [
+            35998896,
+            33807321,
+            34546382
+          ],
+          "workflow_with_fingerprint_demand_ns": [
+            44387034,
+            42197211,
+            43106627
+          ],
+          "source_fingerprints": [
+            8038895374813630357,
+            8038895374813630357,
+            8038895374813630357
+          ],
+          "target_fingerprints": [
+            10924298101297215626,
+            10924298101297215626,
+            10924298101297215626
+          ],
+          "attributed_total_ns": [
+            35939273,
+            33768058,
+            34502541
+          ],
+          "unattributed_ns": [
+            58802,
+            38562,
+            43430
+          ],
+          "output_sha256": [
+            "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4",
+            "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4",
+            "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4"
+          ],
+          "gates": {
+            "event_order_cardinality_verified": true,
+            "source_semantics_verified": true,
+            "changed_semantics_verified": true,
+            "exact_noop_verified": true,
+            "patch_round_trip_verified": true,
+            "same_lineage_apply_verified": true,
+            "reopened_source_apply_verified": true,
+            "independent_fingerprints_verified": true,
+            "workflow_arithmetic_verified": true,
+            "inverse_round_trip_verified": true,
+            "stale_source_refusal_verified": true,
+            "malformed_source_refusal_verified": true,
+            "typed_edit_refusal_verified": true,
+            "output_hash_verified": true,
+            "untouched_streams_verified": true
+          }
+        }
+      },
+      "output_sha256": "c04d51f9a9e2c5332b3c6da9ecec9b4a6b436be470c63bc8bf22b5f159776af4"
+    }
+  ]
+}
