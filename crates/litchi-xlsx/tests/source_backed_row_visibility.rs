@@ -31,7 +31,8 @@ struct VersionedSource {
     id: u64,
     revision: AtomicU64,
     rejected_read_offset: AtomicU64,
-    rejected_read_count: AtomicU64,
+    allowed_matching_reads: AtomicU64,
+    matching_read_count: AtomicU64,
 }
 
 impl VersionedSource {
@@ -41,7 +42,8 @@ impl VersionedSource {
             id: NEXT_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
             revision: AtomicU64::new(0),
             rejected_read_offset: AtomicU64::new(u64::MAX),
-            rejected_read_count: AtomicU64::new(0),
+            allowed_matching_reads: AtomicU64::new(0),
+            matching_read_count: AtomicU64::new(0),
         }
     }
 
@@ -50,12 +52,19 @@ impl VersionedSource {
     }
 
     fn reject_small_read_at(&self, offset: u64) {
-        self.rejected_read_count.store(0, Ordering::SeqCst);
+        self.allowed_matching_reads.store(0, Ordering::SeqCst);
+        self.matching_read_count.store(0, Ordering::SeqCst);
         self.rejected_read_offset.store(offset, Ordering::SeqCst);
     }
 
-    fn rejected_small_read_count(&self) -> u64 {
-        self.rejected_read_count.load(Ordering::SeqCst)
+    fn allow_one_small_read_at(&self, offset: u64) {
+        self.allowed_matching_reads.store(1, Ordering::SeqCst);
+        self.matching_read_count.store(0, Ordering::SeqCst);
+        self.rejected_read_offset.store(offset, Ordering::SeqCst);
+    }
+
+    fn matching_small_read_count(&self) -> u64 {
+        self.matching_read_count.load(Ordering::SeqCst)
     }
 }
 
@@ -66,8 +75,10 @@ impl ReadAt for VersionedSource {
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
         if offset == self.rejected_read_offset.load(Ordering::SeqCst) && output.len() < 64 * 1024 {
-            self.rejected_read_count.fetch_add(1, Ordering::SeqCst);
-            return Err(io::Error::other("selected worksheet payload read rejected"));
+            let matching = self.matching_read_count.fetch_add(1, Ordering::SeqCst);
+            if matching >= self.allowed_matching_reads.load(Ordering::SeqCst) {
+                return Err(io::Error::other("selected worksheet payload read rejected"));
+            }
         }
         let offset = usize::try_from(offset).map_err(|_| io::Error::other("offset"))?;
         if offset >= self.bytes.len() {
@@ -153,6 +164,21 @@ fn exact_rows() -> (String, String) {
         r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetData><row r='1' spans='1:1' ht='20' customHeight='1' hidden="1"><c r="A1"><v>1</v></c></row><row r="2" hidden="1"><c r='B2' t="b"><v>1</v></c></row><row r="3"><c r="C3" t='inlineStr'><is><t xml:space="preserve"> keep </t></is></c></row></sheetData></worksheet>"#
     );
     (before, after)
+}
+
+fn oversized_row_worksheet_xml(padding: usize) -> String {
+    let mut sheet = String::with_capacity(padding + 512);
+    sheet.push_str(&format!(r#"<worksheet xmlns="{SML}">"#));
+    let mut remaining = padding;
+    while remaining != 0 {
+        let chunk = remaining.min(1024 * 1024);
+        sheet.push_str("<!--");
+        sheet.extend(std::iter::repeat_n('x', chunk));
+        sheet.push_str("-->");
+        remaining -= chunk;
+    }
+    sheet.push_str(r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#);
+    sheet
 }
 
 fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
@@ -274,6 +300,47 @@ fn canonical_requests_are_exact_noops() {
     assert!(!commit.changed());
     assert!(commit.patch().is_empty());
     assert_eq!(commit.snapshot().source_xml(), xml.as_bytes());
+}
+
+#[test]
+fn changed_publication_reuses_matched_provenance_without_selected_reload() {
+    let bytes = ordinary(oversized_row_worksheet_xml(8 * 1024 * 1024 + 64 * 1024));
+    let worksheet_data_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
+    let unused = OpcPackage::from_bytes(&bytes)
+        .unwrap()
+        .get_part(&PackURI::new(UNUSED).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let source = Arc::new(VersionedSource::new(bytes));
+    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.hide(row(0)).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+
+    // Publication must retain the one selected-member read needed by the OPC
+    // overlay path, but a second semantic snapshot reload would exceed this
+    // allowance and fail before output completes.
+    source.allow_one_small_read_at(worksheet_data_offset);
+
+    let mut output = Vec::new();
+    let published_snapshot = editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(source.matching_small_read_count(), 1);
+    assert_eq!(published_snapshot.is_hidden(row(0)), Some(true));
+
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = Snapshot::load(&published, "Sheet1").unwrap();
+    assert_eq!(reopened.is_hidden(row(0)), Some(true));
+    assert_eq!(
+        published
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        unused,
+    );
 }
 
 #[test]
@@ -471,7 +538,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
             ExecutionError::ResourceLimit(_)
         )))
     ));
-    assert_eq!(source.rejected_small_read_count(), 0);
+    assert_eq!(source.matching_small_read_count(), 0);
     assert_eq!(editor.cache_diagnostics().successful_loads, 1);
 
     drop(editor);

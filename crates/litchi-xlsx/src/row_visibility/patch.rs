@@ -42,6 +42,10 @@ impl Patch {
         self.inner.is_empty()
     }
 
+    pub(super) const fn inner(&self) -> &cell_values::Patch {
+        &self.inner
+    }
+
     /// Exact source-bound inverse, including the producer's original lexical
     /// representation of the `hidden` attribute.
     #[must_use]
