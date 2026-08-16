@@ -36,6 +36,14 @@ impl Error {
     pub fn kind(&self) -> &ErrorKind {
         &self.inner.kind
     }
+
+    /// Consume this error and return its owned kind.
+    ///
+    /// This lets higher-level streaming publishers retain an original I/O
+    /// error and its source chain while adding format-specific progress.
+    pub fn into_kind(self) -> ErrorKind {
+        self.inner.kind
+    }
 }
 
 #[derive(Debug)]
@@ -81,6 +89,14 @@ pub enum ErrorKind {
     /// A local parallel-read worker pool could not be created.
     ParallelReadWorkerPool { workers: usize, message: String },
 
+    /// A bounded operation could not reserve its required memory.
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        source: std::collections::TryReserveError,
+    },
+
     /// A parallel-read operation observed cooperative cancellation.
     Cancelled,
 
@@ -116,7 +132,15 @@ pub enum ErrorKind {
     UnsupportedPreservation { reason: &'static str },
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.inner.kind {
+            ErrorKind::Allocation { source, .. } => Some(source),
+            ErrorKind::IO(error) | ErrorKind::Io(error) => Some(error),
+            _ => None,
+        }
+    }
+}
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -182,6 +206,10 @@ impl std::fmt::Display for ErrorKind {
                     "Could not create local parallel read pool with {workers} worker(s): {message}"
                 )
             },
+            ErrorKind::Allocation {
+                resource,
+                ref source,
+            } => write!(f, "could not reserve {resource}: {source}"),
             ErrorKind::Cancelled => write!(f, "Operation cancelled"),
             ErrorKind::LimitExceeded {
                 resource,
@@ -261,5 +289,35 @@ impl From<ErrorKind> for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
         Error::from(ErrorKind::IO(err))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, ErrorKind};
+
+    #[test]
+    fn allocation_error_retains_original_try_reserve_source() {
+        let source = Vec::<u8>::new().try_reserve_exact(usize::MAX).unwrap_err();
+        let source_message = source.to_string();
+        let error = Error::from(ErrorKind::Allocation {
+            resource: "test allocation",
+            source,
+        });
+
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::Allocation {
+                resource: "test allocation",
+                ..
+            }
+        ));
+        let source = std::error::Error::source(&error).expect("allocation source");
+        assert_eq!(source.to_string(), source_message);
+        assert!(
+            source
+                .downcast_ref::<std::collections::TryReserveError>()
+                .is_some()
+        );
     }
 }
