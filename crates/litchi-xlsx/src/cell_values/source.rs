@@ -478,8 +478,18 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
+        self.publish_patch_to_stream(writer, commit.patch())
+    }
+
+    /// Publish one exact-source-checked worksheet patch for an owning sibling
+    /// facade that retains the same scalar worksheet closure.
+    pub(crate) fn publish_patch_to_stream<W: Write>(
+        self,
+        writer: W,
+        patch: &Patch,
+    ) -> Result<Snapshot> {
         self.package.check_execution()?;
-        let before = commit.patch().before();
+        let before = patch.before();
         let current = match before.matches_source_backed(&self.package)? {
             SourceProvenance::Matched => None,
             SourceProvenance::Mismatched => {
@@ -499,10 +509,10 @@ impl SourceBackedEditor {
                 part: current.worksheet_part_name().to_string(),
             });
         }
-        let target = if commit.patch().is_empty() {
+        let target = if patch.is_empty() {
             current.unwrap_or_else(|| before.clone())
         } else {
-            commit.patch().after().clone()
+            patch.after().clone()
         };
         self.write_snapshot_overlay_to_stream(writer, &target)?;
         Ok(target)

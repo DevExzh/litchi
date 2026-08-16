@@ -87,10 +87,6 @@ impl Snapshot {
         &self.inner
     }
 
-    pub(crate) fn same_source(&self, other: &Self) -> bool {
-        self.inner.same_source(&other.inner)
-    }
-
     pub(crate) fn check_execution(&self) -> Result<()> {
         self.inner.check_execution()
     }

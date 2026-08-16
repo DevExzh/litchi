@@ -162,19 +162,13 @@ impl SourceBackedEditor {
         writer: W,
         commit: &Commit,
     ) -> Result<Snapshot> {
-        let current = self.snapshot(commit.patch().before().sheet_position())?;
-        if !current.same_source(commit.patch().before()) {
-            return Err(Error::PatchConflict {
-                part: current.worksheet_part_name().to_string(),
-            });
-        }
         let target = if commit.patch().is_empty() {
-            current
+            commit.patch().before().clone()
         } else {
             commit.patch().after().clone()
         };
         self.inner
-            .write_snapshot_overlay_to_stream(writer, target.inner())?;
+            .publish_patch_to_stream(writer, commit.patch().inner())?;
         Ok(target)
     }
 }
