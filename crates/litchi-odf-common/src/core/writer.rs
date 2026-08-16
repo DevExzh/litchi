@@ -14,10 +14,239 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use soapberry_zip::office::StreamingArchiveWriter;
+use soapberry_zip::office::{
+    StreamingArchiveFailure, StreamingArchiveWriter, StreamingLimitExceeded, StreamingLimitResource,
+};
+use soapberry_zip::{ErrorKind as ZipErrorKind, LimitResource as ZipLimitResource};
 use std::collections::HashSet;
-use std::io::{self, Write};
+use std::fmt;
+use std::io::{self, Read, Write};
 use zeroize::Zeroizing;
+
+const MAX_MANIFEST_TEXT_BYTES: usize = 1024;
+const MANIFEST_PATH: &str = "META-INF/manifest.xml";
+
+/// Finite limits applied to sequential ODF package publication.
+///
+/// These limits bound ZIP transport bytes and the writer's retained manifest
+/// bookkeeping. They do not make arbitrary caller-owned readers seekable or
+/// reserve the complete payload in memory.
+pub use soapberry_zip::office::StreamingArchiveLimits as PackageWriterLimits;
+
+/// Compression methods supported by opaque streamed ODF package members.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageCompression {
+    /// Keep the member uncompressed.
+    Stored,
+    /// Compress the member with ZIP Deflate.
+    Deflated,
+}
+
+/// A finite ZIP resource bounded by sequential ODF publication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackageWriterLimitResource {
+    /// Number of file members accepted by the package.
+    FileCount,
+    /// UTF-8 bytes in one member name.
+    MemberNameBytes,
+    /// Aggregate variable central-directory metadata bytes.
+    MetadataBytes,
+    /// Compressed bytes in one member.
+    CompressedSize,
+    /// Uncompressed bytes in one member.
+    EntrySize,
+    /// Aggregate uncompressed bytes across members.
+    TotalSize,
+    /// Complete bytes accepted by the output sink.
+    OutputBytes,
+    /// A future transport resource not known by this crate yet.
+    Other,
+}
+
+impl fmt::Display for PackageWriterLimitResource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::FileCount => "file count",
+            Self::MemberNameBytes => "member name bytes",
+            Self::MetadataBytes => "metadata bytes",
+            Self::CompressedSize => "compressed member size",
+            Self::EntrySize => "uncompressed member size",
+            Self::TotalSize => "total uncompressed size",
+            Self::OutputBytes => "output bytes",
+            Self::Other => "other streaming resource",
+        })
+    }
+}
+
+/// Typed attribution for a finite ODF package publication ceiling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PackageWriterLimitExceeded {
+    resource: PackageWriterLimitResource,
+    actual: u64,
+    maximum: u64,
+}
+
+impl PackageWriterLimitExceeded {
+    /// The bounded resource that caused the failure.
+    #[must_use]
+    pub const fn resource(self) -> PackageWriterLimitResource {
+        self.resource
+    }
+
+    /// The attempted or observed value.
+    #[must_use]
+    pub const fn actual(self) -> u64 {
+        self.actual
+    }
+
+    /// The configured finite ceiling.
+    #[must_use]
+    pub const fn maximum(self) -> u64 {
+        self.maximum
+    }
+}
+
+impl fmt::Display for PackageWriterLimitExceeded {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "ODF package {resource} limit exceeded: attempted {actual}, maximum {maximum}",
+            resource = self.resource,
+            actual = self.actual,
+            maximum = self.maximum,
+        )
+    }
+}
+
+/// A bounded ODF package publication failure.
+///
+/// Existing in-memory writer methods continue to return [`litchi_core::Error`].
+/// The sequential reader and sink APIs use this error so callers can inspect
+/// whether a caller-owned sink contains an incomplete prefix and how many
+/// bytes it accepted.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum PackageWriterError {
+    /// A preflight, source, or archive error without a typed streaming prefix.
+    Core(Error),
+    /// The original ZIP/archive failure, retained for callers that need its
+    /// concrete source chain instead of only a compatibility string.
+    Archive(soapberry_zip::Error),
+    /// A finalization failure retaining the complete typed archive report.
+    ArchiveFailure(StreamingArchiveFailure),
+    /// The caller-owned sink accepted a prefix before publication failed.
+    IncompleteOutput {
+        /// Bytes accepted by the output sink before failure.
+        written: u64,
+        /// The underlying failure.
+        source: Box<Self>,
+    },
+    /// A low-level streaming byte ceiling was reached after publication began.
+    LimitExceeded {
+        /// Bytes accepted by the output sink before failure.
+        written: u64,
+        /// The bounded streaming resource that caused the failure.
+        limit: PackageWriterLimitExceeded,
+        /// The underlying failure.
+        source: Box<Self>,
+    },
+}
+
+impl PackageWriterError {
+    /// Return the number of output bytes accepted before this failure, if any.
+    #[must_use]
+    pub const fn written(&self) -> Option<u64> {
+        match self {
+            Self::Core(_) | Self::Archive(_) | Self::ArchiveFailure(_) => None,
+            Self::IncompleteOutput { written, .. } | Self::LimitExceeded { written, .. } => {
+                Some(*written)
+            },
+        }
+    }
+
+    /// Return the low-level byte limit attribution, if this was a limit error.
+    #[must_use]
+    pub const fn limit(&self) -> Option<PackageWriterLimitExceeded> {
+        match self {
+            Self::LimitExceeded { limit, .. } => Some(*limit),
+            Self::Core(_)
+            | Self::Archive(_)
+            | Self::ArchiveFailure(_)
+            | Self::IncompleteOutput { .. } => None,
+        }
+    }
+
+    /// Consume this error and recover the compatibility core error.
+    #[must_use]
+    pub fn into_core_error(self) -> Error {
+        match self {
+            Self::Core(error) => error,
+            Self::Archive(error) => Error::ZipError(error.to_string()),
+            Self::ArchiveFailure(failure) => Error::ZipError(failure.to_string()),
+            Self::IncompleteOutput { source, .. } | Self::LimitExceeded { source, .. } => {
+                source.into_core_error()
+            },
+        }
+    }
+}
+
+impl From<Error> for PackageWriterError {
+    fn from(error: Error) -> Self {
+        Self::Core(error)
+    }
+}
+
+impl From<PackageWriterError> for Error {
+    fn from(error: PackageWriterError) -> Self {
+        error.into_core_error()
+    }
+}
+
+impl fmt::Display for PackageWriterError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Core(error) => error.fmt(formatter),
+            Self::Archive(error) => error.fmt(formatter),
+            Self::ArchiveFailure(failure) => failure.fmt(formatter),
+            Self::IncompleteOutput { written, source } => {
+                write!(
+                    formatter,
+                    "incomplete ODF output after {written} byte(s): {source}"
+                )
+            },
+            Self::LimitExceeded {
+                written,
+                limit,
+                source,
+            } => write!(
+                formatter,
+                "ODF streaming limit {limit} after {written} byte(s): {source}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PackageWriterError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Core(error) => Some(error),
+            Self::Archive(error) => match error.kind() {
+                ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => Some(source),
+                _ => Some(error),
+            },
+            Self::ArchiveFailure(failure) => match failure.error().kind() {
+                ZipErrorKind::IO(source) | ZipErrorKind::Io(source) => Some(source),
+                _ => Some(failure),
+            },
+            Self::IncompleteOutput { source, .. } | Self::LimitExceeded { source, .. } => {
+                Some(source)
+            },
+        }
+    }
+}
+
+/// Result returned by sequential ODF package publication methods.
+pub type PackageWriterResult<T> = std::result::Result<T, PackageWriterError>;
 
 use super::encryption::{Profile, encrypt_entry};
 use super::manifest::{
@@ -26,6 +255,7 @@ use super::manifest::{
 };
 use super::package::OwnedPackage;
 use super::xml_splice::XmlSplicePublication;
+use crate::package::validate_manifest_path;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 
@@ -155,9 +385,16 @@ fn validate_canonical_odf_datetime(value: &str, field: &str) -> Result<()> {
     reason = "`PackageWriter` is the established public ODF package writer name."
 )]
 pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
+    // The locally retained limits also bound generated ODF manifest XML and
+    // manifest-only entries; ZIP transport metadata alone is insufficient.
     zip_writer: StreamingArchiveWriter<W>,
+    limits: PackageWriterLimits,
     mimetype: Option<String>,
     manifest_entries: Vec<ManifestEntry>,
+    manifest_paths: HashSet<String>,
+    member_paths: HashSet<String>,
+    manifest_metadata_bytes: u64,
+    archive_entry_count: usize,
     manifest_version: String,
     wrote_any_entry: bool,
     wrote_mimetype: bool,
@@ -192,9 +429,9 @@ pub struct Structure;
 
 /// A bounded, fallibly growing in-memory package sink.
 ///
-/// Every write checks the configured byte limit before reserving exactly the
-/// required capacity. This is intended for package publication paths that must
-/// never first materialize an oversized archive.
+/// Every write checks the configured byte limit before an amortized capacity
+/// increase capped at that limit. This is intended for package publication
+/// paths that must never first materialize an oversized archive.
 pub struct BoundedBytes {
     bytes: Vec<u8>,
     limit: usize,
@@ -225,11 +462,16 @@ impl Write for BoundedBytes {
                 "ODF bounded package output exceeds its limit",
             ));
         }
-        self.bytes.try_reserve_exact(bytes.len()).map_err(|error| {
-            io::Error::other(format!(
-                "ODF bounded package output allocation failed: {error}"
-            ))
-        })?;
+        if length > self.bytes.capacity() {
+            let doubled_capacity = self.bytes.capacity().saturating_mul(2).max(1);
+            let desired_capacity = doubled_capacity.max(length).min(self.limit);
+            let additional = desired_capacity.saturating_sub(self.bytes.capacity());
+            self.bytes.try_reserve_exact(additional).map_err(|error| {
+                io::Error::other(format!(
+                    "ODF bounded package output allocation failed: {error}"
+                ))
+            })?;
+        }
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
     }
@@ -245,8 +487,13 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
     pub fn new() -> Self {
         Self {
             zip_writer: StreamingArchiveWriter::new(),
+            limits: PackageWriterLimits::default(),
             mimetype: None,
             manifest_entries: Vec::new(),
+            manifest_paths: HashSet::new(),
+            member_paths: HashSet::new(),
+            manifest_metadata_bytes: 0,
+            archive_entry_count: 0,
             manifest_version: "1.3".to_string(),
             wrote_any_entry: false,
             wrote_mimetype: false,
@@ -261,6 +508,12 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
     pub fn new_bounded(limit: usize) -> PackageWriter<BoundedBytes> {
         PackageWriter::with_writer(BoundedBytes::new(limit))
     }
+
+    /// Create an in-memory writer with explicit finite ZIP transport limits.
+    #[must_use]
+    pub fn new_with_limits(limits: PackageWriterLimits) -> Self {
+        Self::with_writer_and_limits(io::Cursor::new(Vec::new()), limits)
+    }
 }
 
 impl Default for PackageWriter<io::Cursor<Vec<u8>>> {
@@ -272,10 +525,21 @@ impl Default for PackageWriter<io::Cursor<Vec<u8>>> {
 impl<W: Write> PackageWriter<W> {
     /// Create a package writer over an arbitrary output sink.
     pub fn with_writer(writer: W) -> Self {
+        Self::with_writer_and_limits(writer, PackageWriterLimits::default())
+    }
+
+    /// Create a package writer over an arbitrary sink with explicit finite
+    /// ZIP transport limits.
+    pub fn with_writer_and_limits(writer: W, limits: PackageWriterLimits) -> Self {
         Self {
-            zip_writer: StreamingArchiveWriter::with_writer(writer),
+            zip_writer: StreamingArchiveWriter::with_writer_and_limits(writer, limits),
+            limits,
             mimetype: None,
             manifest_entries: Vec::new(),
+            manifest_paths: HashSet::new(),
+            member_paths: HashSet::new(),
+            manifest_metadata_bytes: 0,
+            archive_entry_count: 0,
             manifest_version: "1.3".to_string(),
             wrote_any_entry: false,
             wrote_mimetype: false,
@@ -366,31 +630,340 @@ impl<W: Write> PackageWriter<W> {
     /// Returns an error when the MIME type has already been written, another
     /// package entry was written first, or the archive write fails.
     pub fn set_mimetype(&mut self, mimetype: &str) -> Result<()> {
-        if self.wrote_mimetype {
-            return Err(Error::InvalidFormat("MIME type already set".to_string()));
-        }
-        if self.wrote_any_entry {
-            return Err(Error::InvalidFormat(
-                "Cannot set MIME type after writing other files".to_string(),
-            ));
-        }
+        self.validate_mimetype_publication(mimetype)
+            .map_err(PackageWriterError::into_core_error)?;
 
-        self.mimetype = Some(mimetype.to_string());
-
-        self.zip_writer
-            .write_stored("mimetype", mimetype.as_bytes())
-            .map_err(|e| Error::ZipError(e.to_string()))?;
-        self.wrote_any_entry = true;
-        self.wrote_mimetype = true;
-
-        self.manifest_entries.push(ManifestEntry {
+        let entry = ManifestEntry {
             full_path: "/".to_string(),
             media_type: mimetype.to_string(),
             size: None,
             encryption: None,
-        });
+        };
+        let entry_bytes = self
+            .validate_manifest_candidate(&entry)
+            .map_err(PackageWriterError::into_core_error)?;
 
+        self.zip_writer
+            .write_stored("mimetype", mimetype.as_bytes())
+            .map_err(|e| Error::ZipError(e.to_string()))?;
+
+        self.mimetype = Some(mimetype.to_string());
+        self.wrote_any_entry = true;
+        self.wrote_mimetype = true;
+        self.archive_entry_count += 1;
+        self.member_paths.insert("mimetype".to_string());
+        self.record_manifest_entry(entry, entry_bytes);
         Ok(())
+    }
+
+    /// Set the MIME type using the typed sequential publication error.
+    ///
+    /// This is the caller-owned-sink counterpart to [`Self::set_mimetype`].
+    /// It validates the MIME metadata and all bounded bookkeeping before the
+    /// `mimetype` local header is emitted; sink and archive failures retain
+    /// the original ZIP error as their source.
+    pub fn set_mimetype_streaming(&mut self, mimetype: &str) -> PackageWriterResult<()> {
+        self.validate_mimetype_publication(mimetype)?;
+
+        let entry = ManifestEntry {
+            full_path: "/".to_string(),
+            media_type: mimetype.to_string(),
+            size: None,
+            encryption: None,
+        };
+        let entry_bytes = self.validate_manifest_candidate(&entry)?;
+
+        if let Err(error) = self
+            .zip_writer
+            .write_stored("mimetype", mimetype.as_bytes())
+        {
+            return Err(self.map_archive_error(error));
+        }
+
+        self.mimetype = Some(mimetype.to_string());
+        self.wrote_any_entry = true;
+        self.wrote_mimetype = true;
+        self.archive_entry_count += 1;
+        self.member_paths.insert("mimetype".to_string());
+        self.record_manifest_entry(entry, entry_bytes);
+        Ok(())
+    }
+
+    fn validate_mimetype_publication(&self, mimetype: &str) -> PackageWriterResult<()> {
+        if self.wrote_mimetype {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "MIME type already set".to_string(),
+            )));
+        }
+        if self.wrote_any_entry {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "Cannot set MIME type after writing other files".to_string(),
+            )));
+        }
+        Self::validate_media_type(mimetype, false, "MIME type").map_err(PackageWriterError::Core)
+    }
+
+    fn validate_media_type(value: &str, allow_empty: bool, field: &str) -> Result<()> {
+        if allow_empty && value.is_empty() {
+            return Ok(());
+        }
+        if value.is_empty() || value.len() > MAX_MANIFEST_TEXT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODF {field} must be non-empty and at most {MAX_MANIFEST_TEXT_BYTES} bytes"
+            )));
+        }
+        if !value.is_ascii()
+            || value
+                .chars()
+                .any(|character| character.is_control() || character.is_whitespace())
+        {
+            return Err(Error::InvalidFormat(format!(
+                "ODF {field} must be ASCII and contain no whitespace or control characters"
+            )));
+        }
+
+        let mut parts = value.split('/');
+        let top_level = parts.next().unwrap_or_default();
+        let subtype = parts.next().unwrap_or_default();
+        let valid_token = |token: &str| {
+            !token.is_empty()
+                && token.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric()
+                        || matches!(
+                            byte,
+                            b'!' | b'#'
+                                | b'$'
+                                | b'%'
+                                | b'&'
+                                | b'\''
+                                | b'*'
+                                | b'+'
+                                | b'-'
+                                | b'.'
+                                | b'^'
+                                | b'_'
+                                | b'`'
+                                | b'|'
+                                | b'~'
+                        )
+                })
+        };
+        if !valid_token(top_level) || !valid_token(subtype) || parts.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "ODF {field} must contain exactly one valid type/subtype pair"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_manifest_version(value: &str) -> Result<()> {
+        if value.is_empty() || value.len() > MAX_MANIFEST_TEXT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODF manifest version must be non-empty and at most {MAX_MANIFEST_TEXT_BYTES} bytes"
+            )));
+        }
+        if value.chars().any(char::is_control) {
+            return Err(Error::InvalidFormat(
+                "ODF manifest version contains a control character".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_member_path(&self, path: &str, allow_directory: bool) -> Result<()> {
+        if path.is_empty() {
+            return Err(Error::InvalidFormat(
+                "ODF member path must not be empty".to_string(),
+            ));
+        }
+        if path == "/" {
+            return Err(Error::InvalidFormat(
+                "ODF member path must be relative and non-root".to_string(),
+            ));
+        }
+        if !allow_directory && path.ends_with('/') {
+            return Err(Error::InvalidFormat(
+                "ODF file member path must not end with '/'".to_string(),
+            ));
+        }
+        // The shared ODF validator is stricter than ZIP's normalization: it
+        // rejects URI aliases (`?`, `#`, percent escapes, dot segments, and
+        // separators) before a raw member name can reach the transport.
+        validate_manifest_path(path)?;
+        if path.len() as u64 > self.limits.max_member_name_bytes {
+            return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed: path.len() as u64,
+                limit: self.limits.max_member_name_bytes,
+                scope: std::sync::Arc::from("ODF member name"),
+            }));
+        }
+        Ok(())
+    }
+
+    fn is_reserved_admin_path(path: &str) -> bool {
+        matches!(
+            path,
+            "mimetype" | "manifest.xml" | "META-INF" | "META-INF/" | MANIFEST_PATH
+        ) || (path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
+    }
+
+    fn is_document_signature_path(path: &str) -> bool {
+        path.starts_with("META-INF/") && path.ends_with("signatures.xml")
+    }
+
+    fn is_reserved_write_path(path: &str) -> bool {
+        Self::is_reserved_admin_path(path) && !Self::is_document_signature_path(path)
+    }
+
+    fn validate_reader_path(&self, path: &str) -> PackageWriterResult<()> {
+        let path_bytes = u64::try_from(path.len()).unwrap_or(u64::MAX);
+        if path_bytes > self.limits.max_member_name_bytes {
+            return Err(self.manifest_limit_error(
+                PackageWriterLimitResource::MemberNameBytes,
+                path_bytes,
+                self.limits.max_member_name_bytes,
+            ));
+        }
+        self.validate_member_path(path, false)
+            .map_err(PackageWriterError::Core)?;
+        if Self::is_reserved_admin_path(path) {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                "ODF reader publication reserves administrative member '{path}'"
+            ))));
+        }
+        Ok(())
+    }
+
+    fn manifest_limit_error(
+        &self,
+        resource: PackageWriterLimitResource,
+        actual: u64,
+        maximum: u64,
+    ) -> PackageWriterError {
+        let limit = PackageWriterLimitExceeded {
+            resource,
+            actual,
+            maximum,
+        };
+        let source = Box::new(PackageWriterError::Core(Error::InvalidFormat(
+            limit.to_string(),
+        )));
+        PackageWriterError::LimitExceeded {
+            written: self.zip_writer.output_bytes(),
+            limit,
+            source,
+        }
+    }
+
+    fn manifest_fixed_metadata_bytes(&self) -> Result<u64> {
+        let mut prefix = String::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version=""#,
+        );
+        prefix.push_str(&escape_xml(&self.manifest_version));
+        prefix.push('>');
+        let bytes = prefix
+            .len()
+            .checked_add("</manifest:manifest>".len())
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODF manifest metadata size overflow".to_string())
+            })?;
+        u64::try_from(bytes)
+            .map_err(|_| Error::InvalidFormat("ODF manifest metadata is too large".to_string()))
+    }
+
+    fn manifest_entry_metadata_bytes(entry: &ManifestEntry, version: &str) -> Result<u64> {
+        let mut xml = String::new();
+        let estimate = entry
+            .full_path
+            .len()
+            .saturating_add(entry.media_type.len())
+            .saturating_add(1_024);
+        xml.try_reserve(estimate)
+            .map_err(|source| Error::Allocation {
+                resource: "ODF manifest entry metadata",
+                source,
+            })?;
+        Self::write_manifest_entry(&mut xml, entry, version);
+        u64::try_from(xml.len())
+            .map_err(|_| Error::InvalidFormat("ODF manifest metadata is too large".to_string()))
+    }
+
+    fn validate_manifest_candidate(&self, entry: &ManifestEntry) -> PackageWriterResult<u64> {
+        if entry.full_path == "/" {
+            Self::validate_media_type(&entry.media_type, false, "MIME type")
+                .map_err(PackageWriterError::Core)?;
+        } else {
+            if Self::is_reserved_write_path(&entry.full_path) {
+                return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                    "ODF manifest path '{}' is reserved for generated package metadata",
+                    entry.full_path
+                ))));
+            }
+            self.validate_member_path(&entry.full_path, entry.full_path.ends_with('/'))
+                .map_err(PackageWriterError::Core)?;
+            Self::validate_media_type(&entry.media_type, true, "manifest media type")
+                .map_err(PackageWriterError::Core)?;
+        }
+        if self.manifest_paths.contains(&entry.full_path)
+            || self.member_paths.contains(&entry.full_path)
+        {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                "ODF manifest/member path collision: '{}'",
+                entry.full_path
+            ))));
+        }
+
+        let next_entries = self.manifest_entries.len().checked_add(1).ok_or_else(|| {
+            PackageWriterError::Core(Error::InvalidFormat(
+                "ODF manifest entry count overflow".to_string(),
+            ))
+        })?;
+        let next_entries_u64 = u64::try_from(next_entries).unwrap_or(u64::MAX);
+        let maximum_entries = u64::try_from(self.limits.max_entries).unwrap_or(u64::MAX);
+        if next_entries > self.limits.max_entries {
+            return Err(self.manifest_limit_error(
+                PackageWriterLimitResource::FileCount,
+                next_entries_u64,
+                maximum_entries,
+            ));
+        }
+
+        let entry_bytes = Self::manifest_entry_metadata_bytes(entry, &self.manifest_version)
+            .map_err(PackageWriterError::Core)?;
+        let fixed_bytes = self
+            .manifest_fixed_metadata_bytes()
+            .map_err(PackageWriterError::Core)?;
+        let next_metadata = self
+            .manifest_metadata_bytes
+            .checked_add(entry_bytes)
+            .and_then(|bytes| fixed_bytes.checked_add(bytes))
+            .ok_or_else(|| {
+                PackageWriterError::Core(Error::InvalidFormat(
+                    "ODF manifest metadata size overflow".to_string(),
+                ))
+            })?;
+        if next_metadata > self.limits.max_metadata_bytes {
+            return Err(self.manifest_limit_error(
+                PackageWriterLimitResource::MetadataBytes,
+                next_metadata,
+                self.limits.max_metadata_bytes,
+            ));
+        }
+        Ok(entry_bytes)
+    }
+
+    fn record_manifest_entry(&mut self, entry: ManifestEntry, entry_bytes: u64) {
+        self.manifest_metadata_bytes = self.manifest_metadata_bytes.saturating_add(entry_bytes);
+        let inserted = self.manifest_paths.insert(entry.full_path.clone());
+        debug_assert!(inserted);
+        self.manifest_entries.push(entry);
+    }
+
+    fn record_member_path(&mut self, path: &str) {
+        let inserted = self.member_paths.insert(path.to_string());
+        debug_assert!(inserted);
+        self.archive_entry_count += 1;
     }
 
     /// Add a file to the package
@@ -454,6 +1027,105 @@ impl<W: Write> PackageWriter<W> {
         self.write_file(path, content, media_type, PayloadOrigin::AuthoredOrChanged)
     }
 
+    /// Add an opaque, non-XML file by consuming a reader incrementally.
+    ///
+    /// The reader is not retained after this method returns. The member uses
+    /// Deflate compression, and the ZIP transport applies its configured
+    /// finite entry, aggregate, metadata, and output limits.
+    ///
+    /// XML-classified members, encryption, and document signing are refused
+    /// before a new ZIP local header is emitted. A source or sink failure
+    /// permanently poisons this writer; the returned error reports accepted
+    /// output bytes when publication had already started.
+    pub fn add_file_reader<R: Read>(&mut self, path: &str, reader: R) -> PackageWriterResult<()> {
+        let media_type = Self::guess_media_type(path);
+        self.add_file_reader_with_media_type(path, reader, media_type)
+    }
+
+    /// Add an opaque, non-XML file by consuming a reader incrementally with an
+    /// explicit manifest media type.
+    pub fn add_file_reader_with_media_type<R: Read>(
+        &mut self,
+        path: &str,
+        reader: R,
+        media_type: &str,
+    ) -> PackageWriterResult<()> {
+        self.add_file_reader_with_media_type_and_compression(
+            path,
+            reader,
+            media_type,
+            PackageCompression::Deflated,
+        )
+    }
+
+    /// Add an opaque, non-XML file by consuming a reader incrementally with an
+    /// explicit media type and ZIP compression method.
+    pub fn add_file_reader_with_media_type_and_compression<R: Read>(
+        &mut self,
+        path: &str,
+        reader: R,
+        media_type: &str,
+        compression: PackageCompression,
+    ) -> PackageWriterResult<()> {
+        self.validate_reader_publication(path, media_type)?;
+
+        let entry = ManifestEntry {
+            full_path: path.to_string(),
+            media_type: media_type.to_string(),
+            size: None,
+            encryption: None,
+        };
+        let entry_bytes = self.validate_manifest_candidate(&entry)?;
+
+        let result = match compression {
+            PackageCompression::Stored => self.zip_writer.write_stored_stream(path, reader),
+            PackageCompression::Deflated => self.zip_writer.write_deflated_stream(path, reader),
+        };
+        if let Err(error) = result {
+            return Err(self.map_archive_error(error));
+        }
+
+        self.record_manifest_entry(entry, entry_bytes);
+        self.wrote_any_entry = true;
+        self.record_member_path(path);
+        if !path.starts_with("META-INF/") {
+            self.wrote_payload_entry = true;
+        }
+        Ok(())
+    }
+
+    fn validate_reader_publication(&self, path: &str, media_type: &str) -> PackageWriterResult<()> {
+        self.validate_reader_path(path)?;
+        if !self.wrote_mimetype {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "MIME type not set".to_string(),
+            )));
+        }
+        Self::validate_media_type(media_type, false, "manifest media type")
+            .map_err(PackageWriterError::Core)?;
+        if xml_minifier::audit::package::is_xml_part(path, media_type) {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                "ODF reader publication rejects XML member '{path}'; use add_file() or add_file_with_media_type()"
+            ))));
+        }
+        if self.encryption.is_some() {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "ODF reader publication does not support encryption".to_string(),
+            )));
+        }
+        if self.document_signer.is_some() {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "ODF reader publication does not support document signing".to_string(),
+            )));
+        }
+        if self.member_paths.contains(path) || self.manifest_paths.contains(path) {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(format!(
+                "ODF manifest/member path collision: '{path}'"
+            ))));
+        }
+        Ok(())
+    }
+
     fn write_file(
         &mut self,
         path: &str,
@@ -461,36 +1133,60 @@ impl<W: Write> PackageWriter<W> {
         media_type: &str,
         origin: PayloadOrigin,
     ) -> Result<()> {
+        self.validate_member_path(path, false)?;
+        if Self::is_reserved_write_path(path) {
+            return Err(Error::InvalidFormat(format!(
+                "ODF member path '{path}' is reserved for generated package metadata"
+            )));
+        }
+        Self::validate_media_type(media_type, true, "manifest media type")?;
         if matches!(origin, PayloadOrigin::AuthoredOrChanged) {
             Self::validate_authored_xml(path, content, media_type)?;
         }
+        // Validate path/media/collision/count/manifest bookkeeping before any
+        // encryption work can materialize a second payload buffer. The final
+        // encrypted descriptor is checked again below because it contributes
+        // additional bounded manifest metadata.
+        let mut entry = ManifestEntry {
+            full_path: path.to_string(),
+            media_type: media_type.to_string(),
+            size: None,
+            encryption: None,
+        };
+        let mut entry_bytes = self
+            .validate_manifest_candidate(&entry)
+            .map_err(PackageWriterError::into_core_error)?;
         let encrypt = self
             .encryption
             .as_ref()
             .filter(|_| !path.starts_with("META-INF/"));
-        let (size, encryption) = if let Some(settings) = encrypt {
+        let encrypted_content = if let Some(settings) = encrypt {
             let (ciphertext, descriptor) =
                 encrypt_entry(content, settings.password.as_str(), settings.profile)?;
-            self.zip_writer
-                .write_stored(path, &ciphertext)
-                .map_err(|e| Error::ZipError(e.to_string()))?;
             let plaintext_size = u64::try_from(content.len()).map_err(|error| {
                 Error::InvalidFormat(format!("ODF plaintext entry is too large: {error}"))
             })?;
-            (Some(plaintext_size), Some(descriptor))
+            entry.size = Some(plaintext_size);
+            entry.encryption = Some(descriptor);
+            entry_bytes = self
+                .validate_manifest_candidate(&entry)
+                .map_err(PackageWriterError::into_core_error)?;
+            Some(ciphertext)
+        } else {
+            None
+        };
+        if let Some(ciphertext) = encrypted_content {
+            self.zip_writer
+                .write_stored(path, &ciphertext)
+                .map_err(|e| Error::ZipError(e.to_string()))?;
         } else {
             self.zip_writer
                 .write_deflated(path, content)
                 .map_err(|e| Error::ZipError(e.to_string()))?;
-            (None, None)
         };
-        self.manifest_entries.push(ManifestEntry {
-            full_path: path.to_string(),
-            media_type: media_type.to_string(),
-            size,
-            encryption,
-        });
+        self.record_manifest_entry(entry, entry_bytes);
         self.wrote_any_entry = true;
+        self.record_member_path(path);
         if !path.starts_with("META-INF/") {
             self.wrote_payload_entry = true;
         }
@@ -595,13 +1291,24 @@ impl<W: Write> PackageWriter<W> {
                 "Invalid manifest-only path".to_string(),
             ));
         }
+        if Self::is_reserved_admin_path(path) {
+            return Err(Error::InvalidFormat(format!(
+                "ODF manifest-only path '{path}' is reserved for generated package metadata or signing"
+            )));
+        }
+        self.validate_member_path(path, path.ends_with('/'))?;
+        Self::validate_media_type(media_type, true, "manifest media type")?;
 
-        self.manifest_entries.push(ManifestEntry {
+        let entry = ManifestEntry {
             full_path: path.to_string(),
             media_type: media_type.to_string(),
             size: None,
             encryption: None,
-        });
+        };
+        let entry_bytes = self
+            .validate_manifest_candidate(&entry)
+            .map_err(PackageWriterError::into_core_error)?;
+        self.record_manifest_entry(entry, entry_bytes);
         Ok(())
     }
 
@@ -653,7 +1360,7 @@ impl<W: Write> PackageWriter<W> {
     /// Returns an error when the path is not a safe relative directory or the
     /// manifest entry cannot be added.
     pub fn add_manifest_directory(&mut self, path: &str, media_type: &str) -> Result<()> {
-        if !path.ends_with('/') || path.starts_with('/') || path.contains("..") {
+        if !path.ends_with('/') || path == "/" {
             return Err(Error::InvalidFormat(
                 "invalid embedded-object manifest directory".to_string(),
             ));
@@ -711,30 +1418,42 @@ impl<W: Write> PackageWriter<W> {
             .get_file("META-INF/manifest.xml")
             .or_else(|_| source.get_file("manifest.xml"))?;
         if let Some(version) = source_manifest_version(&bytes)? {
+            Self::validate_manifest_version(&version)?;
             self.manifest_version = version;
         }
         Ok(())
     }
 
     /// Generate the manifest.xml content
-    fn generate_manifest(&self) -> String {
-        let mut manifest = String::from(
+    fn generate_manifest(&self) -> Result<String> {
+        let total_bytes = self
+            .manifest_fixed_metadata_bytes()?
+            .checked_add(self.manifest_metadata_bytes)
+            .ok_or_else(|| {
+                Error::InvalidFormat("ODF manifest metadata size overflow".to_string())
+            })?;
+        let capacity = usize::try_from(total_bytes)
+            .map_err(|_| Error::InvalidFormat("ODF manifest metadata is too large".to_string()))?;
+        let mut manifest = String::new();
+        manifest
+            .try_reserve(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "ODF manifest metadata",
+                source,
+            })?;
+        manifest.push_str(
             r#"<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version=""#,
         );
-        manifest.push_str(&self.manifest_version);
+        manifest.push_str(&escape_xml(&self.manifest_version));
         manifest.push_str("\">");
 
         // Add manifest entries
-        let mut seen_paths: HashSet<&str> = HashSet::with_capacity(self.manifest_entries.len());
         for entry in &self.manifest_entries {
-            if !seen_paths.insert(entry.full_path.as_str()) {
-                continue;
-            }
             Self::write_manifest_entry(&mut manifest, entry, &self.manifest_version);
         }
 
         manifest.push_str("</manifest:manifest>");
-        manifest
+        Ok(manifest)
     }
 
     /// Guess media type from file path
@@ -760,6 +1479,178 @@ impl<W: Write> PackageWriter<W> {
         }
     }
 
+    fn map_archive_error(&self, error: soapberry_zip::Error) -> PackageWriterError {
+        let poisoned = self.zip_writer.is_poisoned();
+        let written = self.zip_writer.output_bytes();
+        let limit = self
+            .zip_writer
+            .last_limit()
+            .map(Self::map_streaming_limit)
+            .or_else(|| Self::map_zip_limit(&error));
+        let source = PackageWriterError::Archive(error);
+        Self::map_stream_failure(
+            source,
+            if poisoned || limit.is_some() {
+                written
+            } else {
+                0
+            },
+            limit,
+        )
+    }
+
+    fn map_archive_failure(failure: StreamingArchiveFailure) -> PackageWriterError {
+        let written = failure.progress().output_bytes();
+        let limit = failure
+            .limit()
+            .map(Self::map_streaming_limit)
+            .or_else(|| Self::map_zip_limit(failure.error()));
+        Self::map_stream_failure(PackageWriterError::ArchiveFailure(failure), written, limit)
+    }
+
+    fn map_streaming_limit(limit: StreamingLimitExceeded) -> PackageWriterLimitExceeded {
+        let resource = match limit.resource() {
+            StreamingLimitResource::CompressedBytes => PackageWriterLimitResource::CompressedSize,
+            StreamingLimitResource::OutputBytes => PackageWriterLimitResource::OutputBytes,
+            _ => PackageWriterLimitResource::Other,
+        };
+        PackageWriterLimitExceeded {
+            resource,
+            actual: limit.actual(),
+            maximum: limit.maximum(),
+        }
+    }
+
+    fn map_zip_limit(error: &soapberry_zip::Error) -> Option<PackageWriterLimitExceeded> {
+        let ZipErrorKind::LimitExceeded {
+            resource,
+            actual,
+            maximum,
+        } = error.kind()
+        else {
+            return None;
+        };
+        let resource = match resource {
+            ZipLimitResource::FileCount => PackageWriterLimitResource::FileCount,
+            ZipLimitResource::MemberNameBytes => PackageWriterLimitResource::MemberNameBytes,
+            ZipLimitResource::MetadataBytes => PackageWriterLimitResource::MetadataBytes,
+            ZipLimitResource::CompressedSize => PackageWriterLimitResource::CompressedSize,
+            ZipLimitResource::EntrySize => PackageWriterLimitResource::EntrySize,
+            ZipLimitResource::TotalSize => PackageWriterLimitResource::TotalSize,
+        };
+        Some(PackageWriterLimitExceeded {
+            resource,
+            actual: *actual,
+            maximum: *maximum,
+        })
+    }
+
+    fn map_stream_error(
+        source: Error,
+        written: u64,
+        limit: Option<PackageWriterLimitExceeded>,
+    ) -> PackageWriterError {
+        Self::map_stream_failure(PackageWriterError::Core(source), written, limit)
+    }
+
+    fn map_stream_failure(
+        source: PackageWriterError,
+        written: u64,
+        limit: Option<PackageWriterLimitExceeded>,
+    ) -> PackageWriterError {
+        let source = Box::new(source);
+        if let Some(limit) = limit {
+            PackageWriterError::LimitExceeded {
+                written,
+                limit,
+                source,
+            }
+        } else if written != 0 {
+            PackageWriterError::IncompleteOutput { written, source }
+        } else {
+            *source
+        }
+    }
+
+    fn validate_finish_publication(&self) -> PackageWriterResult<()> {
+        if !self.wrote_mimetype {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "MIME type not set".to_string(),
+            )));
+        }
+        let fixed_bytes = self
+            .manifest_fixed_metadata_bytes()
+            .map_err(PackageWriterError::Core)?;
+        let manifest_bytes = fixed_bytes
+            .checked_add(self.manifest_metadata_bytes)
+            .ok_or_else(|| {
+                PackageWriterError::Core(Error::InvalidFormat(
+                    "ODF manifest metadata size overflow".to_string(),
+                ))
+            })?;
+        if manifest_bytes > self.limits.max_metadata_bytes {
+            return Err(self.manifest_limit_error(
+                PackageWriterLimitResource::MetadataBytes,
+                manifest_bytes,
+                self.limits.max_metadata_bytes,
+            ));
+        }
+        let next_archive_entries = self.archive_entry_count.checked_add(1).ok_or_else(|| {
+            PackageWriterError::Core(Error::InvalidFormat(
+                "ODF archive entry count overflow".to_string(),
+            ))
+        })?;
+        if next_archive_entries > self.limits.max_entries {
+            return Err(self.manifest_limit_error(
+                PackageWriterLimitResource::FileCount,
+                u64::try_from(next_archive_entries).unwrap_or(u64::MAX),
+                u64::try_from(self.limits.max_entries).unwrap_or(u64::MAX),
+            ));
+        }
+        Ok(())
+    }
+
+    fn finish_into_writer_with_progress(
+        mut self,
+    ) -> PackageWriterResult<(W, Option<crate::signature::DocumentSigner>)> {
+        self.validate_finish_publication()?;
+
+        // Generate and write manifest.
+        let manifest_content = match self.generate_manifest() {
+            Ok(content) => content,
+            Err(error) => {
+                return Err(Self::map_stream_error(
+                    error,
+                    self.zip_writer.output_bytes(),
+                    self.zip_writer.last_limit().map(Self::map_streaming_limit),
+                ));
+            },
+        };
+        if let Err(error) = Self::validate_authored_xml(
+            "META-INF/manifest.xml",
+            manifest_content.as_bytes(),
+            "text/xml",
+        ) {
+            return Err(Self::map_stream_error(
+                error,
+                self.zip_writer.output_bytes(),
+                self.zip_writer.last_limit().map(Self::map_streaming_limit),
+            ));
+        }
+        if let Err(error) = self
+            .zip_writer
+            .write_deflated("META-INF/manifest.xml", manifest_content.as_bytes())
+        {
+            return Err(self.map_archive_error(error));
+        }
+
+        let signer = self.document_signer.take();
+        self.zip_writer
+            .finish_with_progress()
+            .map(|(writer, _progress)| (writer, signer))
+            .map_err(Self::map_archive_failure)
+    }
+
     /// Finish writing the package and return the bytes.
     ///
     /// This method writes the mimetype file, manifest, and finalizes the ZIP archive.
@@ -769,29 +1660,27 @@ impl<W: Write> PackageWriter<W> {
     /// Returns an error if:
     /// - No MIME type has been set
     /// - Writing to the ZIP archive fails
-    fn finish_into_writer(mut self) -> Result<(W, Option<crate::signature::DocumentSigner>)> {
-        if !self.wrote_mimetype {
-            return Err(Error::InvalidFormat("MIME type not set".to_string()));
+    fn finish_into_writer(self) -> Result<(W, Option<crate::signature::DocumentSigner>)> {
+        self.finish_into_writer_with_progress()
+            .map_err(PackageWriterError::into_core_error)
+    }
+
+    /// Finish the package on a caller-owned sequential sink.
+    ///
+    /// This method never signs the package and refuses a configured document
+    /// signer before writing the manifest. If the sink has accepted bytes,
+    /// failures preserve the accepted count in [`PackageWriterError`].
+    pub fn finish_to_writer(self) -> PackageWriterResult<W> {
+        if self.document_signer.is_some() {
+            let source = Error::InvalidFormat(
+                "ODF sequential package output does not support document signing".to_string(),
+            );
+            let written = self.zip_writer.output_bytes();
+            return Err(Self::map_stream_error(source, written, None));
         }
-
-        // Generate and write manifest
-        let manifest_content = self.generate_manifest();
-        Self::validate_authored_xml(
-            "META-INF/manifest.xml",
-            manifest_content.as_bytes(),
-            "text/xml",
-        )?;
-        self.zip_writer
-            .write_deflated("META-INF/manifest.xml", manifest_content.as_bytes())
-            .map_err(|e| Error::ZipError(e.to_string()))?;
-
-        // Finish ZIP archive and return bytes
-        let signer = self.document_signer.take();
-        let writer = self
-            .zip_writer
-            .finish()
-            .map_err(|e| Error::ZipError(e.to_string()))?;
-        Ok((writer, signer))
+        let (writer, signer) = self.finish_into_writer_with_progress()?;
+        debug_assert!(signer.is_none());
+        Ok(writer)
     }
 }
 
@@ -853,7 +1742,7 @@ impl<W: Write> PackageWriter<W> {
         xml.push_str(&escape_xml(&entry.full_path));
         if entry.full_path == "/" {
             xml.push_str("\" manifest:version=\"");
-            xml.push_str(manifest_version);
+            xml.push_str(&escape_xml(manifest_version));
         }
         xml.push_str("\" manifest:media-type=\"");
         xml.push_str(&escape_xml(&entry.media_type));
@@ -1365,7 +2254,7 @@ mod tests {
             .unwrap();
         writer.add_file("content.xml", b"<content/>").unwrap();
 
-        let manifest = writer.generate_manifest();
+        let manifest = writer.generate_manifest().unwrap();
         assert!(manifest.contains("manifest:manifest"));
         assert!(manifest.contains("content.xml"));
         assert!(manifest.contains("text/xml"));
