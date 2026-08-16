@@ -980,12 +980,12 @@ final clean control/candidate revisions are
 `c95e6c6004cbd725c789597566a81c0897ab6915ecd7c274deab222d134b3fd3`.
 Clean CPU-2 release ABBA used 20 warmups and 500 retained samples per tiny,
 large, and payload-heavy shape in each leg. Lifecycle p50/mean/p95 positive-faster deltas are
-`+33.78/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
-`+12.27/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
-`+17.33/+17.09/+16.58` and `+17.80/+17.75/+16.25` payload-heavy. With
+`+33.77/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
+`+12.28/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
+`+17.33/+17.09/+16.58` and `+17.82/+17.75/+16.25` payload-heavy. With
 immediate fingerprint demand, workflow p50/mean/p95 positive-faster deltas are
-`+14.56/+16.34/+22.24`, `+13.90/+15.80/+21.90`,
-`+4.49/+4.82/+10.24`, `+5.82/+5.64/+4.26`,
+`+14.56/+16.34/+22.24`, `+13.89/+15.80/+21.90`,
+`+4.50/+4.82/+10.24`, `+5.83/+5.64/+4.26`,
 `+6.55/+6.41/+6.26`, and `+7.08/+7.08/+6.33` in shape/direction order.
 The isolated patch/apply extension spans about 99.6-99.99% across the reported
 p50/mean/p95 deltas, while its
@@ -993,8 +993,8 @@ deferred first scan is visible at roughly 25.7 us, 164 us, and 8.37-8.39 ms
 for the three candidate shapes.
 
 Same-implementation lifecycle p50/mean drift is control
-`-1.18%/-1.41%`, `+0.26%/-0.42%`, `+0.47%/+0.72%` and candidate
-`-0.33%/-0.75%`, `-1.51%/-1.51%`, `-0.11%/-0.08%` in tiny/large/
+`-1.18%/-1.41%`, `+0.25%/-0.42%`, `+0.48%/+0.72%` and candidate
+`-0.34%/-0.75%`, `-1.50%/-1.51%`, `-0.12%/-0.08%` in tiny/large/
 payload-heavy order. The positive paired directions are not generalized beyond
 the named host/corpus. Final heaptrack records 50,677 allocation calls and
 128.28M peak heap for both revisions, with profiler RSS 145.14M versus

@@ -87,14 +87,14 @@ Positive percentages mean the candidate is faster. Each cell is
 
 | Shape | Positive-faster lifecycle delta | Evidence decision |
 |---|---:|---|
-| tiny | +33.78% / +35.19% / +38.94%  /  +33.21% / +34.76% / +39.67% | retained |
-| large | +12.27% / +12.59% / +17.53%  /  +13.81% / +13.55% / +11.68% | retained |
-| payload-heavy | +17.33% / +17.09% / +16.58%  /  +17.80% / +17.75% / +16.25% | retained |
+| tiny | +33.77% / +35.19% / +38.94%  /  +33.21% / +34.76% / +39.67% | retained |
+| large | +12.28% / +12.59% / +17.53%  /  +13.81% / +13.55% / +11.68% | retained |
+| payload-heavy | +17.33% / +17.09% / +16.58%  /  +17.82% / +17.75% / +16.25% | retained |
 
 The same-implementation lifecycle drift is retained as a host-stability
 disclosure. Control A1 to A2 p50/mean drift is `-1.18%/-1.41%` tiny,
-`+0.26%/-0.42%` large, and `+0.47%/+0.72%` payload-heavy. Candidate B1 to
-B2 drift is `-0.33%/-0.75%`, `-1.51%/-1.51%`, and `-0.11%/-0.08%`,
+`+0.25%/-0.42%` large, and `+0.48%/+0.72%` payload-heavy. Candidate B1 to
+B2 drift is `-0.34%/-0.75%`, `-1.50%/-1.51%`, and `-0.12%/-0.08%`,
 respectively. The paired directions remain positive, and the final
 distributions are substantially tighter, but the result still should not be
 generalized beyond the named host and corpus.
@@ -113,8 +113,8 @@ scan at that point.
 
 With the immediate fingerprint demand included in the explicit workflow, the
 candidate's descriptive p50/mean/p95 positive-faster delta is +14.56% / +16.34% / +22.24% and
-+13.90% / +15.80% / +21.90% for tiny, +4.49% / +4.82% / +10.24% and
-+5.82% / +5.64% / +4.26% for large, and +6.55% / +6.41% / +6.26% and
++13.89% / +15.80% / +21.90% for tiny, +4.50% / +4.82% / +10.24% and
++5.83% / +5.64% / +4.26% for large, and +6.55% / +6.41% / +6.26% and
 +7.08% / +7.08% / +6.33% for payload-heavy in the two paired directions.
 
 ## Guardrails and resource observations

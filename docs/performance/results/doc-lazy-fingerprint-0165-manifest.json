@@ -224,20 +224,20 @@
     {
       "path": "docs/performance/results/doc-lazy-fingerprint-0165-paired-deltas.tsv",
       "role": "derived-statistics",
-      "sha256": "d3a459a1379bfd625583f8a0b32915e5ed014b698ec7d228ef650c8b74a08077",
+      "sha256": "1a00201d0a30599fa6c7d2e41f88cadf3b57f4b885500e214ddfcf9ca215f8bb",
       "bytes": 1627
     },
     {
       "path": "docs/performance/results/doc-lazy-fingerprint-0165-primary-stats.tsv",
       "role": "derived-statistics",
-      "sha256": "ef91cc3d397e795c749dfe70573b30efdb982d7bac8de11a67bb2e22756cc188",
+      "sha256": "1f40f2094f99810d3d9001a697553052b6ee3a2118109f253161d74769762b38",
       "bytes": 10266
     },
     {
       "path": "docs/performance/results/doc-lazy-fingerprint-0165-summary.json",
       "role": "summary",
-      "sha256": "c4b38be3cbd4fabddc0814c009f0e3b9b82b0e53211b9b67a7d42434ccaa75ec",
-      "bytes": 72689
+      "sha256": "b7b5b63fb6b148610b81e55efab1125345e20380b2b72c3570d1e31632648c08",
+      "bytes": 73227
     }
   ]
 }

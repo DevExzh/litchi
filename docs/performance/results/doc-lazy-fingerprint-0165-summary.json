@@ -207,6 +207,14 @@
       }
     ]
   },
+  "phase_statistic_method": {
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "mean": "arithmetic mean",
+    "pooled": "concatenate the four same-shape process vectors before statistics",
+    "phase_share": "use chronologically aligned phase and measured_total vectors; compute phase/measured-lifecycle percentage per sample before statistics",
+    "stability_review_trigger": "report any same-implementation per-leg p50 or mean spread above 5 percent; do not pool different shapes"
+  },
   "primary_metrics": {
     "metric_names": [
       "measured_total_ns",
@@ -241,7 +249,7 @@
             "edit_patch_ns": {
               "samples": 500,
               "min_ns": 163906,
-              "p50_ns": 164408,
+              "p50_ns": 164412,
               "p95_ns": 173879,
               "p99_ns": 184255,
               "max_ns": 222438,
@@ -250,7 +258,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 1093542,
-              "p50_ns": 1153524,
+              "p50_ns": 1153674,
               "p95_ns": 1269914,
               "p99_ns": 1345420,
               "max_ns": 1396661,
@@ -268,7 +276,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 1175093,
-              "p50_ns": 1233465,
+              "p50_ns": 1233559,
               "p95_ns": 1353680,
               "p99_ns": 1428385,
               "max_ns": 1475419,
@@ -277,7 +285,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 1175113,
-              "p50_ns": 1233485,
+              "p50_ns": 1233579,
               "p95_ns": 1353700,
               "p99_ns": 1428416,
               "max_ns": 1475439,
@@ -297,7 +305,7 @@
             "edit_patch_ns": {
               "samples": 500,
               "min_ns": 8316732,
-              "p50_ns": 8363326,
+              "p50_ns": 8363357,
               "p95_ns": 8582910,
               "p99_ns": 9203949,
               "max_ns": 9714873,
@@ -306,7 +314,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 38867332,
-              "p50_ns": 41152713,
+              "p50_ns": 41156352,
               "p95_ns": 43521739,
               "p99_ns": 45575757,
               "max_ns": 48659712,
@@ -315,7 +323,7 @@
             "same_lineage_apply_ns": {
               "samples": 500,
               "min_ns": 4197400,
-              "p50_ns": 4241561,
+              "p50_ns": 4241631,
               "p95_ns": 4315013,
               "p99_ns": 4646751,
               "max_ns": 4728624,
@@ -324,7 +332,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 43103155,
-              "p50_ns": 45395400,
+              "p50_ns": 45397089,
               "p95_ns": 47778343,
               "p99_ns": 50196372,
               "max_ns": 52955608,
@@ -333,7 +341,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 43103416,
-              "p50_ns": 45395581,
+              "p50_ns": 45397380,
               "p95_ns": 47778924,
               "p99_ns": 50196502,
               "max_ns": 52955999,
@@ -362,7 +370,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 76426,
-              "p50_ns": 79160,
+              "p50_ns": 79164,
               "p95_ns": 100689,
               "p99_ns": 114499,
               "max_ns": 217210,
@@ -380,7 +388,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 88793,
-              "p50_ns": 91597,
+              "p50_ns": 91607,
               "p95_ns": 113036,
               "p99_ns": 127055,
               "max_ns": 229587,
@@ -389,7 +397,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 88823,
-              "p50_ns": 91617,
+              "p50_ns": 91627,
               "p95_ns": 113056,
               "p99_ns": 127075,
               "max_ns": 229607,
@@ -422,7 +430,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 1109563,
-              "p50_ns": 1156497,
+              "p50_ns": 1156557,
               "p95_ns": 1198686,
               "p99_ns": 1246742,
               "max_ns": 1282402,
@@ -440,7 +448,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 1188341,
-              "p50_ns": 1235787,
+              "p50_ns": 1235977,
               "p95_ns": 1277685,
               "p99_ns": 1325461,
               "max_ns": 1361080,
@@ -449,7 +457,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 1188361,
-              "p50_ns": 1235807,
+              "p50_ns": 1236002,
               "p95_ns": 1277705,
               "p99_ns": 1325481,
               "max_ns": 1361100,
@@ -469,7 +477,7 @@
             "edit_patch_ns": {
               "samples": 500,
               "min_ns": 8324157,
-              "p50_ns": 8376199,
+              "p50_ns": 8376534,
               "p95_ns": 8517425,
               "p99_ns": 8728828,
               "max_ns": 9348302,
@@ -478,7 +486,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 40035077,
-              "p50_ns": 41345455,
+              "p50_ns": 41354792,
               "p95_ns": 43605663,
               "p99_ns": 44957087,
               "max_ns": 56848675,
@@ -487,7 +495,7 @@
             "same_lineage_apply_ns": {
               "samples": 500,
               "min_ns": 4210805,
-              "p50_ns": 4248818,
+              "p50_ns": 4249074,
               "p95_ns": 4318946,
               "p99_ns": 4410341,
               "max_ns": 4695756,
@@ -496,7 +504,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 44262016,
-              "p50_ns": 45616058,
+              "p50_ns": 45616566,
               "p95_ns": 47917017,
               "p99_ns": 49367428,
               "max_ns": 61171937,
@@ -505,7 +513,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 44262046,
-              "p50_ns": 45616108,
+              "p50_ns": 45616611,
               "p95_ns": 47917047,
               "p99_ns": 49367448,
               "max_ns": 61171967,
@@ -534,7 +542,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 75796,
-              "p50_ns": 78228,
+              "p50_ns": 78233,
               "p95_ns": 96684,
               "p99_ns": 113828,
               "max_ns": 133455,
@@ -594,7 +602,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 981286,
-              "p50_ns": 1011989,
+              "p50_ns": 1012043,
               "p95_ns": 1047266,
               "p99_ns": 1091308,
               "max_ns": 1157149,
@@ -612,7 +620,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 981326,
-              "p50_ns": 1012029,
+              "p50_ns": 1012088,
               "p95_ns": 1047306,
               "p99_ns": 1091348,
               "max_ns": 1157189,
@@ -621,7 +629,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 1147194,
-              "p50_ns": 1178058,
+              "p50_ns": 1178108,
               "p95_ns": 1215020,
               "p99_ns": 1255405,
               "max_ns": 1321536,
@@ -632,7 +640,7 @@
             "deferred_fingerprint_ns": {
               "samples": 500,
               "min_ns": 8309791,
-              "p50_ns": 8363825,
+              "p50_ns": 8363865,
               "p95_ns": 8596887,
               "p99_ns": 8879107,
               "max_ns": 9794110,
@@ -650,7 +658,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 32909855,
-              "p50_ns": 34020952,
+              "p50_ns": 34025774,
               "p95_ns": 36305331,
               "p99_ns": 38360021,
               "max_ns": 39464522,
@@ -659,7 +667,7 @@
             "same_lineage_apply_ns": {
               "samples": 500,
               "min_ns": 450,
-              "p50_ns": 832,
+              "p50_ns": 836,
               "p95_ns": 1072,
               "p99_ns": 1171,
               "max_ns": 1192,
@@ -668,7 +676,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 32910396,
-              "p50_ns": 34021883,
+              "p50_ns": 34026720,
               "p95_ns": 36306522,
               "p99_ns": 38361123,
               "max_ns": 39465453,
@@ -677,7 +685,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 41246117,
-              "p50_ns": 42421929,
+              "p50_ns": 42422558,
               "p95_ns": 44786513,
               "p99_ns": 46742603,
               "max_ns": 47811103,
@@ -706,7 +714,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 50530,
-              "p50_ns": 52423,
+              "p50_ns": 52428,
               "p95_ns": 61484,
               "p99_ns": 69796,
               "max_ns": 93219,
@@ -724,7 +732,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 50570,
-              "p50_ns": 52473,
+              "p50_ns": 52478,
               "p95_ns": 61524,
               "p99_ns": 69856,
               "max_ns": 93259,
@@ -733,7 +741,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 76316,
-              "p50_ns": 78279,
+              "p50_ns": 78283,
               "p95_ns": 87912,
               "p99_ns": 95612,
               "max_ns": 119014,
@@ -766,7 +774,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 950714,
-              "p50_ns": 996727,
+              "p50_ns": 996827,
               "p95_ns": 1058702,
               "p99_ns": 1129791,
               "max_ns": 1472163,
@@ -784,7 +792,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 950754,
-              "p50_ns": 996767,
+              "p50_ns": 996867,
               "p95_ns": 1058772,
               "p99_ns": 1129831,
               "max_ns": 1472603,
@@ -793,7 +801,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 1114580,
-              "p50_ns": 1163878,
+              "p50_ns": 1163883,
               "p95_ns": 1223320,
               "p99_ns": 1293837,
               "max_ns": 1652663,
@@ -804,7 +812,7 @@
             "deferred_fingerprint_ns": {
               "samples": 500,
               "min_ns": 8318540,
-              "p50_ns": 8379355,
+              "p50_ns": 8379405,
               "p95_ns": 8511768,
               "p99_ns": 8788840,
               "max_ns": 9349366,
@@ -813,7 +821,7 @@
             "edit_patch_ns": {
               "samples": 500,
               "min_ns": 40,
-              "p50_ns": 732,
+              "p50_ns": 736,
               "p95_ns": 1352,
               "p99_ns": 1473,
               "max_ns": 1742,
@@ -822,7 +830,7 @@
             "measured_total_ns": {
               "samples": 500,
               "min_ns": 32721019,
-              "p50_ns": 33984945,
+              "p50_ns": 33986152,
               "p95_ns": 36517774,
               "p99_ns": 38790935,
               "max_ns": 41563574,
@@ -840,7 +848,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 32721730,
-              "p50_ns": 33985546,
+              "p50_ns": 33986848,
               "p95_ns": 36518626,
               "p99_ns": 38792016,
               "max_ns": 41564596,
@@ -849,7 +857,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 41072766,
-              "p50_ns": 42387006,
+              "p50_ns": 42387056,
               "p95_ns": 44885903,
               "p99_ns": 47508807,
               "max_ns": 50072648,
@@ -896,7 +904,7 @@
             "workflow_no_diagnostic_ns": {
               "samples": 500,
               "min_ns": 50529,
-              "p50_ns": 52283,
+              "p50_ns": 52287,
               "p95_ns": 58370,
               "p99_ns": 69195,
               "max_ns": 93720,
@@ -905,7 +913,7 @@
             "workflow_with_fingerprint_demand_ns": {
               "samples": 500,
               "min_ns": 76255,
-              "p50_ns": 78099,
+              "p50_ns": 78109,
               "p95_ns": 85258,
               "p99_ns": 94942,
               "max_ns": 119446,
@@ -944,7 +952,7 @@
       },
       "measured_total_ns": {
         "a1_to_b1_percent": {
-          "p50": 12.27,
+          "p50": 12.28,
           "mean": 12.59,
           "p95": 17.53
         },
@@ -973,19 +981,19 @@
           "p95": 22.63
         },
         "a2_to_b2_percent": {
-          "p50": 19.34,
+          "p50": 19.35,
           "mean": 19.09,
           "p95": 17.13
         }
       },
       "workflow_with_fingerprint_demand_ns": {
         "a1_to_b1_percent": {
-          "p50": 4.49,
+          "p50": 4.50,
           "mean": 4.82,
           "p95": 10.24
         },
         "a2_to_b2_percent": {
-          "p50": 5.82,
+          "p50": 5.83,
           "mean": 5.64,
           "p95": 4.26
         }
@@ -994,12 +1002,12 @@
     "payload-heavy": {
       "deferred_fingerprint_ns": {
         "a1_to_b1_percent": {
-          "p50": -4919797.06,
+          "p50": -4919820.59,
           "mean": -4283070.53,
           "p95": -1868788.48
         },
         "a2_to_b2_percent": {
-          "p50": -20948287.50,
+          "p50": -20948412.50,
           "mean": -19334865.13,
           "p95": -7093040.00
         }
@@ -1023,7 +1031,7 @@
           "p95": 16.58
         },
         "a2_to_b2_percent": {
-          "p50": 17.80,
+          "p50": 17.82,
           "mean": 17.75,
           "p95": 16.25
         }
@@ -1047,7 +1055,7 @@
           "p95": 24.01
         },
         "a2_to_b2_percent": {
-          "p50": 25.50,
+          "p50": 25.49,
           "mean": 25.37,
           "p95": 23.79
         }
@@ -1092,7 +1100,7 @@
       },
       "measured_total_ns": {
         "a1_to_b1_percent": {
-          "p50": 33.78,
+          "p50": 33.77,
           "mean": 35.19,
           "p95": 38.94
         },
@@ -1121,7 +1129,7 @@
           "p95": 45.57
         },
         "a2_to_b2_percent": {
-          "p50": 42.35,
+          "p50": 42.34,
           "mean": 43.40,
           "p95": 46.52
         }
@@ -1133,7 +1141,7 @@
           "p95": 22.24
         },
         "a2_to_b2_percent": {
-          "p50": 13.90,
+          "p50": 13.89,
           "mean": 15.80,
           "p95": 21.90
         }
@@ -1143,36 +1151,36 @@
   "same_implementation_drift_percent": {
     "tiny": {
       "control_a1_to_a2_percent": {
-        "p50": -1.1773623041940373,
+        "p50": -1.1760396139659441,
         "mean": -1.409549134538864,
         "p95": -3.977594374757918
       },
       "candidate_b1_to_b2_percent": {
-        "p50": -0.3261927016767449,
+        "p50": -0.33569848172732125,
         "mean": -0.7546920343876445,
         "p95": -5.129789864029666
       }
     },
     "large": {
       "control_a1_to_a2_percent": {
-        "p50": 0.25773195876288657,
+        "p50": 0.2498972846748735,
         "mean": -0.4246444761830627,
         "p95": -5.608883751183151
       },
       "candidate_b1_to_b2_percent": {
-        "p50": -1.5081191593979777,
+        "p50": -1.5034934286389017,
         "mean": -1.513556461205747,
         "p95": 1.0919861811612332
       }
     },
     "payload-heavy": {
       "control_a1_to_a2_percent": {
-        "p50": 0.46835794276795306,
+        "p50": 0.4821612955395075,
         "mean": 0.7224904523529797,
         "p95": 0.19283236821028682
       },
       "candidate_b1_to_b2_percent": {
-        "p50": -0.10583772023781109,
+        "p50": -0.11644702042633916,
         "mean": -0.0794381465061864,
         "p95": 0.5851564884506906
       }

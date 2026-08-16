@@ -218,12 +218,12 @@ SHA-256 values are
 Both builds were clean exact-revision builds. Clean CPU-2 release ABBA used
 20 warmups and 500 retained samples per shape and leg, retaining 6,000
 lifecycle samples. Descriptive lifecycle p50/mean/p95 positive-faster deltas were
-`+33.78/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
-`+12.27/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
-`+17.33/+17.09/+16.58` and `+17.80/+17.75/+16.25` payload-heavy. With
+`+33.77/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
+`+12.28/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
+`+17.33/+17.09/+16.58` and `+17.82/+17.75/+16.25` payload-heavy. With
 immediate fingerprint demand included, workflow p50/mean/p95 positive-faster deltas are
-`+14.56/+16.34/+22.24` and `+13.90/+15.80/+21.90` tiny,
-`+4.49/+4.82/+10.24` and `+5.82/+5.64/+4.26` large, and
+`+14.56/+16.34/+22.24` and `+13.89/+15.80/+21.90` tiny,
+`+4.50/+4.82/+10.24` and `+5.83/+5.64/+4.26` large, and
 `+6.55/+6.41/+6.26` and `+7.08/+7.08/+6.33` payload-heavy.
 
 The isolated edit-patch/same-lineage-apply extension spans approximately
@@ -243,9 +243,9 @@ revisions, peak heap is 128.28M in both, profiler RSS is 145.14M versus
 These are not operation-only attribution.
 
 The final same-implementation lifecycle p50/mean drift is control
-`-1.18%/-1.41%` tiny, `+0.26%/-0.42%` large, and `+0.47%/+0.72%`
-payload-heavy; candidate drift is `-0.33%/-0.75%`, `-1.51%/-1.51%`, and
-`-0.11%/-0.08%`, respectively. The paired directions remain positive, but
+`-1.18%/-1.41%` tiny, `+0.25%/-0.42%` large, and `+0.48%/+0.72%`
+payload-heavy; candidate drift is `-0.34%/-0.75%`, `-1.50%/-1.51%`, and
+`-0.12%/-0.08%`, respectively. The paired directions remain positive, but
 the result is still limited to the named host and corpus.
 
 The same-implementation drift disclosure and all raw vectors are retained in

@@ -1715,9 +1715,9 @@ independently computed expected source/target FNV-1a fingerprints and four
 additional gates. The final post-rebase comparison is clean at control
 `d6818e290` and candidate `5dd813b1e`: CPU-2 A1/B1/B2/A2 uses 20 warmups and
 500 retained samples per shape (6,000 primary samples) plus 24,000 guard
-samples. Lifecycle p50 positive-faster deltas are +33.78%/+33.21% tiny, +12.27%/+13.81%
-large, and +17.33%/+17.80% payload-heavy; immediate fingerprint-demand
-workflow p50 positive-faster deltas are +14.56%/+13.90%, +4.49%/+5.82%, and
+samples. Lifecycle p50 positive-faster deltas are +33.77%/+33.21% tiny, +12.28%/+13.81%
+large, and +17.33%/+17.82% payload-heavy; immediate fingerprint-demand
+workflow p50 positive-faster deltas are +14.56%/+13.89%, +4.50%/+5.83%, and
 +6.55%/+7.08%. Final DOC guards are noop +78.84%/+79.89% tiny and
 +71.08%/+70.40% large, one-edit +37.23%/+40.81% and +20.45%/+19.79%, while
 DOC open is -3.52%/+0.13% and +0.55%/-1.80%. Neighboring XLS one-edit/open
