@@ -523,13 +523,13 @@ impl Package {
     ) -> Result<NativeTarget, TableLockError> {
         let document = Self::root_document(&self.state.components).map_err(map_read_error)?;
         let sheet_reference = document
-            .sheets
+            .sheet_references()
             .get(sheet_position)
             .ok_or(TableLockError::SheetNotFound)?;
         let sheet_object = self
             .state
             .index
-            .resolve_ref_id(&self.state.components, sheet_reference.identifier)
+            .resolve_ref_id(&self.state.components, sheet_reference.identifier())
             .map_err(map_read_error)?
             .ok_or(TableLockError::InvalidSource)?;
         let owner_message_index = unique_sheet_message_index(sheet_object.messages)?;
@@ -544,7 +544,7 @@ impl Package {
             index: sheet_position,
         };
         let decoded_sheet =
-            super::decode_sheet_payload(sheet_object.messages, path).map_err(map_read_error)?;
+            super::sheet_projection(sheet_object.messages, path).map_err(map_read_error)?;
 
         let mut table_index = 0usize;
         for drawable in decoded_sheet.drawable_infos {
@@ -562,7 +562,7 @@ impl Package {
                 return Ok(NativeTarget {
                     drawable_identifier: drawable.identifier,
                     model_identifier: snapshot.table_model().identifier().get(),
-                    owner_identifier: sheet_reference.identifier,
+                    owner_identifier: sheet_reference.identifier(),
                     owner_component_index,
                     owner_object_index,
                     owner_message_index,
@@ -820,7 +820,7 @@ fn validate_selected_ownership(
     if sheet_object.archive_info.identifier != Some(target.owner_identifier) {
         return Err(TableLockError::InvalidSource);
     }
-    let sheet = super::decode_sheet_payload(&sheet_object.messages, super::SemanticPath::Package)
+    let sheet = super::sheet_projection(&sheet_object.messages, super::SemanticPath::Package)
         .map_err(map_read_error)?;
     if sheet
         .drawable_infos

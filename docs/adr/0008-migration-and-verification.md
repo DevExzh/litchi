@@ -10722,3 +10722,36 @@ close preserved the 500,058-byte candidate and tracked source at SHA-256
 `3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
 This is read-only application acceptance for the focused reader migration,
 not a save/reopen, rendering-fidelity, or additional mutation claim.
+
+## 2026-08-16 Numbers package projection gate
+
+The next Numbers reader slice removes the package reader's eager generated
+decodes for the type-1 document order, type-2/3 sheet ownership, and selected
+rich-text storage diagnostic. The root order is read through the existing
+strict/Buffa `numbers_sheet_order_codec`; sheet names and drawable references
+are read through the bounded Numbers name preflight; and storage fragments are
+validated and materialized through `litchi-iwa-text-wire`'s
+`ValidatedStorage`. The focused package keeps the source-backed graph and
+format-owned semantic errors private; no generated archive value crosses the
+public API.
+
+The permanent gate covers standard and form-based sheets, duplicate and
+missing rooted references, malformed or wrong-wire selected fields,
+strict/Buffa disagreement, malformed storage skip parity, UTF-8 text, exact
+and one-over input/field/work/output/nesting ceilings, aggregate text limits,
+fallible reservation, and failure atomicity. A canonical generated decoder is
+test-only oracle material; production tests must prove that the selected
+reader path remains generated-message-free while the remaining table and
+formula graph debt stays explicit. This slice is not a complete Numbers
+host-exit or whole-graph Buffa claim.
+
+The native gate uses a mode-0444 disposable copy of
+`test-data/iwork/numbers/basic.numbers` in Apple Numbers 14.4 (build
+7043.0.93). It must open as locked without repair, recovery, conversion, or
+warning UI and expose `Sheet 1`, `Table 1`, the 22-by-7 table, the
+`Litchi native Numbers fixture` text marker, and numeric `42`. Focused reread
+must agree on the sheet/table/text/cell projection, and the tracked source
+must remain unopened and byte-identical. This read-only gate establishes
+application acceptance for the selected projection only; it does not claim
+native save fidelity, general rendering, performance, or retirement of the
+migration-host Numbers editor.

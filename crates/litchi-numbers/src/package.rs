@@ -55,9 +55,11 @@ use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{numbers_sheet_order_codec, table_info_codec};
-use litchi_iwa_protos::{tn, tswp};
+use litchi_iwa_text_wire::{
+    RewriteError as TextWireError, RewriteLimits as TextWireLimits, ValidatedStorage,
+    decode_storage_with_limits,
+};
 use plist::stream::{Event as PlistEvent, Reader as PlistReader};
-use prost::Message;
 use thiserror::Error;
 
 use crate::{Document, DocumentError, DocumentLimits, Sheet};
@@ -357,10 +359,6 @@ impl Error {
             path: SemanticPath::StructuredTables,
         }
     }
-
-    fn malformed_payload(_error: prost::DecodeError, path: SemanticPath) -> Self {
-        Self::MalformedPayload { path }
-    }
 }
 
 /// Result returned by native Numbers package operations.
@@ -604,7 +602,7 @@ impl Package {
         validate_numbers_application(&components, options.archive())?;
         let semantic = options.semantic();
         let index = Index::from_components(&components, semantic.max_objects())?;
-        let root = Self::root_document(&components)?;
+        let root = Self::root_sheet_order(&components, semantic)?;
         let sheets = Self::decode_sheets(&components, &index, &root, semantic, true)?;
         let document_limits = DocumentLimits::new(
             semantic.max_sheets(),
@@ -782,30 +780,50 @@ impl Package {
         const STORAGE_TYPES: [u32; 14] = [
             200, 201, 202, 203, 204, 205, 2001, 2002, 2003, 2004, 2005, 2011, 2012, 2022,
         ];
+        let maximum = self.state.options.semantic().max_output_text_bytes();
         let mut text = String::new();
         for object in self.state.components.iter_objects() {
             for message in &object.messages {
                 if !STORAGE_TYPES.contains(&message.type_) {
                     continue;
                 }
-                let Ok(storage) = tswp::StorageArchive::decode(message.data.as_slice()) else {
+                let Some(storage) = decode_numbers_storage(
+                    message.data.as_slice(),
+                    maximum.saturating_sub(text.len()),
+                    text.len(),
+                    maximum,
+                )?
+                else {
                     continue;
                 };
-                if storage.text.is_empty() {
+                if storage.storage().runs().is_empty() {
                     continue;
                 }
-                if !text.is_empty() {
-                    text.push('\n');
-                }
-                text.push_str(&storage.text.join("\n"));
+                append_storage_fragments(&mut text, &storage, maximum)?;
             }
         }
         Ok(text)
     }
 
-    fn root_document(components: &Components) -> Result<tn::DocumentArchive> {
-        tn::DocumentArchive::decode(Self::root_document_payload(components)?)
-            .map_err(|error| Error::malformed_payload(error, SemanticPath::Document))
+    /// Decode the rooted sheet order through the generated-free Buffa
+    /// projection. The generated TN document is retained only by the legacy
+    /// transaction compatibility helpers below; package construction and the
+    /// archive-free semantic handoff consume this bounded snapshot instead.
+    fn root_sheet_order(
+        components: &Components,
+        limits: SemanticLimits,
+    ) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+        let payload = Self::root_document_payload(components)?;
+        preflight_root_sheet_references_with_max(payload, limits.max_sheets())
+    }
+
+    fn root_document(
+        components: &Components,
+    ) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+        preflight_root_sheet_references_with_max(
+            Self::root_document_payload(components)?,
+            SemanticLimits::default().max_sheets(),
+        )
     }
 
     fn root_document_payload(components: &Components) -> Result<&[u8]> {
@@ -832,55 +850,59 @@ impl Package {
     fn decode_sheets(
         components: &Components,
         index: &Index,
-        document: &tn::DocumentArchive,
+        document: &numbers_sheet_order_codec::DocumentSheetOrderSnapshot,
         limits: SemanticLimits,
         retain_comments: bool,
     ) -> Result<Vec<Sheet>> {
-        if document.sheets.len() > limits.max_sheets() {
+        if document.sheet_references().len() > limits.max_sheets() {
             return Err(Error::SemanticLimit {
                 kind: SemanticLimitKind::Sheets,
-                observed: document.sheets.len(),
+                observed: document.sheet_references().len(),
                 maximum: limits.max_sheets(),
                 path: SemanticPath::Document,
             });
         }
 
         let mut budget = SemanticBudget::new(limits);
-        budget.charge_references(document.sheets.len(), SemanticPath::Document)?;
+        budget.charge_references(document.sheet_references().len(), SemanticPath::Document)?;
         let extractor = TableDataExtractor::new(components, index, limits);
         let extractor = if retain_comments {
             extractor
         } else {
             extractor.without_comments()
         };
-        extractor.charge_references(document.sheets.len())?;
+        extractor.charge_references(document.sheet_references().len())?;
         let mut sheets = Vec::new();
         sheets
-            .try_reserve_exact(document.sheets.len())
+            .try_reserve_exact(document.sheet_references().len())
             .map_err(|_error| {
                 Error::Common(litchi_iwa_common::Error::Allocation {
                     resource: "Numbers semantic sheets",
-                    amount: document.sheets.len(),
+                    amount: document.sheet_references().len(),
                 })
             })?;
 
         let mut seen_sheets = HashSet::new();
         seen_sheets
-            .try_reserve(document.sheets.len())
+            .try_reserve(document.sheet_references().len())
             .map_err(|_error| {
-                allocation_error("Numbers rooted sheet identities", document.sheets.len())
+                allocation_error(
+                    "Numbers rooted sheet identities",
+                    document.sheet_references().len(),
+                )
             })?;
         let mut seen_drawables = HashSet::new();
         let mut seen_models = HashSet::new();
-        for (position, reference) in document.sheets.iter().enumerate() {
+        for (position, reference) in document.sheet_references().iter().enumerate() {
             let path = SemanticPath::Sheet { index: position };
-            if !seen_sheets.insert(reference.identifier) {
+            let sheet_identifier = reference.identifier();
+            if !seen_sheets.insert(sheet_identifier) {
                 return Err(Error::InvalidFormat(format!(
                     "Numbers {path} repeats an earlier rooted sheet"
                 )));
             }
             let object = index
-                .resolve_ref_id(components, reference.identifier)?
+                .resolve_ref_id(components, sheet_identifier)?
                 .ok_or_else(|| Error::InvalidFormat(format!("Numbers {path} is missing")))?;
             let (message_type, payload) = sheet_payload(object.messages, path)?;
             let consumed_references = limits
@@ -895,32 +917,26 @@ impl Package {
             budget.charge_references(projected_drawables.len(), path)?;
             extractor.charge_references(projected_drawables.len())?;
             extractor.charge_output_text(projected_name.len())?;
-            let archive = decode_sheet_payload(object.messages, path)?;
-            if archive.name != projected_name
-                || archive.drawable_infos.len() != projected_drawables.len()
-                || archive
-                    .drawable_infos
-                    .iter()
-                    .zip(&projected_drawables)
-                    .any(|(decoded, projected)| decoded.identifier != *projected)
-            {
-                return Err(Error::MalformedPayload { path });
-            }
             seen_drawables
-                .try_reserve(archive.drawable_infos.len())
+                .try_reserve(projected_drawables.len())
                 .map_err(|_error| {
                     allocation_error(
                         "Numbers rooted drawable identities",
-                        archive.drawable_infos.len(),
+                        projected_drawables.len(),
                     )
                 })?;
-            let mut sheet = DecodedSheet::new(archive.name, position);
-            for (drawable_position, drawable) in archive.drawable_infos.into_iter().enumerate() {
+            let mut sheet = DecodedSheet::new(
+                try_owned_text(projected_name, "Numbers rooted sheet name")?,
+                position,
+            );
+            for (drawable_position, drawable_identifier) in
+                projected_drawables.into_iter().enumerate()
+            {
                 let drawable_path = SemanticPath::Drawable {
                     sheet: position,
                     index: drawable_position,
                 };
-                if !seen_drawables.insert(drawable.identifier) {
+                if !seen_drawables.insert(drawable_identifier) {
                     return Err(Error::InvalidFormat(format!(
                         "Numbers {drawable_path} repeats an earlier rooted drawable"
                     )));
@@ -928,7 +944,7 @@ impl Package {
                 let Some(table) = Self::extract_table(
                     components,
                     index,
-                    drawable.identifier,
+                    drawable_identifier,
                     &extractor,
                     drawable_path,
                     &mut budget,
@@ -1009,6 +1025,128 @@ impl Package {
             .extract_reachable_table_from_object(&model, path)
             .map(Some)
     }
+}
+
+fn decode_numbers_storage(
+    source: &[u8],
+    remaining_text_bytes: usize,
+    current_text_bytes: usize,
+    maximum_text_bytes: usize,
+) -> Result<Option<ValidatedStorage>> {
+    let Some(limits) = text_wire_limits(source.len(), remaining_text_bytes) else {
+        return Ok(None);
+    };
+    match decode_storage_with_limits(source, limits) {
+        Ok(storage) => Ok(Some(storage)),
+        Err(TextWireError::LimitExceeded {
+            resource: "text bytes",
+            observed,
+            ..
+        }) => Err(Error::SemanticLimit {
+            kind: SemanticLimitKind::OutputTextBytes,
+            observed: current_text_bytes.saturating_add(observed),
+            maximum: maximum_text_bytes,
+            path: SemanticPath::Package,
+        }),
+        Err(TextWireError::Allocation { resource, amount }) => {
+            Err(Error::Common(litchi_iwa_common::Error::Allocation {
+                resource,
+                amount,
+            }))
+        },
+        Err(_) => Ok(None),
+    }
+}
+
+fn text_wire_limits(source_bytes: usize, max_text_bytes: usize) -> Option<TextWireLimits> {
+    let message_bytes = source_bytes.clamp(1, TextWireLimits::MAX_MESSAGE_BYTES);
+    let fields = source_bytes.clamp(1, TextWireLimits::MAX_FIELDS);
+    let fragments = source_bytes.clamp(1, TextWireLimits::MAX_FRAGMENTS);
+    let table_entries = source_bytes.clamp(1, TextWireLimits::MAX_TABLE_ENTRIES);
+    let references = source_bytes.clamp(1, TextWireLimits::MAX_OBJECT_REFERENCES);
+    let work = TextWireLimits::MAX_REWRITE_WORK;
+    let text_bytes = max_text_bytes.clamp(1, TextWireLimits::MAX_TEXT_BYTES);
+    let output_bytes = TextWireLimits::MAX_OUTPUT_BYTES;
+    TextWireLimits::new(
+        message_bytes,
+        fields,
+        4,
+        fragments,
+        text_bytes,
+        table_entries,
+        references,
+        output_bytes,
+        work,
+    )
+    .ok()
+}
+
+fn append_storage_fragments(
+    output: &mut String,
+    storage: &ValidatedStorage,
+    maximum: usize,
+) -> Result<()> {
+    let semantic = storage.storage();
+    let runs = semantic.runs();
+    let separator_count = usize::from(!output.is_empty()) + runs.len().saturating_sub(1);
+    let fragment_bytes = runs.iter().try_fold(0usize, |total, run| {
+        total.checked_add(run.len()).ok_or(Error::SemanticLimit {
+            kind: SemanticLimitKind::OutputTextBytes,
+            observed: usize::MAX,
+            maximum,
+            path: SemanticPath::Package,
+        })
+    })?;
+    let required = fragment_bytes
+        .checked_add(separator_count)
+        .ok_or(Error::SemanticLimit {
+            kind: SemanticLimitKind::OutputTextBytes,
+            observed: usize::MAX,
+            maximum,
+            path: SemanticPath::Package,
+        })?;
+    let observed = output
+        .len()
+        .checked_add(required)
+        .ok_or(Error::SemanticLimit {
+            kind: SemanticLimitKind::OutputTextBytes,
+            observed: usize::MAX,
+            maximum,
+            path: SemanticPath::Package,
+        })?;
+    if observed > maximum {
+        return Err(Error::SemanticLimit {
+            kind: SemanticLimitKind::OutputTextBytes,
+            observed,
+            maximum,
+            path: SemanticPath::Package,
+        });
+    }
+    output
+        .try_reserve(required)
+        .map_err(|_error| allocation_error("Numbers compatibility text", required))?;
+    if !output.is_empty() {
+        output.push('\n');
+    }
+    let source = semantic.text();
+    for (index, run) in runs.iter().copied().enumerate() {
+        if index != 0 {
+            output.push('\n');
+        }
+        let end = run.end().ok_or(Error::SemanticLimit {
+            kind: SemanticLimitKind::OutputTextBytes,
+            observed: usize::MAX,
+            maximum,
+            path: SemanticPath::Package,
+        })?;
+        let fragment = source
+            .get(run.start()..end)
+            .ok_or(Error::MalformedPayload {
+                path: SemanticPath::Package,
+            })?;
+        output.push_str(fragment);
+    }
+    Ok(())
 }
 
 /// Bounded policy for the focused table-info reference projection.
@@ -1129,19 +1267,7 @@ pub(crate) fn semantic_document_from_prepared_source(
     let index = Index::from_components(&components, semantic.max_objects())?;
     let source_record_count = index.object_count();
     let root_payload = Package::root_document_payload(&components)?;
-    let root_projection = preflight_root_sheet_references(root_payload, document_limits)?;
-    let root = Package::root_document(&components)?;
-    if root.sheets.len() != root_projection.sheet_references().len()
-        || root
-            .sheets
-            .iter()
-            .zip(root_projection.sheet_references())
-            .any(|(decoded, projected)| decoded.identifier != projected.identifier())
-    {
-        return Err(Error::MalformedPayload {
-            path: SemanticPath::Document,
-        });
-    }
+    let root = preflight_root_sheet_references(root_payload, document_limits)?;
     let sheets = Package::decode_sheets(&components, &index, &root, semantic, false)
         .map_err(|error| remap_document_limit_error(error, document_limits))?;
     let table_count = sheets
@@ -1168,9 +1294,14 @@ fn preflight_root_sheet_references(
     payload: &[u8],
     limits: DocumentLimits,
 ) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
-    let max_sheets = limits
-        .max_sheets()
-        .min(DocumentLimits::default().max_sheets());
+    preflight_root_sheet_references_with_max(payload, limits.max_sheets())
+}
+
+fn preflight_root_sheet_references_with_max(
+    payload: &[u8],
+    max_sheets: usize,
+) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+    let max_sheets = max_sheets.min(DocumentLimits::default().max_sheets());
     let options = numbers_sheet_order_codec::DecodeOptions::new(
         payload.len().max(1),
         payload.len().saturating_mul(2).max(1),
@@ -1899,17 +2030,39 @@ fn unique_message<'a>(
     Ok(Some(message))
 }
 
-fn decode_sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<tn::SheetArchive> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SheetProjection {
+    pub(super) name: String,
+    pub(super) drawable_infos: Vec<DrawableProjection>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct DrawableProjection {
+    pub(super) identifier: u64,
+}
+
+fn sheet_projection(messages: &[RawMessage], path: SemanticPath) -> Result<SheetProjection> {
     let (message_type, payload) = sheet_payload(messages, path)?;
-    match message_type {
-        SHEET_MESSAGE_TYPE => {
-            tn::SheetArchive::decode(payload).map_err(|error| Error::malformed_payload(error, path))
-        },
-        FORM_BASED_SHEET_MESSAGE_TYPE => tn::FormBasedSheetArchive::decode(payload)
-            .map(|form_archive| form_archive.super_)
-            .map_err(|error| Error::malformed_payload(error, path)),
-        _ => Err(Error::MalformedPayload { path }),
+    let consumed_references = 0;
+    let (name, identifiers) = names::preflight_sheet_payload(
+        message_type,
+        payload,
+        SemanticLimits::default().max_references(),
+    )
+    .map_err(|error| map_sheet_preflight_error(error, path, consumed_references))?;
+    let mut drawable_infos = Vec::new();
+    drawable_infos
+        .try_reserve_exact(identifiers.len())
+        .map_err(|_error| {
+            allocation_error("Numbers sheet drawable projection", identifiers.len())
+        })?;
+    for identifier in identifiers {
+        drawable_infos.push(DrawableProjection { identifier });
     }
+    Ok(SheetProjection {
+        name: try_owned_text(name, "Numbers sheet name")?,
+        drawable_infos,
+    })
 }
 
 fn sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<(u32, &[u8])> {
@@ -1976,6 +2129,14 @@ fn map_sheet_preflight_error(
 
 fn allocation_error(resource: &'static str, amount: usize) -> Error {
     Error::Common(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+fn try_owned_text(source: &str, resource: &'static str) -> Result<String> {
+    let mut text = String::new();
+    text.try_reserve_exact(source.len())
+        .map_err(|_error| allocation_error(resource, source.len()))?;
+    text.push_str(source);
+    Ok(text)
 }
 
 fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>> {
@@ -2105,7 +2266,8 @@ const fn input_too_large(observed: u64, limits: Limits) -> Error {
 mod tests {
     use super::*;
     use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
-    use litchi_iwa_protos::{kn, tp, tsa, tsce, tsk, tst};
+    use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsk, tst};
+    use prost::Message;
     use std::io::Write;
 
     #[test]
