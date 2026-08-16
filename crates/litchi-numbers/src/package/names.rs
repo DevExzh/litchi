@@ -1840,6 +1840,7 @@ fn local_reference_identifier_common(source: &[u8]) -> litchi_iwa_common::Result
                         "invalid local reference".into(),
                     ));
                 }
+                field.validate_canonical_key()?;
                 identifier = Some(canonical_varint(field.payload()).map_err(|_| {
                     litchi_iwa_common::Error::InvalidFormat("invalid local reference".into())
                 })?);
@@ -1850,6 +1851,7 @@ fn local_reference_identifier_common(source: &[u8]) -> litchi_iwa_common::Result
                         "invalid local reference".into(),
                     ));
                 }
+                field.validate_canonical_key()?;
                 let value = canonical_varint(field.payload()).map_err(|_| {
                     litchi_iwa_common::Error::InvalidFormat("invalid local reference".into())
                 })?;
@@ -1866,6 +1868,7 @@ fn local_reference_identifier_common(source: &[u8]) -> litchi_iwa_common::Result
                         "invalid local reference".into(),
                     ));
                 }
+                field.validate_canonical_key()?;
                 let value = canonical_varint(field.payload()).map_err(|_| {
                     litchi_iwa_common::Error::InvalidFormat("invalid local reference".into())
                 })?;

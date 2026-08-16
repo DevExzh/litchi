@@ -10807,3 +10807,35 @@ that Apple Numbers exercises every new refusal branch. Those branches are
 covered by the synthetic complete-wire and malformed-wire matrices. No new
 manifest edge or host method is retired by this projection; the broader
 Numbers editor and ordered migration debt remain open.
+
+## 2026-08-17 Numbers extractor rich-text envelope gate
+
+The focused Numbers extractor removes a redundant generated read from the
+rich-text sidecar path. Its complete raw-wire preflight now owns the selected
+type-6218 envelope semantics: field 1 must contain one strict local storage
+reference and field 3 must contain one length-delimited cell-owner value.
+After that preflight, the storage identifier is passed directly to the bounded
+`litchi-iwa-text-wire` decoder. The previous generated
+`RichTextPayloadArchive::decode` and reference-parity allocation are gone from
+production; test-only generated builders remain available as fixture/oracle
+material.
+
+The gate preserves canonical selected-field framing, duplicate rejection,
+local-reference validation, malformed-storage handling, aggregate text
+accounting, and failure-before-publication behavior. The storage path retains
+its checked input, field, nesting, reference, wire-work, UTF-8, and semantic
+text ceilings, while caller-owned component bytes remain the exact
+preservation authority. This is deliberately a narrow envelope cut: the
+extractor still has independent generated table-model, BNC cell, list,
+formula, comment, and AST paths, and no host API or manifest edge is retired.
+
+The focused Numbers all-feature library run is 298 passing with four ignored,
+including nine focused rich-text projection tests; the document-reader
+integration run is 16/16, and the boundary unit suite is 267/267. The live
+boundary audit accepts 64 packages, 239 internal
+declarations, and the unchanged 14-item ordered migration debt. The existing
+Numbers basic and formula/rich-text native gates remain authoritative: Apple
+Numbers 14.4 accepted the locked/read-only fixtures without repair or
+conversion UI and retained the recorded sheet, table, formula, and rich-text
+semantics. No native save, rendering, performance, or full-graph Buffa claim
+is inferred from this duplicate-decode removal.

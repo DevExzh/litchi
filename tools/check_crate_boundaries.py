@@ -1800,6 +1800,7 @@ IWA_NUMBERS_TABLE_INFO_SOURCE = (
 )
 NUMBERS_SOURCE_ROOT = Path("crates/litchi-numbers/src")
 NUMBERS_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package.rs"
+NUMBERS_EXTRACTOR_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "extractor.rs"
 NUMBERS_NAMES_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "names.rs"
 NUMBERS_PACKAGE_TEST_MODULE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
@@ -1831,6 +1832,15 @@ NUMBERS_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS = (
         "StorageArchive::decode",
         re.compile(
             r"(?<![A-Za-z0-9_#])StorageArchive[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+)
+NUMBERS_EXTRACTOR_NO_EAGER_RICH_TEXT_SOURCE_PATTERNS = (
+    (
+        "RichTextPayloadArchive::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])RichTextPayloadArchive[ \t\r\n]*::"
             r"[ \t\r\n]*decode\b"
         ),
     ),
@@ -8639,6 +8649,43 @@ def audit_numbers_package_no_eager_prost_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_extractor_no_eager_rich_text_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the Numbers extractor's rich-text ingress archive-free.
+
+    The extractor still has independently migrating generated readers for the
+    table-model and cell-storage paths.  This narrow ratchet protects the
+    rich-text path that already has a bounded wire projection: a regression to
+    ``RichTextPayloadArchive::decode`` would allocate the complete generated
+    envelope before its storage-reference and text budgets are applied.  As
+    with the package ingress ratchet, canonical Prost fixtures may remain in a
+    test-only module.
+    """
+
+    violations: list[str] = []
+    source_path = root / NUMBERS_EXTRACTOR_SOURCE
+    if not source_path.is_file():
+        return violations
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    masked_source = _mask_rust_non_code(raw_source)
+    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
+    production_source = (
+        raw_source[: test_module.start()] if test_module is not None else raw_source
+    )
+    production_code = _mask_rust_non_code(production_source)
+    for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_RICH_TEXT_SOURCE_PATTERNS:
+        for match in pattern.finditer(production_code):
+            line_number = production_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers extractor production source uses "
+                f"{label}: {NUMBERS_EXTRACTOR_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_names_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -9797,6 +9844,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_placeholder_visibility_facade_source_topology()
         + audit_keynote_package_no_eager_prost_source_topology()
         + audit_numbers_package_no_eager_prost_source_topology()
+        + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()

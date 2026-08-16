@@ -294,3 +294,38 @@ and it does not make the complete Numbers table/formula/sidecar graph
 generated-message-free. The ordinary Numbers manifest still retains its
 compatibility Prost paths where unrelated table extraction and editing code
 requires them.
+
+## 2026-08-17 amendment: bounded Numbers rich-text payload envelope
+
+The Numbers table extractor now treats its bounded raw-wire preflight as the
+authoritative projection of the small type-6218
+`TST.RichTextPayloadArchive` envelope. The preflight scans the complete
+message, requires one canonical length-delimited local storage reference in
+field 1 and one cell-owner value in field 3, and validates the nested local
+reference framing before returning the storage identifier. The extractor
+forwards that identifier directly to the existing bounded
+`litchi-iwa-text-wire` storage path. It no longer constructs a generated
+`RichTextPayloadArchive` with Prost merely to read the same reference and
+compare it with the already-validated projection.
+
+This removes one redundant generated allocation and one duplicate parse from
+the rich-text path without changing its source authority. Unknown envelope
+bytes remain owned by the original component and are neither retained in the
+private projection nor re-encoded. Storage validation and materialization still
+charge physical bytes, fields, nesting, references, wire work, UTF-8 text, and
+the caller's remaining aggregate semantic text budget before owned output is
+published; document projection retains the existing strict validation/text
+length parity check. The focused ratchet excludes only test fixtures and
+rejects a production `RichTextPayloadArchive::decode`; it intentionally does
+not claim that the broader Numbers extractor or crate is Prost-free.
+
+Current verification is 298 passing and four ignored tests in the all-feature
+Numbers library suite, including nine focused rich-text projection tests,
+16/16 document-reader integration tests, and 267/267 boundary-policy tests.
+The live boundary graph remains 64 workspace packages,
+239 internal declarations, and the unchanged 14 ordered `litchi-iwa`
+migration debts. Existing formula/rich-text and basic Numbers application
+fixtures remain the native semantic oracles; this read-path-only change does
+not alter their bytes or require a new native mutation claim. This is a bounded
+allocation-shape improvement, not a measured latency/RSS result or a complete
+table, tile, formula, comment, or host-editor migration.
