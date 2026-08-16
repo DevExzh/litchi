@@ -1797,7 +1797,10 @@ impl std::fmt::Display for StreamingArchiveFailure {
 
 impl std::error::Error for StreamingArchiveFailure {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.error)
+        match self.error.kind() {
+            ErrorKind::IO(error) | ErrorKind::Io(error) => Some(error),
+            _ => Some(&self.error),
+        }
     }
 }
 
@@ -1979,13 +1982,16 @@ impl<W: Write> StreamingArchiveEntry<W> {
         self.output_bytes = self.output_counter.load(Ordering::Acquire);
     }
 
-    fn capture_io_failure(&mut self, error: &std::io::Error) {
-        let limit = streaming_limit_from_io_error(error);
+    fn capture_io_failure(&mut self, error: std::io::Error) -> std::io::Error {
+        let limit = streaming_limit_from_io_error(&error);
         self.last_limit = limit;
         self.refresh_output_bytes();
 
-        if let Some((resource, actual, maximum)) = streaming_payload_limit_from_io_error(error) {
+        let returned = if let Some((resource, actual, maximum)) =
+            streaming_payload_limit_from_io_error(&error)
+        {
             self.failure = Some(limit_error(resource, actual, maximum));
+            error
         } else if let Some(StreamingLimitExceeded {
             resource: StreamingLimitResource::CompressedBytes,
             actual,
@@ -1993,13 +1999,23 @@ impl<W: Write> StreamingArchiveEntry<W> {
         }) = limit
         {
             self.failure = Some(limit_error(LimitResource::CompressedSize, actual, maximum));
+            error
         } else {
-            self.failure = Some(Error::from(std::io::Error::new(
-                error.kind(),
-                error.to_string(),
-            )));
-        }
+            let kind = error.kind();
+            let message = error.to_string();
+            // `std::io::Error` is not cloneable.  Keep the original object in
+            // the retained typed failure and return a lightweight immediate
+            // notification to the `Write` caller; `finish_with_progress` is
+            // the publication result that carries the complete source chain.
+            let returned = std::io::Error::new(kind, message);
+            // Move the original error into the typed failure.  Rebuilding the
+            // error from its display text here would erase nested/custom
+            // sources before `finish_with_progress` can report them.
+            self.failure = Some(Error::from(error));
+            returned
+        };
         self.poisoned = true;
+        returned
     }
 
     fn failure(self) -> StreamingArchiveFailure {
@@ -2107,8 +2123,7 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
                 next_entry,
                 self.limits.max_entry_size,
             );
-            self.capture_io_failure(&error);
-            return Err(error);
+            return Err(self.capture_io_failure(error));
         }
         let next_total = self.total_uncompressed_bytes.saturating_add(next_entry);
         if next_total > self.limits.max_total_size {
@@ -2117,8 +2132,7 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
                 next_total,
                 self.limits.max_total_size,
             );
-            self.capture_io_failure(&error);
-            return Err(error);
+            return Err(self.capture_io_failure(error));
         }
 
         let result = self
@@ -2134,18 +2148,14 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
                     std::io::ErrorKind::WriteZero,
                     "streaming ZIP entry sink accepted no bytes",
                 );
-                self.capture_io_failure(&error);
-                Err(error)
+                Err(self.capture_io_failure(error))
             },
             Ok(written) => {
                 self.uncompressed_bytes = self.uncompressed_bytes.saturating_add(written as u64);
                 self.refresh_output_bytes();
                 Ok(written)
             },
-            Err(error) => {
-                self.capture_io_failure(&error);
-                Err(error)
-            },
+            Err(error) => Err(self.capture_io_failure(error)),
         }
     }
 
@@ -2163,10 +2173,10 @@ impl<W: Write> Write for StreamingArchiveEntry<W> {
                 std::io::Error::new(std::io::ErrorKind::Other, "streaming ZIP entry finished")
             })
             .and_then(Write::flush);
-        if let Err(error) = &result {
-            self.capture_io_failure(error);
+        match result {
+            Ok(()) => Ok(()),
+            Err(error) => Err(self.capture_io_failure(error)),
         }
-        result
     }
 }
 
@@ -3176,6 +3186,48 @@ mod tests {
     }
 
     #[derive(Debug)]
+    struct NestedSinkSource;
+
+    impl std::fmt::Display for NestedSinkSource {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("nested sink failure")
+        }
+    }
+
+    impl std::error::Error for NestedSinkSource {}
+
+    #[derive(Debug)]
+    struct NestedFailingWriter {
+        bytes: Vec<u8>,
+        fail_after: usize,
+    }
+
+    impl NestedFailingWriter {
+        fn new(fail_after: usize) -> Self {
+            Self {
+                bytes: Vec::new(),
+                fail_after,
+            }
+        }
+    }
+
+    impl Write for NestedFailingWriter {
+        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+            if self.bytes.len() >= self.fail_after {
+                return Err(io::Error::new(io::ErrorKind::BrokenPipe, NestedSinkSource));
+            }
+            let available = self.fail_after - self.bytes.len();
+            let written = data.len().min(available);
+            self.bytes.extend_from_slice(&data[..written]);
+            Ok(written)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
     struct ZeroWriter;
 
     impl Write for ZeroWriter {
@@ -3438,6 +3490,38 @@ mod tests {
         ));
         assert!(failure.progress().is_poisoned());
         assert!(failure.progress().output_bytes() <= 52);
+    }
+
+    #[test]
+    fn consuming_entry_writer_retains_nested_sink_source() {
+        // The stored local header is 30 bytes plus the member name.  Permit
+        // that prefix, then fail on the first payload write so the entry
+        // capture path—not descriptor finalization—owns the original error.
+        let name = "nested.bin";
+        let mut sink = NestedFailingWriter::new(30 + name.len());
+        let mut entry = StreamingArchiveWriter::with_writer(&mut sink)
+            .start_entry(name, CompressionMethod::Store)
+            .unwrap();
+        let immediate = entry.write(b"payload").unwrap_err();
+        assert_eq!(immediate.kind(), io::ErrorKind::BrokenPipe);
+
+        let failure = match entry.finish() {
+            Ok(_) => panic!("nested sink failure unexpectedly finished"),
+            Err(failure) => failure,
+        };
+        let error = match failure.error().kind() {
+            ErrorKind::IO(error) | ErrorKind::Io(error) => error,
+            other => panic!("expected retained I/O error, got {other:?}"),
+        };
+        assert!(
+            error
+                .get_ref()
+                .and_then(|source| source.downcast_ref::<NestedSinkSource>())
+                .is_some(),
+            "nested sink source was lost"
+        );
+        let source = std::error::Error::source(&failure).expect("failure source");
+        assert!(source.downcast_ref::<io::Error>().is_some());
     }
 
     #[test]

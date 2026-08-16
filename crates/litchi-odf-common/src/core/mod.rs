@@ -34,10 +34,17 @@
 //! ## ✅ Package Writing (`writer.rs`) - COMPLETE
 //! - ✅ `PackageWriter<W>` - Generic ZIP archive writer
 //! - ✅ `new()` / `with_writer()` - Create writers
+//! - ✅ `with_writer_and_limits()` - Create bounded sequential writers
 //! - ✅ `set_mimetype()` - Set MIME type (stored uncompressed)
+//! - ✅ `set_mimetype_streaming()` - Set MIME type with typed sink progress
 //! - ✅ `add_file()` - Add files to package
 //! - ✅ `add_file_with_media_type()` - Add with manifest entry
+//! - ✅ `add_file_reader()` - Stream opaque non-XML members from a reader
 //! - ✅ `finish()` / `finish_to_bytes()` - Finalize package
+//! - ✅ `finish_to_writer()` - Finalize on a sequential sink
+//!
+//! Sequential writer limits bound ZIP transport and retained manifest
+//! bookkeeping; they do not materialize arbitrary reader payloads in memory.
 //! - ✅ Default template generation (content.xml, styles.xml, meta.xml, settings.xml)
 //! - ✅ Manifest.xml auto-generation
 //!
@@ -87,7 +94,10 @@ pub use metadata::{
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::{OwnedPackage, SourceBackedPackage, SourcePackageLimits};
-pub use writer::{PackageWriter, Structure};
+pub use writer::{
+    PackageCompression, PackageWriter, PackageWriterError, PackageWriterLimitExceeded,
+    PackageWriterLimitResource, PackageWriterLimits, PackageWriterResult, Structure,
+};
 pub use xml::{Content, Meta, Styles};
 pub use xml_splice::{
     AuthoredXmlFragment, XmlSourcePart, XmlSourceRange, XmlSplicePublication,
