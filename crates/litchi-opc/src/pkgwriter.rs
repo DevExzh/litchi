@@ -11,7 +11,7 @@ use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI};
 use crate::phys_pkg::PhysPkgWriter;
 use crate::rel::Relationships;
 use litchi_core::xml::escape_xml;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::io::Write;
 use std::path::Path;
@@ -74,6 +74,36 @@ struct PlannedPart<'package> {
 struct PlannedRelationships {
     uri: PackURI,
     xml: String,
+}
+
+enum PlannedAppend<'package> {
+    Part(&'package PlannedPart<'package>),
+    Relationships(&'package PlannedPart<'package>),
+}
+
+impl PlannedAppend<'_> {
+    fn owner_name(&self) -> &str {
+        match self {
+            Self::Part(part) | Self::Relationships(part) => part.partname.as_str(),
+        }
+    }
+
+    fn member_name(&self) -> Option<&str> {
+        match self {
+            Self::Part(part) => Some(part.partname.membername()),
+            Self::Relationships(part) => part
+                .relationships
+                .as_ref()
+                .map(|relationships| relationships.uri.membername()),
+        }
+    }
+
+    fn kind_order(&self) -> u8 {
+        match self {
+            Self::Part(_) => 0,
+            Self::Relationships(_) => 1,
+        }
+    }
 }
 
 impl<'package> PublicationPlan<'package> {
@@ -177,9 +207,12 @@ fn try_write_preserved<W: Write>(
     let Ok(index) = soapberry_zip::PreservationIndex::new(&archive, &mut buffer) else {
         return Ok(PreservationWrite::Fallback(writer));
     };
-    if index.entries().len() != provenance.members.len()
-        || publication.parts.len() != provenance.parts.len()
-    {
+    if index.archive_end_offset() != source.len() as u64 {
+        // Preserve only a complete source archive.  Otherwise a successful
+        // preservation write would silently discard bytes after the EOCD.
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    if index.entries().len() != provenance.members.len() {
         return Ok(PreservationWrite::Fallback(writer));
     }
 
@@ -190,16 +223,133 @@ fn try_write_preserved<W: Write>(
             resource: "OPC targeted publication part lookup",
             source,
         })?;
+    let mut additions = Vec::new();
+    let mut relationship_additions = Vec::new();
+    additions
+        .try_reserve(publication.parts.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC topology-add publication parts",
+            source,
+        })?;
+    relationship_additions
+        .try_reserve(publication.parts.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC topology-add relationship members",
+            source,
+        })?;
     for part in &publication.parts {
-        let Some(source_part) = provenance.parts.get(part.partname) else {
-            return Ok(PreservationWrite::Fallback(writer));
-        };
-        if !source_part.member_present
-            || source_part.relationships_member_present != part.relationships.is_some()
-        {
-            return Ok(PreservationWrite::Fallback(writer));
+        if let Some(source_part) = provenance.parts.get(part.partname) {
+            if !source_part.member_present {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            if !source_part.relationships_member_present && part.relationships.is_some() {
+                relationship_additions.push(part);
+            }
+            planned_parts.insert(part.partname, part);
+        } else {
+            additions.push(part);
         }
-        planned_parts.insert(part.partname, part);
+    }
+    additions.sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+    relationship_additions
+        .sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+    let mut omitted_ids = HashSet::new();
+    omitted_ids
+        .try_reserve(index.entries().len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC omitted preservation members",
+            source,
+        })?;
+    for (source_member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
+        let omitted = match &source_member.kind {
+            SourceMemberKind::Part(partname) => !planned_parts.contains_key(partname),
+            SourceMemberKind::PartRelationships(partname) => planned_parts
+                .get(partname)
+                .is_none_or(|part| part.relationships.is_none()),
+            SourceMemberKind::ContentTypes
+            | SourceMemberKind::PackageRelationships
+            | SourceMemberKind::Unknown => false,
+        };
+        if omitted {
+            omitted_ids.insert(indexed_entry.id());
+        }
+    }
+    if !omitted_ids.is_empty() && !omitted_members_form_suffix(&index, &omitted_ids)? {
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    let topology_add = !additions.is_empty() || !relationship_additions.is_empty();
+    let append_capacity = additions
+        .len()
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(relationship_additions.len()))
+        .ok_or_else(|| crate::OpcError::ZipError("OPC append member count overflow".into()))?;
+    let mut appended = Vec::new();
+    appended
+        .try_reserve_exact(append_capacity)
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC appended preservation members",
+            source,
+        })?;
+    for part in &additions {
+        appended.push(PlannedAppend::Part(part));
+        if part.relationships.is_some() {
+            appended.push(PlannedAppend::Relationships(part));
+        }
+    }
+    for part in &relationship_additions {
+        appended.push(PlannedAppend::Relationships(part));
+    }
+    appended.sort_unstable_by(|left, right| {
+        left.owner_name()
+            .cmp(right.owner_name())
+            .then_with(|| left.kind_order().cmp(&right.kind_order()))
+    });
+    if topology_add
+        && provenance.members.iter().any(|member| {
+            member.name.is_none() || matches!(&member.kind, SourceMemberKind::Unknown)
+        })
+    {
+        // Appending generated entries after a source member whose identity is
+        // not modeled would silently change an opaque archive topology. Keep
+        // the existing full-writer fallback for unknown/non-UTF-8 members.
+        return Ok(PreservationWrite::Fallback(writer));
+    }
+    if topology_add {
+        let mut member_names = HashSet::new();
+        member_names
+            .try_reserve(provenance.members.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC source preservation member names",
+                source,
+            })?;
+        for member in &provenance.members {
+            let Some(name) = member.name.as_deref() else {
+                return Ok(PreservationWrite::Fallback(writer));
+            };
+            member_names.insert(normalized_member_name(
+                name,
+                "OPC source preservation member name",
+            )?);
+        }
+        let mut appended_names = HashSet::new();
+        appended_names
+            .try_reserve(appended.len())
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC appended preservation member names",
+                source,
+            })?;
+        for append in &appended {
+            let Some(name) = append.member_name() else {
+                return Ok(PreservationWrite::Fallback(writer));
+            };
+            if name.is_empty() {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+            let normalized = normalized_member_name(name, "OPC appended preservation member name")?;
+            if member_names.contains(&normalized) || !appended_names.insert(normalized) {
+                return Ok(PreservationWrite::Fallback(writer));
+            }
+        }
     }
 
     let package_relationship_members = provenance
@@ -211,15 +361,30 @@ fn try_write_preserved<W: Write>(
         return Ok(PreservationWrite::Fallback(writer));
     }
 
-    let content_types_changed = publication.parts.iter().any(|part| {
-        provenance
-            .parts
-            .get(part.partname)
-            .is_none_or(|source| source.content_type != part.content_type)
-    });
+    let removed_part = provenance
+        .members
+        .iter()
+        .zip(index.entries())
+        .any(|(member, entry)| {
+            omitted_ids.contains(&entry.id()) && matches!(member.kind, SourceMemberKind::Part(_))
+        });
+    let content_types_changed = removed_part
+        || publication.parts.iter().any(|part| {
+            provenance
+                .parts
+                .get(part.partname)
+                .is_none_or(|source| source.content_type != part.content_type)
+        });
     let mut regenerated_bytes = 0_u64;
     let mut regenerated_members = 0_u64;
-    for member in &provenance.members {
+    let omitted_members = u64::try_from(omitted_ids.len())
+        .map_err(|_| crate::OpcError::ZipError("OPC omitted member count overflow".into()))?;
+    let mut appended_members = 0_u64;
+    let mut appended_bytes = 0_u64;
+    for (member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
+        if omitted_ids.contains(&indexed_entry.id()) {
+            continue;
+        }
         let bytes = match &member.kind {
             SourceMemberKind::ContentTypes if content_types_changed => {
                 Some(publication.content_types_xml.len())
@@ -266,73 +431,137 @@ fn try_write_preserved<W: Write>(
             regenerated_members += 1;
         }
     }
+    for append in &appended {
+        appended_members = appended_members.checked_add(1).ok_or_else(|| {
+            crate::OpcError::ZipError("OPC appended member count overflow".into())
+        })?;
+        let bytes = match append {
+            PlannedAppend::Part(part) => part.blob.len(),
+            PlannedAppend::Relationships(part) => {
+                let Some(relationships) = part.relationships.as_ref() else {
+                    return Ok(PreservationWrite::Fallback(writer));
+                };
+                relationships.xml.len()
+            },
+        };
+        appended_bytes = appended_bytes.checked_add(bytes as u64).ok_or_else(|| {
+            crate::OpcError::ZipError("OPC appended member bytes overflow".into())
+        })?;
+    }
     let conservative_output_bound = (source.len() as u64)
         .checked_add(regenerated_bytes.saturating_mul(2))
-        .and_then(|size| size.checked_add(regenerated_members.saturating_mul(64 * 1024)));
-    if conservative_output_bound.is_none_or(|size| size > u64::from(u32::MAX)) {
+        .and_then(|size| size.checked_add(regenerated_members.saturating_mul(64 * 1024)))
+        .and_then(|size| size.checked_add(appended_bytes.saturating_mul(2)))
+        .and_then(|size| size.checked_add(appended_members.saturating_mul(64 * 1024)));
+    if conservative_output_bound.is_none_or(|size| size > u64::from(u32::MAX))
+        || !output_entry_count_is_zip32_safe(
+            provenance.members.len(),
+            omitted_members,
+            appended_members,
+        )
+    {
         return Ok(PreservationWrite::Fallback(writer));
     }
     let mut plan = soapberry_zip::PreservationPlan::new();
+    plan.try_reserve_exact(index.entries().len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC preservation actions",
+            source,
+        })?;
+    plan.try_reserve_appended(usize::try_from(appended_members).map_err(|_| {
+        crate::OpcError::ZipError("OPC appended member count exceeds platform limits".into())
+    })?)
+    .map_err(|source| crate::OpcError::Allocation {
+        resource: "OPC appended preservation members",
+        source,
+    })?;
     for (source_member, indexed_entry) in provenance.members.iter().zip(index.entries()) {
-        let action = match &source_member.kind {
-            SourceMemberKind::ContentTypes if content_types_changed => regenerated_action(
-                indexed_entry.id(),
-                source_member.name.as_deref(),
-                publication.content_types_xml.as_bytes(),
-            )?,
-            SourceMemberKind::PackageRelationships
-                if provenance.package_relationships_xml != publication.package_rels_xml =>
-            {
-                regenerated_action(
+        let action = if omitted_ids.contains(&indexed_entry.id()) {
+            soapberry_zip::PreservationAction::Omit(indexed_entry.id())
+        } else {
+            match &source_member.kind {
+                SourceMemberKind::ContentTypes if content_types_changed => regenerated_action(
                     indexed_entry.id(),
                     source_member.name.as_deref(),
-                    publication.package_rels_xml.as_bytes(),
-                )?
-            },
-            SourceMemberKind::Part(partname) => {
-                let Some(part) = planned_parts.get(partname) else {
-                    return Ok(PreservationWrite::Fallback(writer));
-                };
-                let Some(source_part) = provenance.parts.get(partname) else {
-                    return Ok(PreservationWrite::Fallback(writer));
-                };
-                if source_part.blob.as_slice() == part.blob {
-                    soapberry_zip::PreservationAction::Copy(indexed_entry.id())
-                } else {
-                    regenerated_shared_action(
-                        indexed_entry.id(),
-                        source_member.name.as_deref(),
-                        package.get_part(partname)?.blob_arc(),
-                    )?
-                }
-            },
-            SourceMemberKind::PartRelationships(partname) => {
-                let Some(part) = planned_parts.get(partname) else {
-                    return Ok(PreservationWrite::Fallback(writer));
-                };
-                let Some(relationships) = &part.relationships else {
-                    return Ok(PreservationWrite::Fallback(writer));
-                };
-                let Some(source_part) = provenance.parts.get(partname) else {
-                    return Ok(PreservationWrite::Fallback(writer));
-                };
-                if source_part.relationships_xml == relationships.xml {
-                    soapberry_zip::PreservationAction::Copy(indexed_entry.id())
-                } else {
+                    publication.content_types_xml.as_bytes(),
+                )?,
+                SourceMemberKind::PackageRelationships
+                    if provenance.package_relationships_xml != publication.package_rels_xml =>
+                {
                     regenerated_action(
                         indexed_entry.id(),
                         source_member.name.as_deref(),
-                        relationships.xml.as_bytes(),
+                        publication.package_rels_xml.as_bytes(),
                     )?
-                }
-            },
-            SourceMemberKind::ContentTypes
-            | SourceMemberKind::PackageRelationships
-            | SourceMemberKind::Unknown => {
-                soapberry_zip::PreservationAction::Copy(indexed_entry.id())
-            },
+                },
+                SourceMemberKind::Part(partname) => {
+                    let Some(part) = planned_parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    let Some(source_part) = provenance.parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    if source_part.blob.as_slice() == part.blob {
+                        soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                    } else {
+                        regenerated_shared_action(
+                            indexed_entry.id(),
+                            source_member.name.as_deref(),
+                            package.get_part(partname)?.blob_arc(),
+                        )?
+                    }
+                },
+                SourceMemberKind::PartRelationships(partname) => {
+                    let Some(part) = planned_parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    let Some(relationships) = &part.relationships else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    let Some(source_part) = provenance.parts.get(partname) else {
+                        return Ok(PreservationWrite::Fallback(writer));
+                    };
+                    if source_part.relationships_xml == relationships.xml {
+                        soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                    } else {
+                        regenerated_action(
+                            indexed_entry.id(),
+                            source_member.name.as_deref(),
+                            relationships.xml.as_bytes(),
+                        )?
+                    }
+                },
+                SourceMemberKind::ContentTypes
+                | SourceMemberKind::PackageRelationships
+                | SourceMemberKind::Unknown => {
+                    soapberry_zip::PreservationAction::Copy(indexed_entry.id())
+                },
+            }
         };
         plan.push(action);
+    }
+    for append in &appended {
+        let entry = match append {
+            PlannedAppend::Part(part) => regenerated_shared_entry(
+                part.partname.membername(),
+                package.get_part(part.partname)?.blob_arc(),
+            )?,
+            PlannedAppend::Relationships(part) => {
+                let Some(relationships) = part.relationships.as_ref() else {
+                    return Ok(PreservationWrite::Fallback(writer));
+                };
+                regenerated_entry(
+                    relationships.uri.membername(),
+                    relationships.xml.as_bytes(),
+                    "OPC appended relationship payload",
+                )?
+            },
+        };
+        plan.try_append(entry)
+            .map_err(|source| crate::OpcError::Allocation {
+                resource: "OPC appended preservation members",
+                source,
+            })?;
     }
 
     index
@@ -372,6 +601,85 @@ fn regenerated_shared_action(
         entry: soapberry_zip::RegeneratedEntry::new_shared(owned_name, data)
             .compression_method(soapberry_zip::CompressionMethod::Deflate),
     })
+}
+
+fn regenerated_entry(
+    name: &str,
+    bytes: &[u8],
+    resource: &'static str,
+) -> Result<soapberry_zip::RegeneratedEntry> {
+    let mut data = Vec::new();
+    data.try_reserve_exact(bytes.len())
+        .map_err(|source| crate::OpcError::Allocation { resource, source })?;
+    data.extend_from_slice(bytes);
+    Ok(
+        soapberry_zip::RegeneratedEntry::new(regenerated_name(Some(name))?, data)
+            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+    )
+}
+
+fn regenerated_shared_entry(
+    name: &str,
+    data: std::sync::Arc<Vec<u8>>,
+) -> Result<soapberry_zip::RegeneratedEntry> {
+    Ok(
+        soapberry_zip::RegeneratedEntry::new_shared(regenerated_name(Some(name))?, data)
+            .compression_method(soapberry_zip::CompressionMethod::Deflate),
+    )
+}
+
+fn normalized_member_name(name: &str, resource: &'static str) -> Result<String> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(name.len())
+        .map_err(|source| crate::OpcError::Allocation { resource, source })?;
+    bytes.extend(name.as_bytes().iter().map(u8::to_ascii_lowercase));
+    String::from_utf8(bytes).map_err(|_| {
+        crate::OpcError::ZipError("OPC preservation member name normalization failed".into())
+    })
+}
+
+fn omitted_members_form_suffix<R: soapberry_zip::ReaderAt>(
+    index: &soapberry_zip::PreservationIndex<'_, R>,
+    omitted: &HashSet<soapberry_zip::PreservationEntryId>,
+) -> Result<bool> {
+    let entries = index.entries();
+    let Some(suffix_start) = entries.len().checked_sub(omitted.len()) else {
+        return Ok(false);
+    };
+    for (position, entry) in entries.iter().enumerate() {
+        if omitted.contains(&entry.id()) != (position >= suffix_start) {
+            return Ok(false);
+        }
+    }
+
+    let mut local_order = Vec::new();
+    local_order
+        .try_reserve_exact(entries.len())
+        .map_err(|source| crate::OpcError::Allocation {
+            resource: "OPC preservation local omission order",
+            source,
+        })?;
+    local_order.extend(0..entries.len());
+    local_order.sort_unstable_by_key(|&position| entries[position].local_span().start);
+    for (position, entry_position) in local_order.iter().enumerate() {
+        if omitted.contains(&entries[*entry_position].id()) != (position >= suffix_start) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn output_entry_count_is_zip32_safe(
+    source_members: usize,
+    omitted_members: u64,
+    appended_members: u64,
+) -> bool {
+    u64::try_from(source_members)
+        .ok()
+        .and_then(|count| count.checked_sub(omitted_members))
+        .and_then(|count| count.checked_add(appended_members))
+        .is_some_and(|count| count < u64::from(u16::MAX))
 }
 
 fn regenerated_name(name: Option<&str>) -> Result<String> {
@@ -769,6 +1077,30 @@ mod tests {
         let mut record = record.to_vec();
         record[42..46].fill(0);
         record
+    }
+
+    #[test]
+    fn targeted_output_entry_count_rejects_zip32_sentinel() {
+        assert!(output_entry_count_is_zip32_safe(
+            usize::from(u16::MAX - 1),
+            0,
+            0
+        ));
+        assert!(!output_entry_count_is_zip32_safe(
+            usize::from(u16::MAX),
+            0,
+            0
+        ));
+        assert!(!output_entry_count_is_zip32_safe(
+            usize::from(u16::MAX - 1),
+            0,
+            1
+        ));
+        assert!(output_entry_count_is_zip32_safe(
+            usize::from(u16::MAX),
+            1,
+            0
+        ));
     }
 
     fn pseudo_random_bytes(len: usize, mut state: u32) -> Vec<u8> {
@@ -1287,22 +1619,124 @@ mod tests {
     }
 
     #[test]
-    fn add_remove_and_relationship_topology_changes_fall_back_to_full_rewrite() {
+    fn topology_part_add_preserves_source_and_appends_deterministic_members() {
+        let (source, _first, _second) = two_part_source(b"topology addition");
+        let source_raw = raw_archive(&source);
+        let mut added = OpcPackage::from_vec(source.clone()).expect("open add source");
+        let first_added = PackURI::new("/custom/zzz.bin").unwrap();
+        let second_added = PackURI::new("/custom/aaa.bin").unwrap();
+        let mut first_part = crate::BlobPart::new(
+            first_added.clone(),
+            "application/octet-stream".to_owned(),
+            b"third with relationships".to_vec(),
+        );
+        crate::Part::relate_to_ext(&mut first_part, "https://example.com/new", "urn:new");
+        added.add_part(Box::new(first_part));
+        added.add_part(Box::new(crate::BlobPart::new(
+            second_added.clone(),
+            "application/octet-stream".to_owned(),
+            b"third without relationships".to_vec(),
+        )));
+
+        let added_output = PackageWriter::to_bytes(&added).expect("publish added parts");
+        let added_raw = raw_archive(&added_output);
+        assert_eq!(added_raw.comment, source_raw.comment);
+        assert_eq!(
+            &added_raw.local_order[..source_raw.local_order.len()],
+            source_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &added_raw.central_order[..source_raw.central_order.len()],
+            source_raw.central_order.as_slice()
+        );
+        assert_eq!(
+            &added_raw.local_order[source_raw.local_order.len()..],
+            [
+                "custom/aaa.bin",
+                "custom/zzz.bin",
+                "custom/_rels/zzz.bin.rels"
+            ]
+        );
+        assert_eq!(
+            &added_raw.central_order[source_raw.central_order.len()..],
+            [
+                "custom/aaa.bin",
+                "custom/zzz.bin",
+                "custom/_rels/zzz.bin.rels"
+            ]
+        );
+        for name in &source_raw.local_order {
+            if name == "[Content_Types].xml" {
+                assert_ne!(
+                    added_raw.local_members[name],
+                    source_raw.local_members[name]
+                );
+            } else {
+                assert_eq!(
+                    added_raw.local_members[name], source_raw.local_members[name],
+                    "{name}"
+                );
+                assert_eq!(
+                    central_without_local_offset(&added_raw.central_records[name]),
+                    central_without_local_offset(&source_raw.central_records[name]),
+                    "{name}"
+                );
+            }
+        }
+        let reopened = OpcPackage::from_bytes(&added_output).expect("reopen added package");
+        assert_eq!(
+            reopened.get_part(&second_added).unwrap().blob(),
+            b"third without relationships"
+        );
+        let reopened_first = reopened.get_part(&first_added).unwrap();
+        assert_eq!(reopened_first.blob(), b"third with relationships");
+        assert_eq!(reopened_first.rels().len(), 1);
+        assert_eq!(
+            reopened_first.rels().get("rId1").unwrap().target_ref(),
+            "https://example.com/new"
+        );
+        assert_eq!(
+            reopened.get_part(&second_added).unwrap().content_type(),
+            "application/octet-stream"
+        );
+    }
+
+    #[test]
+    fn appended_suffix_removal_restores_exact_source_bytes() {
+        let (source, _first, _second) = two_part_source(b"suffix removal");
+        let appended_name = PackURI::new("/custom/appended.bin").unwrap();
+        let mut appended_part = crate::BlobPart::new(
+            appended_name.clone(),
+            "application/octet-stream".to_owned(),
+            b"temporary appended payload".to_vec(),
+        );
+        crate::Part::relate_to_ext(
+            &mut appended_part,
+            "https://example.com/temporary",
+            "urn:temporary",
+        );
+
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open append source");
+        package.add_part(Box::new(appended_part));
+        let appended = PackageWriter::to_bytes(&package).expect("publish appended suffix");
+        assert_ne!(appended, source);
+
+        let mut reopened = OpcPackage::from_vec(appended).expect("reopen appended suffix");
+        assert!(reopened.remove_part(&appended_name));
+        let restored = PackageWriter::to_bytes(&reopened).expect("remove appended suffix");
+
+        assert_eq!(restored, source);
+    }
+
+    #[test]
+    fn non_suffix_part_and_relationship_removals_fall_back_to_full_rewrite() {
         let (source, first, second) = two_part_source(b"topology fallback");
 
-        let mut added = OpcPackage::from_vec(source.clone()).expect("open add source");
-        added.add_part(Box::new(crate::BlobPart::new(
-            PackURI::new("/custom/third.bin").unwrap(),
-            "application/octet-stream".to_owned(),
-            b"third".to_vec(),
-        )));
-        let added_output = PackageWriter::to_bytes(&added).expect("publish added part");
-        assert!(raw_archive(&added_output).comment.is_empty());
-
         let mut removed = OpcPackage::from_vec(source.clone()).expect("open remove source");
-        assert!(removed.remove_part(&second));
+        assert!(removed.remove_part(&first));
         let removed_output = PackageWriter::to_bytes(&removed).expect("publish removed part");
         assert!(raw_archive(&removed_output).comment.is_empty());
+        assert!(removed.get_part(&second).is_ok());
 
         let mut removed_relationship =
             OpcPackage::from_vec(source).expect("open relationship removal source");
@@ -1317,17 +1751,67 @@ mod tests {
         let removed_relationship_output =
             PackageWriter::to_bytes(&removed_relationship).expect("publish relationship removal");
         assert!(raw_archive(&removed_relationship_output).comment.is_empty());
+    }
 
-        let (source, first) = source_with_non_part_framing();
-        let mut added_relationship =
-            OpcPackage::from_vec(source).expect("open relationship addition source");
-        added_relationship
-            .get_part_mut(&first)
+    #[test]
+    fn adding_relationship_member_to_existing_part_preserves_and_appends() {
+        let (source, _first, second) = two_part_source(b"relationship presence addition");
+        let source_raw = raw_archive(&source);
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open relationship source");
+        package
+            .get_part_mut(&second)
             .unwrap()
             .relate_to_ext("https://example.com", "urn:new");
-        let added_relationship_output =
-            PackageWriter::to_bytes(&added_relationship).expect("publish relationship addition");
-        let raw = raw_archive(&added_relationship_output);
+        let output = PackageWriter::to_bytes(&package).expect("publish relationship addition");
+        let output_raw = raw_archive(&output);
+        assert_eq!(output_raw.comment, source_raw.comment);
+        assert_eq!(
+            &output_raw.local_order[..source_raw.local_order.len()],
+            source_raw.local_order.as_slice()
+        );
+        assert_eq!(
+            &output_raw.central_order[..source_raw.central_order.len()],
+            source_raw.central_order.as_slice()
+        );
+        assert_eq!(
+            &output_raw.local_order[source_raw.local_order.len()..],
+            ["custom/_rels/second.bin.rels"]
+        );
+        assert_eq!(
+            &output_raw.central_order[source_raw.central_order.len()..],
+            ["custom/_rels/second.bin.rels"]
+        );
+        for name in &source_raw.local_order {
+            assert_eq!(
+                output_raw.local_members[name], source_raw.local_members[name],
+                "{name}"
+            );
+            assert_eq!(
+                central_without_local_offset(&output_raw.central_records[name]),
+                central_without_local_offset(&source_raw.central_records[name]),
+                "{name}"
+            );
+        }
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen relationship output");
+        let relationships = reopened.get_part(&second).unwrap().rels();
+        assert_eq!(relationships.len(), 1);
+        assert_eq!(
+            relationships.get("rId1").unwrap().target_ref(),
+            "https://example.com"
+        );
+    }
+
+    #[test]
+    fn topology_add_with_unknown_non_part_falls_back() {
+        let (source, _first) = source_with_non_part_framing();
+        let mut package = OpcPackage::from_vec(source).expect("open unknown-member source");
+        package.add_part(Box::new(crate::BlobPart::new(
+            PackURI::new("/custom/third.bin").unwrap(),
+            "application/octet-stream".to_owned(),
+            b"third".to_vec(),
+        )));
+        let output = PackageWriter::to_bytes(&package).expect("publish topology addition");
+        let raw = raw_archive(&output);
         assert!(raw.comment.is_empty());
         assert!(!raw.local_members.contains_key("junk.dat"));
     }
@@ -1360,6 +1844,21 @@ mod tests {
                 .as_bytes()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn trailing_source_bytes_fall_back_before_targeted_preservation() {
+        let (source, first, _second) = two_part_source(b"trailing fallback");
+        let mut suffixed = source;
+        suffixed.extend_from_slice(b"trailing bytes outside EOCD");
+        let mut package = OpcPackage::from_vec(suffixed).expect("open suffixed OPC");
+        package
+            .get_part_mut(&first)
+            .expect("first part")
+            .set_blob(b"changed payload".to_vec());
+
+        let output = PackageWriter::to_bytes(&package).expect("publish suffixed source");
+        assert!(raw_archive(&output).comment.is_empty());
     }
 
     #[test]
