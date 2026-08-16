@@ -620,6 +620,10 @@ enum Case {
     XlsxSourceBackedManagedCellValuesOnePercentEditSave,
     XlsxSourceBackedManagedCellValuesBatchEditSave,
     XlsxSourceBackedManagedCellValuesMultiSheetEditSave,
+    XlsxEagerCellClearEditSave,
+    XlsxSourceBackedCellClearEditSave,
+    XlsxEagerCellRemoveEditSave,
+    XlsxSourceBackedCellRemoveEditSave,
     CfbOpen,
     CfbListStreams,
     CfbReadOne,
@@ -1004,6 +1008,14 @@ impl Case {
             },
             Self::XlsxSourceBackedManagedCellValuesMultiSheetEditSave => {
                 "xlsx_source_backed_managed_cell_values_multi_sheet_edit_save"
+            },
+            Self::XlsxEagerCellClearEditSave => "xlsx_eager_cell_clear_edit_save",
+            Self::XlsxSourceBackedCellClearEditSave => {
+                "xlsx_source_backed_cell_clear_edit_save"
+            },
+            Self::XlsxEagerCellRemoveEditSave => "xlsx_eager_cell_remove_edit_save",
+            Self::XlsxSourceBackedCellRemoveEditSave => {
+                "xlsx_source_backed_cell_remove_edit_save"
             },
             Self::CfbOpen => "cfb_open",
             Self::CfbListStreams => "cfb_list_streams",
@@ -1470,7 +1482,7 @@ impl Case {
     }
 
     const fn uses_xlsx_cell_values(self) -> bool {
-        self.is_xlsx_cell_values_edit_save()
+        self.is_xlsx_cell_values_edit_save() || self.is_xlsx_cell_lifecycle_edit_save()
     }
 
     const fn uses_streaming_creation(self) -> bool {
@@ -2083,6 +2095,30 @@ impl Case {
                 | Self::XlsxSourceBackedManagedCellValuesOnePercentEditSave
                 | Self::XlsxSourceBackedManagedCellValuesBatchEditSave
                 | Self::XlsxSourceBackedManagedCellValuesMultiSheetEditSave
+        )
+    }
+
+    const fn is_xlsx_cell_lifecycle_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerCellClearEditSave
+                | Self::XlsxSourceBackedCellClearEditSave
+                | Self::XlsxEagerCellRemoveEditSave
+                | Self::XlsxSourceBackedCellRemoveEditSave
+        )
+    }
+
+    const fn is_xlsx_cell_lifecycle_source_backed(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceBackedCellClearEditSave | Self::XlsxSourceBackedCellRemoveEditSave
+        )
+    }
+
+    const fn is_xlsx_cell_lifecycle_remove(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerCellRemoveEditSave | Self::XlsxSourceBackedCellRemoveEditSave
         )
     }
 }
@@ -6424,12 +6460,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .iter()
                 .filter(|case| case.uses_xlsx_cell_values())
             {
-                results.push(run_xlsx_cell_values_edit_save(
-                    *case,
-                    &corpus,
-                    options.warmup_iterations,
-                    options.samples,
-                )?);
+                let result = if case.is_xlsx_cell_lifecycle_edit_save() {
+                    run_xlsx_cell_lifecycle_edit_save(
+                        *case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?
+                } else {
+                    run_xlsx_cell_values_edit_save(
+                        *case,
+                        &corpus,
+                        options.warmup_iterations,
+                        options.samples,
+                    )?
+                };
+                results.push(result);
             }
         }
     }
@@ -7387,6 +7433,14 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_backed_managed_cell_values_multi_sheet_edit_save" => {
             Some(Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave)
         },
+        "xlsx_eager_cell_clear_edit_save" => Some(Case::XlsxEagerCellClearEditSave),
+        "xlsx_source_backed_cell_clear_edit_save" => {
+            Some(Case::XlsxSourceBackedCellClearEditSave)
+        },
+        "xlsx_eager_cell_remove_edit_save" => Some(Case::XlsxEagerCellRemoveEditSave),
+        "xlsx_source_backed_cell_remove_edit_save" => {
+            Some(Case::XlsxSourceBackedCellRemoveEditSave)
+        },
         "cfb_open" => Some(Case::CfbOpen),
         "cfb_list_streams" => Some(Case::CfbListStreams),
         "cfb_read_one" => Some(Case::CfbReadOne),
@@ -7829,6 +7883,10 @@ fn print_usage() {
                                        xlsx_source_backed_managed_cell_values_one_percent_edit_save,\n\
                                        xlsx_source_backed_managed_cell_values_batch_edit_save,\n\
                                        xlsx_source_backed_managed_cell_values_multi_sheet_edit_save,\n\
+                                       xlsx_eager_cell_clear_edit_save,\n\
+                                       xlsx_source_backed_cell_clear_edit_save,\n\
+                                       xlsx_eager_cell_remove_edit_save,\n\
+                                       xlsx_source_backed_cell_remove_edit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
@@ -13097,6 +13155,18 @@ fn run_xlsx_cell_value_lifecycle_gates(
                 "XLSX cell CRUD clear/remove lifecycle gate did not change one cell".into(),
             );
         }
+        let foreign_editor =
+            litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+                OwnedSource::new(corpus.archive.clone()),
+            ))?;
+        let mut foreign_output = Vec::new();
+        if foreign_editor
+            .publish_multi_commit_to_stream(&mut foreign_output, &commit)
+            .is_ok()
+            || !foreign_output.is_empty()
+        {
+            return Err("XLSX lifecycle foreign source lineage was accepted".into());
+        }
         let mut published = Vec::new();
         editor.publish_multi_commit_to_stream(&mut published, &commit)?;
         verify_xlsx_cell_crud_package_identity(corpus, &published)?;
@@ -13586,6 +13656,12 @@ fn run_case_with_config(
         | Case::XlsxSourceBackedManagedCellValuesBatchEditSave
         | Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave => {
             run_xlsx_cell_values_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxEagerCellClearEditSave
+        | Case::XlsxSourceBackedCellClearEditSave
+        | Case::XlsxEagerCellRemoveEditSave
+        | Case::XlsxSourceBackedCellRemoveEditSave => {
+            run_xlsx_cell_lifecycle_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxSourceOpen => run_xlsx_source_open(corpus, warmup_iterations, samples),
         Case::XlsxSourceListSheets => {
@@ -25521,6 +25597,379 @@ fn xlsx_cell_crud_eager_output(
     Ok(output)
 }
 
+fn xlsx_cell_lifecycle_target(spec: &XlsxCorpus) -> Result<XlsxCoordinate, Box<dyn Error>> {
+    spec.cell_inventory
+        .as_ref()
+        .and_then(|inventory| inventory.first())
+        .and_then(|cells| cells.first())
+        .copied()
+        .ok_or_else(|| "XLSX cell lifecycle corpus has no target cell".into())
+}
+
+fn verify_xlsx_cell_lifecycle_output(
+    workbook: &Workbook,
+    spec: &XlsxCorpus,
+    target: XlsxCoordinate,
+    remove: bool,
+) -> Result<(), Box<dyn Error>> {
+    if workbook.len() != spec.sheet_count {
+        return Err("XLSX cell lifecycle output changed worksheet count".into());
+    }
+    let inventory = spec
+        .cell_inventory
+        .as_ref()
+        .ok_or("XLSX cell lifecycle output has no cell inventory")?;
+    for sheet_index in 0..spec.sheet_count {
+        let sheet = workbook
+            .sheet(xlsx_sheet_name(sheet_index).as_str())?
+            .ok_or("XLSX cell lifecycle output is missing a worksheet")?;
+        let expected_count = inventory
+            .get(sheet_index)
+            .ok_or("XLSX cell lifecycle inventory is missing a worksheet")?
+            .len()
+            .checked_sub(usize::from(remove && sheet_index == target.sheet))
+            .ok_or("XLSX cell lifecycle expected cell count underflowed")?;
+        if sheet.cells("A1:XFD1048576")?.count() != expected_count {
+            return Err("XLSX cell lifecycle changed an unexpected cell owner count".into());
+        }
+        for coordinate in inventory
+            .get(sheet_index)
+            .ok_or("XLSX cell lifecycle inventory is missing cells")?
+        {
+            let address = xlsx_address(coordinate.row, coordinate.column)?;
+            let stored = sheet.cell(address.as_str())?.stored();
+            if *coordinate == target {
+                if remove {
+                    if stored.is_some() {
+                        return Err("XLSX remove lifecycle retained the target owner".into());
+                    }
+                } else if !matches!(stored, Some(XlsxCell::Empty)) {
+                    return Err("XLSX clear lifecycle did not retain an empty owner".into());
+                }
+            } else {
+                let expected = xlsx_value(*coordinate).to_string();
+                if !matches!(
+                    stored,
+                    Some(XlsxCell::Value(XlsxValue::Number(value)))
+                        if value.as_str() == expected
+                ) {
+                    return Err("XLSX cell lifecycle changed an unselected cell".into());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn xlsx_cell_lifecycle_semantic_hash(
+    output: &[u8],
+    spec: &XlsxCorpus,
+    target: XlsxCoordinate,
+    remove: bool,
+) -> Result<String, Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(output.to_vec())?;
+    verify_xlsx_cell_lifecycle_output(&workbook, spec, target, remove)?;
+    let inventory = spec
+        .cell_inventory
+        .as_ref()
+        .ok_or("XLSX cell lifecycle semantic hash has no inventory")?;
+    let mut semantic = Vec::new();
+    for coordinate in inventory.iter().flatten() {
+        let state = if *coordinate == target {
+            if remove { "missing" } else { "empty" }
+        } else {
+            "value"
+        };
+        semantic.push(format!("{}!{}={state}", xlsx_cell_name(*coordinate), xlsx_value(*coordinate)));
+    }
+    Ok(sha256_hex(semantic.join("\n").as_bytes()))
+}
+
+fn xlsx_cell_lifecycle_eager_output(
+    corpus: &Corpus,
+    spec: &XlsxCorpus,
+    target: XlsxCoordinate,
+    remove: bool,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let mut edit = workbook.edit()?;
+    let mut sheet = edit
+        .sheet(xlsx_sheet_name(target.sheet).as_str())?
+        .ok_or("XLSX eager cell lifecycle target sheet is missing")?;
+    let address = xlsx_address(target.row, target.column)?;
+    if remove {
+        sheet.remove(address)?;
+    } else {
+        sheet.clear(address)?;
+    }
+    let commit = edit.commit()?;
+    let output = commit.workbook().to_bytes()?;
+    let reopened = Workbook::from_bytes(output.clone())?;
+    verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
+    verify_xlsx_cell_crud_package_identity(corpus, &output)?;
+    Ok(output)
+}
+
+fn xlsx_cell_lifecycle_source_output(
+    corpus: &Corpus,
+    spec: &XlsxCorpus,
+    target: XlsxCoordinate,
+    remove: bool,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+    let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
+    let address = litchi_xlsx::Address::at(
+        u32::try_from(target.row)?,
+        u32::try_from(target.column)?,
+    )?;
+    if remove {
+        edit.remove(target.sheet, address)?;
+    } else {
+        edit.clear(target.sheet, address)?;
+    }
+    let commit = edit.commit()?;
+    if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+        return Err("XLSX source cell lifecycle did not produce one change".into());
+    }
+    let mut output = Vec::new();
+    editor.publish_multi_commit_to_stream(&mut output, &commit)?;
+    let reopened = Workbook::from_bytes(output.clone())?;
+    verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
+    verify_xlsx_cell_crud_package_identity(corpus, &output)?;
+    Ok(output)
+}
+
+fn run_xlsx_cell_lifecycle_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_cell_lifecycle_edit_save()
+    {
+        return Err("XLSX cell lifecycle case requires its fixed multi-sheet media corpus".into());
+    }
+    let spec = xlsx_spec(corpus)?;
+    let target = xlsx_cell_lifecycle_target(spec)?;
+    let remove = case.is_xlsx_cell_lifecycle_remove();
+    let source_backed = case.is_xlsx_cell_lifecycle_source_backed();
+
+    // Shared source-backed no-op, lifecycle, volatile-patch, stale-source,
+    // package, and semantic gates run before the measured loop. They use the
+    // public source-backed clear/remove API even for the eager pair so the
+    // shared lifecycle contract is checked once without polluting samples;
+    // eager-specific package and semantic checks are performed separately.
+    run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
+    let expected = if source_backed {
+        xlsx_cell_lifecycle_source_output(corpus, spec, target, remove)?
+    } else {
+        xlsx_cell_lifecycle_eager_output(corpus, spec, target, remove)?
+    };
+    let expected_digest = sha256_hex(&expected);
+    let expected_semantic = xlsx_cell_lifecycle_semantic_hash(&expected, spec, target, remove)?;
+    let untouched = source_backed.then(|| {
+        xlsx_cell_crud_untouched_member_evidence(corpus, &expected, &[target])
+    });
+    let (untouched_member_count, untouched_member_sha256) = untouched
+        .transpose()?
+        .unwrap_or_default();
+    let maximum = xlsx_output_ceiling(expected.len())?;
+    let payload_ranges = source_backed
+        .then(|| xlsx_cell_crud_payload_ranges(corpus))
+        .transpose()?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut output_digests = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let backing = source_backed.then(|| {
+            Arc::new(InstrumentedSource::new(
+                corpus.archive.clone(),
+                payload_ranges
+                    .clone()
+                    .expect("XLSX lifecycle source ranges are present"),
+            ))
+        });
+        let mut sink = WindowedHashingSink::new(maximum, 64 * 1024)?;
+        let mut duration = Duration::ZERO;
+        let mut source_evidence = if source_backed {
+            let read_at: Arc<dyn ReadAt> = backing
+                .clone()
+                .expect("XLSX lifecycle source backing is present");
+            let open_started = Instant::now();
+            let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(
+                read_at,
+            )?;
+            let open_duration = open_started.elapsed();
+            let open_ns = elapsed_ns(open_duration)?;
+            duration += open_duration;
+
+            let plan_started = Instant::now();
+            let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
+            let address = litchi_xlsx::Address::at(
+                u32::try_from(target.row)?,
+                u32::try_from(target.column)?,
+            )?;
+            if remove {
+                edit.remove(target.sheet, address)?;
+            } else {
+                edit.clear(target.sheet, address)?;
+            }
+            let plan_duration = plan_started.elapsed();
+            let plan_ns = elapsed_ns(plan_duration)?;
+            duration += plan_duration;
+
+            let commit_started = Instant::now();
+            let commit = edit.commit()?;
+            let commit_duration = commit_started.elapsed();
+            let commit_ns = elapsed_ns(commit_duration)?;
+            duration += commit_duration;
+            if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+                return Err("XLSX source lifecycle sample did not change one cell".into());
+            }
+            let diagnostics = editor.cache_diagnostics();
+            if diagnostics.budget_managed
+                || diagnostics.successful_loads == 0
+                || diagnostics.budget_memory_used != 0
+                || diagnostics.budget_cache_reserved_bytes != 0
+            {
+                return Err("XLSX source lifecycle diagnostics are outside unmanaged bounds".into());
+            }
+            let publication_started = Instant::now();
+            editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
+            let publication_duration = publication_started.elapsed();
+            let publication_ns = elapsed_ns(publication_duration)?;
+            duration += publication_duration;
+            let source = backing
+                .as_ref()
+                .expect("XLSX lifecycle source backing is present")
+                .snapshot();
+            XlsxCellValuesIterationEvidence {
+                implementation: "source-backed",
+                cache_mode: "unmanaged-control",
+                timing_scope: "open, selector planning/staging, commit, and non-retaining stream publication; reopen/verification is separate and excluded",
+                update_count: 1,
+                selected_worksheet_count: 1,
+                open_ns,
+                plan_ns,
+                commit_ns,
+                publication_ns,
+                reopen_ns: 0,
+                source,
+                diagnostics,
+                pre_publication_budget: xlsx_cell_values_budget_snapshot(diagnostics),
+                post_publication_budget: XlsxCellValuesBudgetSnapshot::default(),
+                payload_materializations: diagnostics.successful_loads,
+                budget_used_after_package_drop: 0,
+                budget_used_after_handles_drop: 0,
+                budget_objects_used_after_handles_drop: 0,
+                output_sha256: String::new(),
+                semantic_sha256: expected_semantic.clone(),
+                untouched_member_count,
+                untouched_member_sha256: untouched_member_sha256.clone(),
+                output_budget_refusal: XlsxCellValuesOutputRefusalEvidence::default(),
+            }
+        } else {
+            let open_started = Instant::now();
+            let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+            let open_duration = open_started.elapsed();
+            let open_ns = elapsed_ns(open_duration)?;
+            duration += open_duration;
+            let plan_started = Instant::now();
+            let mut edit = workbook.edit()?;
+            let mut sheet = edit
+                .sheet(xlsx_sheet_name(target.sheet).as_str())?
+                .ok_or("XLSX eager cell lifecycle target sheet is missing")?;
+            let address = xlsx_address(target.row, target.column)?;
+            if remove {
+                sheet.remove(address)?;
+            } else {
+                sheet.clear(address)?;
+            }
+            let plan_duration = plan_started.elapsed();
+            let plan_ns = elapsed_ns(plan_duration)?;
+            duration += plan_duration;
+            let commit_started = Instant::now();
+            let commit = edit.commit()?;
+            let commit_duration = commit_started.elapsed();
+            let commit_ns = elapsed_ns(commit_duration)?;
+            duration += commit_duration;
+            let publication_started = Instant::now();
+            commit.workbook().write_to(&mut sink)?;
+            let publication_duration = publication_started.elapsed();
+            let publication_ns = elapsed_ns(publication_duration)?;
+            duration += publication_duration;
+            XlsxCellValuesIterationEvidence {
+                implementation: "eager",
+                cache_mode: "not-applicable",
+                timing_scope: "open, selector planning/staging, commit, and non-retaining stream publication; reopen/verification is separate and excluded",
+                update_count: 1,
+                selected_worksheet_count: 1,
+                open_ns,
+                plan_ns,
+                commit_ns,
+                publication_ns,
+                reopen_ns: 0,
+                source: SourceSnapshot::default(),
+                diagnostics: SourceCacheDiagnostics::default(),
+                pre_publication_budget: XlsxCellValuesBudgetSnapshot::default(),
+                post_publication_budget: XlsxCellValuesBudgetSnapshot::default(),
+                payload_materializations: 0,
+                budget_used_after_package_drop: 0,
+                budget_used_after_handles_drop: 0,
+                budget_objects_used_after_handles_drop: 0,
+                output_sha256: String::new(),
+                semantic_sha256: expected_semantic.clone(),
+                untouched_member_count: 0,
+                untouched_member_sha256: String::new(),
+                output_budget_refusal: XlsxCellValuesOutputRefusalEvidence::default(),
+            }
+        };
+
+        let (sink_summary, digest) = sink.finish();
+        if digest != expected_digest {
+            return Err("XLSX cell lifecycle stream digest differs from expected output".into());
+        }
+        if sink_summary.accepted_bytes != u64::try_from(expected.len())?
+            || sink_summary.retained_output_bytes != Some(0)
+            || sink_summary.largest_write > 64 * 1024
+        {
+            return Err("XLSX cell lifecycle publication exceeded the fixed sink bound".into());
+        }
+        let reopen_started = Instant::now();
+        let reopened = Workbook::from_bytes(expected.clone())?;
+        verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
+        let reopen_ns = elapsed_ns(reopen_started.elapsed())?;
+        source_evidence.reopen_ns = reopen_ns;
+        source_evidence.output_sha256 = digest.clone();
+        if iteration >= warmup_iterations {
+            source_summary.record_xlsx_cell_values(source_evidence)?;
+            sink_summaries.push(sink_summary);
+            output_digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let sink = deterministic_sink_summary(&sink_summaries, case.name())?;
+    if output_digests.iter().any(|digest| digest != &expected_digest) {
+        return Err("XLSX cell lifecycle output hashes are not deterministic".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: Some(sink),
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: Some(expected_digest),
+        operation_metrics: None,
+    })
+}
+
 fn run_xlsx_cell_values_edit_save(
     case: Case,
     corpus: &Corpus,
@@ -34974,7 +35423,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 305);
+        assert_eq!(selectable_count, 309);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -39057,6 +39506,62 @@ mod tests {
         assert_eq!(xlsx_cell_count(dense_spec).unwrap(), 17_792);
         assert_eq!(dense_spec.one_percent_updates.len(), 178);
         assert!(dense_first.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
+    }
+
+    #[test]
+    fn xlsx_cell_lifecycle_clear_and_remove_controls_are_matched_and_bounded() {
+        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        let cases = [
+            Case::XlsxEagerCellClearEditSave,
+            Case::XlsxSourceBackedCellClearEditSave,
+            Case::XlsxEagerCellRemoveEditSave,
+            Case::XlsxSourceBackedCellRemoveEditSave,
+        ];
+        let mut semantic_by_operation = BTreeMap::new();
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            let measured = run_case(case, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            let sink = measured.sink.as_ref().unwrap();
+            assert_eq!(sink.retained_output_bytes, Some(0));
+            assert!(sink.accepted_bytes > 0);
+            let source = measured.source.unwrap();
+            let evidence = source.xlsx_cell_values.unwrap();
+            assert_eq!(evidence.open_ns.len(), 1);
+            assert_eq!(evidence.plan_ns.len(), 1);
+            assert_eq!(evidence.commit_ns.len(), 1);
+            assert_eq!(evidence.publication_ns.len(), 1);
+            assert_eq!(evidence.reopen_ns.len(), 1);
+            assert_eq!(evidence.update_count, 1);
+            assert_eq!(evidence.selected_worksheet_count, 1);
+            assert_eq!(evidence.output_sha256.len(), 1);
+            assert_eq!(evidence.semantic_sha256.len(), 1);
+            assert_eq!(evidence.untouched_member_count > 0, case.is_xlsx_cell_lifecycle_source_backed());
+            if case.is_xlsx_cell_lifecycle_source_backed() {
+                assert!(evidence.source_read_calls[0] > 0);
+                assert!(evidence.source_read_bytes[0] > 0);
+                assert!(evidence.payload_materializations[0] > 0);
+                assert_eq!(evidence.implementation, "source-backed");
+            } else {
+                assert_eq!(evidence.source_read_calls, vec![0]);
+                assert_eq!(evidence.source_read_bytes, vec![0]);
+                assert_eq!(evidence.payload_materializations, vec![0]);
+                assert_eq!(evidence.implementation, "eager");
+            }
+            let operation = if case.is_xlsx_cell_lifecycle_remove() {
+                "remove"
+            } else {
+                "clear"
+            };
+            if let Some(previous) = semantic_by_operation.insert(
+                operation,
+                evidence.semantic_sha256[0].clone(),
+            ) {
+                assert_eq!(previous, evidence.semantic_sha256[0]);
+            }
+        }
+        assert_eq!(semantic_by_operation.len(), 2);
     }
 
     #[test]

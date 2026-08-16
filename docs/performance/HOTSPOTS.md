@@ -352,6 +352,18 @@ Confirmed source facts:
   improvements of 21.38%/22.70%. Physical source reads and successful
   materializations are unchanged, so this is a semantic-reparse result rather
   than an I/O claim. See [`change 0096`](changes/0096-xlsx-source-provenance-publication.md).
+- Change 0163 adds four opt-in eager/source-backed scalar-cell lifecycle
+  selectors over the existing medium and dense/sparse numeric four-sheet
+  corpora. The eager `WorksheetEdit` and positional source editor each clear or
+  remove `Sheet1!A1`; clear retains an empty owner and remove deletes it. Open,
+  plan/stage, commit, publication and lifecycle phases are separate, and a
+  fixed 64-KiB hashing sink retains zero output. Generic logical source and
+  materialization counters, semantic/package/no-op/volatile-patch/stale/
+  foreign gates, and source-backed raw preservation of unselected members are
+  recorded outside timing. This is correctness/phase/counter evidence only;
+  the source-backed patch has no durable wire contract and no latency,
+  allocation/RSS, physical-I/O, cold-cache, decompression or real-producer
+  claim is made. See [`change 0163`](changes/0163-xlsx-cell-clear-remove-evidence.md).
 - Plain worksheets previously ran a separate namespace-aware x14ac collection
   before every complete semantic parse even when no `dyDescent` token existed.
   Successful no-token reads now skip that pass; rejected inputs rerun it to
@@ -784,7 +796,8 @@ Confirmed source facts:
   adds four RTF selectors measured at the pre-staged publication-call interval,
   making that matrix 295. Change 0154 adds six ODF publication selectors,
   making that matrix 301; change 0159 later made it 302, change 0160 made it
-  303, and change 0162 makes the current matrix 305.
+  303, change 0162 made the matrix 305, and change 0163 makes the current
+  matrix 309.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical

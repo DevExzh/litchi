@@ -413,8 +413,8 @@ selector was added; only `cfg(test)` source-event acceptance and tests changed.
 Change 0153 adds four RTF selectors measured at the pre-staged
 publication-call interval, making that matrix 295. Change 0154 adds six ODF
 content-COW publication selectors, making that matrix 301; change 0159 later
-made it 302, change 0160 made it 303, and change 0162 makes the current matrix
-305. Local or generic
+made it 302, change 0160 made it 303, change 0162 made it 305, and change
+0163 makes the current matrix 309. Local or generic
 latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
 network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -611,7 +611,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**305 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**309 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -664,6 +664,22 @@ sink and digest gates. This raises the selectable matrix to 305 without
 changing the default 36/198 tranche. No debug latency, allocation/RSS,
 physical-I/O, real-producer or broad RTF media claim is accepted. See
 [`0162`](changes/0162-rtf-picture-crud-evidence.md).
+
+Change 0163 adds four opt-in XLSX scalar-cell lifecycle selectors: eager and
+positional source-backed clear, plus eager and positional source-backed remove.
+They reuse the existing deterministic medium and dense/sparse four-worksheet
+numeric corpus and target one existing `Sheet1!A1` owner. Clear retains an
+empty `<c>` owner; remove deletes that owner. Open, planning/staging, commit,
+sequential publication and lifecycle vectors are separate. A fixed 64-KiB
+windowed hashing sink retains zero output bytes; generic logical source and
+materialization counters are recorded, with eager counters explicitly
+not-applicable. Semantic, package, exact no-op, volatile source-patch,
+stale/foreign, and source-backed raw-unselected-member gates remain outside
+timing. The four selectors raise the matrix from 305 to 309 without changing
+the default 36/198 tranche. This is correctness/phase/counter evidence only:
+no latency, allocation/RSS, physical-I/O, cold-cache, decompression,
+durable-source-patch, or real-producer claim is accepted. See
+[`0163`](changes/0163-xlsx-cell-clear-remove-evidence.md).
 
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32

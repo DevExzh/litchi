@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **305 selectable cases**; 200 was the count before the
+harness contains **309 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -146,6 +146,25 @@ This raises the selectable matrix from 303 to 305 without changing the default
 speedup, allocation/RSS, total-memory, physical-I/O, real-producer, compressed/
 binary/nested picture, image-rendering or general rich-media claim.
 
+## XLSX scalar-cell clear/remove evidence (change 0163)
+
+[Change 0163](changes/0163-xlsx-cell-clear-remove-evidence.md) adds four
+opt-in eager/source-backed lifecycle selectors over the existing medium and
+dense/sparse four-worksheet numeric corpus. Each targets `Sheet1!A1` and
+separately reports open, planning/staging, commit, sequential publication, and
+lifecycle phases. Eager uses `WorksheetEdit`; source-backed uses the
+positional cell-values editor. Clear retains an empty `<c>` owner, while remove
+deletes that owner. A fixed 64-KiB windowed hashing sink retains zero output
+bytes; generic logical source/materialization counters are recorded.
+
+Semantic/package/no-op, volatile source-patch, stale/foreign, and source-backed
+raw-unselected-member gates are outside timing. The source-backed patch has no
+durable wire contract, so durable-source-patch evidence is explicitly absent.
+The four selectors raise the matrix from 305 to 309 without changing the
+default 36/198 tranche. This is correctness/phase/counter evidence only, with
+no latency, allocation/RSS, physical-I/O, cold-cache, decompression, or
+real-producer claim.
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
@@ -182,7 +201,7 @@ revision the 291-name selector matrix was unchanged; change 0153 adds four RTF
 selectors measured at the pre-staged publication-call interval, making that
 matrix 295. Change 0154 adds six ODF publication selectors, making the current
 matrix 301; change 0159 later made it 302, change 0160 made it 303, and change
-0162 makes the current matrix 305. No runtime
+0162 made the current matrix 305, and 0163 makes it 309. No runtime
 selector was added to 0152; only `cfg(test)` source-event acceptance and tests
 changed. Local or generic latency,
 allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
@@ -1193,7 +1212,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 305 selectable cases. Change
+The current standalone harness provides 309 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1275,7 +1294,8 @@ evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 0153 adds four RTF selectors measured at the pre-staged publication-call
 interval, making that matrix 295. Change 0154 adds six ODF content-COW
 publication selectors, making that matrix 301; change 0159 later made it 302,
-change 0160 made it 303, and change 0162 makes the current matrix 305.
+change 0160 made it 303, change 0162 made it 305, and change 0163 makes the
+current matrix 309.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps
