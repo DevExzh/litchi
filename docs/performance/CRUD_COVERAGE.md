@@ -2,7 +2,7 @@
 
 Date: 2026-08-16
 
-This is a coverage map, not a completion claim. It compares the 302 selectable
+This is a coverage map, not a completion claim. It compares the 303 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -79,7 +79,14 @@ conversion for other formats remain.
 
 ## Highest-return next cases
 
-1. Attribute remaining final owner/public-reader work after the accepted native
+1. Use a future clean release distribution from change 0160's explicit native
+   DOC owner/public-reader phase evidence to identify and then target dominant
+   work without weakening either independent validation layer. The new
+   diagnostic selector preserves the complete
+   lifecycle and reports strict-owner, public-reader, retention, authoring,
+   in-memory finish, patch, and output-materialization intervals independently;
+   it makes no optimization or release-performance claim.
+   Continue final owner/public-reader work after the accepted native
    XLS editor reuse and fixed-width inventory carry-forward, DOC batched stream
    publication, PPT root-open reuse and
    direct PPT text-edit resolver reuse. Change 0050 removes the newly
@@ -1120,7 +1127,8 @@ control logical source calls (19.09% fewer). At that revision the 291-name
 matrix was unchanged; change 0153 adds four RTF selectors measured at the
 pre-staged publication-call interval,
 making that matrix 295. Change 0154 adds six ODF content-COW publication
-selectors, making that matrix 301; change 0159 now makes it 302. Only `cfg(test)` source-event acceptance and
+selectors, making that matrix 301; change 0159 made it 302, and change 0160
+makes it 303. Only `cfg(test)` source-event acceptance and
 tests changed in 0152. This is
 source-event/correctness evidence only. Root MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain; local or
@@ -1144,7 +1152,8 @@ or resource-adding ODF CRUD, and iWork claims remain open. See
 [summary](results/odf-content-cow-abba-0154-summary.json).
 
 Change 0159 adds one opt-in source-backed PPTX plain cross-presentation
-slide-copy selector, taking the current selectable matrix from 301 to 302
+slide-copy selector, taking the selectable matrix from 301 to 302 at that
+revision
 while preserving the default 36 cases / 198 records. It reuses the exact
 plain source/destination corpus from the owned-source selector and calls the
 public source-backed plan/publication API. Only `plan_ns` and
@@ -1154,6 +1163,21 @@ untimed. Separate source/destination logical `ReadAt` call/byte counters are
 recorded, but cache, eager/source speedup, allocation/RSS, physical-I/O,
 media-rich, real-producer, and release-ABBA claims remain explicitly open.
 See [`0159`](changes/0159-pptx-source-backed-cross-copy-evidence.md).
+
+Change 0160 adds the opt-in `doc_owner_public_phases` attribution selector over
+the exact tiny, large, and payload-heavy native DOC writer corpora. It emits
+per-sample strict-owner, complete public-reader, exact-source retention,
+authoring, in-memory owner-render, patch, outer-operation, output-materializing,
+and checked unattributed intervals. Exact semantic readback, no-op identity,
+patch/inverse/stale behavior, malformed/typed refusal, hashes, and untouched
+CFB streams are untimed gates. Successful event order/cardinality is checked
+after each named outer interval but before the lifecycle timer stops, so that
+recorder validation remains visible in checked unattributed time. Separate
+format tests bind balanced error events. The production feature emits ordered,
+content-free events and owns no clock. This is attribution/correctness evidence
+only; synchronous observer overhead is disclosed, and no speedup, physical-I/O,
+allocation/RSS, cold-cache, real-producer, or optimization claim is accepted.
+See [`0160`](changes/0160-doc-owner-public-phase-attribution.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

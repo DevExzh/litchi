@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
 litchi-core = { path = "../../crates/litchi-core" }
-litchi-doc = { path = "../../crates/litchi-doc" }
+litchi-doc = { path = "../../crates/litchi-doc", features = ["performance-diagnostics"] }
 litchi-docx = { path = "../../crates/litchi-docx" }
 litchi-odf-common = { path = "../../crates/litchi-odf-common" }
 litchi-odraw = { path = "../../crates/litchi-odraw" }

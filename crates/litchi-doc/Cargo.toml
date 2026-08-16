@@ -11,6 +11,8 @@ rust-version.workspace = true
 [features]
 default = []
 formula = ["dep:litchi-formula"]
+# Runtime-neutral phase callbacks for reproducible open/commit profiling.
+performance-diagnostics = []
 
 [dependencies]
 bitflags          = { workspace = true }

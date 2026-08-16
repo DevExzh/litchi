@@ -671,6 +671,7 @@ enum Case {
     DocSemanticNoopEditSave,
     DocSemanticOneEditSave,
     DocBodySnapshotListParagraphs,
+    DocOwnerPublicPhases,
     XlsSemanticOpen,
     XlsSemanticListWorksheets,
     XlsSemanticOneCell,
@@ -1075,6 +1076,7 @@ impl Case {
             Self::DocSemanticNoopEditSave => "doc_semantic_noop_edit_save",
             Self::DocSemanticOneEditSave => "doc_semantic_one_edit_save",
             Self::DocBodySnapshotListParagraphs => "doc_body_snapshot_list_paragraphs",
+            Self::DocOwnerPublicPhases => "doc_owner_public_phases",
             Self::XlsSemanticOpen => "xls_semantic_open",
             Self::XlsSemanticListWorksheets => "xls_semantic_list_worksheets",
             Self::XlsSemanticOneCell => "xls_semantic_one_cell",
@@ -1353,6 +1355,10 @@ impl Case {
                 | Self::DocSemanticOneEditSave
                 | Self::DocBodySnapshotListParagraphs
         )
+    }
+
+    const fn is_doc_owner_public_phases(self) -> bool {
+        matches!(self, Self::DocOwnerPublicPhases)
     }
 
     const fn uses_semantic_xls(self) -> bool {
@@ -2644,6 +2650,64 @@ struct SourceSummary {
     odf_content_cow: Option<OdfContentCowSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    doc_owner_public_phases: Option<DocOwnerPublicPhaseSummary>,
+}
+
+/// Per-sample phase attribution for the native DOC owner/public-reader seam.
+///
+/// The production feature emits only ordered, content-free boundaries. The
+/// harness owns all clocks and records each boundary interval independently;
+/// no phase is inferred by subtracting aggregate or median timings. The
+/// complete semantic, patch, refusal, and preservation gates are collected
+/// outside these timed vectors.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct DocOwnerPublicPhaseSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    selected_paragraph: usize,
+    source_bytes: u64,
+    candidate_bytes: u64,
+    source_archive_sha256: String,
+    expected_output_sha256: String,
+    open_owner_ns: Vec<u64>,
+    open_public_ns: Vec<u64>,
+    open_retain_ns: Vec<u64>,
+    edit_authoring_ns: Vec<u64>,
+    edit_new_ns: Vec<u64>,
+    edit_replacement_ns: Vec<u64>,
+    edit_finish_ns: Vec<u64>,
+    edit_final_owner_ns: Vec<u64>,
+    edit_final_public_ns: Vec<u64>,
+    edit_final_retain_ns: Vec<u64>,
+    edit_patch_ns: Vec<u64>,
+    edit_commit_outer_ns: Vec<u64>,
+    edit_output_materialization_ns: Vec<u64>,
+    open_attributed_total_ns: Vec<u64>,
+    edit_attributed_total_ns: Vec<u64>,
+    open_outer_ns: Vec<u64>,
+    edit_total_ns: Vec<u64>,
+    measured_total_ns: Vec<u64>,
+    attributed_total_ns: Vec<u64>,
+    unattributed_ns: Vec<u64>,
+    output_sha256: Vec<String>,
+    gates: DocOwnerPublicPhaseGateSummary,
+}
+
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct DocOwnerPublicPhaseGateSummary {
+    event_order_cardinality_verified: bool,
+    source_semantics_verified: bool,
+    changed_semantics_verified: bool,
+    exact_noop_verified: bool,
+    patch_round_trip_verified: bool,
+    inverse_round_trip_verified: bool,
+    stale_source_refusal_verified: bool,
+    malformed_source_refusal_verified: bool,
+    typed_edit_refusal_verified: bool,
+    output_hash_verified: bool,
+    untouched_streams_verified: bool,
 }
 
 /// Separate phase evidence for the matched existing-document RTF tail
@@ -5664,6 +5728,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_opc_source_cache_evidence()
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
+                    && !case.is_doc_owner_public_phases()
                     && !case.is_pptx_source_edit_save()
                     && !case.is_pptx_cross_copy()
                     && !case.is_pptx_source_backed_cross_copy()
@@ -6238,6 +6303,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                     options.range_simulation,
                 )?);
             }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_doc_owner_public_phases())
+    {
+        for shape in &options.writer_shapes {
+            let corpus = build_writer_corpus(Case::DocFreshWriteTo, *shape)?;
+            results.push(run_case_with_config(
+                Case::DocOwnerPublicPhases,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
         }
     }
 
@@ -7251,6 +7333,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "doc_semantic_noop_edit_save" => Some(Case::DocSemanticNoopEditSave),
         "doc_semantic_one_edit_save" => Some(Case::DocSemanticOneEditSave),
         "doc_body_snapshot_list_paragraphs" => Some(Case::DocBodySnapshotListParagraphs),
+        "doc_owner_public_phases" => Some(Case::DocOwnerPublicPhases),
         "xls_semantic_open" => Some(Case::XlsSemanticOpen),
         "xls_semantic_list_worksheets" => Some(Case::XlsSemanticListWorksheets),
         "xls_semantic_one_cell" => Some(Case::XlsSemanticOneCell),
@@ -7615,6 +7698,7 @@ fn print_usage() {
                                        doc_semantic_one_paragraph,doc_semantic_full_text,\n\
                                        doc_semantic_noop_edit_save,doc_semantic_one_edit_save,\n\
                                        doc_body_snapshot_list_paragraphs,\n\
+                                       doc_owner_public_phases,\n\
                                        xls_semantic_open,xls_semantic_list_worksheets,\n\
                                        xls_semantic_one_cell,xls_semantic_full_cell_scan,\n\
                                        xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
@@ -13209,6 +13293,9 @@ fn run_case_with_config(
         Case::DocBodySnapshotListParagraphs => {
             run_doc_body_snapshot_list_paragraphs(corpus, warmup_iterations, samples)
         },
+        Case::DocOwnerPublicPhases => {
+            run_doc_owner_public_phases(corpus, warmup_iterations, samples)
+        },
         Case::XlsSemanticOpen
         | Case::XlsSemanticListWorksheets
         | Case::XlsSemanticOneCell
@@ -14694,11 +14781,7 @@ fn verify_semantic_doc(
         return Err("semantic DOC paragraph count differs from writer specification".into());
     }
     for (index, paragraph) in projected.iter().enumerate() {
-        let expected = if updated == Some(index) {
-            updated_writer_text("doc", 0, index, 0)
-        } else {
-            writer_text("doc", 0, index, 0)
-        };
+        let expected = semantic_doc_expected_text(shape, index, updated == Some(index));
         if paragraph.position() != Position::new(index) || paragraph.text() != expected {
             return Err(
                 "semantic DOC projected paragraph differs from writer specification".into(),
@@ -14716,11 +14799,7 @@ fn verify_semantic_doc(
     }
     let mut expected_full = String::new();
     for (index, paragraph) in paragraphs.iter().enumerate() {
-        let expected = if updated == Some(index) {
-            updated_writer_text("doc", 0, index, 0)
-        } else {
-            writer_text("doc", 0, index, 0)
-        };
+        let expected = semantic_doc_expected_text(shape, index, updated == Some(index));
         if paragraph.text()? != expected {
             return Err("semantic DOC paragraph text differs from writer specification".into());
         }
@@ -14731,6 +14810,16 @@ fn verify_semantic_doc(
         return Err("semantic DOC full text differs from writer specification".into());
     }
     Ok(())
+}
+
+fn semantic_doc_expected_text(shape: WriterShape, paragraph: usize, updated: bool) -> String {
+    if updated {
+        updated_writer_text("doc", 0, paragraph, 0)
+    } else if shape == WriterShape::PayloadHeavy {
+        writer_payload_text("doc", 0, paragraph, 0, 20_000)
+    } else {
+        writer_text("doc", 0, paragraph, 0)
+    }
 }
 
 fn run_doc_body_snapshot_list_paragraphs(
@@ -14770,6 +14859,495 @@ fn run_doc_body_snapshot_list_paragraphs(
         elapsed,
         None,
     ))
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct DocPhaseDurations {
+    strict_owner_ns: u64,
+    public_reader_ns: u64,
+    source_retention_ns: u64,
+    finish_ns: u64,
+    patch_ns: u64,
+}
+
+/// Bounded synchronous observer used only by the benchmark harness.
+///
+/// The production observer emits content-free boundaries and owns no clock.
+/// This recorder reserves the complete event envelope before the profiled
+/// operation starts, then timestamps those boundaries with `Instant` in this
+/// harness. It deliberately does not collect an unbounded event log.
+struct DocPhaseRecorder {
+    active: Option<(litchi_doc::body_text::DiagnosticPhase, Instant)>,
+    events: Vec<litchi_doc::body_text::DiagnosticEvent>,
+    strict_owner_ns: Option<u64>,
+    public_reader_ns: Option<u64>,
+    source_retention_ns: Option<u64>,
+    finish_ns: Option<u64>,
+    patch_ns: Option<u64>,
+    error: Option<&'static str>,
+}
+
+impl DocPhaseRecorder {
+    fn new(expected_phases: usize) -> Result<Self, Box<dyn Error>> {
+        let event_capacity = expected_phases
+            .checked_mul(2)
+            .ok_or("DOC diagnostic event capacity overflows usize")?;
+        Ok(Self {
+            active: None,
+            events: Vec::with_capacity(event_capacity),
+            strict_owner_ns: None,
+            public_reader_ns: None,
+            source_retention_ns: None,
+            finish_ns: None,
+            patch_ns: None,
+            error: None,
+        })
+    }
+
+    fn observe(&mut self, event: litchi_doc::body_text::DiagnosticEvent) {
+        use litchi_doc::body_text::{DiagnosticEvent, DiagnosticOutcome};
+
+        if self.error.is_some() {
+            return;
+        }
+        if self.events.len() == self.events.capacity() {
+            self.error = Some("DOC diagnostic recorder event capacity was exceeded");
+            return;
+        }
+        match event {
+            DiagnosticEvent::Started { phase } => {
+                if self.active.is_some() {
+                    self.error = Some("DOC diagnostic recorder observed nested phases");
+                    return;
+                }
+                self.active = Some((phase, Instant::now()));
+            },
+            DiagnosticEvent::Finished { phase, outcome } => {
+                let Some((started_phase, started)) = self.active.take() else {
+                    self.error = Some("DOC diagnostic recorder observed an unmatched finish");
+                    return;
+                };
+                if started_phase != phase {
+                    self.error = Some("DOC diagnostic recorder phase boundaries are mismatched");
+                    return;
+                }
+                if outcome != DiagnosticOutcome::Success {
+                    self.error = Some("DOC profiled operation reported a failed phase");
+                    return;
+                }
+                let Ok(duration_ns) = u64::try_from(started.elapsed().as_nanos()) else {
+                    self.error = Some("DOC diagnostic phase duration does not fit u64");
+                    return;
+                };
+                let slot = match phase {
+                    litchi_doc::body_text::DiagnosticPhase::StrictOwnerValidation => {
+                        &mut self.strict_owner_ns
+                    },
+                    litchi_doc::body_text::DiagnosticPhase::PublicReaderValidation => {
+                        &mut self.public_reader_ns
+                    },
+                    litchi_doc::body_text::DiagnosticPhase::SourceRetention => {
+                        &mut self.source_retention_ns
+                    },
+                    litchi_doc::body_text::DiagnosticPhase::Finish => &mut self.finish_ns,
+                    litchi_doc::body_text::DiagnosticPhase::Patch => &mut self.patch_ns,
+                    litchi_doc::body_text::DiagnosticPhase::ExactNoOp => {
+                        self.events.push(event);
+                        return;
+                    },
+                };
+                if slot.replace(duration_ns).is_some() {
+                    self.error = Some("DOC diagnostic recorder observed a duplicate phase");
+                    return;
+                }
+            },
+        }
+        self.events.push(event);
+    }
+
+    fn validate(
+        &self,
+        expected: &[litchi_doc::body_text::DiagnosticPhase],
+    ) -> Result<(), Box<dyn Error>> {
+        use litchi_doc::body_text::{DiagnosticEvent, DiagnosticOutcome};
+
+        if let Some(error) = self.error {
+            return Err(error.into());
+        }
+        if self.active.is_some() {
+            return Err("DOC diagnostic recorder has an active phase at operation end".into());
+        }
+        let expected_events = expected
+            .len()
+            .checked_mul(2)
+            .ok_or("DOC diagnostic expected event count overflows usize")?;
+        if self.events.len() != expected_events {
+            return Err("DOC diagnostic event cardinality differs from the phase contract".into());
+        }
+        for (index, phase) in expected.iter().copied().enumerate() {
+            let started = self.events[index * 2];
+            let finished = self.events[index * 2 + 1];
+            if started != (DiagnosticEvent::Started { phase })
+                || finished
+                    != (DiagnosticEvent::Finished {
+                        phase,
+                        outcome: DiagnosticOutcome::Success,
+                    })
+            {
+                return Err("DOC diagnostic event order differs from the phase contract".into());
+            }
+        }
+        Ok(())
+    }
+
+    fn finish(
+        self,
+        expected: &[litchi_doc::body_text::DiagnosticPhase],
+    ) -> Result<DocPhaseDurations, Box<dyn Error>> {
+        self.validate(expected)?;
+        let duration = |phase, observed: Option<u64>| -> Result<u64, Box<dyn Error>> {
+            if expected.contains(&phase) {
+                observed.ok_or_else(|| "DOC diagnostic phase duration was not recorded".into())
+            } else {
+                Ok(0)
+            }
+        };
+        Ok(DocPhaseDurations {
+            strict_owner_ns: duration(
+                litchi_doc::body_text::DiagnosticPhase::StrictOwnerValidation,
+                self.strict_owner_ns,
+            )?,
+            public_reader_ns: duration(
+                litchi_doc::body_text::DiagnosticPhase::PublicReaderValidation,
+                self.public_reader_ns,
+            )?,
+            source_retention_ns: duration(
+                litchi_doc::body_text::DiagnosticPhase::SourceRetention,
+                self.source_retention_ns,
+            )?,
+            finish_ns: duration(
+                litchi_doc::body_text::DiagnosticPhase::Finish,
+                self.finish_ns,
+            )?,
+            patch_ns: duration(litchi_doc::body_text::DiagnosticPhase::Patch, self.patch_ns)?,
+        })
+    }
+}
+
+fn profile_doc_open(
+    input: Vec<u8>,
+) -> Result<
+    (
+        litchi_doc::body_text::Snapshot,
+        DocPhaseDurations,
+        u64,
+    ),
+    Box<dyn Error>,
+> {
+    use litchi_doc::body_text::{DiagnosticPhase, Snapshot, TransactionLimits};
+
+    let expected = [
+        DiagnosticPhase::StrictOwnerValidation,
+        DiagnosticPhase::PublicReaderValidation,
+        DiagnosticPhase::SourceRetention,
+    ];
+    let mut recorder = DocPhaseRecorder::new(expected.len())?;
+    let started = Instant::now();
+    let snapshot = Snapshot::open_bounded_profiled(
+        input,
+        litchi_doc::tracked_revision::Limits::default(),
+        TransactionLimits::default(),
+        |event| recorder.observe(event),
+    )?;
+    let outer_ns = elapsed_ns(started.elapsed())?;
+    let phases = recorder.finish(&expected)?;
+    Ok((snapshot, phases, outer_ns))
+}
+
+fn profile_doc_changed_commit(
+    edit: litchi_doc::body_text::Edit,
+) -> Result<(litchi_doc::body_text::Commit, DocPhaseDurations, u64), Box<dyn Error>> {
+    use litchi_doc::body_text::DiagnosticPhase;
+
+    let expected = [
+        DiagnosticPhase::Finish,
+        DiagnosticPhase::StrictOwnerValidation,
+        DiagnosticPhase::PublicReaderValidation,
+        DiagnosticPhase::SourceRetention,
+        DiagnosticPhase::Patch,
+    ];
+    let mut recorder = DocPhaseRecorder::new(expected.len())?;
+    let started = Instant::now();
+    let commit = edit.commit_profiled(|event| recorder.observe(event))?;
+    let outer_ns = elapsed_ns(started.elapsed())?;
+    let phases = recorder.finish(&expected)?;
+    Ok((commit, phases, outer_ns))
+}
+
+fn verify_doc_untouched_streams(source: &[u8], candidate: &[u8]) -> Result<(), Box<dyn Error>> {
+    let mut source_ole = OleFile::open(Cursor::new(source))?;
+    let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    let mut source_paths = source_ole.list_streams();
+    let mut candidate_paths = candidate_ole.list_streams();
+    source_paths.sort();
+    candidate_paths.sort();
+    if source_paths != candidate_paths {
+        return Err("DOC publication changed the CFB stream inventory".into());
+    }
+    for path in source_paths {
+        if matches!(path.last().map(String::as_str), Some("WordDocument" | "0Table" | "1Table"))
+        {
+            continue;
+        }
+        let path_refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+        if source_ole.open_stream(&path_refs)? != candidate_ole.open_stream(&path_refs)? {
+            return Err(format!("DOC publication changed unmodeled stream {path:?}").into());
+        }
+    }
+    Ok(())
+}
+
+fn run_doc_owner_public_phases(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_doc::body_text::{DiagnosticPhase, Error as DocBodyError, Refusal, Snapshot};
+
+    let shape = writer_shape(corpus)?;
+    let paragraph_count = shape.doc_paragraph_count();
+    let selected = paragraph_count / 2;
+    let source = Snapshot::from_bytes(corpus.archive.clone())?;
+
+    // All semantic, patch, refusal, hash, and preservation checks are
+    // intentionally preflight work. They are not part of timed phase samples.
+    verify_semantic_doc(&corpus.archive, shape, None)?;
+    let mut ordinary_edit = source.edit()?;
+    ordinary_edit.replace_paragraph(
+        Position::new(selected),
+        &updated_writer_text("doc", 0, selected, 0),
+    )?;
+    let ordinary_commit = ordinary_edit.commit()?;
+    if !ordinary_commit.changed()
+        || ordinary_commit.patch().is_noop()
+        || ordinary_commit.patch().changes().len() != 1
+    {
+        return Err("DOC changed preflight did not produce one semantic change".into());
+    }
+    let expected_changed = ordinary_commit.snapshot().finish();
+    verify_semantic_doc(&expected_changed, shape, Some(selected))?;
+
+    let applied = ordinary_commit.patch().apply(&source)?;
+    if applied.bytes() != ordinary_commit.snapshot().bytes()
+        || applied.bytes() != expected_changed.as_slice()
+    {
+        return Err("DOC changed patch replay differs from the expected output".into());
+    }
+    let restored = ordinary_commit.patch().inverse().apply(&applied)?;
+    if restored.bytes() != source.bytes() {
+        return Err("DOC inverse patch did not restore exact source bytes".into());
+    }
+    if ordinary_commit.patch().apply(&applied).is_ok() {
+        return Err("DOC stale-source patch application was accepted".into());
+    }
+
+    let no_op = source.clone().edit()?.commit()?;
+    if no_op.changed()
+        || !no_op.patch().is_noop()
+        || no_op.patch().changes().len() != 0
+        || no_op.snapshot().bytes() != source.bytes()
+    {
+        return Err("DOC exact no-op preflight changed the source".into());
+    }
+
+    // Exercise the no-op diagnostic contract outside timed samples as well;
+    // changed samples intentionally have a different event cardinality.
+    let no_op_profile_source = Snapshot::from_bytes(corpus.archive.clone())?;
+    let no_op_profile_edit = no_op_profile_source.edit()?;
+    let no_op_expected = [
+        DiagnosticPhase::Finish,
+        DiagnosticPhase::ExactNoOp,
+        DiagnosticPhase::Patch,
+    ];
+    let mut no_op_recorder = DocPhaseRecorder::new(no_op_expected.len())?;
+    let no_op_profile_commit = no_op_profile_edit
+        .commit_profiled(|event| no_op_recorder.observe(event))?;
+    no_op_recorder.validate(&no_op_expected)?;
+    if no_op_profile_commit.changed()
+        || !no_op_profile_commit.patch().is_noop()
+        || no_op_profile_commit.snapshot().bytes() != source.bytes()
+    {
+        return Err("DOC profiled exact no-op contract changed the source".into());
+    }
+
+    let mut refusal_edit = source.clone().edit()?;
+    if !matches!(
+        refusal_edit.replace_paragraph(Position::new(paragraph_count), "out-of-range"),
+        Err(DocBodyError::Refused(Refusal::ParagraphNotFound))
+    ) {
+        return Err("DOC out-of-range edit did not return its typed refusal".into());
+    }
+    if Snapshot::from_bytes(vec![0_u8; 8]).is_ok() {
+        return Err("DOC malformed source was accepted by the strict owner".into());
+    }
+    verify_doc_untouched_streams(&corpus.archive, &expected_changed)?;
+    let expected_output_sha256 = sha256_hex(&expected_changed);
+
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut summary = DocOwnerPublicPhaseSummary {
+        implementation: "litchi-doc::body_text::Snapshot/Edit profiled owner-public seam",
+        timing_scope: "native DOC owner/public validation and in-memory owner rendering; deterministic replacement text is prepared before the lifecycle timer; output materialization separately timed",
+        performance_claim: "attribution-only correctness evidence; synchronous observer overhead is included and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
+        selected_paragraph: selected,
+        source_bytes: u64::try_from(corpus.archive.len())?,
+        candidate_bytes: u64::try_from(expected_changed.len())?,
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        expected_output_sha256: expected_output_sha256.clone(),
+        ..DocOwnerPublicPhaseSummary::default()
+    };
+    let event_order_cardinality_verified = true;
+    let replacement = updated_writer_text("doc", 0, selected, 0);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let input = corpus.archive.clone();
+        let lifecycle_started = Instant::now();
+        let (snapshot, open_phases, open_outer_ns) = profile_doc_open(input)?;
+
+        let edit_new_started = Instant::now();
+        let mut edit = snapshot.edit()?;
+        let edit_new_ns = elapsed_ns(edit_new_started.elapsed())?;
+
+        let replacement_started = Instant::now();
+        edit.replace_paragraph(Position::new(selected), &replacement)?;
+        let replacement_ns = elapsed_ns(replacement_started.elapsed())?;
+        let authoring_ns = edit_new_ns
+            .checked_add(replacement_ns)
+            .ok_or("DOC edit authoring duration overflows u64")?;
+
+        let (commit, edit_phases, edit_commit_outer_ns) = profile_doc_changed_commit(edit)?;
+        let output_started = Instant::now();
+        let output = commit.snapshot().finish();
+        let output_materialization_ns = elapsed_ns(output_started.elapsed())?;
+        let measured_total_ns = elapsed_ns(lifecycle_started.elapsed())?;
+
+        if !commit.changed()
+            || commit.patch().is_noop()
+            || commit.patch().changes().len() != 1
+            || output != expected_changed
+        {
+            return Err("DOC profiled changed sample differs from preflight output".into());
+        }
+
+        let open_attributed_total_ns = open_phases
+            .strict_owner_ns
+            .checked_add(open_phases.public_reader_ns)
+            .and_then(|total| total.checked_add(open_phases.source_retention_ns))
+            .ok_or("DOC open attributed duration overflows u64")?;
+        let edit_attributed_total_ns = authoring_ns
+            .checked_add(edit_phases.finish_ns)
+            .and_then(|total| total.checked_add(edit_phases.strict_owner_ns))
+            .and_then(|total| total.checked_add(edit_phases.public_reader_ns))
+            .and_then(|total| total.checked_add(edit_phases.source_retention_ns))
+            .and_then(|total| total.checked_add(edit_phases.patch_ns))
+            .and_then(|total| total.checked_add(output_materialization_ns))
+            .ok_or("DOC edit attributed duration overflows u64")?;
+        let edit_total_ns = authoring_ns
+            .checked_add(edit_commit_outer_ns)
+            .and_then(|total| total.checked_add(output_materialization_ns))
+            .ok_or("DOC edit total duration overflows u64")?;
+        let attributed_total_ns = open_attributed_total_ns
+            .checked_add(edit_attributed_total_ns)
+            .ok_or("DOC attributed duration overflows u64")?;
+        let unattributed_ns = measured_total_ns
+            .checked_sub(attributed_total_ns)
+            .ok_or("DOC attributed duration exceeded the measured lifecycle")?;
+        if open_attributed_total_ns > open_outer_ns {
+            return Err("DOC open phase attribution exceeded its measured outer interval".into());
+        }
+        if edit_attributed_total_ns > edit_total_ns {
+            return Err("DOC edit phase attribution exceeded its measured outer interval".into());
+        }
+        if attributed_total_ns
+            .checked_add(unattributed_ns)
+            != Some(measured_total_ns)
+        {
+            return Err("DOC attributed and unattributed durations do not total the lifecycle".into());
+        }
+
+        if iteration >= warmup_iterations {
+            elapsed.push(measured_total_ns);
+            summary.open_owner_ns.push(open_phases.strict_owner_ns);
+            summary.open_public_ns.push(open_phases.public_reader_ns);
+            summary.open_retain_ns.push(open_phases.source_retention_ns);
+            summary.edit_authoring_ns.push(authoring_ns);
+            summary.edit_new_ns.push(edit_new_ns);
+            summary.edit_replacement_ns.push(replacement_ns);
+            summary.edit_finish_ns.push(edit_phases.finish_ns);
+            summary
+                .edit_final_owner_ns
+                .push(edit_phases.strict_owner_ns);
+            summary
+                .edit_final_public_ns
+                .push(edit_phases.public_reader_ns);
+            summary
+                .edit_final_retain_ns
+                .push(edit_phases.source_retention_ns);
+            summary.edit_patch_ns.push(edit_phases.patch_ns);
+            summary.edit_commit_outer_ns.push(edit_commit_outer_ns);
+            summary
+                .edit_output_materialization_ns
+                .push(output_materialization_ns);
+            summary
+                .open_attributed_total_ns
+                .push(open_attributed_total_ns);
+            summary.edit_attributed_total_ns.push(edit_attributed_total_ns);
+            summary.open_outer_ns.push(open_outer_ns);
+            summary.edit_total_ns.push(edit_total_ns);
+            summary.measured_total_ns.push(measured_total_ns);
+            summary.attributed_total_ns.push(attributed_total_ns);
+            summary.unattributed_ns.push(unattributed_ns);
+            summary.output_sha256.push(sha256_hex(&output));
+        }
+        std::hint::black_box(output);
+    }
+
+    if summary.output_sha256
+        .iter()
+        .any(|digest| digest != &expected_output_sha256)
+    {
+        return Err("DOC profiled output hash differs from the expected hash".into());
+    }
+    if summary.measured_total_ns.len() != samples
+        || summary.open_owner_ns.len() != samples
+        || summary.edit_finish_ns.len() != samples
+        || elapsed.len() != summary.measured_total_ns.len()
+    {
+        return Err("DOC profiled phase vectors have unexpected sample cardinality".into());
+    }
+
+    summary.gates = DocOwnerPublicPhaseGateSummary {
+        event_order_cardinality_verified,
+        source_semantics_verified: true,
+        changed_semantics_verified: true,
+        exact_noop_verified: true,
+        patch_round_trip_verified: true,
+        inverse_round_trip_verified: true,
+        stale_source_refusal_verified: true,
+        malformed_source_refusal_verified: true,
+        typed_edit_refusal_verified: true,
+        output_hash_verified: true,
+        untouched_streams_verified: true,
+    };
+    let mut result = result_with_source(
+        Case::DocOwnerPublicPhases,
+        corpus,
+        elapsed,
+        SourceSummary {
+            doc_owner_public_phases: Some(summary),
+            ..SourceSummary::default()
+        },
+    );
+    result.output_sha256 = Some(expected_output_sha256);
+    Ok(result)
 }
 
 fn run_semantic_doc(
@@ -33589,7 +34167,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 302);
+        assert_eq!(selectable_count, 303);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -35468,6 +36046,83 @@ mod tests {
         assert_eq!(measured.case, "doc_body_snapshot_list_paragraphs");
         assert_eq!(measured.elapsed_ns.samples.len(), 2);
         assert!(measured.sink.is_none());
+    }
+
+    #[test]
+    fn doc_owner_public_phase_case_is_opt_in_and_checked() {
+        let corpus = build_writer_corpus(Case::DocFreshWriteTo, WriterShape::Tiny).unwrap();
+        assert_eq!(
+            parse_case("doc_owner_public_phases"),
+            Some(Case::DocOwnerPublicPhases)
+        );
+        assert!(!Case::DEFAULT.contains(&Case::DocOwnerPublicPhases));
+
+        let measured = run_case(Case::DocOwnerPublicPhases, &corpus, 0, 2).unwrap();
+        assert_eq!(measured.case, "doc_owner_public_phases");
+        assert_eq!(measured.elapsed_ns.samples.len(), 2);
+        let output_sha256 = measured.output_sha256.clone();
+        let evidence = measured
+            .source
+            .unwrap()
+            .doc_owner_public_phases
+            .unwrap();
+        assert_eq!(
+            output_sha256,
+            Some(evidence.expected_output_sha256.clone())
+        );
+        assert_ne!(
+            evidence.expected_output_sha256,
+            corpus.manifest.archive_sha256
+        );
+        assert_eq!(evidence.open_owner_ns.len(), 2);
+        assert_eq!(evidence.edit_new_ns.len(), 2);
+        assert_eq!(evidence.edit_replacement_ns.len(), 2);
+        assert_eq!(evidence.edit_finish_ns.len(), 2);
+        assert_eq!(evidence.edit_output_materialization_ns.len(), 2);
+        assert_eq!(
+            evidence.output_sha256,
+            vec![evidence.expected_output_sha256.clone(); 2]
+        );
+        assert!(evidence.gates.event_order_cardinality_verified);
+        assert!(evidence.gates.source_semantics_verified);
+        assert!(evidence.gates.changed_semantics_verified);
+        assert!(evidence.gates.exact_noop_verified);
+        assert!(evidence.gates.patch_round_trip_verified);
+        assert!(evidence.gates.inverse_round_trip_verified);
+        assert!(evidence.gates.stale_source_refusal_verified);
+        assert!(evidence.gates.malformed_source_refusal_verified);
+        assert!(evidence.gates.typed_edit_refusal_verified);
+        assert!(evidence.gates.output_hash_verified);
+        assert!(evidence.gates.untouched_streams_verified);
+        let mut measured_totals = evidence.measured_total_ns.clone();
+        measured_totals.sort_unstable();
+        assert_eq!(measured_totals, measured.elapsed_ns.samples);
+        for index in 0..2 {
+            assert!(evidence.open_attributed_total_ns[index] <= evidence.open_outer_ns[index]);
+            assert!(evidence.edit_attributed_total_ns[index] <= evidence.edit_total_ns[index]);
+            assert_eq!(
+                evidence.attributed_total_ns[index]
+                    .checked_add(evidence.unattributed_ns[index]),
+                Some(evidence.measured_total_ns[index])
+            );
+        }
+    }
+
+    #[test]
+    fn doc_owner_public_phase_case_supports_payload_heavy_corpus() {
+        let corpus = build_writer_corpus(Case::DocFreshWriteTo, WriterShape::PayloadHeavy).unwrap();
+        let measured = run_case(Case::DocOwnerPublicPhases, &corpus, 0, 1).unwrap();
+        let evidence = measured
+            .source
+            .unwrap()
+            .doc_owner_public_phases
+            .unwrap();
+        assert_eq!(measured.elapsed_ns.samples.len(), 1);
+        assert_eq!(evidence.source_bytes, corpus.archive.len() as u64);
+        assert_eq!(evidence.output_sha256.len(), 1);
+        assert_eq!(evidence.output_sha256[0], evidence.expected_output_sha256);
+        assert!(evidence.gates.changed_semantics_verified);
+        assert!(evidence.gates.untouched_streams_verified);
     }
 
     #[test]

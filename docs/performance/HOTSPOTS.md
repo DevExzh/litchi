@@ -783,7 +783,8 @@ Confirmed source facts:
   accepted. At that revision the 291-name matrix was unchanged; change 0153
   adds four RTF selectors measured at the pre-staged publication-call interval,
   making that matrix 295. Change 0154 adds six ODF publication selectors,
-  making the current matrix 301.
+  making that matrix 301; change 0159 later made it 302 and change 0160 makes
+  the current matrix 303.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
@@ -881,6 +882,18 @@ Checked adoption of that result then improves root one-shape edit/save 18.59%
 p50. The previous
 spare-capacity DOC move remains rejected and must remain an independent writer
 guardrail.
+
+Change 0160 adds the missing direct attribution boundary rather than another
+shortcut. The opt-in `doc_owner_public_phases` case observes the exact same
+strict owner and complete public-reader work on tiny, large, and payload-heavy
+writer artifacts, then independently records edit creation, replacement
+staging, in-memory owner rendering, candidate owner/public validation,
+source retention, patch construction, and output materialization. The format
+crate emits content-free ordered events and owns no clock. A focused test and
+three-shape unoptimized smoke establish event, arithmetic, semantic, patch,
+hash, refusal, and untouched-stream correctness only; they do not establish a
+latency ranking. The next native optimization must be selected from a
+current-revision release distribution and must keep both validation layers.
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed
