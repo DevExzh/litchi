@@ -102,7 +102,7 @@ generalized beyond the named host and corpus.
 ## Explicit workflow accounting
 
 The edit patch and same-lineage apply extensions span approximately
-99.6-99.99% across the reported statistics versus the eager-fingerprint
+99.6-99.99% across the reported p50/mean/p95 deltas versus the eager-fingerprint
 control for their isolated operations. The
 first deferred fingerprint demand is intentionally visible: the control's
 eager work is about 20-170 ns at that boundary, while the candidate's first

@@ -227,7 +227,7 @@ immediate fingerprint demand included, workflow p50/mean/p95 positive-faster del
 `+6.55/+6.41/+6.26` and `+7.08/+7.08/+6.33` payload-heavy.
 
 The isolated edit-patch/same-lineage-apply extension spans approximately
-99.6-99.99% across the reported statistics versus the eager-fingerprint
+99.6-99.99% across the reported p50/mean/p95 deltas versus the eager-fingerprint
 control, while the deferred
 source-plus-target scan is explicit and lands at roughly 25.7 us, 164 us, and
 8.37-8.39 ms for tiny, large, and payload-heavy candidates. Mandatory DOC
