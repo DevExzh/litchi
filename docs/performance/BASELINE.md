@@ -727,12 +727,12 @@ apply and the first source/target fingerprint demand are explicit workflow
 extensions. Clean CPU-2 release `A1 control, B1 candidate, B2 candidate, A2
 control` runs used 20 warmups and 500 retained samples per shape and leg, for
 6,000 lifecycle samples. Descriptive lifecycle p50/mean/p95 positive-faster deltas were
-`+33.78/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
-`+12.27/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
-`+17.33/+17.09/+16.58` and `+17.80/+17.75/+16.25` payload-heavy. With
+`+33.77/+35.19/+38.94` and `+33.21/+34.76/+39.67` tiny,
+`+12.28/+12.59/+17.53` and `+13.81/+13.55/+11.68` large, and
+`+17.33/+17.09/+16.58` and `+17.82/+17.75/+16.25` payload-heavy. With
 immediate fingerprint demand included, workflow p50/mean/p95 positive-faster deltas are
-`+14.56/+16.34/+22.24` and `+13.90/+15.80/+21.90` tiny,
-`+4.49/+4.82/+10.24` and `+5.82/+5.64/+4.26` large, and
+`+14.56/+16.34/+22.24` and `+13.89/+15.80/+21.90` tiny,
+`+4.50/+4.82/+10.24` and `+5.83/+5.64/+4.26` large, and
 `+6.55/+6.41/+6.26` and `+7.08/+7.08/+6.33` payload-heavy.
 
 The isolated edit-patch/same-lineage-apply extension is approximately
