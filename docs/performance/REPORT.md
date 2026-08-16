@@ -110,6 +110,17 @@ cold-cache, filesystem, or real-producer result is accepted. See the
 [summary](results/doc-owner-public-phases-0160-summary.json) and
 [raw-artifact manifest](results/doc-owner-public-phases-0160.sha256).
 
+The immediate clone-elision experiment did not survive end-to-end guards.
+[Change 0161](changes/0161-doc-public-validation-borrow-rejected.md) borrowed
+the existing DOC byte vector for both public-reader validations without
+removing either validation layer. In clean CPU-2 A/B/B/A release runs, tiny
+lifecycle p50 improved 3.20%/3.24%, large regressed 3.06%/7.31%, and
+payload-heavy directions disagreed at -0.18%/+2.52%. Large p95 regressed
+37.52%/14.49%. All semantic and preservation gates passed, but the >5% p50
+trigger and tails reject the candidate. Its temporary branch and code were
+removed; only the [negative-result summary](results/doc-public-borrow-0161-summary.json)
+and raw evidence remain.
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
