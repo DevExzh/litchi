@@ -783,8 +783,8 @@ Confirmed source facts:
   accepted. At that revision the 291-name matrix was unchanged; change 0153
   adds four RTF selectors measured at the pre-staged publication-call interval,
   making that matrix 295. Change 0154 adds six ODF publication selectors,
-  making that matrix 301; change 0159 later made it 302 and change 0160 makes
-  the current matrix 303.
+  making that matrix 301; change 0159 later made it 302, change 0160 made it
+  303, and change 0162 makes the current matrix 305.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
@@ -913,6 +913,20 @@ clone may have preconditioned cache/allocation state, but no cache or allocation
 claim is made. The candidate is fully absent from production. Further native
 DOC work needs a measured shared physical/parsed substrate or fused proof, not
 the same naked borrow substitution.
+
+Change 0162 closes the immediate selectable-evidence gap for the existing RTF
+standalone-picture APIs. Two opt-in selectors exercise bounded same-length
+PNG/JPEG payload replacement and exact picture-group removal over 2/8/64-group
+ASCII corpora whose hexadecimal transports mix case, spaces and newlines. The
+harness builds an independent exact splice, leaves an unselected replacement
+group in every shape, reports open/stage/commit/publication/lifecycle vectors,
+and publishes through the public sequential writer into a zero-retained-output
+hashing sink. Volatile and deterministic durable patch round trips, no-op,
+stale/foreign/refusal and partial/zero-sink gates are untimed. This is phase and
+correctness evidence, not an optimization result; `Edit::commit` still owns a
+complete candidate and reparses it. Allocation/RSS and a clean balanced release
+comparison are required before choosing a picture-path optimization. See
+[`0162`](changes/0162-rtf-picture-crud-evidence.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

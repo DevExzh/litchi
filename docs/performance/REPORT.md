@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **303 selectable cases**; 200 was the count before the
+harness contains **305 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -121,6 +121,31 @@ trigger and tails reject the candidate. Its temporary branch and code were
 removed; only the [negative-result summary](results/doc-public-borrow-0161-summary.json)
 and raw evidence remain.
 
+## RTF standalone-picture CRUD evidence (change 0162)
+
+[Change 0162](changes/0162-rtf-picture-crud-evidence.md) adds two opt-in
+selectors for the already committed exact-source picture transaction APIs:
+bounded same-length payload replacement and bounded complete-group removal.
+Tiny/medium/large generated ASCII corpora contain 2/8/64 alternating PNG/JPEG
+groups with deterministic mixed-case hexadecimal digits, spaces and newlines.
+Replacement selects 1/7/63 pictures and leaves one group unselected; removal
+selects 1/4/32 alternating positions.
+
+The harness constructs expected bytes independently by replacing only source
+hexadecimal digit positions or deleting exact group spans, then requires public
+commit bytes to match. It reports open, one bounded staging call, commit,
+fixed-memory hashing-sink publication and complete lifecycle vectors. Untimed
+gates cover semantic reopen, visible text and unselected raw preservation,
+same-payload no-op identity, volatile and deterministic-durable patch
+forward/inverse, stale/foreign/refusal checks, partial/zero sinks and exact
+digests. The six-record all-shape debug smoke passes every gate with exact sink
+byte counts and zero retained output bytes.
+
+This raises the selectable matrix from 303 to 305 without changing the default
+36 cases / 198 records. It is not release latency evidence and makes no
+speedup, allocation/RSS, total-memory, physical-I/O, real-producer, compressed/
+binary/nested picture, image-rendering or general rich-media claim.
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
@@ -156,8 +181,8 @@ Only this named source-event/correctness scope is accepted. At the 0152
 revision the 291-name selector matrix was unchanged; change 0153 adds four RTF
 selectors measured at the pre-staged publication-call interval, making that
 matrix 295. Change 0154 adds six ODF publication selectors, making the current
-matrix 301; change 0159 later made it 302 and change 0160 makes the current
-matrix 303. No runtime
+matrix 301; change 0159 later made it 302, change 0160 made it 303, and change
+0162 makes the current matrix 305. No runtime
 selector was added to 0152; only `cfg(test)` source-event acceptance and tests
 changed. Local or generic latency,
 allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
@@ -1168,7 +1193,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 303 selectable cases. Change
+The current standalone harness provides 305 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1249,8 +1274,8 @@ logical source calls (19.09% fewer). This accepts source-event/correctness
 evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 0153 adds four RTF selectors measured at the pre-staged publication-call
 interval, making that matrix 295. Change 0154 adds six ODF content-COW
-publication selectors, making that matrix 301; change 0159 later made it 302
-and change 0160 makes the current matrix 303.
+publication selectors, making that matrix 301; change 0159 later made it 302,
+change 0160 made it 303, and change 0162 makes the current matrix 305.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps
