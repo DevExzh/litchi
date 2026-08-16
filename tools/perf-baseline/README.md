@@ -189,9 +189,11 @@ three-slide source/two-slide destination packages. They report plan, commit,
 and OPC sequential publication timings separately, with reopen timing retained
 as a non-publication diagnostic. Complete semantic/package/dependency-closure,
 collision-remap, source-immutability, durable-patch, and stale/foreign/refusal
-gates are untimed. The selectors brought the selectable matrix to 273 at that point
-names while leaving the default 36 cases / 198 records unchanged. They make no
-speedup, allocation, RSS, release-ABBA, or physical-I/O claim.
+gates are untimed. The selectors brought the selectable matrix to 273 names at
+that point while leaving the default 36 cases / 198 records unchanged. They make no
+speedup, allocation, RSS, release-ABBA, or physical-I/O claim at the 0145
+revision. Change 0158 now accepts the later owned-source additive-topology
+publisher on these exact selectors at the bounded prepared-operation scope.
 
 Change 0146 adds 12 shared CFB MiniFAT `open_stream` evidence selectors:
 36-byte and 4095-byte targets across `many-small` and `wide-root`, with
@@ -280,6 +282,18 @@ boundary. It makes no end-to-end, allocation/RSS, physical-I/O, decompression,
 cold-cache, filesystem, real-producer, or iWork claim. See the
 [`0154` record](../../docs/performance/changes/0154-odf-content-cow-publication-evidence.md)
 and [summary](../../docs/performance/results/odf-content-cow-abba-0154-summary.json).
+
+Change 0158 adds no selector. It compares clean release control `e8a67b19e`
+and candidate `d900ae633` on the existing plain and media-rich PPTX cross-copy
+cases using 20 warmups, 200 samples, and strict CPU-2 A/B/B/A order. Total p50
+improves 29.643%/26.196% and 43.294%/43.604%; media-rich publication p50
+improves 49.321%/49.680%. Plain publication tails are withheld after declared
+same-implementation drift triggers. The accepted boundary is canonical
+generated owned-source prepared slide copy; source-backed/cold-I/O,
+decompression, real-producer, generic OPC/PPTX, and iWork claims remain open.
+See the
+[`0158` record](../../docs/performance/changes/0158-pptx-additive-topology-release-abba.md)
+and [summary](../../docs/performance/results/pptx-additive-topology-abba-0158-summary.json).
 
 The validation/section and scalar-cell selectors are opt-in and do not alter the default
 36 cases / 198 records:

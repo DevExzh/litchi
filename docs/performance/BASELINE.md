@@ -280,8 +280,35 @@ publication phases separately; reopen is retained as a non-publication
 diagnostic. Complete semantic/package topology, dependency-closure,
 collision-remap, source-immutability, durable-patch, stale/foreign, and refusal
 checks remain outside timing. This is correctness and sink-counter evidence
-only: no speedup, allocation, RSS, release-ABBA, or physical-I/O claim is made.
-See the [change record](changes/0145-pptx-cross-slide-copy-evidence.md).
+only at the 0145 revision. [Change 0158](changes/0158-pptx-additive-topology-release-abba.md)
+now accepts a clean release comparison for the later owned-source additive-
+topology publisher; allocation attribution and physical-I/O remain open. See
+the [original selector record](changes/0145-pptx-cross-slide-copy-evidence.md).
+
+## PPTX additive-topology release ABBA (change 0158)
+
+Clean control `e8a67b19e` and candidate `d900ae633` release binaries used the
+byte-identical harness and lockfile in strict CPU-2 `A1, B1, B2, A2` order.
+Each leg retained 200 samples per plain and media-rich selector after 20
+warmups, for 1,600 total observations. All semantic, topology, dependency,
+durable-patch, immutability, stale/foreign, and refusal gates passed.
+
+| Corpus | Total p50 improvement, pair 1 / pair 2 | Publication p50 improvement, pair 1 / pair 2 |
+|---|---:|---:|
+| Plain | 29.643% / 26.196% | 82.798% / 82.304% |
+| Media-rich | 43.294% / 43.604% | 49.321% / 49.680% |
+
+Plain total and media-rich total/publication p95, p99, and mean agree in both
+directions. Plain publication tails are withheld because candidate same-
+implementation drift crossed the p95/p99 thresholds. Matched process-wide
+profiles agree with the media-rich total direction: task-clock falls
+42.399%/43.122%, cycles 42.583%/43.116%, and instructions
+46.686%/46.775%; maximum RSS is 0.486%/0.480% higher and peak heap is
+effectively unchanged. This accepts only canonical generated owned-source
+prepared slide copy. It is not end-to-end file save, source-backed/cold-I/O,
+decompression, generic OPC/PPTX, real-producer, or iWork evidence. See the
+[record](changes/0158-pptx-additive-topology-release-abba.md) and
+[summary](results/pptx-additive-topology-abba-0158-summary.json).
 
 ## CFB MiniFAT `open_stream` evidence (change 0146)
 
