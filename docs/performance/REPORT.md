@@ -140,6 +140,32 @@ decompression, cold-cache, filesystem, real-producer, or iWork evidence. See
 the [summary](results/odf-content-cow-abba-0154-summary.json) and compressed raw
 reports.
 
+## PPTX additive-topology release ABBA (change 0158)
+
+[Change 0158](changes/0158-pptx-additive-topology-release-abba.md) compares
+clean control `e8a67b19e` with candidate `d900ae633` using the existing plain
+and media-rich cross-presentation slide-copy selectors. The harness and locked
+dependency graph are byte-identical. Four CPU-2 legs used 20 warmups and 200
+retained samples per case, totaling 1,600 observations.
+
+The candidate's owned-source OPC publisher raw-copies unchanged physical
+members while appending generated Parts; the control rebuilds the complete
+package. Total p50 improves 29.643%/26.196% on plain and 43.294%/43.604% on
+media-rich in the two ABBA directions. Media-rich publication p50 improves
+49.321%/49.680%, with p95/p99/mean agreement. Plain publication p50/mean is
+accepted, but its p95/p99 claim is withheld because candidate same-revision
+tail drift crossed the declared thresholds.
+
+All semantic/topology/dependency/durable-patch/refusal gates pass. Matched
+whole-process media-rich profiles show task-clock reductions of
+42.399%/43.122%, cycle reductions of 42.583%/43.116%, and instruction
+reductions of 46.686%/46.775%; maximum RSS is less than 0.5% higher and peak
+heap is effectively unchanged. The result is restricted to canonical
+generated owned-source prepared slide copy. Source-backed/cold-I/O,
+decompression, generic OPC/PPTX, real-producer, and iWork claims remain open.
+See the [summary](results/pptx-additive-topology-abba-0158-summary.json) and
+[artifact manifest](results/pptx-additive-topology-0158.sha256).
+
 | Change | Current evidence | Scope / limitation |
 |---|---|---|
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |

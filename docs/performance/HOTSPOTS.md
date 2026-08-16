@@ -2,7 +2,7 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0154`](changes/0154-odf-content-cow-publication-evidence.md)
+Evidence through: [`change 0158`](changes/0158-pptx-additive-topology-release-abba.md)
 (0152 is a final clean release ABBA for same-target MiniFAT single-flight;
 all correctness/source-event invariants passed and the existing concurrent
 scenarios recorded 6,473 versus 8,000 logical source calls, but only that
@@ -1054,6 +1054,27 @@ cold-cache, filesystem, real-producer, or richer structural/resource-adding
 ODF gaps. See
 [`change 0154`](changes/0154-odf-content-cow-publication-evidence.md) and the
 [summary](results/odf-content-cow-abba-0154-summary.json).
+
+## PPTX additive-topology publication (change 0158)
+
+The owned-source OPC publisher now preserves raw unchanged physical members
+while appending generated Parts and supports exact physical-suffix omission
+for the PPTX slide-copy inverse. Clean CPU-2 release ABBA accepts total p50
+improvements of 29.643%/26.196% for the plain corpus and 43.294%/43.604% for
+the approximately 16 MiB media-rich corpus. Media-rich publication p50
+improves 49.321%/49.680%; p95/p99/mean agree. Plain publication tail claims
+are withheld after same-implementation drift triggers.
+
+Process-wide profiles attribute the media-rich result to less CPU work:
+task-clock falls 42.399%/43.122%, cycles 42.583%/43.116%, and instructions
+46.686%/46.775%, while maximum RSS is within 0.5% and peak heap is effectively
+unchanged. The path still copies the complete owned source, ordinary OPC open
+is still eager, and the writer performs unconditional plan-container reserves
+that deserve a separate measured no-op/small-mutation tranche. Source-backed
+topology mutation, physical/cold I/O, decompression/recompression-byte counts,
+real producers, and general OPC/PPTX remain open. See the
+[`0158` record](changes/0158-pptx-additive-topology-release-abba.md) and
+[summary](results/pptx-additive-topology-abba-0158-summary.json).
 
 The standalone harness now records a fixed six-bucket distribution for every
 serialized sink summary. It counts logical `Write::write` calls at the point
