@@ -8869,6 +8869,101 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_package_no_eager_prost_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::{tn, tswp};\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tn::DocumentArchive::decode(bytes);\n"
+                "        let _ = tn::SheetArchive::decode(bytes);\n"
+                "        let _ = tn::FormBasedSheetArchive::decode(bytes);\n"
+                "        let _ = tswp::StorageArchive::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "DocumentArchive::decode": (
+                "let _ = tn::DocumentArchive::decode(bytes);\n"
+            ),
+            "SheetArchive::decode": "let _ = tn::SheetArchive::decode(bytes);\n",
+            "FormBasedSheetArchive::decode": (
+                "let _ = tn::FormBasedSheetArchive::decode(bytes);\n"
+            ),
+            "StorageArchive::decode": (
+                "let _ = tswp::StorageArchive::decode(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(f"uses {label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_package_no_eager_prost_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                "const NOTE: &str = \"tn::DocumentArchive::decode\";\n"
+                "/* tswp::StorageArchive::decode */\n"
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tn;\n"
+                "    use prost::Message;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
     def test_focused_pages_package_no_eager_prost_allows_test_only_usage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

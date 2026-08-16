@@ -3042,3 +3042,37 @@ exact apply/inverse, conflicts, final-slide refusal, semantic/input limits,
 redaction, malformed ingress, and source atomicity. This adds adversarial
 evidence for the already focused deletion owner; it does not broaden deletion
 semantics or remove another host surface.
+
+## 2026-08-16 amendment: Numbers package root/sheet/text projection
+
+The focused Numbers package removes the remaining eager Prost decodes at its
+root-and-text reader seam for this slice. The type-1 document order is now a
+strict, bounded `numbers_sheet_order_codec` projection. Type-2 standard and
+type-3 form-based sheets use the existing strict name/drawable preflight and
+publish only a semantic name plus validated drawable references. Selected
+rich-text storage messages use the shared archive-free `ValidatedStorage`
+decoder from `litchi-iwa-text-wire`; the compatibility diagnostic preserves
+its historical deterministic ordering and ignores malformed storage
+candidates. No generated document, sheet, form-sheet, or storage object is
+published by these paths.
+
+The projection charges physical input, fields, nesting, and aggregate wire
+work, then charges rooted references, drawable references, title/name bytes,
+and aggregate text before owned allocation. Canonical framing, unique
+ownership, missing references, UTF-8, strict/Buffa parity, and caller-selected
+semantic ceilings are checked before the rooted document becomes visible.
+Unknown component and protobuf bytes remain source-owned and are not retained
+or re-encoded by the private views. The boundary is deliberately narrower
+than the complete Numbers graph: table, tile, formula, sidecar, and host editor
+paths remain ordered migration debt, and this amendment does not claim the
+monolith is removable.
+
+The corresponding native acceptance gate is read-only. A mode-0444 copy of
+the tracked `test-data/iwork/numbers/basic.numbers` fixture is opened in Apple
+Numbers 14.4 (7043.0.93), with no repair, recovery, conversion, or warning UI.
+The locked copy must show `Sheet 1`/`Table 1`, a 22-by-7 table, the
+`Litchi native Numbers fixture` marker, and numeric `42`; focused reread must
+report the same sheet, table, text, and cell values. The tracked source remains
+unopened and exact. This is application-acceptance evidence for the selected
+reader path, not a native resave, rendering, performance, or complete Buffa
+claim.

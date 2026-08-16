@@ -1173,7 +1173,7 @@ fn rooted_table_info_identifiers(source: &Package) -> Result<HashSet<u64>, Error
             .get_index(target.component_index)
             .and_then(|component| component.archive().objects.get(target.object_index))
             .ok_or(Error::InvalidSource)?;
-        let decoded = super::decode_sheet_payload(
+        let decoded = super::sheet_projection(
             object.messages.as_slice(),
             super::SemanticPath::Sheet {
                 index: sheet_position,
@@ -1362,16 +1362,16 @@ fn validate_root_document(source: &Package) -> Result<(), Error> {
 fn resolve_native_sheet(source: &Package, sheet_position: usize) -> Result<SheetTarget<'_>, Error> {
     let document = Package::root_document(&source.state.components).map_err(map_read_error)?;
     let reference = document
-        .sheets
+        .sheet_references()
         .get(sheet_position)
         .ok_or(Error::SheetNotFound)?;
-    if reference.identifier == 0 || reference.deprecated_is_external == Some(true) {
+    if reference.identifier() == 0 || reference.deprecated_is_external() == Some(true) {
         return Err(Error::InvalidSource);
     }
     let resolved = source
         .state
         .index
-        .resolve_ref_id(&source.state.components, reference.identifier)
+        .resolve_ref_id(&source.state.components, reference.identifier())
         .map_err(map_read_error)?
         .ok_or(Error::InvalidSource)?;
     let message_index = unique_sheet_message_index(resolved.messages)?;
@@ -1381,7 +1381,7 @@ fn resolve_native_sheet(source: &Package, sheet_position: usize) -> Result<Sheet
         .ok_or(Error::InvalidSource)?;
     let object = resolved_object(source, resolved)?;
     validate_message_metadata(object, message_index)?;
-    let decoded = super::decode_sheet_payload(
+    let decoded = super::sheet_projection(
         resolved.messages,
         super::SemanticPath::Sheet {
             index: sheet_position,
@@ -1399,7 +1399,7 @@ fn resolve_native_sheet(source: &Package, sheet_position: usize) -> Result<Sheet
         return Err(Error::InvalidSource);
     }
     Ok(SheetTarget {
-        identifier: reference.identifier,
+        identifier: reference.identifier(),
         component_index: resolved.component_index,
         object_index: resolved.object_index,
         message_index,
@@ -1414,7 +1414,7 @@ fn resolve_native_table(
     table_position: usize,
 ) -> Result<TableTarget<'_>, Error> {
     let sheet = resolve_native_sheet(source, sheet_position)?;
-    let decoded = super::decode_sheet_payload(
+    let decoded = super::sheet_projection(
         source
             .state
             .components

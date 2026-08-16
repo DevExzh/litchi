@@ -228,3 +228,30 @@ arithmetic overflow) through the focused crate and root facade rather than
 fabricating `limit + 1`. Exact-limit and one-under regressions lock these
 rules. This is a correctness and boundedness result; it makes no latency,
 allocation-count, throughput, or peak-RSS claim.
+
+## 2026-08-16 amendment: bounded Numbers root, sheet, and storage views
+
+The focused Numbers package removes four eager application-payload decodes from
+its production package reader. The type-1 document root is projected through
+the existing strict `numbers_sheet_order_codec` view; standard and form-based
+type-2/3 sheets use the bounded name/drawable preflight; and compatibility
+storage text uses the shared bounded `ValidatedStorage` path from
+`litchi-iwa-text-wire`. The semantic reader therefore retains only the root
+sheet references, borrowed sheet name and drawable spans, and the text needed
+by its public diagnostic. It does not construct a generated document, sheet,
+form-sheet, or storage object for these paths.
+
+Each selected payload is bounded before publication by input bytes, traversed
+fields, nesting, aggregate wire work, and the caller's remaining semantic
+references or text output. Sheet names, drawable references, and joined storage
+text are checked before owned allocation; malformed storage candidates retain
+the established compatibility skip behavior, while malformed rooted document
+and sheet ownership fails atomically. Standard/form sheet parity, duplicate
+references, missing objects, and strict-versus-Buffa disagreement remain
+failure cases. Raw component bytes remain the preservation authority, so the
+private Buffa views neither retain unknown fields nor encode replacement data.
+
+This is an allocation-shape and boundedness improvement, not a measured
+latency, RSS, or complete Numbers Buffa-laziness claim. Table, tile, formula,
+sidecar, and other native graph paths remain separate migration work and may
+still use generated Prost values behind their own limits.
