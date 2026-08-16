@@ -1,0 +1,199 @@
+{
+  "schema": "litchi.odf-content-cow-abba.v1",
+  "date": "2026-08-16",
+  "status": "accepted for the prepared in-memory publication boundary",
+  "revision": "6218ecab331e2b82e2a9fd762d5ead4d6098a451",
+  "release_binary_sha256": "4a45436ce46331ff96b5ab8549cdbfd5efe25f0540914a9d7f28c964a17c04de",
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "affinity_visible_cpus": 1,
+    "allocator": "Rust system allocator",
+    "page_size_bytes": 4096,
+    "worktree_clean": true
+  },
+  "protocol": {
+    "order": [
+      "A1 owned rebuild",
+      "B1 source positional",
+      "B2 source positional",
+      "A2 owned rebuild"
+    ],
+    "warmups_per_record": 20,
+    "samples_per_record": 100,
+    "records_per_leg": 3,
+    "retained_samples": 1200,
+    "timing_scope": "prepared owner and candidate; rebuild or source-positional publication plus the same fixed 16 KiB non-seek hashing sink",
+    "improvement_formula": "100 * (control - candidate) / control",
+    "percentiles": "midpoint p50 and nearest-rank p95/p99",
+    "mean_confidence_interval": "two-sided Student's t interval"
+  },
+  "artifacts": [
+    {
+      "leg": "A1 owned rebuild",
+      "path": "odf-content-cow-a1-owned-0154.json.zst",
+      "raw_bytes": 23086,
+      "raw_sha256": "e9f8a0f3dfe7616a14f5b5fe0db5300a467a9b124da6a151cface4cb28f400a9",
+      "compressed_bytes": 4246,
+      "compressed_sha256": "aa228940a78564063bc3ec35405d66b12d616920088f56044aab21747281d80d"
+    },
+    {
+      "leg": "B1 source positional",
+      "path": "odf-content-cow-b1-positional-0154.json.zst",
+      "raw_bytes": 104040,
+      "raw_sha256": "d276b1fe21536b60eb2b25aadc0314ab05ccd8cc18c7091f9489eb05f45d84a9",
+      "compressed_bytes": 4387,
+      "compressed_sha256": "4c968478ffc3fce7e6c5f7ec7d8bcf47bbcf6aa098acf4a98c0fe293a528ccb5"
+    },
+    {
+      "leg": "B2 source positional",
+      "path": "odf-content-cow-b2-positional-0154.json.zst",
+      "raw_bytes": 104037,
+      "raw_sha256": "f29dcdb9a6b5911d856311ae8d0f6086c76dfeefcbe28f4e279f85e088a6b48e",
+      "compressed_bytes": 4315,
+      "compressed_sha256": "633770e428d992d68f2582af5048ac68536b07323962a35efb8968f048c2f96c"
+    },
+    {
+      "leg": "A2 owned rebuild",
+      "path": "odf-content-cow-a2-owned-0154.json.zst",
+      "raw_bytes": 23090,
+      "raw_sha256": "468dc53670dee69832a1c66d65125dfe03b1af87a7470bbc1d29659ca9cc70b5",
+      "compressed_bytes": 4252,
+      "compressed_sha256": "493ecd91bd01625c11e41b6745259ec5d9a941db1218bca9cac6dcd442395851"
+    }
+  ],
+  "families": [
+    {
+      "family": "odt",
+      "source_archive_bytes": 16786287,
+      "source_archive_sha256": "097b17ebc8fe811888eba6a9a7d118bc94bb99651880782ccecedf93c003b5ed",
+      "candidate_content_sha256": "f70bb119f92bc4e22eb03a9738de3809becd94fad3a5a97f0b304b127838e7c2",
+      "owned_output": {
+        "bytes": 16786298,
+        "sha256": "a139cca4c0b0f41f083d919dd7059ef376a549c06f054832258f325924f0ef9e"
+      },
+      "positional_output": {
+        "bytes": 16786297,
+        "sha256": "27fe561fb23def87aade1856682c25ff01f6ee7f6c165f88928c51bda32a6452"
+      },
+      "positional_logical_read_at_per_sample": {
+        "calls": 611,
+        "bytes": 16789267,
+        "range_overlap_bytes": 2980,
+        "ordinary_payload_calls": 525,
+        "ordinary_payload_bytes": 16783466,
+        "content_bytes": 950,
+        "untouched_non_picture_bytes": 1090,
+        "pictures_bytes": 16782376
+      },
+      "legs_ns": {
+        "a1": {"p50": 224782235, "p95": 231171747, "p99": 234523184, "mean": 225519270.88, "standard_deviation": 2749256.42, "mean_ci95": [224973758.77, 226064782.99]},
+        "b1": {"p50": 7669333, "p95": 7988446, "p99": 8170827, "mean": 7709785.69, "standard_deviation": 143422.61, "mean_ci95": [7681327.53, 7738243.85]},
+        "b2": {"p50": 7558855, "p95": 7624462, "p99": 7641144, "mean": 7560354.14, "standard_deviation": 37368.01, "mean_ci95": [7552939.52, 7567768.76]},
+        "a2": {"p50": 224546448, "p95": 232553003, "p99": 235422550, "mean": 225147583.70, "standard_deviation": 3289546.15, "mean_ci95": [224494866.38, 225800301.02]}
+      },
+      "paired_improvement_percent": {
+        "a1_vs_b1": {"p50": 96.58811, "p95": 96.54437, "p99": 96.51598, "mean": 96.58132},
+        "a2_vs_b2": {"p50": 96.63372, "p95": 96.72141, "p99": 96.75429, "mean": 96.64205}
+      },
+      "same_implementation_drift_percent": {
+        "a1_to_a2": {"p50": -0.10490, "mean": -0.16481},
+        "b1_to_b2": {"p50": -1.44052, "mean": -1.93821}
+      }
+    },
+    {
+      "family": "ods",
+      "source_archive_bytes": 16790689,
+      "source_archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+      "candidate_content_sha256": "1340b8cf3b3a56170e39ea7acc3338fb66b96f650dda05ed82fe938d55cd8c07",
+      "owned_output": {
+        "bytes": 16790778,
+        "sha256": "fa578f7de1cde14ef2254294c0e589ec2ed502077d40e4d768f897a65902bd34"
+      },
+      "positional_output": {
+        "bytes": 16790778,
+        "sha256": "fa578f7de1cde14ef2254294c0e589ec2ed502077d40e4d768f897a65902bd34"
+      },
+      "positional_logical_read_at_per_sample": {
+        "calls": 597,
+        "bytes": 16793240,
+        "range_overlap_bytes": 2551,
+        "ordinary_payload_calls": 523,
+        "ordinary_payload_bytes": 16782726,
+        "content_bytes": 6383,
+        "untouched_non_picture_bytes": 350,
+        "pictures_bytes": 16782376
+      },
+      "legs_ns": {
+        "a1": {"p50": 223905161, "p95": 228099223, "p99": 231091509, "mean": 224525204.22, "standard_deviation": 2017307.52, "mean_ci95": [224124926.64, 224925481.80]},
+        "b1": {"p50": 8178647, "p95": 8486484, "p99": 8537635, "mean": 8218627.14, "standard_deviation": 115476.15, "mean_ci95": [8195714.17, 8241540.11]},
+        "b2": {"p50": 8171938, "p95": 8238310, "p99": 8279758, "mean": 8173657.45, "standard_deviation": 40078.10, "mean_ci95": [8165705.09, 8181609.81]},
+        "a2": {"p50": 224277251, "p95": 236227222, "p99": 238911912, "mean": 225669026.94, "standard_deviation": 4218670.80, "mean_ci95": [224831951.14, 226506102.74]}
+      },
+      "paired_improvement_percent": {
+        "a1_vs_b1": {"p50": 96.34727, "p95": 96.27948, "p99": 96.30552, "mean": 96.33955},
+        "a2_vs_b2": {"p50": 96.35632, "p95": 96.51255, "p99": 96.53439, "mean": 96.37803}
+      },
+      "same_implementation_drift_percent": {
+        "a1_to_a2": {"p50": 0.16618, "mean": 0.50944},
+        "b1_to_b2": {"p50": -0.08203, "mean": -0.54717}
+      }
+    },
+    {
+      "family": "odp",
+      "source_archive_bytes": 16786129,
+      "source_archive_sha256": "c5e98dac88846d7b8264f0af4e893d80e21672222c35c3b8890f78cff53242d3",
+      "candidate_content_sha256": "a0a7ef607aa269473958042527bdafff4dbb022ddaddcb818e671bfdb50e595d",
+      "owned_output": {
+        "bytes": 16786168,
+        "sha256": "49e3fb5492170a32049672669e31bc40f6346ad684c0bd47b44dbbaa32948765"
+      },
+      "positional_output": {
+        "bytes": 16786166,
+        "sha256": "50e5a9ae069c9212ce9d4c9beae72f46a6dd1eae98dec532bb4cccab30c3e24b"
+      },
+      "positional_logical_read_at_per_sample": {
+        "calls": 611,
+        "bytes": 16789117,
+        "range_overlap_bytes": 2988,
+        "ordinary_payload_calls": 525,
+        "ordinary_payload_bytes": 16783443,
+        "content_bytes": 823,
+        "untouched_non_picture_bytes": 1067,
+        "pictures_bytes": 16782376
+      },
+      "legs_ns": {
+        "a1": {"p50": 224014568, "p95": 232621067, "p99": 236237149, "mean": 224493930.81, "standard_deviation": 3782014.18, "mean_ci95": [223743497.15, 225244364.47]},
+        "b1": {"p50": 7694928, "p95": 7949762, "p99": 7996877, "mean": 7727215.50, "standard_deviation": 127757.40, "mean_ci95": [7701865.66, 7752565.34]},
+        "b2": {"p50": 7588807, "p95": 7709239, "p99": 7765276, "mean": 7604077.34, "standard_deviation": 62566.89, "mean_ci95": [7591662.71, 7616491.97]},
+        "a2": {"p50": 222658234, "p95": 227574396, "p99": 233846029, "mean": 223190739.50, "standard_deviation": 2510000.09, "mean_ci95": [222692701.03, 223688777.97]}
+      },
+      "paired_improvement_percent": {
+        "a1_vs_b1": {"p50": 96.56499, "p95": 96.58253, "p99": 96.61489, "mean": 96.55794},
+        "a2_vs_b2": {"p50": 96.59172, "p95": 96.61243, "p99": 96.67932, "mean": 96.59301}
+      },
+      "same_implementation_drift_percent": {
+        "a1_to_a2": {"p50": -0.60547, "mean": -0.58050},
+        "b1_to_b2": {"p50": -1.37910, "mean": -1.59356}
+      }
+    }
+  ],
+  "acceptance": {
+    "both_pair_directions_agree": true,
+    "maximum_absolute_same_implementation_p50_drift_percent": 1.44052,
+    "every_report_schema_and_cardinality_verified": true,
+    "every_semantic_reopen_and_exact_content_gate_verified": true,
+    "every_positional_raw_identity_and_order_gate_verified": true,
+    "every_noop_limit_cancellation_and_source_immutability_gate_verified": true,
+    "b1_b2_source_evidence_identical": true
+  },
+  "claim_boundaries": [
+    "The accepted comparison is the prepared publication-call boundary only, not end-to-end editing or save latency.",
+    "The source is an in-memory immutable ReadAt implementation; counters are logical range overlap, not physical I/O, syscalls, device, filesystem, decompression, or network evidence.",
+    "The fixed hashing sink is shared by both implementations and retains no complete output; it is not filesystem output evidence.",
+    "No allocation-count, allocated-byte, peak-heap, RSS, cold-cache, energy, throughput, multi-thread scaling, real-producer, or iWork claim is made."
+  ]
+}

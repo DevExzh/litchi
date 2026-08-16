@@ -2,7 +2,7 @@
 
 Date: 2026-08-16
 
-This is a coverage map, not a completion claim. It compares the 295 selectable
+This is a coverage map, not a completion claim. It compares the 301 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -1113,7 +1113,8 @@ passed; existing concurrent scenarios recorded 6,473 candidate versus 8,000
 control logical source calls (19.09% fewer). At that revision the 291-name
 matrix was unchanged; change 0153 adds four RTF selectors measured at the
 pre-staged publication-call interval,
-making the current matrix 295. Only `cfg(test)` source-event acceptance and
+making that matrix 295. Change 0154 adds six ODF content-COW publication
+selectors, making the current matrix 301. Only `cfg(test)` source-event acceptance and
 tests changed in 0152. This is
 source-event/correctness evidence only. Root MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain; local or
@@ -1122,6 +1123,19 @@ cold-cache/device/network, decompression, native semantic, OOXML, ODF, RTF,
 and iWork claims are withheld. See the
 [`0152` release record](changes/0152-cfb-same-target-singleflight-release-abba.md)
 and [summary](results/cfb-singleflight-abba-0152-summary.json).
+
+Change 0154 adds no new production CRUD capability; it measures the committed
+generic source-positional ODF `content.xml` publisher against the owned rebuild
+for matched semantic ODT/ODS/ODP edits. The clean CPU-2 A/B/B/A result accepts
+96.35%-96.63% p50 improvement in both pair directions at the prepared
+in-memory publication boundary. Exact content, semantic reopen, member
+inventory, positional untouched-member raw identity plus physical/central
+order, no-op, limits, cancellation, source immutability, and logical `ReadAt`
+replay remain untimed gates. End-to-end edit/save, allocation/RSS,
+physical-I/O, decompression, cold-cache, filesystem, real-producer, structural
+or resource-adding ODF CRUD, and iWork claims remain open. See
+[`0154`](changes/0154-odf-content-cow-publication-evidence.md) and the
+[summary](results/odf-content-cow-abba-0154-summary.json).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

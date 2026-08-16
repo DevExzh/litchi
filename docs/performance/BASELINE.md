@@ -380,11 +380,12 @@ correctness and logical source-event invariants passed. In the existing
 concurrent scenarios, the candidate recorded 6,473 logical source calls versus
 8,000 for control, a 19.09% reduction.
 
-This accepts only the named source-event/correctness result. The existing
-At the 0152 revision the 291-name selector matrix was unchanged: no runtime
+This accepts only the named source-event/correctness result. At the 0152
+revision the 291-name selector matrix was unchanged: no runtime
 selector was added; only `cfg(test)` source-event acceptance and tests changed.
 Change 0153 adds four RTF selectors measured at the pre-staged
-publication-call interval, making the current matrix 295. Local or generic
+publication-call interval, making that matrix 295. Change 0154 adds six ODF
+content-COW publication selectors, making the current matrix 301. Local or generic
 latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
 network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -581,7 +582,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**295 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**301 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -910,6 +911,20 @@ apply/inverse/stale/foreign, cancellation, sink failure/partial progress,
 limits, and source-version gates remain untimed correctness checks. No
 end-to-end, rich-format, allocation/RSS, physical-I/O, or ABBA latency claim is
 made. See [`0153`](changes/0153-rtf-tail-publication-plan-evidence.md).
+
+Change 0154 adds six matched ODT/ODS/ODP owned-rebuild and source-positional
+`content.xml` publication selectors. A clean CPU-2 release ABBA used 20
+warmups and 100 samples per record in strict A/B/B/A order. Both pair
+directions accept prepared-publication p50 improvements of 96.35%-96.63%; p95,
+p99, and mean agree, and maximum absolute same-implementation p50 drift is
+1.441%. Exact content, family reopen, inventory, positional raw untouched
+identity plus physical/central order, no-op, limits, cancellation, source
+immutability, bounded sink, and logical `ReadAt` replay remain untimed gates.
+This is an in-memory prepared-publication result only: no end-to-end,
+allocation/RSS, physical-I/O, decompression, cold-cache, filesystem,
+real-producer, or iWork claim is made. See
+[`0154`](changes/0154-odf-content-cow-publication-evidence.md) and the
+[summary](results/odf-content-cow-abba-0154-summary.json).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Committed change `0091` adds four opt-in eager
