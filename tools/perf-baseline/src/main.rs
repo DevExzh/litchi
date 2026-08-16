@@ -31094,7 +31094,10 @@ mod tests {
                             assert!(
                                 actual == vec![cache]
                                     || actual == direct_and_cache
-                                    || actual == direct_twice,
+                                    || actual == direct_twice
+                                    // A same-target single-flight may serve both
+                                    // callers from one physical direct read.
+                                    || actual == vec![direct],
                                 "unexpected concurrent source multiset for {shape:?}/{target:?}: {actual:?}"
                             );
                         },
@@ -31281,6 +31284,149 @@ mod tests {
                         _ => None,
                     };
                     assert_eq!(evidence.root_cache_read_bytes, vec![root_expected]);
+                }
+            }
+        }
+    }
+
+    fn cfb_expected_minifat_physical_start(archive: &[u8], target_name: &str) -> u64 {
+        let parsed = super::OleFile::open(std::io::Cursor::new(archive)).unwrap();
+        let sector_size = parsed.sector_size();
+        let read_u16 = |bytes: &[u8]| u16::from_le_bytes(bytes.try_into().unwrap());
+        let read_u32 = |bytes: &[u8]| u32::from_le_bytes(bytes.try_into().unwrap());
+        let mini_sector_size = 1_usize << usize::from(read_u16(&archive[0x20..0x22]));
+        let fat_sector_count = usize::try_from(read_u32(&archive[0x2C..0x30])).unwrap();
+        let difat_sector_count = usize::try_from(read_u32(&archive[0x48..0x4C])).unwrap();
+        let header_fat_count = fat_sector_count.min(109);
+        let mut fat_sectors = Vec::with_capacity(fat_sector_count);
+        for index in 0..header_fat_count {
+            let offset = 0x4C + index * 4;
+            fat_sectors.push(read_u32(&archive[offset..offset + 4]));
+        }
+        let mut difat_sector = read_u32(&archive[0x44..0x48]);
+        for _ in 0..difat_sector_count {
+            let offset = (usize::try_from(difat_sector).unwrap() + 1) * sector_size;
+            let bytes = &archive[offset..offset + sector_size];
+            for index in 0..(sector_size / 4 - 1) {
+                if fat_sectors.len() == fat_sector_count {
+                    break;
+                }
+                let entry = index * 4;
+                fat_sectors.push(read_u32(&bytes[entry..entry + 4]));
+            }
+            difat_sector = read_u32(&bytes[sector_size - 4..]);
+        }
+        assert_eq!(fat_sectors.len(), fat_sector_count);
+
+        let mut fat = Vec::with_capacity(fat_sector_count * (sector_size / 4));
+        for sector in fat_sectors {
+            let offset = (usize::try_from(sector).unwrap() + 1) * sector_size;
+            let bytes = &archive[offset..offset + sector_size];
+            for index in 0..(sector_size / 4) {
+                let entry = index * 4;
+                fat.push(read_u32(&bytes[entry..entry + 4]));
+            }
+        }
+
+        let root_start_sector = parsed.root_entry().unwrap().start_sector;
+        let target_start_mini_sector = parsed
+            .list_directory_entries(&[])
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.name == target_name)
+            .unwrap()
+            .start_sector;
+        let mini_offset = usize::try_from(target_start_mini_sector)
+            .unwrap()
+            .checked_mul(mini_sector_size)
+            .unwrap();
+        let root_ordinal = mini_offset / sector_size;
+        let root_within = mini_offset % sector_size;
+        let mut root_sector = root_start_sector;
+        for _ in 0..root_ordinal {
+            root_sector = *fat.get(usize::try_from(root_sector).unwrap()).unwrap();
+        }
+        (u64::from(root_sector) + 1) * u64::try_from(sector_size).unwrap()
+            + u64::try_from(root_within).unwrap()
+    }
+
+    #[test]
+    fn cfb_open_stream_current_candidate_concurrent_accepts_d_or_dd() {
+        for shape in [CorpusShape::ManySmall, CorpusShape::WideRoot] {
+            for target in [CfbSelectiveTarget::Mini, CfbSelectiveTarget::Mini4095] {
+                let corpus = build_cfb_selective_corpus(shape, target).unwrap();
+                let evidence = run_cfb_open_stream(
+                    match target {
+                        CfbSelectiveTarget::Mini => Case::CfbOpenStreamMiniSharedConcurrent,
+                        CfbSelectiveTarget::Mini4095 => Case::CfbOpenStreamMini4095SharedConcurrent,
+                        CfbSelectiveTarget::Fat => unreachable!(),
+                    },
+                    &corpus,
+                    0,
+                    1,
+                )
+                .unwrap()
+                .source
+                .unwrap()
+                .cfb_open_stream
+                .unwrap();
+
+                let target_len = u64::try_from(corpus.target_payload.len()).unwrap();
+                let direct_start =
+                    cfb_expected_minifat_physical_start(&corpus.archive, &corpus.target_name);
+                let direct = [direct_start, target_len, target_len];
+                let expected_direct_range = [direct_start, direct_start + target_len];
+                let target_hash = corpus.manifest.target_payload_sha256.clone();
+
+                assert_eq!(evidence.output_sha256, vec![vec![target_hash; 2]]);
+                assert_eq!(
+                    evidence.returned_payload_bytes,
+                    vec![vec![target_len, target_len]]
+                );
+
+                // Production unit tests gate a true in-flight owner/waiter
+                // overlap and deterministically prove one direct read. This
+                // harness gate only coordinates caller entry; scheduling may
+                // let the second claim begin after the owner completes, so
+                // aggregate evidence legitimately records [D] or [D,D].
+                let direct_events = evidence.logical_read_ranges[0].clone();
+                assert!(
+                    direct_events == vec![direct] || direct_events == vec![direct, direct],
+                    "unexpected concurrent direct-event vector for {shape:?}/{target:?}: actual={direct_events:?}, expected={direct:?}"
+                );
+                let logical_read_calls = u64::try_from(direct_events.len()).unwrap();
+                let logical_read_bytes = logical_read_calls.checked_mul(target_len).unwrap();
+                let direct_sizes = vec![target_len; direct_events.len()];
+                assert_eq!(evidence.logical_read_calls, vec![logical_read_calls]);
+                assert_eq!(evidence.logical_read_bytes, vec![logical_read_bytes]);
+                assert_eq!(
+                    evidence.logical_read_range_sizes,
+                    vec![direct_sizes.clone()]
+                );
+                assert_eq!(
+                    evidence.per_operation_read_calls,
+                    vec![vec![logical_read_calls]]
+                );
+                assert_eq!(
+                    evidence.per_operation_read_bytes,
+                    vec![vec![logical_read_bytes]]
+                );
+                assert_eq!(
+                    evidence.per_operation_read_range_sizes,
+                    vec![vec![direct_sizes]]
+                );
+                assert_eq!(
+                    evidence.per_operation_read_ranges,
+                    vec![vec![direct_events]]
+                );
+                assert_eq!(evidence.root_cache_read_bytes, vec![None]);
+
+                // The field is a derived diagnostic and may remain unset for
+                // the unchanged concurrent runner; when present, it must be
+                // the exact extent of the raw direct event above.
+                assert_eq!(evidence.expected_direct_physical_range.len(), 1);
+                if let Some(actual) = evidence.expected_direct_physical_range[0] {
+                    assert_eq!(actual, expected_direct_range);
                 }
             }
         }
