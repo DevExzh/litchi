@@ -412,7 +412,8 @@ revision the 291-name selector matrix was unchanged: no runtime
 selector was added; only `cfg(test)` source-event acceptance and tests changed.
 Change 0153 adds four RTF selectors measured at the pre-staged
 publication-call interval, making that matrix 295. Change 0154 adds six ODF
-content-COW publication selectors, making the current matrix 301. Local or generic
+content-COW publication selectors, making that matrix 301; change 0159 later
+made it 302 and change 0160 makes the current matrix 303. Local or generic
 latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
 network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -609,10 +610,25 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**301 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**303 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
+
+Change 0160 adds one opt-in native DOC owner/public-reader attribution case.
+For each retained sample it records strict-owner, complete public-reader,
+exact-source retention, edit construction, replacement staging, in-memory
+owner rendering, final owner/public validation, patch construction, outer
+operation, output-materialization, and checked unattributed intervals. It
+reuses the exact deterministic tiny, large, and payload-heavy writer bytes.
+All semantic, no-op, patch/inverse/stale, malformed/typed-refusal, hash, and
+untouched-stream checks are outside timing. Successful event-order/cardinality
+validation follows the named outer interval but remains inside the complete
+lifecycle timer and therefore its checked unattributed remainder. Separate
+format tests bind balanced error events. The current
+three-shape debug smoke is correctness evidence only; no latency, optimization,
+physical-I/O, allocation/RSS, cold-cache, or real-producer result is accepted.
+See [`0160`](changes/0160-doc-owner-public-phase-attribution.md).
 
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32

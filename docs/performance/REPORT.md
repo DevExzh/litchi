@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **301 selectable cases**; 200 was the count before the
+harness contains **303 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -74,8 +74,27 @@ calculation-metadata/defined-name/page-break/page-margin/print-options/page-setu
 semantic cases, 13 opt-in RTF semantic case names across four
 capability-bounded variants (39 tiny / 70 tiny-plus-large rows), 24
 shape-selected ODT/ODS/ODP semantic cases, twelve fixed media-rich ODF cases,
-and 21 opt-in native DOC/XLS/PPT semantic cases. It
+and 22 opt-in native DOC/XLS/PPT semantic/phase-attribution cases. It
 is still not broad program or CRUD coverage.
+
+## Native DOC owner/public-reader phase attribution (change 0160)
+
+[Change 0160](changes/0160-doc-owner-public-phase-attribution.md) adds the
+opt-in `doc_owner_public_phases` selector over the exact deterministic tiny,
+large, and payload-heavy DOC writer corpora. A feature-gated, content-free
+observer emits ordered boundaries for strict owner validation, complete public
+reader validation, exact-source retention, in-memory owner rendering, exact
+no-op detection, and patch construction; the format crate owns no clock.
+The harness separately times edit construction, replacement staging, outer
+operations, and final output materialization, then checks attributed plus
+unattributed time against each measured lifecycle.
+
+The focused two-shape test and three-shape debug smoke pass exact semantic
+reopen, no-op, patch/inverse/stale, malformed/typed refusal, output-hash, event
+order/cardinality, and untouched-CFB-stream gates. The smoke is diagnostic only:
+its single unoptimized sample is not accepted latency evidence. Synchronous
+observer overhead remains included, and no speedup, optimization, physical-I/O,
+allocation/RSS, cold-cache, real-producer, or release comparison is claimed.
 
 ## Managed XLSX source-editor production freeze (change 0151)
 
@@ -112,7 +131,8 @@ Only this named source-event/correctness scope is accepted. At the 0152
 revision the 291-name selector matrix was unchanged; change 0153 adds four RTF
 selectors measured at the pre-staged publication-call interval, making that
 matrix 295. Change 0154 adds six ODF publication selectors, making the current
-matrix 301. No runtime
+matrix 301; change 0159 later made it 302 and change 0160 makes the current
+matrix 303. No runtime
 selector was added to 0152; only `cfg(test)` source-event acceptance and tests
 changed. Local or generic latency,
 allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
@@ -1123,7 +1143,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 301 selectable cases. Change
+The current standalone harness provides 303 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1204,7 +1224,8 @@ logical source calls (19.09% fewer). This accepts source-event/correctness
 evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 0153 adds four RTF selectors measured at the pre-staged publication-call
 interval, making that matrix 295. Change 0154 adds six ODF content-COW
-publication selectors, making the current matrix 301.
+publication selectors, making that matrix 301; change 0159 later made it 302
+and change 0160 makes the current matrix 303.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps

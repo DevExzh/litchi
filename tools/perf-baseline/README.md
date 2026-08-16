@@ -80,7 +80,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 302
+provide their source-read counters. The current `Case` matrix exposes 303
 selectable case names in total. Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -207,7 +207,7 @@ setup, reopen, raw/topology/semantic gates, typed stale/foreign refusals, and
 source-read checks are outside timing. The schema records separate source and
 destination logical `ReadAt` call/byte counters, with no cache, allocation,
 RSS, physical-I/O, eager/source speedup, ABBA, or media-rich claim. This
-selector brings the current selectable matrix to 302 names while leaving the
+selector brought the selectable matrix to 302 names at change 0159 while leaving the
 default 36 cases / 198 records unchanged.
 
 Change 0146 adds 12 shared CFB MiniFAT `open_stream` evidence selectors:
@@ -275,7 +275,8 @@ accepted only as source-event/correctness evidence. At the 0152 revision the
 291-name selector matrix was unchanged; change 0153 adds four RTF selectors
 measured at the pre-staged publication-call interval, making that matrix 295.
 Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
-matrix 301 at that revision; change 0159 now makes it 302. No runtime selector was added
+matrix 301 at that revision; change 0159 made it 302, and change 0160 makes it
+303. No runtime selector was added
 to 0152; only `cfg(test)` source-event acceptance and tests changed. Root
 MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain. Local or
@@ -1610,6 +1611,32 @@ relationship, `rIdBenchmarkMain`, targeting that middle Part. These packages
 use generator identifier `litchi-opc-synthetic-v2`; older v1 corpus hashes
 remain distinguishable.
 
+Measure native DOC owner/public phase attribution explicitly (it is not in
+the default matrix):
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 --writer-shape tiny,large,payload-heavy \
+  --case doc_owner_public_phases \
+  --json target/perf/doc-owner-public-phases.json
+```
+
+The three selected writer shapes reuse the exact deterministic DOC bytes from
+the legacy writer matrix. The result stores one vector entry per retained
+sample for each named phase and for checked attributed/unattributed totals;
+`elapsed_ns.samples` is the sorted view of the same measured lifecycle totals.
+The complete semantic, patch, refusal, hash, and preservation gates run before
+the sample loop or after each sample's timer stops. Successful event-order and
+cardinality validation runs after each named outer interval but before the
+complete lifecycle timer stops, so its recorder work is visible in checked
+unattributed time. Separate format tests bind balanced error events. Observer
+callbacks are synchronous; their dispatch and recorder work are present in
+outer/lifecycle measurements even though individual phase intervals stop
+before final recorder bookkeeping. `Snapshot::finish` is timed as output
+materialization after commit; it is not a file save/publication operation.
+Change 0160 adds this one opt-in selector, taking the current matrix from 302
+to 303 names without changing the default 36 cases / 198 records.
+
 ## Cases
 
 - `zip_index`: parse the ZIP central directory and build Soapberry's index.
@@ -1772,6 +1799,25 @@ native-Office claim is made.
   `paragraphs(Projection::All)`. Every returned position and paragraph text is
   verified after timing. This narrow opt-in case attributes the paragraph
   terminator/PAPX containment work used by exact-source DOC transactions.
+- `doc_owner_public_phases`: opt-in native DOC owner/public-reader phase
+  attribution over the exact `doc_fresh_write_to` bytes. The case runs the
+  deterministic `tiny`, `large`, and `payload-heavy` writer shapes when
+  selected, and reports per-sample strict-owner/public-reader/source-retain
+  open phases, `Edit::new`, replacement staging, in-memory `Edit::finish`,
+  final strict-owner/public-reader/source-retain/patch phases, and separate
+  `Snapshot::finish` output materialization. The production
+  `performance-diagnostics` feature emits only ordered content-free events;
+  the harness owns `Instant` and uses a bounded preallocated recorder. Event
+  order/cardinality is validated after each named outer interval but inside
+  the lifecycle timer and checked unattributed remainder. Semantic
+  source/output reopen, exact no-op/changed state, forward/inverse/stale patch
+  behavior, typed refusal, malformed input, output hashes, and untouched CFB
+  stream preservation are untimed gates.
+  `Finish` here means in-memory owner rendering, not file publication or save.
+  Attribution is per-sample checked arithmetic with explicit unattributed time;
+  synchronous observer overhead and non-additive boundary work remain visible.
+  This is correctness/attribution evidence only, with no speedup, physical-I/O,
+  allocation, RSS, cold-cache, or real-producer claim.
 - `xls_semantic_open`: open the generated native workbook through the ordinary
   `litchi_xls::Workbook` reader.
 - `xls_semantic_list_worksheets` / `xls_semantic_one_cell` /
@@ -2249,6 +2295,30 @@ eager/source-backed materialization counts are twelve and three, respectively,
 because both controls validate the styles relationship needed by authored
 color/DXF filters and sorts; their complete typed readback and output hashes
 are required to match.
+
+### Native DOC owner/public phase evidence
+
+`doc_owner_public_phases` adds `source.doc_owner_public_phases` without
+changing schema version 1 or the default case matrix. Its per-sample vectors
+are `open_owner_ns`, `open_public_ns`, `open_retain_ns`, `edit_new_ns`,
+`edit_replacement_ns`, `edit_authoring_ns`, `edit_finish_ns`,
+`edit_final_owner_ns`, `edit_final_public_ns`, `edit_final_retain_ns`,
+`edit_patch_ns`, `edit_commit_outer_ns`, and
+`edit_output_materialization_ns`. The summary also records open/edit outer
+totals, measured lifecycle totals, attributed totals, checked unattributed
+time, source/candidate sizes and hashes, one output hash per sample, and
+boolean semantic/patch/refusal/preservation gates. The vectors retain sample
+iteration order; `elapsed_ns.samples` is sorted by the existing statistics
+helper, so comparisons use the same measured-total multiset rather than
+assuming positional alignment with the evidence vectors.
+
+The feature-gated production observer is clock-free and content-free. The
+harness alone timestamps events with `Instant` using a bounded preallocated
+recorder. Observer dispatch and recorder validation are present in outer or
+lifecycle measurements; final per-event bookkeeping occurs after an individual
+phase duration is sampled. The explicit unattributed remainder makes that
+non-additive work visible. No result is evidence of speedup, physical I/O,
+allocation, RSS, cold-cache behavior, or real-producer coverage.
 
 ## External profiling
 

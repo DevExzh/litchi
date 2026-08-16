@@ -451,6 +451,78 @@ impl From<PatchError> for Error {
     }
 }
 
+/// A deterministic phase boundary exposed by the opt-in performance
+/// diagnostics seam.
+///
+/// The phases describe format-owned work rather than implementation objects or
+/// physical identifiers. They intentionally carry no source content, byte
+/// offsets, CFB stream names, or package identifiers.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticPhase {
+    /// Validation by the strict DOC owner used for safe editing.
+    StrictOwnerValidation,
+    /// Complete validation by the public package/document reader.
+    PublicReaderValidation,
+    /// Ownership allocation retaining the exact source for the immutable snapshot.
+    SourceRetention,
+    /// In-memory owner rendering of the staged editor into candidate bytes.
+    Finish,
+    /// The candidate matched the source byte-for-byte.
+    ExactNoOp,
+    /// Construction of the reversible semantic patch.
+    Patch,
+}
+
+/// Result class attached to a completed diagnostic phase.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticOutcome {
+    /// The phase completed and its enclosing operation continued.
+    Success,
+    /// The phase returned an ordinary typed operation error.
+    Error,
+}
+
+/// One ordered, content-free phase event emitted by a profiled operation.
+///
+/// Every started phase has one matching finished event, including phases that
+/// return an error. An observer is called synchronously in operation order;
+/// the library neither timestamps events nor consults ambient runtime state.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticEvent {
+    /// A phase is about to run.
+    Started { phase: DiagnosticPhase },
+    /// A phase has returned to its caller.
+    Finished {
+        phase: DiagnosticPhase,
+        outcome: DiagnosticOutcome,
+    },
+}
+
+#[cfg(feature = "performance-diagnostics")]
+fn observe_phase<T, Operation>(
+    observer: &mut impl FnMut(DiagnosticEvent),
+    phase: DiagnosticPhase,
+    operation: Operation,
+) -> Result<T>
+where
+    Operation: FnOnce() -> Result<T>,
+{
+    observer(DiagnosticEvent::Started { phase });
+    let result = operation();
+    observer(DiagnosticEvent::Finished {
+        phase,
+        outcome: if result.is_ok() {
+            DiagnosticOutcome::Success
+        } else {
+            DiagnosticOutcome::Error
+        },
+    });
+    result
+}
+
 /// Immutable, exact-source snapshot for the body-text transaction seam.
 #[derive(Clone)]
 pub struct Snapshot {
@@ -488,6 +560,53 @@ impl Snapshot {
         package.document().map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
+            limits,
+            transaction_limits,
+        })
+    }
+
+    /// Opens an owned DOC source while reporting deterministic phase
+    /// boundaries to an external observer.
+    ///
+    /// This is an opt-in profiling equivalent of [`Self::open_bounded`]. It
+    /// performs the same strict-owner validation, complete public-reader
+    /// validation, and exact-source retention in the same order. The
+    /// observer receives no document content or physical identifiers, and no
+    /// clock or other ambient runtime state is consulted.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same error as [`Self::open_bounded`]. A failed validation
+    /// phase is closed with [`DiagnosticOutcome::Error`] before the error is
+    /// returned.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn open_bounded_profiled(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        transaction_limits: TransactionLimits,
+        mut observer: impl FnMut(DiagnosticEvent),
+    ) -> Result<Self> {
+        let bytes = input.into();
+        observe_phase(
+            &mut observer,
+            DiagnosticPhase::StrictOwnerValidation,
+            || RevisionEditor::open(bytes.clone(), limits).map_err(Error::Invalid),
+        )?;
+        observe_phase(
+            &mut observer,
+            DiagnosticPhase::PublicReaderValidation,
+            || {
+                let mut package = crate::Package::from_reader(Cursor::new(bytes.clone()))
+                    .map_err(Error::Invalid)?;
+                package.document().map_err(Error::Invalid)?;
+                Ok(())
+            },
+        )?;
+        let source = observe_phase(&mut observer, DiagnosticPhase::SourceRetention, || {
+            Ok(Arc::from(bytes.into_boxed_slice()))
+        })?;
+        Ok(Self {
+            source,
             limits,
             transaction_limits,
         })
@@ -1443,6 +1562,54 @@ impl Edit {
             Snapshot::open_bounded(bytes, self.source.limits, self.source.transaction_limits)?
         };
         let patch = Patch::new(self.source, snapshot.clone(), self.changes);
+        Ok(Commit { snapshot, patch })
+    }
+
+    /// Publishes a commit while reporting deterministic, content-free phase
+    /// boundaries to an external observer.
+    ///
+    /// This is an opt-in profiling equivalent of [`Self::commit`]. Changed
+    /// candidates report editor finish, strict-owner validation, complete
+    /// public-reader validation, source retention, and patch construction. An
+    /// exact byte-for-byte no-op reports finish, the no-op decision, and patch
+    /// construction; it shares the source allocation and does not reopen or
+    /// retain a new candidate.
+    ///
+    /// The safe public edit verbs do not provide a raw WordDocument/table
+    /// injection path: each binary mutation validates its candidate before it
+    /// is installed in the editor. Consequently a deterministic typed
+    /// `Finish` or candidate-reopen failure cannot be manufactured through a
+    /// public `Edit`; those failures remain possible for lower-level render or
+    /// allocation conditions. The profiled open tests cover the reachable
+    /// strict-owner and public-reader validation failures, while the phase
+    /// helper test locks the finish-error event contract.
+    /// The ordinary commit path is unchanged and the observer cannot alter the
+    /// returned document semantics.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same error as [`Self::commit`]. A failed phase is closed
+    /// before the error is returned.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
+        let bytes = observe_phase(&mut observer, DiagnosticPhase::Finish, || {
+            self.editor.finish().map_err(Error::Invalid)
+        })?;
+        let snapshot = if bytes == self.source.bytes() {
+            observe_phase(&mut observer, DiagnosticPhase::ExactNoOp, || {
+                Ok(self.source.clone())
+            })?
+        } else {
+            Snapshot::open_bounded_profiled(
+                bytes,
+                self.source.limits,
+                self.source.transaction_limits,
+                &mut observer,
+            )?
+        };
+        let patch = observe_phase(&mut observer, DiagnosticPhase::Patch, || {
+            Ok(Patch::new(self.source, snapshot.clone(), self.changes))
+        })?;
         Ok(Commit { snapshot, patch })
     }
 
@@ -3599,7 +3766,11 @@ mod tests {
         CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
         Snapshot, Story, TextTarget, TransactionLimits,
     };
+    #[cfg(feature = "performance-diagnostics")]
+    use super::{DiagnosticEvent, DiagnosticOutcome, DiagnosticPhase, observe_phase};
     use crate::tracked_revision::Limits;
+    #[cfg(feature = "performance-diagnostics")]
+    use crate::tracked_revision::RevisionEditor;
     use crate::writer::{
         CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
     };
@@ -3760,6 +3931,284 @@ mod tests {
             16 * 1024,
             12 * 1024 * 1024,
         )
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    fn public_reader_failure_doc() -> Vec<u8> {
+        let mut package =
+            PackageEditor::open(doc(&["alpha"]), Targets::default(), Limits::default())
+                .expect("fixture package should open");
+        let mut word = package
+            .stream(&["WordDocument".to_string()])
+            .expect("WordDocument stream")
+            .to_vec();
+        // FIB pair 113 is owned by the public RSID reader, not by the strict
+        // body-text owner. A one-byte payload is deterministically malformed
+        // for that reader while the strict owner ignores it.
+        let pointer = 154 + 113 * 8;
+        word[pointer..pointer + 4].copy_from_slice(&0_u32.to_le_bytes());
+        word[pointer + 4..pointer + 8].copy_from_slice(&1_u32.to_le_bytes());
+        package
+            .put_stream(&["WordDocument".to_string()], word)
+            .expect("replace WordDocument stream");
+        package.finish().expect("fixture package should finish")
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_open_matches_ordinary_open_and_balances_success_events() {
+        let bytes = doc(&["alpha", "bravo"]);
+        let ordinary = Snapshot::open(bytes.clone(), Limits::default()).expect("ordinary open");
+        let mut events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled(
+            bytes,
+            Limits::default(),
+            TransactionLimits::default(),
+            |event| events.push(event),
+        )
+        .expect("profiled open");
+
+        assert_eq!(profiled, ordinary);
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::SourceRetention,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::SourceRetention,
+                    outcome: DiagnosticOutcome::Success,
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_open_matches_ordinary_error_and_closes_failed_phase() {
+        let bytes = vec![0_u8; 8];
+        let ordinary =
+            Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
+        let mut events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled(
+            bytes,
+            Limits::default(),
+            TransactionLimits::default(),
+            |event| events.push(event),
+        )
+        .map_err(|error| error.to_string());
+
+        assert_eq!(profiled, ordinary);
+        assert!(profiled.is_err());
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                    outcome: DiagnosticOutcome::Error,
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_open_public_reader_error_closes_only_public_phase() {
+        let bytes = public_reader_failure_doc();
+        assert!(RevisionEditor::open(bytes.clone(), Limits::default()).is_ok());
+        let ordinary =
+            Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
+        let mut events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled(
+            bytes,
+            Limits::default(),
+            TransactionLimits::default(),
+            |event| events.push(event),
+        )
+        .map_err(|error| error.to_string());
+
+        assert_eq!(profiled, ordinary);
+        assert!(profiled.is_err());
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                    outcome: DiagnosticOutcome::Error,
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn failed_finish_phase_is_balanced_when_render_returns_error() {
+        // The public Edit API validates every binary mutation before storing
+        // it, so a renderer failure cannot be injected without relying on an
+        // allocator or lower-level CFB failure. Exercise the same phase
+        // boundary with the typed error returned by such a renderer.
+        let mut events = Vec::new();
+        let result: super::Result<()> = observe_phase(
+            &mut |event| events.push(event),
+            DiagnosticPhase::Finish,
+            || Err(Error::Conflict),
+        );
+
+        assert!(result.is_err());
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::Finish,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::Finish,
+                    outcome: DiagnosticOutcome::Error,
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_changed_commit_matches_ordinary_commit() {
+        let bytes = doc(&["alpha", "bravo"]);
+        let ordinary_source = Snapshot::open(bytes.clone(), Limits::default()).expect("source");
+        let mut ordinary_edit = ordinary_source.edit().expect("ordinary edit");
+        ordinary_edit
+            .replace_paragraph(Position::new(0), "omega")
+            .expect("ordinary replacement");
+        let ordinary = ordinary_edit.commit().expect("ordinary commit");
+
+        let profiled_source = Snapshot::open(bytes, Limits::default()).expect("source");
+        let mut profiled_edit = profiled_source.edit().expect("profiled edit");
+        profiled_edit
+            .replace_paragraph(Position::new(0), "omega")
+            .expect("profiled replacement");
+        let mut events = Vec::new();
+        let profiled = profiled_edit
+            .commit_profiled(|event| events.push(event))
+            .expect("profiled commit");
+
+        assert_eq!(profiled, ordinary);
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::Finish,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::Finish,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::SourceRetention,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::SourceRetention,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::Patch,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::Patch,
+                    outcome: DiagnosticOutcome::Success,
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_exact_noop_commit_matches_ordinary_and_skips_reopen() {
+        let bytes = doc(&["alpha", "bravo"]);
+        let ordinary_source = Snapshot::open(bytes.clone(), Limits::default()).expect("source");
+        let ordinary = ordinary_source
+            .edit()
+            .expect("ordinary edit")
+            .commit()
+            .expect("ordinary commit");
+
+        let profiled_source = Snapshot::open(bytes, Limits::default()).expect("source");
+        let mut profiled_edit = profiled_source.edit().expect("profiled edit");
+        profiled_edit
+            .replace_paragraph(Position::new(0), "alpha")
+            .expect("same text replacement");
+        let mut events = Vec::new();
+        let profiled = profiled_edit
+            .commit_profiled(|event| events.push(event))
+            .expect("profiled no-op commit");
+
+        assert_eq!(profiled, ordinary);
+        assert!(!profiled.changed());
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::Finish,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::Finish,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::ExactNoOp,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::ExactNoOp,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::Patch,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::Patch,
+                    outcome: DiagnosticOutcome::Success,
+                },
+            ]
+        );
     }
 
     #[test]
