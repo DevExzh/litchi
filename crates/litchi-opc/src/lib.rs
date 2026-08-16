@@ -69,5 +69,6 @@ pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
     PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
     SourceCacheDiagnostics, SourceCacheLimitError, SourceCacheLimits, SourceLineage,
+    SourceTopologyPlan,
 };
 pub use validation::{validate_read_at, validate_read_at_with_limits};
