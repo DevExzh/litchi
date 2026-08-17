@@ -414,8 +414,8 @@ Change 0153 adds four RTF selectors measured at the pre-staged
 publication-call interval, making that matrix 295. Change 0154 adds six ODF
 content-COW publication selectors, making that matrix 301; change 0159 later
 made it 302, change 0160 made it 303, change 0162 made it 305, change 0163
-made it 309, change 0164 made it 311, change 0166 made it 315, and change 0174
-makes the current matrix 319. Local or generic latency, allocation/RSS/peak memory, physical
+made it 309, change 0164 made it 311, change 0166 made it 315, change 0174
+made it 319, and change 0175 makes the current matrix 320. Local or generic latency, allocation/RSS/peak memory, physical
 I/O/syscalls, cold-cache/device/network behavior, decompression, native
 semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -612,7 +612,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**319 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**320 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -1848,3 +1848,23 @@ tranche compiled the ODF fuzz target offline; the PPT and ODS tranches have no
 dedicated fuzz target in the current tree. A workspace all-target/all-feature
 gate was not rerun because iWork was explicitly excluded while its crates are
 changing independently.
+
+## Immutable-owned CFB atomic save and rejected reuse experiments (changes 0175-0176)
+
+The opt-in owned CFB filesystem selector raises the matrix to 320 names while
+leaving the default 36 cases / 198 records unchanged. For its fixed
+16,913,408-byte corpus, sealed ownership removes exactly 33,826,816 logical
+source bytes, 34 one-MiB fingerprint reads, and two source/target digest pairs
+per atomic save. Generic sources retain both complete fences; owned emission
+still hashes every source and target byte and preserves flush/fsync/rename/
+parent-sync durability. Clean CPU-2 A/B/B/A totals are lower in both warm and
+advisory-cold paired directions, but 11.29%-14.16% control drift exceeds the
+5% gate, so latency is descriptive only. See
+[`0175`](changes/0175-cfb-owned-atomic-save.md).
+
+Authenticated ODS `content.xml` reuse and XLSX conditional-formatting parsed
+readback reuse were both fully reverted. ODS regressed source-backed p50 by
+1.63%-2.83% in both directions; XLSX moved -4.81%/+1.99% across paired
+directions. Exact output hashes and correctness gates passed, but neither
+experiment met the usefulness/repeatability gate. See
+[`0176`](changes/0176-rejected-odf-xlsx-reuse.md).

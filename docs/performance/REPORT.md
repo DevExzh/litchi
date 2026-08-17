@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **319 selectable cases**; 200 was the count before the
+harness contains **320 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1486,7 +1486,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 319 selectable cases. Change
+The current standalone harness provides 320 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1569,8 +1569,8 @@ evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 interval, making that matrix 295. Change 0154 adds six ODF content-COW
 publication selectors, making that matrix 301; change 0159 later made it 302,
 change 0160 made it 303, change 0162 made it 305, change 0163 made it 309,
-change 0164 made it 311, change 0166 made it 315, and change 0174 makes the
-current matrix 319.
+change 0164 made it 311, change 0166 made it 315, change 0174 made it 319, and
+change 0175 makes the current matrix 320.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps
@@ -2026,3 +2026,19 @@ The scenario-by-scenario gap map and next case queue are in
 The ranked source-level queue and path maps are maintained in
 [`HOTSPOTS.md`](HOTSPOTS.md), and architectural gates are in
 [`ADR_COMPLIANCE.md`](ADR_COMPLIANCE.md).
+
+## Latest accepted and rejected tranche
+
+Change 0175 adds one opt-in owned-CFB atomic-save filesystem selector and keeps
+the historical default matrix fixed. Sealed immutable ownership removes two
+complete source fingerprint scans per save: 33,826,816 logical bytes and 34
+large reads on the retained 16.9 MiB corpus. Generic sources keep both fences;
+owned publication retains full emission source/target hashes and atomic
+durability. Both measured candidate directions are lower, but control drift
+exceeds 5%, so only the deterministic work reduction is accepted.
+
+Change 0176 records and reverts two non-useful micro-optimizations. ODS
+authenticated source-content reuse regresses source-backed p50 in both paired
+directions, and XLSX conditional-formatting readback reuse disagrees across
+directions. No production behavior or performance claim remains from either
+experiment.

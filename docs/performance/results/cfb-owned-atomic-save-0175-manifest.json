@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "change": "0175",
+  "artifacts": [
+    {"path": "cfb-owned-atomic-save-0175-a1.json.zst", "bytes": 6031, "sha256": "fb490c245598f8c8a13d365dd178bbc7eb3606111cc69c18ac93fbfe063c2daf", "uncompressed_bytes": 181972, "uncompressed_sha256": "6b490b16afcc7e2dc9b3d4e94a0f27d774893d214e1fcafdbf1e1fe7091e3839"},
+    {"path": "cfb-owned-atomic-save-0175-b1.json.zst", "bytes": 5855, "sha256": "9a3cb3030f4a4900261c85118f6a0a774a358d26ed73dc25ae2e2a6a5399042e", "uncompressed_bytes": 181966, "uncompressed_sha256": "ec19e8554509087a9f932396cb054823849d3371d9e0f59cf0b42b083cdca29a"},
+    {"path": "cfb-owned-atomic-save-0175-b2.json.zst", "bytes": 5978, "sha256": "afdb4b20f261808fd6e97cab2b9ad52ee73385302bb21334622e3ffb4c28a445", "uncompressed_bytes": 181995, "uncompressed_sha256": "3c8ad36f71a8c08ae9177f20ec5fb73060b73fa495d7a133133198bb6ed9cce8"},
+    {"path": "cfb-owned-atomic-save-0175-a2.json.zst", "bytes": 5976, "sha256": "4a2f7e3d43fedd511a286fb95946c88e9e43b641485d07976ec9b44ddd70562f", "uncompressed_bytes": 181980, "uncompressed_sha256": "32d1236d5e9c9b710ab5bef1f7d8e947d8dd84ea6fe5f835ac1472f182e05195"}
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "change": "0176",
+  "decision": "revert_both_experiments",
+  "protocol": {"cpu_affinity": "2", "logical_cpus_available": 1, "warmups": 20, "samples": 200, "order": ["control-a1", "candidate-b1", "candidate-b2", "control-a2"]},
+  "ods": {
+    "control_revision": "65b756853c441df705e1d10a7a1690539738545b",
+    "candidate_revision": "c775989a00e80781962705c70d61549f8f95989b",
+    "output_sha256": {"one": "fa578f7de1cde14ef2254294c0e589ec2ed502077d40e4d768f897a65902bd34", "one_percent": "5d9fc848e830ccea59ca2632715d1eaf54d8aeafc3683c92241c22404285db06"},
+    "source_backed_p50_candidate_regression_percent": {"one": {"a1_to_b1": 1.838179, "b2_to_a2": 2.700702}, "one_percent": {"a1_to_b1": 1.629075, "b2_to_a2": 2.829030}},
+    "revert_revision": "0188c0850"
+  },
+  "xlsx": {
+    "control_revision": "65b756853c441df705e1d10a7a1690539738545b",
+    "candidate_revision": "153c3ff243120b6e03232d44e47ed2c183f75dc5",
+    "output_sha256": "5a44bffa0f3b4ea554e3eaa6588eec770d72528a9c854019c7abc6ee419b9b70",
+    "source_backed_p50_reduction_percent": {"a1_to_b1": -4.814771, "b2_to_a2": 1.990366},
+    "revert_revision": "1ff922739"
+  },
+  "accepted_performance_claim": null
+}
