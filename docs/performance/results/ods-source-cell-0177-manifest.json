@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "change": "0177",
+  "revision": "2d2c546856936dd643619957d16b1962f1ddaad2",
+  "binary_sha256": "94927d403afca7fa77f9404113531b82850b2df3211e7e410172b8bdb0854c8f",
+  "artifacts": [
+    {
+      "path": "ods-source-cell-0177-a1.json.zst",
+      "bytes": 21285,
+      "sha256": "78270b8952f0d182f2b250a1be354023665c0b43fda77af9a36f37a6b722d726",
+      "uncompressed_bytes": 138593,
+      "uncompressed_sha256": "5e6d463e297ae3c7c11cfb52200f71b9e083fc088d1b622baf9165b9301a9242"
+    },
+    {
+      "path": "ods-source-cell-0177-b1.json.zst",
+      "bytes": 21370,
+      "sha256": "5a39eca98640a7c876653f0e9770fc8f32a0086779958af6be2b30db4a8718fe",
+      "uncompressed_bytes": 354594,
+      "uncompressed_sha256": "f021606d5a5802e53da80716367c733ffca8e5f62053ef37cc265500352d2ce4"
+    },
+    {
+      "path": "ods-source-cell-0177-b2.json.zst",
+      "bytes": 20700,
+      "sha256": "04db4b3aaca4d41a519b0c091dfc95fa535f4207d7b893aca12966b46c610186",
+      "uncompressed_bytes": 354599,
+      "uncompressed_sha256": "efeca9264aea57354a4eaeb545533e743b8f3ae6ad31b260c48c7a7e09bb1f11"
+    },
+    {
+      "path": "ods-source-cell-0177-a2.json.zst",
+      "bytes": 20917,
+      "sha256": "46c6dcbd914adec4d49848e733fce76e6d1bac4ce112e1bbb1313c0e130a5bed",
+      "uncompressed_bytes": 138594,
+      "uncompressed_sha256": "aa43d43e386f03f883244093eaac74cb1aae56582bc9630ec0a3f40a5ce0737d"
+    }
+  ]
+}

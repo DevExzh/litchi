@@ -1868,3 +1868,21 @@ readback reuse were both fully reverted. ODS regressed source-backed p50 by
 directions. Exact output hashes and correctness gates passed, but neither
 experiment met the usefulness/repeatability gate. See
 [`0176`](changes/0176-rejected-odf-xlsx-reuse.md).
+
+## ODS source-backed existing-cell release evidence (change 0177)
+
+The four existing ODS selectors now retain aligned lifecycle and phase vectors
+plus a separately untimed logical `ReadAt` replay. Clean CPU-2 A/B/B/A uses one
+release binary, 20 warmups and 500 samples per workload/leg over the fixed
+16.01 MiB media-rich corpus. For one existing cell, source-backed complete-
+lifecycle p50 is 75.03%/74.27% lower in the two paired directions; mean, p95
+and p99 also improve, and eager/source drift passes the predeclared
+5%/5%/10%/15% thresholds. That one-cell latency result is accepted.
+
+The 21-cell deterministic 1% path is correctness/phase evidence only. Its p50
+is 73.59%/73.16% lower, but candidate mean drift is 5.86%, p95 drift reaches
+14.06%, and p99 drift reaches 18.41%. No 1% latency claim is accepted. The
+617-call/16,801,025-byte replay is logical `ReadAt` evidence, not physical I/O
+or decompression. Allocation/RSS, cache-temperature, real-producer, durable
+ZIP patch, atomic-save and broader ODS CRUD claims remain open. See
+[`0177`](changes/0177-ods-source-cell-release-evidence.md).

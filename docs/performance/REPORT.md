@@ -2042,3 +2042,11 @@ authenticated source-content reuse regresses source-backed p50 in both paired
 directions, and XLSX conditional-formatting readback reuse disagrees across
 directions. No production behavior or performance claim remains from either
 experiment.
+
+Change 0177 accepts the existing source-backed ODS one-cell edit/save path at
+the full open/stage/commit/sequential-publication boundary. On a clean CPU-2
+release A/B/B/A run with 500 samples per workload and leg, p50 is
+75.03%/74.27% lower than eager ownership and p50/mean/p95/p99 stability gates
+all pass. The deterministic 21-cell 1% path remains correctness and phase
+evidence only because same-implementation mean/tail drift exceeds policy.
+Logical source replay counters are explicitly not physical-I/O evidence.

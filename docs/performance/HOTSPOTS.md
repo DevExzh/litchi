@@ -1530,3 +1530,17 @@ workflows; XLSX conditional-formatting readback reuse was directionally
 inconsistent. Both production experiments are reverted. The next ODF/OOXML
 work should target a larger retained allocation or complete physical/semantic
 pass rather than reviving either micro-handoff unchanged.
+
+## Change 0177 update
+
+The accepted source-backed ODS existing-cell closure now has clean release
+evidence at the complete open/stage/commit/sequential-publication boundary.
+One-cell p50 improves 75.03%/74.27% across paired directions with all four
+distribution metrics inside the stability policy, so eager whole-package
+ownership is no longer the preferred path for that bounded media-rich case.
+
+The same conclusion is not generalized to the 21-cell 1% selector: mean and
+tail same-path drift exceed policy despite a large apparent p50 advantage.
+ODS structural cells/rows, formulas, merges, insert/delete, real producers,
+resource profiles and physical I/O remain higher-value open work than another
+retained-content proof micro-handoff.
