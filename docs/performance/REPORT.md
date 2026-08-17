@@ -2061,3 +2061,17 @@ p50 in every paired direction, but every workload fails at least one stability
 threshold, so only deterministic logical work is accepted. Publication hashes,
 atomic durability, physical-I/O/resource, cold-cache, producer, and broader CRUD
 claims remain unchanged or withheld.
+
+Change 0179 retains the source-backed PPTX editor's validated presentation
+catalog across slide capture and publication. On the existing 200-slide
+media-rich corpus, one-edit and same-slide batch workflows move from three
+catalog builds to one, removing 400 slide-node allocations; the eight-slide
+batch moves from ten builds to one, removing 1,800 nodes. Selected Part
+materializations remain 2/2/9 and logical source counters and output hashes are
+unchanged. A clean CPU-2, 20-warmup, 500-sample A/B/B/A records identical
+non-timing projections, but paired latency directions disagree and stability
+gates fail for every workload. The deterministic metadata-work reduction is
+accepted; latency, allocation/RSS, physical-I/O, cold-cache, scaling, producer,
+and broader PPTX claims are withheld. See
+[change 0179](changes/0179-pptx-source-catalog-reuse.md) and the
+[summary](results/pptx-catalog-reuse-0179-summary.json).

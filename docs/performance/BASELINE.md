@@ -14,6 +14,23 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained PPTX catalog result (change 0179)
+
+The source-backed PPTX editor now retains its already validated presentation
+catalog across slide capture and publication. On the fixed 200-slide corpus,
+one-slide workflows remove two complete catalog builds and 400 slide-node
+allocations (`3 -> 1`); the eight-slide batch removes nine builds and 1,800
+nodes (`10 -> 1`). Payload materializations and logical source reads are
+unchanged.
+
+A clean CPU-2 release A/B/B/A over three existing selectors has identical
+non-timing projections in all four legs, but paired p50 directions disagree
+and required stability gates fail for every workload. Only the deterministic
+metadata-work reduction is accepted. Latency, physical I/O, total allocation,
+RSS, cold-cache, scaling, producer, and broader PPTX claims are withheld. See
+[change 0179](changes/0179-pptx-source-catalog-reuse.md) and its
+[machine-readable summary](results/pptx-catalog-reuse-0179-summary.json).
+
 ## Latest retained CFB planning result (change 0178)
 
 Sealed immutable CFB sources now omit one redundant final complete fingerprint

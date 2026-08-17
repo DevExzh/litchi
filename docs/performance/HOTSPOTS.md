@@ -3,6 +3,12 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0179`](changes/0179-pptx-source-catalog-reuse.md)
+(0179 retains the source-backed PPTX editor's validated presentation catalog.
+One-slide workflows remove two full 200-slide graph builds; the eight-slide
+batch removes nine. Exact materializations and logical source reads are
+unchanged. Clean paired latency directions disagree and stability gates fail,
+so only deterministic catalog-build/allocation work is accepted.)
 [`change 0178`](changes/0178-cfb-owned-planning-fingerprint.md)
 (0178 removes one final complete logical fingerprint scan from sealed owned
 CFB planning after candidate reopen and optional format-owner validation.

@@ -1453,6 +1453,17 @@ structural BIFF changes, resource/physical-I/O/cold-cache and producer coverage
 remain open. See
 [`0178`](changes/0178-cfb-owned-planning-fingerprint.md).
 
+Change 0179 likewise adds no selector or CRUD closure and leaves the matrix at
+320. It reuses the source-backed PPTX editor catalog already validated at open,
+removing two complete 200-slide graph builds from one/same-slide edits and nine
+from the eight-slide batch. Payload materializations, logical source reads,
+output hashes, topology, signatures, MCE and stale/foreign refusal remain
+unchanged. Clean release paired latency directions disagree and stability
+gates fail, so only the exact `3 -> 1` / `10 -> 1` catalog-build reduction is
+accepted. General topology edits, relationships, real producers, allocation,
+RSS, physical I/O, cold-cache and broader PPTX coverage remain open. See
+[`0179`](changes/0179-pptx-source-catalog-reuse.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
