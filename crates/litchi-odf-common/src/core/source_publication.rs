@@ -7,7 +7,9 @@
 //! Unsupported source layouts are refused before the first sink write.  The
 //! method does not materialize an owning package and has no logical fallback.
 
-use super::package::{SourceBackedPackage, SourceChangedIo, SourceExecutionIo, SourceReadIo};
+use super::package::{
+    SourceBackedPackage, SourceChangedIo, SourceContentProof, SourceExecutionIo, SourceReadIo,
+};
 use crate::constants;
 use litchi_core::{
     CancellationToken, Error, ExecutionContext, ExecutionError, Resource, Result, SourceVersion,
@@ -676,7 +678,38 @@ impl SourceBackedPackage {
         options: SourceContentPublicationOptions,
     ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
         let replacement_bytes = replacement.as_ref();
-        let result = self.write_content_xml_to_stream_inner(writer, replacement_bytes, &options);
+        let result =
+            self.write_content_xml_to_stream_inner(writer, replacement_bytes, None, &options);
+        match result {
+            Ok(report) => Ok(report),
+            Err(error) => match reconcile_source_state(self, error.progress()) {
+                Ok(()) => Err(error),
+                Err(source_error) => Err(source_error),
+            },
+        }
+    }
+
+    /// Publish using `content.xml` bytes already authenticated by this exact
+    /// source owner.  This is a hidden facade bridge: callers must retain the
+    /// [`SourceContentProof`] returned by
+    /// [`SourceBackedPackage::get_content_xml_with_source_proof`] and pass the
+    /// matching bytes unchanged.  All normal publication gates still run.
+    #[doc(hidden)]
+    pub fn write_content_xml_to_stream_with_known_source_content<W: Write>(
+        &self,
+        writer: W,
+        known_content: &[u8],
+        proof: &SourceContentProof,
+        replacement: impl AsRef<[u8]>,
+        options: SourceContentPublicationOptions,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        let replacement_bytes = replacement.as_ref();
+        let result = self.write_content_xml_to_stream_inner(
+            writer,
+            replacement_bytes,
+            Some((proof, known_content)),
+            &options,
+        );
         match result {
             Ok(report) => Ok(report),
             Err(error) => match reconcile_source_state(self, error.progress()) {
@@ -690,6 +723,7 @@ impl SourceBackedPackage {
         &self,
         writer: W,
         replacement_bytes: &[u8],
+        known_source_content: Option<(&SourceContentProof, &[u8])>,
         options: &SourceContentPublicationOptions,
     ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
         check_cancellation(options, SourceContentPublicationProgress::Untouched)?;
@@ -741,13 +775,23 @@ impl SourceBackedPackage {
             SourceContentPublicationProgress::Untouched,
         )?;
 
-        let source_content = self
-            .get_file(constants::ODF_CONTENT)
-            .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
-        self.ensure_current_for_publication()
-            .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
-        let no_op = source_content == replacement_bytes;
-        drop(source_content);
+        let no_op = if let Some((proof, known_content)) = known_source_content {
+            self.validate_known_content_proof(proof, known_content)
+                .map_err(|error| {
+                    map_core_error(error, SourceContentPublicationProgress::Untouched)
+                })?;
+            known_content == replacement_bytes
+        } else {
+            let source_content = self.get_file(constants::ODF_CONTENT).map_err(|error| {
+                map_core_error(error, SourceContentPublicationProgress::Untouched)
+            })?;
+            self.ensure_current_for_publication().map_err(|error| {
+                map_core_error(error, SourceContentPublicationProgress::Untouched)
+            })?;
+            let no_op = source_content == replacement_bytes;
+            drop(source_content);
+            no_op
+        };
 
         if no_op {
             consume_execution_resource(
@@ -1754,6 +1798,7 @@ mod tests {
     use super::*;
     use crate::core::PackageWriter;
     use litchi_core::OwnedSource;
+    use std::io::Cursor;
 
     const MIME: &str = constants::ODF_TEXT;
     const SOURCE: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body/></office:document-content>"#;
@@ -1767,6 +1812,40 @@ mod tests {
             .add_file_with_media_type("Pictures/blob.bin", b"opaque", "application/octet-stream")
             .expect("opaque");
         writer.finish_to_bytes().expect("package")
+    }
+
+    fn package_bytes_with_stale_manifest_size() -> Vec<u8> {
+        let mut bytes = Cursor::new(Vec::new());
+        {
+            let mut writer = zip::ZipWriter::new(&mut bytes);
+            let stored = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            let deflated = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            writer
+                .start_file("mimetype", stored)
+                .expect("mimetype entry");
+            writer.write_all(MIME.as_bytes()).expect("mimetype bytes");
+            writer
+                .start_file(constants::ODF_CONTENT, deflated)
+                .expect("content entry");
+            writer.write_all(SOURCE).expect("content bytes");
+            writer
+                .start_file(constants::ODF_MANIFEST, deflated)
+                .expect("manifest entry");
+            writer
+                .write_all(
+                    format!(
+                        r#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="{}" manifest:version="1.2"><manifest:file-entry manifest:full-path="/" manifest:media-type="{}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml" manifest:size="1"/></manifest:manifest>"#,
+                        "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0",
+                        MIME,
+                    )
+                    .as_bytes(),
+                )
+                .expect("manifest bytes");
+            writer.finish().expect("finish ZIP");
+        }
+        bytes.into_inner()
     }
 
     #[test]
@@ -1794,5 +1873,158 @@ mod tests {
             .expect("publish");
         assert!(report.is_no_op());
         assert_eq!(output, bytes);
+    }
+
+    #[test]
+    fn known_content_accepts_stale_unencrypted_manifest_size_only_for_exact_noop() {
+        let bytes = package_bytes_with_stale_manifest_size();
+        let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
+            .expect("open source with stale manifest:size");
+        let (known, proof) = package
+            .get_content_xml_with_source_proof()
+            .expect("authenticate ZIP-declared content size");
+        assert_eq!(known, SOURCE);
+
+        let mut output = Vec::new();
+        let report = package
+            .write_content_xml_to_stream_with_known_source_content(
+                &mut output,
+                &known,
+                &proof,
+                SOURCE,
+                SourceContentPublicationOptions::default(),
+            )
+            .expect("exact no-op preserves stale producer metadata");
+        assert!(report.is_no_op());
+        assert_eq!(output, bytes);
+
+        let mut output = Vec::new();
+        let error = package
+            .write_content_xml_to_stream_with_known_source_content(
+                &mut output,
+                &known,
+                &proof,
+                TARGET,
+                SourceContentPublicationOptions::default(),
+            )
+            .expect_err("changed publication must refuse manifest:size");
+        assert!(matches!(
+            error,
+            SourceContentPublicationError::Unsupported { reason }
+                if reason.contains("manifest:size")
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn known_source_content_rejects_mismatched_bytes_and_size_before_output() {
+        let bytes = package_bytes();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).expect("open");
+        let (known, proof) = package
+            .get_content_xml_with_source_proof()
+            .expect("authenticated content");
+
+        let mut mismatched = known.clone();
+        mismatched[0] ^= 1;
+        let mut output = Vec::new();
+        let error = package
+            .write_content_xml_to_stream_with_known_source_content(
+                &mut output,
+                &mismatched,
+                &proof,
+                TARGET,
+                SourceContentPublicationOptions::default(),
+            )
+            .expect_err("mismatched retained bytes must fail closed");
+        assert!(matches!(
+            error,
+            SourceContentPublicationError::Core(Error::InvalidFormat(message))
+                if message.contains("authenticated source member")
+        ));
+        assert!(output.is_empty());
+
+        let mut output = Vec::new();
+        let error = package
+            .write_content_xml_to_stream_with_known_source_content(
+                &mut output,
+                &known[..known.len() - 1],
+                &proof,
+                TARGET,
+                SourceContentPublicationOptions::default(),
+            )
+            .expect_err("mismatched retained size must fail closed");
+        assert!(matches!(
+            error,
+            SourceContentPublicationError::Core(Error::InvalidFormat(message))
+                if message.contains("indexed ZIP size")
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn known_source_content_exact_no_op_preserves_signed_like_archive_bytes() {
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(MIME).expect("mimetype");
+        writer.add_file("content.xml", SOURCE).expect("content");
+        writer
+            .add_file_with_media_type(
+                "META-INF/documentsignatures.xml",
+                br#"<signatures xmlns="urn:test"/>"#,
+                "application/vnd.oasis.opendocument.digital-signature",
+            )
+            .expect("signature");
+        let bytes = writer.finish_to_bytes().expect("package");
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        let (known, proof) = package
+            .get_content_xml_with_source_proof()
+            .expect("authenticated content");
+        let mut output = Vec::new();
+        let report = package
+            .write_content_xml_to_stream_with_known_source_content(
+                &mut output,
+                &known,
+                &proof,
+                SOURCE,
+                SourceContentPublicationOptions::default(),
+            )
+            .expect("exact no-op");
+        assert!(report.is_no_op());
+        assert_eq!(output, bytes);
+    }
+
+    #[test]
+    fn known_source_content_refuses_encrypted_source_before_output() {
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(MIME).expect("mimetype");
+        writer
+            .set_encryption("source-password", crate::core::Profile::compatible())
+            .expect("encryption");
+        writer.add_file("content.xml", SOURCE).expect("content");
+        let bytes = writer.finish_to_bytes().expect("package");
+        let package = SourceBackedPackage::from_read_at_with_password(
+            Arc::new(OwnedSource::new(bytes)),
+            "source-password",
+        )
+        .expect("open");
+        let (known, proof) = package
+            .get_content_xml_with_source_proof()
+            .expect("authenticated decrypted content");
+        let mut output = Vec::new();
+        let error = package
+            .write_content_xml_to_stream_with_known_source_content(
+                &mut output,
+                &known,
+                &proof,
+                TARGET,
+                SourceContentPublicationOptions::default(),
+            )
+            .expect_err("encrypted source must remain refused");
+        assert!(matches!(
+            error,
+            SourceContentPublicationError::Unsupported { .. }
+        ));
+        assert!(output.is_empty());
     }
 }

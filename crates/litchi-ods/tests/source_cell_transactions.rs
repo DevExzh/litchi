@@ -1,8 +1,8 @@
 use std::{
-    io::{self, Write},
+    io::{self, Cursor, Write},
     sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 
@@ -118,6 +118,37 @@ fn source_cell_commit_streams_one_and_repeated_run_edits_with_exact_patch() {
     assert!(identical.contains("META-INF/manifest.xml"));
     assert!(identical.contains("Pictures/opaque.bin"));
     assert!(!identical.contains("content.xml"));
+}
+
+#[test]
+fn source_cell_commit_reuses_authenticated_content_without_second_payload_read() {
+    let source_bytes = package(&ordinary_content(), false).unwrap();
+    let (content_start, content_end) = zip_payload_range(&source_bytes, "content.xml");
+    let source = Arc::new(ProbeSource::new(source_bytes));
+    let owner = SourceBackedSpreadsheet::from_read_at(source.clone()).unwrap();
+    let reads_after_open = source.read_count();
+    source.forbid_range((content_start, content_end));
+
+    let mut edit = owner.edit_cells().unwrap();
+    assert_eq!(
+        edit.set_cell("Data", 0, 0, text("omega")).unwrap(),
+        Some(true)
+    );
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    commit.write_to(&mut output).unwrap();
+
+    assert_eq!(
+        source.forbidden_read_count(),
+        0,
+        "the authenticated source content payload was read again"
+    );
+    assert!(
+        source.read_count() > reads_after_open,
+        "changed publication should still read untouched ZIP framing/members"
+    );
+    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    assert_eq!(cell_text(&reopened, 0, 0), Some("omega"));
 }
 
 #[test]
@@ -290,6 +321,13 @@ fn ordinary_rows() -> String {
         .to_string()
 }
 
+fn zip_payload_range(bytes: &[u8], name: &str) -> (u64, u64) {
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let file = archive.by_name(name).unwrap();
+    let start = file.data_start().unwrap();
+    (start, start + file.compressed_size())
+}
+
 #[test]
 fn no_op_is_exact_and_changed_signed_source_is_refused_before_output() {
     let unsigned = package(&ordinary_content(), false).unwrap();
@@ -434,6 +472,69 @@ fn publication_propagates_stale_limit_cancellation_and_partial_sink_state() {
 struct MutableSource {
     bytes: Arc<Vec<u8>>,
     revision: AtomicU64,
+}
+
+struct ProbeSource {
+    bytes: Arc<Vec<u8>>,
+    reads: AtomicUsize,
+    revision: AtomicU64,
+    forbidden_range: Mutex<Option<(u64, u64)>>,
+    forbidden_reads: AtomicUsize,
+}
+
+impl ProbeSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes: Arc::new(bytes),
+            reads: AtomicUsize::new(0),
+            revision: AtomicU64::new(0),
+            forbidden_range: Mutex::new(None),
+            forbidden_reads: AtomicUsize::new(0),
+        }
+    }
+
+    fn read_count(&self) -> usize {
+        self.reads.load(Ordering::Relaxed)
+    }
+
+    fn forbid_range(&self, range: (u64, u64)) {
+        *self.forbidden_range.lock().unwrap() = Some(range);
+    }
+
+    fn forbidden_read_count(&self) -> usize {
+        self.forbidden_reads.load(Ordering::Relaxed)
+    }
+}
+
+impl ReadAt for ProbeSource {
+    fn len(&self) -> io::Result<u64> {
+        u64::try_from(self.bytes.len()).map_err(|_| io::Error::other("source too large"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.reads.fetch_add(1, Ordering::Relaxed);
+        if let Some((start, end)) = *self.forbidden_range.lock().unwrap() {
+            let requested_end = offset.saturating_add(output.len() as u64);
+            if offset < end && requested_end > start {
+                self.forbidden_reads.fetch_add(1, Ordering::Relaxed);
+                return Err(io::Error::other("authenticated content payload was read"));
+            }
+        }
+        let start = usize::try_from(offset).unwrap_or(usize::MAX);
+        let Some(bytes) = self.bytes.get(start..) else {
+            return Ok(0);
+        };
+        let length = bytes.len().min(output.len());
+        output[..length].copy_from_slice(&bytes[..length]);
+        Ok(length)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(
+            0x4f44_5350,
+            self.revision.load(Ordering::Relaxed),
+        ))
+    }
 }
 
 impl MutableSource {

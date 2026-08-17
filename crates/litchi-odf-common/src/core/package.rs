@@ -11,6 +11,7 @@ use litchi_core::FileSource;
 use litchi_core::{
     Error, ExecutionContext, ExecutionError, ReadAt, Resource, ResourceLimit, Result, SourceVersion,
 };
+use sha2::{Digest, Sha256};
 use soapberry_zip::office::{
     ArchiveLimits as SourceArchiveLimits, ArchiveValidationPolicy as SourceArchiveValidationPolicy,
     IndexedArchive as SourceIndexedArchive,
@@ -157,6 +158,7 @@ impl Default for SourcePackageLimits {
 /// identifies the same source snapshot.
 pub struct SourceBackedPackage {
     source: Arc<dyn ReadAt>,
+    owner_token: Arc<()>,
     source_version: SourceVersion,
     source_length: u64,
     limits: SourcePackageLimits,
@@ -164,6 +166,35 @@ pub struct SourceBackedPackage {
     manifest: super::manifest::Manifest,
     mimetype: String,
     password: Option<Zeroizing<String>>,
+}
+
+/// Opaque proof that bytes were read and verified as this package's
+/// `content.xml` at a particular source revision.
+///
+/// This type is intentionally only useful with the package that created it.
+/// The source-backed ODS facade retains the proof alongside its parsed
+/// `content.xml` so publication can avoid reading and decompressing that
+/// member a second time while still checking size, identity, ownership, and
+/// source revision before any output is accepted.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct SourceContentProof {
+    owner_token: Arc<()>,
+    source_version: SourceVersion,
+    source_length: u64,
+    indexed_size: u64,
+    digest: [u8; 32],
+}
+
+impl std::fmt::Debug for SourceContentProof {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SourceContentProof")
+            .field("source_version", &self.source_version)
+            .field("source_length", &self.source_length)
+            .field("indexed_size", &self.indexed_size)
+            .finish_non_exhaustive()
+    }
 }
 
 impl std::fmt::Debug for SourceBackedPackage {
@@ -598,6 +629,7 @@ impl SourceBackedPackage {
 
         Ok(Self {
             source,
+            owner_token: Arc::new(()),
             source_version,
             source_length,
             limits,
@@ -779,6 +811,48 @@ impl SourceBackedPackage {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
+    /// Read and authenticate the decoded `content.xml` member for the
+    /// source-backed ODS publication handoff.
+    ///
+    /// This hidden bridge exists for the format facade, which already needs
+    /// the member bytes to build its immutable semantic snapshot.  The proof
+    /// records the package owner, captured source revision and length, indexed
+    /// uncompressed size, and a digest of the verified bytes.  Later
+    /// publication can validate retained facade bytes against that proof
+    /// without a second source read or decompression.
+    #[doc(hidden)]
+    pub fn get_content_xml_with_source_proof(&self) -> Result<(Vec<u8>, SourceContentProof)> {
+        self.ensure_current()?;
+        let bytes = self.get_file(crate::constants::ODF_CONTENT)?;
+        let indexed_size = self.publication_content_logical_size()?;
+        let actual_size = u64::try_from(bytes.len()).map_err(|_| {
+            Error::InvalidFormat("ODF content.xml exceeds platform limits".to_string())
+        })?;
+        if indexed_size != actual_size {
+            return Err(Error::InvalidFormat(
+                "ODF content.xml size differs from indexed ZIP metadata".to_string(),
+            ));
+        }
+        let observed_length = self.source_length_observed()?;
+        if observed_length != self.source_length {
+            return Err(Error::InvalidFormat(
+                "ODF source length changed without a new source version".to_string(),
+            ));
+        }
+        let digest = Sha256::digest(&bytes);
+        self.ensure_current()?;
+        Ok((
+            bytes,
+            SourceContentProof {
+                owner_token: Arc::clone(&self.owner_token),
+                source_version: self.source_version,
+                source_length: self.source_length,
+                indexed_size,
+                digest: digest.into(),
+            },
+        ))
+    }
+
     /// Materialize an exact, source-checked owned package.
     ///
     /// This is the explicit transition from positional lazy access to the
@@ -856,6 +930,52 @@ impl SourceBackedPackage {
         self.source.len()
     }
 
+    pub(crate) fn validate_known_content_proof(
+        &self,
+        proof: &SourceContentProof,
+        content: &[u8],
+    ) -> Result<()> {
+        self.ensure_current()?;
+        if !Arc::ptr_eq(&self.owner_token, &proof.owner_token) {
+            return Err(Error::InvalidFormat(
+                "known ODF content proof belongs to a different source owner".to_string(),
+            ));
+        }
+        if proof.source_version != self.source_version {
+            return Err(Error::InvalidFormat(
+                "known ODF content proof has a different source version".to_string(),
+            ));
+        }
+        if proof.source_length != self.source_length {
+            return Err(Error::InvalidFormat(
+                "known ODF content proof has a different source length".to_string(),
+            ));
+        }
+        let observed_length = self.source_length_observed()?;
+        if observed_length != self.source_length {
+            return Err(Error::InvalidFormat(
+                "ODF source length changed without a new source version".to_string(),
+            ));
+        }
+        let indexed_size = self.publication_content_logical_size()?;
+        let actual_size = u64::try_from(content.len()).map_err(|_| {
+            Error::InvalidFormat("ODF content.xml exceeds platform limits".to_string())
+        })?;
+        if proof.indexed_size != indexed_size || actual_size != indexed_size {
+            return Err(Error::InvalidFormat(
+                "known ODF content bytes do not match indexed ZIP size".to_string(),
+            ));
+        }
+        let digest: [u8; 32] = Sha256::digest(content).into();
+        if digest != proof.digest {
+            return Err(Error::InvalidFormat(
+                "known ODF content bytes do not match the authenticated source member".to_string(),
+            ));
+        }
+        self.ensure_current()?;
+        Ok(())
+    }
+
     pub(crate) fn begin_publication_input_accounting(
         &self,
         execution: Option<&ExecutionContext>,
@@ -929,6 +1049,29 @@ impl SourceBackedPackage {
             .metadata(path)
             .map(|metadata| metadata.uncompressed_size())
             .map_err(map_zip_error)
+    }
+
+    pub(crate) fn publication_content_logical_size(&self) -> Result<u64> {
+        let archive_size = self.publication_member_size(crate::constants::ODF_CONTENT)?;
+        let Some(entry) = manifest_entry_for_path(&self.manifest, crate::constants::ODF_CONTENT)?
+        else {
+            return Ok(archive_size);
+        };
+        if entry.encryption.is_some() {
+            // Encrypted ZIP payload metadata describes ciphertext. The
+            // manifest size is the authenticated decoded plaintext size used
+            // by `get_file`.
+            return entry.size.ok_or_else(|| {
+                Error::InvalidFormat(
+                    "encrypted ODF content.xml has no plaintext manifest:size".to_string(),
+                )
+            });
+        }
+        // The ZIP catalog is authoritative for decoded, unencrypted payloads.
+        // `manifest:size` can be stale on otherwise readable producer output.
+        // Changed raw publication retains its separate fail-closed refusal for
+        // any size-bearing content entry; exact no-op may preserve the source.
+        Ok(archive_size)
     }
 
     pub(crate) fn publication_max_member_size(&self) -> Result<u64> {
