@@ -430,8 +430,15 @@ struct SheetData {
 #[derive(Clone, Copy)]
 struct SourcePolicyFacts {
     public_worksheet_coverage: bool,
-    unprotected_workbook: bool,
+    protection: SourceProtectionPolicy,
     macro_free_workbook: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SourceProtectionPolicy {
+    Unprotected,
+    WorkbookOrShared,
+    Worksheet,
 }
 
 impl SourcePolicyFacts {
@@ -439,7 +446,7 @@ impl SourcePolicyFacts {
         require_public_worksheet_coverage(workbook, sheets)?;
         Ok(Self {
             public_worksheet_coverage: true,
-            unprotected_workbook: workbook_is_unprotected(workbook)?,
+            protection: workbook_protection_policy(workbook)?,
             macro_free_workbook: workbook_is_macro_free(workbook),
         })
     }
@@ -450,11 +457,19 @@ impl SourcePolicyFacts {
                 "source-backed numeric source lost public worksheet coverage".into(),
             ));
         }
-        if !self.unprotected_workbook {
-            return Err(Error::UnsafeEdit(
-                "protected or shared workbooks are not eligible for source-backed numeric edits"
-                    .into(),
-            ));
+        match self.protection {
+            SourceProtectionPolicy::Unprotected => {},
+            SourceProtectionPolicy::WorkbookOrShared => {
+                return Err(Error::UnsafeEdit(
+                    "protected or shared workbooks are not eligible for source-backed numeric edits"
+                        .into(),
+                ));
+            },
+            SourceProtectionPolicy::Worksheet => {
+                return Err(Error::UnsafeEdit(
+                    "protected worksheets are not eligible for source-backed numeric edits".into(),
+                ));
+            },
         }
         if !self.macro_free_workbook {
             return Err(Error::UnsafeEdit(
@@ -5510,7 +5525,9 @@ impl From<OverlayError> for Error {
     }
 }
 
-fn workbook_is_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<bool> {
+fn workbook_protection_policy<R: Read + Seek>(
+    workbook: &Workbook<R>,
+) -> Result<SourceProtectionPolicy> {
     let protection = workbook.protection();
     if protection.structure_protected()
         || protection.windows_protected()
@@ -5520,7 +5537,7 @@ fn workbook_is_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<boo
         || protection.write_protected()
         || protection.file_sharing().is_some()
     {
-        return Ok(false);
+        return Ok(SourceProtectionPolicy::WorkbookOrShared);
     }
     for metadata in workbook.sheets() {
         let Some(index) = metadata.parsed_worksheet_index() else {
@@ -5532,19 +5549,21 @@ fn workbook_is_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<boo
             || protection.scenarios_protected()
             || protection.has_password()
         {
-            return Ok(false);
+            return Ok(SourceProtectionPolicy::Worksheet);
         }
     }
-    Ok(true)
+    Ok(SourceProtectionPolicy::Unprotected)
 }
 
 fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
-    if workbook_is_unprotected(workbook)? {
-        Ok(())
-    } else {
-        Err(Error::UnsafeEdit(
+    match workbook_protection_policy(workbook)? {
+        SourceProtectionPolicy::Unprotected => Ok(()),
+        SourceProtectionPolicy::WorkbookOrShared => Err(Error::UnsafeEdit(
             "protected or shared workbooks are not eligible for source-backed numeric edits".into(),
-        ))
+        )),
+        SourceProtectionPolicy::Worksheet => Err(Error::UnsafeEdit(
+            "protected worksheets are not eligible for source-backed numeric edits".into(),
+        )),
     }
 }
 
