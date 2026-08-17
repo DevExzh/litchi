@@ -297,9 +297,7 @@ pub fn validate_source_backed_with_limits(
         .map_err(PptxValidationError::Ingress)?;
 
     let mut facts = Facts::new(report_limits, source_version)?;
-    let catalog = inspect_catalog(package);
-
-    let graph = inspect_graph(package, input_limits.max_graph_nodes())?;
+    let (catalog, graph) = inspect_catalog_and_graph(package, input_limits.max_graph_nodes())?;
     facts.graph = if graph.blocked {
         GraphOutcome::Blocked
     } else {
@@ -1087,55 +1085,90 @@ struct CatalogFacts {
     macros: u64,
 }
 
-fn inspect_catalog(package: &SourceBackedPackage) -> CatalogFacts {
+fn inspect_catalog_and_graph(
+    package: &SourceBackedPackage,
+    max_nodes: usize,
+) -> Result<(CatalogFacts, GraphFacts), PptxValidationError> {
     let mut catalog = CatalogFacts {
         external_targets: 0,
         signatures: 0,
         macros: 0,
     };
+    let mut seen = std::collections::HashSet::<String>::new();
+    seen.try_reserve(1)
+        .map_err(|_| PptxValidationError::Allocation {
+            resource: "PPTX relationship graph set",
+        })?;
+    let mut missing_targets = 0_u64;
+    let mut invalid_targets = 0_u64;
+    let mut blocked = false;
+
     for relationship in package.rels().iter() {
-        catalog.external_targets = catalog
-            .external_targets
-            .saturating_add(u64::from(relationship.is_external()));
-        catalog.signatures = catalog
-            .signatures
-            .saturating_add(u64::from(is_signature_relationship(relationship.reltype())));
-        catalog.macros = catalog
-            .macros
-            .saturating_add(u64::from(is_macro_relationship(relationship.reltype())));
+        inspect_catalog_relationship(&mut catalog, relationship);
+        if !blocked && !relationship.is_external() {
+            blocked = inspect_graph_relationship(
+                package,
+                relationship,
+                &mut seen,
+                max_nodes,
+                &mut missing_targets,
+                &mut invalid_targets,
+            )?;
+        }
     }
+
     for part in package.iter_parts() {
-        catalog.external_targets = catalog.external_targets.saturating_add(
-            u64::try_from(part.rels().iter().filter(|rel| rel.is_external()).count())
-                .unwrap_or(u64::MAX),
-        );
         catalog.signatures = catalog.signatures.saturating_add(u64::from(
             is_signature_path(part.partname().as_str())
                 || is_signature_content_type(part.content_type()),
         ));
-        catalog.signatures = catalog.signatures.saturating_add(
-            u64::try_from(
-                part.rels()
-                    .iter()
-                    .filter(|rel| is_signature_relationship(rel.reltype()))
-                    .count(),
-            )
-            .unwrap_or(u64::MAX),
-        );
         catalog.macros = catalog.macros.saturating_add(u64::from(
             is_macro_path(part.partname().as_str()) || is_macro_content_type(part.content_type()),
         ));
-        catalog.macros = catalog.macros.saturating_add(
-            u64::try_from(
-                part.rels()
-                    .iter()
-                    .filter(|rel| is_macro_relationship(rel.reltype()))
-                    .count(),
-            )
-            .unwrap_or(u64::MAX),
-        );
+
+        if !blocked {
+            if record_graph_node(&mut seen, part.partname().as_str(), max_nodes)? {
+                blocked = true;
+            }
+        }
+        for relationship in part.rels().iter() {
+            inspect_catalog_relationship(&mut catalog, relationship);
+            if !blocked && !relationship.is_external() {
+                blocked = inspect_graph_relationship(
+                    package,
+                    relationship,
+                    &mut seen,
+                    max_nodes,
+                    &mut missing_targets,
+                    &mut invalid_targets,
+                )?;
+            }
+        }
     }
-    catalog
+
+    Ok((
+        catalog,
+        GraphFacts {
+            blocked,
+            missing_targets,
+            invalid_targets,
+        },
+    ))
+}
+
+fn inspect_catalog_relationship(
+    catalog: &mut CatalogFacts,
+    relationship: &litchi_opc::Relationship,
+) {
+    catalog.external_targets = catalog
+        .external_targets
+        .saturating_add(u64::from(relationship.is_external()));
+    catalog.signatures = catalog
+        .signatures
+        .saturating_add(u64::from(is_signature_relationship(relationship.reltype())));
+    catalog.macros = catalog
+        .macros
+        .saturating_add(u64::from(is_macro_relationship(relationship.reltype())));
 }
 
 struct GraphFacts {
@@ -1144,80 +1177,29 @@ struct GraphFacts {
     invalid_targets: u64,
 }
 
-fn inspect_graph(
+fn inspect_graph_relationship(
     package: &SourceBackedPackage,
-    max_nodes: usize,
-) -> Result<GraphFacts, PptxValidationError> {
-    let mut seen = std::collections::HashSet::<String>::new();
-    seen.try_reserve(1)
-        .map_err(|_| PptxValidationError::Allocation {
-            resource: "PPTX relationship graph set",
-        })?;
-    let mut missing_targets = 0_u64;
-    let mut invalid_targets = 0_u64;
-    let mut blocked = inspect_graph_relationships(
-        package,
-        package.rels(),
-        &mut seen,
-        max_nodes,
-        &mut missing_targets,
-        &mut invalid_targets,
-    )?;
-    if !blocked {
-        for part in package.iter_parts() {
-            if record_graph_node(&mut seen, part.partname().as_str(), max_nodes)? {
-                blocked = true;
-                break;
-            }
-            blocked = inspect_graph_relationships(
-                package,
-                part.rels(),
-                &mut seen,
-                max_nodes,
-                &mut missing_targets,
-                &mut invalid_targets,
-            )?;
-            if blocked {
-                break;
-            }
-        }
-    }
-    Ok(GraphFacts {
-        blocked,
-        missing_targets,
-        invalid_targets,
-    })
-}
-
-fn inspect_graph_relationships(
-    package: &SourceBackedPackage,
-    relationships: &litchi_opc::Relationships,
+    relationship: &litchi_opc::Relationship,
     seen: &mut std::collections::HashSet<String>,
     max_nodes: usize,
     missing_targets: &mut u64,
     invalid_targets: &mut u64,
 ) -> Result<bool, PptxValidationError> {
-    for relationship in relationships.iter().filter(|rel| !rel.is_external()) {
-        let target = match relationship.target_partname() {
-            Ok(target) => target,
-            Err(_) => {
-                *invalid_targets = invalid_targets.saturating_add(1);
-                continue;
-            },
-        };
-        match package.part(&target) {
-            Ok(_) => {
-                if record_graph_node(seen, target.as_str(), max_nodes)? {
-                    return Ok(true);
-                }
-            },
-            Err(error) if is_transient(&error) => {
-                return Err(PptxValidationError::Ingress(error));
-            },
-            Err(_) => *missing_targets = missing_targets.saturating_add(1),
-        }
+    let target = match relationship.target_partname() {
+        Ok(target) => target,
+        Err(_) => {
+            *invalid_targets = invalid_targets.saturating_add(1);
+            return Ok(false);
+        },
+    };
+    match package.part(&target) {
+        Ok(_) => record_graph_node(seen, target.as_str(), max_nodes),
+        Err(error) if is_transient(&error) => Err(PptxValidationError::Ingress(error)),
+        Err(_) => {
+            *missing_targets = missing_targets.saturating_add(1);
+            Ok(false)
+        },
     }
-    Ok(false)
 }
 
 fn record_graph_node(

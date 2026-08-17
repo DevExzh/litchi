@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use litchi_core::{CheckStatus, OwnedSource, ReadAt, ValidationLimits};
+use litchi_core::{CheckStatus, EvidenceValue, OwnedSource, ReadAt, ValidationLimits};
 use litchi_opc::SourceBackedPackage;
 use litchi_pptx::{
     PptxValidationLimits, validate_source_backed, validate_source_backed_with_limits,
@@ -500,6 +500,67 @@ fn graph_checks_orphan_manifests_and_agile_vba_signature_presence() {
         status(&report, "pptx.package.macro_presence"),
         CheckStatus::Complete
     ));
+}
+
+#[test]
+fn graph_limit_stops_graph_only_and_keeps_later_catalog_facts() {
+    let bytes = package_bytes(
+        &format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{REL}"><p:sldIdLst><p:sldId id="256" r:id="rIdSlide"/></p:sldIdLst></p:presentation>"#
+        ),
+        &format!(r#"<p:sld xmlns:p="{PML}"/>"#),
+        &format!(
+            r#"<Relationships xmlns="{PKG_REL}"><Relationship Id="rIdSlide" Type="{SLIDE}" Target="slides/slide1.xml"/><Relationship Id="rIdMissing" Type="{IMAGE}" Target="slides/missing.bin"/><Relationship Id="rIdExternal" Type="{IMAGE}" Target="https://example.invalid/image.png" TargetMode="External"/></Relationships>"#
+        ),
+        &format!(
+            r#"<Relationships xmlns="{PKG_REL}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT}" Target="ppt/presentation.xml"/></Relationships>"#
+        ),
+        &[
+            ("_xmlsignatures/origin.sigs", b"opaque-signature".as_slice()),
+            ("ppt/vbaProject.bin", b"opaque-vba".as_slice()),
+        ],
+    );
+    let report = validate_source_with_limits(
+        Arc::new(OwnedSource::new(bytes)),
+        PptxValidationLimits::default().with_max_graph_nodes(0),
+        ValidationLimits::default(),
+    )
+    .unwrap();
+
+    assert!(matches!(
+        status(&report, "pptx.package.relationship_graph"),
+        CheckStatus::Blocked { .. }
+    ));
+    assert!(matches!(
+        status(&report, "pptx.package.external_target_presence"),
+        CheckStatus::Complete
+    ));
+    assert!(matches!(
+        status(&report, "pptx.package.signature_presence"),
+        CheckStatus::Complete
+    ));
+    assert!(matches!(
+        status(&report, "pptx.package.macro_presence"),
+        CheckStatus::Complete
+    ));
+    for (code, expected) in [
+        ("pptx.external_target.present", 1),
+        ("pptx.signature.infrastructure_present", 1),
+        ("pptx.macro.storage_present", 1),
+    ] {
+        let issue = report
+            .issues()
+            .iter()
+            .find(|issue| issue.code() == code)
+            .expect("catalog presence issue");
+        assert_eq!(issue.evidence()[0].value(), EvidenceValue::Count(expected));
+    }
+    assert!(
+        !report
+            .issues()
+            .iter()
+            .any(|issue| issue.code() == "pptx.relationship_graph.incomplete")
+    );
 }
 
 #[test]
