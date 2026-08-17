@@ -40,6 +40,7 @@ const CFB_FILE_SOURCE_SHA256: &str =
     "7ffbd37c3e472a21b382bcbb02e430a62164e58d2270bbee0deaa584ff47a94d";
 const CFB_FILE_EXPECTED_OUTPUT_SHA256: &str =
     "7994759e1b2e3e520c0f0df5efb1586e34c6bc0f5744a7f4b989733cfd2830fc";
+const CFB_FILE_OWNED_SOURCE_VERSION_ID: u64 = 0xcfb0_0184;
 const FILESYSTEM_OLE_COMMON_REPLACEMENT: &[u8] = b"litchi-ole-common-modified-stream-v1";
 const PPTX_FILE_SELECTED_POSITION: usize = super::PPTX_SOURCE_SLIDE_COUNT / 2;
 const PPTX_FILE_CORPUS_GENERATOR: &str = super::PPTX_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -242,6 +243,8 @@ struct ChildResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     cfb_phases: Option<CfbPhaseEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    cfb_owned: Option<CfbOwnedEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_source_replay: Option<DocxSourceReplayEvidence>,
@@ -431,6 +434,18 @@ pub(crate) struct Evidence {
     pub cache_states: Vec<&'static str>,
     pub fresh_child_per_sample: bool,
     pub samples: Vec<SampleEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cfb_owned: Option<Vec<CfbOwnedSampleEvidence>>,
+}
+
+/// Per-sample immutable-owned CFB provenance kept outside the generic
+/// `SampleEvidence`/operation-metrics shape, whose positional-read vectors do
+/// not apply to this ingress path.
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct CfbOwnedSampleEvidence {
+    pub sample_index: usize,
+    pub cache_state: &'static str,
+    pub evidence: CfbOwnedEvidence,
 }
 
 pub(crate) struct Run {
@@ -445,6 +460,7 @@ struct OperationDetails {
     cfb_changed_spans: Option<u64>,
     cfb_published_bytes: Option<u64>,
     cfb_phases: Option<CfbPhaseEvidence>,
+    cfb_owned: Option<CfbOwnedEvidence>,
 }
 
 /// Operation-local attribution for the three sequential stages of the CFB
@@ -467,6 +483,40 @@ pub(crate) struct CfbPhaseSample {
     pub logical_read_returned_bytes: u64,
 }
 
+/// Provenance and phase attribution for the opt-in immutable-owned CFB
+/// filesystem selector.
+///
+/// This evidence deliberately has no logical `ReadAt` counters. The source
+/// is read from the filesystem and sealed as `Arc<[u8]>` before the timed
+/// operation, so reporting positional-read events for the timed phases would
+/// misrepresent the ingress path. The generic logical counter fields remain
+/// zero only as a legacy wire-shape placeholder and are paired with the
+/// explicit not-applicable scope.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct CfbOwnedEvidence {
+    pub implementation: String,
+    pub ingress: String,
+    pub ownership: String,
+    pub logical_read_counter_scope: String,
+    pub source_ingress_bytes: u64,
+    pub source_sha256: String,
+    pub source_version_id: u64,
+    pub source_version_revision: u64,
+    pub phases: CfbOwnedPhaseEvidence,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub(crate) struct CfbOwnedPhaseEvidence {
+    pub open: CfbOwnedPhaseSample,
+    pub plan: CfbOwnedPhaseSample,
+    pub atomic_publication: CfbOwnedPhaseSample,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub(crate) struct CfbOwnedPhaseSample {
+    pub elapsed_ns: u64,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Operation {
     OpcEagerOpen,
@@ -474,6 +524,7 @@ enum Operation {
     OpcEagerSave,
     OpcSourceSave,
     CfbOverlaySave,
+    CfbOwnedOverlaySave,
     PptxEagerOpen,
     PptxSourceOpen,
     PptxEagerListSlides,
@@ -500,6 +551,7 @@ impl Operation {
             "opc_file_eager_one_part_atomic_save" => Some(Self::OpcEagerSave),
             "opc_file_source_one_part_atomic_save" => Some(Self::OpcSourceSave),
             "cfb_file_same_length_overlay_atomic_save" => Some(Self::CfbOverlaySave),
+            "cfb_file_owned_same_length_overlay_atomic_save" => Some(Self::CfbOwnedOverlaySave),
             "pptx_file_eager_open" => Some(Self::PptxEagerOpen),
             "pptx_file_source_open" => Some(Self::PptxSourceOpen),
             "pptx_file_eager_list_slides" => Some(Self::PptxEagerListSlides),
@@ -527,6 +579,7 @@ impl Operation {
             Self::OpcEagerSave => super::Case::OpcFileEagerOnePartAtomicSave,
             Self::OpcSourceSave => super::Case::OpcFileSourceOnePartAtomicSave,
             Self::CfbOverlaySave => super::Case::CfbFileSameLengthOverlayAtomicSave,
+            Self::CfbOwnedOverlaySave => super::Case::CfbFileOwnedSameLengthOverlayAtomicSave,
             Self::PptxEagerOpen => super::Case::PptxFileEagerOpen,
             Self::PptxSourceOpen => super::Case::PptxFileSourceOpen,
             Self::PptxEagerListSlides => super::Case::PptxFileEagerListSlides,
@@ -549,12 +602,19 @@ impl Operation {
     const fn is_save(self) -> bool {
         matches!(
             self,
-            Self::OpcEagerSave | Self::OpcSourceSave | Self::CfbOverlaySave
+            Self::OpcEagerSave
+                | Self::OpcSourceSave
+                | Self::CfbOverlaySave
+                | Self::CfbOwnedOverlaySave
         )
     }
 
     const fn is_cfb(self) -> bool {
-        matches!(self, Self::CfbOverlaySave)
+        matches!(self, Self::CfbOverlaySave | Self::CfbOwnedOverlaySave)
+    }
+
+    const fn is_cfb_owned(self) -> bool {
+        matches!(self, Self::CfbOwnedOverlaySave)
     }
 
     const fn is_pptx(self) -> bool {
@@ -865,6 +925,7 @@ fn run_one(
     let mut warm_elapsed = Vec::with_capacity(samples);
     let mut cold_elapsed = Vec::with_capacity(samples);
     let mut sample_evidence = Vec::with_capacity(samples * 2);
+    let mut cfb_owned_evidence = Vec::new();
     for sample_index in 0..samples {
         if cache_selection.warm() {
             if operation.is_save() {
@@ -897,6 +958,7 @@ fn run_one(
                 operation,
                 expected_digest.as_deref(),
                 stem,
+                &mut cfb_owned_evidence,
             )?;
         }
 
@@ -931,6 +993,7 @@ fn run_one(
                 operation,
                 expected_digest.as_deref(),
                 stem,
+                &mut cfb_owned_evidence,
             )?;
         }
     }
@@ -971,6 +1034,7 @@ fn run_one(
             cache_states: cache_selection.names(),
             fresh_child_per_sample: true,
             samples: sample_evidence,
+            cfb_owned: (!cfb_owned_evidence.is_empty()).then_some(cfb_owned_evidence),
         },
     })
 }
@@ -983,8 +1047,13 @@ fn record_sample(
     operation: Operation,
     expected_digest: Option<&str>,
     stem: &str,
+    cfb_owned_evidence: &mut Vec<CfbOwnedSampleEvidence>,
 ) -> Result<(), Box<dyn Error>> {
-    validate_cfb_phase_evidence(operation, &invocation.child)?;
+    if operation.is_cfb_owned() {
+        validate_cfb_owned_evidence(operation, &invocation.child)?;
+    } else {
+        validate_cfb_phase_evidence(operation, &invocation.child)?;
+    }
     if operation.is_save() {
         if invocation.child.output_sha256.as_deref() != expected_digest {
             return Err(format!(
@@ -996,6 +1065,13 @@ fn record_sample(
         return Err(
             format!("{stem} {cache_state} emitted an output hash for an open operation").into(),
         );
+    }
+    if let Some(evidence) = invocation.child.cfb_owned.as_ref() {
+        cfb_owned_evidence.push(CfbOwnedSampleEvidence {
+            sample_index,
+            cache_state,
+            evidence: evidence.clone(),
+        });
     }
     samples.push(SampleEvidence {
         sample_index,
@@ -1083,6 +1159,66 @@ fn validate_cfb_phase_evidence(
     Ok(())
 }
 
+fn validate_cfb_owned_evidence(
+    operation: Operation,
+    child: &ChildResult,
+) -> Result<(), Box<dyn Error>> {
+    if !operation.is_cfb_owned() {
+        if child.cfb_owned.is_some() {
+            return Err(
+                "non-owned filesystem sample unexpectedly reported owned CFB evidence".into(),
+            );
+        }
+        return Ok(());
+    }
+    if child.cfb_phases.is_some() {
+        return Err("owned CFB filesystem sample unexpectedly reported logical-read phases".into());
+    }
+    let owned = child
+        .cfb_owned
+        .as_ref()
+        .ok_or("owned CFB filesystem sample omitted ownership evidence")?;
+    if owned.implementation != "SharedOleFile::open_owned" {
+        return Err("owned CFB filesystem sample reported an unexpected implementation".into());
+    }
+    if owned.ingress != "filesystem_read_all_before_cfb_phase_timers"
+        || owned.ownership != "Arc<[u8]>"
+        || owned.logical_read_counter_scope != "not_applicable_immutable_owned_slice"
+    {
+        return Err("owned CFB filesystem sample reported unexpected provenance".into());
+    }
+    if owned.source_ingress_bytes == 0 || owned.source_sha256.len() != 64 {
+        return Err("owned CFB filesystem sample reported invalid source provenance".into());
+    }
+    let phases = [
+        owned.phases.open,
+        owned.phases.plan,
+        owned.phases.atomic_publication,
+    ];
+    let elapsed = phases.iter().try_fold(0_u64, |total, phase| {
+        total
+            .checked_add(phase.elapsed_ns)
+            .ok_or_else(|| io::Error::other("owned CFB phase elapsed total overflows u64"))
+    })?;
+    if elapsed > child.elapsed_ns {
+        return Err(format!(
+            "owned CFB phase elapsed total {elapsed} exceeds operation elapsed {}",
+            child.elapsed_ns
+        )
+        .into());
+    }
+    if child.logical_read_counter_scope != "not_applicable_immutable_owned_slice"
+        || child.logical_read_calls != 0
+        || child.logical_read_requested_bytes != 0
+        || child.logical_read_bytes != 0
+        || child.max_concurrent_reads != 0
+        || !child.logical_read_request_sizes.is_empty()
+    {
+        return Err("owned CFB filesystem sample exposed fabricated logical-read counters".into());
+    }
+    Ok(())
+}
+
 fn filesystem_result(
     case: super::Case,
     corpus: &super::Corpus,
@@ -1111,7 +1247,9 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
                 &replacement,
             )?))
         },
-        Operation::CfbOverlaySave => expected_cfb_output_digest(corpus),
+        Operation::CfbOverlaySave | Operation::CfbOwnedOverlaySave => {
+            expected_cfb_output_digest(corpus)
+        },
         Operation::OpcEagerOpen
         | Operation::OpcSourceOpen
         | Operation::PptxEagerOpen
@@ -1289,6 +1427,9 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
             &mut details,
         )?,
         Operation::CfbOverlaySave => run_cfb_overlay_save(&source, &destination, &mut details)?,
+        Operation::CfbOwnedOverlaySave => {
+            run_cfb_owned_overlay_save(&source, &destination, &mut details)?
+        },
         Operation::PptxEagerOpen
         | Operation::PptxSourceOpen
         | Operation::PptxEagerListSlides
@@ -1316,25 +1457,26 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
     let snapshot = counter.map_or_else(ReadMetrics::default, |counter| counter.snapshot());
-    let logical_read_counter_scope =
-        if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
-            "not_applicable_eager_opc"
-        } else if operation.is_pptx() {
-            if operation.is_source_pptx() {
-                "untimed_source_replay_only"
-            } else {
-                "not_applicable_eager_pptx"
-            }
-        } else if operation.is_docx() {
-            if operation.is_source_docx() {
-                "untimed_source_replay_only"
-            } else {
-                "not_applicable_eager_docx"
-            }
+    let logical_read_counter_scope = if operation.is_cfb_owned() {
+        "not_applicable_immutable_owned_slice"
+    } else if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
+        "not_applicable_eager_opc"
+    } else if operation.is_pptx() {
+        if operation.is_source_pptx() {
+            "untimed_source_replay_only"
         } else {
-            "timed_read_at"
+            "not_applicable_eager_pptx"
         }
-        .to_owned();
+    } else if operation.is_docx() {
+        if operation.is_source_docx() {
+            "untimed_source_replay_only"
+        } else {
+            "not_applicable_eager_docx"
+        }
+    } else {
+        "timed_read_at"
+    }
+    .to_owned();
     let pptx_source_replay = operation
         .is_source_pptx()
         .then(|| replay_pptx_source(&source, operation))
@@ -1374,6 +1516,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         cfb_changed_spans: details.cfb_changed_spans,
         cfb_published_bytes: details.cfb_published_bytes,
         cfb_phases: details.cfb_phases,
+        cfb_owned: details.cfb_owned,
         pptx_source_replay,
         docx_source_replay,
     };
@@ -2586,6 +2729,61 @@ fn run_cfb_overlay_save(
     Ok(Some(counter))
 }
 
+fn run_cfb_owned_overlay_save(
+    source: &Path,
+    destination: &Path,
+    details: &mut OperationDetails,
+) -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
+    // The filesystem ingress is intentionally outside all three phase timers.
+    // The resulting immutable slice is the source owned by `SharedOleFile`;
+    // no logical ReadAt adapter is involved in the timed operation.
+    let source_bytes = fs::read(source)?;
+    let source_ingress_bytes = u64::try_from(source_bytes.len())?;
+    let source_sha256 = super::sha256_hex(&source_bytes);
+    let owned_source: Arc<[u8]> = Arc::from(source_bytes.into_boxed_slice());
+    let version = SourceVersion::new(CFB_FILE_OWNED_SOURCE_VERSION_ID, 0);
+
+    let open_started = Instant::now();
+    let shared = SharedOleFile::open_owned(Arc::clone(&owned_source), version)?;
+    let open_elapsed_ns = u64::try_from(open_started.elapsed().as_nanos())?;
+
+    let plan_started = Instant::now();
+    let overlay = SameLengthStreamOverlay::new(
+        vec![super::OLE_COMMON_TARGET.to_owned()],
+        Arc::from(FILESYSTEM_OLE_COMMON_REPLACEMENT.to_vec()),
+    );
+    let plan = shared.plan_same_length_stream_overlays(vec![overlay], OverlayLimits::default())?;
+    let plan_elapsed_ns = u64::try_from(plan_started.elapsed().as_nanos())?;
+
+    let publication_started = Instant::now();
+    let report = plan.save(destination)?;
+    let publication_elapsed_ns = u64::try_from(publication_started.elapsed().as_nanos())?;
+    details.cfb_changed_spans = Some(u64::try_from(report.changed_spans())?);
+    details.cfb_published_bytes = Some(report.bytes());
+    details.cfb_owned = Some(CfbOwnedEvidence {
+        implementation: "SharedOleFile::open_owned".to_owned(),
+        ingress: "filesystem_read_all_before_cfb_phase_timers".to_owned(),
+        ownership: "Arc<[u8]>".to_owned(),
+        logical_read_counter_scope: "not_applicable_immutable_owned_slice".to_owned(),
+        source_ingress_bytes,
+        source_sha256,
+        source_version_id: version.id(),
+        source_version_revision: version.revision(),
+        phases: CfbOwnedPhaseEvidence {
+            open: CfbOwnedPhaseSample {
+                elapsed_ns: open_elapsed_ns,
+            },
+            plan: CfbOwnedPhaseSample {
+                elapsed_ns: plan_elapsed_ns,
+            },
+            atomic_publication: CfbOwnedPhaseSample {
+                elapsed_ns: publication_elapsed_ns,
+            },
+        },
+    });
+    Ok(None)
+}
+
 fn cfb_phase_sample(
     before: ReadTotals,
     after: ReadTotals,
@@ -2645,7 +2843,7 @@ fn verify_child_output(
             let replacement = filesystem_opc_replacement()?;
             super::verify_opc_overlay_output(corpus, &output, &replacement)
         },
-        Operation::CfbOverlaySave => {
+        Operation::CfbOverlaySave | Operation::CfbOwnedOverlaySave => {
             let mut ole = OleFile::open(File::open(destination)?)?;
             if ole.list_streams().len() != corpus.manifest.entry_count
                 || ole.open_stream(&[super::OLE_COMMON_TARGET])?
@@ -2939,6 +3137,7 @@ mod tests {
             "opc_file_eager_one_part_atomic_save",
             "opc_file_source_one_part_atomic_save",
             "cfb_file_same_length_overlay_atomic_save",
+            "cfb_file_owned_same_length_overlay_atomic_save",
             "pptx_file_eager_open",
             "pptx_file_source_open",
             "pptx_file_eager_list_slides",
@@ -2959,6 +3158,19 @@ mod tests {
             assert!(Operation::parse(name).is_some(), "{name}");
         }
         assert!(Operation::parse("ole2_same_length_overlay_atomic_save").is_none());
+    }
+
+    #[test]
+    fn owned_cfb_operation_marks_immutable_ingress_without_read_counters() {
+        let operation = Operation::parse("cfb_file_owned_same_length_overlay_atomic_save")
+            .expect("owned CFB selector parses");
+        assert!(operation.is_cfb());
+        assert!(operation.is_cfb_owned());
+        assert!(operation.is_save());
+        assert_eq!(
+            operation.case().name(),
+            "cfb_file_owned_same_length_overlay_atomic_save"
+        );
     }
 
     #[test]

@@ -83,7 +83,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 319
+provide their source-read counters. The current `Case` matrix exposes 320
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
@@ -584,14 +584,15 @@ them without clean release builds, CPU affinity, balanced control/managed ABBA
 ordering, retained raw samples, allocation and peak-memory evidence, and stable
 counter identities.
 
-Measure the controlled filesystem tranche (five opt-in cases):
+Measure the controlled filesystem tranche (six opt-in cases):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 1 --samples 5 \
   --case opc_file_eager_open,opc_file_source_open,\
 opc_file_eager_one_part_atomic_save,opc_file_source_one_part_atomic_save,\
-cfb_file_same_length_overlay_atomic_save \
+cfb_file_same_length_overlay_atomic_save,\
+cfb_file_owned_same_length_overlay_atomic_save \
   --json target/perf/filesystem-crud.json
 ```
 
@@ -625,8 +626,14 @@ When both OPC save cases are selected, their per-state sample hashes
 must also match. Save cases seed a pre-existing destination before both warm and cold measurements
 and publish through a same-filesystem sibling temporary file plus atomic
 rename; the CFB case uses the checked same-length stream-overlay publisher and
-records its changed-span and published-byte report fields. OPC materialization
-counts are recorded when exposed by the public API. After every prime and
+records its changed-span and published-byte report fields. The owned CFB
+selector reads the source once before the nested CFB phase timers, seals it as
+`Arc<[u8]>`, and calls `SharedOleFile::open_owned`; its total operation time
+includes that filesystem ingress, while its provenance, source-byte hash, and
+separate open/plan/atomic-publication timings are recorded under `cfb_owned`.
+Its generic logical `ReadAt` vectors are explicitly not applicable rather than
+invented for immutable slice ownership. OPC materialization counts are
+recorded when exposed by the public API. After every prime and
 measured child, the parent re-reads the source and checks its pinned SHA-256
 before proceeding to the next sample.
 
