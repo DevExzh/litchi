@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "change": "0179",
+  "control_revision": "a4f0d884c0fd92ee90d213599479616de6941900",
+  "candidate_revision": "a43258127c23e0acf370325317d2d364ed49781a",
+  "artifacts": [
+    {
+      "path": "pptx-catalog-reuse-0179-a1.json.zst",
+      "bytes": 6019,
+      "sha256": "b4f0e442a930289d55a235c42c8ef6f8e7380d9b217fc4db9e7cdf3b1c864dc3",
+      "uncompressed_bytes": 182711,
+      "uncompressed_sha256": "f7f2b6e327279640abcc94bda1b518ce5db3a83fd984761516a6ccef4b2d3631"
+    },
+    {
+      "path": "pptx-catalog-reuse-0179-b1.json.zst",
+      "bytes": 5822,
+      "sha256": "c0decd818a8f07bca32400fb9238b888288645f6cf1dac11dd7ff2b7f91d2eb7",
+      "uncompressed_bytes": 182844,
+      "uncompressed_sha256": "2049791ced595959f79a06d0e59f799dc329e57ca1576e440badb25a921939f7"
+    },
+    {
+      "path": "pptx-catalog-reuse-0179-b2.json.zst",
+      "bytes": 5963,
+      "sha256": "8275ffc759cd2041bd4afb6800aa3d353659e0013aed4cced1f4deff004a7017",
+      "uncompressed_bytes": 182875,
+      "uncompressed_sha256": "8ff2399407af05e0b13be118391aef9b24fc94414557a1f381bade4833ca5d77"
+    },
+    {
+      "path": "pptx-catalog-reuse-0179-a2.json.zst",
+      "bytes": 6076,
+      "sha256": "8420eff172810b74f06f92d056e7049508b6d18618a02b6b8c73f547e74ca81c",
+      "uncompressed_bytes": 182996,
+      "uncompressed_sha256": "09b9eeafea568144c005d3cc99dafd123b3a1eb9c29e7b314b64186828d11507"
+    },
+    {
+      "path": "pptx-catalog-reuse-0179-summary.json",
+      "bytes": 5394,
+      "sha256": "0bd75dd05fa25898b7991b6a382ba2430adf85a3d23c2d156c105d6df0210318"
+    }
+  ]
+}

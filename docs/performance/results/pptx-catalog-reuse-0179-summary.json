@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "change": "0179",
+  "decision": "retain_deterministic_work_reduction_withhold_latency",
+  "control_revision": "a4f0d884c0fd92ee90d213599479616de6941900",
+  "control_binary_source_revision": "1535b141e5e2777681306ec898cb9292eafccc74",
+  "control_binary_to_run_revision_scope": "checked-in performance documentation and results only; no production or harness source change",
+  "candidate_revision": "a43258127c23e0acf370325317d2d364ed49781a",
+  "post_measurement_test_only_revision": "c3bff4af1f00f0f368361675888ec4d5359bff74",
+  "control_binary_sha256": "af7a105d9ff22c28bfd00d7433af51ebdde1e3f883b404b04b91d4a3493c38e4",
+  "candidate_binary_sha256": "4cce0decc587bb02f964aed6d6dfc62234e3e904cad39302b079d4adcdca1143",
+  "protocol": {
+    "order": [
+      "control-a1",
+      "candidate-b1",
+      "candidate-b2",
+      "control-a2"
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_case": 500,
+    "timed_scope": "existing source-backed PPTX open, edit, commit, and sequential publication lifecycle",
+    "source_counter_scope": "logical ReadAt requests and semantic Part materializations; not physical I/O"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "semantic_projection": {
+    "canonical_sha256": "490f3d10ce334833558a43261fb1121b41bd33f2e0541b02d19a539d542ba470",
+    "all_four_legs_equal": true,
+    "excluded_fields": "git revision, worktree dirty flag, and elapsed timing vectors"
+  },
+  "deterministic_work_reduction": {
+    "slide_count": 200,
+    "one_edit": {
+      "catalog_builds_before": 3,
+      "catalog_builds_after": 1,
+      "catalog_builds_removed": 2,
+      "slide_node_allocations_removed": 400
+    },
+    "same_slide_batch": {
+      "catalog_builds_before": 3,
+      "catalog_builds_after": 1,
+      "catalog_builds_removed": 2,
+      "slide_node_allocations_removed": 400
+    },
+    "eight_slide_batch": {
+      "catalog_builds_before": 10,
+      "catalog_builds_after": 1,
+      "catalog_builds_removed": 9,
+      "slide_node_allocations_removed": 1800
+    },
+    "also_removed_per_catalog_build": "one presentation-reference parse, one reserved slide vector, and cloned package/presentation/slide relationship bindings",
+    "payload_materializations_changed": false,
+    "logical_source_reads_changed": false
+  },
+  "workloads": {
+    "one_edit": {
+      "case": "pptx_source_backed_one_edit_save",
+      "output_sha256": "bcfd05dc7590051137db64810db2d822ac814417c03c50d8a7fc33f429e50d61",
+      "ordinary_payload_materializations": 2,
+      "elapsed_p50_ns": {
+        "a1": 6504338,
+        "b1": 4846774,
+        "b2": 8386415,
+        "a2": 6248584
+      },
+      "paired_p50_reduction_percent": {
+        "a1_to_b1": 25.483977,
+        "b2_to_a2": -34.213047
+      },
+      "same_implementation_drift_percent": {
+        "control": {"p50": 3.932053, "mean": 0.145868, "p95": 15.572033, "p99": 21.049985},
+        "candidate": {"p50": 73.030865, "mean": 60.789698, "p95": 73.427728, "p99": 21.858255}
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "paired directions disagree and p95/p99 control plus every candidate stability gate fail"
+    },
+    "same_slide_batch": {
+      "case": "pptx_source_backed_batch_edit_save",
+      "output_sha256": "8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755",
+      "ordinary_payload_materializations": 2,
+      "elapsed_p50_ns": {
+        "a1": 6735076,
+        "b1": 8168630,
+        "b2": 8645969,
+        "a2": 9401742
+      },
+      "paired_p50_reduction_percent": {
+        "a1_to_b1": -21.284897,
+        "b2_to_a2": 8.038649
+      },
+      "same_implementation_drift_percent": {
+        "control": {"p50": 39.593703, "mean": 36.453122, "p95": 23.383220, "p99": 13.726929},
+        "candidate": {"p50": 5.843563, "mean": 6.869061, "p95": 11.117695, "p99": 13.448264}
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "paired directions disagree and control p50/mean/p95 plus candidate p50/mean/p95 stability gates fail"
+    },
+    "eight_slide_batch": {
+      "case": "pptx_source_backed_multi_slide_batch_edit_save",
+      "output_sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "ordinary_payload_materializations": 9,
+      "elapsed_p50_ns": {
+        "a1": 10203333,
+        "b1": 11494690,
+        "b2": 12290665,
+        "a2": 14527465
+      },
+      "paired_p50_reduction_percent": {
+        "a1_to_b1": -12.656227,
+        "b2_to_a2": 15.397043
+      },
+      "same_implementation_drift_percent": {
+        "control": {"p50": 42.379603, "mean": 40.780873, "p95": 33.005682, "p99": 30.815762},
+        "candidate": {"p50": 6.924719, "mean": 9.532554, "p95": 19.514116, "p99": 14.370007}
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "paired directions disagree and all control plus candidate p50/mean/p95 stability gates fail"
+    }
+  },
+  "latency_claim": null,
+  "latency_withheld_reason": "paired directions disagree and required same-implementation stability gates fail for every workload",
+  "withheld_scope": [
+    "latency, throughput, and scaling",
+    "physical I/O",
+    "allocation and RSS",
+    "cold-cache behavior",
+    "real-producer artifacts",
+    "PPTX edit closures other than existing source-backed same-topology slide text"
+  ]
+}
