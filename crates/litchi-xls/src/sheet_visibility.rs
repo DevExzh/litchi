@@ -482,10 +482,15 @@ impl Transaction {
         let source: Arc<dyn ReadAt> =
             Arc::new(SnapshotSource::new(Arc::clone(&self.source.inner.bytes)));
         let publisher = SourceBackedOverlayPublisher::open(source).map_err(overlay_to_error)?;
-        let plan = publisher
-            .plan_splices(splices, StreamSpliceLimits::default())
-            .map_err(overlay_to_error)?;
-        verify_source_backed_readback(&plan, &self.source, &effective)?;
+        let (plan, owner_validated) = publisher
+            .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
+                verify_source_backed_candidate(candidate.clone(), &self.source, &effective)
+                    .map_err(VisibilityOwnerError::Owner)
+            })
+            .map_err(VisibilityOwnerError::into_error)?;
+        if owner_validated.is_none() {
+            verify_source_backed_readback(&plan, &self.source, &effective)?;
+        }
 
         let source_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
             .map_err(|_error| Error::InvalidData("Workbook stream length exceeds u64".into()))?;
@@ -1298,12 +1303,40 @@ fn overlay_to_error(error: OverlayError) -> Error {
     }
 }
 
+enum VisibilityOwnerError {
+    Overlay(OverlayError),
+    Owner(Error),
+}
+
+impl VisibilityOwnerError {
+    fn into_error(self) -> Error {
+        match self {
+            Self::Overlay(error) => overlay_to_error(error),
+            Self::Owner(error) => error,
+        }
+    }
+}
+
+impl From<OverlayError> for VisibilityOwnerError {
+    fn from(error: OverlayError) -> Self {
+        Self::Overlay(error)
+    }
+}
+
 fn verify_source_backed_readback(
     plan: &ValidatedOverlayPlan,
     source: &Snapshot,
     changes: &[&Change],
 ) -> Result<()> {
     let candidate = plan.composed_source().map_err(overlay_to_error)?;
+    verify_source_backed_candidate(candidate, source, changes)
+}
+
+fn verify_source_backed_candidate(
+    candidate: ComposedOverlaySource,
+    source: &Snapshot,
+    changes: &[&Change],
+) -> Result<()> {
     let workbook = Workbook::new(PositionalReader::new(candidate))?;
     require_unprotected(&workbook)?;
 
