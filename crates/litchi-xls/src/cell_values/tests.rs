@@ -29,6 +29,22 @@ fn package() -> Vec<u8> {
     package.finish().unwrap()
 }
 
+fn protected_package(worksheet: bool) -> Vec<u8> {
+    let mut writer = crate::Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(sheet, 3, 2, 4.5).unwrap();
+    if worksheet {
+        writer
+            .protect_sheet(sheet, Some("sheet"), true, true)
+            .unwrap();
+    } else {
+        writer.protect_workbook(Some("book"), true, false);
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
     let source = package();
     let mut ole = OleFile::open(Cursor::new(source)).unwrap();
@@ -590,12 +606,17 @@ fn source_backed_numeric_plan_consumes_cached_source_policy_facts() {
     for fact in 0..3 {
         let mut source = Snapshot::from_bytes(package()).unwrap();
         assert!(source.inner.source_policy.public_worksheet_coverage);
-        assert!(source.inner.source_policy.unprotected_workbook);
+        assert_eq!(
+            source.inner.source_policy.protection,
+            SourceProtectionPolicy::Unprotected
+        );
         assert!(source.inner.source_policy.macro_free_workbook);
         let inner = Arc::get_mut(&mut source.inner).unwrap();
         match fact {
             0 => inner.source_policy.public_worksheet_coverage = false,
-            1 => inner.source_policy.unprotected_workbook = false,
+            1 => {
+                inner.source_policy.protection = SourceProtectionPolicy::WorkbookOrShared;
+            },
             2 => inner.source_policy.macro_free_workbook = false,
             _ => unreachable!(),
         }
@@ -604,6 +625,33 @@ fn source_backed_numeric_plan_consumes_cached_source_policy_facts() {
         edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
             .unwrap();
         assert!(edit.commit_source_backed_plan().is_err());
+    }
+}
+
+#[test]
+fn source_backed_numeric_plan_preserves_protection_refusal_reasons() {
+    for (worksheet, expected) in [
+        (
+            false,
+            "Unsafe edit refused: protected or shared workbooks are not eligible for source-backed numeric edits",
+        ),
+        (
+            true,
+            "Unsafe edit refused: protected worksheets are not eligible for source-backed numeric edits",
+        ),
+    ] {
+        let source = Snapshot::from_bytes(protected_package(worksheet)).unwrap();
+        assert_ne!(
+            source.inner.source_policy.protection,
+            SourceProtectionPolicy::Unprotected
+        );
+        let mut edit = source.edit();
+        edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 4.5)
+            .unwrap();
+        assert_eq!(
+            edit.commit_source_backed_plan().unwrap_err().to_string(),
+            expected
+        );
     }
 }
 
