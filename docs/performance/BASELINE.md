@@ -14,6 +14,26 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained eager OPC payload-sharing result (change 0186)
+
+Ordinary eager OPC opening now carries the ZIP reader's immutable
+`Arc<Vec<u8>>` decompression allocation through serialized-part and XML/binary
+Part construction. It removes one full payload ownership copy per admitted
+Part while leaving eager all-Part decompression, validation, limits,
+cancellation, exact publication, and save semantics unchanged.
+
+The four-Part, 16 MiB incompressible owned-open Heaptrack diagnostic records
+whole-process peak heap changing from 71.72M to 55.02M. Clean CPU-2
+A1/B1/B2/A2 release runs use 20 warmups and 500 samples for borrowed/owned
+opens over many-small and few-large. Few-large p50 is 40.44%-48.10% lower in
+both paired directions, but the control drift gate fails, so it is withheld.
+Only few-large owned-open p99 passes every paired-direction and stability gate,
+at 32.99%/43.51% lower. Many-small latency is withheld.
+
+This is payload-ownership evidence, not selective-open laziness or a broad
+OOXML result. See [change 0186](changes/0186-opc-eager-shared-payloads.md) and
+its [machine-readable summary](results/opc-eager-shared-0194-summary.json).
+
 ## Latest retained OPC shared-overlay result (change 0185)
 
 The source-backed OPC publisher now accepts caller-owned `Arc<Vec<u8>>`

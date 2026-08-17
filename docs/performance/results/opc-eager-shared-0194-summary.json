@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "change": "0186-opc-eager-shared-payloads",
+  "decision": "retain",
+  "revisions": {
+    "control": "938146d13e537217d9473dae967a9e4cf0391b91",
+    "candidate": "1705990aa61b0a4498b0dbaeb6ab6f7d6c5288f9"
+  },
+  "binary_sha256": {
+    "control": "dc26f8244208b4c348851833c151a569e850eeb22e370f5b2cfcebff0dd8fb93",
+    "candidate": "9a60798138fe184c91a617a899c0f6e4d38d1a03628572d7e752db4895ddddec"
+  },
+  "protocol": {
+    "order": ["a1_control", "b1_candidate", "b2_candidate", "a2_control"],
+    "cpu_affinity": "2",
+    "logical_cpus_visible": 1,
+    "warmups_per_record": 20,
+    "samples_per_record": 500,
+    "profile": "release",
+    "payload_kind": "incompressible",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    }
+  },
+  "correctness_projection": {
+    "command": "jq 'del(.environment.git_revision,.environment.git_worktree_dirty) | .results |= map(del(.elapsed_ns))'",
+    "deleted_fields": [
+      "environment.git_revision",
+      "environment.git_worktree_dirty",
+      "results[].elapsed_ns"
+    ],
+    "sha256_all_legs": "09ada8b6d30846d5494a1628f63f404aebabf3ae955d73a41b15f7aacbf1133d"
+  },
+  "deterministic_work": {
+    "serial_eager_payload_handoff_before": "Arc<Vec<u8>> -> Vec<u8> -> Arc<Vec<u8>>",
+    "serial_eager_payload_handoff_after": "Arc<Vec<u8>> -> Arc<Vec<u8>>",
+    "removed_full_payload_copies_per_admitted_part": 1,
+    "decompression_changed": false,
+    "ordinary_part_materialization_changed": false
+  },
+  "cases": [
+    {
+      "case": "opc_open",
+      "shape": "many-small",
+      "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+      "entry_count": 256,
+      "archive_bytes": 303003,
+      "uncompressed_payload_bytes": 262144,
+      "reduction_percent": {
+        "p50": [-4.448892, -0.606369],
+        "mean": [-6.481816, -6.752404],
+        "p95": [-20.469126, -33.829476],
+        "p99": [-38.298190, -11.872639]
+      },
+      "same_implementation_drift_percent": {
+        "p50": [4.435107, 0.593091],
+        "mean": [5.949155, 6.218389],
+        "p95": [12.789073, 25.297684],
+        "p99": [32.621993, 7.281030]
+      },
+      "accepted_statistics": []
+    },
+    {
+      "case": "opc_open_owned",
+      "shape": "many-small",
+      "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+      "entry_count": 256,
+      "archive_bytes": 303003,
+      "uncompressed_payload_bytes": 262144,
+      "reduction_percent": {
+        "p50": [-3.585148, 1.131067],
+        "mean": [-8.449662, 2.813660],
+        "p95": [-40.990864, 11.877359],
+        "p99": [-47.391583, 5.015683]
+      },
+      "same_implementation_drift_percent": {
+        "p50": [6.853926, 1.988884],
+        "mean": [9.483943, 1.886798],
+        "p95": [24.607222, 22.117524],
+        "p99": [32.231456, 14.785401]
+      },
+      "accepted_statistics": []
+    },
+    {
+      "case": "opc_open",
+      "shape": "few-large",
+      "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+      "entry_count": 4,
+      "archive_bytes": 16783632,
+      "uncompressed_payload_bytes": 16777216,
+      "reduction_percent": {
+        "p50": [43.423744, 48.097101],
+        "mean": [42.528831, 49.131605],
+        "p95": [38.150368, 51.209926],
+        "p99": [35.593231, 52.773473]
+      },
+      "same_implementation_drift_percent": {
+        "p50": [8.874853, 0.118514],
+        "mean": [10.131309, 2.521507],
+        "p95": [14.729121, 9.495949],
+        "p99": [19.144823, 12.636571]
+      },
+      "accepted_statistics": []
+    },
+    {
+      "case": "opc_open_owned",
+      "shape": "few-large",
+      "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+      "entry_count": 4,
+      "archive_bytes": 16783632,
+      "uncompressed_payload_bytes": 16777216,
+      "reduction_percent": {
+        "p50": [40.438821, 46.979803],
+        "mean": [39.727516, 47.303448],
+        "p95": [34.284092, 49.464223],
+        "p99": [32.992768, 43.505247]
+      },
+      "same_implementation_drift_percent": {
+        "p50": [5.776870, 5.839498],
+        "mean": [6.417377, 6.958723],
+        "p95": [11.229802, 14.463870],
+        "p99": [8.801312, 8.268063]
+      },
+      "accepted_statistics": ["p99"]
+    }
+  ],
+  "heaptrack_profile": {
+    "case": "opc_open_owned",
+    "shape": "few-large",
+    "warmups": 0,
+    "samples": 1,
+    "control": {
+      "allocation_calls": 763,
+      "temporary_allocations": 115,
+      "peak_heap_display": "71.72M",
+      "profiler_inflated_peak_rss_display": "76.64M"
+    },
+    "candidate": {
+      "allocation_calls": 755,
+      "temporary_allocations": 115,
+      "peak_heap_display": "55.02M",
+      "profiler_inflated_peak_rss_display": "50.36M"
+    },
+    "peak_heap_display_reduction": "16.70M",
+    "interpretation": "whole-process diagnostic including corpus construction; the peak-heap delta matches removal of one 16 MiB decompressed-payload copy"
+  },
+  "accepted_scope": [
+    "one full decompressed-payload ownership copy removed per admitted ordinary eager OPC Part",
+    "few-large owned-open p99 latency only: 32.992768% and 43.505247% lower",
+    "whole-process diagnostic peak heap: 71.72M to 55.02M"
+  ],
+  "withheld_scope": [
+    "many-small latency",
+    "few-large p50, mean, and p95 latency",
+    "general allocation or RSS claims",
+    "decompression reduction",
+    "selective-open laziness",
+    "physical I/O or cold-cache behavior",
+    "throughput, scaling, real-producer, and broad OOXML CRUD performance",
+    "iWork"
+  ]
+}

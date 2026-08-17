@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "change": "0186-opc-eager-shared-payloads",
+  "artifacts": [
+    {
+      "path": "opc-eager-shared-0194-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 6281,
+      "compressed_sha256": "249ebd4ed8ac36c33e9bb4cde4d0f8a810b66ad182838d2f336294d36673f790",
+      "uncompressed_bytes": 44193,
+      "uncompressed_sha256": "e5bd272665fada2b306eebdd77776dfd4abf33c23b8b3890a62d75230a6791cf"
+    },
+    {
+      "path": "opc-eager-shared-0194-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 6518,
+      "compressed_sha256": "6afbae4ac34d6668923788009ca1b27d7f6265e68130469184640545db17e449",
+      "uncompressed_bytes": 44157,
+      "uncompressed_sha256": "9d1048477e5d8cf6416f742cc3d05c34c4821ba48450d882d01a654ab7711547"
+    },
+    {
+      "path": "opc-eager-shared-0194-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 6374,
+      "compressed_sha256": "6182d996ab99109b7afa196e2a6e103657d7f2cf12da9db04c261471367087c0",
+      "uncompressed_bytes": 44111,
+      "uncompressed_sha256": "c7af5a18a7d45f97bd09714f45ac7d0a77ba866ae8a884efe6f0ac006182bdc9"
+    },
+    {
+      "path": "opc-eager-shared-0194-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 6596,
+      "compressed_sha256": "622882cc9ed06d94f3a4f407d25d92e63f2330cfe5cdee1d714ec9f28b6d9b39",
+      "uncompressed_bytes": 44694,
+      "uncompressed_sha256": "eb028e882988a5c7d8d35bf14811631f66c02da48a92b2f28f32202d7ba3bccf"
+    },
+    {
+      "path": "opc-eager-shared-0194-control.heaptrack.zst",
+      "role": "control_heaptrack",
+      "bytes": 19778,
+      "sha256": "2304dde7607ef4db21a6dbb3c1750fa227d3fff121ecb5e549bebda603edc7b4"
+    },
+    {
+      "path": "opc-eager-shared-0194-candidate.heaptrack.zst",
+      "role": "candidate_heaptrack",
+      "bytes": 19689,
+      "sha256": "600864681c663d9a06ed11c6c9d865fbdd6c5a11270280c986697419b10a9f8e"
+    },
+    {
+      "path": "opc-eager-shared-0194-control-profile.json",
+      "role": "control_profile_report",
+      "bytes": 3220,
+      "sha256": "c64e86b17a4e976290be10182b7cd138b53ac92d6d650824d1e56659c4f3538d"
+    },
+    {
+      "path": "opc-eager-shared-0194-candidate-profile.json",
+      "role": "candidate_profile_report",
+      "bytes": 3211,
+      "sha256": "703bd8a81bda2b294c3587eac5d8ff865e82d7ff255ce2ead4dd7ae4945e64d4"
+    },
+    {
+      "path": "opc-eager-shared-0194-summary.json",
+      "role": "derived_summary",
+      "bytes": 5625,
+      "sha256": "dbd512348c9fe93eb4edf0e54ad7a9927966676c5dcaf24abb21c7869a82281c"
+    }
+  ]
+}
