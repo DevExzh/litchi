@@ -11,6 +11,30 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## XLSX row-visibility cell-store reuse (change 0184)
+
+[Change 0184](changes/0184-xlsx-row-visibility-store-reuse.md) makes the
+existing-row visibility rewriter return a private lifetime/source-bound proof.
+The changed commit reuses the immutable scalar-cell store while retaining
+candidate XML validation, a fresh row scan, source/cancellation checks, exact
+patch readback, and complete OPC publication validation. Generic cell-value
+rewrites still parse the complete candidate.
+
+Clean CPU-2 A1/B1/B2/A2 release runs use 20 warmups and 500 samples for the
+existing medium/large hide-one and unhide-256 selectors. Large commit p50 is
+37.79%-43.93% lower in A1->B1 and 40.88%-43.25% lower in B2->A2; all large
+commit p50/mean/p95/p99 gates pass. Large unhide-256 complete lifecycle is
+21.70%-29.98% lower across accepted statistics, and large hide-one accepts
+mean/p95/p99. Medium unhide-256 accepts commit p50/p99 only. All medium total
+latency, medium hide-one commit latency, and large hide-one total p50 are
+withheld for stability drift.
+
+All four legs have the same non-timing projection, exact outputs, semantic
+reopen, untouched-member hashes, logical source counters and refusal gates.
+This accepts one row-only parsed-store handoff, not allocation/RSS,
+physical-I/O, cold-cache, producer, formula, structural-row, or broad XLSX
+performance.
+
 ## ODS one-percent source-backed lifecycle (change 0183)
 
 [Change 0183](changes/0183-ods-one-percent-release-evidence.md) remeasures the

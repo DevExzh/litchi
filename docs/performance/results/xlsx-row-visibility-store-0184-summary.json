@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "change": "0184",
+  "decision": "accept_row_visibility_cell_store_reuse_with_scoped_latency_claims",
+  "revisions": {
+    "control": "f41a76ecf9ffc38586ac5838748e3109c70a0468",
+    "candidate": "9adbc95bd0b29b79915fae61b17010f78165d14a"
+  },
+  "binary_sha256": {
+    "control": "f16fac1f2028ae616f3dccf675ab6784b328e0f9b4744344c8ca761a4367d3ba",
+    "candidate": "04408b8fa0c0011db989a3f6bdf7f37512dd8a0744ca460d5e216a9b230bd410"
+  },
+  "protocol": {
+    "order": ["control-a1", "candidate-b1", "candidate-b2", "control-a2"],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_case": 500,
+    "fresh_process_per_leg": true,
+    "cases": [
+      "xlsx_source_backed_row_visibility_edit_save",
+      "xlsx_source_backed_row_visibility_batch_edit_save"
+    ],
+    "shapes": ["medium", "large"],
+    "primary_metric": "commit_ns",
+    "secondary_metric": "elapsed_ns",
+    "guard_metric": "publication_ns",
+    "timing_scope": "source-backed editor open + row-visibility stage + commit + sequential publication through a zero-retention hashing sink"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "deterministic_work": {
+    "changed_commit_cell_store_parse_before": 1,
+    "changed_commit_cell_store_parse_after": 0,
+    "candidate_xml_grammar_validation_retained": true,
+    "fresh_row_visibility_scan_retained": true,
+    "source_store_shared_by_arc": true,
+    "rewrite_proof_lifetime_and_source_identity_bound": true
+  },
+  "correctness_projection": {
+    "filter": "del(.environment.git_revision, .results[].elapsed_ns, .results[].source.xlsx_row_visibility.lifecycle_ns, .results[].source.xlsx_row_visibility.open_ns, .results[].source.xlsx_row_visibility.plan_or_stage_ns, .results[].source.xlsx_row_visibility.commit_ns, .results[].source.xlsx_row_visibility.publication_ns)",
+    "serialization": "jq -S",
+    "all_four_legs_sha256": "2515c11ccbcbb58bc223803197c94ab5e7f64ffdb3dcf48b4cd7ba6475bf502d"
+  },
+  "cases": [
+    {
+      "case": "xlsx_source_backed_row_visibility_edit_save",
+      "shape": "medium",
+      "update_count": 1,
+      "elapsed_ns": {
+        "legs": {
+          "a1": {"p50": 35752635, "mean": 36351937.982, "p95": 40803311, "p99": 46500305},
+          "b1": {"p50": 28553689, "mean": 28888015.592, "p95": 31349735, "p99": 35050025},
+          "b2": {"p50": 30849899, "mean": 31548029.804, "p95": 36956598, "p99": 42154447},
+          "a2": {"p50": 35464781, "mean": 36152110.876, "p95": 40823669, "p99": 45168132}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 20.135428, "b2_to_a2": 13.012577},
+          "mean": {"a1_to_b1": 20.532392, "b2_to_a2": 12.735304},
+          "p95": {"a1_to_b1": 23.168649, "b2_to_a2": 9.472620},
+          "p99": {"a1_to_b1": 24.624097, "b2_to_a2": 6.672149}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 0.805127, "candidate": 8.041728},
+          "mean": {"control": 0.549701, "candidate": 9.208020},
+          "p95": {"control": 0.049893, "candidate": 17.884882},
+          "p99": {"control": 2.864869, "candidate": 20.269378}
+        },
+        "accepted_statistics": []
+      },
+      "commit_ns": {
+        "legs": {
+          "a1": {"p50": 15085516, "mean": 15406814.916, "p95": 17382090, "p99": 21223201},
+          "b1": {"p50": 8663980, "mean": 8799606.528, "p95": 9634588, "p99": 10877561},
+          "b2": {"p50": 9300869, "mean": 9628520.724, "p95": 11774495, "p99": 13513883},
+          "a2": {"p50": 14878041, "mean": 15259293.992, "p95": 17724244, "p99": 20730994}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 42.567560, "b2_to_a2": 37.485930},
+          "mean": {"a1_to_b1": 42.884973, "b2_to_a2": 36.900615},
+          "p95": {"a1_to_b1": 44.571752, "b2_to_a2": 33.568422},
+          "p99": {"a1_to_b1": 48.746841, "b2_to_a2": 34.813145}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 1.375326, "candidate": 7.350998},
+          "mean": {"control": 0.957504, "candidate": 9.419901},
+          "p95": {"control": 1.968428, "candidate": 22.210675},
+          "p99": {"control": 2.319193, "candidate": 24.236334}
+        },
+        "accepted_statistics": []
+      },
+      "publication_p50_ns": {"a1": 7995115, "b1": 7660066, "b2": 8158425, "a2": 7924697}
+    },
+    {
+      "case": "xlsx_source_backed_row_visibility_batch_edit_save",
+      "shape": "medium",
+      "update_count": 256,
+      "elapsed_ns": {
+        "legs": {
+          "a1": {"p50": 36937000, "mean": 37695724.440, "p95": 44045882, "p99": 50629572},
+          "b1": {"p50": 29518971, "mean": 29926824.592, "p95": 32303930, "p99": 35790203},
+          "b2": {"p50": 31169722, "mean": 31929481.806, "p95": 38595106, "p99": 42437041},
+          "a2": {"p50": 35454441, "mean": 35909225.412, "p95": 38139636, "p99": 44972455}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 20.082922, "b2_to_a2": 12.085140},
+          "mean": {"a1_to_b1": 20.609499, "b2_to_a2": 11.082789},
+          "p95": {"a1_to_b1": 26.658456, "b2_to_a2": -1.194217},
+          "p99": {"a1_to_b1": 29.309687, "b2_to_a2": 5.637704}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 4.013750, "candidate": 5.592170},
+          "mean": {"control": 4.739262, "candidate": 6.691847},
+          "p95": {"control": 13.409304, "candidate": 19.474956},
+          "p99": {"control": 11.173543, "candidate": 18.571669}
+        },
+        "accepted_statistics": []
+      },
+      "commit_ns": {
+        "legs": {
+          "a1": {"p50": 15631554, "mean": 16061412.032, "p95": 18513521, "p99": 23640553},
+          "b1": {"p50": 8987626, "mean": 9168659.792, "p95": 10314294, "p99": 11605873},
+          "b2": {"p50": 9376224, "mean": 9655409.400, "p95": 12412933, "p99": 13301937},
+          "a2": {"p50": 14911677, "mean": 15135587.522, "p95": 16421220, "p99": 20214463}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 42.503311, "b2_to_a2": 37.121599},
+          "mean": {"a1_to_b1": 42.914983, "b2_to_a2": 36.207238},
+          "p95": {"a1_to_b1": 44.287778, "b2_to_a2": 24.409191},
+          "p99": {"a1_to_b1": 50.906931, "b2_to_a2": 34.195942}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 4.605281, "candidate": 4.323700},
+          "mean": {"control": 5.764278, "candidate": 5.308841},
+          "p95": {"control": 11.301475, "candidate": 20.346899},
+          "p99": {"control": 14.492427, "candidate": 14.613842}
+        },
+        "accepted_statistics": ["p50", "p99"]
+      },
+      "publication_p50_ns": {"a1": 8101010, "b1": 7849908, "b2": 8179340, "a2": 7910677}
+    },
+    {
+      "case": "xlsx_source_backed_row_visibility_edit_save",
+      "shape": "large",
+      "update_count": 1,
+      "elapsed_ns": {
+        "legs": {
+          "a1": {"p50": 274195749, "mean": 276799763.862, "p95": 298882706, "p99": 323243667},
+          "b1": {"p50": 239227346, "mean": 239454175.646, "p95": 264673890, "p99": 287990371},
+          "b2": {"p50": 224004452, "mean": 227587911.906, "p95": 254223793, "p99": 271983595},
+          "a2": {"p50": 273914590, "mean": 275733570.470, "p95": 296422221, "p99": 315471787}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 12.753080, "b2_to_a2": 18.221059},
+          "mean": {"a1_to_b1": 13.491915, "b2_to_a2": 17.460935},
+          "p95": {"a1_to_b1": 11.445566, "b2_to_a2": 14.235919},
+          "p99": {"a1_to_b1": 10.906106, "b2_to_a2": 13.785129}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 0.102540, "candidate": 6.363359},
+          "mean": {"control": 0.385186, "candidate": 4.955547},
+          "p95": {"control": 0.823228, "candidate": 3.948292},
+          "p99": {"control": 2.404341, "candidate": 5.558094}
+        },
+        "accepted_statistics": ["mean", "p95", "p99"]
+      },
+      "commit_ns": {
+        "legs": {
+          "a1": {"p50": 121446497, "mean": 123627701.290, "p95": 137360174, "p99": 153024616},
+          "b1": {"p50": 75547181, "mean": 76170400.428, "p95": 88973616, "p99": 101813169},
+          "b2": {"p50": 71961713, "mean": 73635157.288, "p95": 84780106, "p99": 95565377},
+          "a2": {"p50": 121720823, "mean": 123130371.150, "p95": 135388347, "p99": 151128129}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 37.793857, "b2_to_a2": 40.879702},
+          "mean": {"a1_to_b1": 38.387271, "b2_to_a2": 40.197405},
+          "p95": {"a1_to_b1": 35.226046, "b2_to_a2": 37.380057},
+          "p99": {"a1_to_b1": 33.466150, "b2_to_a2": 36.765328}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 0.225882, "candidate": 4.745998},
+          "mean": {"control": 0.402281, "candidate": 3.328384},
+          "p95": {"control": 1.435516, "candidate": 4.713206},
+          "p99": {"control": 1.239335, "candidate": 6.136526}
+        },
+        "accepted_statistics": ["p50", "mean", "p95", "p99"]
+      },
+      "publication_p50_ns": {"a1": 50689483, "b1": 50893452, "b2": 49895769, "a2": 51856661}
+    },
+    {
+      "case": "xlsx_source_backed_row_visibility_batch_edit_save",
+      "shape": "large",
+      "update_count": 256,
+      "elapsed_ns": {
+        "legs": {
+          "a1": {"p50": 274554646, "mean": 280099388.418, "p95": 313187172, "p99": 331303569},
+          "b1": {"p50": 213532675, "mean": 214679513.172, "p95": 225060005, "p99": 231982096},
+          "b2": {"p50": 216720398, "mean": 218314197.116, "p95": 230989643, "p99": 241053835},
+          "a2": {"p50": 276764974, "mean": 279788220.858, "p95": 306057326, "p99": 319401846}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 22.225802, "b2_to_a2": 21.695150},
+          "mean": {"a1_to_b1": 23.355951, "b2_to_a2": 21.971627},
+          "p95": {"a1_to_b1": 28.138818, "b2_to_a2": 24.527328},
+          "p99": {"a1_to_b1": 29.978993, "b2_to_a2": 24.529605}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 0.805059, "candidate": 1.492850},
+          "mean": {"control": 0.111092, "candidate": 1.693074},
+          "p95": {"control": 2.276545, "candidate": 2.634692},
+          "p99": {"control": 3.592392, "candidate": 3.910534}
+        },
+        "accepted_statistics": ["p50", "mean", "p95", "p99"]
+      },
+      "commit_ns": {
+        "legs": {
+          "a1": {"p50": 122421408, "mean": 125596074.260, "p95": 143984183, "p99": 156299562},
+          "b1": {"p50": 68645870, "mean": 69289033.958, "p95": 74377934, "p99": 77065302},
+          "b2": {"p50": 69444626, "mean": 70332545.610, "p95": 76550219, "p99": 80527333},
+          "a2": {"p50": 122361272, "mean": 125030414.684, "p95": 142739935, "p99": 152201976}
+        },
+        "reduction_percent": {
+          "p50": {"a1_to_b1": 43.926580, "b2_to_a2": 43.246237},
+          "mean": {"a1_to_b1": 44.831847, "b2_to_a2": 43.747651},
+          "p95": {"a1_to_b1": 48.342983, "b2_to_a2": 46.370846},
+          "p99": {"a1_to_b1": 50.693846, "b2_to_a2": 47.091795}
+        },
+        "same_implementation_drift_percent": {
+          "p50": {"control": 0.049122, "candidate": 1.163589},
+          "mean": {"control": 0.450380, "candidate": 1.506027},
+          "p95": {"control": 0.864156, "candidate": 2.920604},
+          "p99": {"control": 2.621623, "candidate": 4.492334}
+        },
+        "accepted_statistics": ["p50", "mean", "p95", "p99"]
+      },
+      "publication_p50_ns": {"a1": 50506111, "b1": 48164801, "b2": 48806014, "a2": 50582406}
+    }
+  ],
+  "correctness_gates": {
+    "exact_output_hash": true,
+    "semantic_reopen": true,
+    "untouched_member_identity": true,
+    "exact_noop": true,
+    "stale_source_refusal": true,
+    "foreign_source_refusal": true,
+    "protected_source_refusal": true,
+    "formula_source_refusal": true,
+    "markup_compatibility_source_refusal": true,
+    "macro_source_refusal": true,
+    "relationship_source_refusal": true,
+    "signed_source_refusal": true,
+    "typed_partial_sink_progress": true,
+    "zero_output_on_refusal": true,
+    "source_counter_gate": true,
+    "non_timing_projection_identical_across_implementations": true
+  },
+  "latency_claim": "accepted only for the statistics listed in each case's accepted_statistics arrays",
+  "withheld_scope": "all medium hide-one latency; medium batch total latency and commit mean/p95; large hide-one elapsed p50; allocation/RSS, physical I/O, decompression, cold-cache, throughput/scaling, producer breadth, formulas, structural rows, and broad XLSX CRUD"
+}

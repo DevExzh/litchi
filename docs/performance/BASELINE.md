@@ -14,6 +14,25 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained XLSX row-visibility result (change 0184)
+
+The existing-row visibility editor now carries a lifetime/source-bound proof
+from its direct `hidden`-attribute rewriter and reuses the immutable scalar-cell
+store after independently validating candidate XML and rescanning row state.
+Each changed commit removes one complete scalar-cell parse; generic cell-value
+edits retain their full candidate parse.
+
+Clean CPU-2 A/B/B/A release runs use 20 warmups and 500 samples for medium and
+large hide-one/unhide-256 workflows. Large commit p50 is 37.79%-43.93% lower in
+the first pair and 40.88%-43.25% in the second, with all large commit
+distribution/stability gates passing. Large unhide-256 complete lifecycle is
+21.70%-29.98% lower across accepted statistics. Medium unhide-256 commit p50
+and p99 pass; medium total latency and all medium hide-one latency are withheld
+for drift. No allocation/RSS, physical-I/O, cold-cache, producer, formula,
+structural-row, or broad XLSX claim follows. See
+[change 0184](changes/0184-xlsx-row-visibility-store-reuse.md) and its
+[machine-readable summary](results/xlsx-row-visibility-store-0184-summary.json).
+
 ## Latest retained ODS one-percent result (change 0183)
 
 The previously withheld fixed ODS 21-existing-cell workload now has a clean

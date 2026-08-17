@@ -144,8 +144,11 @@ conversion for other formats remain.
    has matched eager/source-backed correctness and phase evidence (change
    0166). Change 0167 removes the source-backed row publisher's redundant
    semantic reload through an existing lineage/version proof, but unstable
-   release drift withholds an end-to-end performance claim; no durable-source-
-   patch claim is made.
+   release drift withholds an end-to-end performance claim. Change 0184 then
+   removes the changed candidate's redundant complete scalar-cell parse through
+   an exact-source, lifetime-bound validated-store handoff and accepts only the
+   stable large-case and selected medium semantic-commit statistics; no
+   durable-source-patch claim is made.
    Conditional-formatting replacement is selectable
    without an ABBA claim and tab visibility remains unmeasured.
    Direct writer-local action regrouping was measured and rejected
@@ -1331,6 +1334,21 @@ workflow p50; first-pair medium hide/unhide complete-workflow p99 regresses
 retained without an acceptance-grade end-to-end latency, allocation/RSS,
 physical-I/O, cold-cache, decompression, or producer claim. See
 [`0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md).
+
+Change 0184 keeps the same four row-visibility selectors and matrix counts
+while replacing the changed candidate's complete scalar-cell reparse with a
+private, lifetime-bound rewrite token that may reuse only the exact snapshot
+source's validated cell store. Row markup is still freshly scanned, worksheet
+XML is still fully validated, and generic scalar-cell rewrites retain their
+full parse. Clean 20-warmup/500-sample CPU-2 A/B/B/A records accept both large
+semantic-commit directions and all large/unhide complete-workflow statistics;
+medium/unhide semantic-commit p50/p99 and large/hide complete-workflow
+mean/p95/p99 also pass the paired drift gates. Other statistics are withheld
+where same-implementation drift exceeds the preregistered threshold. This is
+correctness-equivalent work elimination only: it does not extend CRUD coverage
+beyond existing explicit row owners and makes no allocation/RSS, physical-I/O,
+cold-cache, decompression, independent-publication, or producer claim. See
+[`0184`](changes/0184-xlsx-row-visibility-store-reuse.md).
 
 Change 0168 keeps the same native XLS Number/RK/MulRK plan-only selectors and
 matrix counts while fusing BIFF semantic target validation into the common

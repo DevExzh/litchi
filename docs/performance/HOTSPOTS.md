@@ -3,6 +3,13 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0184`](changes/0184-xlsx-row-visibility-store-reuse.md)
+(0184 removes one complete scalar-cell parse from each changed source-backed
+existing-row visibility commit through a private lifetime/source-bound rewrite
+proof. Large commit statistics and large-batch complete lifecycle pass the
+paired gates; medium total and medium hide-one latency remain withheld, as do
+resource, physical-I/O, producer, structural-row, formula and broad XLSX
+claims.)
 [`change 0183`](changes/0183-ods-one-percent-release-evidence.md)
 (0183 closes the previously withheld fixed ODS 21-existing-cell result. A
 clean current-HEAD A/B/B/A rerun accepts complete source-backed lifecycle p50
@@ -1624,3 +1631,19 @@ The next larger ODS seams remain the entire touched-`Sheet` clone during a
 21-cell transaction and the complete XML layout/semantic reparse after the
 rewritten worksheet is assembled. Either needs separate implementation and
 matched evidence; neither is implied solved by this rerun.
+
+## Change 0184 update
+
+The source-backed XLSX existing-row visibility path no longer reparses every
+scalar cell after its own bounded direct-`hidden` rewrite. A private token keeps
+the exact source slice borrowed and identity-checked, candidate XML grammar is
+still validated, row visibility is rescanned, and generic worksheet editors
+cannot fabricate the handoff. The removed work is one complete scalar-cell
+parse per effective changed commit.
+
+Large hide-one/unhide-256 commit distributions pass all paired-direction and
+drift gates; large unhide-256 complete lifecycle also passes all statistics.
+The medium batch retains only commit p50/p99, while medium totals and medium
+hide-one remain withheld. The next XLSX row work should target measured
+stage/publication attribution, structural row ownership, formulas and producer
+matrices rather than widening this proof to arbitrary worksheet rewrites.
