@@ -472,6 +472,65 @@ fn direct_write_to_retains_three_complete_source_scans() {
 }
 
 #[test]
+fn owned_direct_write_uses_only_the_hashed_emission_scan() {
+    let source = Arc::new(MutableSource::new(sample_bytes()));
+    let file = SharedOleFile::open_owned_source_for_test(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x67, 4_096)], limits())
+        .unwrap();
+
+    source.reads.store(0, Ordering::SeqCst);
+    let candidate = plan.composed_source().unwrap();
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        fingerprint_chunks(file.file_size())
+    );
+    drop(candidate);
+
+    source.reads.store(0, Ordering::SeqCst);
+    source.request_sizes.lock().unwrap().clear();
+    let mut output = Vec::new();
+    let report = plan.write_to(&mut output).unwrap();
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        publication_chunks(file.file_size())
+    );
+    assert!(
+        source
+            .request_sizes
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|request| *request <= 65_536)
+    );
+    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(output.len() as u64, file.file_size());
+    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    assert_eq!(
+        reopened.open_stream(&["Fat4096"]).unwrap(),
+        vec![0x67; 4_096]
+    );
+}
+
+#[test]
+fn public_owned_arc_source_publishes_exactly() {
+    let source: Arc<[u8]> = Arc::from(sample_bytes());
+    let file =
+        SharedOleFile::open_owned(Arc::clone(&source), SourceVersion::new(0xcafe_0181, 0)).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4097", 0x68, 4_097)], limits())
+        .unwrap();
+    let mut output = Vec::new();
+    let report = plan.write_to(&mut output).unwrap();
+    assert_eq!(report.bytes(), source.len() as u64);
+    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    assert_eq!(
+        reopened.open_stream(&["Fat4097"]).unwrap(),
+        vec![0x68; 4_097]
+    );
+}
+
+#[test]
 fn fingerprint_requests_are_coalesced_without_widening_publication_chunks() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
     let file = SharedOleFile::open(source.clone()).unwrap();
@@ -527,6 +586,37 @@ fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
 
     // Atomic save retains the initial fingerprint preflight, 64 KiB emission
     // scan, and mandatory post-flush/fsync pre-rename fingerprint preflight.
+    assert_eq!(
+        source.reads.load(Ordering::SeqCst),
+        fingerprint_chunks(file.file_size()) * 2 + publication_chunks(file.file_size())
+    );
+    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+
+    std::fs::remove_file(destination).unwrap();
+    std::fs::remove_dir(directory).unwrap();
+}
+
+#[test]
+fn owned_atomic_save_retains_both_complete_fingerprint_fences() {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let directory = std::env::temp_dir().join(format!(
+        "litchi-cfb-owned-overlay-scan-count-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let destination = directory.join("document.ole");
+    std::fs::write(&destination, b"old destination").unwrap();
+
+    let source = Arc::new(MutableSource::new(sample_bytes()));
+    let file = SharedOleFile::open_owned_source_for_test(source.clone()).unwrap();
+    let plan = file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x69, 4_096)], limits())
+        .unwrap();
+    source.reads.store(0, Ordering::SeqCst);
+
+    let report = plan.save(&destination).unwrap();
     assert_eq!(
         source.reads.load(Ordering::SeqCst),
         fingerprint_chunks(file.file_size()) * 2 + publication_chunks(file.file_size())

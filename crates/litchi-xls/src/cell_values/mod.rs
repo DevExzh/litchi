@@ -3272,9 +3272,11 @@ impl fmt::Debug for SourceBackedCommit {
 /// It keeps the immutable source and the checked CFB overlay plan. The plan
 /// owns the compact exact physical replacement spans derived from the numeric
 /// splices; logical path and expected-range descriptors are consumed during
-/// validation rather than duplicated here. The plan's positional source is
-/// rechecked for source freshness and both complete artifact fingerprints on
-/// every read, sequential publication, and atomic save.
+/// validation rather than duplicated here. Direct sequential publication
+/// retains source/target hashing during its one emission pass and relies on
+/// the source's sealed immutable `Arc<[u8]>` ownership instead of generic
+/// pre/post scans. Checked composed views and atomic saves retain their normal
+/// complete fingerprint preflights.
 ///
 /// The plan is intentionally forward-only. An exact artifact inverse would
 /// need a source-bound reverse plan rooted in the composed target; the
@@ -5090,12 +5092,11 @@ fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceB
     require_unprotected_workbook(&source_workbook)?;
     require_macro_free_workbook(&source_workbook)?;
 
-    let source_adapter: Arc<dyn ReadAt> = Arc::new(SnapshotSource::new(
+    let publisher = SourceBackedOverlayPublisher::open_owned(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
-    ));
-    let publisher =
-        SourceBackedOverlayPublisher::open(source_adapter).map_err(source_backed_overlay_error)?;
+    )
+    .map_err(source_backed_overlay_error)?;
     let source_version = publisher
         .source_version()
         .map_err(source_backed_overlay_error)?;

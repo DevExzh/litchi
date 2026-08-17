@@ -332,6 +332,7 @@ enum MiniFATOpenMode {
 pub struct SharedOleFile {
     pub(crate) source: Arc<dyn ReadAt>,
     pub(crate) expected_version: SourceVersion,
+    pub(crate) source_is_owned_immutable: bool,
     pub(crate) index: Arc<ParsedOleIndex>,
     /// Serializes only lazy mini-stream initialization. Regular streams never
     /// acquire this lock or any shared cursor lock.
@@ -384,6 +385,22 @@ impl SharedOleFile {
         Self::open_with_limits(source, SharedOleFileLimits::default())
     }
 
+    /// Opens bytes whose immutable ownership is retained by the CFB reader.
+    ///
+    /// Unlike a type-erased [`ReadAt`] adapter, an `Arc<[u8]>` cannot change
+    /// while this reader and its derived plans retain a clone. Publication may
+    /// use that sealed provenance internally; callers cannot mark an arbitrary
+    /// positional source as immutable through a flag or version token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source exceeds the default limit or is not a
+    /// valid CFB file.
+    pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OleError> {
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource { source, version });
+        Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
+    }
+
     /// Opens and validates a positional source under caller-selected limits.
     ///
     /// The source version is captured before parsing and compared after the
@@ -397,6 +414,14 @@ impl SharedOleFile {
     pub fn open_with_limits(
         source: Arc<dyn ReadAt>,
         limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
+        Self::open_source_with_limits(source, limits, false)
+    }
+
+    fn open_source_with_limits(
+        source: Arc<dyn ReadAt>,
+        limits: SharedOleFileLimits,
+        source_is_owned_immutable: bool,
     ) -> Result<Self, OleError> {
         let expected_version = source.version()?;
         let source_length = source.len();
@@ -428,11 +453,17 @@ impl SharedOleFile {
         Ok(Self {
             source,
             expected_version,
+            source_is_owned_immutable,
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
             minifat_singleflight: MiniFATSingleFlight::new(),
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn open_owned_source_for_test(source: Arc<dyn ReadAt>) -> Result<Self, OleError> {
+        Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
     }
 
     /// Physical length captured while parsing this CFB file.
@@ -2183,6 +2214,37 @@ impl SharedOleFile {
     }
 }
 
+struct OwnedArcSource {
+    source: Arc<[u8]>,
+    version: SourceVersion,
+}
+
+impl ReadAt for OwnedArcSource {
+    fn len(&self) -> io::Result<u64> {
+        u64::try_from(self.source.len())
+            .map_err(|_error| io::Error::other("owned CFB source length exceeds u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() {
+            return Ok(0);
+        }
+        let Ok(start) = usize::try_from(offset) else {
+            return Ok(0);
+        };
+        let Some(available) = self.source.get(start..) else {
+            return Ok(0);
+        };
+        let count = available.len().min(output.len());
+        output[..count].copy_from_slice(&available[..count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
 fn next_chain_sector(table: &[u32], sector: u32, table_name: &str) -> Result<u32, OleError> {
     if sector >= MAXREGSECT {
         return Err(OleError::CorruptedFile(format!(
@@ -2546,6 +2608,7 @@ mod tests {
         let file = SharedOleFile {
             source: source.clone(),
             expected_version,
+            source_is_owned_immutable: false,
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -4302,6 +4365,7 @@ mod tests {
         let file = SharedOleFile {
             source: source.clone(),
             expected_version,
+            source_is_owned_immutable: false,
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -4520,6 +4584,7 @@ mod tests {
         let file = SharedOleFile {
             source: source.clone(),
             expected_version,
+            source_is_owned_immutable: false,
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),
@@ -4600,6 +4665,7 @@ mod tests {
         let file = SharedOleFile {
             source: source.clone(),
             expected_version,
+            source_is_owned_immutable: false,
             index: Arc::new(index),
             ministream: Mutex::new(None),
             minifat_direct_state: AtomicU64::new(minifat_state(0, MINIFAT_DIRECT_UNCLAIMED)),

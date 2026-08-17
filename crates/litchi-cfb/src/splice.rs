@@ -267,6 +267,7 @@ impl SharedOleFile {
             source: Arc::clone(&self.source),
             version: self.expected_version,
             length: self.index.file_size,
+            source_is_owned_immutable: self.source_is_owned_immutable,
         };
         source.ensure_length()?;
 
