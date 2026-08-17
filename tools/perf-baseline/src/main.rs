@@ -2810,6 +2810,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_cell_batch_sweep: Option<OdsCellBatchSweepSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    ods_source_cell: Option<OdsSourceCellSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     odf_content_cow: Option<OdfContentCowSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
@@ -3201,6 +3203,76 @@ struct OdsCellBatchSweepSummary {
     sweep_stored_cell_counts: Vec<usize>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     sweep_cell_digest_sha256: Vec<String>,
+}
+
+/// Matched ODS existing-cell edit/save evidence. The timed lifecycle keeps
+/// the established open, stage, commit, and sequential publication scope;
+/// source counters are collected by a separate untimed source-backed replay.
+/// This is correctness and phase evidence only, and makes no speedup claim.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdsSourceCellSummary {
+    implementation: &'static str,
+    workload: &'static str,
+    update_count: usize,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_evidence_scope: &'static str,
+    safety_evidence_scope: &'static str,
+    production_contracts_outside_selector: &'static str,
+    source_bytes: u64,
+    output_bytes: u64,
+    source_archive_sha256: String,
+    output_sha256: String,
+    semantic_sha256: String,
+    lifecycle_ns: Vec<u64>,
+    open_ns: Vec<u64>,
+    stage_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_read_range_overlap_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    content_source_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    content_source_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    untouched_source_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    untouched_source_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pictures_source_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pictures_source_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_version_calls: Vec<u64>,
+    source_hash_verified: bool,
+    output_hash_verified: bool,
+    semantic_hash_verified: bool,
+    semantic_reopen_verified: bool,
+    media_payloads_verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    patch_forward_inverse_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    raw_untouched_member_identity_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_immutability_verified: Option<bool>,
+    exact_output_verified: bool,
+    exact_sink_verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exact_noop_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    foreign_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replacement_limit_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    partial_sink_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_replay_gates_verified: Option<bool>,
+    sink_summary: Option<SinkSummary>,
 }
 
 /// Matched ODF content-only publication evidence. Preparation, exact no-op,
@@ -23916,8 +23988,22 @@ fn verify_ods_source_cell_gates(
         accepted: 0,
         fail_after: 7,
     };
-    if commit.write_to(&mut partial).is_ok() || partial.accepted == 0 {
-        return Err("ODS source cell partial-sink gate did not fail after progress".into());
+    let partial_error = commit
+        .write_to(&mut partial)
+        .expect_err("ODS source cell partial sink must fail after its accepted prefix");
+    if !matches!(
+        partial_error,
+        litchi_odf_common::core::SourceContentPublicationError::Sink {
+            progress:
+                litchi_odf_common::core::SourceContentPublicationProgress::Indeterminate {
+                    accepted_before: 7
+                },
+            ..
+        }
+    ) || partial_error.written() != 7
+        || partial.accepted != 7
+    {
+        return Err("ODS source cell partial-sink gate lost exact progress".into());
     }
     verify_ods_source_cell_output(corpus, expected_output, updates, true)?;
     if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
@@ -23959,35 +24045,64 @@ fn run_ods_source_cell_edit_save(
     };
     let expected_digest = sha256_hex(expected_output);
     let expected_bytes = u64::try_from(expected_output.len())?;
+    let update_indices = ods_source_cell_update_indices(&updates);
+    let semantic_digest = sha256_hex(
+        expected_semantic_ods_full_cell_text(SemanticShape::Medium, &update_indices).as_bytes(),
+    );
+    let source_archive_sha256 = corpus.manifest.archive_sha256.clone();
     let mut elapsed = Vec::with_capacity(samples);
+    let mut lifecycle_ns = Vec::with_capacity(samples);
+    let mut open_ns = Vec::with_capacity(samples);
+    let mut stage_ns = Vec::with_capacity(samples);
+    let mut commit_ns = Vec::with_capacity(samples);
+    let mut publication_ns = Vec::with_capacity(samples);
     let mut sinks = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let mut sink = WindowedHashingSink::new(expected_bytes, ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
         let started = Instant::now();
+        let open_started = Instant::now();
+        let open_duration;
+        let stage_duration;
+        let commit_duration;
+        let publication_duration;
         if source_backed {
             let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
             let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
+            open_duration = open_started.elapsed();
+            let stage_started = Instant::now();
             let mut edit = owner.edit_cells()?;
             let changed = stage_ods_source_cell_changes(&mut edit, &updates, one_percent)?;
+            stage_duration = stage_started.elapsed();
+            let commit_started = Instant::now();
             let commit = edit.commit()?;
+            commit_duration = commit_started.elapsed();
             if changed != commit.changed_cells() {
                 return Err("ODS source cell timed commit changed an unexpected cell count".into());
             }
+            let publication_started = Instant::now();
             let report = commit.write_to(&mut sink)?;
             if report.changed_cells() != updates.len() || report.bytes() != expected_bytes {
                 return Err("ODS source cell timed publication report differs".into());
             }
+            publication_duration = publication_started.elapsed();
             std::hint::black_box(commit);
         } else {
             let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
+            open_duration = open_started.elapsed();
+            let stage_started = Instant::now();
             let mut edit = snapshot.edit();
             stage_ods_owned_cell_changes(&mut edit, &updates, one_percent)?;
+            stage_duration = stage_started.elapsed();
+            let commit_started = Instant::now();
             let commit = edit.commit()?;
+            commit_duration = commit_started.elapsed();
             let bytes = commit.snapshot().as_bytes();
             if u64::try_from(bytes.len())? != expected_bytes {
                 return Err("ODS owned timed output length differs from its oracle".into());
             }
+            let publication_started = Instant::now();
             sink.write_all(bytes)?;
+            publication_duration = publication_started.elapsed();
             std::hint::black_box(commit);
         }
         let duration = started.elapsed();
@@ -23997,11 +24112,233 @@ fn run_ods_source_cell_edit_save(
         }
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
         if iteration >= warmup_iterations {
+            let lifecycle = elapsed_ns(duration)?;
+            let open = elapsed_ns(open_duration)?;
+            let stage = elapsed_ns(stage_duration)?;
+            let commit = elapsed_ns(commit_duration)?;
+            let publication = elapsed_ns(publication_duration)?;
+            let phase_sum = open
+                .checked_add(stage)
+                .and_then(|sum| sum.checked_add(commit))
+                .and_then(|sum| sum.checked_add(publication))
+                .ok_or("ODS source cell phase duration sum overflowed")?;
+            if phase_sum > lifecycle {
+                return Err("ODS source cell phases exceed their aligned lifecycle".into());
+            }
+            lifecycle_ns.push(lifecycle);
+            open_ns.push(open);
+            stage_ns.push(stage);
+            commit_ns.push(commit);
+            publication_ns.push(publication);
             sinks.push(summary);
         }
     }
+    if [
+        lifecycle_ns.len(),
+        open_ns.len(),
+        stage_ns.len(),
+        commit_ns.len(),
+        publication_ns.len(),
+    ]
+    .iter()
+    .any(|length| *length != samples)
+    {
+        return Err("ODS source cell phase evidence has an incomplete sample vector".into());
+    }
     let sink = deterministic_sink_summary(&sinks, "ODS source cell publication")?;
-    let mut measured = result(case, corpus, elapsed, Some(sink));
+    if sink.retained_output_bytes != Some(0)
+        || sink.retained_authoring_window_bytes
+            != Some(u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?)
+        || sink.accepted_bytes != expected_bytes
+        || sink.largest_write > u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?
+    {
+        return Err("ODS source cell publication exceeded the retained sink bound".into());
+    }
+
+    let mut source_read_calls = Vec::new();
+    let mut source_read_bytes = Vec::new();
+    let mut source_read_range_overlap_bytes = Vec::new();
+    let mut content_source_read_calls = Vec::new();
+    let mut content_source_read_bytes = Vec::new();
+    let mut untouched_source_read_calls = Vec::new();
+    let mut untouched_source_read_bytes = Vec::new();
+    let mut pictures_source_read_calls = Vec::new();
+    let mut pictures_source_read_bytes = Vec::new();
+    let mut source_version_calls = Vec::new();
+    let mut source_immutability_verified = true;
+    let mut source_replay_gates_verified = true;
+    if source_backed {
+        let (content_range, untouched_ranges, picture_ranges, _untouched_names) =
+            odf_content_cow_ranges(&corpus.archive)?;
+        for _sample in 0..samples {
+            let instrumented_source = Arc::new(InstrumentedSource::new_odf(
+                corpus.archive.clone(),
+                vec![content_range.clone()],
+                untouched_ranges.clone(),
+                picture_ranges.clone(),
+            ));
+            let read_at: Arc<dyn ReadAt> = instrumented_source.clone();
+            let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(read_at)?;
+            let mut edit = owner.edit_cells()?;
+            let changed = stage_ods_source_cell_changes(&mut edit, &updates, one_percent)?;
+            let commit = edit.commit()?;
+            if changed != commit.changed_cells() {
+                return Err("ODS source cell replay changed an unexpected cell count".into());
+            }
+            let mut replay_sink =
+                WindowedHashingSink::new(expected_bytes, ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
+            let report = commit.write_to(&mut replay_sink)?;
+            let (replay_sink_summary, replay_digest) = replay_sink.finish();
+            let replay_snapshot = instrumented_source.snapshot();
+            let version_calls = instrumented_source.version_calls();
+            let source_unchanged =
+                sha256_hex(instrumented_source.bytes.as_slice()) == source_archive_sha256;
+            let replay_gates = report.changed_cells() == updates.len()
+                && report.bytes() == expected_bytes
+                && replay_digest == expected_digest
+                && replay_sink_summary.accepted_bytes == expected_bytes
+                && replay_sink_summary.retained_output_bytes == Some(0)
+                && replay_sink_summary.retained_authoring_window_bytes
+                    == Some(u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?)
+                && replay_sink_summary.largest_write
+                    <= u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?
+                && replay_snapshot.read_calls != 0
+                && replay_snapshot.read_bytes != 0
+                && replay_snapshot.read_range_overlap_bytes <= replay_snapshot.read_bytes
+                && replay_snapshot.odf.content.read_calls != 0
+                && replay_snapshot.odf.content.read_bytes != 0
+                && replay_snapshot.odf.untouched.read_calls != 0
+                && replay_snapshot.odf.untouched.read_bytes != 0
+                && replay_snapshot.odf.pictures.read_calls != 0
+                && replay_snapshot.odf.pictures.read_bytes != 0
+                && version_calls != 0
+                && source_unchanged;
+            if !replay_gates {
+                return Err(
+                    "ODS source cell InstrumentedSource replay failed its logical-read gates"
+                        .into(),
+                );
+            }
+            source_read_calls.push(replay_snapshot.read_calls);
+            source_read_bytes.push(replay_snapshot.read_bytes);
+            source_read_range_overlap_bytes.push(replay_snapshot.read_range_overlap_bytes);
+            content_source_read_calls.push(replay_snapshot.odf.content.read_calls);
+            content_source_read_bytes.push(replay_snapshot.odf.content.read_bytes);
+            untouched_source_read_calls.push(replay_snapshot.odf.untouched.read_calls);
+            untouched_source_read_bytes.push(replay_snapshot.odf.untouched.read_bytes);
+            pictures_source_read_calls.push(replay_snapshot.odf.pictures.read_calls);
+            pictures_source_read_bytes.push(replay_snapshot.odf.pictures.read_bytes);
+            source_version_calls.push(version_calls);
+            source_immutability_verified &= source_unchanged;
+            source_replay_gates_verified &= replay_gates;
+            std::hint::black_box(commit);
+        }
+    }
+    if source_backed
+        && [
+            source_read_calls.len(),
+            source_read_bytes.len(),
+            source_read_range_overlap_bytes.len(),
+            content_source_read_calls.len(),
+            content_source_read_bytes.len(),
+            untouched_source_read_calls.len(),
+            untouched_source_read_bytes.len(),
+            pictures_source_read_calls.len(),
+            pictures_source_read_bytes.len(),
+            source_version_calls.len(),
+        ]
+        .iter()
+        .any(|length| *length != samples)
+    {
+        return Err("ODS source cell source evidence has an incomplete sample vector".into());
+    }
+
+    let source_hash_verified = sha256_hex(&corpus.archive) == source_archive_sha256;
+    let output_hash_verified = sha256_hex(expected_output) == expected_digest;
+    let semantic_hash_verified = {
+        let reopened = litchi_ods::Spreadsheet::from_bytes(expected_output.to_vec())?;
+        sha256_hex(semantic_ods_full_cell_text(&reopened, SemanticShape::Medium)?.as_bytes())
+            == semantic_digest
+    };
+    if !source_hash_verified || !output_hash_verified || !semantic_hash_verified {
+        return Err("ODS source cell hash gates failed".into());
+    }
+    let ods_source_cell = OdsSourceCellSummary {
+        implementation: if source_backed {
+            "source_backed"
+        } else {
+            "owned_snapshot"
+        },
+        workload: if one_percent {
+            "one_percent_existing_cells"
+        } else {
+            "one_existing_cell"
+        },
+        update_count: updates.len(),
+        timing_scope: "open + stage + commit + sequential publication through the fixed-window hashing sink",
+        performance_claim: "none; correctness and phase evidence only",
+        source_evidence_scope: if source_backed {
+            "untimed InstrumentedSource full lifecycle replay after timed samples; logical ReadAt range overlap only"
+        } else {
+            "not applicable to owned eager snapshot"
+        },
+        safety_evidence_scope: if source_backed {
+            "untimed source-backed gates: patch forward/inverse, foreign-source refusal, exact no-op, replacement limit, and exact partial-sink progress"
+        } else {
+            "eager selector verifies deterministic output, semantic reopen, media preservation, source/output hashes, and bounded sink only"
+        },
+        production_contracts_outside_selector: "stale/version and cancellation refusal, signed/protected packages, formulas, unknown or repeated rows, and transaction bounds remain production-test evidence and are not re-proved by this selector",
+        source_bytes: u64::try_from(corpus.archive.len())?,
+        output_bytes: expected_bytes,
+        source_archive_sha256,
+        output_sha256: expected_digest.clone(),
+        semantic_sha256: semantic_digest,
+        lifecycle_ns,
+        open_ns,
+        stage_ns,
+        commit_ns,
+        publication_ns,
+        source_read_calls,
+        source_read_bytes,
+        source_read_range_overlap_bytes,
+        content_source_read_calls,
+        content_source_read_bytes,
+        untouched_source_read_calls,
+        untouched_source_read_bytes,
+        pictures_source_read_calls,
+        pictures_source_read_bytes,
+        source_version_calls,
+        source_hash_verified,
+        output_hash_verified,
+        semantic_hash_verified,
+        semantic_reopen_verified: true,
+        media_payloads_verified: true,
+        patch_forward_inverse_verified: source_backed.then_some(true),
+        raw_untouched_member_identity_verified: source_backed.then_some(true),
+        source_immutability_verified: source_backed.then_some(source_immutability_verified),
+        exact_output_verified: true,
+        exact_sink_verified: true,
+        exact_noop_verified: source_backed.then_some(true),
+        foreign_source_refusal_verified: source_backed.then_some(true),
+        replacement_limit_verified: source_backed.then_some(true),
+        partial_sink_verified: source_backed.then_some(true),
+        source_replay_gates_verified: source_backed.then_some(source_replay_gates_verified),
+        sink_summary: Some(sink),
+    };
+    let root_read_calls = ods_source_cell.source_read_calls.clone();
+    let root_read_bytes = ods_source_cell.source_read_bytes.clone();
+    let mut measured = result_with_source(
+        case,
+        corpus,
+        elapsed,
+        SourceSummary {
+            read_calls: root_read_calls,
+            read_bytes: root_read_bytes,
+            ods_source_cell: Some(ods_source_cell),
+            ..SourceSummary::default()
+        },
+    );
+    measured.sink = Some(sink);
     measured.output_sha256 = Some(expected_digest);
     Ok(measured)
 }
@@ -40554,7 +40891,12 @@ mod tests {
         let corpus = build_ods_media_corpus().unwrap();
         for (name, case) in cases {
             assert_eq!(parse_case(name), Some(case));
-            let result = run_case(case, &corpus, 0, 1).unwrap();
+            let samples = if matches!(case, Case::OdsSourceBackedOneEditSave) {
+                2
+            } else {
+                1
+            };
+            let result = run_case(case, &corpus, 0, samples).unwrap();
             assert_eq!(result.case, name);
             let sink = result.sink.expect("ODS source cell selector sink");
             assert_eq!(sink.retained_output_bytes, Some(0));
@@ -40563,6 +40905,109 @@ mod tests {
                 Some(super::ODF_CONTENT_COW_SINK_WINDOW_BYTES as u64)
             );
             assert!(result.output_sha256.is_some());
+            let source = result.source.expect("ODS source cell evidence");
+            let evidence = source.ods_source_cell.expect("ODS source cell summary");
+            let expected_updates = if matches!(
+                case,
+                Case::OdsSourceEagerOnePercentEditSave | Case::OdsSourceBackedOnePercentEditSave
+            ) {
+                super::semantic_update_indices(SemanticShape::Medium.ods_cell_count())
+                    .unwrap()
+                    .len()
+            } else {
+                1
+            };
+            assert_eq!(evidence.update_count, expected_updates);
+            assert_eq!(evidence.lifecycle_ns.len(), samples);
+            assert_eq!(evidence.open_ns.len(), samples);
+            assert_eq!(evidence.stage_ns.len(), samples);
+            assert_eq!(evidence.commit_ns.len(), samples);
+            assert_eq!(evidence.publication_ns.len(), samples);
+            for index in 0..samples {
+                assert!(
+                    evidence.open_ns[index]
+                        + evidence.stage_ns[index]
+                        + evidence.commit_ns[index]
+                        + evidence.publication_ns[index]
+                        <= evidence.lifecycle_ns[index]
+                );
+            }
+            assert!(evidence.source_hash_verified);
+            assert!(evidence.output_hash_verified);
+            assert!(evidence.semantic_hash_verified);
+            assert!(evidence.semantic_reopen_verified);
+            assert!(evidence.media_payloads_verified);
+            assert!(evidence.exact_output_verified);
+            assert!(evidence.exact_sink_verified);
+            let json = serde_json::to_value(&evidence).unwrap();
+            assert!(json["production_contracts_outside_selector"]
+                .as_str()
+                .unwrap()
+                .contains("stale/version"));
+            if matches!(
+                case,
+                Case::OdsSourceBackedOneEditSave | Case::OdsSourceBackedOnePercentEditSave
+            ) {
+                for vector in [
+                    &evidence.source_read_calls,
+                    &evidence.source_read_bytes,
+                    &evidence.source_read_range_overlap_bytes,
+                    &evidence.content_source_read_calls,
+                    &evidence.content_source_read_bytes,
+                    &evidence.untouched_source_read_calls,
+                    &evidence.untouched_source_read_bytes,
+                    &evidence.pictures_source_read_calls,
+                    &evidence.pictures_source_read_bytes,
+                    &evidence.source_version_calls,
+                ] {
+                    assert_eq!(vector.len(), samples);
+                }
+                assert_eq!(evidence.patch_forward_inverse_verified, Some(true));
+                assert_eq!(evidence.exact_noop_verified, Some(true));
+                assert_eq!(evidence.foreign_source_refusal_verified, Some(true));
+                assert_eq!(evidence.replacement_limit_verified, Some(true));
+                assert_eq!(evidence.partial_sink_verified, Some(true));
+                assert_eq!(evidence.raw_untouched_member_identity_verified, Some(true));
+                assert_eq!(evidence.source_replay_gates_verified, Some(true));
+                assert_eq!(evidence.source_immutability_verified, Some(true));
+                for field in [
+                    "patch_forward_inverse_verified",
+                    "exact_noop_verified",
+                    "foreign_source_refusal_verified",
+                    "replacement_limit_verified",
+                    "partial_sink_verified",
+                ] {
+                    assert_eq!(json[field], true);
+                }
+                assert!(
+                    evidence.content_source_read_bytes[0] != 0
+                        && evidence.untouched_source_read_bytes[0] != 0
+                        && evidence.pictures_source_read_bytes[0] != 0
+                );
+            } else {
+                assert!(evidence.source_read_calls.is_empty());
+                assert!(evidence.source_version_calls.is_empty());
+                assert_eq!(evidence.raw_untouched_member_identity_verified, None);
+                assert_eq!(evidence.source_replay_gates_verified, None);
+                assert_eq!(evidence.source_immutability_verified, None);
+                assert_eq!(evidence.patch_forward_inverse_verified, None);
+                assert_eq!(evidence.exact_noop_verified, None);
+                assert_eq!(evidence.foreign_source_refusal_verified, None);
+                assert_eq!(evidence.replacement_limit_verified, None);
+                assert_eq!(evidence.partial_sink_verified, None);
+                for field in [
+                    "patch_forward_inverse_verified",
+                    "exact_noop_verified",
+                    "foreign_source_refusal_verified",
+                    "replacement_limit_verified",
+                    "partial_sink_verified",
+                    "raw_untouched_member_identity_verified",
+                    "source_replay_gates_verified",
+                    "source_immutability_verified",
+                ] {
+                    assert!(json.get(field).is_none());
+                }
+            }
         }
     }
 
