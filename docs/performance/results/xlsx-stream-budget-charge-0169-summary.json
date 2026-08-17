@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "change": "0169-xlsx-streaming-budget-charge",
+  "decision": {
+    "production_change": "retained; cumulative Budget::consume charges traverse immutable ancestors without transient node ownership, while releasable Reservation charges retain up to four ancestors inline and spill for deeper hierarchies",
+    "latency_claim": "accepted for medium and large complete XLSX streaming creation at p50, mean, p95, and p99; tiny p50, mean, and p95 only",
+    "tiny_p99_claim": "withheld because candidate p99 was 1.811774% and 2.754450% slower in the two paired directions",
+    "allocation_claim": "descriptive whole-process Heaptrack boundary: 18,877,776 fewer allocation calls and 15,730,000 fewer temporary allocations; peak heap unchanged",
+    "memory_claim": "no RSS or bounded-total-memory claim; GNU Time RSS directions disagree and Heaptrack RSS includes profiler overhead",
+    "io_claim": "none; creation uses an in-memory non-seek hashing discard sink and does not measure physical or cold I/O"
+  },
+  "builds": {
+    "control": {
+      "revision": "7e90bb800a43e116a021866c8b9215706deef684",
+      "binary_sha256": "1a2e9187ed244498d8c8ef57cdd4fa49a71bb8ea1dbe4ba687c70e0ddbc0ba9b",
+      "binary_bytes": 43525136,
+      "worktree_clean": true
+    },
+    "candidate": {
+      "revision": "b79fd0480fbbedb763e930a41c3349a196ff70d7",
+      "binary_sha256": "15c713da23551d054871c7994af7f6458ce85601b53ed95f56b5ee978c9f00ba",
+      "binary_bytes": 43462280,
+      "worktree_clean": true
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "kernel": "Linux 6.8.0-101-generic",
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "execution_order": [
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "selector": "xlsx_streaming_create",
+    "shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "warmups": 20,
+    "samples_per_leg_per_shape": 200,
+    "timing_scope": "writer construction, deterministic row text generation, row encoding, compression, ZIP finalization, and publication to the hashing discard sink",
+    "excluded_from_timing": "expected-artifact construction, complete Workbook reopen, semantic readback, sink construction, and final digest extraction",
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "drift_gates_pct": {
+      "p50_and_mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    }
+  },
+  "validation": {
+    "all_records_clean_exact_revision_affinity": true,
+    "all_elapsed_vectors_length_200": true,
+    "all_artifacts_reopened_and_all_cells_verified_outside_timing": true,
+    "all_archive_and_worksheet_hashes_match_across_legs": true,
+    "all_sink_topology_and_counters_match_across_legs": true,
+    "retained_output_bytes": 0,
+    "retained_authoring_window_bytes": 4096,
+    "same_implementation_drift_within_tiered_gates": true,
+    "medium_and_large_direction_agrees_all_statistics_both_pairs": true,
+    "tiny_direction_agrees_p50_mean_p95_both_pairs": true,
+    "tiny_direction_agrees_p99_both_pairs": false
+  },
+  "latency_reduction_pct": {
+    "tiny": {
+      "a1_to_b1": {
+        "p50": 6.633014,
+        "mean": 6.256119,
+        "p95": 3.040023,
+        "p99": -1.811774
+      },
+      "b2_to_a2": {
+        "p50": 8.323377,
+        "mean": 6.726089,
+        "p95": 2.429634,
+        "p99": -2.754450
+      }
+    },
+    "medium": {
+      "a1_to_b1": {
+        "p50": 8.226104,
+        "mean": 7.675099,
+        "p95": 4.859872,
+        "p99": 4.602770
+      },
+      "b2_to_a2": {
+        "p50": 7.080942,
+        "mean": 6.498093,
+        "p95": 4.661140,
+        "p99": 1.052739
+      }
+    },
+    "large": {
+      "a1_to_b1": {
+        "p50": 8.211924,
+        "mean": 8.467461,
+        "p95": 9.764407,
+        "p99": 9.080661
+      },
+      "b2_to_a2": {
+        "p50": 8.584109,
+        "mean": 8.697315,
+        "p95": 8.325401,
+        "p99": 8.738472
+      }
+    }
+  },
+  "resource_profiles": {
+    "heaptrack_scope": "whole process with three warmups, twenty samples, untimed artifact construction and reopen, and profiler overhead",
+    "control_allocation_calls": 38672384,
+    "candidate_allocation_calls": 19794608,
+    "allocation_calls_reduction": 18877776,
+    "allocation_calls_reduction_pct": 48.814617,
+    "control_temporary_allocations": 22545902,
+    "candidate_temporary_allocations": 6815902,
+    "temporary_allocations_reduction": 15730000,
+    "temporary_allocations_reduction_pct": 69.768777,
+    "control_peak_heap": "225.45M",
+    "candidate_peak_heap": "225.45M",
+    "perf_stat_scope": "whole process A/B/B/A with three warmups and twenty large-shape samples",
+    "cycles_reduction_pct": [
+      8.284806,
+      7.805358
+    ],
+    "instructions_reduction_pct": [
+      6.545702,
+      6.589758
+    ],
+    "branches_reduction_pct": [
+      5.760909,
+      5.795748
+    ],
+    "branch_misses_change_pct": [
+      123.099529,
+      82.656839
+    ],
+    "branch_miss_result": "regressed in both process-wide directions and disclosed; absolute branch-miss rate remains below 0.25%",
+    "gnu_time_max_rss_kib": {
+      "a1": 252772,
+      "b1": 252128,
+      "b2": 252900,
+      "a2": 252396
+    }
+  },
+  "corpora": [
+    {
+      "shape": "tiny",
+      "rows": 64,
+      "cells": 256,
+      "text_input_bytes": 3008,
+      "worksheet_xml_bytes": 13425,
+      "archive_bytes": 3451,
+      "archive_sha256": "21e1f8267717fed447ef787285f154ccbf7a6d2ba460d385956e3d8546e7336c",
+      "worksheet_sha256": "0d133e59c766b109e74b7219d23ee9dde397f4eb55c58eea84fda53caebce1ee",
+      "sink_write_calls": 49,
+      "largest_sink_write": 1519
+    },
+    {
+      "shape": "medium",
+      "rows": 8192,
+      "cells": 32768,
+      "text_input_bytes": 385024,
+      "worksheet_xml_bytes": 1795765,
+      "archive_bytes": 167418,
+      "archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+      "worksheet_sha256": "539f28638970fa5f207bd9686e0d0c7372e9cc9df0aec30e296ae9bdb4b3e226",
+      "sink_write_calls": 54,
+      "largest_sink_write": 29338
+    },
+    {
+      "shape": "large",
+      "rows": 131072,
+      "cells": 524288,
+      "text_input_bytes": 6160384,
+      "worksheet_xml_bytes": 29742241,
+      "archive_bytes": 2563433,
+      "archive_sha256": "cf6965fc6ec2586d52f127fc58301aae68d2e10b51488312c88d20165153a3b1",
+      "worksheet_sha256": "e8e667f47810fbfc5e4924c5d878d70cbf299976c9ac39ef33a6f0f9673b65a4",
+      "sink_write_calls": 133,
+      "largest_sink_write": 30832
+    }
+  ],
+  "tables": {
+    "primary_stats": "xlsx-stream-budget-charge-0169-primary-stats.tsv",
+    "comparisons": "xlsx-stream-budget-charge-0169-comparisons.tsv"
+  }
+}

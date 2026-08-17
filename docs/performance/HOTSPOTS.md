@@ -3,7 +3,11 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0168`](changes/0168-xls-numeric-validation-fusion.md)
+[`change 0169`](changes/0169-xlsx-streaming-budget-charge.md)
+(0169 retains a shared hierarchical-budget charge optimization selected by
+the one-sheet XLSX streaming writer. Medium/large and tiny-through-p95 latency
+directions agree; tiny p99 is withheld, process Heaptrack allocation calls fall,
+peak heap is flat, and RSS directions disagree.)
 (0168 retains a narrow native-XLS validation-fusion mechanism and raw release
 evidence but withholds an acceptance-grade latency claim because the same-
 implementation drift gate failed. 0167 retains an XLSX publication work-
@@ -276,10 +280,12 @@ whole-package OPC materialization
 Confirmed source facts:
 
 - `litchi-xlsx` now exposes bounded forward-only creation for one-sheet
-  workbooks. Its correctness and resource-limit tests do not establish latency,
-  allocation, peak-memory, or large-stream performance; matching harness and
-  profiler evidence remains pending. This is distinct from the source-backed
-  existing-cell publication result below.
+  workbooks. Change 0169 adds scoped warm in-memory tiny/medium/large latency
+  evidence and descriptive whole-process allocation profiles for the exact
+  inline-scalar corpus. Operation-local allocation, total/peak-memory and RSS
+  attribution, physical/cold I/O, richer authoring and producer evidence remain
+  pending. This is distinct from the source-backed existing-cell publication
+  result below.
 - The legacy eager path still materializes all admitted Parts. The additive
   source-backed XLSX facade avoids timed source reads while listing after open;
   managed source-backed OPC caches charge exact physical `InputBytes`,
@@ -1040,6 +1046,22 @@ control and candidate drift exceed the 5% stability gate. Treat the scans as
 removed production work, not as an accepted latency or physical-I/O result;
 stable ABBA, allocator/RSS, cold-device, and producer evidence remain open. See
 [`0168`](changes/0168-xls-numeric-validation-fusion.md).
+
+Change 0169 confirms that hierarchical accounting itself was a measurable XLSX
+streaming hot path. The large one-sheet shape performs one Work charge per row,
+one per cell, and one releasable Objects reservation per accepted row. The old
+cumulative charge path built and dropped an owned ancestor vector each time.
+`Budget::consume` now walks immutable ancestors by reference; reservations keep
+four charged nodes inline and spill beyond that without bounding caller-defined
+hierarchy depth. Clean paired release runs accept medium/large
+p50/mean/p95/p99 and tiny p50/mean/p95 reductions. Tiny p99 regresses and is
+withheld. Matched whole-process Heaptrack allocation calls fall 48.81% and
+temporary allocations 69.77%, while peak heap is unchanged and RSS directions
+disagree. Deflate remains the dominant sampled cost. Treat this as accepted
+warm in-memory one-sheet XLSX creation and shared-accounting allocation evidence,
+not total-memory, physical-I/O, cold-cache, richer XLSX, producer, or universal
+budget evidence. See
+[`0169`](changes/0169-xlsx-streaming-budget-charge.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

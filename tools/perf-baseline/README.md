@@ -339,6 +339,21 @@ but the 5% same-implementation drift gate fails. No acceptance-grade latency,
 tail, allocation/RSS, physical-I/O, or producer claim is made. See
 [`0168`](../../docs/performance/changes/0168-xls-numeric-validation-fusion.md).
 
+Change 0169 changes the shared hierarchical budget charge path and adds no
+selector. The existing `xlsx_streaming_create` large shape exposed a transient
+allocation in every cumulative row/cell charge. `Budget::consume` now walks the
+immutable ancestor chain by reference, while releasable reservations retain up
+to four charged nodes inline and spill for deeper caller-defined hierarchies.
+Clean CPU-2 release A/B/B/A runs use 20 warmups and 200 samples per shape.
+Medium and large p50/mean/p95/p99 improve in both paired directions by
+1.05%-9.76%; tiny p50/mean/p95 also improve, while tiny p99 regresses
+1.81%/2.75% and is withheld. Matched whole-process Heaptrack captures record
+48.81% fewer allocation calls and 69.77% fewer temporary allocations with
+unchanged 225.45M peak heap. RSS directions disagree. The result is limited to
+warm in-memory, one-sheet inline-scalar forward-only XLSX creation; it is not a
+total-memory, physical-I/O, cold-cache, producer, or broad `Budget` claim. See
+[`0169`](../../docs/performance/changes/0169-xlsx-streaming-budget-charge.md).
+
 Change 0154 adds matched owned-rebuild and source-positional content-only
 publication selectors for ODT, ODS, and ODP. Each selector prepares the real
 semantic edit and owner outside timing, then measures one public publication
@@ -1378,6 +1393,19 @@ records p50 geomean improvements of 76.41%/76.47%; the large case falls from
 7,208,970 to 1,441,802 sink calls while exact bytes and hashes remain stable.
 This is a fresh-creation result, not an existing-document edit or memory-profile
 claim.
+
+The XLSX case now has a clean release A/B/B/A result in
+[change 0169](../../docs/performance/changes/0169-xlsx-streaming-budget-charge.md).
+After removing transient hierarchical-budget charge allocations, medium and
+large p50/mean/p95/p99 improve in both paired directions by 1.05%-9.76%; tiny
+p50/mean/p95 also improve, while its p99 regresses 1.81%/2.75% and is withheld.
+Matched whole-process Heaptrack captures record 38,672,384 -> 19,794,608
+allocation calls and 22,545,902 -> 6,815,902 temporary allocations, with
+unchanged 225.45M peak heap. The exact archive/worksheet hashes, 4 KiB retained
+row window, and zero retained output remain fixed. The allocation counts cover
+the whole benchmark process, not only the timed writer; RSS directions disagree
+and no total-memory, physical-I/O, cold-cache, multi-sheet, shared-string/style/
+formula/date, real-producer, or broad `Budget` claim is made.
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \

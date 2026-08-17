@@ -1,0 +1,301 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 14K of event 'cycles:P'
+# Event count (approx.): 16915436720
+#
+# Overhead  Command          Shared Object             Symbol
+# ........  ...............  ........................  ...................................................................................................................................
+#
+    28.75%  litchi-perf-con  litchi-perf-control-0178  [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--26.22%--flate2::zio::Writer<W,D>::write_with_status
+               |          std::io::Write::write_all
+               |          litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+               |          litchi_perf_baseline::run_streaming_creation
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --2.53%--flate2::zio::Writer<W,D>::write_with_status
+                          std::io::Write::write_all
+                          litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                          litchi_perf_baseline::build_streaming_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+    12.04%  litchi-perf-con  litchi-perf-control-0178  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+               |--11.10%--flate2::zio::Writer<W,D>::write_with_status
+               |          std::io::Write::write_all
+               |          |
+               |           --11.10%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+               |                     litchi_perf_baseline::run_streaming_creation
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --0.94%--flate2::zio::Writer<W,D>::write_with_status
+                          std::io::Write::write_all
+                          litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                          litchi_perf_baseline::build_streaming_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+    10.52%  litchi-perf-con  litchi-perf-control-0178  [.] _ZN11litchi_core6budget6Budget6charge17h9b90788338183db2E.llvm.2332376692037271399
+            |
+            ---_ZN11litchi_core6budget6Budget6charge17h9b90788338183db2E.llvm.2332376692037271399
+               |
+               |--8.92%--litchi_core::budget::Budget::consume
+               |          litchi_core::execution::ExecutionContext::consume
+               |          |
+               |          |--8.22%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+               |          |          litchi_perf_baseline::run_streaming_creation
+               |          |          litchi_perf_baseline::main
+               |          |          0xffffffffffffffff
+               |          |
+               |           --0.70%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+               |                     litchi_perf_baseline::build_streaming_corpus
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --1.60%--litchi_core::execution::ExecutionContext::reserve
+                          |
+                           --1.44%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                                     litchi_perf_baseline::run_streaming_creation
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     5.66%  litchi-perf-con  libc.so.6                 [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memcpy_avx512_unaligned_erms (inlined)
+               |
+               |--1.78%--litchi_xlsx::streaming::push_escaped
+               |          litchi_xlsx::streaming::append_cell
+               |          |
+               |           --1.61%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+               |                     litchi_perf_baseline::run_streaming_creation
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+               |--1.67%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |          litchi_xlsx::raw::worksheet::parse
+               |          litchi_xlsx::workbook::model::Worksheet::store
+               |          litchi_xlsx::workbook::model::Worksheet::rows
+               |          litchi_perf_baseline::build_streaming_corpus
+               |          litchi_perf_baseline::main
+               |          0xffffffffffffffff
+               |
+                --1.29%--litchi_xlsx::streaming::append_cell
+                          |
+                           --1.17%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                                     litchi_perf_baseline::run_streaming_creation
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     5.15%  litchi-perf-con  libc.so.6                 [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+               |
+                --5.08%--<flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                          |
+                           --4.76%--flate2::zio::Writer<W,D>::write_with_status
+                                     std::io::Write::write_all
+                                     litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                                     litchi_perf_baseline::run_streaming_creation
+                                     litchi_perf_baseline::main
+                                     0xffffffffffffffff
+
+     2.53%  litchi-perf-con  litchi-perf-control-0178  [.] litchi_xlsx::streaming::push_escaped
+            |
+            ---litchi_xlsx::streaming::push_escaped
+               litchi_xlsx::streaming::append_cell
+               |
+                --2.31%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                          litchi_perf_baseline::run_streaming_creation
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     2.43%  litchi-perf-con  litchi-perf-control-0178  [.] litchi_ooxml_common::xml::unqualified_attribute_value
+            |
+            ---litchi_ooxml_common::xml::unqualified_attribute_value
+               |
+               |--1.11%--litchi_xlsx::raw::worksheet::validation::optional_u32
+               |          |
+               |           --1.01%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+               |                     litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+               |                     litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               |                     litchi_xlsx::raw::worksheet::parse
+               |                     litchi_xlsx::workbook::model::Worksheet::store
+               |                     litchi_xlsx::workbook::model::Worksheet::rows
+               |                     litchi_perf_baseline::build_streaming_corpus
+               |                     litchi_perf_baseline::main
+               |                     0xffffffffffffffff
+               |
+                --0.67%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+                          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+                          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::model::Worksheet::store
+                          litchi_xlsx::workbook::model::Worksheet::rows
+                          litchi_perf_baseline::build_streaming_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.98%  litchi-perf-con  litchi-perf-control-0178  [.] litchi_core::budget::Budget::consume
+            |
+            ---litchi_core::budget::Budget::consume
+               litchi_core::execution::ExecutionContext::consume
+               |
+                --1.88%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                          litchi_perf_baseline::run_streaming_creation
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.64%  litchi-perf-con  litchi-perf-control-0178  [.] litchi_core::budget::Reservation::commit
+            |
+            ---litchi_core::budget::Reservation::commit
+               |
+                --1.50%--litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                          litchi_perf_baseline::run_streaming_creation
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.46%  litchi-perf-con  litchi-perf-control-0178  [.] litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+            |
+            ---litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               litchi_xlsx::raw::worksheet::parse
+               litchi_xlsx::workbook::model::Worksheet::store
+               litchi_xlsx::workbook::model::Worksheet::rows
+               litchi_perf_baseline::build_streaming_corpus
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     1.45%  litchi-perf-con  litchi-perf-control-0178  [.] zlib_rs::deflate::flush_block_only
+            |
+            ---zlib_rs::deflate::flush_block_only
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |
+                --1.33%--flate2::zio::Writer<W,D>::write_with_status
+                          std::io::Write::write_all
+                          litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                          litchi_perf_baseline::run_streaming_creation
+                          0xffffffffffffffff
+
+     1.19%  litchi-perf-con  libc.so.6                 [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+               |
+                --0.94%--litchi_ooxml_common::mce::codec::process_markup_compatibility
+                          litchi_ooxml_common::mce::codec::process_ooxml
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::model::Worksheet::store
+                          litchi_xlsx::workbook::model::Worksheet::rows
+                          litchi_perf_baseline::build_streaming_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.17%  litchi-perf-con  litchi-perf-control-0178  [.] _ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17hb64b84504b62007bE.llvm.2540630635761220163
+            |
+            ---_ZN9quick_xml6reader9ns_reader17NsReader$LT$R$GT$13process_event17hb64b84504b62007bE.llvm.2540630635761220163
+               litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               litchi_xlsx::raw::worksheet::parse
+               litchi_xlsx::workbook::model::Worksheet::store
+               litchi_xlsx::workbook::model::Worksheet::rows
+               litchi_perf_baseline::build_streaming_corpus
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     1.15%  litchi-perf-con  litchi-perf-control-0178  [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate
+               crc32fast::Hasher::update
+               |
+                --0.98%--std::io::Write::write_all
+                          litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+                          litchi_perf_baseline::run_streaming_creation
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     1.13%  litchi-perf-con  litchi-perf-control-0178  [.] quick_xml::name::NamespaceResolver::resolve_event
+            |
+            ---quick_xml::name::NamespaceResolver::resolve_event
+               litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+               litchi_xlsx::raw::worksheet::parse
+               litchi_xlsx::workbook::model::Worksheet::store
+               litchi_xlsx::workbook::model::Worksheet::rows
+               litchi_perf_baseline::build_streaming_corpus
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.82%  litchi-perf-con  litchi-perf-control-0178  [.] litchi_xlsx::raw::worksheet::validation::optional_u32
+            |
+            ---litchi_xlsx::raw::worksheet::validation::optional_u32
+               |
+                --0.69%--litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+                          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+                          litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+                          litchi_xlsx::raw::worksheet::parse
+                          litchi_xlsx::workbook::model::Worksheet::store
+                          litchi_xlsx::workbook::model::Worksheet::rows
+                          litchi_perf_baseline::build_streaming_corpus
+                          litchi_perf_baseline::main
+                          0xffffffffffffffff
+
+     0.72%  litchi-perf-con  litchi-perf-control-0178  [.] sha2::sha256::x86_sha::compress
+            |
+            ---sha2::sha256::x86_sha::compress
+
+     0.66%  litchi-perf-con  litchi-perf-control-0178  [.] quick_xml::events::attributes::IterState::next
+            |
+            ---quick_xml::events::attributes::IterState::next
+
+     0.64%  litchi-perf-con  libc.so.6                 [.] __memmove_avx512_unaligned
+            |
+            ---__memcpy_avx512_unaligned (inlined)
+
+     0.62%  litchi-perf-con  [unknown]                 [k] 0xffffffff9d800f30
+            |
+            ---0xffffffff9d800f30
+
+     0.56%  litchi-perf-con  litchi-perf-control-0178  [.] litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+            |
+            ---litchi_xlsx::streaming::StreamingWorkbookWriter<W>::write_row
+               litchi_perf_baseline::run_streaming_creation
+               litchi_perf_baseline::main
+               0xffffffffffffffff
+
+     0.56%  litchi-perf-con  litchi-perf-control-0178  [.] ryu::pretty::format64
+            |
+            ---ryu::pretty::format64
+               ryu::buffer::Buffer::format
+               litchi_xlsx::streaming::append_cell
+
+     0.56%  litchi-perf-con  litchi-perf-control-0178  [.] zlib_rs::deflate::compare256::avx2::compare256
+            |
+            ---zlib_rs::deflate::compare256::avx2::compare256
+               zlib_rs::deflate::longest_match::longest_match
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               zlib_rs::stable::Deflate::compress
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
