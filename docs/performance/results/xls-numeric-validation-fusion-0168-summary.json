@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "change": "0168-xls-numeric-validation-fusion",
+  "decision": {
+    "production_change": "retained; XLS semantic target validation now runs on the exact CFB-composed view inside the existing pre/post fingerprint fence, eliminating two redundant post-plan full-source scans",
+    "release_latency_claim": "withheld because same-implementation temporal drift exceeded the predeclared 5% gate",
+    "observed_complete_workflow_reduction_pct_range": [
+      19.223422,
+      28.157369
+    ],
+    "observed_semantic_commit_reduction_pct_range": [
+      37.58179,
+      48.043347
+    ],
+    "latency_result": "complete workflow and semantic commit p50/mean/p95/p99 were lower in both paired directions for both families, but remain descriptive because the drift gate failed",
+    "resource_claim": "none; scan deltas are code-derived logical source work, ingress counters exclude internal fingerprint reads, and whole-process time/RSS sidecars are descriptive only"
+  },
+  "builds": {
+    "control": {
+      "revision": "66ad0e76c4b2b587c890999fd1b0b73daafd42e7",
+      "binary_sha256": "e4fcf89c82d800e93ce55b775e52c98781e2d3f7047a33e15b51b2d4caefb6e2"
+    },
+    "candidate": {
+      "revision": "3b4666ffe3c141d73e4f2bd53a7cd24eea6f3e7a",
+      "binary_sha256": "43d659db23738e07a9d6561be94d1e966a7590b5811f85bd56487350e56098bb"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "kernel": "Linux 6.8.0-101-generic",
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "execution_order": [
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "warmups": 20,
+    "samples_per_leg_per_family": 500,
+    "families": [
+      "Number",
+      "RK+MulRK"
+    ],
+    "selectors": [
+      "xls_numeric_plan_only_number_edit_save",
+      "xls_numeric_plan_only_rk_mulrk_edit_save"
+    ],
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "same_implementation_drift_gate_pct": 5.0
+  },
+  "validation": {
+    "all_records_clean_exact_revision_affinity": true,
+    "all_timing_and_evidence_vectors_length_500": true,
+    "all_runner_semantic_security_preservation_gates": true,
+    "all_complete_target_materialized_bytes_zero": true,
+    "corpus_output_and_fingerprint_hashes_match_across_legs": true,
+    "source_ingress_and_sink_topology_match_across_legs": true,
+    "complete_workflow_direction_agrees_all_statistics_both_pairs": true,
+    "semantic_commit_direction_agrees_all_statistics_both_pairs": true,
+    "publication_direction_agrees_all_statistics_both_pairs": false,
+    "same_implementation_drift_within_gate": false,
+    "maximum_absolute_control_drift": {
+      "pct": 10.557888,
+      "scope": "rk-mulrk total_ns p50 control_a1_to_a2_drift"
+    },
+    "maximum_absolute_candidate_drift": {
+      "pct": 9.813597,
+      "scope": "rk-mulrk commit_ns p99 candidate_b1_to_b2_drift"
+    }
+  },
+  "code_derived_work_elimination": {
+    "scope": "two removed ValidatedOverlayPlan::composed_source calls; each performed one complete source scan while hashing source and composed target together",
+    "fingerprint_chunk_bytes": 1048576,
+    "number": {
+      "full_source_scans_removed_per_sample": 2,
+      "source_bytes_removed_per_sample": 33991680,
+      "read_at_calls_removed_per_sample": 34
+    },
+    "rk_mulrk": {
+      "full_source_scans_removed_per_sample": 2,
+      "source_bytes_removed_per_sample": 405504,
+      "read_at_calls_removed_per_sample": 2
+    },
+    "physical_io_claim": "none; the measured OwnedSource is memory-backed and published source counters cover ingress, not these internal fingerprint reads"
+  },
+  "whole_process_sidecars": {
+    "number": {
+      "a1": {
+        "elapsed_wall": "1:16.18",
+        "user_seconds": 69.14,
+        "system_seconds": 6.99,
+        "max_rss_kib": 194456,
+        "filesystem_inputs": 4896,
+        "filesystem_outputs": 560,
+        "exit_status": 0
+      },
+      "b1": {
+        "elapsed_wall": "0:59.59",
+        "user_seconds": 54.71,
+        "system_seconds": 4.83,
+        "max_rss_kib": 194200,
+        "filesystem_inputs": 18168,
+        "filesystem_outputs": 3048,
+        "exit_status": 0
+      },
+      "b2": {
+        "elapsed_wall": "0:59.74",
+        "user_seconds": 54.91,
+        "system_seconds": 4.8,
+        "max_rss_kib": 194276,
+        "filesystem_inputs": 0,
+        "filesystem_outputs": 560,
+        "exit_status": 0
+      },
+      "a2": {
+        "elapsed_wall": "1:15.26",
+        "user_seconds": 70.54,
+        "system_seconds": 4.7,
+        "max_rss_kib": 194292,
+        "filesystem_inputs": 0,
+        "filesystem_outputs": 560,
+        "exit_status": 0
+      }
+    },
+    "rk-mulrk": {
+      "a1": {
+        "elapsed_wall": "0:01.11",
+        "user_seconds": 0.98,
+        "system_seconds": 0.13,
+        "max_rss_kib": 159768,
+        "filesystem_inputs": 0,
+        "filesystem_outputs": 536,
+        "exit_status": 0
+      },
+      "b1": {
+        "elapsed_wall": "0:00.94",
+        "user_seconds": 0.83,
+        "system_seconds": 0.11,
+        "max_rss_kib": 143408,
+        "filesystem_inputs": 0,
+        "filesystem_outputs": 536,
+        "exit_status": 0
+      },
+      "b2": {
+        "elapsed_wall": "0:00.96",
+        "user_seconds": 0.84,
+        "system_seconds": 0.11,
+        "max_rss_kib": 143408,
+        "filesystem_inputs": 0,
+        "filesystem_outputs": 536,
+        "exit_status": 0
+      },
+      "a2": {
+        "elapsed_wall": "0:01.15",
+        "user_seconds": 1.02,
+        "system_seconds": 0.11,
+        "max_rss_kib": 143284,
+        "filesystem_inputs": 0,
+        "filesystem_outputs": 536,
+        "exit_status": 0
+      }
+    }
+  },
+  "cases": [
+    {
+      "family": "Number",
+      "selector": "xls_numeric_plan_only_number_edit_save",
+      "updates": 1,
+      "source_cfb_bytes": 16995840,
+      "workbook_bytes": 80946,
+      "source_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "output_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+      "source_ingress_read_calls": 260,
+      "source_ingress_read_bytes": 16995840,
+      "sink_write_calls": 260,
+      "splice_count": 1,
+      "replacement_bytes": 8,
+      "changed_spans": 1,
+      "complete_target_materialized_bytes": 0
+    },
+    {
+      "family": "RK+MulRK",
+      "selector": "xls_numeric_plan_only_rk_mulrk_edit_save",
+      "updates": 3,
+      "source_cfb_bytes": 202752,
+      "workbook_bytes": 1665,
+      "source_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+      "output_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+      "source_ingress_read_calls": 4,
+      "source_ingress_read_bytes": 202752,
+      "sink_write_calls": 4,
+      "splice_count": 3,
+      "replacement_bytes": 12,
+      "changed_spans": 3,
+      "complete_target_materialized_bytes": 0
+    }
+  ],
+  "tables": {
+    "primary_stats": "xls-numeric-validation-fusion-0168-primary-stats.tsv",
+    "comparisons": "xls-numeric-validation-fusion-0168-comparisons.tsv"
+  }
+}

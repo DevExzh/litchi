@@ -778,6 +778,23 @@ RSS, or physical-I/O claim is made. See
 [summary](results/xlsx-row-visibility-provenance-0167-summary.json), and the
 [manifest](results/xlsx-row-visibility-provenance-0167-manifest.json).
 
+Change 0168 removes two redundant complete source scans from native XLS
+fixed-width Number/RK/MulRK plan-only commit. BIFF semantic owner validation now
+runs on the exact composed view after CFB reopen/range checks and before CFB's
+final source/target fingerprint fence. Number therefore avoids 33,991,680
+logical source bytes and 34 one-MiB reads per effective sample; RK/MulRK avoids
+405,504 bytes and two reads. These are code-derived in-memory scan counts, not
+physical-I/O measurements. Clean CPU-2 release A/B/B/A runs used 20 warmups and
+500 samples per family. Complete-workflow p50/mean/p95/p99 values are
+descriptively 19.22%-28.16% lower and semantic-commit values 37.58%-48.04%
+lower in both paired directions, but same-implementation drift reaches 10.56%
+for control and 9.81% for candidate. The 5% gate fails, so no acceptance-grade
+latency, tail, allocation/RSS, peak-memory, physical-I/O, cold-cache, or
+producer claim is made. See
+[`0168`](changes/0168-xls-numeric-validation-fusion.md), the
+[summary](results/xls-numeric-validation-fusion-0168-summary.json), and the
+[manifest](results/xls-numeric-validation-fusion-0168-manifest.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use
