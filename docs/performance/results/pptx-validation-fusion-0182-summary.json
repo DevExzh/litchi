@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "change": "0182",
+  "decision": "accept_large_validation_latency_and_structural_work_reduction",
+  "control_binary_source_revision": "48122377c2cf43fa3a5e402d1f5409c495d37346",
+  "candidate_revision": "e11f06d2b85af4f147bbd36f517847b025eeb9b1",
+  "runtime_report_revision": "e11f06d2b85af4f147bbd36f517847b025eeb9b1",
+  "runtime_revision_scope": "The frozen control binary was built before the production commit and then executed from the clean candidate checkout; schema-1 reports resolve Git metadata at runtime, so all four legs report the candidate checkout while the distinct control source revision is bound separately.",
+  "control_binary_sha256": "6d34aa99268c84b36b200cdf09e8041c67b22a5f885c8ebd211490477deac17c",
+  "candidate_binary_sha256": "cf89cac1954e1756da9ae58f50094da1735d3fd0d6a7ce096bdb742595ce8b90",
+  "protocol": {
+    "order": [
+      "control-a1",
+      "candidate-b1",
+      "candidate-b2",
+      "control-a2"
+    ],
+    "case": "pptx_validation_report",
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_shape": 500,
+    "timed_scope": "bounded source-backed PPTX open and complete semantic validation report",
+    "source_counter_scope": "logical ReadAt requests exposed by the positional source; not physical I/O"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "semantic_projection": {
+    "canonical_sha256": "5b3d2fdc95a327b46997cbcc72e03dfb5cb36ec9ed1ad64e052285b328e27dde",
+    "all_four_legs_equal": true,
+    "excluded_fields": "elapsed_ns only",
+    "validation_report_sha256": "44e911271656f414bcfabc23d3798317ad90400ba4ce289035b2538eaae693d6",
+    "check_count": 9,
+    "issue_count": 0,
+    "ordinary_payload_read_calls": 0,
+    "ordinary_payload_read_bytes": 0,
+    "max_in_flight_reads": 1
+  },
+  "deterministic_work_reduction": {
+    "package_relationship_list_passes_before": 2,
+    "package_relationship_list_passes_after": 1,
+    "part_relationship_list_passes_before_per_part": 4,
+    "part_relationship_list_passes_after_per_part": 1,
+    "removed_relationship_list_passes_for_n_parts": "1 + 3N",
+    "unchanged": [
+      "graph target lookups until the configured graph-node limit",
+      "presentation and slide XML parsing",
+      "logical source reads and bytes",
+      "ordinary payload materializations",
+      "validation report topology and evidence"
+    ]
+  },
+  "workloads": {
+    "tiny": {
+      "corpus_sha256": "26b1487517882224f820f9f2384c6428dcc40fa2d12c306d74df2809f4003f49",
+      "source_bytes": 31530,
+      "source_read_calls": 118,
+      "source_read_bytes": 10241,
+      "elapsed_p50_ns": {
+        "a1": 253604,
+        "b1": 250074,
+        "b2": 239730,
+        "a2": 268845
+      },
+      "paired_reduction_percent": {
+        "p50": [1.391934, 10.829660],
+        "mean": [2.413822, 10.218848],
+        "p95": [4.600120, 11.542868],
+        "p99": [4.489130, 7.944984]
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 6.009763,
+          "mean": 5.808128,
+          "p95": 6.519156,
+          "p99": 11.037911
+        },
+        "candidate": {
+          "p50": 4.136376,
+          "mean": 2.654496,
+          "p95": 1.232800,
+          "p99": 7.020245
+        }
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "control p50 and mean drift exceed the predeclared 5% thresholds"
+    },
+    "medium": {
+      "corpus_sha256": "50ad2f81099ee29d4768d7080b7fc51ea2b5ca2aadd531031efcab65e8d5409e",
+      "source_bytes": 40788,
+      "source_read_calls": 208,
+      "source_read_bytes": 19016,
+      "elapsed_p50_ns": {
+        "a1": 633156,
+        "b1": 625416,
+        "b2": 644883,
+        "a2": 687416
+      },
+      "paired_reduction_percent": {
+        "p50": [1.222448, 6.187374],
+        "mean": [-2.311850, 6.756915],
+        "p95": [-1.973363, 10.234844],
+        "p99": [3.240734, 1.417124]
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 8.569768,
+          "mean": 8.330490,
+          "p95": 7.664597,
+          "p99": 1.754853
+        },
+        "candidate": {
+          "p50": 3.112648,
+          "mean": 1.271758,
+          "p95": 5.224961,
+          "p99": 0.096760
+        }
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "control p50 and mean drift fail, and mean/p95 paired directions disagree"
+    },
+    "large": {
+      "corpus_sha256": "9c46542b763fc4bef63dfe4336cadd2bfba2b7e7b3f18a376c3924eb5643b3e9",
+      "source_bytes": 215220,
+      "source_read_calls": 1088,
+      "source_read_bytes": 188606,
+      "elapsed_p50_ns": {
+        "a1": 31803435,
+        "b1": 28145123,
+        "b2": 28474481,
+        "a2": 30643934
+      },
+      "paired_reduction_percent": {
+        "p50": [11.502883, 7.079551],
+        "mean": [11.488813, 6.559166],
+        "p95": [11.182994, 6.450167],
+        "p99": [11.615851, 4.866245]
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 3.645836,
+          "mean": 3.306428,
+          "p95": 1.765350,
+          "p99": 3.443069
+        },
+        "candidate": {
+          "p50": 1.170213,
+          "mean": 2.078938,
+          "p95": 7.188160,
+          "p99": 3.930665
+        }
+      },
+      "latency_claim": "Complete bounded validation p50 is 7.08%-11.50% lower for this deterministic large semantic PPTX corpus; mean, p95, and p99 directions also agree and both implementations pass the stability gates.",
+      "latency_withheld_scope": [
+        "other PPTX corpus shapes",
+        "physical I/O and cold-cache behavior",
+        "allocation, RSS, and total memory",
+        "throughput and scaling",
+        "real-producer presentations",
+        "PPTX CRUD and publication"
+      ]
+    }
+  }
+}

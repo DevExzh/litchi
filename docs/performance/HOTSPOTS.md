@@ -3,6 +3,13 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0182`](changes/0182-pptx-validation-catalog-graph-fusion.md)
+(0182 fuses the bounded PPTX validator's catalog and graph traversal. Package
+relationship passes change 2 -> 1 and per-Part relationship passes 4 -> 1.
+The clean large semantic-corpus validation p50 result is accepted at
+7.08%-11.50% lower in paired directions; tiny/medium latency plus resource,
+physical-I/O, cold-cache, scaling, producer, and broad PPTX claims remain
+withheld.)
 [`change 0181`](changes/0181-xls-source-policy-reuse.md)
 (0181 reuses immutable native-XLS snapshot policy facts in the existing
 plan-only fixed-width numeric path. Number total and commit p50/mean/p95/p99

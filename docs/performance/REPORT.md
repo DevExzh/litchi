@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-17
+Date: 2026-08-18
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -10,6 +10,25 @@ claim that the end-to-end performance program or CRUD scenario matrix is
 complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
+
+## PPTX validation catalog/graph fusion (change 0182)
+
+[Change 0182](changes/0182-pptx-validation-catalog-graph-fusion.md) fuses the
+existing source-backed PPTX catalog-presence and relationship-graph walks. The
+private traversal preserves package-first graph ordering, per-Part node-before-
+relationship ordering, transient errors, and the node-limit boundary while
+continuing content-free external/signature/macro counting after graph stop.
+Package relationship-list passes change `2 -> 1`; each Part's relationship-list
+passes change `4 -> 1`.
+
+Clean CPU-2 A1/B1/B2/A2 release runs retain exact non-timing report, corpus,
+source, and counter projections over tiny/medium/large. The large deterministic
+semantic corpus passes paired-direction and 5%/5%/10%/15% drift gates: complete
+validation p50 is 11.50% and 7.08% lower; mean is 11.49%/6.56%, p95
+11.18%/6.45%, and p99 11.62%/4.87% lower. Tiny and medium latency remain
+withheld. The accepted result is warm complete-validator latency for that one
+large generated corpus, not physical-I/O, allocation/RSS, cold-cache, scaling,
+producer-breadth, mutation, or general OOXML performance.
 
 ## Current-HEAD resource evidence (change 0115)
 
