@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "change": "0183",
+  "revision": "63088f66332068cf57f6faf0afe68d0618ba6d8d",
+  "binary_sha256": "9937ec3e5f9b09286ff728cddb02f8b45fe59cef66b5525b81dd50c7e1e038e0",
+  "artifacts": [
+    {"path": "ods-one-percent-release-0183-a1.json.zst", "bytes": 12263, "sha256": "a688b471e11e4e631ae6c8e5c087632bb249fc6a2345bdcff4be9d4cee4c7a07", "uncompressed_bytes": 70302, "uncompressed_sha256": "2cf1f69ab59a057f63807f8fe85f3e11c3d9340f65d331edb0fe96cc4fb6c50f"},
+    {"path": "ods-one-percent-release-0183-b1.json.zst", "bytes": 12228, "sha256": "9c4df25e3c71e71ed56400ece22390086f7bafb5ce3c3fe974480662947705f2", "uncompressed_bytes": 178340, "uncompressed_sha256": "11811df62499435b242690e81523befcafc413ac531b38f18b2ae0533ce590a7"},
+    {"path": "ods-one-percent-release-0183-b2.json.zst", "bytes": 12297, "sha256": "ed2d976c3e41d46d52f1b9a65d3df66a160c09a48a40afa0e7f3eb6f0d6218bf", "uncompressed_bytes": 178339, "uncompressed_sha256": "30b668d56912b02f4469f8ca0ab5e452e37bb23fe367c8475439086074dbffcd"},
+    {"path": "ods-one-percent-release-0183-a2.json.zst", "bytes": 12325, "sha256": "381760a1f23513a9bfb4aef764da3d4a944b81a8d3b40d0cca6a0e6ad2a98fb5", "uncompressed_bytes": 70308, "uncompressed_sha256": "2ebaa118d18548a077a0483fd88677c0b9ec8d74bfdcfb4832a1e1ace98a80a1"}
+  ]
+}

@@ -14,6 +14,24 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained ODS one-percent result (change 0183)
+
+The previously withheld fixed ODS 21-existing-cell workload now has a clean
+current-HEAD rerun over the same bounded source-backed lifecycle. A CPU-2
+A/B/B/A with one release binary, 20 warmups, and 500 samples per fresh process
+passes every predeclared stability gate. Complete open, stage, commit, and
+sequential-publication p50 is 72.07%-72.61% lower than eager owned-snapshot
+publication; mean, p95, and p99 are 68.20%-72.33% lower.
+
+This is evidence closure for the existing implementation, not a new production
+or harness change. The claim is limited to the fixed generated two-sheet,
+2,048-cell, eight-resource corpus and its 21 existing-cell replacements.
+Logical source replay is not physical I/O. Allocation/RSS, cold cache, real
+producers, formulas, merges, structural rows, insert/delete, durable ZIP patch,
+atomic save, and broad ODS CRUD remain open. See
+[change 0183](changes/0183-ods-one-percent-release-evidence.md) and its
+[machine-readable summary](results/ods-one-percent-release-0183-summary.json).
+
 ## Latest retained PPTX validation result (change 0182)
 
 The source-backed PPTX validator now collects catalog presence facts and

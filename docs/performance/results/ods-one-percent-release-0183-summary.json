@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "change": "0183",
+  "decision": "accept_fixed_one_percent_existing_cell_complete_lifecycle_latency",
+  "revision": "63088f66332068cf57f6faf0afe68d0618ba6d8d",
+  "binary_sha256": "9937ec3e5f9b09286ff728cddb02f8b45fe59cef66b5525b81dd50c7e1e038e0",
+  "protocol": {
+    "order": ["eager-a1", "source-backed-b1", "source-backed-b2", "eager-a2"],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_case": 500,
+    "fresh_process_per_leg": true,
+    "timed_scope": "open + stage 21 existing-cell replacements + commit + sequential publication through the fixed 16 KiB zero-retention hashing sink",
+    "source_counter_scope": "separate untimed full-lifecycle InstrumentedSource replay; logical ReadAt range overlap only"
+  },
+  "stability_threshold_percent": {"p50": 5, "mean": 5, "p95": 10, "p99": 15},
+  "corpus": {
+    "generator": "litchi-ods-media-publication-v1",
+    "source_bytes": 16790689,
+    "source_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "sheets": 2,
+    "cells": 2048,
+    "updates": 21,
+    "opaque_media_resources": 8,
+    "output_bytes": 16790961,
+    "output_sha256": "5d9fc848e830ccea59ca2632715d1eaf54d8aeafc3683c92241c22404285db06",
+    "semantic_sha256": "70712048d45fd0d6e5066f86b32d4d17df31ff4cf3ae6063947c417fd7df47de",
+    "retained_sink_bytes": 0,
+    "retained_sink_window_bytes": 16384
+  },
+  "elapsed_ns": {
+    "a1": {"p50": 72672513, "mean": 73910714.406, "p95": 83793212, "p99": 89889302},
+    "b1": {"p50": 20297255, "mean": 20939944.406000003, "p95": 25401143, "p99": 26369498},
+    "b2": {"p50": 20301400, "mean": 20869571.42399998, "p95": 24666441, "p99": 28698787},
+    "a2": {"p50": 74122653, "mean": 75424116.39600006, "p95": 86487667, "p99": 90235910}
+  },
+  "source_backed_reduction_percent": {
+    "a1_to_b1": {"p50": 72.070245, "mean": 71.668594, "p95": 69.685918, "p99": 70.664476},
+    "b2_to_a2": {"p50": 72.611072, "mean": 72.330373, "p95": 71.479817, "p99": 68.195825}
+  },
+  "same_implementation_drift_percent": {
+    "eager": {"p50": 1.995445, "mean": 2.047608, "p95": 3.215601, "p99": 0.385594},
+    "source_backed": {"p50": 0.020421, "mean": 0.336071, "p95": 2.892397, "p99": 8.833270}
+  },
+  "correctness_projection": {
+    "filter": "del(.results[].elapsed_ns, .results[].source.ods_source_cell.lifecycle_ns, .results[].source.ods_source_cell.open_ns, .results[].source.ods_source_cell.stage_ns, .results[].source.ods_source_cell.commit_ns, .results[].source.ods_source_cell.publication_ns)",
+    "serialization": "jq -S",
+    "eager_a1_a2_sha256": "8560687ef146beb024ffbef354da98ac7e83a7a03dc36a3495100c677d329557",
+    "source_backed_b1_b2_sha256": "bfe07162d4b57fea51561e43481703b92806ddc58bba6d88e3c3b8d83ae8c05f",
+    "cross_implementation_identity_claimed": false
+  },
+  "source_backed_logical_read_replay": {
+    "read_calls": 617,
+    "read_bytes": 16801025,
+    "classified_range_overlap_bytes": 10336,
+    "content_calls": 2,
+    "untouched_member_calls": 5,
+    "picture_calls": 520,
+    "source_version_calls": 2450,
+    "scope": "logical ReadAt evidence, not physical I/O, decompression, or device traffic"
+  },
+  "correctness_gates": {
+    "exact_output_hash": true,
+    "semantic_reopen": true,
+    "media_payloads": true,
+    "raw_untouched_member_identity_source_backed": true,
+    "patch_forward_inverse_source_backed": true,
+    "foreign_source_refusal_source_backed": true,
+    "exact_noop_source_backed": true,
+    "replacement_limit_source_backed": true,
+    "typed_partial_sink_progress_source_backed": true,
+    "source_immutability_source_backed": true,
+    "phase_sum_within_lifecycle": true
+  },
+  "raw_selector_performance_claim": "none; correctness and phase evidence only",
+  "latency_claim": "accepted by change 0183 for p50, mean, p95, and p99 in both paired directions on the fixed generated one-percent workload",
+  "withheld_scope": "no allocation/RSS, physical-I/O, decompression, cold-cache, producer, durable ZIP patch, atomic-save, formulas, merges, structural row, insert/delete, or broad ODS CRUD claim"
+}
