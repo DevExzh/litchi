@@ -787,6 +787,8 @@ enum Case {
     XlsxSourceListSheets,
     XlsxSourceFirstCell,
     XlsxSourceNarrowColumnRangeScan,
+    XlsxFileOpen,
+    XlsxFileOpenLifecycle,
     XlsxStreamingCreate,
     OpcRangeSourceOpen,
     OpcRangeSourceOpenMainRead,
@@ -1231,6 +1233,8 @@ impl Case {
             Self::XlsxSourceListSheets => "xlsx_source_list_sheets",
             Self::XlsxSourceFirstCell => "xlsx_source_first_cell",
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
+            Self::XlsxFileOpen => "xlsx_file_open",
+            Self::XlsxFileOpenLifecycle => "xlsx_file_open_lifecycle",
             Self::XlsxStreamingCreate => "xlsx_streaming_create",
             Self::OpcRangeSourceOpen => "opc_range_source_open",
             Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
@@ -2057,6 +2061,10 @@ impl Case {
                 | Self::OdsFileEagerCellBatchSweep
                 | Self::OdsFileSourceCellBatchSweep
         )
+    }
+
+    const fn is_xlsx_root_file(self) -> bool {
+        matches!(self, Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle)
     }
 
     const fn is_docx_source_edit_save(self) -> bool {
@@ -6365,6 +6373,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_odp_root_file()
                     && !case.is_odp_repeated_text()
                     && !case.is_ods_root_file()
+                    && !case.is_xlsx_root_file()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
@@ -7458,6 +7467,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.is_xlsx_root_file()) {
+        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium)?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_xlsx_root_file())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -8182,6 +8209,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_list_sheets" => Some(Case::XlsxSourceListSheets),
         "xlsx_source_first_cell" => Some(Case::XlsxSourceFirstCell),
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
+        "xlsx_file_open" => Some(Case::XlsxFileOpen),
+        "xlsx_file_open_lifecycle" => Some(Case::XlsxFileOpenLifecycle),
         "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
         "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
         "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
@@ -8561,6 +8590,7 @@ fn print_usage() {
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
+                                       xlsx_file_open,xlsx_file_open_lifecycle,\n\
                                        xlsx_streaming_create,\n\
                                        opc_range_source_open,opc_range_source_open_main_read,\n\
                                        xlsx_range_source_open,xlsx_range_source_list_sheets,\n\
@@ -14922,6 +14952,9 @@ fn run_case_with_config(
         Case::XlsxSourceFirstCell => run_xlsx_source_first_cell(corpus, warmup_iterations, samples),
         Case::XlsxSourceNarrowColumnRangeScan => {
             run_xlsx_source_narrow_column_range_scan(corpus, warmup_iterations, samples)
+        },
+        Case::XlsxFileOpen | Case::XlsxFileOpenLifecycle => {
+            run_xlsx_root_file_access(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxStreamingCreate | Case::RtfStreamingCreate => {
             Err("streaming creation cases use their bounded corpus runner".into())
@@ -28150,6 +28183,131 @@ fn run_xlsx_source_narrow_column_range_scan(
     ))
 }
 
+fn xlsx_root_file_case_parameters(case: Case) -> Result<bool, Box<dyn Error>> {
+    match case {
+        Case::XlsxFileOpen => Ok(false),
+        Case::XlsxFileOpenLifecycle => Ok(true),
+        _ => Err("non-root XLSX case passed to XLSX root case parameters".into()),
+    }
+}
+
+fn xlsx_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, Box<dyn Error>> {
+    Ok(sha256_hex(&serde_json::to_vec(metadata)?))
+}
+
+fn create_xlsx_root_source_file(archive: &[u8]) -> Result<PathBuf, Box<dyn Error>> {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("XLSX root source timestamp is before epoch: {error}"))?
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "litchi-perf-baseline-xlsx-root-{}-{stamp}.xlsx",
+        std::process::id()
+    ));
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)?;
+    file.write_all(archive)?;
+    file.flush()?;
+    Ok(path)
+}
+
+fn run_xlsx_root_file_access(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR {
+        return Err(
+            "XLSX root filesystem cases require the deterministic cell-CRUD XLSX corpus".into(),
+        );
+    }
+    let lifecycle = xlsx_root_file_case_parameters(case)?;
+    let oracle = litchi::Workbook::from_bytes(corpus.archive.clone())
+        .map_err(|error| error.to_string())?;
+    let expected_names = oracle
+        .worksheet_names()
+        .map_err(|error| error.to_string())?;
+    let expected_count = oracle
+        .worksheet_count()
+        .map_err(|error| error.to_string())?;
+    let expected_text = oracle.text().map_err(|error| error.to_string())?;
+    let expected_metadata_sha256 = xlsx_root_metadata_digest(
+        &oracle.metadata().map_err(|error| error.to_string())?,
+    )?;
+    if expected_names.len() != spec.sheet_count || expected_count != spec.sheet_count {
+        return Err("XLSX root oracle worksheet shape differs from corpus".into());
+    }
+    let source_path = create_xlsx_root_source_file(&corpus.archive)?;
+    let source_path_sha256 = corpus.manifest.archive_sha256.clone();
+    let result = (|| {
+        let mut elapsed = Vec::with_capacity(samples);
+        for iteration in 0..iteration_count(warmup_iterations, samples)? {
+            let started = Instant::now();
+            let workbook =
+                litchi::Workbook::open(&source_path).map_err(|error| error.to_string())?;
+            let measured_projection = if lifecycle {
+                Some((
+                    workbook
+                        .worksheet_names()
+                        .map_err(|error| error.to_string())?,
+                    workbook
+                        .worksheet_count()
+                        .map_err(|error| error.to_string())?,
+                    workbook.text().map_err(|error| error.to_string())?,
+                ))
+            } else {
+                None
+            };
+            let duration = started.elapsed();
+
+            let (names, count, text) = match measured_projection {
+                Some(projection) => projection,
+                None => (
+                    workbook
+                        .worksheet_names()
+                        .map_err(|error| error.to_string())?,
+                    workbook
+                        .worksheet_count()
+                        .map_err(|error| error.to_string())?,
+                    workbook.text().map_err(|error| error.to_string())?,
+                ),
+            };
+            let metadata_sha256 = xlsx_root_metadata_digest(
+                &workbook.metadata().map_err(|error| error.to_string())?,
+            )?;
+            if names != expected_names
+                || count != expected_count
+                || text != expected_text
+                || metadata_sha256 != expected_metadata_sha256
+            {
+                return Err("XLSX root path projection differs from from_bytes oracle".into());
+            }
+
+            let source_bytes = fs::read(&source_path)?;
+            let source_hash_verified = source_bytes == corpus.archive
+                && sha256_hex(&source_bytes) == source_path_sha256
+                && source_bytes.len() == corpus.manifest.archive_bytes;
+            if !source_hash_verified {
+                return Err("XLSX root source file differs from deterministic archive".into());
+            }
+            std::hint::black_box(&workbook);
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+
+        Ok(result(case, corpus, elapsed, None))
+    })();
+    let cleanup = fs::remove_file(&source_path);
+    match (result, cleanup) {
+        (Ok(result), Ok(())) => Ok(result),
+        (Ok(_), Err(error)) => Err(error.into()),
+        (Err(error), _) => Err(error),
+    }
+}
+
 fn verify_unselected_xlsx_ranges_untouched(
     snapshot: SourceSnapshot,
     context: &str,
@@ -38738,7 +38896,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 322);
+        assert_eq!(selectable_count, 324);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -42557,6 +42715,40 @@ mod tests {
             source_media.selected_media_read_prior_range_overlap_bytes[0],
             source_media.selected_media_read_prior_range_overlap_bytes[1]
         );
+    }
+
+    #[test]
+    fn xlsx_unified_root_selectors_match_from_bytes_oracle() {
+        for (name, case) in [
+            ("xlsx_file_open", Case::XlsxFileOpen),
+            ("xlsx_file_open_lifecycle", Case::XlsxFileOpenLifecycle),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(case.is_xlsx_root_file());
+            assert!(!case.uses_xlsx());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        let open = run_case(Case::XlsxFileOpen, &corpus, 0, 2).unwrap();
+        let lifecycle = run_case(Case::XlsxFileOpenLifecycle, &corpus, 0, 2).unwrap();
+        for result in [open, lifecycle] {
+            assert_eq!(result.elapsed_ns.samples.len(), 2);
+            assert!(
+                result.source.is_none(),
+                "the selector keeps the existing schema"
+            );
+            assert_eq!(
+                result.corpus.generator,
+                XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+            );
+            assert_eq!(
+                result.corpus.archive_sha256,
+                corpus.manifest.archive_sha256
+            );
+        }
     }
 
     #[test]
