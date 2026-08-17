@@ -813,6 +813,21 @@ physical-I/O, cold-cache, multi-sheet, producer, or every-`Budget` claim. See
 [summary](results/xlsx-stream-budget-charge-0169-summary.json), and the
 [manifest](results/xlsx-stream-budget-charge-0169-manifest.json).
 
+Change 0170 batches ordinary XLSX streaming text as contiguous UTF-8 runs
+between XML entities, skips scalar counting when the byte count already proves
+the 32,767-character bound, and formats each row number once. The existing
+selector and corpus are unchanged. Clean CPU-2 release A/B/B/A runs used 20
+warmups and 300 samples per tiny/medium/large shape. Large p50/mean/p95/p99
+improve in both directions by 5.02%-6.99%; medium p50/mean/p95 by 4.45%-5.52%;
+tiny p50 by 5.03%/7.74%. Tiny mean/p95/p99 and medium p99 are withheld because
+paired directions disagree. Exact worksheet/archive hashes, rows/cells, sink
+counters, zero retained output, and the 4 KiB row window remain fixed. Matched
+whole-process instructions and branches fall, but branch misses regress and no
+allocation/RSS/total-memory/I/O claim is made. See
+[`0170`](changes/0170-xlsx-streaming-escape-runs.md), the
+[summary](results/xlsx-stream-escape-0170-summary.json), and the
+[manifest](results/xlsx-stream-escape-0170-manifest.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use
@@ -1102,9 +1117,11 @@ Bounded forward-only one-sheet XLSX creation and RTF authoring exist in
 production (`8245da20d` and `5918be8ec`). RTF's accepted ASCII batching result
 is recorded in change 0097. XLSX change 0169 accepts the precise warm in-memory
 one-sheet latency directions and descriptively records the matched whole-process
-allocation-call reductions described above; tiny p99, RSS, total-memory/peak-memory attribution,
-physical/cold I/O, multi-sheet/richer authoring, and producer evidence remain
-open.
+allocation-call reductions described above. Change 0170 additionally accepts
+large p50/mean/p95/p99, medium p50/mean/p95, and tiny p50 improvements from
+batched XML-safe UTF-8 runs; the other tiny statistics and medium p99 are
+withheld. RSS, total-memory/peak-memory attribution, physical/cold I/O,
+multi-sheet/richer authoring, and producer evidence remain open.
 
 Bounded semantic validation reports are now implemented for DOCX, PPTX, RTF,
 and XLS, alongside the existing CFB, OPC, and ODF validation reports. They

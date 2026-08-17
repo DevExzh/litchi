@@ -1358,6 +1358,16 @@ coverage: multi-sheet, shared-string/style/formula/date, physical/cold I/O,
 total-memory, and producer claims remain open. See
 [`0169`](changes/0169-xlsx-streaming-budget-charge.md).
 
+Change 0170 also keeps the 315-case matrix and existing selector unchanged.
+It batches ordinary UTF-8 between XML entity boundaries, skips redundant scalar
+counting when byte length proves the character bound, and reuses one formatted
+row number. Clean CPU-2 A/B/B/A accepts large p50/mean/p95/p99, medium
+p50/mean/p95, and tiny p50 improvements while preserving exact archive/
+worksheet hashes, sink topology, zero retained output, and the 4 KiB window.
+Tiny mean/tails and medium p99 are withheld. This remains performance evidence,
+not new CRUD or richer-authoring coverage. See
+[`0170`](changes/0170-xlsx-streaming-escape-runs.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

@@ -354,6 +354,21 @@ warm in-memory, one-sheet inline-scalar forward-only XLSX creation; it is not a
 total-memory, physical-I/O, cold-cache, producer, or broad `Budget` claim. See
 [`0169`](../../docs/performance/changes/0169-xlsx-streaming-budget-charge.md).
 
+Change 0170 changes only the XLSX streaming encoder and adds no selector.
+Measured ordinary text is validated in source order but appended in contiguous
+UTF-8 runs between XML entities; byte length avoids a redundant scalar-count
+pass when it already proves Excel's character bound, and one row-number lexical
+form is reused across that row. Clean CPU-2 release A/B/B/A runs use 20 warmups
+and 300 samples per shape. Large p50/mean/p95/p99 improve in both paired
+directions by 5.02%-6.99%; medium p50/mean/p95 improve by 4.45%-5.52%; tiny p50
+improves by 5.03%/7.74%. Tiny mean/tails and medium p99 are withheld because
+paired directions disagree. Exact archive/worksheet hashes, sink topology,
+zero retained output, and the 4 KiB row window remain fixed. Whole-process
+instructions/branches fall in matched counter runs, but branch misses regress;
+no allocation, RSS, total-memory, physical-I/O, cold-cache, richer-authoring,
+or producer claim is made. See
+[`0170`](../../docs/performance/changes/0170-xlsx-streaming-escape-runs.md).
+
 Change 0154 adds matched owned-rebuild and source-positional content-only
 publication selectors for ODT, ODS, and ODP. Each selector prepares the real
 semantic edit and owner outside timing, then measures one public publication
@@ -1406,6 +1421,16 @@ row window, and zero retained output remain fixed. The allocation counts cover
 the whole benchmark process, not only the timed writer; RSS directions disagree
 and no total-memory, physical-I/O, cold-cache, multi-sheet, shared-string/style/
 formula/date, real-producer, or broad `Budget` claim is made.
+
+[Change 0170](../../docs/performance/changes/0170-xlsx-streaming-escape-runs.md)
+keeps the same selector and exact corpus while batching ordinary text between
+XML entity boundaries. Large p50/mean/p95/p99, medium p50/mean/p95, and tiny
+p50 improve in both clean paired directions; tiny mean/tails and medium p99 are
+withheld. The output hashes, logical sink counters, zero retained output, and
+4 KiB row window remain unchanged. Matched process-wide counters record
+6.15%-6.19% fewer instructions and 10.54%-10.57% fewer branches, while branch
+misses regress 8.99%-14.37%. These counters are descriptive whole-process
+evidence, not operation-local CPU, allocation, memory, or I/O attribution.
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \

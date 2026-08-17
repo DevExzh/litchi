@@ -3,7 +3,11 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0169`](changes/0169-xlsx-streaming-budget-charge.md)
+[`change 0170`](changes/0170-xlsx-streaming-escape-runs.md)
+(0170 batches the measured one-sheet XLSX streaming XML text path while
+preserving exact output. Large all-statistic, medium through-p95, and tiny p50
+directions are accepted; remaining tiny statistics and medium p99 are withheld,
+and branch misses regress in the descriptive process-counter run.)
 (0169 retains a shared hierarchical-budget charge optimization selected by
 the one-sheet XLSX streaming writer. Medium/large and tiny-through-p95 latency
 directions agree; tiny p99 is withheld, process Heaptrack allocation calls fall,
@@ -1062,6 +1066,19 @@ warm in-memory one-sheet XLSX creation and shared-accounting allocation evidence
 not total-memory, physical-I/O, cold-cache, richer XLSX, producer, or universal
 budget evidence. See
 [`0169`](changes/0169-xlsx-streaming-budget-charge.md).
+
+Change 0170 addresses the next measured encoder slice without changing the
+larger Deflate policy. The control profile attributes 4.35% of process samples
+to `push_escaped`, including 2.01% reaching `memmove` through per-scalar
+extension. Ordinary UTF-8 is now appended by run between the five XML entities;
+text length avoids a second scalar pass when bytes prove the character bound,
+and each row number is formatted once. Clean paired release runs accept large
+p50/mean/p95/p99, medium p50/mean/p95, and tiny p50 improvements. Exact output
+and the 4 KiB window remain fixed. Process-wide instructions/branches decrease,
+but branch misses regress and no allocation/RSS/total-memory/I/O claim follows.
+Deflate remains the dominant sampled cost and requires an explicit cross-format
+compression-policy study. See
+[`0170`](changes/0170-xlsx-streaming-escape-runs.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

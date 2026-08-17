@@ -1,0 +1,164 @@
+[
+  {
+    "case": "xlsx_streaming_create",
+    "corpus": {
+      "archive_bytes": 3451,
+      "archive_member_count": 6,
+      "archive_sha256": "21e1f8267717fed447ef787285f154ccbf7a6d2ba460d385956e3d8546e7336c",
+      "compression": "deflate",
+      "entry_bytes": 0,
+      "entry_count": 256,
+      "generator": "litchi-xlsx-streaming-create-v1",
+      "name": "xlsx-streaming-create-tiny",
+      "package_format": "xlsx",
+      "payload_kind": "deterministic-scalar-text",
+      "shape": "tiny",
+      "target_entry": "xl/worksheets/sheet1.xml",
+      "target_payload_bytes": 13425,
+      "target_payload_sha256": "0d133e59c766b109e74b7219d23ee9dde397f4eb55c58eea84fda53caebce1ee",
+      "uncompressed_payload_bytes": 3008,
+      "xlsx": {
+        "columns_per_sheet": 4,
+        "one_percent_update_count": 0,
+        "rows_per_sheet": 64,
+        "sheet_count": 1,
+        "source_members": {
+          "shared_strings": null,
+          "styles": "xl/styles.xml",
+          "workbook": "xl/workbook.xml",
+          "worksheets": [
+            "xl/worksheets/sheet1.xml"
+          ]
+        }
+      }
+    },
+    "output_sha256": "21e1f8267717fed447ef787285f154ccbf7a6d2ba460d385956e3d8546e7336c",
+    "sink": {
+      "accepted_bytes": 3451,
+      "authored_part_bytes": 13425,
+      "cells": 256,
+      "input_bytes": 3008,
+      "largest_write": 1519,
+      "retained_authoring_window_bytes": 4096,
+      "retained_output_bytes": 0,
+      "rows": 64,
+      "write_calls": 49,
+      "write_size_buckets": {
+        "bytes_0": 0,
+        "bytes_16385_to_65536": 0,
+        "bytes_1_to_512": 48,
+        "bytes_4097_to_16384": 0,
+        "bytes_513_to_4096": 1,
+        "bytes_over_65536": 0
+      }
+    }
+  },
+  {
+    "case": "xlsx_streaming_create",
+    "corpus": {
+      "archive_bytes": 167418,
+      "archive_member_count": 6,
+      "archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+      "compression": "deflate",
+      "entry_bytes": 0,
+      "entry_count": 32768,
+      "generator": "litchi-xlsx-streaming-create-v1",
+      "name": "xlsx-streaming-create-medium",
+      "package_format": "xlsx",
+      "payload_kind": "deterministic-scalar-text",
+      "shape": "medium",
+      "target_entry": "xl/worksheets/sheet1.xml",
+      "target_payload_bytes": 1795765,
+      "target_payload_sha256": "539f28638970fa5f207bd9686e0d0c7372e9cc9df0aec30e296ae9bdb4b3e226",
+      "uncompressed_payload_bytes": 385024,
+      "xlsx": {
+        "columns_per_sheet": 4,
+        "one_percent_update_count": 0,
+        "rows_per_sheet": 8192,
+        "sheet_count": 1,
+        "source_members": {
+          "shared_strings": null,
+          "styles": "xl/styles.xml",
+          "workbook": "xl/workbook.xml",
+          "worksheets": [
+            "xl/worksheets/sheet1.xml"
+          ]
+        }
+      }
+    },
+    "output_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+    "sink": {
+      "accepted_bytes": 167418,
+      "authored_part_bytes": 1795765,
+      "cells": 32768,
+      "input_bytes": 385024,
+      "largest_write": 29338,
+      "retained_authoring_window_bytes": 4096,
+      "retained_output_bytes": 0,
+      "rows": 8192,
+      "write_calls": 54,
+      "write_size_buckets": {
+        "bytes_0": 0,
+        "bytes_16385_to_65536": 6,
+        "bytes_1_to_512": 48,
+        "bytes_4097_to_16384": 0,
+        "bytes_513_to_4096": 0,
+        "bytes_over_65536": 0
+      }
+    }
+  },
+  {
+    "case": "xlsx_streaming_create",
+    "corpus": {
+      "archive_bytes": 2563433,
+      "archive_member_count": 6,
+      "archive_sha256": "cf6965fc6ec2586d52f127fc58301aae68d2e10b51488312c88d20165153a3b1",
+      "compression": "deflate",
+      "entry_bytes": 0,
+      "entry_count": 524288,
+      "generator": "litchi-xlsx-streaming-create-v1",
+      "name": "xlsx-streaming-create-large",
+      "package_format": "xlsx",
+      "payload_kind": "deterministic-scalar-text",
+      "shape": "large",
+      "target_entry": "xl/worksheets/sheet1.xml",
+      "target_payload_bytes": 29742241,
+      "target_payload_sha256": "e8e667f47810fbfc5e4924c5d878d70cbf299976c9ac39ef33a6f0f9673b65a4",
+      "uncompressed_payload_bytes": 6160384,
+      "xlsx": {
+        "columns_per_sheet": 4,
+        "one_percent_update_count": 0,
+        "rows_per_sheet": 131072,
+        "sheet_count": 1,
+        "source_members": {
+          "shared_strings": null,
+          "styles": "xl/styles.xml",
+          "workbook": "xl/workbook.xml",
+          "worksheets": [
+            "xl/worksheets/sheet1.xml"
+          ]
+        }
+      }
+    },
+    "output_sha256": "cf6965fc6ec2586d52f127fc58301aae68d2e10b51488312c88d20165153a3b1",
+    "sink": {
+      "accepted_bytes": 2563433,
+      "authored_part_bytes": 29742241,
+      "cells": 524288,
+      "input_bytes": 6160384,
+      "largest_write": 30832,
+      "retained_authoring_window_bytes": 4096,
+      "retained_output_bytes": 0,
+      "rows": 131072,
+      "write_calls": 133,
+      "write_size_buckets": {
+        "bytes_0": 0,
+        "bytes_16385_to_65536": 84,
+        "bytes_1_to_512": 48,
+        "bytes_4097_to_16384": 1,
+        "bytes_513_to_4096": 0,
+        "bytes_over_65536": 0
+      }
+    }
+  }
+]

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "change": "0170-xlsx-streaming-escape-runs",
+  "self_excluded": true,
+  "artifact_count": 20,
+  "artifacts": [
+    {
+      "path": "xlsx-stream-escape-0170-a1.json.zst",
+      "bytes": 4722,
+      "sha256": "02959545b92b289e63d752bb771c3e6c31eb8059d2169ea71de1f8a572500869",
+      "uncompressed_bytes": 26688,
+      "uncompressed_sha256": "42ba2cba1fbb662b5e421efc86c03d74494461cc7fbe0765ca92db051e0ed4ef"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-b1.json.zst",
+      "bytes": 4618,
+      "sha256": "39d76ab422afd568eb17127ec8ac45e74e2e33e1acf94c6332d247e991d0a693",
+      "uncompressed_bytes": 26691,
+      "uncompressed_sha256": "1e054276e8236e31f1b86121879e2797c7fe250e9a2e4c45ef20e4adb0881b91"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-b2.json.zst",
+      "bytes": 4677,
+      "sha256": "f49cb284cd1aa6777d8234f6cf2ce568dff80780b2321cd1d1b501f0722426df",
+      "uncompressed_bytes": 26691,
+      "uncompressed_sha256": "4f3b1a69ccc0d42dfff1122742ea6825250c91a81037050c8eae22de920163f0"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-a2.json.zst",
+      "bytes": 4681,
+      "sha256": "269172d70afe6d4c7f8e6819a6dde9d3d3184a7ca8c9d56d7cfac61b2322bdf7",
+      "uncompressed_bytes": 26690,
+      "uncompressed_sha256": "9a0981955ae66807995947ca1481b0d7ddae309ab0ac182b44aeaa4071515eb6"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-a1.time.txt",
+      "bytes": 920,
+      "sha256": "09e731e01ca84c417d678028f75cd10b1a02e981411b2c96917516ffb592fb3f"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-b1.time.txt",
+      "bytes": 920,
+      "sha256": "84831b91cf1800b8af93d6b9804811b24aa007e9c60d6d9f2fa3950791b1a289"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-b2.time.txt",
+      "bytes": 920,
+      "sha256": "619fb817a5adc85828e6cfb55d6db41677fd552341d865dd61ce29a7adce2012"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-a2.time.txt",
+      "bytes": 920,
+      "sha256": "0e08742868183c4da6631e6549b9beff984e2fbd56115f29009105e7be82530f"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-a1.csv",
+      "bytes": 330,
+      "sha256": "b5a6a59b84f6b5071af291922dca87f493c72e658bab3762f3276cda1063d31e"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-b1.csv",
+      "bytes": 329,
+      "sha256": "95df76fc05dd0687f0339554a9340213493f29481454b0ac086b261d815602ac"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-b2.csv",
+      "bytes": 330,
+      "sha256": "b70abf6931857cdc2edf3d74c503be15e998561f5f916c6ef02b0a0b35222f79"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-a2.csv",
+      "bytes": 330,
+      "sha256": "7aeb385ab2ed196278b69dde324f9dadf8aa0e5266b3a75ff20c70b5e0960ad8"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-a1.json.zst",
+      "bytes": 1739,
+      "sha256": "ca190dd082f7ecfccb63830031b50956ed882450185e12ad1a6dd4597a0f7a34",
+      "uncompressed_bytes": 4760,
+      "uncompressed_sha256": "d7d8b2652fce9ff5888312bbd04f4c56bb98e63880f439044d2d8b9d17752c68"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-b1.json.zst",
+      "bytes": 1734,
+      "sha256": "70fc4f914daa6f9a6b6e82e83da4ef250af92c781f3465ad203315cf1dbe39eb",
+      "uncompressed_bytes": 4753,
+      "uncompressed_sha256": "6cbc03556218d8af4f906fe384cde1702ae0d75e2a2c9ba8289bb550daaf2279"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-b2.json.zst",
+      "bytes": 1732,
+      "sha256": "98ec7bcb62c60c6563eb20c7a2010cbc8afca2bf92b49d7d5ae17656c84bda98",
+      "uncompressed_bytes": 4753,
+      "uncompressed_sha256": "c145748c876691d4ffac444cf3c4a275815246ddc0bcb4f6844d611274d711ce"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-perf-a2.json.zst",
+      "bytes": 1740,
+      "sha256": "2e4ba926a1e1062072ce254212e8b9b5d2feae0c47e5cf63432fb382dbe72ef9",
+      "uncompressed_bytes": 4760,
+      "uncompressed_sha256": "8f8483e7c26792287449e12d4dfbd2b55119acdbb447d13cc490e68022d5b022"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-primary-stats.tsv",
+      "bytes": 1168,
+      "sha256": "ff299b8a0a9419a80f39e8fc10b719353d8c9e7f116c5330ebbf3befa82ebaf4"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-comparisons.tsv",
+      "bytes": 1074,
+      "sha256": "c4e959149a38cf5cdd92346487d379621760e7651cb1e58cc153a629eb7446dc"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-semantic.json",
+      "bytes": 5198,
+      "sha256": "ac45efd2aad893fa55321b94e79429ada9975deac9e061951194ef443fc47d4c"
+    },
+    {
+      "path": "xlsx-stream-escape-0170-summary.json",
+      "bytes": 7232,
+      "sha256": "e6e4e25b70508d06d48743cb0c874ebecad70aa9b410ae6bac5515353d46426e"
+    }
+  ]
+}
