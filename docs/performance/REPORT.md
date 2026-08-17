@@ -364,6 +364,30 @@ not operation-local allocation, CPU, memory, physical-I/O, or cold-cache claims.
 See the [summary](results/xlsx-stream-escape-0170-summary.json) and
 [manifest](results/xlsx-stream-escape-0170-manifest.json).
 
+## Legacy CFB owner-validation fusion (change 0171)
+
+[Change 0171](changes/0171-cfb-owner-validation-fusion.md) moves source-backed
+DOC paragraph, PPT shape-text, and XLS worksheet-visibility semantic readback
+onto the exact composed CFB view already owned by the common planner. The
+existing callback remains inside the complete final fingerprint fence; CFB
+reopen/range validation, no-op behavior, security checks, publication, and
+atomic-save fences are unchanged.
+
+Each effective transaction removes one complete source scan and one
+source/target SHA-256 pair. The measured 2,135,552-byte XLS corpus therefore
+avoids three logical one-MiB reads per scalar or 64-worksheet batch. Clean
+CPU-2 release A/B/B/A runs used 20 warmups and 300 samples. The source-backed
+64-worksheet complete workflow improves p50/mean/p95 by 12.51%-15.38% in both
+directions. Scalar and batch semantic staging/plan p50/mean/p95 improve by
+31.44%-33.16%.
+
+The scalar complete workflow is withheld because its eager guard shifts by a
+similar or larger amount. Batch p99 exceeds the control drift gate, and the
+publication phase regresses or disagrees. DOC/PPT latency and allocation, RSS,
+physical-I/O, cold-cache, and producer claims are also withheld. See the
+[summary](results/cfb-owner-fusion-0171-summary.json) and
+[manifest](results/cfb-owner-fusion-0171-manifest.json).
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed

@@ -828,6 +828,23 @@ allocation/RSS/total-memory/I/O claim is made. See
 [summary](results/xlsx-stream-escape-0170-summary.json), and the
 [manifest](results/xlsx-stream-escape-0170-manifest.json).
 
+Change 0171 moves source-backed DOC paragraph, PPT shape-text, and XLS
+worksheet-visibility semantic readback onto the exact composed CFB view already
+created by the common planner's owner callback. Each effective transaction
+therefore removes one complete artifact scan, `ceil(artifact_bytes / 1 MiB)`
+logical reads, and one source/target SHA-256 pair while retaining CFB reopen,
+format-owner validation, the final complete fingerprint fence, publication,
+and atomic-save checks. On the measured 2,135,552-byte XLS corpus this is one
+scan and three logical reads. Clean CPU-2 release A/B/B/A runs used 20 warmups
+and 300 samples. The 64-worksheet source-backed complete workflow improves
+p50/mean/p95 by 12.51%-15.38% in both directions; scalar and batch semantic
+staging/plan p50/mean/p95 improve by 31.44%-33.16%. Scalar total, p99,
+publication, DOC/PPT latency, allocation/RSS, physical-I/O, cold-cache, and
+producer claims are withheld. See
+[`0171`](changes/0171-cfb-owner-validation-fusion.md), the
+[summary](results/cfb-owner-fusion-0171-summary.json), and the
+[manifest](results/cfb-owner-fusion-0171-manifest.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use
