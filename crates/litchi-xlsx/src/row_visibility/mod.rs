@@ -9,7 +9,7 @@
 //! package graphs are refused rather than partially interpreted.
 
 mod patch;
-mod rewrite;
+pub(crate) mod rewrite;
 mod snapshot;
 mod source;
 

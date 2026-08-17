@@ -673,6 +673,31 @@ impl Snapshot {
         Ok(result)
     }
 
+    /// Rebind worksheet bytes after the row-visibility owner proves that only
+    /// direct `hidden` attributes changed.
+    ///
+    /// Cell values, formulas, styles, metadata, and owners are therefore
+    /// byte-identical, so their already validated store remains authoritative.
+    /// The candidate XML grammar is still validated independently before the
+    /// source-bound snapshot is published.
+    pub(crate) fn from_visibility_rewrite<'source>(
+        source: &'source Self,
+        rewrite: crate::row_visibility::rewrite::VisibilityRewrite<'source>,
+    ) -> Result<Self> {
+        source.source.check_execution()?;
+        let bytes = rewrite.into_bytes_for(source.source_xml())?;
+        validation::worksheet_xml(&bytes)?;
+        let mut result = source.clone();
+        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
+        result.source.check_execution()?;
+        Ok(result)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shares_cell_store_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.cells, &other.cells)
+    }
+
     /// Selected worksheet name.
     #[must_use]
     pub fn sheet_name(&self) -> &str {

@@ -23,6 +23,32 @@ struct RowTag {
     insert_at: usize,
 }
 
+/// Proof that worksheet bytes were produced solely by this module's bounded
+/// direct-`hidden` rewrite.
+///
+/// The private fields prevent other worksheet editors from fabricating the
+/// proof and reusing a parsed cell store after changing cell semantics.
+#[derive(Debug)]
+pub(crate) struct VisibilityRewrite<'source> {
+    bytes: Vec<u8>,
+    source: &'source [u8],
+}
+
+impl<'source> VisibilityRewrite<'source> {
+    fn new(source: &'source [u8], bytes: Vec<u8>) -> Self {
+        Self { bytes, source }
+    }
+
+    pub(crate) fn into_bytes_for(self, source: &[u8]) -> Result<Vec<u8>> {
+        if self.source.as_ptr() != source.as_ptr() || self.source.len() != source.len() {
+            return Err(invalid(
+                "row-visibility rewrite belongs to another worksheet source",
+            ));
+        }
+        Ok(self.bytes)
+    }
+}
+
 pub(super) fn scan(xml: &[u8]) -> Result<Vec<(Row, bool)>> {
     let tags = row_tags(xml)?;
     let mut rows = Vec::new();
@@ -34,9 +60,12 @@ pub(super) fn scan(xml: &[u8]) -> Result<Vec<(Row, bool)>> {
     Ok(rows)
 }
 
-pub(super) fn rewrite(xml: &[u8], actions: &BTreeMap<Row, bool>) -> Result<(Vec<u8>, usize)> {
+pub(super) fn rewrite<'source>(
+    xml: &'source [u8],
+    actions: &BTreeMap<Row, bool>,
+) -> Result<(VisibilityRewrite<'source>, usize)> {
     if actions.is_empty() {
-        return Ok((xml.to_vec(), 0));
+        return Ok((VisibilityRewrite::new(xml, xml.to_vec()), 0));
     }
     let tags = row_tags(xml)?;
     let mut by_row = BTreeMap::new();
@@ -60,7 +89,7 @@ pub(super) fn rewrite(xml: &[u8], actions: &BTreeMap<Row, bool>) -> Result<(Vec<
         }
     }
     if changed == 0 {
-        return Ok((xml.to_vec(), 0));
+        return Ok((VisibilityRewrite::new(xml, xml.to_vec()), 0));
     }
     let capacity = xml
         .len()
@@ -83,7 +112,7 @@ pub(super) fn rewrite(xml: &[u8], actions: &BTreeMap<Row, bool>) -> Result<(Vec<
         cursor = tag.tag.end;
     }
     output.extend_from_slice(&xml[cursor..]);
-    Ok((output, changed))
+    Ok((VisibilityRewrite::new(xml, output), changed))
 }
 
 fn write_tag(output: &mut Vec<u8>, xml: &[u8], tag: &RowTag, hidden: bool) {
