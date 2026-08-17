@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **320 selectable cases**; 200 was the count before the
+harness contains **322 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1486,7 +1486,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 320 selectable cases. Change
+The current standalone harness provides 322 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1570,7 +1570,7 @@ interval, making that matrix 295. Change 0154 adds six ODF content-COW
 publication selectors, making that matrix 301; change 0159 later made it 302,
 change 0160 made it 303, change 0162 made it 305, change 0163 made it 309,
 change 0164 made it 311, change 0166 made it 315, change 0174 made it 319, and
-change 0175 makes the current matrix 320.
+change 0175 made the then-current matrix 320.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps
@@ -2075,3 +2075,16 @@ accepted; latency, allocation/RSS, physical-I/O, cold-cache, scaling, producer,
 and broader PPTX claims are withheld. See
 [change 0179](changes/0179-pptx-source-catalog-reuse.md) and the
 [summary](results/pptx-catalog-reuse-0179-summary.json).
+
+Change 0180 adds two opt-in matched selectors and a bounded threshold-two cache
+to source-backed ODT full-text extraction. Four public projections now perform
+two complete `content.xml` block-model phases instead of four, with one
+at-most-16-MiB retained string and four independent owned results. Across two
+clean balanced CPU-2 cycles, p50 improves 47.01%-50.95% and mean
+46.83%-51.29% in all four paired directions. The first cycle's candidate p95
+and p99 drift exceeds policy, so tails remain withheld even though the retry
+passes. Exact semantic/archive/media/range/freshness gates and zero
+post-preparation reads hold in all eight legs. No allocation/RSS, physical-I/O,
+cold-cache, single-call/open, producer, generic ODF, or broader CRUD claim is
+accepted. See [change 0180](changes/0180-odt-source-text-cache.md) and the
+[summary](results/odt-text-cache-0180-summary.json).

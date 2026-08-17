@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "change": "0180",
+  "decision": "accept_repeated_text_p50_and_mean_withhold_tails",
+  "control_revision": "238184ff5394a8246863401dc8fee14d5ef26756",
+  "candidate_revision": "3023f9cec588637b6aca3f6c1bbbda40f0290395",
+  "control_binary_sha256": "0211cffee86cbc898a994f6eddf5d1be8e58e3615e565717b379e72a86d2bfb0",
+  "candidate_binary_sha256": "c198e16a03a5999db7317faa8d64a1a24584835a5c94e3c4bbe952ee1e204834",
+  "protocol": {
+    "cycles": [
+      ["control-a1", "candidate-b1", "candidate-b2", "control-a2"],
+      ["control-a3", "candidate-b3", "candidate-b4", "control-a4"]
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_case_per_leg": 500,
+    "total_retained_samples": 8000,
+    "timed_scope": "four complete source-backed ODT text projections after owner and output-slot preparation",
+    "source_counter_scope": "separate untimed InstrumentedSource replay; logical ReadAt evidence only"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "corpus": {
+    "paragraph_count": 10000,
+    "archive_member_count": 13,
+    "pictures_count": 8,
+    "pictures_uncompressed_payload_bytes": 16777216,
+    "source_archive_bytes": 16812034,
+    "canonical_text_sha256": "7559b81385c1773da1ef9ee52972f8ff032e1cf4996824d30e4b40a003a135c0",
+    "content_xml_sha256": "9c3f7b7ab4fcc52ea163a5386bfdcbabc141db6d7c6710cf2825c67fafe2c01e",
+    "source_archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "pictures_uncompressed_payload_sha256": "3fcd043b492f4af6763f6a148d4b3bde40526c787af88dd16cac1cc713bef312"
+  },
+  "semantic_gates": {
+    "projection_calls": 4,
+    "semantic_parity_all_samples": true,
+    "archive_topology_all_samples": true,
+    "media_payloads_all_samples": true,
+    "source_ranges_all_samples": true,
+    "source_freshness_all_samples": true,
+    "zero_post_preparation_reads_all_samples": true,
+    "uncached_version_observations_per_call": [2, 2, 2, 2],
+    "candidate_version_observations_per_call": [2, 4, 2, 2]
+  },
+  "deterministic_work_reduction": {
+    "complete_content_xml_projection_phases_before": 4,
+    "complete_content_xml_projection_phases_after": 2,
+    "retained_text_cache_entries": 1,
+    "retained_text_limit_bytes": 16777216,
+    "returned_owned_strings": 4,
+    "source_reads_after_preparation": 0
+  },
+  "cached_selector": {
+    "case": "odt_source_backed_repeated_text_cached",
+    "elapsed_ns": {
+      "a1": {"p50": 17032161, "mean": 17570789.079999972, "p95": 21368577, "p99": 23561874},
+      "b1": {"p50": 8355045, "mean": 8557967.188000005, "p95": 10224112, "p99": 10931789},
+      "b2": {"p50": 8541436, "mean": 8948584.235999994, "p95": 11259950, "p99": 14029841},
+      "a2": {"p50": 16138153, "mean": 16829388.364000004, "p95": 21128853, "p99": 22661577},
+      "a3": {"p50": 16151350, "mean": 16629095.169999996, "p95": 19827014, "p99": 21086882},
+      "b3": {"p50": 8558367, "mean": 8812219.872, "p95": 11096523, "p99": 11844477},
+      "b4": {"p50": 8340796, "mean": 8640829.828000002, "p95": 11102126, "p99": 11560015},
+      "a4": {"p50": 15950762, "mean": 16745172.977999998, "p95": 21724440, "p99": 23149615}
+    },
+    "paired_reduction_percent": {
+      "cycle_1": {
+        "p50": [50.945479, 47.073026],
+        "mean": [51.294349, 46.827632],
+        "p95": [52.153520, 46.708181],
+        "p99": [53.603907, 38.089741]
+      },
+      "cycle_2": {
+        "p50": [47.011445, 47.709106],
+        "mean": [47.007220, 48.398086],
+        "p95": [44.033312, 48.895686],
+        "p99": [43.830117, 50.063900]
+      }
+    },
+    "same_implementation_drift_percent": {
+      "cycle_1": {
+        "control": {"p50": 5.248941, "mean": 4.219507, "p95": 1.121853, "p99": 3.820991},
+        "candidate": {"p50": 2.230880, "mean": 4.564367, "p95": 10.131325, "p99": 28.339844}
+      },
+      "cycle_2": {
+        "control": {"p50": 1.241927, "mean": 0.698040, "p95": 9.569903, "p99": 9.782067},
+        "candidate": {"p50": 2.542202, "mean": 1.944913, "p95": 0.050493, "p99": 2.401643}
+      }
+    },
+    "accepted_metrics": ["p50", "mean"],
+    "withheld_metrics": ["p95", "p99"],
+    "withheld_reason": "cycle 1 candidate p95 and p99 same-implementation drift exceeded the predeclared thresholds; cycle 2 is retained as the triggered balanced retry"
+  },
+  "uncached_guard": {
+    "case": "odt_source_backed_repeated_text_uncached",
+    "cycle_1_p50_paired_percent": [-16.355246, -5.803641],
+    "cycle_2_p50_paired_percent": [-0.497210, -0.045600],
+    "decision": "guard_only",
+    "interpretation": "the first cycle contained ambient control drift; the second uncached cycle was near-neutral and the cache result repeated"
+  },
+  "accepted_claim": "for this exact prepared 10000-paragraph four-call source-backed ODT workload, the threshold-two cache reduces p50 by 47.01%-50.95% and mean by 46.83%-51.29% across four paired directions",
+  "withheld_scope": [
+    "p95 and p99 latency",
+    "single-call and open latency",
+    "allocation and RSS",
+    "physical I/O, decompression, recompression, and copied-byte volume",
+    "cold-cache, scaling, and real-producer behavior",
+    "generic ODF and non-text ODT projections",
+    "broad ODT CRUD"
+  ]
+}

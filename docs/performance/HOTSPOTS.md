@@ -3,6 +3,11 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0180`](changes/0180-odt-source-text-cache.md)
+(0180 retains one bounded full-text projection on the first successful parse
+after the two-call source-backed ODT threshold. Four candidate public calls
+reduce complete `content.xml` projection phases from four to two. Two clean balanced cycles accept p50 and
+mean only; p95/p99 and resource/I/O claims remain withheld.)
 [`change 0179`](changes/0179-pptx-source-catalog-reuse.md)
 (0179 retains the source-backed PPTX editor's validated presentation catalog.
 One-slide workflows remove two full 200-slide graph builds; the eight-slide
@@ -128,6 +133,21 @@ unchanged logical bytes, output hash and one-span publication. Warm p50 improves
 both directions. A matched whole-process RSS boundary found no candidate
 increase, but operation-only allocation/peak memory, physical I/O and proven
 cold-storage claims remain open.
+
+## ODT repeated source-backed full-text projection (change 0180)
+
+The production threshold-two cache removes two of four complete semantic text
+projections for the exact prepared `SourceBackedDocument` workload. It retains
+at most one 16 MiB string, returns a fresh owned string per call, refuses
+retention on size/allocation pressure, retries parse errors, and checks source
+freshness around publication and cache hits. Concurrent initial publishers may
+duplicate the bounded parse; this is safe but not single-flight. Two clean
+CPU-2 A/B/B/A cycles
+accept p50 reductions of 47.01%-50.95% and mean reductions of
+46.83%-51.29%. First-cycle candidate p95/p99 drift fails policy, so tails are
+withheld despite the clean retry. Every replay records zero post-preparation
+reads; allocation/RSS, physical I/O, single-call/open, producer, and broader
+ODF evidence remain open.
 
 ## ODP repeated full-text projection (change 0140)
 
@@ -844,7 +864,7 @@ Confirmed source facts:
   making that matrix 301; change 0159 later made it 302, change 0160 made it
   303, change 0162 made the matrix 305, change 0163 made it 309, and change
   0164 made that matrix 311; change 0166 made it 315, change 0174 made it 319,
-  and change 0175 makes the current matrix 320.
+  and change 0175 made the then-current matrix 320.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
