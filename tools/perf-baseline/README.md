@@ -327,6 +327,18 @@ regresses 6.95%/2.69%. No acceptance-grade latency or resource claim is made.
 See
 [`0167`](../../docs/performance/changes/0167-xlsx-row-visibility-provenance-reuse.md).
 
+Change 0168 changes production validation only and adds no selector. Native
+XLS Number/RK/MulRK plan-only commit now runs BIFF owner validation on the exact
+composed CFB view inside the existing pre/post fingerprint fence. This removes
+two redundant post-plan complete source scans per effective edit while
+retaining CFB reopen, selected-range checks, source preconditions, final
+source/target fingerprints, security policy, semantic readback, and publication
+fences. Clean CPU-2 A/B/B/A records observe descriptively lower complete-
+workflow and semantic-commit p50/mean/p95/p99 values in both paired directions,
+but the 5% same-implementation drift gate fails. No acceptance-grade latency,
+tail, allocation/RSS, physical-I/O, or producer claim is made. See
+[`0168`](../../docs/performance/changes/0168-xls-numeric-validation-fusion.md).
+
 Change 0154 adds matched owned-rebuild and source-positional content-only
 publication selectors for ODT, ODS, and ODP. Each selector prepares the real
 semantic edit and owner outside timing, then measures one public publication
@@ -2512,6 +2524,24 @@ allocation/RSS, physical-I/O, or producer claim is made. See
 [`0167`](../../docs/performance/changes/0167-xlsx-row-visibility-provenance-reuse.md)
 and the
 [summary](../../docs/performance/results/xlsx-row-visibility-provenance-0167-summary.json).
+
+Change 0168 refines the existing native XLS plan-only numeric selectors without
+changing their inputs or matrix counts. The CFB planner now offers an additive
+owner-validation callback on the same composed positional view that it reopens
+and verifies. XLS uses that callback for Workbook coverage, protection, macro,
+and numeric readback checks before CFB's final fingerprint fence. The former
+two post-plan `composed_source()` calls are gone: Number avoids 33,991,680
+logical source bytes and 34 one-MiB `ReadAt` calls per sample; RK/MulRK avoids
+405,504 bytes and two calls. Those are code-derived in-memory scan counts, not
+physical-I/O measurements. Clean 20-warmup/500-sample CPU-2 A/B/B/A records
+observe 19.22%-28.16% lower complete-workflow and 37.58%-48.04% lower semantic-
+commit p50/mean/p95/p99 values in both paired directions. The stability gate
+fails at 10.56% maximum control and 9.81% maximum candidate drift, so the
+production work elimination is retained without an acceptance-grade latency,
+tail, allocation/RSS, physical-I/O, or real-producer claim. See
+[`0168`](../../docs/performance/changes/0168-xls-numeric-validation-fusion.md)
+and the
+[summary](../../docs/performance/results/xls-numeric-validation-fusion-0168-summary.json).
 
 ### Native DOC owner/public phase evidence
 

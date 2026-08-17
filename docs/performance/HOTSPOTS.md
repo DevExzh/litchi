@@ -3,8 +3,11 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md)
-(0167 retains a narrow XLSX publication work-elimination mechanism and raw
+[`change 0168`](changes/0168-xls-numeric-validation-fusion.md)
+(0168 retains a narrow native-XLS validation-fusion mechanism and raw release
+evidence but withholds an acceptance-grade latency claim because the same-
+implementation drift gate failed. 0167 retains an XLSX publication work-
+elimination mechanism and raw
 release evidence but withholds an acceptance-grade latency claim because the
 same-implementation drift gate failed. 0165 is an accepted native-DOC
 lifecycle/workflow result for the exact
@@ -1022,6 +1025,21 @@ p99 directions disagree. Treat the redundant parse/scan as removed production
 work, not as an accepted end-to-end or resource result; stable ABBA, allocator,
 RSS, and physical-I/O evidence remain open. See
 [`0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md).
+
+Change 0168 confirms a separate native XLS validation hotspot. The plan-only
+Number/RK/MulRK path was reconstructing a fingerprint-checked composed source
+twice after the common CFB planner had already reopened and fenced the same
+candidate. An additive callback now runs BIFF semantic validation on the exact
+composed view inside CFB's existing final fingerprint bracket. This removes two
+complete source scans without weakening structural, selected-range, semantic,
+security, stale-source, no-op, or publication checks. The deterministic work
+delta is 33,991,680 bytes/34 one-MiB reads for Number and 405,504 bytes/two
+reads for RK/MulRK per effective sample. Clean release pairs observe lower
+complete-workflow and semantic-commit distributions in both directions, but
+control and candidate drift exceed the 5% stability gate. Treat the scans as
+removed production work, not as an accepted latency or physical-I/O result;
+stable ABBA, allocator/RSS, cold-device, and producer evidence remain open. See
+[`0168`](changes/0168-xls-numeric-validation-fusion.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

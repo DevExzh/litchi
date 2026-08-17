@@ -287,6 +287,33 @@ accepted. Raw vectors and sidecars are bound by the
 [summary](results/xlsx-row-visibility-provenance-0167-summary.json) and
 [manifest](results/xlsx-row-visibility-provenance-0167-manifest.json).
 
+## XLS numeric validation fusion (change 0168)
+
+[Change 0168](changes/0168-xls-numeric-validation-fusion.md) moves native XLS
+Number/RK/MulRK semantic target validation onto the exact composed positional
+view already created, reopened, and range-checked by the common CFB planner.
+The owner callback runs before CFB's final complete source/target fingerprint
+fence and preserves native semantic errors. No-op plans skip it. All
+structural, source-precondition, protection, macro, encryption/signature,
+numeric readback, stale-source, partial-output, and publication checks remain.
+
+The former two post-plan `composed_source()` calls each performed a complete
+source scan. Their removal saves 33,991,680 logical source bytes and 34
+one-MiB reads per effective Number sample, or 405,504 bytes and two reads per
+RK/MulRK sample. These deterministic counts describe the in-memory code path,
+not physical I/O; the existing source counters cover owned-source ingress.
+
+Clean CPU-2 `A1 control, B1 candidate, B2 candidate, A2 control` release runs
+used 20 warmups and 500 samples per family. Complete-workflow p50/mean/p95/p99
+values are descriptively 19.22%-28.16% lower and semantic-commit values
+37.58%-48.04% lower in both paired directions. The 5% stability gate fails:
+maximum absolute control drift is 10.56% and candidate drift is 9.81%. The
+production work elimination and exact correctness artifacts are retained, but
+no acceptance-grade latency, tail, allocation/RSS, physical-I/O, cold-cache,
+or producer improvement is accepted. See the
+[summary](results/xls-numeric-validation-fusion-0168-summary.json) and
+[manifest](results/xls-numeric-validation-fusion-0168-manifest.json).
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed

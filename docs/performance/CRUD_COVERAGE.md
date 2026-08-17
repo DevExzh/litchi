@@ -1328,6 +1328,22 @@ retained without an acceptance-grade end-to-end latency, allocation/RSS,
 physical-I/O, cold-cache, decompression, or producer claim. See
 [`0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md).
 
+Change 0168 keeps the same native XLS Number/RK/MulRK plan-only selectors and
+matrix counts while fusing BIFF semantic target validation into the common
+CFB planner's existing composed-view fingerprint bracket. Two redundant
+post-plan complete source scans are removed per effective edit; no-op plans
+still skip semantic target validation, and CFB reopen/range checks, source
+preconditions, final source/target fingerprints, format security policy,
+numeric readback, partial-output typing, and publication remain. Clean CPU-2
+20-warmup/500-sample A/B/B/A records observe lower complete-workflow and
+semantic-commit p50/mean/p95/p99 values in both paired directions, but the 5%
+same-implementation gate fails at 10.56% control and 9.81% candidate maximum
+drift. The correctness-equivalent work elimination is retained without an
+acceptance-grade latency, allocation/RSS, physical-I/O, cold-cache,
+decompression, or producer claim. This does not extend CRUD coverage beyond
+existing fixed-width existing-cell numeric replacement. See
+[`0168`](changes/0168-xls-numeric-validation-fusion.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
