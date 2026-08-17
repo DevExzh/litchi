@@ -12,6 +12,7 @@ use std::sync::{
 use litchi_core::{Error, ReadAt, SourceVersion};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter, Profile, SourcePackageLimits};
 use litchi_odt::{Document, ReadLimits, SourceBackedDocument};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const MIME: &str = "application/vnd.oasis.opendocument.text";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -74,6 +75,36 @@ fn package() -> Vec<u8> {
     )
 }
 
+fn malformed_text_package() -> Vec<u8> {
+    let content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:text="{TEXT}"><office:body><office:text><text:p>A<text:s text:c="1000001"/></text:p></office:text></office:body></office:document-content>"#
+    );
+    package_with(content.as_bytes(), None, None, None)
+}
+
+fn oversized_text_package() -> Vec<u8> {
+    let paragraph = "x".repeat(1024 * 1024);
+    let mut content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:text="{TEXT}"><office:body><office:text><text:p>"#
+    );
+    for _ in 0..17 {
+        content.push_str(&paragraph);
+    }
+    content.push_str("</text:p></office:text></office:body></office:document-content>");
+    let manifest = format!(
+        r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
+    );
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
+}
+
 fn password_package(password: &str) -> Vec<u8> {
     let mut writer = PackageWriter::new();
     writer.set_mimetype(MIME).unwrap();
@@ -127,6 +158,7 @@ struct CountingSource {
     reads: AtomicUsize,
     bytes_read: AtomicUsize,
     revision: AtomicU64,
+    versions: AtomicUsize,
     ranges: Mutex<Vec<(u64, u64)>>,
 }
 
@@ -137,12 +169,21 @@ impl CountingSource {
             reads: AtomicUsize::new(0),
             bytes_read: AtomicUsize::new(0),
             revision: AtomicU64::new(0),
+            versions: AtomicUsize::new(0),
             ranges: Mutex::new(Vec::new()),
         }
     }
 
     fn bytes_read(&self) -> usize {
         self.bytes_read.load(Ordering::Relaxed)
+    }
+
+    fn reads(&self) -> usize {
+        self.reads.load(Ordering::Relaxed)
+    }
+
+    fn versions(&self) -> usize {
+        self.versions.load(Ordering::Relaxed)
     }
 
     fn bump_revision(&self) {
@@ -181,6 +222,7 @@ impl ReadAt for CountingSource {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
+        self.versions.fetch_add(1, Ordering::Relaxed);
         Ok(SourceVersion::new(
             0x4f44_5401,
             self.revision.load(Ordering::Relaxed),
@@ -266,6 +308,104 @@ fn source_facade_matches_owned_semantics_and_can_materialize() {
 
     let materialized = source.materialize().unwrap();
     assert_eq!(materialized.text().unwrap(), eager.text().unwrap());
+}
+
+#[test]
+fn source_facade_text_cache_has_thresholded_freshness_vector_and_fresh_hits() {
+    let bytes = package();
+    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let document = SourceBackedDocument::from_read_at(source.clone()).unwrap();
+    let expected = eager.text().unwrap();
+    let reads_before_text = source.reads();
+    let versions_before_text = source.versions();
+
+    assert_eq!(document.text().unwrap(), expected);
+    let after_first = source.versions();
+    assert_eq!(after_first - versions_before_text, 2);
+
+    assert_eq!(document.text().unwrap(), expected);
+    let after_publication = source.versions();
+    assert_eq!(after_publication - after_first, 4);
+
+    let cached_first = document.text().unwrap();
+    let after_first_hit = source.versions();
+    assert_eq!(after_first_hit - after_publication, 2);
+    let cached_second = document.text().unwrap();
+    assert_eq!(source.versions() - after_first_hit, 2);
+    assert_ne!(cached_first.as_ptr(), cached_second.as_ptr());
+    assert_eq!(cached_first, expected);
+    assert_eq!(cached_second, expected);
+    assert_eq!(source.reads(), reads_before_text);
+}
+
+#[test]
+fn source_facade_text_cache_is_safe_for_concurrent_first_construction() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<SourceBackedDocument>();
+
+    let bytes = package();
+    let expected = Document::from_bytes(bytes.clone()).unwrap().text().unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let document = Arc::new(SourceBackedDocument::from_read_at(source.clone()).unwrap());
+
+    let handles: Vec<_> = (0..8)
+        .map(|_| {
+            let document = Arc::clone(&document);
+            std::thread::spawn(move || document.text())
+        })
+        .collect();
+    for handle in handles {
+        assert_eq!(handle.join().unwrap().unwrap(), expected);
+    }
+
+    let versions_before_cache_hit = source.versions();
+    assert_eq!(document.text().unwrap(), expected);
+    assert_eq!(source.versions() - versions_before_cache_hit, 2);
+}
+
+#[test]
+fn source_facade_text_parse_errors_are_not_cached() {
+    let source = Arc::new(CountingSource::new(malformed_text_package()));
+    let document = SourceBackedDocument::from_read_at(source.clone()).unwrap();
+
+    assert!(document.text().is_err());
+    let versions_before_retry = source.versions();
+    assert!(document.text().is_err());
+    assert_eq!(
+        source.versions() - versions_before_retry,
+        2,
+        "a parse error must leave the thresholded cache uninitialized so the parser is retried"
+    );
+}
+
+#[test]
+fn source_facade_oversized_text_falls_back_without_retention() {
+    let source = Arc::new(CountingSource::new(oversized_text_package()));
+    let document = SourceBackedDocument::from_read_at(source.clone()).unwrap();
+
+    let first = document.text().unwrap();
+    assert!(first.len() > 16 * 1024 * 1024);
+    assert_eq!(document.text().unwrap(), first);
+
+    let versions_before_fallback = source.versions();
+    assert_eq!(document.text().unwrap(), first);
+    assert_eq!(
+        source.versions() - versions_before_fallback,
+        3,
+        "an oversized projection uses the parser fallback instead of retaining text"
+    );
+}
+
+#[test]
+fn source_facade_text_cache_refuses_stale_revision_after_publication() {
+    let source = Arc::new(CountingSource::new(package()));
+    let document = SourceBackedDocument::from_read_at(source.clone()).unwrap();
+    assert!(document.text().is_ok());
+    assert!(document.text().is_ok());
+
+    source.bump_revision();
+    assert!(matches!(document.text(), Err(Error::SourceChanged { .. })));
 }
 
 #[test]
@@ -508,7 +648,7 @@ fn _limits_type_is_shared() {
 fn replace_member(bytes: &[u8], target: &str, replacement: &[u8]) -> Vec<u8> {
     let package = OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
     let names = package.files().unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = StreamingArchiveWriter::new();
     for name in names {
         let data = if name == target {
             replacement.to_vec()
