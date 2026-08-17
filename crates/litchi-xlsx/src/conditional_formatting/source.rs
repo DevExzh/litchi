@@ -169,6 +169,11 @@ impl SourceEdit {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn from_snapshot_for_test(before: Snapshot) -> Self {
+        Self::new(before)
+    }
+
     #[must_use]
     /// Exact source state captured when this edit began.
     pub const fn before(&self) -> &Snapshot {
@@ -230,12 +235,11 @@ impl SourceEdit {
         }
         let dxf_count = self.before.differential_format_count();
         super::package::validate_authored(&self.staged, dxf_count)?;
-        let output = super::replace_conditional_formattings(
+        let (output, readback) = super::package::replace_conditional_formattings_with_readback(
             self.before.source_xml(),
             &self.staged,
             dxf_count,
         )?;
-        let readback = super::package::parse_editable_conditional_formattings(&output, dxf_count)?;
         if readback != self.staged {
             return Err(invalid(
                 "conditional-formatting publication changed the staged state",

@@ -2,6 +2,9 @@
 
 use std::ops::Range as ByteRange;
 
+#[cfg(test)]
+use std::cell::Cell;
+
 use quick_xml::escape::escape;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
@@ -98,6 +101,15 @@ pub fn replace_conditional_formattings(
     values: &[Formatting],
     differential_format_count: usize,
 ) -> Result<Vec<u8>> {
+    replace_conditional_formattings_with_readback(worksheet_xml, values, differential_format_count)
+        .map(|(output, _)| output)
+}
+
+pub(crate) fn replace_conditional_formattings_with_readback(
+    worksheet_xml: &[u8],
+    values: &[Formatting],
+    differential_format_count: usize,
+) -> Result<(Vec<u8>, Vec<Formatting>)> {
     let layout = scan_layout(worksheet_xml)?;
     let before = parse_conditional_formattings(worksheet_xml, differential_format_count)?;
     if before.len() != layout.spans.len() {
@@ -107,7 +119,7 @@ pub fn replace_conditional_formattings(
     }
     validate_authored(values, differential_format_count)?;
     if before == values {
-        return Ok(worksheet_xml.to_vec());
+        return Ok((worksheet_xml.to_vec(), before));
     }
     let replacement = write_collections(values, layout.namespace)?;
     let removed = layout.spans.iter().try_fold(0usize, |sum, span| {
@@ -147,13 +159,14 @@ pub fn replace_conditional_formattings(
         output.extend_from_slice(&worksheet_xml[cursor..]);
     }
     scan_layout(&output)?;
+    record_readback_parse();
     let readback = parse_conditional_formattings(&output, differential_format_count)?;
     if readback != values {
         return Err(invalid(
             "conditional-formatting worksheet write verification failed",
         ));
     }
-    Ok(output)
+    Ok((output, readback))
 }
 
 pub(crate) fn parse_editable_conditional_formattings(
@@ -161,6 +174,7 @@ pub(crate) fn parse_editable_conditional_formattings(
     differential_format_count: usize,
 ) -> Result<Vec<Formatting>> {
     let layout = scan_layout(worksheet_xml)?;
+    record_readback_parse();
     let values = parse_conditional_formattings(worksheet_xml, differential_format_count)?;
     if values.len() != layout.spans.len() {
         return Err(invalid(
@@ -169,6 +183,30 @@ pub(crate) fn parse_editable_conditional_formattings(
     }
     validate_authored(&values, differential_format_count)?;
     Ok(values)
+}
+
+#[cfg(test)]
+thread_local! {
+    static READBACK_PARSE_COUNT: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+fn record_readback_parse() {
+    READBACK_PARSE_COUNT.with(|count| count.set(count.get().saturating_add(1)));
+}
+
+#[cfg(not(test))]
+#[inline]
+fn record_readback_parse() {}
+
+#[cfg(test)]
+pub(crate) fn reset_readback_parse_count() {
+    READBACK_PARSE_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn readback_parse_count() -> usize {
+    READBACK_PARSE_COUNT.with(Cell::get)
 }
 
 pub(crate) fn validate_authored(
