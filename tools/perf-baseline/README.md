@@ -83,7 +83,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 320
+provide their source-read counters. The current `Case` matrix exposes 322
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
@@ -177,6 +177,27 @@ p50 improves 45.80%/46.32% and p95 improves 45.25%/45.83% in paired directions;
 whole-process allocation-call counts improve 14.31%, while peak heap and RSS
 remain neutral. No single-call, open, physical-I/O, decompression, cold-cache,
 or generic ODF claim is made;
+two additional matched source-backed ODT repeated-text selectors
+(`odt_source_backed_repeated_text_uncached` and
+`odt_source_backed_repeated_text_cached`) are also opt-in over one fixed
+large 10,000-paragraph ODT with eight deterministic 2 MiB `Pictures/*`
+members. Each source owner and four output slots are prepared outside timing.
+The uncached control reproduces the current `SourceBackedDocument::text`
+semantics from retained `content.xml` through public
+`TextElements::extract_text`, including exactly two source-freshness
+observations per call; the candidate calls public `SourceBackedDocument::text()`
+four times. The timer contains exactly those four full-text projections.
+Independent untimed `InstrumentedSource` replays require the control's eight
+freshness observations (`[2, 2, 2, 2]` per call), zero post-preparation
+`ReadAt` reads, zero `Pictures/*` reads after preparation, and deterministic
+content/media range counters. The candidate accepts either the pre-cache
+`[2, 2, 2, 2]` shape or the cache-enabled `[2, 4, 2, 2]` publication-window
+shape and records the observed shape and total. Exact semantic text, archive
+topology, source XML hash, eight-media payload identity, and projection hashes
+remain outside timing.
+These additions bring the selectable matrix to 322 names while leaving the
+default 36 cases / 198 records unchanged; they provide correctness and phase
+evidence only and make no latency claim;
 six additional matched simulated CFB selective-read cases
 (`cfb_selective_simulated_{mini,mini_4095,fat}_{legacy,shared}_read`) reuse the
 same deterministic final-position targets while applying the configured
@@ -1659,6 +1680,31 @@ Harness regressions additionally prove raw local/central record identity for
 all untouched core and media members, including styled and unstyled run and
 hyperlink publication. These cases do not vary with `--semantic-shape` and are
 opt-in.
+
+The matched ODT repeated-text selectors use a separate large media-rich
+corpus. Run both phases with:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 \
+  --case odt_source_backed_repeated_text_uncached,odt_source_backed_repeated_text_cached \
+  --json target/perf/odt-repeated-text.json
+```
+
+The corpus contains 10,000 deterministic paragraphs and eight incompressible
+2 MiB `Pictures/*` members. Owner construction and output-slot reservation are
+outside the timed interval; exactly four full-text projections are timed per
+sample. The uncached control obtains retained `content.xml` with
+`SourceBackedDocument::content_xml()` and calls public
+`TextElements::extract_text`, preserving the current two-freshness-check
+semantics per call. The candidate invokes public `SourceBackedDocument::text()`
+four times, so the same harness remains valid when the production text cache is
+enabled. Untimed replays verify exact semantic text, archive topology, media
+payload hashes, content/media compressed-range classification, the control's
+eight freshness observations (`[2, 2, 2, 2]`), and zero source reads after
+owner preparation. The candidate records either that pre-cache shape or the
+cache-enabled `[2, 4, 2, 2]` shape (ten total observations). This is
+phase/correctness evidence only; no latency claim is made.
 
 `odt_embedded_resource_scalar_replace_save` and
 `odt_embedded_resource_batch_replace_save` share a deterministic extension of
