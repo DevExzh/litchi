@@ -1178,11 +1178,16 @@ the fixed 16 KiB non-seek hashing sink. The source-backed controls use
 `SourceBackedSpreadsheet::from_read_at`, `edit_cells`, `set_cell`/`set_cells`,
 `commit`, and `write_to` without `materialize()`. Open, staging, commit/plan,
 and sequential publication are timed. Reopen, full semantic digest, media
-payload hashes, source/output hashes, source raw-untouched-member identity,
-exact no-op, foreign-source patch refusal, replacement-limit, and partial-sink
-gates are untimed. The fixed sink retains zero output bytes. These selectors
-provide correctness and matched timing evidence only; they make no release
-speedup, allocation/RSS, physical-I/O, cold-cache, or producer claim.
+payload hashes, and source/output hashes are untimed. Source-backed records
+add aligned lifecycle/open/stage/commit/publication vectors and a separate
+untimed `InstrumentedSource` replay. Source-only raw-untouched-member,
+patch/inverse, exact-noop, foreign-source, replacement-limit, partial-sink and
+immutability gates are nullable and omitted from eager records. Stale/version,
+cancellation, signed/protected, formula/unknown/repeated-row, and transaction-
+bound contracts remain production-test evidence outside this selector. The
+fixed sink retains zero output bytes. The selector makes no physical-I/O,
+decompression, allocation/RSS, cold-cache, producer, or broad CRUD claim;
+accepted release latency is scoped by the linked change record.
 
 Run the fixed medium ODT paragraph publication case with eight 2 MiB
 incompressible opaque resources:

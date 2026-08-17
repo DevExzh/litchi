@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "change": "0177",
+  "decision": "accept_one_cell_latency_withhold_one_percent_latency",
+  "revision": "2d2c546856936dd643619957d16b1962f1ddaad2",
+  "binary_sha256": "94927d403afca7fa77f9404113531b82850b2df3211e7e410172b8bdb0854c8f",
+  "protocol": {
+    "order": [
+      "eager-a1",
+      "source-backed-b1",
+      "source-backed-b2",
+      "eager-a2"
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_case": 500,
+    "timed_scope": "open + stage + commit + sequential publication through the fixed 16 KiB zero-retention hashing sink",
+    "source_counter_scope": "separate untimed full-lifecycle InstrumentedSource replay; logical ReadAt range overlap only"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "corpus": {
+    "generator": "litchi-ods-media-publication-v1",
+    "source_bytes": 16790689,
+    "source_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "sheets": 2,
+    "cells": 2048,
+    "opaque_media_resources": 8,
+    "retained_sink_bytes": 0,
+    "retained_sink_window_bytes": 16384
+  },
+  "workloads": {
+    "one_existing_cell": {
+      "updates": 1,
+      "output_bytes": 16790778,
+      "output_sha256": "fa578f7de1cde14ef2254294c0e589ec2ed502077d40e4d768f897a65902bd34",
+      "semantic_sha256": "0f1eb5660a013f586d2ff7b185edb54092b262e25db657d63900aef33ce47519",
+      "elapsed_ns": {
+        "a1": {"p50": 68878797, "mean": 69656466.098, "p95": 77913644, "p99": 82773261},
+        "b1": {"p50": 17196286, "mean": 17317624.884, "p95": 18169559, "p99": 19559771},
+        "b2": {"p50": 16991710, "mean": 17102583.672, "p95": 17914965, "p99": 19397644},
+        "a2": {"p50": 66033315, "mean": 66627609.488, "p95": 70713214, "p99": 76849413}
+      },
+      "descriptive_phase_p50_ns": {
+        "a1": {"open": 4935945, "stage": 16821457, "commit": 37018062, "publication": 7046414},
+        "b1": {"open": 4046238, "stage": 1715322, "commit": 2737214, "publication": 8479599},
+        "b2": {"open": 4031393, "stage": 1699897, "commit": 2653764, "publication": 8413490},
+        "a2": {"open": 4634867, "stage": 15961135, "commit": 35570100, "publication": 6965094}
+      },
+      "source_backed_reduction_percent": {
+        "a1_to_b1": {"p50": 75.033992, "mean": 75.138525, "p95": 76.679875, "p99": 76.369457},
+        "b2_to_a2": {"p50": 74.267974, "mean": 74.331086, "p95": 74.665322, "p99": 74.758891}
+      },
+      "same_implementation_drift_percent": {
+        "eager": {"p50": 4.131144, "mean": 4.348278, "p95": 9.241552, "p99": 7.156717},
+        "source_backed": {"p50": 1.189652, "mean": 1.241748, "p95": 1.401212, "p99": 0.82888}
+      },
+      "latency_claim": "accepted for p50, mean, p95, and p99 in both paired directions"
+    },
+    "one_percent_existing_cells": {
+      "updates": 21,
+      "output_bytes": 16790961,
+      "output_sha256": "5d9fc848e830ccea59ca2632715d1eaf54d8aeafc3683c92241c22404285db06",
+      "semantic_sha256": "70712048d45fd0d6e5066f86b32d4d17df31ff4cf3ae6063947c417fd7df47de",
+      "elapsed_ns": {
+        "a1": {"p50": 70818773, "mean": 71036755.73, "p95": 73831868, "p99": 76494179},
+        "b1": {"p50": 18700332, "mean": 18776055.076, "p95": 19566874, "p99": 20295797},
+        "b2": {"p50": 19519516, "mean": 19876450.806, "p95": 22317971, "p99": 24033008},
+        "a2": {"p50": 72725963, "mean": 73901828.222, "p95": 82154802, "p99": 89309348}
+      },
+      "descriptive_phase_p50_ns": {
+        "a1": {"open": 4425707, "stage": 20567289, "commit": 35084848, "publication": 7023419},
+        "b1": {"open": 4036667, "stage": 1847773, "commit": 4162869, "publication": 8441537},
+        "b2": {"open": 4384887, "stage": 1927380, "commit": 4348984, "publication": 8617412},
+        "a2": {"open": 4621764, "stage": 21480399, "commit": 36037054, "publication": 6988322}
+      },
+      "source_backed_reduction_percent": {
+        "a1_to_b1": {"p50": 73.594103, "mean": 73.568535, "p95": 73.498065, "p99": 73.467528},
+        "b2_to_a2": {"p50": 73.160182, "mean": 73.10425, "p95": 72.834246, "p99": 73.090154}
+      },
+      "same_implementation_drift_percent": {
+        "eager": {"p50": 2.693057, "mean": 4.033225, "p95": 11.272821, "p99": 16.75313},
+        "source_backed": {"p50": 4.380585, "mean": 5.860633, "p95": 14.059972, "p99": 18.413719}
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "same-implementation mean and tail drift exceed the predeclared metric-specific stability thresholds"
+    }
+  },
+  "source_backed_logical_read_replay": {
+    "read_calls": 617,
+    "read_bytes": 16801025,
+    "classified_range_overlap_bytes": 10336,
+    "content_calls": 2,
+    "untouched_member_calls": 5,
+    "picture_calls": 520,
+    "source_version_calls": {
+      "one_existing_cell": 2447,
+      "one_percent_existing_cells": 2450
+    },
+    "scope": "logical ReadAt evidence, not physical I/O, decompression, or device traffic"
+  },
+  "correctness_gates": {
+    "exact_output_hash": true,
+    "semantic_reopen": true,
+    "media_payloads": true,
+    "raw_untouched_member_identity_source_backed": true,
+    "patch_forward_inverse_source_backed": true,
+    "foreign_source_refusal_source_backed": true,
+    "exact_noop_source_backed": true,
+    "replacement_limit_source_backed": true,
+    "typed_partial_sink_progress_source_backed": true,
+    "source_immutability_source_backed": true,
+    "phase_sum_within_lifecycle": true
+  },
+  "withheld_scope": "no allocation/RSS, physical-I/O, decompression, cold-cache, producer, durable ZIP patch, atomic-save, formulas, merges, structural row, insert/delete, or broad ODS CRUD claim"
+}
