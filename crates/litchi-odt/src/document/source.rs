@@ -6,7 +6,13 @@
 //! mutation boundary.  The ZIP index and the validated core XML parts are
 //! retained, while unrelated package members remain cold until selected.
 
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -29,6 +35,8 @@ pub type ReadLimits = SourcePackageLimits;
 
 const FAMILY_NAME: &str = "ODT";
 const CONTENT_ROOT: &str = "<office:text";
+const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
+const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
 
 /// Read-only ODT access over an immutable positional source.
 ///
@@ -48,6 +56,8 @@ pub struct SourceBackedDocument {
     styles: Option<Styles>,
     meta: Option<Meta>,
     style_registry: StyleRegistry,
+    text_queries: AtomicUsize,
+    text_cache: OnceLock<Option<String>>,
 }
 
 impl fmt::Debug for SourceBackedDocument {
@@ -230,6 +240,8 @@ impl SourceBackedDocument {
             styles,
             meta,
             style_registry,
+            text_queries: AtomicUsize::new(0),
+            text_cache: OnceLock::new(),
         })
     }
 
@@ -289,9 +301,76 @@ impl SourceBackedDocument {
 
     /// Extract all document text while retaining paragraph separators.
     pub fn text(&self) -> Result<String> {
+        if let Some(cache) = self.text_cache.get() {
+            self.check_source()?;
+            return self.text_from_cache(cache);
+        }
+
+        // Keep the first call on the established parser path.  Once the
+        // finite threshold is reached, retain one bounded projection when it
+        // is safe to do so.  Saturating the counter avoids an eventual wrap
+        // changing the cache state after an impractical number of calls.
+        let previous = self
+            .text_queries
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_add(1))
+            })
+            .unwrap_or(usize::MAX);
+        if previous.saturating_add(1) < TEXT_CACHE_QUERY_THRESHOLD {
+            return self.text_uncached();
+        }
+
+        let text = self.text_uncached()?;
+        // Do not retain a projection unless the source is still current after
+        // the complete validating parser has finished.  The trailing check
+        // below still covers the publication window itself.
+        self.check_source()?;
+        if self.text_cache.get().is_none() {
+            self.publish_text_cache(&text);
+        }
+        let final_check = self.check_source();
+        match final_check {
+            Err(error) => Err(error),
+            Ok(()) => Ok(text),
+        }
+    }
+
+    fn text_uncached(&self) -> Result<String> {
         self.check_source()?;
         let result = TextElements::extract_text(self.content.xml_content());
         prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    fn text_from_cache(&self, cache: &Option<String>) -> Result<String> {
+        // `None` is a terminal no-retention marker for an oversized or
+        // refused cache construction.  Keep returning the ordinary parser
+        // result without retrying the cache construction.
+        let Some(text) = cache else {
+            return self.text_uncached();
+        };
+        let result = clone_text_result(text);
+        let final_check = self.check_source();
+        match final_check {
+            Err(error) => Err(error),
+            Ok(()) => result,
+        }
+    }
+
+    fn publish_text_cache(&self, text: &str) {
+        if text.len() > TEXT_CACHE_MAX_BYTES {
+            let _ = self.text_cache.set(None);
+            return;
+        }
+
+        // Reserve the retained copy fallibly.  The original parser result is
+        // still returned when the bounded optional cache cannot be allocated.
+        let mut retained = String::new();
+        if retained.try_reserve_exact(text.len()).is_err() {
+            let _ = self.text_cache.set(None);
+            return;
+        }
+        retained.push_str(text);
+        let _ = self.text_cache.set(Some(retained));
     }
 
     /// Return the number of paragraphs in document order.
@@ -486,6 +565,18 @@ fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()
     } else {
         Err(Error::SourceChanged { expected, observed })
     }
+}
+
+fn clone_text_result(text: &str) -> Result<String> {
+    let mut result = String::new();
+    result
+        .try_reserve_exact(text.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT source text result",
+            source,
+        })?;
+    result.push_str(text);
+    Ok(result)
 }
 
 fn prefer_current<T>(source: &dyn ReadAt, expected: SourceVersion, result: Result<T>) -> Result<T> {
