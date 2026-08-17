@@ -2,8 +2,12 @@
 
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
-Evidence through: [`change 0165`](changes/0165-doc-lazy-fingerprint.md)
-(0165 is an accepted native-DOC lifecycle/workflow result for the exact
+Evidence through:
+[`change 0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md)
+(0167 retains a narrow XLSX publication work-elimination mechanism and raw
+release evidence but withholds an acceptance-grade latency claim because the
+same-implementation drift gate failed. 0165 is an accepted native-DOC
+lifecycle/workflow result for the exact
 deterministic corpus; it does not complete the native owner/public-reader or
 CRUD matrix.)
 (0152 is a final clean release ABBA for same-target MiniFAT single-flight;
@@ -800,7 +804,7 @@ Confirmed source facts:
   making that matrix 295. Change 0154 adds six ODF publication selectors,
   making that matrix 301; change 0159 later made it 302, change 0160 made it
   303, change 0162 made the matrix 305, change 0163 made it 309, and change
-  0164 makes the current matrix 311.
+  0164 made that matrix 311; change 0166 makes the current matrix 315.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
@@ -1004,6 +1008,20 @@ only. No speedup, physical-I/O, cold-cache, real-producer, total-memory, operati
 allocator/RSS, generic-DOC, or CRUD-completion claim is attached. Remaining DOC
 work must attribute distinct validation or publication work without removing
 either independent validation layer.
+
+Change 0167 confirms one narrower XLSX publication hotspot: source-backed row
+visibility was reparsing the selected worksheet and rescanning row tags after
+the commit had already retained an exact source-bound cell-values patch and row
+snapshot. The publisher now reuses the established matched/mismatched/
+unavailable provenance boundary and still enters the complete OPC overlay
+publisher. A >8 MiB read trap proves that only the mandatory selected-member
+publication read remains. Descriptive release publication reductions are
+50.42%-68.23% across p50/mean/p95/p99 in both paired directions, but control
+and candidate drift exceed the 5% stability gate and complete-workflow medium
+p99 directions disagree. Treat the redundant parse/scan as removed production
+work, not as an accepted end-to-end or resource result; stable ABBA, allocator,
+RSS, and physical-I/O evidence remain open. See
+[`0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed

@@ -284,8 +284,9 @@ Change 0154 adds six ODT/ODS/ODP content-COW publication selectors, making the
 matrix 301 at that revision; change 0159 made it 302, change 0160 made it 303,
 change 0162 made it 305, change 0163 made it 309, and change 0164 makes it 311.
 Change 0165 extends the existing native-DOC phase selector without adding a
-case, so the selectable matrix remains 311 names and the default remains 36
-cases / 198 records.
+case, so that revision remained at 311 names. Change 0166 adds four row-
+visibility selectors, making the current matrix 315 names; the default remains
+36 cases / 198 records.
 No runtime selector was added to 0152; only `cfg(test)` source-event acceptance
 and tests changed. Root
 MiniStream cache and
@@ -313,6 +314,18 @@ records. This is correctness/phase evidence only and makes no
 latency, speedup, allocation/RSS, physical-I/O, cold-cache, decompression, or
 real-producer claim. See
 [`0166`](../../docs/performance/changes/0166-xlsx-row-visibility-evidence.md).
+
+Change 0167 changes production publication only and adds no selector. Matched
+source-backed row-visibility publication reuses the existing cell-values
+lineage/version proof, removing one semantic worksheet reload, cell parse and
+row scan while retaining the mandatory OPC selected-member read. Clean CPU-2
+A/B/B/A records observe descriptively lower publication vectors, but the 5%
+same-implementation drift gate fails: maximum absolute drift is 34.80% for
+control large/unhide publication p99 and 10.23% for candidate medium/hide
+complete-workflow p50; first-pair medium hide/unhide complete-workflow p99
+regresses 6.95%/2.69%. No acceptance-grade latency or resource claim is made.
+See
+[`0167`](../../docs/performance/changes/0167-xlsx-row-visibility-provenance-reuse.md).
 
 Change 0154 adds matched owned-rebuild and source-positional content-only
 publication selectors for ODT, ODS, and ODP. Each selector prepares the real
@@ -2485,6 +2498,20 @@ signed, protected, formula, markup-compatibility, macro, relationship,
 partial-sink, zero-output, and source-counter gates exercise the source-backed
 transaction only and are omitted from eager records. The controls are
 correctness/phase evidence only; they make no release speedup or latency claim.
+
+Change 0167 measures a production-only source-backed publisher refinement
+without changing these selectors or matrix counts. Matched row commits now
+reuse the existing cell-values lineage/version provenance and skip one
+publication-time semantic worksheet reload, cell parse and row scan; the
+mandatory OPC selected-member read and complete sequential publication remain.
+Clean CPU-2 A/B/B/A records use 20 warmups and 500 samples. Publication
+p50/mean/p95/p99 is descriptively 50.42%-68.23% lower in both pair directions,
+but same-implementation drift exceeds the 5% gate and two medium complete-
+workflow p99 directions regress. No acceptance-grade end-to-end latency,
+allocation/RSS, physical-I/O, or producer claim is made. See
+[`0167`](../../docs/performance/changes/0167-xlsx-row-visibility-provenance-reuse.md)
+and the
+[summary](../../docs/performance/results/xlsx-row-visibility-provenance-0167-summary.json).
 
 ### Native DOC owner/public phase evidence
 

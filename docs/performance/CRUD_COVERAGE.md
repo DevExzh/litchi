@@ -95,9 +95,10 @@ conversion for other formats remain.
    within the disclosed final guard deltas: noop +78.84%/+79.89% (tiny) and
    +71.08%/+70.40% (large), one-edit +37.23%/+40.81% and +20.45%/+19.79%,
    and open -3.52%/+0.13% and +0.55%/-1.80%. The existing
-   `measured_total_ns` lifecycle boundary is unchanged;
-   the selector count remains 311 and the default remains 36 cases / 198
-   records. The guard run retains 24,000 samples.
+   `measured_total_ns` lifecycle boundary is unchanged. At change 0165 the
+   selector count remained 311; change 0166 raises the current count to 315,
+   while the default remains 36 cases / 198 records. The guard run retains
+   24,000 samples.
    This accepts the named private lazy/fused boundary only. A larger shared
    physical/parsed substrate or fused proof across the independent owner and
    public-reader validation layers remains the next DOC mechanism, together
@@ -139,7 +140,10 @@ conversion for other formats remain.
    RSS claim. Scalar-cell clear/physical-remove now have selectable
    phase/counter/correctness evidence (change 0163), while row visibility now
    has matched eager/source-backed correctness and phase evidence (change
-   0166); no durable-source-patch or performance claim is made.
+   0166). Change 0167 removes the source-backed row publisher's redundant
+   semantic reload through an existing lineage/version proof, but unstable
+   release drift withholds an end-to-end performance claim; no durable-source-
+   patch claim is made.
    Conditional-formatting replacement is selectable
    without an ABBA claim and tab visibility remains unmeasured.
    Direct writer-local action regrouping was measured and rejected
@@ -1155,8 +1159,8 @@ matrix was unchanged; change 0153 adds four RTF selectors measured at the
 pre-staged publication-call interval,
 making that matrix 295. Change 0154 adds six ODF content-COW publication
 selectors, making that matrix 301; change 0159 made it 302, change 0160 made
-it 303, change 0162 made it 305, change 0163 made it 309, and change 0164
-makes the current matrix 311. Only `cfg(test)` source-event acceptance and
+it 303, change 0162 made it 305, change 0163 made it 309, change 0164 made it
+311, and change 0166 makes the current matrix 315. Only `cfg(test)` source-event acceptance and
 tests changed in 0152. This is
 source-event/correctness evidence only. Root MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain; local or
@@ -1253,8 +1257,8 @@ partial/zero-sink and hash gates. The public publication sink is a fixed
 only, with no latency, resource, physical-I/O, cold-cache, source-backed,
 real-producer, or rich-RTF claim. The focused harness gate is
 `rtf_paragraph_split_merge_selectors_are_opt_in_bounded_and_gate_complete`;
-the historical default remains 36 cases / 198 records and the selectable
-matrix is now 311 names. See
+the historical default remains 36 cases / 198 records. That revision had 311
+selectable names; change 0166 makes the current matrix 315. See
 [`0164`](changes/0164-rtf-paragraph-split-merge-evidence.md).
 
 Change 0165 records a private native-DOC lazy/fused fingerprint implementation,
@@ -1268,8 +1272,9 @@ vectors, `same_lineage_apply_ns`, `deferred_fingerprint_ns`,
 `workflow_no_diagnostic_ns`, `workflow_with_fingerprint_demand_ns`, and four
 gates for same-lineage apply, reopened-source apply, independent fingerprints,
 and workflow arithmetic. The historical `measured_total_ns` lifecycle
-boundary is unchanged; the selectable matrix remains 311 names and the
-default remains 36 cases / 198 records.
+boundary is unchanged. At that revision the selectable matrix remained 311
+names; change 0166 makes the current matrix 315, while the default remains 36
+cases / 198 records.
 
 The final clean post-rebase CPU-2 A1/B1/B2/A2 release uses control revision
 `d6818e290` and candidate revision `5dd813b1e`, with 20 warmups and 500 samples
@@ -1308,6 +1313,20 @@ from 311 to 315 while preserving the default 36 cases / 198 records, and adds
 correctness/phase evidence only—no speedup, latency, allocation/RSS,
 physical-I/O, cold-cache, decompression, or real-producer claim. See
 [`0166`](changes/0166-xlsx-row-visibility-evidence.md).
+
+Change 0167 keeps the same four selectors and matrix counts while removing one
+redundant publication-time worksheet semantic reload, cell parse and row scan
+from the source-backed row publisher. A >8 MiB read-trap regression proves the
+mandatory OPC selected-member read remains and a second semantic read does not.
+Clean 20-warmup/500-sample CPU-2 A/B/B/A records observe 50.42%-68.23%
+publication reductions across all paired p50/mean/p95/p99 values, but the 5%
+same-implementation gate fails: maximum absolute drift is 34.80% for control
+large/unhide publication p99 and 10.23% for candidate medium/hide complete-
+workflow p50; first-pair medium hide/unhide complete-workflow p99 regresses
+6.95%/2.69%. The implementation and raw evidence are
+retained without an acceptance-grade end-to-end latency, allocation/RSS,
+physical-I/O, cold-cache, decompression, or producer claim. See
+[`0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

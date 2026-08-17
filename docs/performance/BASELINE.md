@@ -414,9 +414,10 @@ Change 0153 adds four RTF selectors measured at the pre-staged
 publication-call interval, making that matrix 295. Change 0154 adds six ODF
 content-COW publication selectors, making that matrix 301; change 0159 later
 made it 302, change 0160 made it 303, change 0162 made it 305, change 0163
-made it 309, and change 0164 makes the current matrix 311. Local or generic
-latency, allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/
-network behavior, decompression, native semantic, OOXML, ODF, RTF, and iWork
+made it 309, change 0164 made it 311, and change 0166 makes the current matrix
+315. Local or generic latency, allocation/RSS/peak memory, physical
+I/O/syscalls, cold-cache/device/network behavior, decompression, native
+semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
 boundaries remain, as do broader performance gaps. See the
 [change record](changes/0152-cfb-same-target-singleflight-release-abba.md) and
@@ -611,7 +612,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**311 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**315 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -759,6 +760,23 @@ CRUD-completeness claim is accepted. See
 [`0165`](changes/0165-doc-lazy-fingerprint.md), the
 [summary](results/doc-lazy-fingerprint-0165-summary.json), and the
 [release manifest](results/doc-lazy-fingerprint-0165-manifest.json).
+
+Change 0167 removes one redundant semantic worksheet reload, cell-store parse,
+and row-tag scan from matched source-backed XLSX row-visibility publication by
+reusing the existing cell-values lineage/version proof. The mandatory OPC
+overlay validation and selected-member read remain. Clean CPU-2 release
+`A1/B1/B2/A2` runs used 20 warmups and 500 retained samples for medium/large
+hide-one and unhide-256. Descriptive publication p50/mean/p95/p99 reductions
+span 50.42%-68.23% and agree in both paired directions, while logical source
+reads remain exactly 204/209 calls with one/six selected-worksheet overlaps.
+The 5% stability gate fails: maximum absolute drift is 34.80% for control
+large/unhide publication p99 and 10.23% for candidate medium/hide complete-
+workflow p50; first-pair medium hide/unhide complete-workflow p99 regresses
+6.95%/2.69%. Therefore no acceptance-grade end-to-end latency, tail, allocation,
+RSS, or physical-I/O claim is made. See
+[`0167`](changes/0167-xlsx-row-visibility-provenance-reuse.md), the
+[summary](results/xlsx-row-visibility-provenance-0167-summary.json), and the
+[manifest](results/xlsx-row-visibility-provenance-0167-manifest.json).
 
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32

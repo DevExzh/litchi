@@ -1,0 +1,23 @@
+	Command being timed: "taskset -c 2 /tmp/litchi-perf-rowvis-candidate-clean-4b156db82 --case xlsx_source_backed_row_visibility_edit_save,xlsx_source_backed_row_visibility_batch_edit_save --xlsx-row-visibility-shape medium,large --warmup 20 --samples 500 --json /tmp/xlsx-row-visibility-0176-clean-b1.json"
+	User time (seconds): 468.92
+	System time (seconds): 0.32
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 7:49.31
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 231516
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 118228
+	Voluntary context switches: 27
+	Involuntary context switches: 1916
+	Swaps: 0
+	File system inputs: 72
+	File system outputs: 2384
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
