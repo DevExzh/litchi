@@ -305,6 +305,119 @@ impl ReadAt for MutableSource {
     }
 }
 
+#[derive(Debug)]
+enum OwnerValidationError {
+    Overlay(OverlayError),
+    Rejected(&'static str),
+}
+
+impl std::fmt::Display for OwnerValidationError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Overlay(error) => write!(formatter, "{error}"),
+            Self::Rejected(reason) => formatter.write_str(reason),
+        }
+    }
+}
+
+impl std::error::Error for OwnerValidationError {}
+
+impl From<OverlayError> for OwnerValidationError {
+    fn from(error: OverlayError) -> Self {
+        Self::Overlay(error)
+    }
+}
+
+#[test]
+fn owner_validation_shares_the_fenced_target_and_preserves_typed_results() {
+    let source_bytes = sample_bytes();
+    let fat = sequence(6_000, 17);
+    let callback_calls = AtomicUsize::new(0);
+    let (plan, owner_version) = shared(source_bytes)
+        .plan_same_length_stream_splices_with_owner(
+            vec![splice("Fat", 510, &fat, &[0xa1, 0xa2, 0xa3, 0xa4])],
+            limits(),
+            |candidate| {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                let reopened = SharedOleFile::open(Arc::new(candidate.clone()))
+                    .map_err(OverlayError::from)
+                    .map_err(OwnerValidationError::from)?;
+                let mut observed = [0_u8; 4];
+                reopened
+                    .read_stream_range(&["Fat"], 510, &mut observed)
+                    .map_err(OverlayError::from)
+                    .map_err(OwnerValidationError::from)?;
+                assert_eq!(observed, [0xa1, 0xa2, 0xa3, 0xa4]);
+                candidate
+                    .version()
+                    .map_err(OverlayError::from)
+                    .map_err(OwnerValidationError::from)
+            },
+        )
+        .unwrap();
+    assert_eq!(callback_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        owner_version,
+        Some(plan.composed_source().unwrap().version().unwrap())
+    );
+
+    let callback_calls = AtomicUsize::new(0);
+    let (noop, owner) = shared(sample_bytes())
+        .plan_same_length_stream_splices_with_owner(
+            vec![splice("Fat", 510, &fat, &fat[510..514])],
+            limits(),
+            |_candidate| {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                Ok::<(), OwnerValidationError>(())
+            },
+        )
+        .unwrap();
+    assert!(noop.is_noop());
+    assert!(owner.is_none());
+    assert_eq!(callback_calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn owner_validation_error_returns_no_plan_and_keeps_its_native_type() {
+    let fat = sequence(6_000, 17);
+    let result = shared(sample_bytes()).plan_same_length_stream_splices_with_owner(
+        vec![splice("Fat", 510, &fat, &[0xa1, 0xa2, 0xa3, 0xa4])],
+        limits(),
+        |_candidate| Err::<(), _>(OwnerValidationError::Rejected("semantic refusal")),
+    );
+    assert!(matches!(
+        result,
+        Err(OwnerValidationError::Rejected("semantic refusal"))
+    ));
+}
+
+#[test]
+fn owner_validation_is_closed_by_the_final_stable_token_fingerprint() {
+    let source_bytes = sample_bytes();
+    let fat = sequence(6_000, 17);
+    let mutable = Arc::new(MutableSource {
+        bytes: Mutex::new(source_bytes.clone()),
+        revision: AtomicU64::new(0),
+        lie: true,
+    });
+    let source: Arc<dyn ReadAt> = mutable.clone();
+    let file = SharedOleFile::open(source).unwrap();
+    let mut changed = source_bytes;
+    changed[100] ^= 0xff;
+    let result = file.plan_same_length_stream_splices_with_owner(
+        vec![splice("Fat", 510, &fat, &[0xa1, 0xa2, 0xa3, 0xa4])],
+        limits(),
+        |_candidate| {
+            mutable.replace(changed);
+            Ok::<(), OverlayError>(())
+        },
+    );
+    assert!(matches!(
+        result,
+        Err(OverlayError::SourceFingerprintChanged { .. })
+    ));
+}
+
 #[test]
 fn no_op_inverse_and_stale_source_contracts_are_exact() {
     let source_bytes = sample_bytes();
