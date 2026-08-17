@@ -3,6 +3,14 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0186`](changes/0186-opc-eager-shared-payloads.md)
+(0186 carries one immutable decompressed allocation from serial eager ZIP
+ingress through OPC XML/binary Part construction, removing one full payload
+copy per admitted Part. The 16 MiB owned-open diagnostic peak heap changes
+71.72M -> 55.02M. Few-large p50 directions are both materially lower but fail
+the control-drift gate; only owned-open p99 is accepted. Ordinary open still
+inflates every admitted Part, and many-small, I/O, decompression, scaling,
+producer, broad OOXML and iWork claims remain withheld.)
 [`change 0185`](changes/0185-opc-shared-source-overlay.md)
 (0185 adds an additive Arc-owned source-overlay handoff in OPC and migrates
 eligible DOCX/PPTX/XLSX publishers. One complete selected-Part ownership copy
@@ -1511,7 +1519,7 @@ pattern elsewhere.
 | # | Source-audit disposition | Measurement needed |
 |---:|---|---|
 | 1 | Refined: legacy OPC path and `Read` ingress slurp the source; source-backed ingress is positional. Five filesystem cases now record process-isolated warm/cold-requested counters and atomic-save hashes, including a repeated release tmpfs capture. | Repeat on a controlled block-backed filesystem/cache host. The release run's accepted cold advice and zero process `read_bytes` on tmpfs are counters/output evidence only, not physical cold-cache behavior. |
-| 2 | Confirmed: ordinary OPC open inflates every admitted Part. | Open/list/one-object scaling against total uncompressed bytes and member count. |
+| 2 | Confirmed: ordinary OPC open inflates every admitted Part. Change 0186 removes the subsequent full-payload ownership copy, but not decompression. | Open/list/one-object scaling against total uncompressed bytes and member count; migrate selective facade opens onto deferred catalogs. |
 | 3 | Implemented for managed source-backed OPC: finite weighted eviction, pinned-handle preservation, per-entry single-flight, exact physical `InputBytes`, exact accepted direct-sink `OutputBytes`, cumulative declared cold-load `Work`, retained catalog/flight/payload `Objects`, retained/in-flight payload `Memory` Budget charging and content-free diagnostics exist; compatibility/unmanaged opens retain finite `SourceCacheLimits`, and legacy eager open does not use that managed cache. | Correctness tests cover all managed resource dimensions and charging/release invariants. Release contention ABBA covers structural/distribution counters but accepts no speedup. Add allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence. |
 | 4 | Measured: ordinary OPC open is serial and explicit eager open has a local bounded session. Six large ZIP tasks reach 4.52x p50 at 12 CPUs; small tasks regress. | Broader real-package scaling and threshold tuning. |
 | 5 | Confirmed: stored entries are CRC-checked then copied. | Stored-media one-Part read and package-open copied-byte/RSS deltas. |

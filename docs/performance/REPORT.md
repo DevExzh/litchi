@@ -11,6 +11,26 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## Eager OPC shared payload ownership (change 0186)
+
+[Change 0186](changes/0186-opc-eager-shared-payloads.md) removes the serial
+eager reader's `Arc<Vec<u8>> -> Vec<u8> -> Arc<Vec<u8>>` handoff. The same
+decompressed allocation now reaches XML and binary Part ownership directly.
+Allocation-identity tests cover the complete handoff; CRC/size and aggregate
+limits, session cancellation, relationship/catalog validation, exact-source
+publication, mutation isolation, and downstream DOCX/PPTX/XLSX suites remain
+green.
+
+On the four-Part, 16 MiB incompressible corpus, whole-process diagnostic peak
+heap changes from 71.72M to 55.02M. Clean 500-sample A1/B1/B2/A2 few-large
+p50 reductions are 43.42%/48.10% for borrowed open and 40.44%/46.98% for owned
+open, but control drift exceeds the 5% gate, so those results are withheld.
+Few-large owned-open p99 is accepted at 32.99%/43.51% lower. Many-small
+latency and general allocation/RSS, I/O, decompression, scaling, producer, and
+broad OOXML claims remain withheld. Ordinary open still decompresses every
+admitted Part; deferred/source-backed facade ingress remains the higher-ROI
+next step.
+
 ## OPC shared source-overlay ownership (change 0185)
 
 [Change 0185](changes/0185-opc-shared-source-overlay.md) adds shared-Arc
