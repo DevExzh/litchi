@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "change": "0184",
+  "artifacts": [
+    {
+      "path": "xlsx-row-visibility-store-0184-a1.json.zst",
+      "role": "control-a1",
+      "revision": "f41a76ecf9ffc38586ac5838748e3109c70a0468",
+      "compressed_bytes": 43633,
+      "compressed_sha256": "db2862a1b3d0c8ae016647f4cc016187e286c736cf1acdd969e33cead1901a9b",
+      "uncompressed_bytes": 1219327,
+      "uncompressed_sha256": "ff6d41c4c4e0c491fe4fb1f4e88eae608ad9c6aa33a00e65f93077d68673e5cc"
+    },
+    {
+      "path": "xlsx-row-visibility-store-0184-b1.json.zst",
+      "role": "candidate-b1",
+      "revision": "9adbc95bd0b29b79915fae61b17010f78165d14a",
+      "compressed_bytes": 42609,
+      "compressed_sha256": "9c85eb8dd2e5c326e8bf6bf87f472a6147807a9d3193cf85fe5c0b9cc13ef661",
+      "uncompressed_bytes": 1216971,
+      "uncompressed_sha256": "bb47d8d94e95b482ba6729c1d2d0435bc8acb939e073d8e81aef617a5f6ec4f1"
+    },
+    {
+      "path": "xlsx-row-visibility-store-0184-b2.json.zst",
+      "role": "candidate-b2",
+      "revision": "9adbc95bd0b29b79915fae61b17010f78165d14a",
+      "compressed_bytes": 43646,
+      "compressed_sha256": "b702265249c791dc1ba7de42dff6cc7cae0e615686e9a4538b98504edef254ad",
+      "uncompressed_bytes": 1217507,
+      "uncompressed_sha256": "908ea730259008d8aa44a79237e0511c43039c45145c1920cf298e2c0492990d"
+    },
+    {
+      "path": "xlsx-row-visibility-store-0184-a2.json.zst",
+      "role": "control-a2",
+      "revision": "f41a76ecf9ffc38586ac5838748e3109c70a0468",
+      "compressed_bytes": 43123,
+      "compressed_sha256": "f3d786bb685eabcbae93590de0a50ff0ab58310fe5cac66c3f00e63395936e41",
+      "uncompressed_bytes": 1219068,
+      "uncompressed_sha256": "54595fb59a7b4354fba1e548aad34d57263dd43a573bbfd1e56e73b006a2734b"
+    },
+    {
+      "path": "xlsx-row-visibility-store-0184-summary.json",
+      "role": "derived-summary",
+      "bytes": 12649,
+      "sha256": "5b17c019842430d40bb3e88767a9d0c0c574dd88229ad394c45184fbaac33185"
+    }
+  ]
+}
