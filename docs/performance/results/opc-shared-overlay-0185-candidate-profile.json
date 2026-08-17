@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "31855dfd267946bfa59eada1fe8f833fc561ce25",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "total_memory_bytes": 33605935104,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 1,
+    "warmup_iterations_per_case": 0,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_source_backed_row_visibility_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_source_backed_row_visibility_edit_save",
+      "corpus": {
+        "name": "xlsx-row-visibility-large-hide",
+        "generator": "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-one-sheet-row-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 65536,
+        "archive_member_count": 14,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4456448,
+        "archive_bytes": 4377814,
+        "archive_sha256": "7ed11c2fa5cbe48b1d011ae1ca0858eca270ffae53c2dacdfa8aafcdd84a6e3c",
+        "target_entry": "worksheet:Sheet1:existing-rows",
+        "target_payload_bytes": 2012934,
+        "target_payload_sha256": "7adac7a7b779593a32eb0f3789ebb4ce7ccda965644bbc3fbc29742527100b26",
+        "xlsx": {
+          "sheet_count": 1,
+          "rows_per_sheet": 2048,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 0,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          2014224164
+        ],
+        "min": 2014224164,
+        "p50": 2014224164,
+        "p95": 2014224164,
+        "p99": 2014224164,
+        "max": 2014224164,
+        "mean": 2014224164.0,
+        "standard_deviation": 0.0,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 2014224164.0,
+          "upper": 2014224164.0
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4377829,
+        "write_calls": 187,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 56,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 131,
+          "bytes_over_65536": 0
+        },
+        "retained_output_bytes": 0,
+        "retained_authoring_window_bytes": 65536
+      },
+      "source": {
+        "read_calls": [
+          209
+        ],
+        "read_bytes": [
+          4381753
+        ],
+        "ordinary_payload_read_calls": [
+          10
+        ],
+        "ordinary_payload_read_bytes": [
+          179896
+        ],
+        "max_in_flight_reads": [
+          1
+        ],
+        "xlsx_row_visibility": {
+          "implementation": "source-backed",
+          "operation": "hide-one",
+          "shape": "large",
+          "timing_scope": "open, selector staging, commit, and sequential publication; expected-output semantic reopen tied to the measured digest and all refusal/preservation gates are separate",
+          "performance_claim": "correctness-and-phase evidence only; no release speedup claim",
+          "source_counter_scope": "owned-source-ingress-only; logical ReadAt counters, not physical I/O",
+          "initially_hidden": false,
+          "update_count": 1,
+          "open_ns": [
+            326880
+          ],
+          "plan_or_stage_ns": [
+            1085652952
+          ],
+          "commit_ns": [
+            838483545
+          ],
+          "publication_ns": [
+            89760787
+          ],
+          "lifecycle_ns": [
+            595468019
+          ],
+          "source_read_calls": [
+            209
+          ],
+          "source_read_bytes": [
+            4381753
+          ],
+          "workbook_read_calls": [
+            2
+          ],
+          "workbook_read_bytes": [
+            388
+          ],
+          "selected_worksheet_read_calls": [
+            6
+          ],
+          "selected_worksheet_read_bytes": [
+            178938
+          ],
+          "unselected_worksheet_read_calls": [
+            0
+          ],
+          "unselected_worksheet_read_bytes": [
+            0
+          ],
+          "cache_hits": [
+            0
+          ],
+          "cache_cold_loads": [
+            3
+          ],
+          "cache_successful_loads": [
+            3
+          ],
+          "cache_retained_entries": [
+            3
+          ],
+          "cache_retained_bytes": [
+            2013820
+          ],
+          "source_version_calls": [
+            561
+          ],
+          "source_sha256": "7ed11c2fa5cbe48b1d011ae1ca0858eca270ffae53c2dacdfa8aafcdd84a6e3c",
+          "output_sha256": [
+            "ded6ea6f97475580072ccf3fe0fbe7615fca3bb060e9c07e29a723e86e661414"
+          ],
+          "semantic_sha256": [
+            "830886669db63d0327da4928822d6a09cf3183c570a709c91119b67a8266919a"
+          ],
+          "untouched_member_count": 13,
+          "untouched_member_sha256": "1f8d2aa4b979c8ec628d748f401931fb3be0b6560a0623532b9c59149d49baa8",
+          "gates": {
+            "exact_output_verified": true,
+            "semantic_reopen_verified": true,
+            "untouched_member_preservation_verified": true,
+            "exact_noop_verified": true,
+            "stale_source_refusal_verified": true,
+            "foreign_source_refusal_verified": true,
+            "protected_source_refusal_verified": true,
+            "formula_source_refusal_verified": true,
+            "markup_compatibility_source_refusal_verified": true,
+            "macro_source_refusal_verified": true,
+            "relationship_source_refusal_verified": true,
+            "signed_source_refusal_verified": true,
+            "partial_sink_verified": true,
+            "zero_output_on_refusal_verified": true,
+            "source_counter_gate_verified": true
+          }
+        }
+      },
+      "output_sha256": "ded6ea6f97475580072ccf3fe0fbe7615fca3bb060e9c07e29a723e86e661414"
+    }
+  ]
+}
