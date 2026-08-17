@@ -2,6 +2,7 @@
 
 mod cell_locator;
 mod source;
+mod source_edit;
 
 use litchi_core::Result;
 use std::{
@@ -16,6 +17,10 @@ pub use crate::authoring::{Builder, MutableSpreadsheet};
 use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use source::{ReadLimits, SourceBackedSpreadsheet};
+pub use source_edit::{
+    SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,
+    SourceCellSnapshot,
+};
 
 /// Maximum number of positional cell selectors accepted by one lookup batch.
 ///

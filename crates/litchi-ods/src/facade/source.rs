@@ -1,10 +1,10 @@
-//! Immutable, positional-source ODS reads.
+//! Immutable, positional-source ODS reads and focused existing-cell edits.
 //!
-//! [`SourceBackedSpreadsheet`] is an additive read-only owner.  The existing
-//! [`super::Spreadsheet`] remains the complete owned/mutable facade; callers
-//! explicitly call [`SourceBackedSpreadsheet::materialize`] before entering
-//! that mutation boundary.  The ZIP index and the validated semantic XML are
-//! retained, while unrelated package members stay cold until selected.
+//! [`SourceBackedSpreadsheet`] retains a ZIP index and validated semantic XML
+//! while unrelated package members stay cold until selected. Focused ordinary
+//! existing-cell edits publish through the source-backed `content.xml` path;
+//! callers explicitly call [`SourceBackedSpreadsheet::materialize`] before
+//! entering the complete owned/mutable [`super::Spreadsheet`] boundary.
 
 use std::{
     fmt,
@@ -40,7 +40,7 @@ const FAMILY_NAME: &str = "ODS";
 /// The bounded ZIP-index policy used by positional ODF facades.
 pub type ReadLimits = SourcePackageLimits;
 
-/// Read-only ODS access over an immutable positional source.
+/// ODS access over an immutable positional source.
 ///
 /// Opening validates the ZIP archive, MIME member, manifest, content root,
 /// and worksheet graph, then retains only the required XML projections.
@@ -48,15 +48,16 @@ pub type ReadLimits = SourcePackageLimits;
 /// selected through [`Self::member_data`] or [`Self::media_data`].  Every
 /// public operation checks the captured [`SourceVersion`] and reports
 /// [`Error::SourceChanged`] when the source no longer identifies the same
-/// snapshot.
+/// snapshot. [`Self::edit_cells`] adds a narrow existing-cell transaction
+/// without materializing the complete package.
 pub struct SourceBackedSpreadsheet {
-    package: SourceBackedPackage,
+    pub(super) package: SourceBackedPackage,
     source: Arc<dyn ReadAt>,
-    source_version: SourceVersion,
-    content_xml: String,
-    styles_xml: Option<String>,
+    pub(super) source_version: SourceVersion,
+    pub(super) content_xml: Arc<str>,
+    pub(super) styles_xml: Option<Arc<str>>,
     definitions: Vec<Definition>,
-    sheets: Vec<Sheet>,
+    pub(super) sheets: Arc<[Sheet]>,
     metadata: crate::metadata::Snapshot,
     settings: Option<Settings>,
     cell_queries: AtomicUsize,
@@ -248,10 +249,10 @@ impl SourceBackedSpreadsheet {
             package,
             source,
             source_version,
-            content_xml,
-            styles_xml,
+            content_xml: Arc::from(content_xml),
+            styles_xml: styles_xml.map(Arc::from),
             definitions,
-            sheets,
+            sheets: Arc::from(sheets),
             metadata,
             settings,
             cell_queries: AtomicUsize::new(0),
@@ -284,7 +285,7 @@ impl SourceBackedSpreadsheet {
     /// Borrow the validated `content.xml` snapshot.
     pub fn content_xml(&self) -> Result<&str> {
         self.check_source()?;
-        let value = self.content_xml.as_str();
+        let value = self.content_xml.as_ref();
         self.check_source()?;
         Ok(value)
     }
@@ -345,7 +346,7 @@ impl SourceBackedSpreadsheet {
     /// Return typed worksheets in document order.
     pub fn sheets(&self) -> Result<&[Sheet]> {
         self.check_source()?;
-        let value = self.sheets.as_slice();
+        let value = self.sheets.as_ref();
         self.check_source()?;
         Ok(value)
     }

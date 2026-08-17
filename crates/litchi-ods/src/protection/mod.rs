@@ -14,6 +14,7 @@ mod tests;
 
 pub use super::model::style_protection::{ConditionalStyle, Protection, Rule};
 pub use model::{Document, Key, Permissions, Sheet, Style, Styles};
+pub(crate) use transaction::source_edit_protection;
 pub use transaction::{Commit, Patch, Snapshot, Transaction, key, update};
 
 /// Cell-protection vocabulary is nested to keep the document/sheet facade

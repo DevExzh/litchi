@@ -4,6 +4,30 @@ use super::{codec, model, validation};
 use crate::model::protection as wire;
 use litchi_core::Result;
 
+/// Return the compact protection state needed by source-backed cell edits
+/// without retaining a second copy of `content.xml`.
+pub(crate) fn source_edit_protection(
+    content_xml: &str,
+    styles_xml: Option<&str>,
+) -> Result<(bool, Vec<String>)> {
+    let (location, document, sheets, styles) = codec::parse(content_xml, styles_xml)?;
+    validation::validate_snapshot(content_xml, &location, &document, &sheets, &styles)?;
+    let mut protected = Vec::new();
+    protected
+        .try_reserve_exact(sheets.len())
+        .map_err(|source| litchi_core::Error::Allocation {
+            resource: "ODS protected worksheet names",
+            source,
+        })?;
+    protected.extend(
+        sheets
+            .into_iter()
+            .filter(|sheet| sheet.protected == Some(true))
+            .map(|sheet| sheet.name),
+    );
+    Ok((document.structure_protected == Some(true), protected))
+}
+
 /// A complete, immutable protection view of one `content.xml` source.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
