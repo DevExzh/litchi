@@ -388,6 +388,32 @@ physical-I/O, cold-cache, and producer claims are also withheld. See the
 [summary](results/cfb-owner-fusion-0171-summary.json) and
 [manifest](results/cfb-owner-fusion-0171-manifest.json).
 
+## Immutable CFB numeric-plan publication (change 0172)
+
+[Change 0172](changes/0172-cfb-owned-numeric-publication.md) preserves the
+native XLS plan-only snapshot's immutable `Arc<[u8]>` ownership through an
+explicit CFB ingress. Only direct sequential publication consumes the private
+proof. It skips the redundant complete pre/post fingerprint scans but retains
+the 64 KiB emission read, source/target hashes, exact sink progress, partial
+output and flush. Generic `ReadAt`, checked composed views and atomic save keep
+their previous complete fences.
+
+The deterministic reduction is two source scans: 33,991,680 logical bytes and
+34 one-MiB reads for Number, or 405,504 bytes and two reads for RK/MulRK. Clean
+CPU-2 release A/B/B/A used 20 warmups and 500 samples. Number complete-workflow
+p50/mean/p95/p99 is 37.54%-39.00% lower and direct publication 64.44%-65.63%
+lower. RK/MulRK complete workflow is 36.63%-38.96% lower and publication
+p50/mean/p95 is 65.54%-66.76% lower. All accepted directions agree and pass
+the 5% drift gate.
+
+RK/MulRK publication p99 is withheld because control drift is 5.28%. Atomic
+save is deliberately unchanged. The measured source is a complete owned
+in-memory artifact, and process RSS is slightly higher in both paired
+directions, so no allocation/RSS, physical-I/O, cold-cache, producer,
+compression, or throughput claim is made. See the
+[summary](results/cfb-owned-numeric-publication-0172-summary.json) and
+[manifest](results/cfb-owned-numeric-publication-0172-manifest.json).
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed

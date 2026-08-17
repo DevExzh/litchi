@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "change": "0172-cfb-owned-numeric-publication",
+  "decision": {
+    "production_change": "retained; native XLS plan-only fixed-width numeric publication preserves immutable Arc byte provenance through CFB and specializes only direct sequential write_to",
+    "accepted_latency_claim": "for both measured Number and RK/MulRK plan-only selectors, complete-workflow p50, mean, p95, and p99 and publication p50, mean, and p95 are lower in both clean ABBA directions within the same-implementation drift gate",
+    "withheld": [
+      "RK/MulRK publication p99 because control same-implementation drift is 5.281574%",
+      "semantic commit/edit/set latency because this change does not target those phases",
+      "atomic-save latency because save retains both complete fingerprint fences",
+      "allocation, RSS, peak-memory, physical-I/O, cold-cache, producer, compression, and throughput claims"
+    ]
+  },
+  "builds": {
+    "control": {
+      "revision": "fbb1dbbd37eb160d5d3e6855501cb2511a3fe220",
+      "binary_sha256": "9a7599cf6320dc42351ba01ea147544f19d9344dfdee843b5cfef405d0cac2df"
+    },
+    "candidate": {
+      "revision": "0db48c38cf6156ef5d4e4e3b8bfb6c21fec900a3",
+      "binary_sha256": "1f890121f07cf0f144b52911775375d75846456d78b368384fc8daa01513359d"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "kernel": "Linux 6.8.0-101-generic",
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "execution_order": [
+      "control_a1",
+      "candidate_b1",
+      "candidate_b2",
+      "control_a2"
+    ],
+    "warmups_per_case_per_leg": 20,
+    "samples_per_case_per_leg": 500,
+    "selectors": [
+      "xls_numeric_plan_only_number_edit_save",
+      "xls_numeric_plan_only_rk_mulrk_edit_save"
+    ],
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "same_implementation_drift_gate_pct": 5.0
+  },
+  "validation": {
+    "all_raw_records_clean_exact_revision_affinity": true,
+    "all_timing_and_phase_vectors_length_500": true,
+    "semantic_projection_identical_across_all_four_legs": true,
+    "semantic_projection_sha256": "1d12946cc3273de5aca1c8b99c7bee7fdca417f3ed1e9feedc13498d1fa8f84e",
+    "corpus_output_fingerprint_sink_and_source_topology_match": true,
+    "number_total_all_statistics_direction_agree": true,
+    "rk_mulrk_total_all_statistics_direction_agree": true,
+    "number_publication_all_statistics_direction_agree": true,
+    "rk_mulrk_publication_p50_mean_p95_direction_agree": true,
+    "rk_mulrk_publication_p99_within_drift_gate": false,
+    "generic_read_at_direct_write_fences_unchanged": true,
+    "owned_atomic_save_fences_unchanged": true
+  },
+  "code_derived_work_elimination": {
+    "scope": "direct ValidatedOverlayPlan::write_to for plans whose immutable provenance is sealed by SharedOleFile::open_owned(Arc<[u8]>, SourceVersion)",
+    "fingerprint_chunk_bytes": 1048576,
+    "publication_chunk_bytes": 65536,
+    "per_effective_operation": {
+      "complete_source_scans_removed": 2,
+      "logical_source_bytes_removed": "2 * artifact length",
+      "read_at_calls_removed": "2 * ceil(artifact length / 1048576)",
+      "source_and_target_sha256_pairs_removed": 2,
+      "emission_source_scan_retained": true,
+      "emission_source_and_target_sha256_pair_retained": true
+    },
+    "number": {
+      "artifact_bytes": 16995840,
+      "logical_source_bytes_removed": 33991680,
+      "read_at_calls_removed": 34
+    },
+    "rk_mulrk": {
+      "artifact_bytes": 202752,
+      "logical_source_bytes_removed": 405504,
+      "read_at_calls_removed": 2
+    },
+    "physical_io_claim": "none; both sources are complete owned in-memory CFB snapshots and harness source counters describe ingress rather than internal fingerprint reads"
+  },
+  "accepted_results_percent_candidate_lower": {
+    "xls_numeric_plan_only_number_edit_save": {
+      "complete_workflow": {
+        "control_a1_to_candidate_b1": {
+          "p50": 38.857311,
+          "mean": 38.797438,
+          "p95": 38.398784,
+          "p99": 38.995821
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 38.380031,
+          "mean": 38.328920,
+          "p95": 38.027763,
+          "p99": 37.540046
+        }
+      },
+      "direct_publication": {
+        "control_a1_to_candidate_b1": {
+          "p50": 65.627576,
+          "mean": 65.598911,
+          "p95": 65.495766,
+          "p99": 65.533148
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 65.364766,
+          "mean": 65.324876,
+          "p95": 65.034578,
+          "p99": 64.440899
+        }
+      }
+    },
+    "xls_numeric_plan_only_rk_mulrk_edit_save": {
+      "complete_workflow": {
+        "control_a1_to_candidate_b1": {
+          "p50": 37.659606,
+          "mean": 37.718706,
+          "p95": 37.650433,
+          "p99": 36.628787
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 38.435567,
+          "mean": 38.509807,
+          "p95": 38.964901,
+          "p99": 38.651985
+        }
+      },
+      "direct_publication": {
+        "control_a1_to_candidate_b1": {
+          "p50": 66.523686,
+          "mean": 66.240465,
+          "p95": 65.539962
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 66.683641,
+          "mean": 66.612310,
+          "p95": 66.758366
+        }
+      }
+    }
+  },
+  "same_implementation_drift_pct": {
+    "number_complete_workflow_max_control": 1.494657,
+    "number_complete_workflow_max_candidate": 0.856029,
+    "number_publication_max_control": 1.142482,
+    "number_publication_max_candidate": 1.990298,
+    "rk_mulrk_complete_workflow_max_control": 4.090166,
+    "rk_mulrk_complete_workflow_max_candidate": 0.766970,
+    "rk_mulrk_publication_p50_mean_p95_max_control": 3.839952,
+    "rk_mulrk_publication_p50_mean_p95_max_candidate": 0.168480,
+    "rk_mulrk_publication_p99_control": 5.281574
+  },
+  "descriptive_process_rss_kib": {
+    "control_a1": 193720,
+    "candidate_b1": 194108,
+    "candidate_b2": 194420,
+    "control_a2": 193588,
+    "claim": "none; candidate is 388 KiB and 832 KiB higher in the paired process directions"
+  },
+  "cases": [
+    {
+      "selector": "xls_numeric_plan_only_number_edit_save",
+      "family": "Number",
+      "updates": 1,
+      "splice_count": 1,
+      "replacement_bytes": 8,
+      "artifact_bytes": 16995840,
+      "workbook_stream_bytes": 80946,
+      "source_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "output_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+      "sink_write_calls": 260,
+      "sink_largest_write_bytes": 65536
+    },
+    {
+      "selector": "xls_numeric_plan_only_rk_mulrk_edit_save",
+      "family": "RK+MulRK",
+      "updates": 3,
+      "splice_count": 3,
+      "replacement_bytes": 12,
+      "artifact_bytes": 202752,
+      "workbook_stream_bytes": 1665,
+      "source_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+      "output_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+      "sink_write_calls": 4,
+      "sink_largest_write_bytes": 65536
+    }
+  ]
+}

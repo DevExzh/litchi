@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "change": "0172-cfb-owned-numeric-publication",
+  "self_excluding": true,
+  "artifact_count": 10,
+  "artifacts": [
+    {
+      "path": "cfb-owned-numeric-publication-0172-a1.json.gz",
+      "bytes": 25480,
+      "sha256": "ad290ac0fa7b5a076847f139e739b70887109c2629d1b556d75e2313a738b713",
+      "uncompressed_bytes": 553185,
+      "uncompressed_sha256": "70edcd03b3873c331303905933d639f49570f7dcf3bb8ac7d11daabc0e0d315c"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-a2.json.gz",
+      "bytes": 26013,
+      "sha256": "b0400a49ae9acc50636f9f14bb6c890e5d1908d3ab8881b8195c6c67b8ea0843",
+      "uncompressed_bytes": 553633,
+      "uncompressed_sha256": "68edb22b45430a74dec1cbba54913fd7120ca361a5d0d3b12a04c995c381eb29"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-b1.json.gz",
+      "bytes": 24947,
+      "sha256": "783ebbc20f01960d0622359dfe8a16e4259ec87241fff378c4c82c1035bc78d5",
+      "uncompressed_bytes": 553372,
+      "uncompressed_sha256": "e4d99be7edeeada718ba7b997f04807df3ae3cfbecac923557a97e448adf7ba7"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-b2.json.gz",
+      "bytes": 25164,
+      "sha256": "2e2c93765f09711b0badf26c7e6116e12fd2923ff14a2d942b0bdadd0d95066e",
+      "uncompressed_bytes": 553543,
+      "uncompressed_sha256": "3efad1a033db15d44ae9ccd7b79fd6ec74219ba5d3cb9b7ea03e0b70160e63bc"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-a1.time.txt",
+      "bytes": 950,
+      "sha256": "26f81983e4f2e2d38847edfc9262d6c55dd55dab353375211d8bd7f289886d0e"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-a2.time.txt",
+      "bytes": 950,
+      "sha256": "975b805d4ad380c1c3a963e4b3bc6145b653a49e6f02b51abddb034c80fdc6a4"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-b1.time.txt",
+      "bytes": 954,
+      "sha256": "8d44f42353439a83de06094fdd7ef0af8b00d523d166ccc5e5e07bc7ab5256cc"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-b2.time.txt",
+      "bytes": 954,
+      "sha256": "62ea347943a9780accaf449a9f74861bc564479791ef19865d6a44c3d2b1d7b7"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-semantic.json",
+      "bytes": 6861,
+      "sha256": "1d12946cc3273de5aca1c8b99c7bee7fdca417f3ed1e9feedc13498d1fa8f84e"
+    },
+    {
+      "path": "cfb-owned-numeric-publication-0172-summary.json",
+      "bytes": 7304,
+      "sha256": "acf314ea70a77fa5da6fb7effa2d5bcf8007753bb3928123a948473fc3612e6a"
+    }
+  ]
+}

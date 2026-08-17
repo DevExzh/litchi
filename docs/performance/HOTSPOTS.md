@@ -3,9 +3,15 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0171`](changes/0171-cfb-owner-validation-fusion.md)
-(0171 fuses semantic owner validation into the existing final CFB fingerprint
-fence for source-backed DOC paragraph, PPT shape-text, and XLS visibility
+[`change 0172`](changes/0172-cfb-owned-numeric-publication.md)
+(0172 preserves immutable owned-byte provenance into native XLS numeric plans
+and removes the two redundant outer fingerprint scans from direct publication.
+Both measured complete workflows and publication through p95 pass the clean
+paired-direction and drift gates; atomic save and resource claims are
+unchanged/withheld.)
+([`0171`](changes/0171-cfb-owner-validation-fusion.md) fuses semantic owner
+validation into the existing final CFB fingerprint fence for source-backed DOC
+paragraph, PPT shape-text, and XLS visibility
 transactions. It removes one complete source scan per effective transaction;
 the measured XLS batch total and scalar/batch plan phases pass paired-direction
 and drift gates, while narrower totals, tails, publication and resource claims
@@ -1099,6 +1105,18 @@ the 64-worksheet complete workflow and 31.44%-33.16% lower p50/mean/p95 for
 scalar/batch semantic staging/plan. Scalar total, p99, publication, resource,
 physical-I/O, cold-cache and DOC/PPT latency claims remain open. See
 [`0171`](changes/0171-cfb-owner-validation-fusion.md).
+
+Change 0172 confirms that generic mutable-source publication fences were also
+dominant on the native XLS plan-only path after semantic validation fusion.
+The CFB owner now seals immutable provenance only from `Arc<[u8]>`; direct
+`write_to` skips its redundant complete pre/post scans but retains the 64 KiB
+emission pass and source/target hashes. Number removes 33,991,680 logical bytes
+and 34 one-MiB reads; RK/MulRK removes 405,504 bytes and two reads. Clean
+20-warmup/500-sample release ABBA accepts 37.54%-39.00% lower complete-workflow
+statistics and 64.44%-66.76% lower direct-publication statistics through p95
+for both families (plus Number p99). RK/MulRK publication p99, atomic-save,
+resource, physical-I/O, cold-cache and producer claims remain open. See
+[`0172`](changes/0172-cfb-owned-numeric-publication.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed
