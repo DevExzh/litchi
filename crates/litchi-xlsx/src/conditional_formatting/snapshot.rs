@@ -50,11 +50,11 @@ impl Snapshot {
     pub(super) fn from_rewritten_source(
         source: &Self,
         bytes: Vec<u8>,
-        readback: Vec<Formatting>,
+        values: Vec<Formatting>,
     ) -> Result<Self> {
         let closure = source.closure.rebind_worksheet_xml(bytes)?;
         Ok(Self {
-            values: Arc::new(readback),
+            values: Arc::new(values),
             closure,
             format_cells_locked: source.format_cells_locked,
         })
