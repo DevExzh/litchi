@@ -3,6 +3,13 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0187`](changes/0187-xlsx-unified-source-ingress.md)
+(0187 routes high-level XLSX filesystem opening through the existing
+source-backed OPC/workbook owner. On one generated four-sheet media-rich
+corpus, open-only p50/mean/p95/p99 are 91.59%-93.10% lower across both clean
+paired directions; open plus names/count/full text is 14.35%-18.30% lower.
+The evidence is warm and in-process; physical-I/O, cold-cache, resource,
+producer, edit/save, broad OOXML and iWork claims remain withheld.)
 [`change 0186`](changes/0186-opc-eager-shared-payloads.md)
 (0186 carries one immutable decompressed allocation from serial eager ZIP
 ingress through OPC XML/binary Part construction, removing one full payload

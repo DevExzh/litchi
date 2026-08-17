@@ -14,6 +14,24 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained high-level XLSX source-ingress result (change 0187)
+
+`litchi::Workbook::open(Path)` now hands validated XLSX files from one
+positional filesystem source into the existing source-backed OPC/workbook
+owner instead of retaining the complete input and eagerly decompressing every
+worksheet. Byte-backed opening and edit/save APIs are unchanged.
+
+Clean candidate CPU-2 A1/B1/B2/A2 release runs use 20 warmups and 500 samples
+on a deterministic four-sheet, 4.23 MiB media-rich corpus. Open-only
+p50/mean/p95/p99 are 91.59%-93.10% lower across both paired directions. Open
+plus worksheet names/count/full text is 14.35%-18.30% lower. Every named
+statistic passes the 5%/5%/10%/15% same-implementation drift gates.
+
+This is warm in-process high-level elapsed evidence, not a physical-I/O,
+cold-cache, allocation/RSS, producer-breadth, edit/save, or broad OOXML claim.
+See [change 0187](changes/0187-xlsx-unified-source-ingress.md) and its
+[machine-readable summary](results/xlsx-unified-ingress-0195-summary.json).
+
 ## Latest retained eager OPC payload-sharing result (change 0186)
 
 Ordinary eager OPC opening now carries the ZIP reader's immutable
