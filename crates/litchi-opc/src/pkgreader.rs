@@ -19,6 +19,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 use std::collections::{HashMap, HashSet, TryReserveError};
+use std::sync::Arc;
 
 /// The small ZIP surface needed by the structural OPC reader.
 ///
@@ -100,8 +101,11 @@ pub struct SerializedPart {
     /// The content type of this part
     pub content_type: String,
 
-    /// The binary content of this part
-    pub blob: Vec<u8>,
+    /// The binary content of this part.
+    ///
+    /// The eager reader adopts the archive reader's shared decompression
+    /// allocation, so passing this value onward does not clone the payload.
+    pub blob: Arc<Vec<u8>>,
 
     /// Serialized relationships from this part
     /// Uses `SmallVec` for efficient storage of typically small relationship collections
@@ -153,6 +157,7 @@ mod physical_part_tests {
     )]
     use super::PackageReader;
     use crate::{BlobPart, OpcPackage, PackURI, PackageWriter};
+    use std::sync::Arc;
 
     const ORPHAN_PART_NAME: &str = "/custom/orphan.xml";
     const ORPHAN_CONTENT: &[u8] = b"<extension xmlns=\"urn:litchi:test\">preserve me</extension>";
@@ -191,6 +196,29 @@ mod physical_part_tests {
             .find(|part| part.partname().as_str() == ORPHAN_PART_NAME)
             .expect("unreferenced physical part must survive save and reopen");
         assert_eq!(surviving_orphan.blob(), ORPHAN_CONTENT);
+    }
+
+    #[test]
+    fn eager_serialized_parts_retain_archive_payload_allocation() {
+        let mut source = OpcPackage::new();
+        source.add_part(Box::new(BlobPart::new(
+            PackURI::new(ORPHAN_PART_NAME).unwrap(),
+            "application/vnd.litchi.extension+xml".to_string(),
+            ORPHAN_CONTENT.to_vec(),
+        )));
+
+        let serialized = PackageWriter::to_bytes(&source).unwrap();
+        let physical = crate::phys_pkg::PhysPkgReader::new(&serialized).unwrap();
+        let reader = PackageReader::from_phys_reader(&physical).unwrap();
+        let archive_blob = physical.archive().read_shared("custom/orphan.xml").unwrap();
+        let serialized_blob = reader
+            .iter_sparts()
+            .find(|spart| spart.partname.as_str() == ORPHAN_PART_NAME)
+            .expect("unreferenced physical part must be loaded")
+            .blob
+            .clone();
+
+        assert!(Arc::ptr_eq(&archive_blob, &serialized_blob));
     }
 }
 
@@ -351,7 +379,7 @@ impl PackageReader {
             |names| {
                 Ok(names
                     .iter()
-                    .map(|name| (*name, archive.read(name)))
+                    .map(|name| (*name, archive.read_shared(name)))
                     .collect())
             },
         )?;
@@ -415,7 +443,14 @@ impl PackageReader {
             &mut non_part_members,
             limits,
             &mut relationship_ledger,
-            |names| session.read_many(archive, names),
+            |names| {
+                session.read_many(archive, names).map(|results| {
+                    results
+                        .into_iter()
+                        .map(|(name, result)| (name, result.map(Arc::new)))
+                        .collect()
+                })
+            },
         )?;
 
         Ok(Self {
@@ -609,7 +644,7 @@ impl PackageReader {
         ) -> Result<
             Vec<(
                 &'name str,
-                std::result::Result<Vec<u8>, soapberry_zip::Error>,
+                std::result::Result<Arc<Vec<u8>>, soapberry_zip::Error>,
             )>,
         >,
     {
@@ -701,7 +736,7 @@ impl PackageReader {
                 limits.max_total_part_bytes(),
             )?;
         }
-        let mut decompressed = HashMap::new();
+        let mut decompressed: HashMap<String, Arc<Vec<u8>>> = HashMap::new();
         decompressed
             .try_reserve(typed_parts.len())
             .map_err(|source| allocation("OPC decompressed parts", source))?;

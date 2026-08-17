@@ -299,11 +299,21 @@ impl XmlPart {
     /// * `xml_bytes` - The XML content as raw bytes
     #[must_use]
     pub fn new(partname: PackURI, content_type: String, xml_bytes: Vec<u8>) -> Self {
+        Self::new_shared(partname, content_type, Arc::new(xml_bytes))
+    }
+
+    /// Create a new `XmlPart` from an already shared allocation.
+    ///
+    /// The part adopts `xml_bytes` without copying its contents. This is used
+    /// by the eager package reader when the ZIP reader already owns a shared
+    /// decompression buffer.
+    #[must_use]
+    pub fn new_shared(partname: PackURI, content_type: String, xml_bytes: Arc<Vec<u8>>) -> Self {
         let rels = Relationships::for_source(&partname);
         Self {
             partname,
             content_type,
-            xml_bytes: Arc::new(xml_bytes),
+            xml_bytes,
             rels,
             element_cache: HashMap::new(),
         }
@@ -517,11 +527,25 @@ impl PartFactory {
         content_type: String,
         blob: Vec<u8>,
     ) -> Result<Box<dyn Part + Send + Sync>> {
+        Self::load_shared(partname, content_type, Arc::new(blob))
+    }
+
+    /// Load a part from an already shared payload, selecting the appropriate
+    /// Part implementation without copying the payload.
+    ///
+    /// This is the ingress used by the eager OPC reader. The `Vec<u8>`-based
+    /// [`Self::load`] method remains the compatibility surface for callers
+    /// that own an ordinary vector.
+    pub fn load_shared(
+        partname: PackURI,
+        content_type: String,
+        blob: Arc<Vec<u8>>,
+    ) -> Result<Box<dyn Part + Send + Sync>> {
         // Determine if this is an XML part based on content type
         if Self::is_xml_content_type(&content_type) {
-            Ok(Box::new(XmlPart::load(partname, content_type, blob)))
+            Ok(Box::new(XmlPart::new_shared(partname, content_type, blob)))
         } else {
-            Ok(Box::new(BlobPart::load(partname, content_type, blob)))
+            Ok(Box::new(BlobPart::new_shared(partname, content_type, blob)))
         }
     }
 
@@ -565,6 +589,29 @@ mod tests {
         let stored = part.blob_arc();
         assert!(Arc::ptr_eq(&content, &stored));
         assert_eq!(stored.as_slice(), content.as_slice());
+    }
+
+    #[test]
+    fn part_factory_shared_load_preserves_allocation_for_xml_and_binary() {
+        let xml_content = Arc::new(b"<root/>".to_vec());
+        let xml = PartFactory::load_shared(
+            PackURI::new("/word/document.xml").unwrap(),
+            "application/xml".to_string(),
+            Arc::clone(&xml_content),
+        )
+        .unwrap();
+        let stored_xml = xml.blob_arc();
+        assert!(Arc::ptr_eq(&xml_content, &stored_xml));
+
+        let binary_content = Arc::new(vec![0x89, 0x50, 0x4E, 0x47]);
+        let binary = PartFactory::load_shared(
+            PackURI::new("/word/media/image1.png").unwrap(),
+            "image/png".to_string(),
+            Arc::clone(&binary_content),
+        )
+        .unwrap();
+        let stored_binary = binary.blob_arc();
+        assert!(Arc::ptr_eq(&binary_content, &stored_binary));
     }
 
     #[test]

@@ -325,10 +325,10 @@ impl OpcPackage {
         // Create all parts - move data instead of cloning
         for spart in sparts {
             let partname = spart.partname.clone(); // Need to clone partname for the HashMap key
-            let mut part = PartFactory::load(
+            let mut part = PartFactory::load_shared(
                 spart.partname,     // Move
                 spart.content_type, // Move
-                spart.blob,         // Move (blob is Arc internally if large)
+                spart.blob,         // Move the shared decompressed payload
             )?;
 
             // Load part relationships
