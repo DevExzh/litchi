@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "change": "0169-xlsx-streaming-budget-charge",
+  "self_excluded": true,
+  "artifact_count": 19,
+  "artifacts": [
+    {
+      "path": "xlsx-stream-budget-charge-0169-a1.json.zst",
+      "bytes": 3994,
+      "sha256": "2a12e74891c3d87af8f5a2b84ae31355741fc7c008d96b03d5c7b5eb77773076",
+      "uncompressed_bytes": 20791,
+      "uncompressed_sha256": "2a773f9ebc0b2cb9890f1930c776a88990da8e1df199853362faa234860dce5d"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-b1.json.zst",
+      "bytes": 4001,
+      "sha256": "01d899bf7fd1a52b5a51d8bc673a56557c8097d0b019748985aa945318662d6e",
+      "uncompressed_bytes": 20792,
+      "uncompressed_sha256": "0920c645b5f45ab1d270c1a388656448f9ab974830c5d2e4e848f41078b02423"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-b2.json.zst",
+      "bytes": 3976,
+      "sha256": "21b6cef5fa89649618d679bd228407aeaca88b5115e3cf3d5650a2ee6abb5476",
+      "uncompressed_bytes": 20792,
+      "uncompressed_sha256": "fd998d7412faff243e75a4fa4453de76f608b69ef87bd9e6267f58f4ada22135"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-a2.json.zst",
+      "bytes": 3957,
+      "sha256": "1746f8bd16cb1b54c7aebb30d34bc0ed13ee3c8ccb102389a055459b723c4ced",
+      "uncompressed_bytes": 20783,
+      "uncompressed_sha256": "1f5e3ed5b343c0ff994f39d6b1860f070b29ac7f48d44300a0cb10c37f4aa9df"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-a1.time.txt",
+      "bytes": 909,
+      "sha256": "f9844656b13f042a9516e7ed8677b392f015881a5033b58fa89d6c90c5075e6c"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-b1.time.txt",
+      "bytes": 917,
+      "sha256": "ee7599b0f9ae55d054e4d687ebd94cfa05cb719b800919dae44fd489711f105c"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-b2.time.txt",
+      "bytes": 917,
+      "sha256": "e96a9b92c7cec2245031929d3b87b8df78e13a82e4f2a301a76a152a60790b05"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-a2.time.txt",
+      "bytes": 909,
+      "sha256": "61cf7f3a92cab0f77208ca0a6061dc681172848d7117c338bd0be474be2e052f"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-perf-a1.csv",
+      "bytes": 330,
+      "sha256": "b703aaf912311b6de33fe67645ad73fa58d0f99c7edd4a63536b8945de981cc1"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-perf-b1.csv",
+      "bytes": 329,
+      "sha256": "fd7e62959eaf4bf844b72f741f8cef0b6426661c1515d20ab38489d64ca6d834"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-perf-b2.csv",
+      "bytes": 329,
+      "sha256": "c8b16cfe8e4e7848625d8eddae7480aed6466fa3ea5839c8d03f950f26619a83"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-perf-a2.csv",
+      "bytes": 330,
+      "sha256": "41547e27197638092de78c4075ef875934b9e92c7b981905b18d365d2847300b"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-control.heaptrack.zst",
+      "bytes": 159624,
+      "sha256": "119ea9ab4349588dfea42a39380117223741669ae1f569e5cf40d1dff51a3110",
+      "uncompressed_bytes": 462324333,
+      "uncompressed_sha256": "454f4a703aaa80c2ebd0e95c4e62f1555f3ea279facceaed8607b4977eb65fa6"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-candidate.heaptrack.zst",
+      "bytes": 117530,
+      "sha256": "ba0a14284b76ea8652b27633a185bce0cd9ed0770c5218e95a177bd43c654e3a",
+      "uncompressed_bytes": 237349439,
+      "uncompressed_sha256": "959e8e518fd235f2dd9df931daf68905b53d91a426fc431b53597abb329289e0"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-control-perf-report.txt",
+      "bytes": 16484,
+      "sha256": "54da156ea9bd626c4ea33128d4bedfe1ddfdee2f1747dd992920ccb1d565cc8d"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-candidate-perf-report.txt",
+      "bytes": 16954,
+      "sha256": "7a703a6245d6a4e528d3da5361d39ae83367ae581f52a744c4a1ee1c201b0649"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-primary-stats.tsv",
+      "bytes": 1168,
+      "sha256": "390ac76ba409a49c2fd43be15c8f11c32835370e96b3a69050f0356808dd297c"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-comparisons.tsv",
+      "bytes": 1086,
+      "sha256": "a812b63d9f87d003fa27e17d1b6f0a7de6149e0b4cc53c682e912bab7b863cda"
+    },
+    {
+      "path": "xlsx-stream-budget-charge-0169-summary.json",
+      "bytes": 6839,
+      "sha256": "9f15d8d2e19a3d2adef4676eeccf95175e75b79a7dfda039397e4e513f47feee"
+    }
+  ]
+}

@@ -314,6 +314,32 @@ or producer improvement is accepted. See the
 [summary](results/xls-numeric-validation-fusion-0168-summary.json) and
 [manifest](results/xls-numeric-validation-fusion-0168-manifest.json).
 
+## XLSX streaming hierarchical-budget charges (change 0169)
+
+[Change 0169](changes/0169-xlsx-streaming-budget-charge.md) removes a transient
+owned ancestor vector from every cumulative `Budget::consume` call and stores
+up to four charged nodes inline for releasable reservations. Deeper caller-
+defined hierarchies still spill; public charge order, rollback, commit/drop,
+errors, limits, and atomics remain unchanged.
+
+The existing one-sheet `xlsx_streaming_create` selector supplied the measured
+hot path and no selector/schema changed. Clean CPU-2 release A/B/B/A runs used
+20 warmups and 200 samples for each shape. Medium and large p50/mean/p95/p99
+improve in both paired directions by 1.05%-9.76%; tiny p50/mean/p95 also
+improve, while tiny p99 regresses 1.81%/2.75% and is withheld. Matched
+whole-process Heaptrack captures record 38,672,384 -> 19,794,608 allocation
+calls and 22,545,902 -> 6,815,902 temporary allocations, with unchanged
+225.45M peak heap. GNU Time RSS directions disagree, and branch misses increase
+from a sub-0.25% absolute rate.
+
+Archive and worksheet hashes, row/cell/text counts, logical sink counters,
+zero retained output, and the 4 KiB row-authoring window remain exact. The
+accepted scope is warm in-memory, synthetic, one-sheet inline-scalar XLSX
+creation. It is not total-memory, physical-I/O, cold-cache, multi-sheet,
+shared-string/style/formula/date, real-producer, or broad `Budget` evidence.
+See the [summary](results/xlsx-stream-budget-charge-0169-summary.json) and
+[manifest](results/xlsx-stream-budget-charge-0169-manifest.json).
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
@@ -432,7 +458,7 @@ See the [summary](results/pptx-additive-topology-abba-0158-summary.json) and
 | [Managed OPC source cache](changes/0086-opc-source-cache-budget-management.md) and [release contention](changes/0088-opc-source-cache-contention-evidence.md) | Managed source-backed OPC (`f8d417ac3`) charges exact physical `InputBytes`, cumulative declared cold-load `Work`, retained catalog/flight/payload `Objects`, and retained/in-flight payload `Memory` to hierarchical `Budget`; compatibility opens remain finite under unmanaged `SourceCacheLimits`; correctness tests cover resource charges, retained-resource releases, pinning, eviction, single-flight, cancellation, sibling competition and contention invariants | Release ABBA provides structural/distribution evidence only; no managed-versus-control speedup accepted. Allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence remain missing |
 | XLSX source-provenance publication reuse | Matched scalar-cell source-backed p50 geomean **-21.66%/-22.65%** and p95 **-21.38%/-22.70%** across ABBA directions; exact output hashes | Removes the repeated semantic worksheet reload/reparse only; physical read/materialization counters are unchanged, and allocation/RSS/cold-I/O claims remain open |
 | Rejected generic XLSX publisher provenance reuse | Seven typed source-backed publishers: pooled p50 geomean **+1.04%**; individual pooled p50 **-1.52% to +3.84%**; whole-process allocation calls **-2.84%**; peak heap unchanged | Fully reverted by `a12387478`. The skipped reload usually hit retained cache state, source/materialization/sink/output evidence was unchanged, and the small allocation reduction did not justify the added snapshot/conflict complexity; see [change 0141](changes/0141-xlsx-source-provenance-negative-result.md) |
-| Bounded forward-only XLSX/RTF creation | RTF streaming p50 geomean **-76.41%/-76.47%**, p95 **-75.23%/-75.76%**; large sink calls **7,208,970 -> 1,441,802**; exact output hashes | RTF escape-free ASCII only, hard 32-byte request ceiling and unchanged 37-byte retained encoder state. XLSX streaming latency/memory evidence and allocation/RSS claims remain pending |
+| Bounded forward-only XLSX/RTF creation | RTF streaming p50 geomean **-76.41%/-76.47%**, p95 **-75.23%/-75.76%**; large sink calls **7,208,970 -> 1,441,802**. XLSX change 0169 accepts medium/large p50/mean/p95/p99 and tiny p50/mean/p95 reductions in both ABBA directions; matched whole-process Heaptrack descriptively records allocation calls **-48.81%** and temporary allocations **-69.77%**. Exact output hashes and bounded authoring windows remain | RTF claim is escape-free ASCII with a hard 32-byte request ceiling and unchanged 37-byte retained encoder state. XLSX claim is synthetic warm in-memory one-sheet inline-scalar creation; tiny p99 is withheld, RSS directions disagree, peak heap is flat, and total-memory/physical-I/O/cold-cache/richer authoring/producer claims remain pending |
 | Bounded semantic validation and ODF repair | DOCX, PPTX, RTF and XLS reports now complement CFB, OPC and ODF reports; one opt-in selector exercises ODF's typed non-destructive `mimetype` local-extra repair plan with exact forward/inverse and zero-retained-output sink evidence | Correctness-only, finite and fail-closed. Planning still performs a bounded full-candidate preflight, so no memory or latency claim is made; structural, encrypted, signed, macro and semantic repairs remain unsupported |
 | RTF logical-tail append | Two historical staging/commit/publication-timing cases plus four matched Commit/PublicationPlan controls cover tiny/medium/large append and exact no-op publication; the four new selectors use the pre-staged publication-call interval and a fixed 16 KiB non-seek counting sink, while separate planning/publication/reopen/lifecycle vectors and retained-byte fields are emitted. Planning/publication vectors are per-sample; reopen/lifecycle vectors are one-element preflight-only gates run outside the sample loop | Correctness/coverage only: candidate snapshot is not window-bounded, and no end-to-end, rich-format, release ABBA, allocation/RSS, physical-I/O, or speedup claim exists; see [changes 0090](changes/0090-rtf-logical-tail-append-evidence.md) and [0153](changes/0153-rtf-tail-publication-plan-evidence.md) |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |
@@ -1850,9 +1876,11 @@ accepted independently.
 Other high-priority gaps are physical cold-filesystem and real range-source
 matrices beyond the debug smoke and repeated tmpfs release capture, threshold
 tuning and cache-acceptance work beyond the committed explicit scaling curves,
-performance and memory evidence for bounded forward-only XLSX creation plus
-allocation/peak-memory evidence for the now latency-measured RTF creation path,
-and broad format-semantic CRUD coverage beyond the generated text/grid slices
+operation-local allocation and total/peak-memory attribution for bounded
+forward-only XLSX creation, richer XLSX authoring plus physical/cold-I/O and
+producer evidence, allocation/peak-memory evidence for the now latency-measured
+RTF creation path, and broad format-semantic CRUD coverage beyond the generated
+text/grid slices
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
 security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS

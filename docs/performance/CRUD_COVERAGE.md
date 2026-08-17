@@ -1344,6 +1344,20 @@ decompression, or producer claim. This does not extend CRUD coverage beyond
 existing fixed-width existing-cell numeric replacement. See
 [`0168`](changes/0168-xls-numeric-validation-fusion.md).
 
+Change 0169 keeps the 315-case matrix and the existing
+`xlsx_streaming_create` selector unchanged. It removes transient hierarchical-
+budget ancestor-vector allocations and retains four reservation nodes inline,
+with deeper caller-defined hierarchies spilling. Clean CPU-2 A/B/B/A records
+accept medium/large p50/mean/p95/p99 and tiny p50/mean/p95 reductions in both
+paired directions; tiny p99 regresses 1.81%/2.75% and is withheld. Matched
+whole-process Heaptrack allocation calls fall 48.81% and temporary allocations
+69.77%, peak heap is unchanged, and RSS directions disagree. Exact one-sheet
+archive/worksheet hashes, scalar-cell counts, zero retained output, and the
+4 KiB authoring window remain fixed. This adds performance evidence, not CRUD
+coverage: multi-sheet, shared-string/style/formula/date, physical/cold I/O,
+total-memory, and producer claims remain open. See
+[`0169`](changes/0169-xlsx-streaming-budget-charge.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

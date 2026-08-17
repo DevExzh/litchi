@@ -795,6 +795,24 @@ producer claim is made. See
 [summary](results/xls-numeric-validation-fusion-0168-summary.json), and the
 [manifest](results/xls-numeric-validation-fusion-0168-manifest.json).
 
+Change 0169 removes transient owned-node-vector construction from cumulative
+hierarchical budget charges and retains up to four releasable reservation nodes
+inline. The existing one-sheet `xlsx_streaming_create` selector supplied the
+measured scale path; no selector or schema changed. Clean CPU-2 release A/B/B/A
+runs used 20 warmups and 200 samples per tiny/medium/large shape. Medium and
+large p50/mean/p95/p99 improve in both paired directions by 1.05%-9.76%; tiny
+p50/mean/p95 also improve, while tiny p99 regresses 1.81%/2.75% and is withheld.
+Same-implementation drift stays inside the predeclared 5%/10%/15% tiers.
+Matched whole-process Heaptrack captures record 48.81% fewer allocation calls
+and 69.77% fewer temporary allocations with unchanged 225.45M peak heap; RSS
+directions disagree. Exact archive/worksheet hashes, rows/cells, logical sink
+counters, zero retained output, and the 4 KiB authoring window remain fixed.
+This is warm in-memory synthetic one-sheet creation evidence, not a total-memory,
+physical-I/O, cold-cache, multi-sheet, producer, or every-`Budget` claim. See
+[`0169`](changes/0169-xlsx-streaming-budget-charge.md), the
+[summary](results/xlsx-stream-budget-charge-0169-summary.json), and the
+[manifest](results/xlsx-stream-budget-charge-0169-manifest.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use
@@ -1081,8 +1099,12 @@ follows from this run. See
 [`0089`](changes/0089-filesystem-release-repeated-evidence.md).
 
 Bounded forward-only one-sheet XLSX creation and RTF authoring exist in
-production (`8245da20d` and `5918be8ec`). Their performance and peak-memory
-evidence is pending; no result in this baseline is attributed to them.
+production (`8245da20d` and `5918be8ec`). RTF's accepted ASCII batching result
+is recorded in change 0097. XLSX change 0169 accepts the precise warm in-memory
+one-sheet latency directions and descriptively records the matched whole-process
+allocation-call reductions described above; tiny p99, RSS, total-memory/peak-memory attribution,
+physical/cold I/O, multi-sheet/richer authoring, and producer evidence remain
+open.
 
 Bounded semantic validation reports are now implemented for DOCX, PPTX, RTF,
 and XLS, alongside the existing CFB, OPC, and ODF validation reports. They
