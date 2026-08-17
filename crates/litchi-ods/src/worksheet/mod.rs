@@ -10,7 +10,7 @@ pub mod model;
 
 pub(crate) mod codec;
 pub(crate) mod package;
-mod snapshot;
+pub(crate) mod snapshot;
 pub(crate) mod transaction;
 pub(crate) mod validation;
 

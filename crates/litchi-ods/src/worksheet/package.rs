@@ -5,7 +5,7 @@
 //! replacement unsafe, so the operation rejects them instead of silently
 //! discarding producer data.
 
-use super::{Sheet, codec, validation};
+use super::{CellValue, Sheet, codec, validation};
 use litchi_core::{Error, Result};
 use litchi_odf_common::{
     constants,
@@ -140,6 +140,24 @@ pub(crate) fn replace_changed_rows(
     apply_edits_bounded(xml, edits, max_output_bytes)
 }
 
+/// Rewrite only the changed physical rows of a source-backed package.
+///
+/// `None` means the source layout is not eligible for this exact row-local
+/// contract (for example, a structural table change or a producer extension
+/// outside the modeled row grammar). Callers must fail closed instead of
+/// falling back to a complete package materialization.
+pub(crate) fn replace_changed_rows_from_content_xml(
+    xml: &str,
+    original: &[Sheet],
+    candidate: &[Option<&Sheet>],
+    max_output_bytes: usize,
+) -> Result<Option<String>> {
+    let edits = changed_row_edits(xml, original, candidate, max_output_bytes, true)?;
+    edits
+        .map(|edits| apply_edits_bounded(xml, edits, max_output_bytes))
+        .transpose()
+}
+
 /// Try a provenance-bearing row-local packaged worksheet publication without
 /// changing the established structural-edit fallback.
 pub(crate) fn try_replace_changed_rows_spliced(
@@ -219,19 +237,6 @@ fn changed_row_edits(
     if tables.len() != original.len() {
         return Err(invalid("flat ODS table inventory changed since parsing"));
     }
-    if allow_ineligible {
-        for table in &tables {
-            for child in direct_children_any(&spans, *table) {
-                if !is_element(&spans[child], TABLE_NAMESPACE, "table-row") {
-                    return Err(Error::InvalidFormat(
-                        "ODS worksheet edit cannot replace a table containing unmodeled direct children"
-                            .to_string(),
-                    ));
-                }
-            }
-        }
-    }
-
     let mut edits = Vec::new();
     for (sheet_index, ((before, after), table)) in
         original.iter().zip(candidate).zip(tables).enumerate()
@@ -274,8 +279,19 @@ fn changed_row_edits(
             ));
         }
 
+        if allow_ineligible
+            && before.rows[prefix..old_end]
+                .iter()
+                .flat_map(|row| &row.cells)
+                .any(|cell| matches!(cell.value, CellValue::Unknown { .. }))
+        {
+            return Err(invalid(
+                "ODS source row span contains an unknown value that cannot be regenerated",
+            ));
+        }
+
         for row in &rows[prefix..old_end] {
-            validate_rewritable_row(xml, &spans, &spans[*row])?;
+            validate_rewritable_row(xml, &spans, *row)?;
         }
         edits.push(RowEdit {
             start: spans[rows[prefix]].start,
@@ -332,7 +348,43 @@ fn apply_edits_bounded(
     Ok(output)
 }
 
-fn validate_rewritable_row(xml: &str, spans: &[Span], span: &Span) -> Result<()> {
+fn validate_rewritable_row(xml: &str, spans: &[Span], span_index: usize) -> Result<()> {
+    let span = spans
+        .get(span_index)
+        .ok_or_else(|| invalid("flat ODS row span is invalid"))?;
+    let mut paragraph_owner = None;
+    for child in spans
+        .iter()
+        .skip(span_index.saturating_add(1))
+        .take_while(|child| child.start < span.end)
+    {
+        if child.parent == Some(span_index) {
+            if is_element(child, TABLE_NAMESPACE, "table-cell")
+                || is_element(child, TABLE_NAMESPACE, "covered-table-cell")
+            {
+                continue;
+            }
+            return Err(Error::InvalidFormat(format!(
+                "flat ODS edit would discard unmodeled row element '{}'",
+                child.local
+            )));
+        }
+        let parent_index = child
+            .parent
+            .ok_or_else(|| invalid("flat ODS row descendant has no parent"))?;
+        let parent = spans
+            .get(parent_index)
+            .ok_or_else(|| invalid("flat ODS row descendant parent is invalid"))?;
+        if parent.parent != Some(span_index)
+            || !is_element(child, codec::TEXT_NAMESPACE, "p")
+            || paragraph_owner == Some(parent_index)
+        {
+            return Err(invalid(
+                "flat ODS edit requires at most one direct text paragraph per cell",
+            ));
+        }
+        paragraph_owner = Some(parent_index);
+    }
     let row = xml
         .get(span.start..span.end)
         .ok_or_else(|| invalid("flat ODS row span is invalid"))?;
@@ -368,6 +420,7 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span: &Span) -> Result<()>
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut row_depth = 0usize;
+    let mut in_paragraph = false;
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
@@ -396,6 +449,9 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span: &Span) -> Result<()>
                     )));
                 }
                 validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local)?;
+                if is_element_name(namespace.as_deref(), &local, codec::TEXT_NAMESPACE, "p") {
+                    in_paragraph = true;
+                }
             },
             Event::Empty(element) => {
                 let namespace = resolve_namespace(&namespace)?;
@@ -419,10 +475,35 @@ fn validate_rewritable_row(xml: &str, spans: &[Span], span: &Span) -> Result<()>
                 }
                 validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local)?;
             },
-            Event::Comment(_) | Event::PI(_) | Event::DocType(_) if row_depth > 0 => {
+            Event::Text(text) if row_depth > 0 => {
+                let bytes: &[u8] = text.as_ref();
+                if !in_paragraph
+                    && !bytes
+                        .iter()
+                        .all(|byte| matches!(byte, b' ' | b'\t' | b'\n' | b'\r'))
+                {
+                    return Err(invalid(
+                        "flat ODS edit would discard text outside a cell paragraph",
+                    ));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if row_depth > 0 => {
+                return Err(invalid(
+                    "flat ODS edit would discard unsupported cell text markup",
+                ));
+            },
+            Event::Decl(_) | Event::Comment(_) | Event::PI(_) | Event::DocType(_)
+                if row_depth > 0 =>
+            {
                 return Err(invalid("flat ODS edit would discard unmodeled row markup"));
             },
-            Event::End(_) if row_depth > 0 => row_depth -= 1,
+            Event::End(element) if row_depth > 0 => {
+                let local = decode(element.local_name().as_ref(), "row element local name")?;
+                if local == "p" && in_paragraph {
+                    in_paragraph = false;
+                }
+                row_depth -= 1;
+            },
             Event::Eof => break,
             Event::Decl(_)
             | Event::Text(_)
@@ -521,6 +602,7 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
     let mut open = Vec::<usize>::new();
 
     loop {
+        let event_start = position(&reader)?;
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid ODS XML: {error}")))?;
@@ -532,7 +614,15 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
                 let local = decode(element.local_name().as_ref(), "element local name")?;
                 let qname = decode(element.name().as_ref(), "element qualified name")?;
                 let index = push_span(
-                    xml, &mut spans, &reader, namespace, local, qname, parent, false,
+                    xml,
+                    &mut spans,
+                    &reader,
+                    namespace,
+                    local,
+                    qname,
+                    parent,
+                    false,
+                    event_start,
                 )?;
                 open.push(index);
             },
@@ -543,7 +633,15 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
                 let local = decode(element.local_name().as_ref(), "element local name")?;
                 let qname = decode(element.name().as_ref(), "element qualified name")?;
                 push_span(
-                    xml, &mut spans, &reader, namespace, local, qname, parent, true,
+                    xml,
+                    &mut spans,
+                    &reader,
+                    namespace,
+                    local,
+                    qname,
+                    parent,
+                    true,
+                    event_start,
                 )?;
             },
             Event::End(_) => {
@@ -551,13 +649,16 @@ fn scan(xml: &str) -> Result<Vec<Span>> {
                     Error::InvalidFormat("ODS XML element stack underflow".to_string())
                 })?;
                 let end = position(&reader)?;
-                let close_start = xml.as_bytes()[..end]
-                    .windows(2)
-                    .rposition(|bytes| bytes == b"</")
-                    .ok_or_else(|| {
-                        Error::InvalidFormat("ODS XML closing tag start is missing".to_string())
-                    })?;
-                spans[index].close_start = close_start;
+                if xml
+                    .as_bytes()
+                    .get(event_start..event_start.saturating_add(2))
+                    != Some(b"</")
+                {
+                    return Err(Error::InvalidFormat(
+                        "ODS XML closing tag start is missing".to_string(),
+                    ));
+                }
+                spans[index].close_start = event_start;
                 spans[index].end = end;
             },
             Event::Eof => break,
@@ -589,6 +690,7 @@ fn push_span(
     qname: String,
     parent: Option<usize>,
     empty: bool,
+    start: usize,
 ) -> Result<usize> {
     if spans.len() >= MAX_SPANS {
         return Err(Error::InvalidFormat(
@@ -596,12 +698,17 @@ fn push_span(
         ));
     }
     let tag_end = position(reader)?;
+    if xml.as_bytes().get(start) != Some(&b'<') || start >= tag_end {
+        return Err(Error::InvalidFormat(
+            "ODS XML element start is missing".to_string(),
+        ));
+    }
     let index = spans.len();
     spans.push(Span {
         namespace,
         local,
         qname,
-        start: tag_start(xml, tag_end)?,
+        start,
         tag_end,
         close_start: tag_end,
         end: tag_end,
@@ -609,22 +716,6 @@ fn push_span(
         empty,
     });
     Ok(index)
-}
-
-fn tag_start(xml: &str, tag_end: usize) -> Result<usize> {
-    let mut quote = None;
-    for (index, byte) in xml.as_bytes()[..tag_end].iter().enumerate().rev() {
-        match (quote, byte) {
-            (Some(delimiter), current) if current == &delimiter => quote = None,
-            (Some(_), _) => {},
-            (None, b'\'' | b'"') => quote = Some(*byte),
-            (None, b'<') => return Ok(index),
-            _ => {},
-        }
-    }
-    Err(Error::InvalidFormat(
-        "ODS XML element start is missing".to_string(),
-    ))
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {

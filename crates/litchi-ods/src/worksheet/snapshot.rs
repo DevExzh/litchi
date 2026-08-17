@@ -277,38 +277,7 @@ impl Edit {
             return Ok(None);
         };
 
-        validate_aggregate_cell_payload(&changes)?;
-        for change in &changes {
-            if change.row >= validation::MAX_LOGICAL_ROWS {
-                return Err(Error::InvalidFormat(format!(
-                    "ODS cell batch row {} is outside the {}-row logical grid",
-                    change.row,
-                    validation::MAX_LOGICAL_ROWS
-                )));
-            }
-            if change.column >= validation::MAX_LOGICAL_COLUMNS {
-                return Err(Error::InvalidFormat(format!(
-                    "ODS cell batch column {} is outside the {}-column logical grid",
-                    change.column,
-                    validation::MAX_LOGICAL_COLUMNS
-                )));
-            }
-            change.cell.validate()?;
-            if change.cell.repeat() != 1 {
-                return Err(Error::InvalidFormat(
-                    "setting one logical cell requires a non-repeated Cell".to_string(),
-                ));
-            }
-        }
-        changes.sort_by_key(|change| (change.row, change.column));
-        for repeated in changes.windows(2) {
-            if repeated[0].row == repeated[1].row && repeated[0].column == repeated[1].column {
-                return Err(Error::InvalidFormat(format!(
-                    "ODS cell batch repeats logical coordinate ({}, {})",
-                    repeated[0].row, repeated[0].column
-                )));
-            }
-        }
+        validate_cell_changes(&mut changes)?;
 
         let effective = effective_cell_changes(&self.draft[index], changes);
         let changed = effective.len();
@@ -569,7 +538,7 @@ impl Snapshot {
     }
 }
 
-fn select(sheets: &[Sheet], selector: Selector<'_>) -> Result<Option<usize>> {
+pub(crate) fn select(sheets: &[Sheet], selector: Selector<'_>) -> Result<Option<usize>> {
     match selector {
         Selector::Position(position) => {
             Ok((position.get() < sheets.len()).then_some(position.get()))
@@ -590,7 +559,7 @@ fn select(sheets: &[Sheet], selector: Selector<'_>) -> Result<Option<usize>> {
     }
 }
 
-fn effective_cell_changes(sheet: &Sheet, changes: Vec<CellChange>) -> Vec<CellChange> {
+pub(crate) fn effective_cell_changes(sheet: &Sheet, changes: Vec<CellChange>) -> Vec<CellChange> {
     let mut effective = Vec::with_capacity(changes.len());
     let mut row_index = 0usize;
     let mut row_start = 0usize;
@@ -629,6 +598,48 @@ fn effective_cell_changes(sheet: &Sheet, changes: Vec<CellChange>) -> Vec<CellCh
         }
     }
     effective
+}
+
+/// Validate and order a bounded cell replacement batch.
+pub(crate) fn validate_cell_changes(changes: &mut [CellChange]) -> Result<()> {
+    if changes.len() > MAX_CELL_CHANGES {
+        return Err(Error::InvalidFormat(format!(
+            "ODS cell batch exceeds the {MAX_CELL_CHANGES} operation safety limit"
+        )));
+    }
+    validate_aggregate_cell_payload(changes)?;
+    for change in changes.iter() {
+        if change.row >= validation::MAX_LOGICAL_ROWS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS cell batch row {} is outside the {}-row logical grid",
+                change.row,
+                validation::MAX_LOGICAL_ROWS
+            )));
+        }
+        if change.column >= validation::MAX_LOGICAL_COLUMNS {
+            return Err(Error::InvalidFormat(format!(
+                "ODS cell batch column {} is outside the {}-column logical grid",
+                change.column,
+                validation::MAX_LOGICAL_COLUMNS
+            )));
+        }
+        change.cell.validate()?;
+        if change.cell.repeat() != 1 {
+            return Err(Error::InvalidFormat(
+                "setting one logical cell requires a non-repeated Cell".to_string(),
+            ));
+        }
+    }
+    changes.sort_by_key(|change| (change.row, change.column));
+    for repeated in changes.windows(2) {
+        if repeated[0].row == repeated[1].row && repeated[0].column == repeated[1].column {
+            return Err(Error::InvalidFormat(format!(
+                "ODS cell batch repeats logical coordinate ({}, {})",
+                repeated[0].row, repeated[0].column
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn validate_aggregate_cell_payload(changes: &[CellChange]) -> Result<()> {
