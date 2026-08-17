@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **311 selectable cases**; 200 was the count before the
+harness contains **315 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -256,6 +256,37 @@ cold-cache, real-producer, generic-DOC, total-memory, operation-only
 allocation/RSS, or CRUD-completeness claim; the wider native owner/public
 validation and format matrix remain open.
 
+## XLSX row-visibility provenance reuse (change 0167)
+
+[Change 0167](changes/0167-xlsx-row-visibility-provenance-reuse.md) makes the
+existing source-backed row-visibility publisher consume its embedded
+cell-values patch through the established tri-state provenance proof. Matched
+lineage/version publication no longer reloads the selected worksheet,
+reparses its cell store, or rescans row tags. Mismatched provenance still
+refuses, unavailable provenance still takes the conservative semantic fallback,
+and every path retains mandatory OPC overlay validation and sequential
+publication.
+
+A >8 MiB worksheet regression permits exactly the one selected-member read
+required by OPC publication; the former second semantic read would fail.
+Focused row/cell suites, 765 XLSX library tests, strict warning/deprecation
+Clippy, format/diff checks, and an independent adversarial review are green.
+
+Clean CPU-2 `A1 control, B1 candidate, B2 candidate, A2 control` release runs
+used 20 warmups and 500 retained samples for four medium/large hide-one and
+unhide-256 records per leg. Every publication p50/mean/p95/p99 pair is lower
+for the candidate, with descriptive reductions of 50.42%-68.23%. Logical
+`ReadAt` topology is unchanged while source-version checks fall by 13 per
+sample. The 5% same-implementation gate fails: maximum absolute drift is
+34.80% for control large/unhide publication p99 and 10.23% for candidate
+medium/hide complete-workflow p50; first-pair medium hide/unhide complete-
+workflow p99 regresses 6.95%/2.69%. The production work
+elimination is retained, but no acceptance-grade end-to-end latency, tail,
+allocation/RSS, physical-I/O, decompression, cold-cache, or producer claim is
+accepted. Raw vectors and sidecars are bound by the
+[summary](results/xlsx-row-visibility-provenance-0167-summary.json) and
+[manifest](results/xlsx-row-visibility-provenance-0167-manifest.json).
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
@@ -292,7 +323,8 @@ revision the 291-name selector matrix was unchanged; change 0153 adds four RTF
 selectors measured at the pre-staged publication-call interval, making that
 matrix 295. Change 0154 adds six ODF publication selectors, making the current
 matrix 301; change 0159 later made it 302, change 0160 made it 303, change
-0162 made it 305, change 0163 made it 309, and change 0164 makes it 311. No runtime
+0162 made it 305, change 0163 made it 309, change 0164 made it 311, and
+change 0166 makes it 315. No runtime
 selector was added to 0152; only `cfg(test)` source-event acceptance and tests
 changed. Local or generic latency,
 allocation/RSS/peak memory, physical I/O/syscalls, cold-cache/device/network,
@@ -1303,7 +1335,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 311 selectable cases. Change
+The current standalone harness provides 315 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1386,7 +1418,7 @@ evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 interval, making that matrix 295. Change 0154 adds six ODF content-COW
 publication selectors, making that matrix 301; change 0159 later made it 302,
 change 0160 made it 303, change 0162 made it 305, change 0163 made it 309,
-and change 0164 makes the current matrix 311.
+change 0164 made it 311, and change 0166 makes the current matrix 315.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "change": "0167-xlsx-row-visibility-provenance-reuse",
+  "self_excluding": true,
+  "artifact_count": 11,
+  "artifacts": [
+    {
+      "path": "xlsx-row-visibility-provenance-0167-a1.json.zst",
+      "bytes": 41711,
+      "sha256": "7658f0ce301aef093d13d7c65fd2eae69c4d569357959c6ae552445439807bd7",
+      "uncompressed_bytes": 1220079,
+      "uncompressed_sha256": "48a2614a7ca618043918035752efe82b7d1d89958073278fa49b727d5731969e"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-a1.time.txt",
+      "bytes": 1008,
+      "sha256": "8d672ca8e495ebc4bda6427f15e2307d0a39930ee8b5906d5a9d41bcac158d25"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-a2.json.zst",
+      "bytes": 43259,
+      "sha256": "bc38e7ba5343fd29f1ec91ba53c5e9b0e3260ad91959ff74bfd3c61d5ecf1832",
+      "uncompressed_bytes": 1221942,
+      "uncompressed_sha256": "53ec802036df1ea8955b53737e29ef278203967847c3245c0560f3bd71909087"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-a2.time.txt",
+      "bytes": 1012,
+      "sha256": "e1acd5c2aea9c8da91b2acdd30df5abb56491054bda4c437cd9f5c7b7a3c431d"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-b1.json.zst",
+      "bytes": 43662,
+      "sha256": "1ea8a9084be198941daf89c3ac686e578642190675442966f6c064a4d9acbc06",
+      "uncompressed_bytes": 1220198,
+      "uncompressed_sha256": "1cec12a6503b05a7a663b4dfa97685d6a73732b91ed66a84f0e746e5d6b408a2"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-b1.time.txt",
+      "bytes": 1009,
+      "sha256": "32b8fe190ee2f4f6c2cd91fcf3a2995845a8864500b29b28a22cbbf9eb73c827"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-b2.json.zst",
+      "bytes": 42985,
+      "sha256": "8db1fb589319ae05c78199ece17795f192c53e38b6fd3b80a78bc93ae75afb2d",
+      "uncompressed_bytes": 1220787,
+      "uncompressed_sha256": "5157ba2217232eb58d5eddb73e9088ed917b6615078fb80931786b96ca06bb7d"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-b2.time.txt",
+      "bytes": 1008,
+      "sha256": "6471474738f3d9d4c0e95d517a2ed6319c5aac3fe82298487f4218518528be50"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-comparisons.tsv",
+      "bytes": 3142,
+      "sha256": "45c09d3a575bbc235707aa95d71bd2fccf8b4acad3a8d14c3ea266a9e60d6012"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-primary-stats.tsv",
+      "bytes": 2852,
+      "sha256": "e7c148663b3fe51213f6c47af25abdd4c4d731090148f744637f46fe8600b174"
+    },
+    {
+      "path": "xlsx-row-visibility-provenance-0167-summary.json",
+      "bytes": 6137,
+      "sha256": "f397cf87c48077f5ef5a9a893452034d32ff4528648a38704d0eaddf2b57a43e"
+    }
+  ]
+}

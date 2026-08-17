@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "change": "0167-xlsx-row-visibility-provenance-reuse",
+  "decision": {
+    "production_change": "retained as a correctness-equivalent measured enabler that removes one redundant semantic worksheet reload, cell parse, and row scan from matched publication",
+    "release_latency_claim": "withheld because same-implementation temporal drift exceeded the 5% acceptance gate",
+    "observed_publication_reduction_pct_range": [
+      50.422219,
+      68.230745
+    ],
+    "observed_phase_result": "publication p50, mean, p95, and p99 were lower for the candidate in both paired directions for all four cases; percentages are descriptive rather than acceptance-grade",
+    "end_to_end_claim": "withheld; two medium A1/B1 p99 comparisons regressed and same-implementation drift exceeded the gate",
+    "resource_claim": "none; logical ReadAt topology was unchanged and whole-process time/RSS sidecars are descriptive only"
+  },
+  "builds": {
+    "control": {
+      "revision": "7dc05de69d9e5e70f827be739dd578bc400ef23a",
+      "binary_sha256": "1996336bdc8b0d29d6262b0c39c017709bb4d996f33ef7192f501bbf0afba54e"
+    },
+    "candidate": {
+      "revision": "4b156db82baa58988a04699fb026cba5b8e8a04c",
+      "binary_sha256": "b4b0e7e034523b3218c01acc0e9aaf82f19af4ad0e39127db056b86e48d6e4a2"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "kernel": "Linux 6.8.0-101-generic",
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "execution_order": [
+      "a1",
+      "b1",
+      "b2",
+      "a2"
+    ],
+    "warmups": 20,
+    "samples_per_case": 500,
+    "cases_per_leg": 4,
+    "shapes": [
+      "medium",
+      "large"
+    ],
+    "selectors": [
+      "xlsx_source_backed_row_visibility_edit_save",
+      "xlsx_source_backed_row_visibility_batch_edit_save"
+    ],
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "same_implementation_drift_gate_pct": 5.0
+  },
+  "validation": {
+    "all_records_clean_exact_revision_affinity": true,
+    "all_vector_lengths_500": true,
+    "all_semantic_and_refusal_gates": true,
+    "all_sinks_retained_zero_output_bytes": true,
+    "corpus_output_semantic_hashes_match_across_legs": true,
+    "logical_read_topology_matches_across_legs": true,
+    "source_version_calls_drop_by_13_per_sample": true,
+    "publication_direction_agrees_all_metrics_all_cases": true,
+    "elapsed_direction_agrees_all_metrics_all_cases": false,
+    "same_implementation_drift_within_gate": false,
+    "maximum_absolute_control_drift": {
+      "pct": 34.796548,
+      "scope": "large/unhide-256 publication p99"
+    },
+    "maximum_absolute_candidate_drift": {
+      "pct": 10.226172,
+      "scope": "medium/hide-one complete-workflow p50"
+    }
+  },
+  "whole_process_sidecars": {
+    "a1": {
+      "elapsed_wall": "8:16.69",
+      "user_seconds": 496.36,
+      "system_seconds": 0.28,
+      "max_rss_kib": 244916,
+      "filesystem_inputs": 136,
+      "filesystem_outputs": 2384,
+      "exit_status": 0
+    },
+    "b1": {
+      "elapsed_wall": "7:49.31",
+      "user_seconds": 468.92,
+      "system_seconds": 0.32,
+      "max_rss_kib": 231516,
+      "filesystem_inputs": 72,
+      "filesystem_outputs": 2384,
+      "exit_status": 0
+    },
+    "b2": {
+      "elapsed_wall": "7:53.24",
+      "user_seconds": 472.77,
+      "system_seconds": 0.39,
+      "max_rss_kib": 229548,
+      "filesystem_inputs": 0,
+      "filesystem_outputs": 2392,
+      "exit_status": 0
+    },
+    "a2": {
+      "elapsed_wall": "9:44.07",
+      "user_seconds": 583.61,
+      "system_seconds": 0.35,
+      "max_rss_kib": 236868,
+      "filesystem_inputs": 21232,
+      "filesystem_outputs": 2392,
+      "exit_status": 0
+    }
+  },
+  "cases": [
+    {
+      "shape": "medium",
+      "operation": "hide-one",
+      "updates": 1,
+      "source_sha256": "4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+      "output_sha256": "59b17e475f7b305b2a0f9a69ff0fb05282fd385fafcc511731db0b495c6f2aad",
+      "semantic_sha256": "f8b1e696797980c5b47a9eb4ce496c135f7587b680df3c48b8edad9ecc6e728a",
+      "source_read_calls": 204,
+      "selected_worksheet_read_calls": 1,
+      "control_source_version_calls": 572,
+      "candidate_source_version_calls": 559
+    },
+    {
+      "shape": "medium",
+      "operation": "unhide-256",
+      "updates": 256,
+      "source_sha256": "fc798b217a8bc54ba51db846727bc0f37987078642ad01f9de169048145592ed",
+      "output_sha256": "4c1f61e3785593dc8a5869b4fcc8289337a3ec362bdc5039f705b03551fa9f77",
+      "semantic_sha256": "95f11172b084aa7b24831d01aac5b30211ba2e78afce12c5b4d353b8e688a19a",
+      "source_read_calls": 204,
+      "selected_worksheet_read_calls": 1,
+      "control_source_version_calls": 572,
+      "candidate_source_version_calls": 559
+    },
+    {
+      "shape": "large",
+      "operation": "hide-one",
+      "updates": 1,
+      "source_sha256": "7ed11c2fa5cbe48b1d011ae1ca0858eca270ffae53c2dacdfa8aafcdd84a6e3c",
+      "output_sha256": "ded6ea6f97475580072ccf3fe0fbe7615fca3bb060e9c07e29a723e86e661414",
+      "semantic_sha256": "830886669db63d0327da4928822d6a09cf3183c570a709c91119b67a8266919a",
+      "source_read_calls": 209,
+      "selected_worksheet_read_calls": 6,
+      "control_source_version_calls": 574,
+      "candidate_source_version_calls": 561
+    },
+    {
+      "shape": "large",
+      "operation": "unhide-256",
+      "updates": 256,
+      "source_sha256": "431daacb640c23704f8f3b130ff27c0563ea4d8f817f664739a16be09bb77692",
+      "output_sha256": "7ed11c2fa5cbe48b1d011ae1ca0858eca270ffae53c2dacdfa8aafcdd84a6e3c",
+      "semantic_sha256": "f33a7314dbcce0321b25fab589f94215dc6f30ffc7022475dff932dbc96f85fc",
+      "source_read_calls": 209,
+      "selected_worksheet_read_calls": 6,
+      "control_source_version_calls": 574,
+      "candidate_source_version_calls": 561
+    }
+  ],
+  "tables": {
+    "primary_stats": "xlsx-row-visibility-provenance-0167-primary-stats.tsv",
+    "comparisons": "xlsx-row-visibility-provenance-0167-comparisons.tsv"
+  }
+}
