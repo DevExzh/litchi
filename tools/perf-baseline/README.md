@@ -5,7 +5,8 @@ ZIP/OPC and CFB/OLE2 substrates, fresh DOC/XLS/PPT writer packaging, and
 public-API XLSX snapshot/edit/save flows, matched opt-in XLSX scalar-cell
 eager/source-backed and managed source-backed publication controls, one-cell
 eager/source-backed clear/remove lifecycle controls, and opt-in DOC/XLS/PPT,
-DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including the opt-in RTF logical-tail
+DOCX/PPTX/RTF/ODT/ODS/ODP semantic flows, including matched ODS
+owned/source-backed existing-cell publication controls and the opt-in RTF logical-tail
 append and ordinary-paragraph split/adjacent-merge transactions, bounded RTF/XLS/DOCX/PPTX/ODF validation reports, and a
 source-backed DOCX section inventory. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
@@ -82,11 +83,12 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 315
+provide their source-read counters. The current `Case` matrix exposes 319
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
-four opt-in XLSX existing-row visibility lifecycle selectors.
+four opt-in XLSX existing-row visibility lifecycle selectors, and four opt-in
+ODS existing-cell publication selectors.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -1149,6 +1151,31 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 30 --case ods_media_one_edit_save \
   --json target/perf/ods-media-publication.json
 ```
+
+Run the matched owned/source-backed existing-cell ODS controls over that same
+two-sheet, 2,048-cell, eight-resource media-rich corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 \
+  --case ods_source_eager_one_edit_save,ods_source_backed_one_edit_save,\
+ods_source_eager_one_percent_edit_save,ods_source_backed_one_percent_edit_save \
+  --json target/perf/ods-source-cell-crud.json
+```
+
+The one-cell selector edits the existing middle cell used by the fixed ODS
+media case; the one-percent selector uses the deterministic evenly spaced
+`semantic_update_indices` closure (21 existing cells). The eager controls use
+the owned ODS transaction and write the complete committed snapshot through
+the fixed 16 KiB non-seek hashing sink. The source-backed controls use
+`SourceBackedSpreadsheet::from_read_at`, `edit_cells`, `set_cell`/`set_cells`,
+`commit`, and `write_to` without `materialize()`. Open, staging, commit/plan,
+and sequential publication are timed. Reopen, full semantic digest, media
+payload hashes, source/output hashes, source raw-untouched-member identity,
+exact no-op, foreign-source patch refusal, replacement-limit, and partial-sink
+gates are untimed. The fixed sink retains zero output bytes. These selectors
+provide correctness and matched timing evidence only; they make no release
+speedup, allocation/RSS, physical-I/O, cold-cache, or producer claim.
 
 Run the fixed medium ODT paragraph publication case with eight 2 MiB
 incompressible opaque resources:

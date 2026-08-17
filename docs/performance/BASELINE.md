@@ -414,8 +414,8 @@ Change 0153 adds four RTF selectors measured at the pre-staged
 publication-call interval, making that matrix 295. Change 0154 adds six ODF
 content-COW publication selectors, making that matrix 301; change 0159 later
 made it 302, change 0160 made it 303, change 0162 made it 305, change 0163
-made it 309, change 0164 made it 311, and change 0166 makes the current matrix
-315. Local or generic latency, allocation/RSS/peak memory, physical
+made it 309, change 0164 made it 311, change 0166 made it 315, and change 0174
+makes the current matrix 319. Local or generic latency, allocation/RSS/peak memory, physical
 I/O/syscalls, cold-cache/device/network behavior, decompression, native
 semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -612,7 +612,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**315 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**319 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.

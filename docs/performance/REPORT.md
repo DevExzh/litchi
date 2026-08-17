@@ -58,7 +58,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **315 selectable cases**; 200 was the count before the
+harness contains **319 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. That measured tranche includes six
@@ -1486,7 +1486,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 315 selectable cases. Change
+The current standalone harness provides 319 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
@@ -1569,7 +1569,8 @@ evidence only. At the 0152 revision the 291-name matrix was unchanged; change
 interval, making that matrix 295. Change 0154 adds six ODF content-COW
 publication selectors, making that matrix 301; change 0159 later made it 302,
 change 0160 made it 303, change 0162 made it 305, change 0163 made it 309,
-change 0164 made it 311, and change 0166 makes the current matrix 315.
+change 0164 made it 311, change 0166 made it 315, and change 0174 makes the
+current matrix 319.
 No runtime selector was added to 0152; only `cfg(test)` source-event
 acceptance and tests changed. Root
 MiniStream cache/resource-accounting boundaries and broader performance gaps

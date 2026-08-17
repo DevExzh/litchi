@@ -862,6 +862,10 @@ enum Case {
     OdsSemanticNoopEditSave,
     OdsSemanticOneEditSave,
     OdsSemanticOnePercentEditSave,
+    OdsSourceEagerOneEditSave,
+    OdsSourceBackedOneEditSave,
+    OdsSourceEagerOnePercentEditSave,
+    OdsSourceBackedOnePercentEditSave,
     OdsMediaOneEditSave,
     OdsContentCowOwnedRebuild,
     OdsContentCowPositional,
@@ -1301,6 +1305,10 @@ impl Case {
             Self::OdsSemanticNoopEditSave => "ods_semantic_noop_edit_save",
             Self::OdsSemanticOneEditSave => "ods_semantic_one_edit_save",
             Self::OdsSemanticOnePercentEditSave => "ods_semantic_one_percent_edit_save",
+            Self::OdsSourceEagerOneEditSave => "ods_source_eager_one_edit_save",
+            Self::OdsSourceBackedOneEditSave => "ods_source_backed_one_edit_save",
+            Self::OdsSourceEagerOnePercentEditSave => "ods_source_eager_one_percent_edit_save",
+            Self::OdsSourceBackedOnePercentEditSave => "ods_source_backed_one_percent_edit_save",
             Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
             Self::OdsContentCowOwnedRebuild => "ods_content_cow_owned_rebuild",
             Self::OdsContentCowPositional => "ods_content_cow_positional",
@@ -1684,6 +1692,16 @@ impl Case {
                 | Self::OdsSemanticNoopEditSave
                 | Self::OdsSemanticOneEditSave
                 | Self::OdsSemanticOnePercentEditSave
+        )
+    }
+
+    const fn is_ods_source_cell_edit_save(self) -> bool {
+        matches!(
+            self,
+            Self::OdsSourceEagerOneEditSave
+                | Self::OdsSourceBackedOneEditSave
+                | Self::OdsSourceEagerOnePercentEditSave
+                | Self::OdsSourceBackedOnePercentEditSave
         )
     }
 
@@ -6163,6 +6181,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odt_resource_batch()
                     && !case.uses_odf_content_cow()
                     && !case.uses_semantic_ods()
+                    && !case.is_ods_source_cell_edit_save()
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
@@ -7021,6 +7040,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                     options.range_simulation,
                 )?);
             }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_ods_source_cell_edit_save())
+    {
+        let corpus = build_ods_media_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_ods_source_cell_edit_save())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
         }
     }
 
@@ -8035,6 +8076,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_semantic_noop_edit_save" => Some(Case::OdsSemanticNoopEditSave),
         "ods_semantic_one_edit_save" => Some(Case::OdsSemanticOneEditSave),
         "ods_semantic_one_percent_edit_save" => Some(Case::OdsSemanticOnePercentEditSave),
+        "ods_source_eager_one_edit_save" => Some(Case::OdsSourceEagerOneEditSave),
+        "ods_source_backed_one_edit_save" => Some(Case::OdsSourceBackedOneEditSave),
+        "ods_source_eager_one_percent_edit_save" => Some(Case::OdsSourceEagerOnePercentEditSave),
+        "ods_source_backed_one_percent_edit_save" => Some(Case::OdsSourceBackedOnePercentEditSave),
         "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
         "ods_content_cow_owned_rebuild" => Some(Case::OdsContentCowOwnedRebuild),
         "ods_content_cow_positional" => Some(Case::OdsContentCowPositional),
@@ -8356,6 +8401,10 @@ fn print_usage() {
                                        ods_semantic_full_cell_text,ods_semantic_create_small,\n\
                                        ods_semantic_noop_edit_save,ods_semantic_one_edit_save,\n\
                                        ods_semantic_one_percent_edit_save,\n\
+                                       ods_source_eager_one_edit_save,\n\
+                                       ods_source_backed_one_edit_save,\n\
+                                       ods_source_eager_one_percent_edit_save,\n\
+                                       ods_source_backed_one_percent_edit_save,\n\
                                        ods_media_one_edit_save,\n\
                                        ods_content_cow_owned_rebuild,ods_content_cow_positional,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
@@ -14745,6 +14794,12 @@ fn run_case_with_config(
         | Case::OdsSemanticOneEditSave
         | Case::OdsSemanticOnePercentEditSave => {
             run_semantic_ods(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdsSourceEagerOneEditSave
+        | Case::OdsSourceBackedOneEditSave
+        | Case::OdsSourceEagerOnePercentEditSave
+        | Case::OdsSourceBackedOnePercentEditSave => {
+            run_ods_source_cell_edit_save(case, corpus, warmup_iterations, samples)
         },
         Case::OdsMediaOneEditSave => {
             run_ods_media_one_edit_save(corpus, warmup_iterations, samples)
@@ -23556,6 +23611,389 @@ fn run_ods_media_one_edit_save(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     Ok(result(Case::OdsMediaOneEditSave, corpus, elapsed, None))
+}
+
+fn ods_source_cell_updates(
+    one_percent: bool,
+) -> Result<Vec<(usize, usize, usize)>, Box<dyn Error>> {
+    let shape = SemanticShape::Medium;
+    if one_percent {
+        Ok(semantic_update_indices(shape.ods_cell_count())?
+            .into_iter()
+            .map(|index| {
+                let cells_per_sheet = shape.ods_rows_per_sheet() * shape.ods_columns_per_sheet();
+                let sheet = index / cells_per_sheet;
+                let local = index % cells_per_sheet;
+                (
+                    sheet,
+                    local / shape.ods_columns_per_sheet(),
+                    local % shape.ods_columns_per_sheet(),
+                )
+            })
+            .collect())
+    } else {
+        Ok(vec![(
+            shape.ods_sheet_count() / 2,
+            shape.ods_rows_per_sheet() / 2,
+            shape.ods_columns_per_sheet() / 2,
+        )])
+    }
+}
+
+fn ods_source_cell_value(sheet: usize, row: usize, column: usize) -> litchi_ods::Cell {
+    let text = semantic_ods_text(sheet, row, column, true);
+    litchi_ods::Cell::new(litchi_ods::CellValue::Text(text.clone()), text)
+}
+
+fn stage_ods_source_cell_changes(
+    edit: &mut litchi_ods::SourceCellEdit<'_>,
+    updates: &[(usize, usize, usize)],
+    one_percent: bool,
+) -> Result<usize, Box<dyn Error>> {
+    if !one_percent {
+        let &(sheet, row, column) = updates
+            .first()
+            .ok_or("ODS source cell edit has no selected cell")?;
+        let sheet_name = semantic_ods_sheet_name(sheet);
+        let changed = edit
+            .set_cell(
+                sheet_name.as_str(),
+                row,
+                column,
+                ods_source_cell_value(sheet, row, column),
+            )?
+            .ok_or("ODS source cell edit selected worksheet is missing")?;
+        return Ok(usize::from(changed));
+    }
+
+    let mut changed = 0usize;
+    for sheet in 0..SemanticShape::Medium.ods_sheet_count() {
+        let changes = updates
+            .iter()
+            .copied()
+            .filter(|(selected_sheet, _, _)| *selected_sheet == sheet)
+            .map(|(_, row, column)| {
+                litchi_ods::worksheet::CellChange::new(
+                    row,
+                    column,
+                    ods_source_cell_value(sheet, row, column),
+                )
+            })
+            .collect::<Vec<_>>();
+        if changes.is_empty() {
+            continue;
+        }
+        let sheet_name = semantic_ods_sheet_name(sheet);
+        changed += edit
+            .set_cells(sheet_name.as_str(), changes)?
+            .ok_or("ODS source cell edit selected worksheet is missing")?;
+    }
+    if changed != updates.len() {
+        return Err("ODS source cell edit changed an unexpected cell count".into());
+    }
+    Ok(changed)
+}
+
+fn stage_ods_owned_cell_changes(
+    edit: &mut litchi_ods::document::Edit,
+    updates: &[(usize, usize, usize)],
+    one_percent: bool,
+) -> Result<usize, Box<dyn Error>> {
+    let mut changed = 0usize;
+    edit.worksheets(|worksheets| {
+        if !one_percent {
+            let &(sheet, row, column) = updates.first().ok_or_else(|| {
+                litchi_core::Error::InvalidFormat("ODS owned cell edit has no selected cell".into())
+            })?;
+            let sheet_name = semantic_ods_sheet_name(sheet);
+            worksheets
+                .set_cell(
+                    sheet_name.as_str(),
+                    row,
+                    column,
+                    ods_source_cell_value(sheet, row, column),
+                )?
+                .ok_or_else(|| {
+                    litchi_core::Error::InvalidFormat(
+                        "ODS owned cell edit selected worksheet is missing".into(),
+                    )
+                })?;
+            changed = 1;
+            return Ok(());
+        }
+
+        for sheet in 0..SemanticShape::Medium.ods_sheet_count() {
+            let changes = updates
+                .iter()
+                .copied()
+                .filter(|(selected_sheet, _, _)| *selected_sheet == sheet)
+                .map(|(_, row, column)| {
+                    litchi_ods::worksheet::CellChange::new(
+                        row,
+                        column,
+                        ods_source_cell_value(sheet, row, column),
+                    )
+                })
+                .collect::<Vec<_>>();
+            if changes.is_empty() {
+                continue;
+            }
+            let sheet_name = semantic_ods_sheet_name(sheet);
+            changed += worksheets
+                .set_cells(sheet_name.as_str(), changes)?
+                .ok_or_else(|| {
+                    litchi_core::Error::InvalidFormat(
+                        "ODS owned cell edit selected worksheet is missing".into(),
+                    )
+                })?;
+        }
+        Ok(())
+    })?;
+    if changed != updates.len() {
+        return Err("ODS owned cell edit changed an unexpected cell count".into());
+    }
+    Ok(changed)
+}
+
+fn ods_source_cell_update_indices(updates: &[(usize, usize, usize)]) -> Vec<usize> {
+    updates
+        .iter()
+        .map(|&(sheet, row, column)| {
+            semantic_ods_flat_index(SemanticShape::Medium, sheet, row, column)
+        })
+        .collect()
+}
+
+fn expected_ods_source_cell_output(
+    corpus: &Corpus,
+    updates: &[(usize, usize, usize)],
+    one_percent: bool,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
+    let mut edit = owner.edit_cells()?;
+    let changed = stage_ods_source_cell_changes(&mut edit, updates, one_percent)?;
+    let commit = edit.commit()?;
+    if changed != commit.changed_cells() {
+        return Err("ODS source cell commit changed an unexpected cell count".into());
+    }
+    let mut output = Vec::new();
+    let report = commit.write_to(&mut output)?;
+    if report.changed_cells() != updates.len() || report.bytes() != output.len() as u64 {
+        return Err("ODS source cell publication report differs from output".into());
+    }
+    Ok(output)
+}
+
+fn expected_ods_owned_cell_output(
+    corpus: &Corpus,
+    updates: &[(usize, usize, usize)],
+    one_percent: bool,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
+    let mut edit = snapshot.edit();
+    stage_ods_owned_cell_changes(&mut edit, updates, one_percent)?;
+    let commit = edit.commit()?;
+    if !commit.changed() {
+        return Err("ODS owned cell edit unexpectedly reported an exact no-op".into());
+    }
+    Ok(commit.snapshot().as_bytes().to_vec())
+}
+
+fn verify_ods_source_cell_output(
+    corpus: &Corpus,
+    output: &[u8],
+    updates: &[(usize, usize, usize)],
+    source_backed: bool,
+) -> Result<(), Box<dyn Error>> {
+    let indices = ods_source_cell_update_indices(updates);
+    let reopened = litchi_ods::Spreadsheet::from_bytes(output.to_vec())?;
+    verify_semantic_ods_updates(&reopened, SemanticShape::Medium, &indices)?;
+    let package = litchi_odf_common::core::OwnedPackage::from_bytes(output.to_vec())?;
+    let package = package.package()?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        let path = ods_media_path(index);
+        if package.manifest().get_media_type(&path) != Some("application/octet-stream")
+            || package.get_file(&path)? != ods_media_payload(index)
+        {
+            return Err(format!("ODS source cell media payload differs for '{path}'").into());
+        }
+    }
+    if sha256_hex(semantic_ods_full_cell_text(&reopened, SemanticShape::Medium)?.as_bytes())
+        != sha256_hex(
+            expected_semantic_ods_full_cell_text(SemanticShape::Medium, &indices).as_bytes(),
+        )
+    {
+        return Err("ODS source cell semantic digest differs from the expected update set".into());
+    }
+    if source_backed {
+        let identical = litchi_odf_common::package::raw_identical_members(&corpus.archive, output)
+            .ok_or("ODS source cell raw-member comparison was unavailable")?;
+        if identical.contains("content.xml") {
+            return Err("ODS source cell publication left content.xml raw-identical".into());
+        }
+        for path in ArchiveReader::new(&corpus.archive)?.file_names() {
+            if path != "content.xml" && !identical.contains(path) {
+                return Err(format!(
+                    "ODS source cell publication changed untouched member '{path}'"
+                )
+                .into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn verify_ods_source_cell_gates(
+    corpus: &Corpus,
+    updates: &[(usize, usize, usize)],
+    one_percent: bool,
+    expected_output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
+    let before = owner.cell_snapshot()?;
+    let mut edit = before.edit()?;
+    stage_ods_source_cell_changes(&mut edit, updates, one_percent)?;
+    let commit = edit.commit()?;
+
+    let applied = commit.patch().apply(&before)?;
+    if applied.content_xml() != commit.snapshot().content_xml()
+        || applied.sheets() != commit.snapshot().sheets()
+    {
+        return Err("ODS source cell forward patch differs from its commit".into());
+    }
+    let restored = commit.patch().inverse().apply(&applied)?;
+    if restored.content_xml() != before.content_xml() || restored.sheets() != before.sheets() {
+        return Err("ODS source cell inverse patch did not restore its source".into());
+    }
+    let foreign_owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(Arc::new(
+        OwnedSource::new(corpus.archive.clone()),
+    ))?;
+    if commit
+        .patch()
+        .apply(&foreign_owner.cell_snapshot()?)
+        .is_ok()
+    {
+        return Err("ODS source cell patch accepted a foreign source snapshot".into());
+    }
+
+    let noop = owner.edit_cells()?.commit()?;
+    let mut noop_output = Vec::new();
+    let report = noop.write_to(&mut noop_output)?;
+    if !report.is_no_op() || noop_output != corpus.archive {
+        return Err("ODS source cell exact no-op gate failed".into());
+    }
+
+    let replacement_limit = commit.snapshot().content_xml().len().saturating_sub(1) as u64;
+    let mut limited = Vec::new();
+    let limit_error = commit
+        .write_to_with_options(
+            &mut limited,
+            litchi_odf_common::core::SourceContentPublicationOptions::new()
+                .with_max_replacement_bytes(replacement_limit),
+        )
+        .expect_err("ODS source cell replacement limit must reject");
+    if !matches!(
+        limit_error,
+        litchi_odf_common::core::SourceContentPublicationError::LimitExceeded { .. }
+    ) || !limited.is_empty()
+    {
+        return Err("ODS source cell replacement limit gate was not untouched".into());
+    }
+
+    let mut partial = PrefixFailSink {
+        accepted: 0,
+        fail_after: 7,
+    };
+    if commit.write_to(&mut partial).is_ok() || partial.accepted == 0 {
+        return Err("ODS source cell partial-sink gate did not fail after progress".into());
+    }
+    verify_ods_source_cell_output(corpus, expected_output, updates, true)?;
+    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
+        || sha256_hex(expected_output).is_empty()
+    {
+        return Err("ODS source cell source/output hash gate failed".into());
+    }
+    Ok(())
+}
+
+fn run_ods_source_cell_edit_save(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != ODS_MEDIA_CORPUS_GENERATOR {
+        return Err("ODS source cell selectors require the fixed media-rich corpus".into());
+    }
+    let source_backed = matches!(
+        case,
+        Case::OdsSourceBackedOneEditSave | Case::OdsSourceBackedOnePercentEditSave
+    );
+    let one_percent = matches!(
+        case,
+        Case::OdsSourceEagerOnePercentEditSave | Case::OdsSourceBackedOnePercentEditSave
+    );
+    let updates = ods_source_cell_updates(one_percent)?;
+    let eager_output = expected_ods_owned_cell_output(corpus, &updates, one_percent)?;
+    let source_output = expected_ods_source_cell_output(corpus, &updates, one_percent)?;
+    verify_ods_source_cell_output(corpus, &eager_output, &updates, false)?;
+    verify_ods_source_cell_output(corpus, &source_output, &updates, true)?;
+    verify_ods_source_cell_gates(corpus, &updates, one_percent, &source_output)?;
+
+    let expected_output = if source_backed {
+        &source_output
+    } else {
+        &eager_output
+    };
+    let expected_digest = sha256_hex(expected_output);
+    let expected_bytes = u64::try_from(expected_output.len())?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut sinks = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut sink = WindowedHashingSink::new(expected_bytes, ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
+        let started = Instant::now();
+        if source_backed {
+            let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+            let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
+            let mut edit = owner.edit_cells()?;
+            let changed = stage_ods_source_cell_changes(&mut edit, &updates, one_percent)?;
+            let commit = edit.commit()?;
+            if changed != commit.changed_cells() {
+                return Err("ODS source cell timed commit changed an unexpected cell count".into());
+            }
+            let report = commit.write_to(&mut sink)?;
+            if report.changed_cells() != updates.len() || report.bytes() != expected_bytes {
+                return Err("ODS source cell timed publication report differs".into());
+            }
+            std::hint::black_box(commit);
+        } else {
+            let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
+            let mut edit = snapshot.edit();
+            stage_ods_owned_cell_changes(&mut edit, &updates, one_percent)?;
+            let commit = edit.commit()?;
+            let bytes = commit.snapshot().as_bytes();
+            if u64::try_from(bytes.len())? != expected_bytes {
+                return Err("ODS owned timed output length differs from its oracle".into());
+            }
+            sink.write_all(bytes)?;
+            std::hint::black_box(commit);
+        }
+        let duration = started.elapsed();
+        let (summary, digest) = sink.finish();
+        if digest != expected_digest || summary.accepted_bytes != expected_bytes {
+            return Err("ODS source cell timed publication hash differs".into());
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        if iteration >= warmup_iterations {
+            sinks.push(summary);
+        }
+    }
+    let sink = deterministic_sink_summary(&sinks, "ODS source cell publication")?;
+    let mut measured = result(case, corpus, elapsed, Some(sink));
+    measured.output_sha256 = Some(expected_digest);
+    Ok(measured)
 }
 
 fn run_semantic_odp(
@@ -37302,7 +37740,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 315);
+        assert_eq!(selectable_count, 319);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -40070,6 +40508,41 @@ mod tests {
         assert!(identical.contains("META-INF/manifest.xml"));
         for index in 0..super::ODS_MEDIA_ENTRY_COUNT {
             assert!(identical.contains(&super::ods_media_path(index)));
+        }
+    }
+
+    #[test]
+    fn ods_source_cell_selectors_parse_and_execute_on_media_rich_corpus() {
+        let cases = [
+            (
+                "ods_source_eager_one_edit_save",
+                Case::OdsSourceEagerOneEditSave,
+            ),
+            (
+                "ods_source_backed_one_edit_save",
+                Case::OdsSourceBackedOneEditSave,
+            ),
+            (
+                "ods_source_eager_one_percent_edit_save",
+                Case::OdsSourceEagerOnePercentEditSave,
+            ),
+            (
+                "ods_source_backed_one_percent_edit_save",
+                Case::OdsSourceBackedOnePercentEditSave,
+            ),
+        ];
+        let corpus = build_ods_media_corpus().unwrap();
+        for (name, case) in cases {
+            assert_eq!(parse_case(name), Some(case));
+            let result = run_case(case, &corpus, 0, 1).unwrap();
+            assert_eq!(result.case, name);
+            let sink = result.sink.expect("ODS source cell selector sink");
+            assert_eq!(sink.retained_output_bytes, Some(0));
+            assert_eq!(
+                sink.retained_authoring_window_bytes,
+                Some(super::ODF_CONTENT_COW_SINK_WINDOW_BYTES as u64)
+            );
+            assert!(result.output_sha256.is_some());
         }
     }
 
