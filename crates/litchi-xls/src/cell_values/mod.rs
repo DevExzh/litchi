@@ -3275,8 +3275,9 @@ impl fmt::Debug for SourceBackedCommit {
 /// validation rather than duplicated here. Direct sequential publication
 /// retains source/target hashing during its one emission pass and relies on
 /// the source's sealed immutable `Arc<[u8]>` ownership instead of generic
-/// pre/post scans. Checked composed views and atomic saves retain their normal
-/// complete fingerprint preflights.
+/// pre/post scans. Checked composed views retain their complete preflight;
+/// atomic saves use the sealed ownership to omit redundant outer scans while
+/// retaining complete emission hashes and durability steps.
 ///
 /// The plan is intentionally forward-only. An exact artifact inverse would
 /// need a source-bound reverse plan rooted in the composed target; the
@@ -5133,10 +5134,10 @@ fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceB
             verify_source_backed_numeric_plan_target(candidate, &source, &changes)
         })?;
 
-    // The CFB planner brackets the semantic readback with complete source and
-    // target fingerprints. If a mutable positional adapter changed bytes with
-    // a stable version token, its final check closes that window before the
-    // plan can be returned or published.
+    // Generic positional adapters retain complete fingerprints around the
+    // semantic readback so a dishonest stable version token cannot hide a
+    // mutation. This source is a sealed immutable Arc, so the CFB planner may
+    // omit only the redundant final scan after validating the composed view.
     let target_version = validated_target_version.unwrap_or(source_version);
     let source_bytes = u64::try_from(source.bytes().len())
         .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;

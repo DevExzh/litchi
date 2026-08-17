@@ -267,6 +267,7 @@ fn composed_view_handles_short_and_interrupted_reads_and_is_concurrent() {
 struct MutableSource {
     bytes: Mutex<Vec<u8>>,
     revision: AtomicU64,
+    reads: AtomicUsize,
     lie: bool,
 }
 
@@ -285,6 +286,7 @@ impl ReadAt for MutableSource {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        self.reads.fetch_add(1, Ordering::SeqCst);
         let bytes = self.bytes.lock().unwrap();
         let Ok(start) = usize::try_from(offset) else {
             return Ok(0);
@@ -378,6 +380,62 @@ fn owner_validation_shares_the_fenced_target_and_preserves_typed_results() {
 }
 
 #[test]
+fn owned_owner_validated_planning_elides_only_the_final_complete_fingerprint() {
+    let bytes = sample_bytes();
+    let fat = sequence(6_000, 17);
+    let replacement = [0xa1, 0xa2, 0xa3, 0xa4];
+
+    let generic_source = Arc::new(MutableSource {
+        bytes: Mutex::new(bytes.clone()),
+        revision: AtomicU64::new(0),
+        reads: AtomicUsize::new(0),
+        lie: false,
+    });
+    let generic_file = SharedOleFile::open(generic_source.clone()).unwrap();
+    generic_source.reads.store(0, Ordering::SeqCst);
+    let (generic_plan, generic_owner) = generic_file
+        .plan_same_length_stream_splices_with_owner(
+            vec![splice("Fat", 510, &fat, &replacement)],
+            limits(),
+            |_candidate| Ok::<_, OverlayError>("generic"),
+        )
+        .unwrap();
+    let generic_reads = generic_source.reads.load(Ordering::SeqCst);
+
+    let owned_reads = Arc::new(AtomicUsize::new(0));
+    let owned_file =
+        SharedOleFile::open_owned_arc_source_for_test(Arc::from(bytes), owned_reads.clone())
+            .unwrap();
+    owned_reads.store(0, Ordering::SeqCst);
+    let (owned_plan, owned_owner) = owned_file
+        .plan_same_length_stream_splices_with_owner(
+            vec![splice("Fat", 510, &fat, &replacement)],
+            limits(),
+            |_candidate| Ok::<_, OverlayError>("owned"),
+        )
+        .unwrap();
+    let owned_planning_reads = owned_reads.load(Ordering::SeqCst);
+
+    assert_eq!(generic_owner, Some("generic"));
+    assert_eq!(owned_owner, Some("owned"));
+    assert_eq!(
+        generic_plan.source_fingerprint(),
+        owned_plan.source_fingerprint()
+    );
+    assert_eq!(
+        generic_plan.target_fingerprint(),
+        owned_plan.target_fingerprint()
+    );
+    assert_eq!(
+        generic_reads,
+        owned_planning_reads
+            + usize::try_from(generic_file.file_size())
+                .unwrap()
+                .div_ceil(1024 * 1024)
+    );
+}
+
+#[test]
 fn owner_validation_error_returns_no_plan_and_keeps_its_native_type() {
     let fat = sequence(6_000, 17);
     let result = shared(sample_bytes()).plan_same_length_stream_splices_with_owner(
@@ -398,6 +456,7 @@ fn owner_validation_is_closed_by_the_final_stable_token_fingerprint() {
     let mutable = Arc::new(MutableSource {
         bytes: Mutex::new(source_bytes.clone()),
         revision: AtomicU64::new(0),
+        reads: AtomicUsize::new(0),
         lie: true,
     });
     let source: Arc<dyn ReadAt> = mutable.clone();
@@ -455,6 +514,7 @@ fn no_op_inverse_and_stale_source_contracts_are_exact() {
         let mutable = Arc::new(MutableSource {
             bytes: Mutex::new(source_bytes.clone()),
             revision: AtomicU64::new(0),
+            reads: AtomicUsize::new(0),
             lie,
         });
         let source: Arc<dyn ReadAt> = mutable.clone();

@@ -524,6 +524,41 @@ fn public_owned_arc_source_publishes_exactly() {
 }
 
 #[test]
+fn owned_overlay_planning_elides_only_the_final_complete_fingerprint() {
+    let bytes = sample_bytes();
+    let generic_source = Arc::new(MutableSource::new(bytes.clone()));
+    let generic_file = SharedOleFile::open(generic_source.clone()).unwrap();
+    generic_source.reads.store(0, Ordering::SeqCst);
+    let generic_plan = generic_file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6a, 4_096)], limits())
+        .unwrap();
+    let generic_reads = generic_source.reads.load(Ordering::SeqCst);
+
+    let owned_reads = Arc::new(AtomicUsize::new(0));
+    let owned_file =
+        SharedOleFile::open_owned_arc_source_for_test(Arc::from(bytes), owned_reads.clone())
+            .unwrap();
+    owned_reads.store(0, Ordering::SeqCst);
+    let owned_plan = owned_file
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x6a, 4_096)], limits())
+        .unwrap();
+    let owned_planning_reads = owned_reads.load(Ordering::SeqCst);
+
+    assert_eq!(
+        generic_plan.source_fingerprint(),
+        owned_plan.source_fingerprint()
+    );
+    assert_eq!(
+        generic_plan.target_fingerprint(),
+        owned_plan.target_fingerprint()
+    );
+    assert_eq!(
+        generic_reads,
+        owned_planning_reads + fingerprint_chunks(generic_file.file_size())
+    );
+}
+
+#[test]
 fn fingerprint_requests_are_coalesced_without_widening_publication_chunks() {
     let source = Arc::new(MutableSource::new(sample_bytes()));
     let file = SharedOleFile::open(source.clone()).unwrap();

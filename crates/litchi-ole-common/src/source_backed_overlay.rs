@@ -43,10 +43,12 @@ impl SourceBackedOverlayPublisher {
     ///
     /// The common protected-container guard is identical to [`Self::open`].
     /// Only the low-level CFB owner may use the provenance to specialize a
-    /// later publication. Composed views retain their normal complete
-    /// fingerprint fence; atomic saves may omit only the two redundant outer
-    /// fences while keeping the full source/target emission hashes and all
-    /// flush, fsync, rename, and parent-sync durability steps.
+    /// later planning and publication. The planner may omit only the redundant
+    /// final validation fingerprint after reading the sealed composed view.
+    /// Checked composed views retain their complete preflight; atomic saves
+    /// may also omit the two redundant outer publication fences while keeping
+    /// the full source/target emission hashes and all flush, fsync, rename, and
+    /// parent-sync durability steps.
     pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_owned(source, version)?;
         reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
@@ -96,8 +98,10 @@ impl SourceBackedOverlayPublisher {
     /// Each splice is checked against the source before a plan is returned;
     /// this avoids staging a complete replacement stream when a semantic
     /// owner already has exact source-relative ranges to publish. The common
-    /// source version, protected-container checks, full artifact fingerprints,
-    /// and candidate CFB reopen remain unchanged from [`Self::plan`].
+    /// source version, protected-container checks, initial full artifact
+    /// fingerprints, and candidate CFB reopen remain unchanged from
+    /// [`Self::plan`]. Generic sources retain the final validation fingerprint;
+    /// sealed owned bytes omit only that redundant scan.
     pub fn plan_splices(
         &self,
         splices: Vec<SameLengthStreamSplice>,
@@ -107,12 +111,14 @@ impl SourceBackedOverlayPublisher {
     }
 
     /// Builds a splice plan whose effective target is also checked by a
-    /// format-owner validator inside the complete CFB fingerprint fence.
+    /// format-owner validator after the initial complete CFB fingerprint.
     ///
     /// The owner receives only the lazy composed target and its native error
     /// type is preserved. Exact byte no-ops skip the callback and return no
-    /// owner result. Protected-container refusal remains an ingress property
-    /// of this publisher and publication remains owned by the returned plan.
+    /// owner result. Generic sources retain the post-callback fingerprint;
+    /// sealed owned bytes omit only that redundant scan. Protected-container
+    /// refusal remains an ingress property of this publisher and publication
+    /// remains owned by the returned plan.
     pub fn plan_splices_with_owner<T, E, F>(
         &self,
         splices: Vec<SameLengthStreamSplice>,

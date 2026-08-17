@@ -193,9 +193,10 @@ impl SharedOleFile {
     ///
     /// The composed artifact is first reopened and checked by the CFB owner.
     /// For an effective edit, `validate_owner` then receives the same lazy
-    /// positional target view before the final complete source and target
-    /// fingerprints are checked. Exact byte no-ops skip the callback and
-    /// return `None` for the owner result.
+    /// positional target view. Generic positional sources are fenced by final
+    /// complete source and target fingerprints after the callback; sealed
+    /// owned bytes omit only that redundant final scan. Exact byte no-ops skip
+    /// the callback and return `None` for the owner result.
     ///
     /// The callback cannot publish bytes or access physical spans. This
     /// additive low-level seam lets a format owner validate its semantic
