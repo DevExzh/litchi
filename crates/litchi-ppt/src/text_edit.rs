@@ -188,6 +188,12 @@ impl From<PackageError> for Error {
     }
 }
 
+impl From<OverlayError> for Error {
+    fn from(error: OverlayError) -> Self {
+        Self::Source(error)
+    }
+}
+
 /// Result type for source-checked existing-shape text edits.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -953,17 +959,34 @@ fn publish_source_operation(
             observed: observed_version,
         }));
     }
-    let plan = publisher
-        .plan_splices(
-            vec![SameLengthStreamSplice::new(
-                operation.document_path.clone(),
-                operation.atom_offset,
-                Arc::clone(&operation.expected),
-                Arc::clone(&operation.replacement),
-            )],
-            source.inner.options.splice_limits,
-        )
-        .map_err(Error::Source)?;
+    let (plan, candidate) = publisher.plan_splices_with_owner(
+        vec![SameLengthStreamSplice::new(
+            operation.document_path.clone(),
+            operation.atom_offset,
+            Arc::clone(&operation.expected),
+            Arc::clone(&operation.replacement),
+        )],
+        source.inner.options.splice_limits,
+        |composed| -> Result<(Arc<dyn ReadAt>, SharedOleFile, SourceVersion)> {
+            let candidate: Arc<dyn ReadAt> = Arc::new(composed.clone());
+            let candidate_shared =
+                SharedOleFile::open_with_limits(Arc::clone(&candidate), shared_limits)
+                    .map_err(map_ole_error)?;
+            reject_macro_components(&candidate_shared)?;
+            let candidate_resolved = source_range::resolve_source_target(
+                &candidate_shared,
+                &operation.document_path,
+                &operation.current_user_path,
+                operation.target,
+                source.inner.options.record_limits,
+            )?;
+            verify_source_readback(&operation, &candidate_resolved)?;
+            let target_version = candidate
+                .version()
+                .map_err(|error| Error::Source(OverlayError::Io(error)))?;
+            Ok((candidate, candidate_shared, target_version))
+        },
+    )?;
     if plan.source_fingerprint() != source.fingerprint() {
         return Err(Error::Source(OverlayError::SourceFingerprintChanged {
             expected: source.fingerprint(),
@@ -971,22 +994,11 @@ fn publish_source_operation(
         }));
     }
 
-    let composed = plan.composed_source().map_err(Error::Source)?;
-    let candidate: Arc<dyn ReadAt> = Arc::new(composed);
-    let candidate_shared = SharedOleFile::open_with_limits(Arc::clone(&candidate), shared_limits)
-        .map_err(map_ole_error)?;
-    reject_macro_components(&candidate_shared)?;
-    let candidate_resolved = source_range::resolve_source_target(
-        &candidate_shared,
-        &operation.document_path,
-        &operation.current_user_path,
-        operation.target,
-        source.inner.options.record_limits,
-    )?;
-    verify_source_readback(&operation, &candidate_resolved)?;
-    let target_version = candidate
-        .version()
-        .map_err(|error| Error::Source(OverlayError::Io(error)))?;
+    let (candidate, candidate_shared, target_version) = candidate.ok_or_else(|| {
+        Error::Source(OverlayError::Unavailable {
+            reason: "changed PPT splice did not produce an owner candidate".into(),
+        })
+    })?;
     let target = SourceSnapshot {
         inner: Arc::new(SourceInner {
             source: candidate,

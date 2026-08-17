@@ -1151,15 +1151,37 @@ fn publish_operation(source: SourceSnapshot, operation: Operation) -> Result<Com
             offset: operation.fc,
         }));
     }
-    let plan = source.inner.shared.plan_same_length_stream_splices(
-        vec![SameLengthStreamSplice::new(
-            vec![WORD_DOCUMENT.to_string()],
-            operation.fc,
-            Arc::clone(&operation.expected),
-            Arc::clone(&operation.replacement),
-        )],
-        source.inner.limits.splice_limits,
-    )?;
+    let (plan, candidate) = source
+        .inner
+        .shared
+        .plan_same_length_stream_splices_with_owner(
+            vec![SameLengthStreamSplice::new(
+                vec![WORD_DOCUMENT.to_string()],
+                operation.fc,
+                Arc::clone(&operation.expected),
+                Arc::clone(&operation.replacement),
+            )],
+            source.inner.limits.splice_limits,
+            |composed| {
+                let candidate_source: Arc<dyn ReadAt> = Arc::new(composed.clone());
+                let candidate = SourceSnapshot::open_with_limits(
+                    Arc::clone(&candidate_source),
+                    source.inner.limits,
+                )?;
+                let candidate_paragraph = candidate.resolve(operation.position)?;
+                if candidate_paragraph.cp_start != operation.cp_start
+                    || candidate_paragraph.cp_end != operation.cp_end
+                    || candidate_paragraph.fc != operation.fc
+                    || candidate_paragraph.expected.as_ref() != operation.replacement.as_ref()
+                    || candidate_paragraph.text != operation.after_text
+                {
+                    return Err(Error::InvalidData(
+                        "candidate DOC source failed paragraph readback".into(),
+                    ));
+                }
+                Ok(candidate)
+            },
+        )?;
     let observed_source = plan.source_fingerprint();
     if observed_source != source.fingerprint() {
         return Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
@@ -1168,21 +1190,9 @@ fn publish_operation(source: SourceSnapshot, operation: Operation) -> Result<Com
         }));
     }
     source.ensure_current()?;
-    let composed = plan.composed_source()?;
-    let candidate_source: Arc<dyn ReadAt> = Arc::new(composed);
-    let candidate =
-        SourceSnapshot::open_with_limits(Arc::clone(&candidate_source), source.inner.limits)?;
-    let candidate_paragraph = candidate.resolve(operation.position)?;
-    if candidate_paragraph.cp_start != operation.cp_start
-        || candidate_paragraph.cp_end != operation.cp_end
-        || candidate_paragraph.fc != operation.fc
-        || candidate_paragraph.expected.as_ref() != operation.replacement.as_ref()
-        || candidate_paragraph.text != operation.after_text
-    {
-        return Err(Error::InvalidData(
-            "candidate DOC source failed paragraph readback".into(),
-        ));
-    }
+    let candidate = candidate.ok_or_else(|| {
+        Error::InvalidData("changed DOC splice did not produce an owner candidate".into())
+    })?;
     if candidate.fingerprint() != plan.target_fingerprint() {
         return Err(Error::Overlay(OverlayError::TargetFingerprintChanged {
             expected: plan.target_fingerprint(),
