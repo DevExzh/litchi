@@ -13,7 +13,7 @@ const MAX_WORKBOOK_PATH_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 #[allow(
     dead_code,
-    reason = "used by the non-positional filesystem fallback; positional ODS paths use their retained source bytes"
+    reason = "used by the non-positional filesystem fallback; positional XLSX/ODS paths use their retained source owner or bytes"
 )]
 fn read_path_bytes(path: impl AsRef<Path>) -> Result<Vec<u8>> {
     use std::{fs::File, io::Read};
@@ -161,30 +161,43 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        #[cfg(all(feature = "ods", any(unix, windows)))]
+        #[cfg(all(any(feature = "xlsx", feature = "ods"), any(unix, windows)))]
         {
-            match crate::detection_smart::detected::detect_ods_source_path(path.as_ref())? {
-                crate::detection_smart::detected::OdsSourcePathDetection::Ods(ods) => {
+            match crate::detection_smart::detected::detect_workbook_source_path(path.as_ref())? {
+                #[cfg(feature = "xlsx")]
+                crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsx {
+                    workbook,
+                    metadata,
+                } => Ok(Self {
+                    inner: WorkbookImpl::Xlsx(super::adapters::Workbook::from_source_backed(
+                        workbook,
+                    )),
+                    cached_metadata: metadata,
+                }),
+                #[cfg(feature = "ods")]
+                crate::detection_smart::detected::WorkbookSourcePathDetection::Ods(ods) => {
                     let metadata = ods.metadata()?.clone();
                     Ok(Self {
                         inner: WorkbookImpl::OdsSource(*ods),
                         cached_metadata: metadata,
                     })
                 },
-                crate::detection_smart::detected::OdsSourcePathDetection::OtherOoxml {
+                crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml {
                     format: _,
                     bytes,
                 }
-                | crate::detection_smart::detected::OdsSourcePathDetection::Bytes(bytes) => {
+                | crate::detection_smart::detected::WorkbookSourcePathDetection::Bytes(bytes) => {
                     Self::from_bytes(bytes)
                 },
-                crate::detection_smart::detected::OdsSourcePathDetection::DisabledOtherOoxml(_) => {
+                crate::detection_smart::detected::WorkbookSourcePathDetection::DisabledOtherOoxml(
+                    _,
+                ) => {
                     Err(Box::new(Error::NotOfficeFile) as Box<dyn std::error::Error + Send + Sync>)
                 },
             }
         }
 
-        #[cfg(not(all(feature = "ods", any(unix, windows))))]
+        #[cfg(not(all(any(feature = "xlsx", feature = "ods"), any(unix, windows))))]
         {
             // Read once into owned memory; detection transfers that ownership
             // into the selected format path.
@@ -359,7 +372,10 @@ impl Workbook {
                 .collect()),
 
             #[cfg(feature = "xlsx")]
-            WorkbookImpl::Xlsx(xlsx) => Ok(xlsx.worksheet_names().to_vec()),
+            WorkbookImpl::Xlsx(xlsx) => {
+                xlsx.ensure_source_current()?;
+                Ok(xlsx.worksheet_names().to_vec())
+            },
 
             #[cfg(feature = "xlsb")]
             WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_names().to_vec()),
@@ -398,7 +414,10 @@ impl Workbook {
             #[cfg(feature = "numbers")]
             WorkbookImpl::Numbers(doc) => Ok(doc.sheets().len()),
             #[cfg(feature = "xlsx")]
-            WorkbookImpl::Xlsx(xlsx) => Ok(xlsx.worksheet_count()),
+            WorkbookImpl::Xlsx(xlsx) => {
+                xlsx.ensure_source_current()?;
+                Ok(xlsx.worksheet_count())
+            },
             #[cfg(feature = "xlsb")]
             WorkbookImpl::Xlsb(xlsb) => Ok(xlsb.worksheet_count()),
             #[cfg(feature = "xls")]
@@ -440,23 +459,28 @@ impl Workbook {
 
             #[cfg(feature = "xlsx")]
             WorkbookImpl::Xlsx(xlsx) => {
+                xlsx.ensure_source_current()?;
                 // Iterate rows across worksheets
-                let mut out = String::new();
-                for i in 0..xlsx.worksheet_count() {
-                    let ws = xlsx.worksheet_by_index(i)?;
-                    let mut rows = ws.rows();
-                    while let Some(row) = rows.next() {
-                        let row = row?;
-                        for (idx, cell) in row.iter().enumerate() {
-                            if idx > 0 {
-                                out.push('\t');
+                let result = (|| {
+                    let mut out = String::new();
+                    for i in 0..xlsx.worksheet_count() {
+                        let ws = xlsx.worksheet_by_index(i)?;
+                        let mut rows = ws.rows();
+                        while let Some(row) = rows.next() {
+                            let row = row?;
+                            for (idx, cell) in row.iter().enumerate() {
+                                if idx > 0 {
+                                    out.push('\t');
+                                }
+                                append_cell_text(&mut out, cell);
                             }
-                            append_cell_text(&mut out, cell);
+                            out.push('\n');
                         }
-                        out.push('\n');
                     }
-                }
-                Ok(out)
+                    Ok(out)
+                })();
+                xlsx.ensure_source_current()?;
+                result
             },
 
             #[cfg(feature = "xlsb")]
@@ -548,6 +572,10 @@ impl Workbook {
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
     pub fn metadata(&self) -> Result<Metadata> {
+        #[cfg(feature = "xlsx")]
+        if let WorkbookImpl::Xlsx(workbook) = &self.inner {
+            workbook.ensure_source_current()?;
+        }
         #[cfg(all(feature = "ods", any(unix, windows)))]
         if let WorkbookImpl::OdsSource(spreadsheet) = &self.inner {
             return Ok(spreadsheet.metadata()?.clone());
@@ -565,6 +593,273 @@ impl Workbook {
             application: Some("Numbers".to_owned()),
             ..Metadata::default()
         }
+    }
+}
+
+#[cfg(all(test, feature = "xlsx", any(unix, windows)))]
+mod source_xlsx_path_tests {
+    use super::{Workbook, WorkbookImpl};
+    use crate::sheet::WorkbookTrait;
+    use litchi_core::{Error, sheet::CellValue};
+    use std::io::{Cursor, Write};
+
+    const WORKSHEET: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+    const WORKBOOK: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+
+    fn package_with_second_kind(
+        second_sheet: &[u8],
+        title: &str,
+        second_content_type: &str,
+        second_relationship_type: &str,
+    ) -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                format!(
+                    r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="{WORKBOOK}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{WORKSHEET}"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="{second_content_type}"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>"#
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("docProps/core.xml", options).unwrap();
+        writer
+            .write_all(
+                format!(
+                    r#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>{title}</dc:title></cp:coreProperties>"#
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        writer.start_file("xl/workbook.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookPr date1904="1"/><sheets><sheet name="First" sheetId="1" r:id="rId1"/><sheet name="Second" sheetId="2" state="hidden" r:id="rId2"/></sheets></workbook>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("xl/_rels/workbook.xml.rels", options)
+            .unwrap();
+        writer
+            .write_all(
+                format!(
+                    r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="{second_relationship_type}" Target="worksheets/sheet2.xml"/></Relationships>"#
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        writer
+            .start_file("xl/worksheets/sheet1.xml", options)
+            .unwrap();
+        writer
+            .write_all(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#,
+            )
+            .unwrap();
+        writer
+            .start_file("xl/worksheets/sheet2.xml", options)
+            .unwrap();
+        writer.write_all(second_sheet).unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
+    fn package(second_sheet: &[u8], title: &str) -> Vec<u8> {
+        package_with_second_kind(
+            second_sheet,
+            title,
+            WORKSHEET,
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+        )
+    }
+
+    fn valid_package(title: &str) -> Vec<u8> {
+        package(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>2</v></c></row></sheetData></worksheet>"#,
+            title,
+        )
+    }
+
+    #[test]
+    fn filesystem_xlsx_uses_source_owner_and_matches_eager_projection() {
+        let bytes = valid_package("source title");
+        let path = tempfile::Builder::new().suffix(".ods").tempfile().unwrap();
+        std::fs::write(path.path(), &bytes).unwrap();
+
+        let source = Workbook::open(path.path()).expect("source XLSX");
+        let eager = Workbook::from_bytes(bytes).expect("eager XLSX");
+        let WorkbookImpl::Xlsx(source_adapter) = &source.inner else {
+            panic!("filesystem XLSX did not select the XLSX owner");
+        };
+        let WorkbookImpl::Xlsx(eager_adapter) = &eager.inner else {
+            panic!("byte XLSX did not select the XLSX owner");
+        };
+        assert!(source_adapter.is_source_backed());
+        assert!(!eager_adapter.is_source_backed());
+        assert_eq!(source.worksheet_names().unwrap(), ["First", "Second"]);
+        assert_eq!(
+            source.worksheet_names().unwrap(),
+            eager.worksheet_names().unwrap()
+        );
+        assert_eq!(
+            source.worksheet_count().unwrap(),
+            eager.worksheet_count().unwrap()
+        );
+        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+        assert_eq!(source.text().unwrap(), "1\n2\n");
+        assert_eq!(
+            source.metadata().unwrap().title,
+            eager.metadata().unwrap().title
+        );
+        assert_eq!(
+            source.metadata().unwrap().title.as_deref(),
+            Some("source title")
+        );
+        assert!(source_adapter.is_1904_date_system());
+
+        let first = source_adapter.worksheet_by_index(0).unwrap();
+        assert_eq!(
+            first.cell_by_coordinate("A1").unwrap().value(),
+            &CellValue::Int(1)
+        );
+    }
+
+    #[test]
+    fn filesystem_xlsx_defers_unselected_worksheet_payload() {
+        let bytes = package(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row>"#,
+            "deferred",
+        );
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), bytes).unwrap();
+
+        let workbook = Workbook::open(path.path()).expect("catalog-only source open");
+        assert_eq!(workbook.worksheet_names().unwrap(), ["First", "Second"]);
+        let WorkbookImpl::Xlsx(adapter) = &workbook.inner else {
+            panic!("filesystem XLSX did not select the XLSX owner");
+        };
+        assert_eq!(
+            adapter
+                .worksheet_by_index(0)
+                .unwrap()
+                .cell_by_coordinate("A1")
+                .unwrap()
+                .value(),
+            &CellValue::Int(1)
+        );
+        assert!(workbook.text().is_err());
+    }
+
+    #[test]
+    fn filesystem_xlsx_text_skips_non_grid_sheet_kinds() {
+        let bytes = package_with_second_kind(
+            br#"<chartsheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+            "chart",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+        );
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), &bytes).unwrap();
+
+        let source = Workbook::open(path.path()).expect("source XLSX with chart sheet");
+        let eager = Workbook::from_bytes(bytes).expect("eager XLSX with chart sheet");
+        assert_eq!(source.worksheet_names().unwrap(), ["First", "Second"]);
+        assert_eq!(source.text().unwrap(), "1\n");
+        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+    }
+
+    #[test]
+    fn filesystem_xlsx_cached_queries_report_source_change() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), valid_package("before")).unwrap();
+        let workbook = Workbook::open(path.path()).expect("source XLSX");
+
+        std::fs::write(path.path(), valid_package("after with a different size")).unwrap();
+        for result in [
+            workbook.worksheet_names().map(|_| ()),
+            workbook.worksheet_count().map(|_| ()),
+            workbook.metadata().map(|_| ()),
+            workbook.text().map(|_| ()),
+        ] {
+            assert!(matches!(
+                result,
+                Err(error) if error.downcast_ref::<Error>().is_some_and(|error| matches!(error, Error::SourceChanged { .. }))
+            ));
+        }
+    }
+
+    #[test]
+    fn filesystem_xlsx_worksheet_handles_preserve_typed_source_change_errors() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), valid_package("before")).unwrap();
+        let workbook = Workbook::open(path.path()).expect("source XLSX");
+        let WorkbookImpl::Xlsx(adapter) = &workbook.inner else {
+            panic!("filesystem XLSX did not select the XLSX owner");
+        };
+        let first = adapter.worksheet_by_index(0).unwrap();
+
+        std::fs::write(path.path(), valid_package("after with a different size")).unwrap();
+        let cell_error = match first.cell_by_coordinate("A1") {
+            Ok(_) => panic!("stale worksheet cell read unexpectedly succeeded"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            cell_error.downcast_ref::<Error>(),
+            Some(Error::SourceChanged { .. })
+        ));
+        let row_error = first
+            .rows()
+            .next()
+            .expect("stale row iterator returned no result")
+            .unwrap_err();
+        assert!(matches!(
+            row_error.downcast_ref::<Error>(),
+            Some(Error::SourceChanged { .. })
+        ));
+        let cell_iterator_error = match first
+            .cells()
+            .next()
+            .expect("stale cell iterator returned no result")
+        {
+            Ok(_) => panic!("stale cell iterator unexpectedly succeeded"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            cell_iterator_error.downcast_ref::<Error>(),
+            Some(Error::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn filesystem_xlsx_propagates_the_opc_input_limit_before_fallback() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), valid_package("bounded")).unwrap();
+        path.as_file()
+            .set_len(litchi_opc::ReadLimits::default().max_input_bytes() + 1)
+            .unwrap();
+
+        let error = Workbook::open(path.path())
+            .err()
+            .expect("oversized non-ODF ZIP unexpectedly opened");
+        assert!(matches!(
+            error.downcast_ref::<litchi_opc::OpcError>(),
+            Some(litchi_opc::OpcError::ReadLimit {
+                resource: litchi_opc::ReadResource::InputBytes,
+                ..
+            })
+        ));
     }
 }
 
@@ -598,7 +893,7 @@ mod source_ods_path_tests {
     #[test]
     fn filesystem_ods_uses_source_owner_and_matches_byte_projection() {
         let bytes = package("source");
-        let path = tempfile::NamedTempFile::new().unwrap();
+        let path = tempfile::Builder::new().suffix(".xlsx").tempfile().unwrap();
         std::fs::write(path.path(), &bytes).unwrap();
 
         let source = Workbook::open(path.path()).expect("source ODS");
@@ -654,10 +949,10 @@ mod source_ods_path_tests {
         let bytes = b"not an office package".to_vec();
         let path = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(path.path(), &bytes).unwrap();
-        let detected = crate::detection_smart::detected::detect_ods_source_path(path.path())
+        let detected = crate::detection_smart::detected::detect_workbook_source_path(path.path())
             .expect("source fallback probe");
         match detected {
-            crate::detection_smart::detected::OdsSourcePathDetection::Bytes(actual) => {
+            crate::detection_smart::detected::WorkbookSourcePathDetection::Bytes(actual) => {
                 assert_eq!(actual, bytes)
             },
             _ => panic!("non-ODS fallback did not retain source bytes"),

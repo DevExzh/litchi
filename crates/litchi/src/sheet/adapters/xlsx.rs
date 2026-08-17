@@ -17,6 +17,18 @@ fn boxed_error(error: impl std::fmt::Display) -> BoxError {
     Box::new(litchi_core::Error::Other(error.to_string()))
 }
 
+fn boxed_xlsx_error(error: xlsx::Error) -> BoxError {
+    match error {
+        xlsx::Error::Package(litchi_opc::OpcError::SourceChanged { expected, actual }) => {
+            Box::new(litchi_core::Error::SourceChanged {
+                expected,
+                observed: actual,
+            })
+        },
+        error => Box::new(error),
+    }
+}
+
 fn convert_value(value: &xlsx::cell::Value) -> CellValue {
     match value {
         xlsx::cell::Value::Bool(value) => CellValue::Bool(*value),
@@ -100,6 +112,21 @@ impl Workbook {
             names,
         }
     }
+
+    pub(crate) fn ensure_source_current(&self) -> SheetResult<()> {
+        match &self.workbook {
+            WorkbookModel::Owned(_) => Ok(()),
+            WorkbookModel::Source(workbook) => workbook
+                .source_version()
+                .map(|_| ())
+                .map_err(boxed_xlsx_error),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn is_source_backed(&self) -> bool {
+        matches!(&self.workbook, WorkbookModel::Source(_))
+    }
 }
 
 impl WorkbookTrait for Workbook {
@@ -133,7 +160,7 @@ impl WorkbookTrait for Workbook {
             WorkbookModel::Owned(workbook) => {
                 let worksheet = workbook
                     .sheet(name)
-                    .map_err(boxed_error)?
+                    .map_err(boxed_xlsx_error)?
                     .ok_or_else(|| boxed_error(format!("XLSX worksheet '{name}' was not found")))?;
                 Ok(Box::new(Worksheet {
                     worksheet: WorksheetModel::Owned(worksheet),
@@ -142,7 +169,7 @@ impl WorkbookTrait for Workbook {
             WorkbookModel::Source(workbook) => {
                 let worksheet = workbook
                     .sheet(name)
-                    .map_err(boxed_error)?
+                    .map_err(boxed_xlsx_error)?
                     .ok_or_else(|| boxed_error(format!("XLSX worksheet '{name}' was not found")))?;
                 Ok(Box::new(Worksheet {
                     worksheet: WorksheetModel::Source(worksheet),
@@ -154,17 +181,23 @@ impl WorkbookTrait for Workbook {
     fn worksheet_by_index(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
         match &self.workbook {
             WorkbookModel::Owned(workbook) => {
-                let worksheet = workbook.sheet(index).map_err(boxed_error)?.ok_or_else(|| {
-                    boxed_error(format!("XLSX worksheet index {index} is out of bounds"))
-                })?;
+                let worksheet = workbook
+                    .sheet(index)
+                    .map_err(boxed_xlsx_error)?
+                    .ok_or_else(|| {
+                        boxed_error(format!("XLSX worksheet index {index} is out of bounds"))
+                    })?;
                 Ok(Box::new(Worksheet {
                     worksheet: WorksheetModel::Owned(worksheet),
                 }))
             },
             WorkbookModel::Source(workbook) => {
-                let worksheet = workbook.sheet(index).map_err(boxed_error)?.ok_or_else(|| {
-                    boxed_error(format!("XLSX worksheet index {index} is out of bounds"))
-                })?;
+                let worksheet = workbook
+                    .sheet(index)
+                    .map_err(boxed_xlsx_error)?
+                    .ok_or_else(|| {
+                        boxed_error(format!("XLSX worksheet index {index} is out of bounds"))
+                    })?;
                 Ok(Box::new(Worksheet {
                     worksheet: WorksheetModel::Source(worksheet),
                 }))
@@ -238,16 +271,25 @@ enum WorksheetModel {
 
 impl Worksheet {
     fn extent(&self) -> SheetResult<Option<Rect>> {
-        match &self.worksheet {
-            WorksheetModel::Owned(worksheet) => worksheet.stored_extent().map_err(boxed_error),
-            WorksheetModel::Source(worksheet) => worksheet.stored_extent().map_err(boxed_error),
+        let result = match &self.worksheet {
+            WorksheetModel::Owned(worksheet) => worksheet.stored_extent(),
+            WorksheetModel::Source(worksheet) => worksheet.stored_extent(),
+        };
+        match result {
+            Ok(extent) => Ok(extent),
+            // The legacy dynamic worksheet trait models non-grid sheet kinds
+            // as empty row/cell iterators. Preserve that contract while
+            // allowing malformed grid payload and source errors through the
+            // fallible iterators below.
+            Err(xlsx::Error::NotWorksheet { .. }) => Ok(None),
+            Err(error) => Err(boxed_xlsx_error(error)),
         }
     }
 
     fn value_at(&self, row: u32, column: u32) -> SheetResult<CellValue> {
         match &self.worksheet {
             WorksheetModel::Owned(worksheet) => {
-                match worksheet.cell((row, column)).map_err(boxed_error)? {
+                match worksheet.cell((row, column)).map_err(boxed_xlsx_error)? {
                     xlsx::cell::View::Stored(cell) => Ok(convert_cell(cell)),
                     xlsx::cell::View::Missing | xlsx::cell::View::Covered(_) => {
                         Ok(CellValue::Empty)
@@ -256,7 +298,7 @@ impl Worksheet {
                 }
             },
             WorksheetModel::Source(worksheet) => {
-                match worksheet.cell((row, column)).map_err(boxed_error)? {
+                match worksheet.cell((row, column)).map_err(boxed_xlsx_error)? {
                     xlsx::SourceCellView::Stored(cell) => Ok(convert_cell(&cell)),
                     xlsx::SourceCellView::Missing | xlsx::SourceCellView::Covered(_) => {
                         Ok(CellValue::Empty)
@@ -305,7 +347,7 @@ impl Worksheet {
                 values.resize(width, CellValue::Empty);
                 for entry in worksheet
                     .cells((row, 0, end_row, end_column))
-                    .map_err(boxed_error)?
+                    .map_err(boxed_xlsx_error)?
                 {
                     let column = usize::try_from(entry.address.column().get())
                         .map_err(|_| boxed_error("XLSX column does not fit usize"))?;
@@ -328,7 +370,7 @@ impl Worksheet {
                 inner: CellsInner::Owned(
                     worksheet
                         .cells(extent)
-                        .map_err(boxed_error)?
+                        .map_err(boxed_xlsx_error)?
                         .map(|(address, cell)| {
                             XlsxCell::new(
                                 address.row().get(),
@@ -342,7 +384,10 @@ impl Worksheet {
             }),
             WorksheetModel::Source(worksheet) => Ok(Cells {
                 inner: CellsInner::Source(
-                    worksheet.cells(extent).map_err(boxed_error)?.into_iter(),
+                    worksheet
+                        .cells(extent)
+                        .map_err(boxed_xlsx_error)?
+                        .into_iter(),
                 ),
             }),
         }
@@ -389,14 +434,24 @@ impl CoreWorksheet for Worksheet {
     }
 
     fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(self.stored_cells().unwrap_or_else(|_| Cells::empty()))
+        Box::new(match self.stored_cells() {
+            Ok(cells) => cells,
+            Err(error) => Cells::error(error),
+        })
     }
 
     fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
+        let dimensions = self.dimensions_inner();
+        let (end, error) = match dimensions {
+            Ok(Some((_, _, row, _))) => (row as usize + 1, None),
+            Ok(None) => (0, None),
+            Err(error) => (0, Some(error)),
+        };
         Box::new(Rows {
             worksheet: self,
             index: 0,
-            end: self.row_count(),
+            end,
+            error,
         })
     }
 
@@ -419,12 +474,19 @@ struct Cells {
 enum CellsInner {
     Owned(std::vec::IntoIter<XlsxCell>),
     Source(std::vec::IntoIter<xlsx::SourceCell>),
+    Error(Option<BoxError>),
 }
 
 impl Cells {
     fn empty() -> Self {
         Self {
             inner: CellsInner::Owned(Vec::new().into_iter()),
+        }
+    }
+
+    fn error(error: BoxError) -> Self {
+        Self {
+            inner: CellsInner::Error(Some(error)),
         }
     }
 }
@@ -440,6 +502,7 @@ impl<'a> CellIterator<'a> for Cells {
                     convert_cell(&entry.cell),
                 )
             }),
+            CellsInner::Error(error) => return error.take().map(Err),
         }?;
         Some(Ok(Box::new(cell) as Box<dyn CoreCell + 'a>))
     }
@@ -449,10 +512,14 @@ struct Rows<'a> {
     worksheet: &'a Worksheet,
     index: usize,
     end: usize,
+    error: Option<BoxError>,
 }
 
 impl<'a> RowIterator<'a> for Rows<'a> {
     fn next(&mut self) -> Option<SheetResult<std::borrow::Cow<'a, [CellValue]>>> {
+        if let Some(error) = self.error.take() {
+            return Some(Err(error));
+        }
         if self.index >= self.end {
             return None;
         }
