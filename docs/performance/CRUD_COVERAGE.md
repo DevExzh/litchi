@@ -1441,6 +1441,18 @@ because mean and tail stability gates fail. Structural cells/rows, formulas,
 merges, insert/delete, real-producer, allocation/RSS and physical-I/O coverage
 remain open.
 
+Change 0178 also leaves the matrix at 320 and adds no CRUD closure. It removes
+one redundant final complete fingerprint only from plans rooted in sealed
+owned CFB bytes, after candidate reopen and optional format-owner validation.
+Generic positional sources retain their final mutation fence. The existing XLS
+comment and fixed-width numeric selectors prove exact output and paired lower
+p50 directions, but workload stability gates withhold latency acceptance. The
+accepted scope is one deterministic logical scan/digest-pair reduction per
+effective owned plan; comment add/remove, length-changing edits, formulas,
+structural BIFF changes, resource/physical-I/O/cold-cache and producer coverage
+remain open. See
+[`0178`](changes/0178-cfb-owned-planning-fingerprint.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

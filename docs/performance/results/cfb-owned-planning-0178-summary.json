@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "change": "0178",
+  "decision": "retain_deterministic_work_reduction_withhold_latency",
+  "control_revision": "d84a3d030540ad0e46adc692dd52db17c3527884",
+  "candidate_revision": "1535b141e5e2777681306ec898cb9292eafccc74",
+  "control_binary_sha256": "94927d403afca7fa77f9404113531b82850b2df3211e7e410172b8bdb0854c8f",
+  "candidate_binary_sha256": "af7a105d9ff22c28bfd00d7433af51ebdde1e3f883b404b04b91d4a3493c38e4",
+  "protocol": {
+    "order": [
+      "control-a1",
+      "candidate-b1",
+      "candidate-b2",
+      "control-a2"
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_case": 500,
+    "timed_scope": "existing matched XLS source-backed edit, planning, and sequential publication lifecycle",
+    "source_counter_scope": "owned-source ingress and sequential sink topology; not physical I/O"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "semantic_projection": {
+    "canonical_sha256": "e2928393eb4b243e00433c55818f3150ac2ffa56f4cb486c1e405b8b0202197d",
+    "all_four_legs_equal": true,
+    "excluded_fields": "elapsed and phase timing vectors"
+  },
+  "deterministic_work_reduction_per_effective_owned_plan": {
+    "large_corpus": {
+      "source_bytes": 16995840,
+      "logical_source_bytes_removed": 16995840,
+      "one_mib_fingerprint_reads_removed": 17,
+      "source_target_digest_pairs_removed": 1
+    },
+    "small_rk_mulrk_corpus": {
+      "source_bytes": 202752,
+      "logical_source_bytes_removed": 202752,
+      "one_mib_fingerprint_reads_removed": 1,
+      "source_target_digest_pairs_removed": 1
+    }
+  },
+  "workloads": {
+    "one_comment": {
+      "case": "xls_comments_source_backed_edit_save",
+      "source_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "output_sha256": "bd4f2f1b4e98781253503260ba19247fd01c159c784d9f114a449400d5ac1e6d",
+      "updates": 1,
+      "splices": 2,
+      "elapsed_p50_ns": {
+        "a1": 52703429,
+        "b1": 35116502,
+        "b2": 37324199,
+        "a2": 53661650
+      },
+      "paired_p50_reduction_percent": {
+        "a1_to_b1": 33.369607,
+        "b2_to_a2": 30.445301
+      },
+      "same_implementation_p50_drift_percent": {
+        "control": 1.818138,
+        "candidate": 6.286779
+      },
+      "descriptive_plan_p50_ns": {
+        "a1": 32331982,
+        "b1": 17750568,
+        "b2": 17089975,
+        "a2": 33107335
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "candidate p50 and p95 same-implementation drift exceed their thresholds"
+    },
+    "all_256_comments": {
+      "case": "xls_comments_source_backed_batch_edit_save",
+      "source_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "output_sha256": "1b76467bd7a229adce1f94c7814e9d46f1cea15f8963b1c21e89bcb2e254e5fc",
+      "updates": 256,
+      "splices": 512,
+      "elapsed_p50_ns": {
+        "a1": 53511760,
+        "b1": 35961804,
+        "b2": 37381463,
+        "a2": 54513582
+      },
+      "paired_p50_reduction_percent": {
+        "a1_to_b1": 32.796447,
+        "b2_to_a2": 31.427249
+      },
+      "same_implementation_p50_drift_percent": {
+        "control": 1.872153,
+        "candidate": 3.947686
+      },
+      "descriptive_plan_p50_ns": {
+        "a1": 32989294,
+        "b1": 18771071,
+        "b2": 17576058,
+        "a2": 34549810
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "candidate p95 and both p99 same-implementation drift values exceed their thresholds"
+    },
+    "one_number": {
+      "case": "xls_numeric_plan_only_number_edit_save",
+      "source_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "output_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+      "updates": 1,
+      "splices": 1,
+      "elapsed_p50_ns": {
+        "a1": 49295618,
+        "b1": 35022257,
+        "b2": 32890170,
+        "a2": 51771942
+      },
+      "paired_p50_reduction_percent": {
+        "a1_to_b1": 28.954624,
+        "b2_to_a2": 36.471052
+      },
+      "same_implementation_p50_drift_percent": {
+        "control": 5.023416,
+        "candidate": 6.087806
+      },
+      "descriptive_commit_p50_ns": {
+        "a1": 33043000,
+        "b1": 18315395,
+        "b2": 17120587,
+        "a2": 34753905
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "p50 plus candidate mean, p95, and p99 same-implementation drift exceed their thresholds"
+    },
+    "three_rk_mulrk_values": {
+      "case": "xls_numeric_plan_only_rk_mulrk_edit_save",
+      "source_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+      "output_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+      "updates": 3,
+      "splices": 3,
+      "elapsed_p50_ns": {
+        "a1": 578389,
+        "b1": 441016,
+        "b2": 413424,
+        "a2": 629350
+      },
+      "paired_p50_reduction_percent": {
+        "a1_to_b1": 23.750970,
+        "b2_to_a2": 34.309367
+      },
+      "same_implementation_p50_drift_percent": {
+        "control": 8.810852,
+        "candidate": 6.256462
+      },
+      "descriptive_commit_p50_ns": {
+        "a1": 401717,
+        "b1": 253664,
+        "b2": 230697,
+        "a2": 441156
+      },
+      "latency_claim": null,
+      "latency_withheld_reason": "control and candidate p50 and mean same-implementation drift exceed their thresholds"
+    }
+  },
+  "latency_claim": null,
+  "latency_withheld_reason": "at least one required p50, mean, p95, or p99 stability gate fails for every workload",
+  "withheld_scope": [
+    "physical I/O",
+    "allocation and RSS",
+    "cold-cache behavior",
+    "throughput and scaling",
+    "generic mutable ReadAt sources",
+    "topology-changing publication",
+    "real-producer artifacts"
+  ]
+}

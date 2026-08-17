@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "change": "0178",
+  "control_revision": "d84a3d030540ad0e46adc692dd52db17c3527884",
+  "candidate_revision": "1535b141e5e2777681306ec898cb9292eafccc74",
+  "artifacts": [
+    {
+      "path": "cfb-owned-planning-0178-a1.json.zst",
+      "bytes": 27160,
+      "sha256": "e9d016097b77f9e61fe704428b923b8b105e950f24f7db6018a1415672a045ca",
+      "uncompressed_bytes": 998224,
+      "uncompressed_sha256": "5cb0e6e72dc0b32a294da4c1c9c4c3aef0bf3d00db3ca69f88d0b317cf4fcd14"
+    },
+    {
+      "path": "cfb-owned-planning-0178-b1.json.zst",
+      "bytes": 26993,
+      "sha256": "072e5989b4d9cd00407b894d23f08af3c68bff33f9719ebdc50bfd2eb9f36d76",
+      "uncompressed_bytes": 998354,
+      "uncompressed_sha256": "c2a07daf0f307eeb1b3b113c73c5a379cfff95d1a3096630ac00a3859f7e3a71"
+    },
+    {
+      "path": "cfb-owned-planning-0178-b2.json.zst",
+      "bytes": 26591,
+      "sha256": "e7c709774cf3f3b81e2167babb5d161824b39d1037d48a687a4b8be6301944a3",
+      "uncompressed_bytes": 997727,
+      "uncompressed_sha256": "d0e4f65a4afb68bf4459dc8bbc5582b8331b9d09ef7c8115cbd4f19e0794500c"
+    },
+    {
+      "path": "cfb-owned-planning-0178-a2.json.zst",
+      "bytes": 27284,
+      "sha256": "385ed5291db4737f83393ce1dbb486e701fc5e4e80ea3294528fd3a03403f047",
+      "uncompressed_bytes": 998376,
+      "uncompressed_sha256": "b65188d8d3219b6a02b3461f18961a8aea8a614e8b232754a8256643a58ae60f"
+    },
+    {
+      "path": "cfb-owned-planning-0178-summary.json",
+      "bytes": 5869,
+      "sha256": "4602008f1703c7813df16b802a35acc972f04527b235292c46f2eea5d7615b47"
+    }
+  ]
+}

@@ -3,6 +3,13 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0178`](changes/0178-cfb-owned-planning-fingerprint.md)
+(0178 removes one final complete logical fingerprint scan from sealed owned
+CFB planning after candidate reopen and optional format-owner validation.
+Generic positional sources retain their hostile stable-token fence. The fixed
+XLS corpora remove 16,995,840 bytes/17 reads or 202,752 bytes/one read per
+effective plan; clean paired latency directions are lower but stability drift
+withholds every workload-level latency claim.)
 [`change 0172`](changes/0172-cfb-owned-numeric-publication.md)
 (0172 preserves immutable owned-byte provenance into native XLS numeric plans
 and removes the two redundant outer fingerprint scans from direct publication.
