@@ -14,6 +14,23 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained XLS source-policy result (change 0181)
+
+The plan-only fixed-width numeric path now reuses the immutable snapshot's
+already validated worksheet-coverage, protection-classification, and
+macro-free facts. Each effective plan removes one complete source
+`Workbook` policy reopen while retaining the independent composed-target
+semantic reopen and every CFB/publication fence.
+
+A clean CPU-2 20-warmup/500-sample A/B/B/A accepts the exact Number workload:
+total p50 is 1.92%-5.91% lower and isolated commit p50 is 3.95%-8.27% lower;
+p50/mean/p95/p99 paired directions and stability gates pass. RK/MulRK latency
+is withheld because candidate and tail drift exceed policy, though the same
+deterministic `1 -> 0` source reopen applies. No publication, physical-I/O,
+allocation/RSS, cold-cache, atomic-save, or broad XLS claim follows. See
+[change 0181](changes/0181-xls-source-policy-reuse.md) and its
+[machine-readable summary](results/xls-source-policy-0181-summary.json).
+
 ## Latest retained ODT repeated-text result (change 0180)
 
 `SourceBackedDocument::text()` now retains one fallibly allocated, at-most

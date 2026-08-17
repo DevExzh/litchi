@@ -2088,3 +2088,21 @@ post-preparation reads hold in all eight legs. No allocation/RSS, physical-I/O,
 cold-cache, single-call/open, producer, generic ODF, or broader CRUD claim is
 accepted. See [change 0180](changes/0180-odt-source-text-cache.md) and the
 [summary](results/odt-text-cache-0180-summary.json).
+
+Change 0181 leaves the 322-name matrix and historical 36-case/198-record
+default unchanged. The existing native-XLS plan-only Number and RK/MulRK
+selectors now measure a candidate that reuses the source snapshot's validated
+worksheet-coverage, protection-classification, and macro-free facts. This
+removes one source `Workbook` policy reopen per effective plan while retaining
+one independent composed-target semantic reopen plus every CFB fingerprint,
+range, source-version, macro-container, readback, and publication fence.
+
+In a clean CPU-2 20-warmup/500-sample A/B/B/A, the Number workflow improves
+p50 5.91%/1.92%, mean 5.36%/1.92%, p95 6.60%/0.48%, and p99 5.99%/1.64%; its
+isolated commit phase improves 2.02%-9.63% across those metrics. All paired
+directions and predeclared stability gates pass. RK/MulRK p50 is lower in both
+directions, but candidate and tail drift fail policy, so that family's latency
+is withheld. Publication is not claimed, and the in-memory `Cursor` parser
+elimination is not presented as `ReadAt` or physical-I/O evidence. See
+[change 0181](changes/0181-xls-source-policy-reuse.md) and the
+[summary](results/xls-source-policy-0181-summary.json).

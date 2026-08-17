@@ -1476,6 +1476,16 @@ physical I/O, single-call/open, producer, generic ODF, non-text projection, and
 broad CRUD coverage remain open. See
 [`0180`](changes/0180-odt-source-text-cache.md).
 
+Change 0181 adds no selector or CRUD closure and leaves the matrix at 322. The
+existing native-XLS plan-only fixed-width numeric path now reuses three private
+source policy facts captured from its immutable complete Workbook validation,
+removing one repeated source semantic reopen while retaining independent target
+validation and every CFB/publication fence. Clean Number total and commit
+p50/mean/p95/p99 pass; RK/MulRK latency, publication, resource/I/O, cold-cache,
+atomic-save, real-producer performance and broader formula/string/structural
+XLS coverage remain open. See
+[`0181`](changes/0181-xls-source-policy-reuse.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
