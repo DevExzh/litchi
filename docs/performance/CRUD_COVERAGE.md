@@ -2,7 +2,7 @@
 
 Date: 2026-08-17
 
-This is a coverage map, not a completion claim. It compares the 320 selectable
+This is a coverage map, not a completion claim. It compares the 322 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -97,7 +97,8 @@ conversion for other formats remain.
    and open -3.52%/+0.13% and +0.55%/-1.80%. The existing
    `measured_total_ns` lifecycle boundary is unchanged. At change 0165 the
    selector count remained 311; change 0166 raised it to 315, change 0174
-   raised it to 319, and change 0175 raises the current count to 320,
+   raised it to 319, change 0175 raised it to 320, and change 0180 raises the
+   current count to 322,
    while the default remains 36 cases / 198 records. The guard run retains
    24,000 samples.
    This accepts the named private lazy/fused boundary only. A larger shared
@@ -1161,7 +1162,7 @@ pre-staged publication-call interval,
 making that matrix 295. Change 0154 adds six ODF content-COW publication
 selectors, making that matrix 301; change 0159 made it 302, change 0160 made
 it 303, change 0162 made it 305, change 0163 made it 309, change 0164 made it
-311, change 0166 made it 315, change 0174 made it 319, and change 0175 makes the current matrix 320. Only `cfg(test)` source-event acceptance and
+311, change 0166 made it 315, change 0174 made it 319, and change 0175 made the then-current matrix 320. Only `cfg(test)` source-event acceptance and
 tests changed in 0152. This is
 source-event/correctness evidence only. Root MiniStream cache and
 resource-accounting boundaries and broader performance gaps remain; local or
@@ -1260,7 +1261,7 @@ real-producer, or rich-RTF claim. The focused harness gate is
 `rtf_paragraph_split_merge_selectors_are_opt_in_bounded_and_gate_complete`;
 the historical default remains 36 cases / 198 records. That revision had 311
 selectable names; change 0166 made it 315, change 0174 made it 319, and change
-0175 makes the current matrix 320. See
+0175 made the then-current matrix 320. See
 [`0164`](changes/0164-rtf-paragraph-split-merge-evidence.md).
 
 Change 0165 records a private native-DOC lazy/fused fingerprint implementation,
@@ -1275,7 +1276,7 @@ vectors, `same_lineage_apply_ns`, `deferred_fingerprint_ns`,
 gates for same-lineage apply, reopened-source apply, independent fingerprints,
 and workflow arithmetic. The historical `measured_total_ns` lifecycle
 boundary is unchanged. At that revision the selectable matrix remained 311
-names; change 0166 made it 315, change 0174 made it 319, and change 0175 makes the current matrix 320,
+names; change 0166 made it 315, change 0174 made it 319, and change 0175 made the then-current matrix 320,
 while the default remains 36
 cases / 198 records.
 
@@ -1431,7 +1432,7 @@ authenticated content reuse regressed both source-backed cell workflows, and
 XLSX conditional-formatting readback reuse was directionally inconsistent.
 Their existing CRUD closures remain as documented before the experiments.
 
-Change 0177 adds no selector name and leaves the current matrix at 320. It
+Change 0177 added no selector name and left the then-current matrix at 320. It
 hardens the existing four ODS source-cell records with aligned lifecycle and
 phase vectors, backend-applicable gates, and a separately untimed logical
 source replay. Clean release A/B/B/A accepts the fixed one-existing-cell
@@ -1441,7 +1442,7 @@ because mean and tail stability gates fail. Structural cells/rows, formulas,
 merges, insert/delete, real-producer, allocation/RSS and physical-I/O coverage
 remain open.
 
-Change 0178 also leaves the matrix at 320 and adds no CRUD closure. It removes
+Change 0178 also left the then-current matrix at 320 and adds no CRUD closure. It removes
 one redundant final complete fingerprint only from plans rooted in sealed
 owned CFB bytes, after candidate reopen and optional format-owner validation.
 Generic positional sources retain their final mutation fence. The existing XLS
@@ -1463,6 +1464,17 @@ gates fail, so only the exact `3 -> 1` / `10 -> 1` catalog-build reduction is
 accepted. General topology edits, relationships, real producers, allocation,
 RSS, physical I/O, cold-cache and broader PPTX coverage remain open. See
 [`0179`](changes/0179-pptx-source-catalog-reuse.md).
+
+Change 0180 raises the matrix from 320 to 322 with matched uncached-control and
+public cached source-backed ODT repeated-text selectors. It adds no CRUD
+closure: the full-text row was already covered. The exact four-call generated
+workload reduces complete XML/block-model projection phases from four to two,
+retains at most one 16 MiB string, returns four fresh owned strings, and proves
+semantic/archive/media/range/freshness parity plus zero post-preparation source
+reads. Two clean balanced cycles accept p50/mean only; tails, allocation/RSS,
+physical I/O, single-call/open, producer, generic ODF, non-text projection, and
+broad CRUD coverage remain open. See
+[`0180`](changes/0180-odt-source-text-cache.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and

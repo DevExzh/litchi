@@ -14,6 +14,25 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained ODT repeated-text result (change 0180)
+
+`SourceBackedDocument::text()` now retains one fallibly allocated, at-most
+16 MiB projection on the first successful parse after its two-call threshold
+is reached. On the fixed
+10,000-paragraph media-rich ODT, four calls perform two complete `content.xml`
+projection phases instead of four while returning four distinct owned strings.
+Every sample proves zero source reads after preparation and exact semantic,
+archive, media, range, and freshness parity.
+
+Two clean CPU-2 release A/B/B/A cycles accept p50 reductions of
+47.01%-50.95% and mean reductions of 46.83%-51.29% across four paired
+directions. p95 and p99 remain withheld because the first candidate cycle
+failed their stability gates; the balanced retry is retained and disclosed.
+No allocation/RSS, physical-I/O, cold-cache, single-call/open, producer,
+generic ODF, or broad CRUD claim follows. See
+[change 0180](changes/0180-odt-source-text-cache.md) and its
+[machine-readable summary](results/odt-text-cache-0180-summary.json).
+
 ## Latest retained PPTX catalog result (change 0179)
 
 The source-backed PPTX editor now retains its already validated presentation
@@ -449,7 +468,7 @@ publication-call interval, making that matrix 295. Change 0154 adds six ODF
 content-COW publication selectors, making that matrix 301; change 0159 later
 made it 302, change 0160 made it 303, change 0162 made it 305, change 0163
 made it 309, change 0164 made it 311, change 0166 made it 315, change 0174
-made it 319, and change 0175 makes the current matrix 320. Local or generic latency, allocation/RSS/peak memory, physical
+made it 319, and change 0175 made the then-current matrix 320. Local or generic latency, allocation/RSS/peak memory, physical
 I/O/syscalls, cold-cache/device/network behavior, decompression, native
 semantic, OOXML, ODF, RTF, and iWork
 claims are withheld. The root MiniStream cache and resource-accounting
@@ -646,7 +665,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**320 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**322 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
