@@ -83,12 +83,20 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 322
+provide their source-read counters. The current `Case` matrix exposes 324
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
 four opt-in XLSX existing-row visibility lifecycle selectors, and four opt-in
 ODS existing-cell publication selectors.
+Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
+`xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
+and a temporary source file. The first times exactly
+`litchi::Workbook::open(Path)`;
+the lifecycle selector times that call plus worksheet names, count, and text.
+Both selectors compare those projections and metadata with an untimed
+`litchi::Workbook::from_bytes(Vec<u8>)` oracle and verify the source archive
+SHA-256. They leave the default 36 cases / 198 records unchanged.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -2204,6 +2212,15 @@ native-Office claim is made.
 - `xlsx_source_narrow_column_range_scan`: cold-read and verify every address
   and value in `B1:B<rows>` through the source-backed public API, with the same
   second-sheet deferral proof.
+- `xlsx_file_open`: open the deterministic medium cell-CRUD XLSX corpus through
+  the high-level `litchi::Workbook::open(Path)` filesystem route. The timed
+  scope is exactly that public path call; the untimed oracle compares metadata,
+  worksheet names/count, full text, and the source archive SHA-256 with
+  `Workbook::from_bytes(Vec<u8>)`.
+- `xlsx_file_open_lifecycle`: use the same temporary source file and oracle,
+  but time the high-level path open followed by worksheet names, worksheet
+  count, and full text. The selector is opt-in and does not claim a source
+  speedup or physical-I/O result.
 - `opc_range_source_open` / `opc_range_source_open_main_read`: repeat the OPC
   structural-open and open-plus-main-Part flows through the deterministic
   latency/bandwidth/range simulator. The structural case requires a fresh main
