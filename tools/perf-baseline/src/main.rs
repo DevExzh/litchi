@@ -107,6 +107,8 @@ const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
 const ODF_REPAIR_LOCAL_EXTRA: &[u8] = &[0x55, 0x54, 0x05, 0x00, 0x01, 0, 0, 0, 0];
 const ODF_REPAIR_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
+const ODT_REPEATED_TEXT_CORPUS_GENERATOR: &str =
+    "litchi-odt-source-backed-repeated-text-media-v1";
 const ODT_RESOURCE_BATCH_CORPUS_GENERATOR: &str =
     "litchi-odt-embedded-resource-batch-publication-v1";
 const ODT_MEDIA_APPEND_RUN_TEXT: &str = " appended run";
@@ -164,6 +166,12 @@ const ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_
     [3, 5, 2, 2];
 const ODT_RESOURCE_BATCH_COUNT: usize = 64;
 const ODT_RESOURCE_PAYLOAD_BYTES: usize = 4 * 1024;
+const ODT_REPEATED_TEXT_CALLS: usize = 4;
+const ODT_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS: u64 = 8;
+const ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_CALLS] =
+    [2, 2, 2, 2];
+const ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_CALLS] =
+    [2, 4, 2, 2];
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT: usize = 8;
@@ -854,6 +862,8 @@ enum Case {
     OdtEmbeddedResourceBatchReplaceSave,
     OdtContentCowOwnedRebuild,
     OdtContentCowPositional,
+    OdtSourceBackedRepeatedTextUncached,
+    OdtSourceBackedRepeatedTextCached,
     OdsSemanticOpen,
     OdsSemanticListSheets,
     OdsSemanticOneCell,
@@ -1300,6 +1310,10 @@ impl Case {
             Self::OdtEmbeddedResourceBatchReplaceSave => "odt_embedded_resource_batch_replace_save",
             Self::OdtContentCowOwnedRebuild => "odt_content_cow_owned_rebuild",
             Self::OdtContentCowPositional => "odt_content_cow_positional",
+            Self::OdtSourceBackedRepeatedTextUncached => {
+                "odt_source_backed_repeated_text_uncached"
+            },
+            Self::OdtSourceBackedRepeatedTextCached => "odt_source_backed_repeated_text_cached",
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
             Self::OdsSemanticOneCell => "ods_semantic_one_cell",
@@ -1681,6 +1695,14 @@ impl Case {
         matches!(
             self,
             Self::OdtContentCowOwnedRebuild | Self::OdtContentCowPositional
+        )
+    }
+
+    const fn is_odt_repeated_text(self) -> bool {
+        matches!(
+            self,
+            Self::OdtSourceBackedRepeatedTextUncached
+                | Self::OdtSourceBackedRepeatedTextCached
         )
     }
 
@@ -2804,6 +2826,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_repeated_text: Option<OdpRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    odt_repeated_text: Option<OdtRepeatedTextSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ods_root: Option<OdsRootSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_cell_sweep: Option<OdsCellSweepSummary>,
@@ -3077,6 +3101,81 @@ struct OdpRepeatedTextSummary {
     source_replay_payload_read_calls: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     source_replay_payload_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_version_observations_per_call: Vec<Vec<u64>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    projection_text_sha256: Vec<String>,
+}
+
+/// Matched repeated-text evidence for the source-backed ODT text cache.
+/// Both selectors use the same large media-rich source owner and exactly four
+/// full-text projection calls.  The control reconstructs the current public
+/// semantics from retained `content.xml` through `TextElements::extract_text`;
+/// the candidate calls `SourceBackedDocument::text()`.  Owner preparation,
+/// output-slot reservation, semantic/archive/media/source-range/freshness
+/// gates, and the no-post-preparation-read replay are outside the timed
+/// projection interval.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdtRepeatedTextSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    source_evidence_scope: &'static str,
+    projection_calls: usize,
+    paragraph_count: usize,
+    archive_member_count: usize,
+    pictures_count: usize,
+    pictures_uncompressed_payload_bytes: u64,
+    canonical_text_sha256: String,
+    content_xml_sha256: String,
+    source_archive_bytes: u64,
+    source_archive_sha256: String,
+    pictures_uncompressed_payload_sha256: String,
+    freshness_shape: String,
+    semantic_parity_verified: bool,
+    archive_topology_verified: bool,
+    media_payloads_verified: bool,
+    source_ranges_verified: bool,
+    source_freshness_verified: bool,
+    zero_post_preparation_reads_verified: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_range_overlap_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_pictures_read_bytes: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     source_replay_version_observations: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -6255,6 +6354,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_pptx()
                     && !case.uses_semantic_odt()
                     && !case.uses_odt_media()
+                    && !case.is_odt_repeated_text()
                     && !case.uses_odt_resource_batch()
                     && !case.uses_odf_content_cow()
                     && !case.uses_semantic_ods()
@@ -7166,6 +7266,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             .iter()
             .copied()
             .filter(|case| case.uses_odf_content_cow_odt())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_odt_repeated_text()) {
+        let corpus = build_odt_repeated_text_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_odt_repeated_text())
         {
             results.push(run_case_with_config(
                 case,
@@ -8147,6 +8265,12 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "odt_content_cow_owned_rebuild" => Some(Case::OdtContentCowOwnedRebuild),
         "odt_content_cow_positional" => Some(Case::OdtContentCowPositional),
+        "odt_source_backed_repeated_text_uncached" => {
+            Some(Case::OdtSourceBackedRepeatedTextUncached)
+        },
+        "odt_source_backed_repeated_text_cached" => {
+            Some(Case::OdtSourceBackedRepeatedTextCached)
+        },
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
@@ -8476,6 +8600,8 @@ fn print_usage() {
                                        odt_embedded_resource_scalar_replace_save,\n\
                                        odt_embedded_resource_batch_replace_save,\n\
                                        odt_content_cow_owned_rebuild,odt_content_cow_positional,\n\
+                                       odt_source_backed_repeated_text_uncached,\n\
+                                       odt_source_backed_repeated_text_cached,\n\
                                        ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
                                        ods_semantic_cell_sweep,\n\
@@ -12233,9 +12359,9 @@ fn odt_resource_batch_image(
     }
 }
 
-fn odt_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
+fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut document = litchi_odt::mutable::MutableDocument::new();
-    for index in 0..SemanticShape::Medium.docx_paragraphs() {
+    for index in 0..shape.docx_paragraphs() {
         document.add_paragraph(&semantic_odt_text(index, false))?;
     }
     let base = document.to_bytes()?;
@@ -12257,6 +12383,14 @@ fn odt_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
         )?;
     }
     Ok(writer.finish_to_bytes()?)
+}
+
+fn odt_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
+    odt_media_archive_for_shape(SemanticShape::Medium)
+}
+
+fn odt_repeated_text_archive() -> Result<Vec<u8>, Box<dyn Error>> {
+    odt_media_archive_for_shape(SemanticShape::Large)
 }
 
 fn odt_resource_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
@@ -12657,6 +12791,53 @@ fn build_odt_media_corpus() -> Result<Corpus, Box<dyn Error>> {
             uncompressed_payload_bytes: paragraph_bytes
                 .checked_add(media_bytes)
                 .ok_or("media-rich ODT aggregate byte count overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: format!("paragraph:{target}"),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: format!("paragraph:{target}"),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn build_odt_repeated_text_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let shape = SemanticShape::Large;
+    let archive = odt_repeated_text_archive()?;
+    verify_odt_repeated_text_archive(&archive)?;
+    let target = shape.docx_paragraphs() / 2;
+    let target_payload = semantic_odt_text(target, false).into_bytes();
+    let paragraph_bytes = (0..shape.docx_paragraphs()).try_fold(0usize, |total, index| {
+        total
+            .checked_add(semantic_odt_text(index, false).len())
+            .ok_or("repeated-text ODT text byte count overflows usize")
+    })?;
+    let media_bytes = ODS_MEDIA_ENTRY_COUNT
+        .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+        .ok_or("repeated-text ODT payload byte count overflows usize")?;
+    let entry_count = shape
+        .docx_paragraphs()
+        .checked_add(ODS_MEDIA_ENTRY_COUNT)
+        .ok_or("repeated-text ODT logical entry count overflows usize")?;
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: "odt-source-backed-repeated-text-media".to_owned(),
+            generator: ODT_REPEATED_TEXT_CORPUS_GENERATOR,
+            package_format: "ODT/ODF/ZIP",
+            shape: "large-media-rich",
+            payload_kind: "deterministic-incompressible-media",
+            compression: "deflate",
+            entry_count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: ODS_MEDIA_ENTRY_BYTES,
+            uncompressed_payload_bytes: paragraph_bytes
+                .checked_add(media_bytes)
+                .ok_or("repeated-text ODT aggregate byte count overflows usize")?,
             archive_bytes: archive.len(),
             archive_sha256: sha256_hex(&archive),
             target_entry: format!("paragraph:{target}"),
@@ -14866,6 +15047,9 @@ fn run_case_with_config(
         Case::OdtContentCowOwnedRebuild | Case::OdtContentCowPositional => {
             run_odf_content_cow(case, corpus, warmup_iterations, samples)
         },
+        Case::OdtSourceBackedRepeatedTextUncached | Case::OdtSourceBackedRepeatedTextCached => {
+            run_odt_repeated_text(case, corpus, warmup_iterations, samples)
+        },
         Case::OdsSemanticOpen
         | Case::OdsSemanticListSheets
         | Case::OdsSemanticOneCell
@@ -15505,6 +15689,24 @@ fn verify_odt_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn E
         }
         if package.get_file(&path)? != odt_media_payload(index) {
             return Err(format!("media-rich ODT payload differs for '{path}'").into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_odt_repeated_text_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    verify_semantic_odt(&document, SemanticShape::Large, &[])?;
+
+    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
+    let package = package.package()?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        let path = odt_media_path(index);
+        if package.manifest().get_media_type(&path) != Some("application/octet-stream") {
+            return Err(format!("repeated-text ODT manifest entry differs for '{path}'").into());
+        }
+        if package.get_file(&path)? != odt_media_payload(index) {
+            return Err(format!("repeated-text ODT payload differs for '{path}'").into());
         }
     }
     Ok(())
@@ -25225,6 +25427,454 @@ fn run_odp_root_file_access(
         (Ok(_), Err(error)) => Err(error.into()),
         (Err(error), _) => Err(error),
     }
+}
+
+fn odt_repeated_text_ranges(
+    corpus: &Corpus,
+) -> Result<(Range<u64>, Vec<Range<u64>>, Vec<Range<u64>>), Box<dyn Error>> {
+    let (content_range, untouched_ranges, picture_ranges, _untouched_names) =
+        odf_content_cow_ranges(&corpus.archive)?;
+    if picture_ranges.len() != ODS_MEDIA_ENTRY_COUNT {
+        return Err("ODT repeated-text source evidence found an unexpected Pictures count".into());
+    }
+    if content_range.is_empty() {
+        return Err("ODT repeated-text source evidence found an empty content.xml range".into());
+    }
+    if picture_ranges.iter().any(Range::is_empty) {
+        return Err("ODT repeated-text source evidence found an empty Pictures range".into());
+    }
+    Ok((content_range, untouched_ranges, picture_ranges))
+}
+
+fn odt_repeated_text_media_payload_digest() -> String {
+    let mut digest = Sha256::new();
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        digest.update((index as u64).to_le_bytes());
+        digest.update(odt_media_payload(index));
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn odt_repeated_text_digest(values: &[String]) -> String {
+    let mut digest = Sha256::new();
+    for (index, value) in values.iter().enumerate() {
+        digest.update((index as u64).to_le_bytes());
+        digest.update((value.len() as u64).to_le_bytes());
+        digest.update(value.as_bytes());
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn odt_repeated_text_uncached(
+    document: &litchi_odt::SourceBackedDocument,
+    content_xml: &str,
+) -> Result<String, Box<dyn Error>> {
+    document.check_source()?;
+    let result = litchi_odt::elements::text::TextElements::extract_text(content_xml);
+    document.check_source()?;
+    Ok(result?)
+}
+
+fn run_odt_repeated_text(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_odt_repeated_text() {
+        return Err("non-repeated-text ODT case passed to repeated-text runner".into());
+    }
+    if corpus.manifest.generator != ODT_REPEATED_TEXT_CORPUS_GENERATOR {
+        return Err("ODT repeated-text cases require the fixed large media-rich corpus".into());
+    }
+
+    let eager = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    let expected_text = eager.text()?;
+    let expected_paragraph_count = eager.paragraph_count()?;
+    if expected_paragraph_count != SemanticShape::Large.docx_paragraphs() {
+        return Err("ODT repeated-text eager paragraph count differs from corpus shape".into());
+    }
+    let content_xml = odf_content_xml(&corpus.archive)?;
+    let canonical_text_sha256 = sha256_hex(expected_text.as_bytes());
+    let content_xml_sha256 = sha256_hex(&content_xml);
+    let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
+    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    if archive_member_count != corpus.manifest.archive_member_count {
+        return Err("ODT repeated-text archive member count differs from manifest".into());
+    }
+    verify_odt_repeated_text_archive(&corpus.archive)?;
+    let pictures_uncompressed_payload_bytes = u64::try_from(
+        ODS_MEDIA_ENTRY_COUNT
+            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+            .ok_or("ODT repeated-text Pictures byte count overflows usize")?,
+    )?;
+    let pictures_uncompressed_payload_sha256 = odt_repeated_text_media_payload_digest();
+
+    let mut expected_outputs = Vec::new();
+    expected_outputs
+        .try_reserve_exact(ODT_REPEATED_TEXT_CALLS)
+        .map_err(|error| format!("ODT repeated-text expected-output allocation failed: {error}"))?;
+    for _ in 0..ODT_REPEATED_TEXT_CALLS {
+        expected_outputs.push(expected_text.clone());
+    }
+    let expected_repeated_digest = odt_repeated_text_digest(&expected_outputs);
+    let implementation = match case {
+        Case::OdtSourceBackedRepeatedTextUncached => "source_backed_uncached_public_control",
+        Case::OdtSourceBackedRepeatedTextCached => "source_backed_text_cache_candidate",
+        _ => unreachable!("repeated-text case validated above"),
+    };
+    let mut elapsed = Vec::new();
+    elapsed
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODT repeated-text elapsed allocation failed: {error}"))?;
+    let mut summary = OdtRepeatedTextSummary {
+        implementation,
+        phase: "four_repeated_full_text_projections",
+        timing_scope: "source-backed owner and four output slots prepared outside timer; four public full-text projections inside timer; semantic, archive, media, source-range, freshness, and zero-post-preparation-read gates outside timer",
+        source_evidence_scope: "separate untimed InstrumentedSource replay per measured sample",
+        projection_calls: ODT_REPEATED_TEXT_CALLS,
+        paragraph_count: expected_paragraph_count,
+        archive_member_count,
+        pictures_count: picture_ranges.len(),
+        pictures_uncompressed_payload_bytes,
+        canonical_text_sha256,
+        content_xml_sha256,
+        source_archive_bytes: u64::try_from(corpus.archive.len())?,
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        pictures_uncompressed_payload_sha256,
+        freshness_shape: "pending".to_owned(),
+        ..OdtRepeatedTextSummary::default()
+    };
+
+    macro_rules! reserve_summary_vec {
+        ($field:ident, $message:literal) => {
+            summary.$field.try_reserve_exact(samples).map_err(|error| {
+                format!(
+                    concat!("ODT repeated-text ", $message, " allocation failed: {}"),
+                    error
+                )
+            })?;
+        };
+    }
+    reserve_summary_vec!(projection_text_sha256, "digest");
+    reserve_summary_vec!(source_preparation_read_calls, "preparation-call");
+    reserve_summary_vec!(source_preparation_read_bytes, "preparation-byte");
+    reserve_summary_vec!(source_preparation_content_read_calls, "preparation-content-call");
+    reserve_summary_vec!(source_preparation_content_read_bytes, "preparation-content-byte");
+    reserve_summary_vec!(source_preparation_untouched_read_calls, "preparation-untouched-call");
+    reserve_summary_vec!(source_preparation_untouched_read_bytes, "preparation-untouched-byte");
+    reserve_summary_vec!(source_preparation_pictures_read_calls, "preparation-pictures-call");
+    reserve_summary_vec!(source_preparation_pictures_read_bytes, "preparation-pictures-byte");
+    reserve_summary_vec!(source_preparation_version_observations, "preparation-version");
+    reserve_summary_vec!(source_replay_read_calls, "replay-call");
+    reserve_summary_vec!(source_replay_read_bytes, "replay-byte");
+    reserve_summary_vec!(source_replay_range_overlap_bytes, "replay-overlap");
+    reserve_summary_vec!(source_replay_content_read_calls, "replay-content-call");
+    reserve_summary_vec!(source_replay_content_read_bytes, "replay-content-byte");
+    reserve_summary_vec!(source_replay_untouched_read_calls, "replay-untouched-call");
+    reserve_summary_vec!(source_replay_untouched_read_bytes, "replay-untouched-byte");
+    reserve_summary_vec!(source_replay_pictures_read_calls, "replay-pictures-call");
+    reserve_summary_vec!(source_replay_pictures_read_bytes, "replay-pictures-byte");
+    reserve_summary_vec!(source_replay_version_observations, "replay-version");
+    summary
+        .source_replay_version_observations_per_call
+        .try_reserve_exact(samples)
+        .map_err(|error| {
+            format!("ODT repeated-text per-call version allocation failed: {error}")
+        })?;
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let document = litchi_odt::SourceBackedDocument::from_read_at(source)?;
+        // Acquire the retained XML before timing.  The control below only
+        // performs its two freshness observations around extraction, matching
+        // the public `text()` boundary without moving XML acquisition into
+        // the four-projection interval.
+        let content_xml = document.content_xml()?;
+        let mut outputs = Vec::new();
+        outputs
+            .try_reserve_exact(ODT_REPEATED_TEXT_CALLS)
+            .map_err(|error| format!("ODT repeated-text output allocation failed: {error}"))?;
+
+        let started = Instant::now();
+        for _ in 0..ODT_REPEATED_TEXT_CALLS {
+            let text = match case {
+                Case::OdtSourceBackedRepeatedTextUncached => {
+                    odt_repeated_text_uncached(&document, content_xml)?
+                },
+                Case::OdtSourceBackedRepeatedTextCached => document.text()?,
+                _ => unreachable!("repeated-text case validated above"),
+            };
+            outputs.push(text);
+        }
+        let duration = started.elapsed();
+
+        if outputs.len() != ODT_REPEATED_TEXT_CALLS
+            || outputs.iter().any(|value| value != &expected_text)
+            || odt_repeated_text_digest(&outputs) != expected_repeated_digest
+        {
+            return Err("ODT repeated-text timed projection differs from canonical text".into());
+        }
+        // This is intentionally outside the measured projection interval:
+        // it is a semantic parity gate, not part of the query timing.
+        let source_projection = odt_repeated_text_uncached(&document, content_xml)?;
+        if source_projection != expected_text {
+            return Err("ODT repeated-text source semantic parity differs from eager text".into());
+        }
+        document.check_source()?;
+        if iteration >= warmup_iterations {
+            summary
+                .projection_text_sha256
+                .push(odt_repeated_text_digest(&outputs));
+        }
+        std::hint::black_box(outputs);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let mut expected_preparation = None;
+    let mut expected_replay = None;
+    let freshness_verified = true;
+    let zero_reads_verified = true;
+    for _ in 0..samples {
+        let source = Arc::new(InstrumentedSource::new_odf(
+            corpus.archive.clone(),
+            vec![content_range.clone()],
+            untouched_ranges.clone(),
+            picture_ranges.clone(),
+        ));
+        let document = litchi_odt::SourceBackedDocument::from_read_at(source.clone())?;
+        // Retain the validated XML before resetting counters.  This is owner
+        // preparation, not one of the four measured/replayed projections.
+        let content_xml = document.content_xml()?;
+        let preparation = source.snapshot();
+        let preparation_versions = source.version_calls();
+        if preparation.read_calls == 0
+            || preparation.read_bytes == 0
+            || preparation.odf.content.read_calls == 0
+            || preparation.odf.content.read_bytes == 0
+            || preparation.odf.pictures.read_calls != 0
+            || preparation.odf.pictures.read_bytes != 0
+        {
+            return Err("ODT repeated-text preparation failed source-range gates".into());
+        }
+        source.reset();
+
+        let mut outputs = Vec::new();
+        outputs
+            .try_reserve_exact(ODT_REPEATED_TEXT_CALLS)
+            .map_err(|error| format!("ODT repeated-text replay output allocation failed: {error}"))?;
+        let mut per_call_version_observations = Vec::new();
+        per_call_version_observations
+            .try_reserve_exact(ODT_REPEATED_TEXT_CALLS)
+            .map_err(|error| {
+                format!("ODT repeated-text per-call replay allocation failed: {error}")
+            })?;
+        for _ in 0..ODT_REPEATED_TEXT_CALLS {
+            let before_versions = source.version_calls();
+            let text = match case {
+                Case::OdtSourceBackedRepeatedTextUncached => {
+                    odt_repeated_text_uncached(&document, content_xml)?
+                },
+                Case::OdtSourceBackedRepeatedTextCached => document.text()?,
+                _ => unreachable!("repeated-text case validated above"),
+            };
+            let after_versions = source.version_calls();
+            let observed = after_versions
+                .checked_sub(before_versions)
+                .ok_or("ODT repeated-text version counter moved backwards")?;
+            per_call_version_observations.push(observed);
+            outputs.push(text);
+        }
+        let replay = source.snapshot();
+        let replay_versions = source.version_calls();
+        let no_post_preparation_reads = replay.read_calls == 0
+            && replay.read_bytes == 0
+            && replay.read_range_overlap_bytes == 0
+            && replay.ordinary_payload_read_calls == 0
+            && replay.ordinary_payload_read_bytes == 0
+            && replay.odf.content.read_calls == 0
+            && replay.odf.content.read_bytes == 0
+            && replay.odf.untouched.read_calls == 0
+            && replay.odf.untouched.read_bytes == 0
+            && replay.odf.pictures.read_calls == 0
+            && replay.odf.pictures.read_bytes == 0;
+        if !no_post_preparation_reads {
+            return Err("ODT repeated-text replay performed a post-preparation ReadAt".into());
+        }
+        let freshness_shape = if per_call_version_observations.as_slice()
+            == ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL.as_slice()
+        {
+            if replay_versions != ODT_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS {
+                return Err(format!(
+                    "ODT repeated-text baseline replay observed {replay_versions} freshness checks, expected {ODT_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS}"
+                )
+                .into());
+            }
+            "baseline_two_checks"
+        } else if case == Case::OdtSourceBackedRepeatedTextCached
+            && per_call_version_observations.as_slice()
+                == ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL.as_slice()
+        {
+            let expected = ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL
+                .iter()
+                .sum::<u64>();
+            if replay_versions != expected {
+                return Err(format!(
+                    "ODT repeated-text cache replay observed {replay_versions} freshness checks, expected {expected}"
+                )
+                .into());
+            }
+            "cache_enabled_publication_window"
+        } else {
+            return Err(format!(
+                "ODT repeated-text replay observed unsupported per-call freshness checks {:?}",
+                per_call_version_observations
+            )
+            .into());
+        };
+        if summary.freshness_shape == "pending" {
+            summary.freshness_shape = freshness_shape.to_owned();
+        } else if summary.freshness_shape != freshness_shape {
+            return Err("ODT repeated-text freshness shape changed across samples".into());
+        }
+        if outputs.len() != ODT_REPEATED_TEXT_CALLS
+            || outputs.iter().any(|value| value != &expected_text)
+            || odt_repeated_text_digest(&outputs) != expected_repeated_digest
+        {
+            return Err("ODT repeated-text source replay differs from canonical text".into());
+        }
+        // The source owner has already been fully prepared.  This final
+        // content projection is outside the exact four-call freshness window
+        // and proves the retained XML still agrees with the eager oracle.
+        if odt_repeated_text_uncached(&document, content_xml)? != expected_text {
+            return Err("ODT repeated-text source replay semantic parity failed".into());
+        }
+
+        let preparation_tuple = (
+            preparation.read_calls,
+            preparation.read_bytes,
+            preparation.odf.content,
+            preparation.odf.untouched,
+            preparation.odf.pictures,
+            preparation_versions,
+        );
+        if let Some(expected) = expected_preparation {
+            if expected != preparation_tuple {
+                return Err("ODT repeated-text preparation counters are not deterministic".into());
+            }
+        } else {
+            expected_preparation = Some(preparation_tuple);
+        }
+        let replay_tuple = (
+            replay.read_calls,
+            replay.read_bytes,
+            replay.read_range_overlap_bytes,
+            replay.odf.content,
+            replay.odf.untouched,
+            replay.odf.pictures,
+            replay_versions,
+        );
+        if let Some(expected) = expected_replay {
+            if expected != replay_tuple {
+                return Err("ODT repeated-text replay counters are not deterministic".into());
+            }
+        } else {
+            expected_replay = Some(replay_tuple);
+        }
+
+        summary.source_preparation_read_calls.push(preparation.read_calls);
+        summary.source_preparation_read_bytes.push(preparation.read_bytes);
+        summary
+            .source_preparation_content_read_calls
+            .push(preparation.odf.content.read_calls);
+        summary
+            .source_preparation_content_read_bytes
+            .push(preparation.odf.content.read_bytes);
+        summary
+            .source_preparation_untouched_read_calls
+            .push(preparation.odf.untouched.read_calls);
+        summary
+            .source_preparation_untouched_read_bytes
+            .push(preparation.odf.untouched.read_bytes);
+        summary
+            .source_preparation_pictures_read_calls
+            .push(preparation.odf.pictures.read_calls);
+        summary
+            .source_preparation_pictures_read_bytes
+            .push(preparation.odf.pictures.read_bytes);
+        summary
+            .source_preparation_version_observations
+            .push(preparation_versions);
+        summary.source_replay_read_calls.push(replay.read_calls);
+        summary.source_replay_read_bytes.push(replay.read_bytes);
+        summary
+            .source_replay_range_overlap_bytes
+            .push(replay.read_range_overlap_bytes);
+        summary
+            .source_replay_content_read_calls
+            .push(replay.odf.content.read_calls);
+        summary
+            .source_replay_content_read_bytes
+            .push(replay.odf.content.read_bytes);
+        summary
+            .source_replay_untouched_read_calls
+            .push(replay.odf.untouched.read_calls);
+        summary
+            .source_replay_untouched_read_bytes
+            .push(replay.odf.untouched.read_bytes);
+        summary
+            .source_replay_pictures_read_calls
+            .push(replay.odf.pictures.read_calls);
+        summary
+            .source_replay_pictures_read_bytes
+            .push(replay.odf.pictures.read_bytes);
+        summary
+            .source_replay_version_observations
+            .push(replay_versions);
+        summary
+            .source_replay_version_observations_per_call
+            .push(per_call_version_observations);
+    }
+
+    let semantic_parity_verified = {
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let document = litchi_odt::SourceBackedDocument::from_read_at(source)?;
+        let paragraphs = document.paragraphs()?;
+        paragraphs.len() == expected_paragraph_count
+            && paragraphs
+                .iter()
+                .enumerate()
+                .all(|(index, paragraph)| {
+                    paragraph.text().ok().as_deref() == Some(semantic_odt_text(index, false).as_str())
+                })
+            && document.text()? == expected_text
+    };
+    if !semantic_parity_verified {
+        return Err("ODT repeated-text exact semantic parity gate failed".into());
+    }
+    summary.semantic_parity_verified = true;
+    summary.archive_topology_verified = true;
+    summary.media_payloads_verified = true;
+    summary.source_ranges_verified = true;
+    summary.source_freshness_verified = freshness_verified;
+    summary.zero_post_preparation_reads_verified = zero_reads_verified;
+    if !summary.source_freshness_verified || !summary.zero_post_preparation_reads_verified {
+        return Err("ODT repeated-text evidence gates are incomplete".into());
+    }
+
+    Ok(result_with_source(
+        case,
+        corpus,
+        elapsed,
+        SourceSummary {
+            read_calls: summary.source_replay_read_calls.clone(),
+            read_bytes: summary.source_replay_read_bytes.clone(),
+            ordinary_payload_read_calls: vec![0; samples],
+            ordinary_payload_read_bytes: vec![0; samples],
+            odt_repeated_text: Some(summary),
+            ..SourceSummary::default()
+        },
+    ))
 }
 
 fn odp_repeated_text_uncached(
@@ -37657,7 +38307,8 @@ mod tests {
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
         build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
-        build_odt_resource_batch_corpus, build_ole_common_corpus, build_opc_corpus,
+        build_odt_repeated_text_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
+        build_opc_corpus,
         build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
         build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
         build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
@@ -38087,7 +38738,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 320);
+        assert_eq!(selectable_count, 322);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -41054,6 +41705,110 @@ mod tests {
         for index in 0..super::ODS_MEDIA_ENTRY_COUNT {
             assert!(identical.contains(&super::odt_media_path(index)));
         }
+    }
+
+    #[test]
+    fn large_odt_repeated_text_selectors_are_matched_and_source_fresh() {
+        for (name, case) in [
+            (
+                "odt_source_backed_repeated_text_uncached",
+                Case::OdtSourceBackedRepeatedTextUncached,
+            ),
+            (
+                "odt_source_backed_repeated_text_cached",
+                Case::OdtSourceBackedRepeatedTextCached,
+            ),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(case.is_odt_repeated_text());
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let first = build_odt_repeated_text_corpus().unwrap();
+        let second = build_odt_repeated_text_corpus().unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(first.manifest.generator, super::ODT_REPEATED_TEXT_CORPUS_GENERATOR);
+        assert_eq!(first.manifest.shape, "large-media-rich");
+        assert_eq!(first.manifest.entry_count, 10_008);
+        assert_eq!(first.manifest.entry_bytes, 2 * 1024 * 1024);
+
+        let uncached = run_case(Case::OdtSourceBackedRepeatedTextUncached, &first, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .odt_repeated_text
+            .unwrap();
+        let cached = run_case(Case::OdtSourceBackedRepeatedTextCached, &first, 0, 2)
+            .unwrap()
+            .source
+            .unwrap()
+            .odt_repeated_text
+            .unwrap();
+
+        assert_eq!(uncached.implementation, "source_backed_uncached_public_control");
+        assert_eq!(cached.implementation, "source_backed_text_cache_candidate");
+        assert_eq!(uncached.projection_calls, super::ODT_REPEATED_TEXT_CALLS);
+        assert_eq!(cached.projection_calls, uncached.projection_calls);
+        assert_eq!(uncached.paragraph_count, SemanticShape::Large.docx_paragraphs());
+        assert_eq!(cached.paragraph_count, uncached.paragraph_count);
+        assert_eq!(uncached.pictures_count, super::ODS_MEDIA_ENTRY_COUNT);
+        assert_eq!(cached.pictures_count, uncached.pictures_count);
+        assert_eq!(
+            uncached.pictures_uncompressed_payload_bytes,
+            (super::ODS_MEDIA_ENTRY_COUNT * super::ODS_MEDIA_ENTRY_BYTES) as u64
+        );
+        assert_eq!(
+            cached.pictures_uncompressed_payload_bytes,
+            uncached.pictures_uncompressed_payload_bytes
+        );
+        assert_eq!(uncached.canonical_text_sha256, cached.canonical_text_sha256);
+        assert_eq!(uncached.content_xml_sha256, cached.content_xml_sha256);
+        assert_eq!(uncached.projection_text_sha256, cached.projection_text_sha256);
+        assert_eq!(uncached.freshness_shape, "baseline_two_checks");
+        for evidence in [&uncached, &cached] {
+            assert!(evidence.semantic_parity_verified);
+            assert!(evidence.archive_topology_verified);
+            assert!(evidence.media_payloads_verified);
+            assert!(evidence.source_ranges_verified);
+            assert!(evidence.source_freshness_verified);
+            assert!(evidence.zero_post_preparation_reads_verified);
+            let expected_per_call = match evidence.freshness_shape.as_str() {
+                "baseline_two_checks" => {
+                    super::ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL.to_vec()
+                },
+                "cache_enabled_publication_window" => {
+                    super::ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL.to_vec()
+                },
+                other => panic!("unexpected ODT freshness shape {other:?}"),
+            };
+            let expected_total = expected_per_call.iter().sum::<u64>();
+            assert_eq!(
+                evidence.source_replay_version_observations,
+                vec![expected_total; 2]
+            );
+            assert_eq!(
+                evidence.source_replay_version_observations_per_call,
+                vec![expected_per_call; 2]
+            );
+            assert_eq!(evidence.source_replay_read_calls, vec![0, 0]);
+            assert_eq!(evidence.source_replay_read_bytes, vec![0, 0]);
+            assert_eq!(evidence.source_replay_range_overlap_bytes, vec![0, 0]);
+            assert_eq!(evidence.source_replay_content_read_calls, vec![0, 0]);
+            assert_eq!(evidence.source_replay_content_read_bytes, vec![0, 0]);
+            assert_eq!(evidence.source_replay_pictures_read_calls, vec![0, 0]);
+            assert_eq!(evidence.source_replay_pictures_read_bytes, vec![0, 0]);
+            assert_eq!(evidence.projection_text_sha256.len(), 2);
+        }
+        let source_json = serde_json::to_value(&cached).unwrap();
+        assert_eq!(
+            source_json["source_replay_version_observations_per_call"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     #[test]
