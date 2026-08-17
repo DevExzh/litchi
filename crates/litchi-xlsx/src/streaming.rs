@@ -369,8 +369,10 @@ impl<W: Write> StreamingWorkbookWriter<W> {
             .check()
             .map_err(|error| self.poison_execution(error))?;
         self.row_scratch.clear();
+        let mut row_number = IntegerBuffer::new();
+        let row_number = row_number.format(row).as_bytes();
         push_bytes(&mut self.row_scratch, self.limits.max_row_bytes, b"<row r=")?;
-        push_quoted_integer(&mut self.row_scratch, self.limits.max_row_bytes, row)?;
+        push_quoted_bytes(&mut self.row_scratch, self.limits.max_row_bytes, row_number)?;
         push_bytes(&mut self.row_scratch, self.limits.max_row_bytes, b">")?;
 
         let mut last_column = None;
@@ -400,7 +402,7 @@ impl<W: Write> StreamingWorkbookWriter<W> {
             append_cell(
                 &mut self.row_scratch,
                 self.limits.max_row_bytes,
-                row,
+                row_number,
                 &cell,
                 self.limits.max_cell_text_bytes,
             )?;
@@ -815,24 +817,22 @@ fn push_bytes(buffer: &mut Vec<u8>, maximum: u64, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn push_quoted_integer(buffer: &mut Vec<u8>, maximum: u64, value: u32) -> Result<()> {
+fn push_quoted_bytes(buffer: &mut Vec<u8>, maximum: u64, value: &[u8]) -> Result<()> {
     push_bytes(buffer, maximum, b"\"")?;
-    let mut number = IntegerBuffer::new();
-    push_bytes(buffer, maximum, number.format(value).as_bytes())?;
+    push_bytes(buffer, maximum, value)?;
     push_bytes(buffer, maximum, b"\"")
 }
 
 fn append_cell(
     buffer: &mut Vec<u8>,
     maximum: u64,
-    row: u32,
+    row_number: &[u8],
     cell: &StreamingCell<'_>,
     max_text_bytes: u64,
 ) -> Result<()> {
     push_bytes(buffer, maximum, b"<c r=\"")?;
     append_column(buffer, maximum, cell.column)?;
-    let mut row_number = IntegerBuffer::new();
-    push_bytes(buffer, maximum, row_number.format(row).as_bytes())?;
+    push_bytes(buffer, maximum, row_number)?;
     match &cell.value {
         StreamingCellValue::Blank => push_bytes(buffer, maximum, b"\"/>")?,
         StreamingCellValue::Bool(value) => {
@@ -859,8 +859,11 @@ fn append_cell(
         },
         StreamingCellValue::Text(value) => {
             let text_bytes = u64::try_from(value.len()).unwrap_or(u64::MAX);
-            let text_chars = u64::try_from(value.chars().count()).unwrap_or(u64::MAX);
-            if text_bytes > max_text_bytes || text_chars > MAX_CELL_CHARACTERS {
+            if text_bytes > max_text_bytes
+                || (text_bytes > MAX_CELL_CHARACTERS
+                    && u64::try_from(value.chars().count()).unwrap_or(u64::MAX)
+                        > MAX_CELL_CHARACTERS)
+            {
                 return Err(invalid(
                     "streaming XLSX text value exceeds its finite limit",
                 ));
@@ -889,8 +892,12 @@ fn append_column(buffer: &mut Vec<u8>, maximum: u64, mut column: u32) -> Result<
 }
 
 fn push_escaped(buffer: &mut Vec<u8>, maximum: u64, value: &str) -> Result<()> {
-    for character in value.chars() {
+    let mut run_start = 0;
+    for (offset, character) in value.char_indices() {
         if !is_xml_character(character) {
+            if run_start < offset {
+                push_bytes(buffer, maximum, &value.as_bytes()[run_start..offset])?;
+            }
             return Err(invalid(format!(
                 "streaming XLSX text contains XML-invalid character U+{:04X}",
                 character as u32
@@ -902,17 +909,16 @@ fn push_escaped(buffer: &mut Vec<u8>, maximum: u64, value: &str) -> Result<()> {
             '>' => "&gt;",
             '"' => "&quot;",
             '\'' => "&apos;",
-            character => {
-                let mut bytes = [0_u8; 4];
-                push_bytes(
-                    buffer,
-                    maximum,
-                    character.encode_utf8(&mut bytes).as_bytes(),
-                )?;
-                continue;
-            },
+            _ => continue,
         };
+        if run_start < offset {
+            push_bytes(buffer, maximum, &value.as_bytes()[run_start..offset])?;
+        }
         push_bytes(buffer, maximum, escaped.as_bytes())?;
+        run_start = offset.saturating_add(character.len_utf8());
+    }
+    if run_start < value.len() {
+        push_bytes(buffer, maximum, &value.as_bytes()[run_start..])?;
     }
     Ok(())
 }
@@ -1107,6 +1113,124 @@ mod tests {
                 )
                 .is_err()
         );
+    }
+
+    fn push_escaped_scalar_reference(
+        buffer: &mut Vec<u8>,
+        maximum: u64,
+        value: &str,
+    ) -> Result<()> {
+        for character in value.chars() {
+            if !is_xml_character(character) {
+                return Err(invalid(format!(
+                    "streaming XLSX text contains XML-invalid character U+{:04X}",
+                    character as u32
+                )));
+            }
+            let escaped = match character {
+                '&' => "&amp;",
+                '<' => "&lt;",
+                '>' => "&gt;",
+                '"' => "&quot;",
+                '\'' => "&apos;",
+                character => {
+                    let mut bytes = [0_u8; 4];
+                    push_bytes(
+                        buffer,
+                        maximum,
+                        character.encode_utf8(&mut bytes).as_bytes(),
+                    )?;
+                    continue;
+                },
+            };
+            push_bytes(buffer, maximum, escaped.as_bytes())?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn batched_text_escaping_matches_scalar_error_order_and_bytes() {
+        let values = [
+            "",
+            "ordinary ASCII run",
+            "&<>\"'",
+            "before&between<after",
+            "\t\n\r",
+            "café 東京 🍋",
+            "ordinary run before\u{1}invalid",
+            "escaped&ampersand then\u{1}invalid",
+            "\u{1}invalid first",
+        ];
+        for value in values {
+            for maximum in 0..=128 {
+                let mut scalar = b"prefix".to_vec();
+                let mut batched = scalar.clone();
+                let scalar_result = push_escaped_scalar_reference(&mut scalar, maximum, value)
+                    .map_err(|error| error.to_string());
+                let batched_result =
+                    push_escaped(&mut batched, maximum, value).map_err(|error| error.to_string());
+                assert_eq!(
+                    batched_result, scalar_result,
+                    "value={value:?}, max={maximum}"
+                );
+                if batched_result.is_ok() {
+                    assert_eq!(batched, scalar, "value={value:?}, max={maximum}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rejected_text_row_can_be_retried_with_exact_scalar_values() {
+        let mut writer = writer();
+        assert!(
+            writer
+                .write_row(
+                    1,
+                    [StreamingCell::new(
+                        1,
+                        StreamingCellValue::Text("ordinary run before\u{1}invalid"),
+                    )],
+                )
+                .is_err()
+        );
+        writer
+            .write_row(
+                1,
+                [
+                    StreamingCell::new(1, StreamingCellValue::Text("&<>\"' café 東京 🍋")),
+                    StreamingCell::new(26, StreamingCellValue::Number(-0.0)),
+                    StreamingCell::new(27, StreamingCellValue::Bool(false)),
+                    StreamingCell::new(702, StreamingCellValue::Error(ErrorValue::Null)),
+                    StreamingCell::new(703, StreamingCellValue::Blank),
+                ],
+            )
+            .unwrap();
+        let bytes = writer.finish().unwrap();
+        let workbook = crate::Workbook::from_bytes(bytes).unwrap();
+        let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        assert!(matches!(
+            sheet.cell("A1").unwrap().stored(),
+            Some(crate::Cell::Value(crate::Value::Text(text)))
+                if text.as_str() == "&<>\"' café 東京 🍋"
+        ));
+        assert!(matches!(
+            sheet.cell("Z1").unwrap().stored(),
+            Some(crate::Cell::Value(crate::Value::Number(value)))
+                if value.as_f64() == Some(-0.0)
+        ));
+        assert!(matches!(
+            sheet.cell("AA1").unwrap().stored(),
+            Some(crate::Cell::Value(crate::Value::Bool(false)))
+        ));
+        assert!(matches!(
+            sheet.cell("ZZ1").unwrap().stored(),
+            Some(crate::Cell::Value(crate::Value::Error(ErrorValue::Null)))
+        ));
+        assert!(matches!(
+            sheet.cell("AAA1").unwrap().stored(),
+            Some(crate::Cell::Empty)
+        ));
     }
 
     #[test]
