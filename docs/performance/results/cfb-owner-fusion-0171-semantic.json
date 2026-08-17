@@ -1,0 +1,336 @@
+{
+  "configuration": {
+    "cases": [
+      "xls_visibility_eager_edit_save",
+      "xls_visibility_source_backed_edit_save",
+      "xls_visibility_eager_batch_edit_save",
+      "xls_visibility_source_backed_batch_edit_save"
+    ],
+    "execution_workers": [
+      1
+    ],
+    "samples_per_case": 300,
+    "warmup_iterations_per_case": 20
+  },
+  "results": [
+    {
+      "case": "xls_visibility_eager_edit_save",
+      "corpus": {
+        "archive_bytes": 2135552,
+        "archive_member_count": 10,
+        "archive_sha256": "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53",
+        "compression": "none",
+        "entry_bytes": 262144,
+        "entry_count": 66,
+        "generator": "litchi-xls-visibility-opaque-v1",
+        "name": "xls-visibility-opaque",
+        "package_format": "XLS/CFB",
+        "payload_kind": "incompressible",
+        "shape": "66-worksheets-opaque-heavy",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 18166,
+        "target_payload_sha256": "3c6971609b489a6dabd90f1c2833430a2f69dcb618bfcbac6322c48ed06bcd50",
+        "uncompressed_payload_bytes": 2115358,
+        "xlsx": null
+      },
+      "output_sha256": "ab2f469d5334a48d2dd9bcbcc0f923d9e038bb1f11fcebbd54cf658dba2d8835",
+      "sink": {
+        "accepted_bytes": 2135552,
+        "largest_write": 65536,
+        "write_calls": 33,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 33,
+          "bytes_1_to_512": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "max_in_flight_reads": [
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          0
+        ],
+        "ordinary_payload_read_calls": [
+          0
+        ],
+        "read_bytes": [
+          2135552
+        ],
+        "read_calls": [
+          33
+        ],
+        "xls_visibility": {
+          "changed_worksheets": [
+            1
+          ],
+          "source_backed": false,
+          "source_bytes": [
+            2135552
+          ],
+          "source_counter_scope": "owned-source-ingress-only",
+          "source_workbook_bytes": [
+            18166
+          ],
+          "target_workbook_bytes": [
+            18166
+          ],
+          "touched_streams": [
+            1
+          ],
+          "update_count": 1
+        }
+      }
+    },
+    {
+      "case": "xls_visibility_source_backed_edit_save",
+      "corpus": {
+        "archive_bytes": 2135552,
+        "archive_member_count": 10,
+        "archive_sha256": "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53",
+        "compression": "none",
+        "entry_bytes": 262144,
+        "entry_count": 66,
+        "generator": "litchi-xls-visibility-opaque-v1",
+        "name": "xls-visibility-opaque",
+        "package_format": "XLS/CFB",
+        "payload_kind": "incompressible",
+        "shape": "66-worksheets-opaque-heavy",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 18166,
+        "target_payload_sha256": "3c6971609b489a6dabd90f1c2833430a2f69dcb618bfcbac6322c48ed06bcd50",
+        "uncompressed_payload_bytes": 2115358,
+        "xlsx": null
+      },
+      "output_sha256": "ab2f469d5334a48d2dd9bcbcc0f923d9e038bb1f11fcebbd54cf658dba2d8835",
+      "sink": {
+        "accepted_bytes": 2135552,
+        "largest_write": 65536,
+        "write_calls": 33,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 33,
+          "bytes_1_to_512": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "max_in_flight_reads": [
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          0
+        ],
+        "ordinary_payload_read_calls": [
+          0
+        ],
+        "read_bytes": [
+          2135552
+        ],
+        "read_calls": [
+          33
+        ],
+        "xls_visibility": {
+          "changed_spans": [
+            1
+          ],
+          "changed_worksheets": [
+            1
+          ],
+          "replacement_bytes": [
+            1
+          ],
+          "source_backed": true,
+          "source_bytes": [
+            2135552
+          ],
+          "source_counter_scope": "owned-source-ingress-only",
+          "source_fingerprints": [
+            "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53"
+          ],
+          "source_workbook_bytes": [
+            18166
+          ],
+          "splice_count": [
+            1
+          ],
+          "target_fingerprints": [
+            "ab2f469d5334a48d2dd9bcbcc0f923d9e038bb1f11fcebbd54cf658dba2d8835"
+          ],
+          "target_workbook_bytes": [
+            18166
+          ],
+          "touched_streams": [
+            1
+          ],
+          "update_count": 1
+        }
+      }
+    },
+    {
+      "case": "xls_visibility_eager_batch_edit_save",
+      "corpus": {
+        "archive_bytes": 2135552,
+        "archive_member_count": 10,
+        "archive_sha256": "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53",
+        "compression": "none",
+        "entry_bytes": 262144,
+        "entry_count": 66,
+        "generator": "litchi-xls-visibility-opaque-v1",
+        "name": "xls-visibility-opaque",
+        "package_format": "XLS/CFB",
+        "payload_kind": "incompressible",
+        "shape": "66-worksheets-opaque-heavy",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 18166,
+        "target_payload_sha256": "3c6971609b489a6dabd90f1c2833430a2f69dcb618bfcbac6322c48ed06bcd50",
+        "uncompressed_payload_bytes": 2115358,
+        "xlsx": null
+      },
+      "output_sha256": "ab847931b5be86ce17e79961b76210eb9d2d8a7509714d5f907dfba6d1a79389",
+      "sink": {
+        "accepted_bytes": 2135552,
+        "largest_write": 65536,
+        "write_calls": 33,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 33,
+          "bytes_1_to_512": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "max_in_flight_reads": [
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          0
+        ],
+        "ordinary_payload_read_calls": [
+          0
+        ],
+        "read_bytes": [
+          2135552
+        ],
+        "read_calls": [
+          33
+        ],
+        "xls_visibility": {
+          "changed_worksheets": [
+            64
+          ],
+          "source_backed": false,
+          "source_bytes": [
+            2135552
+          ],
+          "source_counter_scope": "owned-source-ingress-only",
+          "source_workbook_bytes": [
+            18166
+          ],
+          "target_workbook_bytes": [
+            18166
+          ],
+          "touched_streams": [
+            1
+          ],
+          "update_count": 64
+        }
+      }
+    },
+    {
+      "case": "xls_visibility_source_backed_batch_edit_save",
+      "corpus": {
+        "archive_bytes": 2135552,
+        "archive_member_count": 10,
+        "archive_sha256": "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53",
+        "compression": "none",
+        "entry_bytes": 262144,
+        "entry_count": 66,
+        "generator": "litchi-xls-visibility-opaque-v1",
+        "name": "xls-visibility-opaque",
+        "package_format": "XLS/CFB",
+        "payload_kind": "incompressible",
+        "shape": "66-worksheets-opaque-heavy",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 18166,
+        "target_payload_sha256": "3c6971609b489a6dabd90f1c2833430a2f69dcb618bfcbac6322c48ed06bcd50",
+        "uncompressed_payload_bytes": 2115358,
+        "xlsx": null
+      },
+      "output_sha256": "ab847931b5be86ce17e79961b76210eb9d2d8a7509714d5f907dfba6d1a79389",
+      "sink": {
+        "accepted_bytes": 2135552,
+        "largest_write": 65536,
+        "write_calls": 33,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 33,
+          "bytes_1_to_512": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "max_in_flight_reads": [
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          0
+        ],
+        "ordinary_payload_read_calls": [
+          0
+        ],
+        "read_bytes": [
+          2135552
+        ],
+        "read_calls": [
+          33
+        ],
+        "xls_visibility": {
+          "changed_spans": [
+            64
+          ],
+          "changed_worksheets": [
+            64
+          ],
+          "replacement_bytes": [
+            64
+          ],
+          "source_backed": true,
+          "source_bytes": [
+            2135552
+          ],
+          "source_counter_scope": "owned-source-ingress-only",
+          "source_fingerprints": [
+            "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53"
+          ],
+          "source_workbook_bytes": [
+            18166
+          ],
+          "splice_count": [
+            64
+          ],
+          "target_fingerprints": [
+            "ab847931b5be86ce17e79961b76210eb9d2d8a7509714d5f907dfba6d1a79389"
+          ],
+          "target_workbook_bytes": [
+            18166
+          ],
+          "touched_streams": [
+            1
+          ],
+          "update_count": 64
+        }
+      }
+    }
+  ],
+  "schema_version": 1
+}

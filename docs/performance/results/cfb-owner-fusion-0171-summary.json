@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "change": "0171-cfb-owner-validation-fusion",
+  "decision": {
+    "production_change": "retained; DOC paragraph, PPT shape-text, and XLS worksheet-visibility target validation now consume the exact composed CFB view inside the existing final fingerprint fence",
+    "accepted_latency_claim": "on the measured 64-worksheet XLS visibility batch, source-backed complete-workflow p50, mean, and p95 are lower in both ABBA directions; the semantic staging/plan phase p50, mean, and p95 is also lower for both scalar and batch selectors",
+    "withheld": [
+      "scalar XLS complete-workflow latency because its eager guard shifted by a similar or larger amount",
+      "p99 because batch control drift exceeded the 5% same-implementation gate",
+      "publication latency because its direction regressed or disagreed",
+      "DOC and PPT latency because this tranche adds no matched source-backed mutation selector for those owners",
+      "allocation, RSS, peak-memory, physical-I/O, cold-cache, producer, and throughput claims"
+    ]
+  },
+  "builds": {
+    "control": {
+      "revision": "37d7e9d2f6007f93a8d1b101e126968071ad07ad",
+      "binary_sha256": "307aa56c05fd5307bdb45c3a5a3e9b5fe53a23f8a10724234ca8915bc0193dcb"
+    },
+    "candidate": {
+      "revision": "667a884e2ec678861c243129c3316097c4d8aa20",
+      "binary_sha256": "313319e0152600d17251cffa877e4bfa3ea1e556469e43763a97eb59334d2dce"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "kernel": "Linux 6.8.0-101-generic",
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "execution_order": [
+      "control_a1",
+      "candidate_b1",
+      "candidate_b2",
+      "control_a2"
+    ],
+    "warmups_per_case_per_leg": 20,
+    "samples_per_case_per_leg": 300,
+    "selectors": [
+      "xls_visibility_eager_edit_save",
+      "xls_visibility_source_backed_edit_save",
+      "xls_visibility_eager_batch_edit_save",
+      "xls_visibility_source_backed_batch_edit_save"
+    ],
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "same_implementation_drift_gate_pct": 5.0
+  },
+  "validation": {
+    "all_raw_records_clean_exact_revision_affinity": true,
+    "all_timing_and_phase_vectors_length_300": true,
+    "semantic_projection_identical_across_all_four_legs": true,
+    "semantic_projection_sha256": "47283bda870bb0247ea7b773ac71cfdcbd4834dd065c7ef36223d15f52a45e8b",
+    "corpus_output_fingerprint_and_sink_topology_match": true,
+    "source_backed_scalar_splices_and_replacement_bytes": [
+      1,
+      1
+    ],
+    "source_backed_batch_splices_and_replacement_bytes": [
+      64,
+      64
+    ],
+    "batch_total_p50_mean_p95_direction_agrees": true,
+    "scalar_and_batch_plan_p50_mean_p95_direction_agrees": true,
+    "publication_direction_agrees": false,
+    "p99_within_drift_gate": false
+  },
+  "code_derived_work_elimination": {
+    "scope": "one removed ValidatedOverlayPlan::composed_source call for each effective DOC paragraph, PPT shape-text, or XLS visibility transaction; that call performed one complete source scan while hashing source and composed target together",
+    "fingerprint_chunk_bytes": 1048576,
+    "per_effective_operation": {
+      "complete_source_scans_removed": 1,
+      "logical_source_bytes_removed": "artifact length",
+      "read_at_calls_removed": "ceil(artifact length / 1048576)",
+      "source_and_target_sha256_pairs_removed": 1
+    },
+    "measured_xls_visibility_corpus": {
+      "artifact_bytes": 2135552,
+      "read_at_calls_removed": 3,
+      "logical_source_bytes_removed": 2135552
+    },
+    "physical_io_claim": "none; the measured snapshot is memory-backed and harness ingress counters exclude internal fingerprint reads"
+  },
+  "corpus": {
+    "name": "xls-visibility-opaque",
+    "generator": "litchi-xls-visibility-opaque-v1",
+    "archive_bytes": 2135552,
+    "workbook_stream_bytes": 18166,
+    "archive_sha256": "a9b7396193b505cd1eda7ed78bb1f04b9ef48825d8dfd8c7856fd48395a77a53",
+    "source_ingress_read_calls": 33,
+    "source_ingress_read_bytes": 2135552,
+    "sink_write_calls": 33,
+    "sink_largest_write_bytes": 65536
+  },
+  "accepted_results_percent_candidate_lower": {
+    "xls_visibility_source_backed_batch_edit_save": {
+      "complete_workflow": {
+        "control_a1_to_candidate_b1": {
+          "p50": 12.50588,
+          "mean": 12.608141,
+          "p95": 12.817633
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 12.88211,
+          "mean": 13.362371,
+          "p95": 15.38328
+        }
+      },
+      "semantic_staging_plan": {
+        "control_a1_to_candidate_b1": {
+          "p50": 31.482494,
+          "mean": 31.521605,
+          "p95": 31.687806
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 31.81815,
+          "mean": 32.16241,
+          "p95": 33.157022
+        }
+      },
+      "matched_eager_complete_workflow": {
+        "control_a1_to_candidate_b1": {
+          "p50": 1.163167,
+          "mean": 0.995693,
+          "p95": 2.606688
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 0.227044,
+          "mean": 0.831432,
+          "p95": 2.34893
+        }
+      }
+    },
+    "xls_visibility_source_backed_edit_save": {
+      "semantic_staging_plan": {
+        "control_a1_to_candidate_b1": {
+          "p50": 32.368766,
+          "mean": 32.274805,
+          "p95": 32.092834
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 31.443643,
+          "mean": 31.47928,
+          "p95": 31.725089
+        }
+      }
+    }
+  },
+  "descriptive_withheld_results_percent_candidate_lower": {
+    "scalar_complete_workflow": {
+      "control_a1_to_candidate_b1": {
+        "p50": 13.43225,
+        "mean": 13.344161,
+        "p95": 13.570733,
+        "p99": 13.737864
+      },
+      "candidate_b2_to_control_a2": {
+        "p50": 12.311129,
+        "mean": 12.344839,
+        "p95": 12.836704,
+        "p99": 12.953852
+      },
+      "matched_eager_p50": [
+        19.63157,
+        18.377391
+      ]
+    },
+    "source_backed_publication": {
+      "scalar_p50": [
+        -6.509393,
+        -7.742734
+      ],
+      "batch_p50": [
+        -7.376074,
+        -6.901969
+      ]
+    }
+  },
+  "cases": [
+    {
+      "selector": "xls_visibility_source_backed_edit_save",
+      "updated_worksheets": 1,
+      "splice_count": 1,
+      "replacement_bytes": 1,
+      "changed_spans": 1,
+      "output_sha256": "ab2f469d5334a48d2dd9bcbcc0f923d9e038bb1f11fcebbd54cf658dba2d8835"
+    },
+    {
+      "selector": "xls_visibility_source_backed_batch_edit_save",
+      "updated_worksheets": 64,
+      "splice_count": 64,
+      "replacement_bytes": 64,
+      "changed_spans": 64,
+      "output_sha256": "ab847931b5be86ce17e79961b76210eb9d2d8a7509714d5f907dfba6d1a79389"
+    }
+  ]
+}

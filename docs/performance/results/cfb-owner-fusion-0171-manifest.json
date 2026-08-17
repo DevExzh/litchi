@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "change": "0171-cfb-owner-validation-fusion",
+  "self_excluding": true,
+  "artifact_count": 6,
+  "artifacts": [
+    {
+      "path": "cfb-owner-fusion-0171-a1.json.gz",
+      "bytes": 22228,
+      "sha256": "6bba6d70eb28e5b64b5f2766ecc8bd1dfad8f905c4c95fbd02d9feb59c012b04",
+      "uncompressed_bytes": 402793,
+      "uncompressed_sha256": "3efd76d57a2bcb4bae1c3fe897f634ed2b3093556227f92c7093de521537334b"
+    },
+    {
+      "path": "cfb-owner-fusion-0171-a2.json.gz",
+      "bytes": 22196,
+      "sha256": "461108d2eb4f741308161b31e5b16aa059dc68e8a1a4e7b5d9f3698e72cd474f",
+      "uncompressed_bytes": 402778,
+      "uncompressed_sha256": "0aa55381a643f5383064da27d58ba7004fa9336e8dd4430740d9d8c42ba28d85"
+    },
+    {
+      "path": "cfb-owner-fusion-0171-b1.json.gz",
+      "bytes": 22067,
+      "sha256": "4e202916f30d5a645cb72cf39c73d427bf32e75bff673b296ae2c350f14d1bc8",
+      "uncompressed_bytes": 402210,
+      "uncompressed_sha256": "62ed9ce7acb85e21beea84e268fec0e2596cbd120f06e901927595fcddd5573d"
+    },
+    {
+      "path": "cfb-owner-fusion-0171-b2.json.gz",
+      "bytes": 22162,
+      "sha256": "21d85cd18b353eb0968a67bc12a5f8324ba23946447ed7aece49a4d391b6e67d",
+      "uncompressed_bytes": 402224,
+      "uncompressed_sha256": "c92ffcd18fdb405de517ed5875884caed4bb87b1a3335b8c842896b3097cb2e0"
+    },
+    {
+      "path": "cfb-owner-fusion-0171-semantic.json",
+      "bytes": 9451,
+      "sha256": "47283bda870bb0247ea7b773ac71cfdcbd4834dd065c7ef36223d15f52a45e8b"
+    },
+    {
+      "path": "cfb-owner-fusion-0171-summary.json",
+      "bytes": 6950,
+      "sha256": "4f039b28fc519d37e2281f18ebe4064c6981b95a889b2df4e12fe229a036995e"
+    }
+  ]
+}

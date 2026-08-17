@@ -3,8 +3,15 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[`change 0170`](changes/0170-xlsx-streaming-escape-runs.md)
-(0170 batches the measured one-sheet XLSX streaming XML text path while
+[`change 0171`](changes/0171-cfb-owner-validation-fusion.md)
+(0171 fuses semantic owner validation into the existing final CFB fingerprint
+fence for source-backed DOC paragraph, PPT shape-text, and XLS visibility
+transactions. It removes one complete source scan per effective transaction;
+the measured XLS batch total and scalar/batch plan phases pass paired-direction
+and drift gates, while narrower totals, tails, publication and resource claims
+are withheld.)
+([`0170`](changes/0170-xlsx-streaming-escape-runs.md) batches the measured
+one-sheet XLSX streaming XML text path while
 preserving exact output. Large all-statistic, medium through-p95, and tiny p50
 directions are accepted; remaining tiny statistics and medium p99 are withheld,
 and branch misses regress in the descriptive process-counter run.)
@@ -1079,6 +1086,19 @@ but branch misses regress and no allocation/RSS/total-memory/I/O claim follows.
 Deflate remains the dominant sampled cost and requires an explicit cross-format
 compression-policy study. See
 [`0170`](changes/0170-xlsx-streaming-escape-runs.md).
+
+Change 0171 confirms another legacy CFB validation hotspot. Source-backed DOC
+paragraph, PPT shape-text, and XLS visibility paths were asking the validated
+plan to reconstruct and fingerprint a composed source after the common planner
+had already created, reopened, and fenced that exact view. Owner validation now
+runs in the existing callback before the final fingerprint fence. Each
+effective transaction removes one complete artifact scan and one source/target
+digest pair; the measured 2,135,552-byte XLS corpus avoids three logical
+one-MiB reads. Clean release ABBA accepts 12.51%-15.38% lower p50/mean/p95 for
+the 64-worksheet complete workflow and 31.44%-33.16% lower p50/mean/p95 for
+scalar/batch semantic staging/plan. Scalar total, p99, publication, resource,
+physical-I/O, cold-cache and DOC/PPT latency claims remain open. See
+[`0171`](changes/0171-cfb-owner-validation-fusion.md).
 
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed
