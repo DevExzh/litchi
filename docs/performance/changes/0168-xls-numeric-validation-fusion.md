@@ -95,10 +95,13 @@ values; p95 and p99 use nearest rank.
 
 All 4,000 retained samples preserve the exact source/output hashes, CFB and
 Workbook lengths, sink topology, family-specific splice counts and bytes,
-source/target fingerprints, semantic reopen and readback, opaque streams, and
-the runner's no-op, stale/foreign, partial-sink, signed, encrypted, macro,
-protection, and real-producer gates. Complete target materialization at commit
-remains zero for every sample.
+source/target fingerprints, semantic reopen and readback, and opaque streams.
+Complete target materialization at commit remains zero for every sample, but
+the semantic validator may allocate a candidate Workbook model; this is not a
+total-memory bound. Each leg separately runs untimed no-op, partial-sink,
+signed, encrypted, macro, protection, and real-producer guards before the
+sample loop. Plan-only publication intentionally has no patch/inverse replay,
+so this record makes no stale/foreign replay claim.
 
 ## Descriptive result and rejection boundary
 
