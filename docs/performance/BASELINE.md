@@ -793,10 +793,19 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**322 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**332 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
+
+Change 0188 adds eight opt-in DOCX/PPTX fresh-open-plus-query lifecycle
+selectors. A CPU-2 release A1-eager/B1-source/B2-source/A2-eager run with 30
+retained warm fresh-child samples per case records lower directional values but
+accepts no latency statistic: source-backed PPTX and paragraph-count p50/mean
+drift plus eager full-text p50/mean drift miss the predeclared gates, and every
+tail is conservatively withheld. This is correctness/attribution evidence, not
+physical-I/O, cold-cache, allocation/RSS, edit/save, producer, or broad OOXML
+evidence.
 
 Change 0160 adds one opt-in native DOC owner/public-reader attribution case.
 For each retained sample it records strict-owner, complete public-reader,

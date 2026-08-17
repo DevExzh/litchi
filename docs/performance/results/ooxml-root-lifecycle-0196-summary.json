@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "change": "0188-ooxml-root-lifecycle-evidence",
+  "decision": "retain_selectors_withhold_latency",
+  "claim_scope": "warm fresh-process elapsed time for high-level DOCX/PPTX eager byte ownership versus source-backed filesystem open plus one representative query",
+  "protocol": {
+    "order": [
+      "a1_eager",
+      "b1_source",
+      "b2_source",
+      "a2_eager"
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_visible": 1,
+    "warmups_per_case": 3,
+    "samples_per_case": 30,
+    "profile": "release",
+    "filesystem_cache_state": "warm",
+    "fresh_child_per_sample": true,
+    "stability_threshold_percent": {
+      "p50": 5,
+      "mean": 5,
+      "p95": 10,
+      "p99": 15
+    },
+    "acceptance": "a statistic is accepted only when source-backed elapsed time is lower in both paired directions and eager/source same-implementation drift stays within the statistic threshold",
+    "tail_policy": "all p95/p99 cells are conservatively withheld for this minimum-30-sample evidence tranche even when an individual tail cell passes its drift ceiling"
+  },
+  "provenance": {
+    "source_revision": "749559b4b562d5b86e31ae06d6e8ff2b63afca1b",
+    "source_state": "the additive lifecycle harness diff was uncommitted during measurement, so every raw report deliberately records git_worktree_dirty=true; the measured release binary was rebuilt from the final reviewed source files before the run",
+    "binary_sha256": "dba03ad4b0a0ea0d726661edf5d8bf7028ae63ee913d67fc045aa7b41a20720f",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic"
+  },
+  "corpora": {
+    "pptx": {
+      "generator": "litchi-pptx-source-edit-media-v1",
+      "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+      "archive_bytes": 17017139,
+      "archive_member_count": 445,
+      "slide_count": 200,
+      "media_members": 8
+    },
+    "docx": {
+      "generator": "litchi-docx-source-edit-media-v1",
+      "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+      "archive_bytes": 16793036,
+      "archive_member_count": 20,
+      "paragraph_count": 200,
+      "media_members": 8
+    }
+  },
+  "cases": {
+    "pptx_open_slide_count": {
+      "legs_ns": {
+        "a1": {
+          "p50": 17714725,
+          "mean": 17822852.533333,
+          "p95": 19280716,
+          "p99": 19614308
+        },
+        "b1": {
+          "p50": 2910646,
+          "mean": 2953034.633333,
+          "p95": 3251958,
+          "p99": 3664601
+        },
+        "b2": {
+          "p50": 3253705,
+          "mean": 3331354.466667,
+          "p95": 4236030,
+          "p99": 4408559
+        },
+        "a2": {
+          "p50": 17862101,
+          "mean": 17924170.5,
+          "p95": 19185276,
+          "p99": 20494717
+        }
+      },
+      "source_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 83.569341,
+          "mean": 83.43119,
+          "p95": 83.133624,
+          "p99": 81.316695
+        },
+        "a2_to_b2": {
+          "p50": 81.78431,
+          "mean": 81.414178,
+          "p95": 77.920411,
+          "p99": 78.489291
+        }
+      },
+      "same_implementation_drift_percent": {
+        "eager": {
+          "p50": 0.825077,
+          "mean": 0.565259,
+          "p95": 0.495002,
+          "p99": 4.295785
+        },
+        "source": {
+          "p50": 10.543642,
+          "mean": 11.356337,
+          "p95": 23.230997,
+          "p99": 16.87531
+        }
+      },
+      "accepted_statistics": [],
+      "withheld_reason": "source same-implementation drift exceeds every predeclared ceiling"
+    },
+    "pptx_open_selected_slide": {
+      "legs_ns": {
+        "a1": {
+          "p50": 17785877,
+          "mean": 17943672.366667,
+          "p95": 19736878,
+          "p99": 21980041
+        },
+        "b1": {
+          "p50": 2912088,
+          "mean": 2944960.5,
+          "p95": 3159961,
+          "p99": 3294498
+        },
+        "b2": {
+          "p50": 3223168,
+          "mean": 3319675.533333,
+          "p95": 3894998,
+          "p99": 4646306
+        },
+        "a2": {
+          "p50": 17831834,
+          "mean": 18097169.466667,
+          "p95": 19793496,
+          "p99": 21970437
+        }
+      },
+      "source_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 83.626964,
+          "mean": 83.587749,
+          "p95": 83.98956,
+          "p99": 85.011411
+        },
+        "a2_to_b2": {
+          "p50": 81.924641,
+          "mean": 81.656383,
+          "p95": 80.321829,
+          "p99": 78.852009
+        }
+      },
+      "same_implementation_drift_percent": {
+        "eager": {
+          "p50": 0.257724,
+          "mean": 0.848183,
+          "p95": 0.286043,
+          "p99": 0.043694
+        },
+        "source": {
+          "p50": 9.651374,
+          "mean": 11.287701,
+          "p95": 18.871306,
+          "p99": 29.094253
+        }
+      },
+      "accepted_statistics": [],
+      "withheld_reason": "source same-implementation drift exceeds every predeclared ceiling"
+    },
+    "docx_open_paragraph_count": {
+      "legs_ns": {
+        "a1": {
+          "p50": 14543360,
+          "mean": 14688565.366667,
+          "p95": 15495747,
+          "p99": 18272940
+        },
+        "b1": {
+          "p50": 516649,
+          "mean": 516697,
+          "p95": 551813,
+          "p99": 562157
+        },
+        "b2": {
+          "p50": 549425,
+          "mean": 552712.8,
+          "p95": 599019,
+          "p99": 600811
+        },
+        "a2": {
+          "p50": 14756940,
+          "mean": 14745765.733333,
+          "p95": 15647772,
+          "p99": 16070948
+        }
+      },
+      "source_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 96.447527,
+          "mean": 96.482318,
+          "p95": 96.438939,
+          "p99": 96.923555
+        },
+        "a2_to_b2": {
+          "p50": 96.276837,
+          "mean": 96.251719,
+          "p95": 96.171858,
+          "p99": 96.261509
+        }
+      },
+      "same_implementation_drift_percent": {
+        "eager": {
+          "p50": 1.447319,
+          "mean": 0.38791,
+          "p95": 0.971544,
+          "p99": 12.050562
+        },
+        "source": {
+          "p50": 5.965509,
+          "mean": 6.516187,
+          "p95": 7.880551,
+          "p99": 6.433637
+        }
+      },
+      "accepted_statistics": [],
+      "withheld_reason": "source p50 and mean drift exceed the predeclared ceilings; all tails are withheld by tranche policy"
+    },
+    "docx_open_full_text": {
+      "legs_ns": {
+        "a1": {
+          "p50": 14359826,
+          "mean": 14400150.833333,
+          "p95": 15465806,
+          "p99": 15522975
+        },
+        "b1": {
+          "p50": 591418,
+          "mean": 607755.1,
+          "p95": 704826,
+          "p99": 771077
+        },
+        "b2": {
+          "p50": 579757,
+          "mean": 594539.733333,
+          "p95": 698655,
+          "p99": 833373
+        },
+        "a2": {
+          "p50": 15120639,
+          "mean": 15272745.533333,
+          "p95": 16153032,
+          "p99": 18037759
+        }
+      },
+      "source_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 95.88144,
+          "mean": 95.779523,
+          "p95": 95.442682,
+          "p99": 95.032673
+        },
+        "a2_to_b2": {
+          "p50": 96.16579,
+          "mean": 96.107185,
+          "p95": 95.674775,
+          "p99": 95.379842
+        }
+      },
+      "same_implementation_drift_percent": {
+        "eager": {
+          "p50": 5.031619,
+          "mean": 5.713411,
+          "p95": 4.254471,
+          "p99": 13.941776
+        },
+        "source": {
+          "p50": 1.971702,
+          "mean": 2.174456,
+          "p95": 0.875535,
+          "p99": 7.475164
+        }
+      },
+      "accepted_statistics": [],
+      "withheld_reason": "eager p50 and mean drift exceed the predeclared ceilings; all tails are withheld by tranche policy"
+    }
+  },
+  "untimed_gates": [
+    "complete eager/source semantic projections and source archive hashes match",
+    "every PPTX count replay is catalog-only with zero slide/media payload overlap",
+    "every PPTX selected-slide replay reads only the selected slide and no unselected slide or media payload",
+    "every DOCX lifecycle replay completely covers the main-document payload once during preparation and has zero query-time main/media/unselected/core overlap"
+  ],
+  "limitations": [
+    "no latency statistic is accepted because every p50/mean pair misses at least one same-implementation drift gate and all tails are conservatively withheld",
+    "directional reductions in the raw samples are descriptive only and are not an accepted speedup claim",
+    "no physical-I/O, cold-cache, decompression, allocation, RSS, throughput, scaling, edit/save, producer, broad OOXML, or iWork claim"
+  ]
+}

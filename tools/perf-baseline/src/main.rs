@@ -618,6 +618,10 @@ enum Case {
     PptxFileSourceSlideCount,
     PptxFileEagerSelectedSlide,
     PptxFileSourceSelectedSlide,
+    PptxFileEagerOpenSlideCountLifecycle,
+    PptxFileSourceOpenSlideCountLifecycle,
+    PptxFileEagerOpenSelectedSlideLifecycle,
+    PptxFileSourceOpenSelectedSlideLifecycle,
     DocxFileEagerOpen,
     DocxFileSourceOpen,
     DocxFileEagerParagraphCount,
@@ -626,6 +630,10 @@ enum Case {
     DocxFileSourceListParagraphs,
     DocxFileEagerFullText,
     DocxFileSourceFullText,
+    DocxFileEagerOpenParagraphCountLifecycle,
+    DocxFileSourceOpenParagraphCountLifecycle,
+    DocxFileEagerOpenFullTextLifecycle,
+    DocxFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
     PptxEagerBatchEditSave,
@@ -988,6 +996,18 @@ impl Case {
             Self::PptxFileSourceSlideCount => "pptx_file_source_slide_count",
             Self::PptxFileEagerSelectedSlide => "pptx_file_eager_selected_slide",
             Self::PptxFileSourceSelectedSlide => "pptx_file_source_selected_slide",
+            Self::PptxFileEagerOpenSlideCountLifecycle => {
+                "pptx_file_eager_open_slide_count_lifecycle"
+            },
+            Self::PptxFileSourceOpenSlideCountLifecycle => {
+                "pptx_file_source_open_slide_count_lifecycle"
+            },
+            Self::PptxFileEagerOpenSelectedSlideLifecycle => {
+                "pptx_file_eager_open_selected_slide_lifecycle"
+            },
+            Self::PptxFileSourceOpenSelectedSlideLifecycle => {
+                "pptx_file_source_open_selected_slide_lifecycle"
+            },
             Self::DocxFileEagerOpen => "docx_file_eager_open",
             Self::DocxFileSourceOpen => "docx_file_source_open",
             Self::DocxFileEagerParagraphCount => "docx_file_eager_paragraph_count",
@@ -996,6 +1016,16 @@ impl Case {
             Self::DocxFileSourceListParagraphs => "docx_file_source_list_paragraphs",
             Self::DocxFileEagerFullText => "docx_file_eager_full_text",
             Self::DocxFileSourceFullText => "docx_file_source_full_text",
+            Self::DocxFileEagerOpenParagraphCountLifecycle => {
+                "docx_file_eager_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileSourceOpenParagraphCountLifecycle => {
+                "docx_file_source_open_paragraph_count_lifecycle"
+            },
+            Self::DocxFileEagerOpenFullTextLifecycle => "docx_file_eager_open_full_text_lifecycle",
+            Self::DocxFileSourceOpenFullTextLifecycle => {
+                "docx_file_source_open_full_text_lifecycle"
+            },
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
@@ -2019,6 +2049,10 @@ impl Case {
                 | Self::PptxFileSourceSlideCount
                 | Self::PptxFileEagerSelectedSlide
                 | Self::PptxFileSourceSelectedSlide
+                | Self::PptxFileEagerOpenSlideCountLifecycle
+                | Self::PptxFileSourceOpenSlideCountLifecycle
+                | Self::PptxFileEagerOpenSelectedSlideLifecycle
+                | Self::PptxFileSourceOpenSelectedSlideLifecycle
                 | Self::DocxFileEagerOpen
                 | Self::DocxFileSourceOpen
                 | Self::DocxFileEagerParagraphCount
@@ -2027,6 +2061,10 @@ impl Case {
                 | Self::DocxFileSourceListParagraphs
                 | Self::DocxFileEagerFullText
                 | Self::DocxFileSourceFullText
+                | Self::DocxFileEagerOpenParagraphCountLifecycle
+                | Self::DocxFileSourceOpenParagraphCountLifecycle
+                | Self::DocxFileEagerOpenFullTextLifecycle
+                | Self::DocxFileSourceOpenFullTextLifecycle
         )
     }
 
@@ -7948,6 +7986,18 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_file_source_slide_count" => Some(Case::PptxFileSourceSlideCount),
         "pptx_file_eager_selected_slide" => Some(Case::PptxFileEagerSelectedSlide),
         "pptx_file_source_selected_slide" => Some(Case::PptxFileSourceSelectedSlide),
+        "pptx_file_eager_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileEagerOpenSlideCountLifecycle)
+        },
+        "pptx_file_source_open_slide_count_lifecycle" => {
+            Some(Case::PptxFileSourceOpenSlideCountLifecycle)
+        },
+        "pptx_file_eager_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileEagerOpenSelectedSlideLifecycle)
+        },
+        "pptx_file_source_open_selected_slide_lifecycle" => {
+            Some(Case::PptxFileSourceOpenSelectedSlideLifecycle)
+        },
         "docx_file_eager_open" => Some(Case::DocxFileEagerOpen),
         "docx_file_source_open" => Some(Case::DocxFileSourceOpen),
         "docx_file_eager_paragraph_count" => Some(Case::DocxFileEagerParagraphCount),
@@ -7956,6 +8006,18 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_file_source_list_paragraphs" => Some(Case::DocxFileSourceListParagraphs),
         "docx_file_eager_full_text" => Some(Case::DocxFileEagerFullText),
         "docx_file_source_full_text" => Some(Case::DocxFileSourceFullText),
+        "docx_file_eager_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileEagerOpenParagraphCountLifecycle)
+        },
+        "docx_file_source_open_paragraph_count_lifecycle" => {
+            Some(Case::DocxFileSourceOpenParagraphCountLifecycle)
+        },
+        "docx_file_eager_open_full_text_lifecycle" => {
+            Some(Case::DocxFileEagerOpenFullTextLifecycle)
+        },
+        "docx_file_source_open_full_text_lifecycle" => {
+            Some(Case::DocxFileSourceOpenFullTextLifecycle)
+        },
         "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
         "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
         "cfb_selective_mini_4095_legacy_read" => Some(Case::CfbSelectiveMini4095LegacyRead),
@@ -8450,10 +8512,18 @@ fn print_usage() {
                                        pptx_file_eager_list_slides,pptx_file_source_list_slides,\n\
                                        pptx_file_eager_slide_count,pptx_file_source_slide_count,\n\
                                        pptx_file_eager_selected_slide,pptx_file_source_selected_slide,\n\
+                                       pptx_file_eager_open_slide_count_lifecycle,\n\
+                                       pptx_file_source_open_slide_count_lifecycle,\n\
+                                       pptx_file_eager_open_selected_slide_lifecycle,\n\
+                                       pptx_file_source_open_selected_slide_lifecycle,\n\
                                        docx_file_eager_open,docx_file_source_open,\n\
                                        docx_file_eager_paragraph_count,docx_file_source_paragraph_count,\n\
                                        docx_file_eager_list_paragraphs,docx_file_source_list_paragraphs,\n\
                                        docx_file_eager_full_text,docx_file_source_full_text,\n\
+                                       docx_file_eager_open_paragraph_count_lifecycle,\n\
+                                       docx_file_source_open_paragraph_count_lifecycle,\n\
+                                       docx_file_eager_open_full_text_lifecycle,\n\
+                                       docx_file_source_open_full_text_lifecycle,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        pptx_eager_batch_edit_save,\n\
@@ -14704,6 +14774,10 @@ fn run_case_with_config(
         | Case::PptxFileSourceSlideCount
         | Case::PptxFileEagerSelectedSlide
         | Case::PptxFileSourceSelectedSlide
+        | Case::PptxFileEagerOpenSlideCountLifecycle
+        | Case::PptxFileSourceOpenSlideCountLifecycle
+        | Case::PptxFileEagerOpenSelectedSlideLifecycle
+        | Case::PptxFileSourceOpenSelectedSlideLifecycle
         | Case::DocxFileEagerOpen
         | Case::DocxFileSourceOpen
         | Case::DocxFileEagerParagraphCount
@@ -14711,7 +14785,11 @@ fn run_case_with_config(
         | Case::DocxFileEagerListParagraphs
         | Case::DocxFileSourceListParagraphs
         | Case::DocxFileEagerFullText
-        | Case::DocxFileSourceFullText => {
+        | Case::DocxFileSourceFullText
+        | Case::DocxFileEagerOpenParagraphCountLifecycle
+        | Case::DocxFileSourceOpenParagraphCountLifecycle
+        | Case::DocxFileEagerOpenFullTextLifecycle
+        | Case::DocxFileSourceOpenFullTextLifecycle => {
             Err("filesystem cases are dispatched by the child-process evidence runner".into())
         },
         Case::DocxSourceBackedOneEditSave => {
@@ -38875,7 +38953,7 @@ mod tests {
     }
 
     #[test]
-    fn cfb_open_stream_selector_count_matches_current_case_enumeration() {
+    fn selectable_case_count_matches_current_enumeration() {
         // `Case` is the central selectable-name enumeration. Keep the
         // documented current count mechanically tied to that enum until a
         // generated registry replaces the exhaustive `Case::name` match.
@@ -38896,7 +38974,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 324);
+        assert_eq!(selectable_count, 332);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -39620,6 +39698,10 @@ mod tests {
             "docx_file_source_list_paragraphs",
             "docx_file_eager_full_text",
             "docx_file_source_full_text",
+            "docx_file_eager_open_paragraph_count_lifecycle",
+            "docx_file_source_open_paragraph_count_lifecycle",
+            "docx_file_eager_open_full_text_lifecycle",
+            "docx_file_source_open_full_text_lifecycle",
         ];
         for name in names {
             let case = parse_case(name).expect("DOCX root selector parses");
@@ -39627,7 +39709,25 @@ mod tests {
             assert!(case.is_filesystem());
             assert!(!Case::DEFAULT.contains(&case));
         }
-        assert_eq!(names.len(), 8);
+        assert_eq!(names.len(), 12);
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn pptx_root_filesystem_lifecycle_matrix_is_opt_in_and_complete() {
+        let names = [
+            "pptx_file_eager_open_slide_count_lifecycle",
+            "pptx_file_source_open_slide_count_lifecycle",
+            "pptx_file_eager_open_selected_slide_lifecycle",
+            "pptx_file_source_open_selected_slide_lifecycle",
+        ];
+        for name in names {
+            let case = parse_case(name).expect("PPTX lifecycle selector parses");
+            assert_eq!(case.name(), name);
+            assert!(case.is_filesystem());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(names.len(), 4);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
