@@ -1,8 +1,8 @@
 # Performance CRUD coverage
 
-Date: 2026-08-17
+Date: 2026-08-18
 
-This is a coverage map, not a completion claim. It compares the 322 selectable
+This is a coverage map, not a completion claim. It compares the 324 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -10,7 +10,7 @@ performance claim.
 
 | Required scenario | Current status | Coverage evidence |
 |---|---|---|
-| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; opt-in bounded RTF/XLS/DOCX/PPTX/generic-ODF reports now exercise format validation, while RTF still covers plain, raw CP-1252, LZFu and a real-producer watermark input. Change 0120 adds matched eager/source-path PPTX ordinary-root open controls using `litchi::Presentation::open(path)` and full untimed parity checks; no smart-detection handoff case |
+| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX open; opt-in bounded RTF/XLS/DOCX/PPTX/generic-ODF reports now exercise format validation, while RTF still covers plain, raw CP-1252, LZFu and a real-producer watermark input. Change 0120 adds matched eager/source-path PPTX ordinary-root open controls using `litchi::Presentation::open(path)` and full untimed parity checks. Change 0187 routes high-level `litchi::Workbook::open(path)` for XLSX through its source-backed owner and adds open/open-plus-projection evidence; broader smart-detection handoff coverage remains incomplete |
 | List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; opt-in `docx_section_inventory` now lists the exact source-backed DOCX section descriptors, PPTX ordinary-root `slide_count` proves catalog-only source replay while `list_slides` intentionally materializes all owned slide payloads, change 0122 adds ODP source-backed open/one-middle-slide logical-read guards over a media-rich package, change 0123 adds unified-root ODP filesystem open/list parity guards, and change 0124 adds unified-root ODS filesystem worksheet-name/count/text parity plus direct typed source-read evidence; broader section/edit matrices remain missing |
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX paragraph, an indexed fully validated ODT paragraph, one PPT shape and one PPTX/ODP slide; native PPT now also has matched eager/source-backed selected-shape query-only and fresh-open-plus-query controls, change 0120 adds eager/source-root `slide_count` plus selector-first slide-100 controls with independent exact range evidence, change 0122 adds matched eager/source-backed ODP middle-slide query evidence over retained media, change 0123 adds matched unified-root ODP middle-slide filesystem queries, and change 0124 adds matched typed ODS eager/source selected-cell queries after owner preparation; the already-open RTF paragraph query reuses its parser-derived exact story length and cardinality, while explicit sparse `nth` skips discarded-view construction; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX paragraphs, indexed ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part. Change 0120 adds a source-path PPTX slide-100 read with no unselected-slide/media payload overlap in its separate untimed replay; change 0122 adds an explicit ODP selected-media replay that proves one complete compressed `Pictures/` range and reports non-Pictures bytes separately; change 0123 adds root-path ODP archive/member/hash parity and direct typed source replay evidence; change 0124 adds typed ODS selected-cell and selected-media controls, with compressed-range and uncompressed-payload evidence kept distinct. Three opt-in OPC source-cache selectors add exact managed-Budget boundary evidence plus finite-control/managed same-Part and fixed-work disjoint-Part contention across `1/2x`, `1x`, and `2x` capacities and capped worker widths; their deterministic source delay is correctness evidence, not a latency claim. Semantic image selection remains missing |
@@ -98,7 +98,7 @@ conversion for other formats remain.
    `measured_total_ns` lifecycle boundary is unchanged. At change 0165 the
    selector count remained 311; change 0166 raised it to 315, change 0174
    raised it to 319, change 0175 raised it to 320, and change 0180 raises the
-   current count to 322,
+   current count to 322, and change 0187 raises it to 324,
    while the default remains 36 cases / 198 records. The guard run retains
    24,000 samples.
    This accepts the named private lazy/fused boundary only. A larger shared

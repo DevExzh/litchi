@@ -11,6 +11,29 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## High-level XLSX source-backed path ingress (change 0187)
+
+[Change 0187](changes/0187-xlsx-unified-source-ingress.md) routes validated
+XLSX files opened through `litchi::Workbook::open(Path)` from one positional
+filesystem source into the existing source-backed OPC and workbook owners.
+Core properties and the workbook share that package; byte-backed open and
+editing/publication APIs are unchanged. Source freshness, hard OPC limits,
+OOXML/ODF precedence, lazy worksheet errors, and non-grid sheet semantics are
+covered by focused regressions.
+
+CPU-2 A1/B1/B2/A2 release legs use 20 warmups and 500 samples over one fixed
+four-sheet, 4.23 MiB media-rich XLSX. Open-only p50 is 93.10%/92.98% lower;
+all open-only p50/mean/p95/p99 reductions are 91.59%-93.10%. Open plus
+worksheet names/count/full text p50 is 16.92%/14.76% lower, with all named
+statistics 14.35%-18.30% lower. Every statistic passes the paired-direction
+and same-implementation drift gates.
+
+The harness verifies source SHA-256, names/count/text, and metadata outside
+timing, but emits no source-read or fresh-child cache-state evidence. The
+accepted scope is warm in-process high-level elapsed time for the fixed corpus;
+physical-I/O, cold-cache, allocation/RSS, producer, edit/save, and broad OOXML
+claims remain withheld.
+
 ## Eager OPC shared payload ownership (change 0186)
 
 [Change 0186](changes/0186-opc-eager-shared-payloads.md) removes the serial

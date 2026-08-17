@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "change": "0187-xlsx-unified-source-ingress",
+  "decision": "retain",
+  "claim_scope": "fixed-corpus warm in-process elapsed time for high-level litchi::Workbook::open(Path), and for that open followed by worksheet names, count, and full text",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_visible": 1,
+    "warmups_per_case": 20,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when the candidate is lower in both paired directions and control/candidate same-implementation drift stays within its threshold"
+  },
+  "provenance": {
+    "control_source_revision": "f3a11a9f465a23a5206bc40005296758216a22f0",
+    "control_source_state": "the identical committed harness diff is applied to the control source tree; the raw report therefore deliberately records dirty=true",
+    "candidate_revision": "26607a1757fc750d94d14437d28b08a289724d14",
+    "candidate_dirty": false,
+    "control_binary_sha256": "a55b4f48e4f410e3ff2390d8fb1e60e6dd51ca4581e4116c4fd3a892bac6936d",
+    "candidate_binary_sha256": "3f338fe18768034b93cb7cea9e7e073d8f26eb615dc2619fbd7c11b985690dcc",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "canonical_non_timing_projection_sha256": "bde33e8db9184bdd99f93f124648bea595ae785c9ce27dcc3be738d918f7793c",
+    "canonical_projection_command": "jq 'del(.environment.git_revision,.environment.git_worktree_dirty) | .results |= map(del(.elapsed_ns))'"
+  },
+  "corpus": {
+    "name": "xlsx-cell-values-medium",
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "archive_bytes": 4226429,
+    "archive_member_count": 17,
+    "sheet_count": 4,
+    "rows_per_sheet": 48,
+    "columns_per_sheet": 48,
+    "logical_cell_count": 9216,
+    "uncompressed_logical_payload_bytes": 4231168
+  },
+  "cases": {
+    "xlsx_file_open": {
+      "timing_scope": "litchi::Workbook::open(Path) only",
+      "legs_ns": {
+        "a1": {
+          "p50": 2091863,
+          "mean": 2102198.612,
+          "p95": 2343764,
+          "p99": 2504657
+        },
+        "b1": {
+          "p50": 144340,
+          "mean": 147769.118,
+          "p95": 188382,
+          "p99": 210693
+        },
+        "b2": {
+          "p50": 141251,
+          "mean": 142215.508,
+          "p95": 176165,
+          "p99": 204685
+        },
+        "a2": {
+          "p50": 2013098,
+          "mean": 2038392.452,
+          "p95": 2299760,
+          "p99": 2602381
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 93.099931,
+          "mean": 92.970735,
+          "p95": 91.962416,
+          "p99": 91.587950
+        },
+        "a2_to_b2": {
+          "p50": 92.983402,
+          "mean": 93.023154,
+          "p95": 92.339853,
+          "p99": 92.134703
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 3.765304,
+          "mean": 3.035211,
+          "p95": 1.877493,
+          "p99": 3.901692
+        },
+        "candidate": {
+          "p50": 2.140086,
+          "mean": 3.758302,
+          "p95": 6.485227,
+          "p99": 2.851542
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ]
+    },
+    "xlsx_file_open_lifecycle": {
+      "timing_scope": "litchi::Workbook::open(Path) plus worksheet names, worksheet count, and full text",
+      "legs_ns": {
+        "a1": {
+          "p50": 9045891,
+          "mean": 9110457.462,
+          "p95": 9714303,
+          "p99": 10670760
+        },
+        "b1": {
+          "p50": 7515238,
+          "mean": 7603448.408,
+          "p95": 8213537,
+          "p99": 8717518
+        },
+        "b2": {
+          "p50": 7511651,
+          "mean": 7588755.334,
+          "p95": 8037211,
+          "p99": 8606861
+        },
+        "a2": {
+          "p50": 8812234,
+          "mean": 8902217.366,
+          "p95": 9404105,
+          "p99": 10048830
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 16.920976,
+          "mean": 16.541530,
+          "p95": 15.449034,
+          "p99": 18.304619
+        },
+        "a2_to_b2": {
+          "p50": 14.758834,
+          "mean": 14.754324,
+          "p95": 14.535078,
+          "p99": 14.349621
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 2.583018,
+          "mean": 2.285726,
+          "p95": 3.193209,
+          "p99": 5.828357
+        },
+        "candidate": {
+          "p50": 0.047730,
+          "mean": 0.193242,
+          "p95": 2.146773,
+          "p99": 1.269364
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ]
+    }
+  },
+  "untimed_gates": [
+    "worksheet names and count match the eager from_bytes oracle",
+    "full text matches the eager from_bytes oracle",
+    "core-properties metadata digest matches the eager from_bytes oracle",
+    "source bytes, length, and SHA-256 match the deterministic corpus"
+  ],
+  "limitations": [
+    "no physical-I/O, logical source-read, cold-cache, decompression, allocation, RSS, throughput, or scaling claim",
+    "the source file is created once outside timing and all samples run against the warm in-process path",
+    "the result covers one generated media-rich four-sheet XLSX corpus, not arbitrary producers or broad OOXML",
+    "the change does not alter eager from_bytes ingress or editing/publication APIs",
+    "iWork is outside this tranche"
+  ]
+}

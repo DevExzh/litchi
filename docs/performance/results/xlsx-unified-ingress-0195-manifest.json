@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0187-xlsx-unified-source-ingress",
+  "artifacts": [
+    {
+      "path": "xlsx-unified-ingress-0195-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 4289,
+      "compressed_sha256": "cd2ef6d2780398ae209697b34f56fba9d9dcae4016ebd7bb33f27d4369c0beca",
+      "uncompressed_bytes": 24756,
+      "uncompressed_sha256": "be271ddc220982d738184f0e00e6b68c20ce86dc95ca419fdb2fa9b38a9cbcbf"
+    },
+    {
+      "path": "xlsx-unified-ingress-0195-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 4025,
+      "compressed_sha256": "a82fac59f7ce446b263132b9ea15c50db29a126a6949fa91b69e183fff07d5e4",
+      "uncompressed_bytes": 24242,
+      "uncompressed_sha256": "b77a354548af0064682669a17c264bff1d5b03dec63da5cf4fbe1293231bbaf7"
+    },
+    {
+      "path": "xlsx-unified-ingress-0195-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 3996,
+      "compressed_sha256": "3dc9456930bf43548df2675707ecf300804bab07c6b9509270612184b8021372",
+      "uncompressed_bytes": 24250,
+      "uncompressed_sha256": "ef1ac27b7f88eeb8443f813a9bc386312f2bd4b40c6d2613742e6f72a4e42a5c"
+    },
+    {
+      "path": "xlsx-unified-ingress-0195-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 4275,
+      "compressed_sha256": "b5c2e18b410a5c59d349f593b0dba9cfb4dbdff37522b05d5de0d060329e3324",
+      "uncompressed_bytes": 24760,
+      "uncompressed_sha256": "afc6a87be6d49604060375a8205c8f84c193de44dc8c7544f5e64a50b8774ec9"
+    },
+    {
+      "path": "xlsx-unified-ingress-0195-summary.json",
+      "role": "derived_summary",
+      "bytes": 6186,
+      "sha256": "0405b44192d2431b40dbdf1c15f279cd89e933222438023e90475b9953f94773"
+    }
+  ]
+}
