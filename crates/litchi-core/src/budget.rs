@@ -5,7 +5,10 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
+use smallvec::SmallVec;
 use thiserror::Error;
+
+type ChargedNodes = SmallVec<[Arc<Node>; 4]>;
 
 const RESOURCE_COUNT: usize = 6;
 
@@ -155,7 +158,29 @@ impl Budget {
     /// Returns `ResourceLimit` if charging `amount` would exceed the limit of
     /// this budget or any ancestor.
     pub fn consume(&self, resource: Resource, amount: u64) -> Result<(), ResourceLimit> {
-        self.charge(resource, amount).map(|_| ())
+        let mut charged = 0usize;
+        let mut current = Some(self.node.as_ref());
+        while let Some(node) = current {
+            let counter = &node.used[resource.index()];
+            let limit = node.limits.get(resource);
+            let result = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+                used.checked_add(amount).filter(|next| *next <= limit)
+            });
+            match result {
+                Ok(_) => charged = charged.saturating_add(1),
+                Err(used) => {
+                    release_ancestor_prefix(self.node.as_ref(), charged, resource, amount);
+                    return Err(ResourceLimit {
+                        resource,
+                        observed: used.saturating_add(amount),
+                        limit,
+                        scope: node.scope.clone(),
+                    });
+                },
+            }
+            current = node.parent.as_deref();
+        }
+        Ok(())
     }
 
     /// Current local usage for one resource.
@@ -170,8 +195,8 @@ impl Budget {
         self.node.limits.get(resource)
     }
 
-    fn charge(&self, resource: Resource, amount: u64) -> Result<Vec<Arc<Node>>, ResourceLimit> {
-        let mut charged = Vec::new();
+    fn charge(&self, resource: Resource, amount: u64) -> Result<ChargedNodes, ResourceLimit> {
+        let mut charged = ChargedNodes::new();
         let mut current = Some(self.node.clone());
         while let Some(node) = current {
             let counter = &node.used[resource.index()];
@@ -201,7 +226,7 @@ impl Budget {
 /// RAII token for outstanding budget usage.
 #[derive(Debug)]
 pub struct Reservation {
-    nodes: Vec<Arc<Node>>,
+    nodes: ChargedNodes,
     resource: Resource,
     amount: u64,
 }
@@ -259,11 +284,25 @@ pub struct ResourceLimit {
 
 fn release_nodes(nodes: &[Arc<Node>], resource: Resource, amount: u64) {
     for node in nodes {
-        let counter = &node.used[resource.index()];
-        let _prev = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
-            Some(used.saturating_sub(amount))
-        });
+        release_node(node, resource, amount);
     }
+}
+
+fn release_ancestor_prefix(mut node: &Node, count: usize, resource: Resource, amount: u64) {
+    for _ in 0..count {
+        release_node(node, resource, amount);
+        let Some(parent) = node.parent.as_deref() else {
+            break;
+        };
+        node = parent;
+    }
+}
+
+fn release_node(node: &Node, resource: Resource, amount: u64) {
+    let counter = &node.used[resource.index()];
+    let _prev = counter.fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+        Some(used.saturating_sub(amount))
+    });
 }
 
 #[cfg(test)]
@@ -350,6 +389,54 @@ mod tests {
     }
 
     #[test]
+    fn common_hierarchies_keep_reservation_nodes_inline() {
+        let root = Budget::root("root", limits(100));
+        let child = root.child("child", limits(100));
+        let grandchild = child.child("grandchild", limits(100));
+        let leaf = grandchild.child("leaf", limits(100));
+        let reservation = leaf
+            .reserve(Resource::Memory, 1)
+            .expect("four-level reservation");
+
+        assert_eq!(reservation.nodes.len(), 4);
+        assert!(!reservation.nodes.spilled());
+        drop(reservation);
+        assert_eq!(root.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn deep_hierarchies_spill_and_still_roll_back_exactly() {
+        let root = Budget::root("root", limits(1));
+        let first = root.child("first", limits(100));
+        let second = first.child("second", limits(100));
+        let third = second.child("third", limits(100));
+        let fourth = third.child("fourth", limits(100));
+        let leaf = fourth.child("leaf", limits(100));
+
+        let reservation = leaf
+            .reserve(Resource::Memory, 1)
+            .expect("six-level reservation");
+        assert_eq!(reservation.nodes.len(), 6);
+        assert!(reservation.nodes.spilled());
+        assert!(reservation.commit(1));
+
+        let error = leaf
+            .consume(Resource::Memory, 1)
+            .expect_err("root limit must reject the deep charge");
+        assert_eq!(error.scope.as_ref(), "root");
+        let reservation_error = leaf
+            .reserve(Resource::Memory, 1)
+            .expect_err("spilled reservation must roll back after parent rejection");
+        assert_eq!(reservation_error.scope.as_ref(), "root");
+        for budget in [&root, &first, &second, &third, &fourth, &leaf] {
+            assert_eq!(budget.used(Resource::Memory), 1);
+        }
+        leaf.consume(Resource::Work, 0)
+            .expect("zero consumption must preserve the hierarchy");
+        assert_eq!(root.used(Resource::Work), 0);
+    }
+
+    #[test]
     fn concurrent_reservations_never_exceed_limit() {
         let budget = Budget::root("document", limits(1));
         let barrier = Arc::new(std::sync::Barrier::new(2));
@@ -373,5 +460,29 @@ mod tests {
             assert_eq!(successes, 1);
         });
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn concurrent_consumption_never_exceeds_limit() {
+        let budget = Budget::root("document", limits(1));
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        std::thread::scope(|scope| {
+            let first = budget.clone();
+            let second = budget.clone();
+            let first_barrier = barrier.clone();
+            let second_barrier = barrier.clone();
+            let left = scope.spawn(move || {
+                first_barrier.wait();
+                first.consume(Resource::Memory, 1).is_ok()
+            });
+            let right = scope.spawn(move || {
+                second_barrier.wait();
+                second.consume(Resource::Memory, 1).is_ok()
+            });
+            let successes =
+                u8::from(left.join().unwrap_or(false)) + u8::from(right.join().unwrap_or(false));
+            assert_eq!(successes, 1);
+        });
+        assert_eq!(budget.used(Resource::Memory), 1);
     }
 }
