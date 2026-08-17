@@ -2050,3 +2050,14 @@ release A/B/B/A run with 500 samples per workload and leg, p50 is
 all pass. The deterministic 21-cell 1% path remains correctness and phase
 evidence only because same-implementation mean/tail drift exceeds policy.
 Logical source replay counters are explicitly not physical-I/O evidence.
+
+Change 0178 specializes only CFB plans rooted in sealed `Arc<[u8]>` ownership.
+After the initial complete fingerprint, candidate reopen, and optional native
+owner readback, it omits the redundant final complete scan. Generic positional
+sources keep that final mutation fence. Each effective XLS comments/Number plan
+removes 16,995,840 logical bytes and 17 one-MiB reads; RK/MulRK removes 202,752
+bytes and one read. A clean four-case CPU-2 A/B/B/A observes lower candidate
+p50 in every paired direction, but every workload fails at least one stability
+threshold, so only deterministic logical work is accepted. Publication hashes,
+atomic durability, physical-I/O/resource, cold-cache, producer, and broader CRUD
+claims remain unchanged or withheld.

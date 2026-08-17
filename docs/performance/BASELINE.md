@@ -14,6 +14,23 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained CFB planning result (change 0178)
+
+Sealed immutable CFB sources now omit one redundant final complete fingerprint
+after candidate reopen and optional format-owner validation. Generic `ReadAt`
+sources retain the fence. On the fixed XLS corpora this removes exactly one
+logical source scan per effective plan: 16,995,840 bytes/17 one-MiB reads for
+comments and Number, or 202,752 bytes/one read for RK/MulRK, plus one
+source/target digest pair.
+
+A clean CPU-2 release A/B/B/A over four existing selectors records consistently
+lower candidate p50 values (23.75%-36.47% across the two paired directions),
+but every workload fails at least one predeclared same-implementation stability
+gate. Only the deterministic work reduction is accepted; latency, physical
+I/O, allocation/RSS, cold-cache, scaling, and producer claims are withheld.
+See [change 0178](changes/0178-cfb-owned-planning-fingerprint.md) and its
+[machine-readable summary](results/cfb-owned-planning-0178-summary.json).
+
 ## Current-HEAD resource probe (change 0115)
 
 The standard-library orchestrator and compact machine-readable result are in
