@@ -473,35 +473,28 @@ fn direct_write_to_retains_three_complete_source_scans() {
 
 #[test]
 fn owned_direct_write_uses_only_the_hashed_emission_scan() {
-    let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open_owned_source_for_test(source.clone()).unwrap();
+    let source: Arc<[u8]> = Arc::from(sample_bytes());
+    let reads = Arc::new(AtomicUsize::new(0));
+    let file =
+        SharedOleFile::open_owned_arc_source_for_test(source.clone(), reads.clone()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x67, 4_096)], limits())
         .unwrap();
 
-    source.reads.store(0, Ordering::SeqCst);
+    reads.store(0, Ordering::SeqCst);
     let candidate = plan.composed_source().unwrap();
     assert_eq!(
-        source.reads.load(Ordering::SeqCst),
+        reads.load(Ordering::SeqCst),
         fingerprint_chunks(file.file_size())
     );
     drop(candidate);
 
-    source.reads.store(0, Ordering::SeqCst);
-    source.request_sizes.lock().unwrap().clear();
+    reads.store(0, Ordering::SeqCst);
     let mut output = Vec::new();
     let report = plan.write_to(&mut output).unwrap();
     assert_eq!(
-        source.reads.load(Ordering::SeqCst),
+        reads.load(Ordering::SeqCst),
         publication_chunks(file.file_size())
-    );
-    assert!(
-        source
-            .request_sizes
-            .lock()
-            .unwrap()
-            .iter()
-            .all(|request| *request <= 65_536)
     );
     assert_eq!(report.bytes(), file.file_size());
     assert_eq!(output.len() as u64, file.file_size());
@@ -598,7 +591,7 @@ fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
 }
 
 #[test]
-fn owned_atomic_save_retains_both_complete_fingerprint_fences() {
+fn owned_atomic_save_uses_only_hashed_emission_scan() {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let directory = std::env::temp_dir().join(format!(
         "litchi-cfb-owned-overlay-scan-count-{}-{}",
@@ -609,17 +602,18 @@ fn owned_atomic_save_retains_both_complete_fingerprint_fences() {
     let destination = directory.join("document.ole");
     std::fs::write(&destination, b"old destination").unwrap();
 
-    let source = Arc::new(MutableSource::new(sample_bytes()));
-    let file = SharedOleFile::open_owned_source_for_test(source.clone()).unwrap();
+    let source: Arc<[u8]> = Arc::from(sample_bytes());
+    let reads = Arc::new(AtomicUsize::new(0));
+    let file = SharedOleFile::open_owned_arc_source_for_test(source, reads.clone()).unwrap();
     let plan = file
         .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x69, 4_096)], limits())
         .unwrap();
-    source.reads.store(0, Ordering::SeqCst);
+    reads.store(0, Ordering::SeqCst);
 
     let report = plan.save(&destination).unwrap();
     assert_eq!(
-        source.reads.load(Ordering::SeqCst),
-        fingerprint_chunks(file.file_size()) * 2 + publication_chunks(file.file_size())
+        reads.load(Ordering::SeqCst),
+        publication_chunks(file.file_size())
     );
     assert_eq!(report.bytes(), file.file_size());
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);

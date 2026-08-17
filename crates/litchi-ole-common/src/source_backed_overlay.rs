@@ -43,8 +43,10 @@ impl SourceBackedOverlayPublisher {
     ///
     /// The common protected-container guard is identical to [`Self::open`].
     /// Only the low-level CFB owner may use the provenance to specialize a
-    /// later direct sequential publication; composed views and atomic saves
-    /// retain their normal complete fingerprint fences.
+    /// later publication. Composed views retain their normal complete
+    /// fingerprint fence; atomic saves may omit only the two redundant outer
+    /// fences while keeping the full source/target emission hashes and all
+    /// flush, fsync, rename, and parent-sync durability steps.
     pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_owned(source, version)?;
         reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
