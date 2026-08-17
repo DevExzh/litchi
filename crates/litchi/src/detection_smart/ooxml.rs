@@ -165,7 +165,6 @@ fn detect_ooxml_format_from_content_types(
 /// byte-backed callers and non-source fallbacks.
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-    any(feature = "docx", feature = "ods", feature = "pptx"),
     any(unix, windows)
 ))]
 pub(crate) fn detect_ooxml_format_from_source_backed_package(

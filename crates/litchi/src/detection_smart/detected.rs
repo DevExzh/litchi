@@ -168,14 +168,29 @@ pub(crate) fn detect_prepared_ods(
     }
 }
 
-/// Result of the private source-backed ODS path probe.
-#[cfg(all(feature = "ods", any(unix, windows)))]
+#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+const UNIFIED_WORKBOOK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+/// Result of the private source-backed workbook path probe.
+#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
 #[allow(
     dead_code,
     reason = "OOXML precedence variants are only constructed when an OOXML probe feature is enabled"
 )]
-pub(crate) enum OdsSourcePathDetection {
+#[allow(
+    clippy::large_enum_variant,
+    reason = "this private one-shot handoff moves source metadata directly; boxing it would add an allocation to every valid XLSX filesystem open"
+)]
+pub(crate) enum WorkbookSourcePathDetection {
+    /// A validated, source-retaining XLSX owner and its source-backed core
+    /// properties projection.
+    #[cfg(feature = "xlsx")]
+    Xlsx {
+        workbook: crate::xlsx::SourceBackedWorkbook,
+        metadata: litchi_core::Metadata,
+    },
     /// A validated, source-retaining ODS owner.
+    #[cfg(feature = "ods")]
     Ods(Box<litchi_ods::SourceBackedSpreadsheet>),
     /// A recognized OOXML family whose owner is enabled in this build,
     /// together with bytes read from the same pinned filesystem source.
@@ -190,25 +205,29 @@ pub(crate) enum OdsSourcePathDetection {
     Bytes(Vec<u8>),
 }
 
-/// Open a filesystem ODS through one positional source-backed owner after
-/// giving valid OOXML the existing precedence.  The byte-backed
+/// Open a filesystem XLSX or ODS through one positional source-backed owner
+/// after giving valid OOXML the existing precedence. The byte-backed
 /// [`DetectedFormat`] API remains unchanged; this helper is only used by the
-/// unified filesystem workbook facade.
-#[cfg(all(feature = "ods", any(unix, windows)))]
-pub(crate) fn detect_ods_source_path(
+/// unified filesystem workbook facade. Other formats retain bytes from the
+/// same pinned source for the established eager fallback.
+#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+pub(crate) fn detect_workbook_source_path(
     path: &std::path::Path,
-) -> litchi_core::Result<OdsSourcePathDetection> {
+) -> std::result::Result<WorkbookSourcePathDetection, Box<dyn std::error::Error + Send + Sync>> {
     use litchi_core::ReadAt;
     use std::sync::Arc;
 
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::FileSource::open(path)?);
     let source_version = source.version()?;
 
-    let odf_format = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
-    let is_ods = odf_format == Some(litchi_core::detection::FileFormat::Ods);
+    #[cfg(feature = "ods")]
+    let is_ods = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?
+        == Some(litchi_core::detection::FileFormat::Ods);
+    #[cfg(not(feature = "ods"))]
+    let is_ods = false;
 
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    if is_ods {
+    {
         let mut signature = [0_u8; 4];
         let read = source.read_at(0, &mut signature)?;
         let zip_magic = read == signature.len()
@@ -216,15 +235,14 @@ pub(crate) fn detect_ods_source_path(
                 &signature,
                 litchi_core::detection::utils::ZIP_SIGNATURE,
             );
-        let ooxml_format = if zip_magic {
+        let source_package = if zip_magic {
             match crate::opc::SourceBackedPackage::from_read_at_with_limits(
                 Arc::clone(&source),
                 crate::opc::ReadLimits::default(),
             ) {
-                Ok(package) => {
-                    crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(
-                        &package,
-                    )
+                Ok(package) => Some(package),
+                Err(error) if !is_ods && hard_workbook_ooxml_probe_error(&error) => {
+                    return Err(Box::new(error));
                 },
                 Err(_) => {
                     ensure_path_source_current(source.as_ref(), source_version)?;
@@ -234,7 +252,34 @@ pub(crate) fn detect_ods_source_path(
         } else {
             None
         };
-        if let Some(format) = ooxml_format {
+
+        if let Some(package) = source_package {
+            let Some(format) =
+                crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(
+                    &package,
+                )
+            else {
+                ensure_path_source_current(source.as_ref(), source_version)?;
+                return finish_non_ooxml_workbook_source(source, source_version, is_ods);
+            };
+
+            #[cfg(feature = "xlsx")]
+            if format == litchi_core::detection::FileFormat::Xlsx {
+                let metadata = crate::ooxml_common::properties::read_source_backed(&package)?
+                    .map(litchi_core::Metadata::from)
+                    .unwrap_or_default();
+                let workbook =
+                    crate::xlsx::SourceBackedWorkbook::from_source_backed_package(package)?;
+                let owner_version = workbook.source_version()?;
+                if owner_version != source_version {
+                    return Err(Box::new(litchi_core::Error::SourceChanged {
+                        expected: source_version,
+                        observed: owner_version,
+                    }));
+                }
+                return Ok(WorkbookSourcePathDetection::Xlsx { workbook, metadata });
+            }
+
             let enabled = match format {
                 #[cfg(feature = "docx")]
                 litchi_core::detection::FileFormat::Docx => true,
@@ -247,33 +292,66 @@ pub(crate) fn detect_ods_source_path(
                 _ => false,
             };
             return if enabled {
-                Ok(OdsSourcePathDetection::OtherOoxml {
+                Ok(WorkbookSourcePathDetection::OtherOoxml {
                     format,
                     bytes: read_path_source_bytes(source.as_ref(), source_version)?,
                 })
             } else {
                 ensure_path_source_current(source.as_ref(), source_version)?;
-                Ok(OdsSourcePathDetection::DisabledOtherOoxml(format))
+                Ok(WorkbookSourcePathDetection::DisabledOtherOoxml(format))
             };
         }
     }
 
+    finish_non_ooxml_workbook_source(source, source_version, is_ods)
+}
+
+#[cfg(all(
+    any(feature = "ods", feature = "xlsx"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+fn hard_workbook_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
+    matches!(
+        error,
+        crate::opc::OpcError::InvalidReadLimit { .. }
+            | crate::opc::OpcError::ReadLimit { .. }
+            | crate::opc::OpcError::Cancelled
+            | crate::opc::OpcError::Execution(_)
+            | crate::opc::OpcError::IoError(_)
+            | crate::opc::OpcError::SourceChanged { .. }
+            | crate::opc::OpcError::Allocation { .. }
+            | crate::opc::OpcError::CollectionAllocation { .. }
+    )
+}
+
+#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
+fn finish_non_ooxml_workbook_source(
+    source: std::sync::Arc<dyn litchi_core::ReadAt>,
+    source_version: litchi_core::SourceVersion,
+    is_ods: bool,
+) -> std::result::Result<WorkbookSourcePathDetection, Box<dyn std::error::Error + Send + Sync>> {
+    #[cfg(feature = "ods")]
     if is_ods {
         let ods = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
         let owner_version = ods.source_version()?;
         if owner_version != source_version {
-            return Err(litchi_core::Error::SourceChanged {
+            return Err(Box::new(litchi_core::Error::SourceChanged {
                 expected: source_version,
                 observed: owner_version,
-            });
+            }));
         }
-        return Ok(OdsSourcePathDetection::Ods(Box::new(ods)));
+        return Ok(WorkbookSourcePathDetection::Ods(Box::new(ods)));
     }
+    #[cfg(not(feature = "ods"))]
+    let _ = is_ods;
 
-    read_path_source_bytes(source.as_ref(), source_version).map(OdsSourcePathDetection::Bytes)
+    read_path_source_bytes(source.as_ref(), source_version)
+        .map(WorkbookSourcePathDetection::Bytes)
+        .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
 }
 
-#[cfg(all(feature = "ods", any(unix, windows)))]
+#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
 fn ensure_path_source_current(
     source: &dyn litchi_core::ReadAt,
     expected: litchi_core::SourceVersion,
@@ -286,7 +364,7 @@ fn ensure_path_source_current(
     }
 }
 
-#[cfg(all(feature = "ods", any(unix, windows)))]
+#[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
 fn read_path_source_bytes(
     source: &dyn litchi_core::ReadAt,
     expected: litchi_core::SourceVersion,
@@ -295,13 +373,12 @@ fn read_path_source_bytes(
     let length = source.len()?;
     ensure_path_source_current(source, expected)?;
 
-    let limits = litchi_odf_common::core::SourcePackageLimits::default();
-    if length > limits.max_source_bytes() {
+    if length > UNIFIED_WORKBOOK_MAX_INPUT_BYTES {
         return Err(litchi_core::Error::ResourceLimit(
             litchi_core::ResourceLimit {
                 resource: litchi_core::Resource::InputBytes,
                 observed: length,
-                limit: limits.max_source_bytes(),
+                limit: UNIFIED_WORKBOOK_MAX_INPUT_BYTES,
                 scope: std::sync::Arc::from("unified filesystem workbook"),
             },
         ));
