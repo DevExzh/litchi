@@ -601,6 +601,7 @@ enum Case {
     OpcFileEagerOnePartAtomicSave,
     OpcFileSourceOnePartAtomicSave,
     CfbFileSameLengthOverlayAtomicSave,
+    CfbFileOwnedSameLengthOverlayAtomicSave,
     PptxFileEagerOpen,
     PptxFileSourceOpen,
     PptxFileEagerListSlides,
@@ -964,6 +965,9 @@ impl Case {
             Self::OpcFileEagerOnePartAtomicSave => "opc_file_eager_one_part_atomic_save",
             Self::OpcFileSourceOnePartAtomicSave => "opc_file_source_one_part_atomic_save",
             Self::CfbFileSameLengthOverlayAtomicSave => "cfb_file_same_length_overlay_atomic_save",
+            Self::CfbFileOwnedSameLengthOverlayAtomicSave => {
+                "cfb_file_owned_same_length_overlay_atomic_save"
+            },
             Self::PptxFileEagerOpen => "pptx_file_eager_open",
             Self::PptxFileSourceOpen => "pptx_file_source_open",
             Self::PptxFileEagerListSlides => "pptx_file_eager_list_slides",
@@ -1980,6 +1984,7 @@ impl Case {
                 | Self::OpcFileEagerOnePartAtomicSave
                 | Self::OpcFileSourceOnePartAtomicSave
                 | Self::CfbFileSameLengthOverlayAtomicSave
+                | Self::CfbFileOwnedSameLengthOverlayAtomicSave
                 | Self::PptxFileEagerOpen
                 | Self::PptxFileSourceOpen
                 | Self::PptxFileEagerListSlides
@@ -7715,6 +7720,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "cfb_file_same_length_overlay_atomic_save" => {
             Some(Case::CfbFileSameLengthOverlayAtomicSave)
         },
+        "cfb_file_owned_same_length_overlay_atomic_save" => {
+            Some(Case::CfbFileOwnedSameLengthOverlayAtomicSave)
+        },
         "pptx_file_eager_open" => Some(Case::PptxFileEagerOpen),
         "pptx_file_source_open" => Some(Case::PptxFileSourceOpen),
         "pptx_file_eager_list_slides" => Some(Case::PptxFileEagerListSlides),
@@ -8212,6 +8220,7 @@ fn print_usage() {
                                        opc_file_eager_one_part_atomic_save,\n\
                                        opc_file_source_one_part_atomic_save,\n\
                                        cfb_file_same_length_overlay_atomic_save,\n\
+                                       cfb_file_owned_same_length_overlay_atomic_save,\n\
                                        pptx_file_eager_open,pptx_file_source_open,\n\
                                        pptx_file_eager_list_slides,pptx_file_source_list_slides,\n\
                                        pptx_file_eager_slide_count,pptx_file_source_slide_count,\n\
@@ -14403,6 +14412,7 @@ fn run_case_with_config(
         | Case::OpcFileEagerOnePartAtomicSave
         | Case::OpcFileSourceOnePartAtomicSave
         | Case::CfbFileSameLengthOverlayAtomicSave
+        | Case::CfbFileOwnedSameLengthOverlayAtomicSave
         | Case::PptxFileEagerOpen
         | Case::PptxFileSourceOpen
         | Case::PptxFileEagerListSlides
@@ -37740,7 +37750,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 319);
+        assert_eq!(selectable_count, 320);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -38472,6 +38482,16 @@ mod tests {
             assert!(!Case::DEFAULT.contains(&case));
         }
         assert_eq!(names.len(), 8);
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn owned_cfb_filesystem_selector_is_opt_in_and_round_trips() {
+        let name = "cfb_file_owned_same_length_overlay_atomic_save";
+        let case = parse_case(name).expect("owned CFB filesystem selector parses");
+        assert_eq!(case.name(), name);
+        assert!(case.is_filesystem());
+        assert!(!Case::DEFAULT.contains(&case));
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
