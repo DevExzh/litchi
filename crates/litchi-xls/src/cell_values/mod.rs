@@ -5127,20 +5127,15 @@ fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceB
     }
 
     let splice_count = splices.len();
-    let plan = publisher
-        .plan_splices(splices, StreamSpliceLimits::default())
-        .map_err(source_backed_overlay_error)?;
-    let validated_target_version = if plan.is_noop() {
-        None
-    } else {
-        Some(verify_source_backed_numeric_plan_target(
-            &plan, &source, &changes,
-        )?)
-    };
+    let (plan, validated_target_version) =
+        publisher.plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
+            verify_source_backed_numeric_plan_target(candidate, &source, &changes)
+        })?;
 
-    // The semantic readback above is bracketed by a second complete source and
-    // target fingerprint check. If a mutable positional adapter changed bytes
-    // with a stable version token, this closes that window before publication.
+    // The CFB planner brackets the semantic readback with complete source and
+    // target fingerprints. If a mutable positional adapter changed bytes with
+    // a stable version token, its final check closes that window before the
+    // plan can be returned or published.
     let target_version = validated_target_version.unwrap_or(source_version);
     let source_bytes = u64::try_from(source.bytes().len())
         .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
@@ -5171,27 +5166,17 @@ fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceB
 }
 
 fn verify_source_backed_numeric_plan_target(
-    plan: &ValidatedOverlayPlan,
+    candidate: &ComposedOverlaySource,
     source: &Snapshot,
     changes: &[Change],
 ) -> Result<SourceVersion> {
-    let candidate = plan
-        .composed_source()
-        .map_err(source_backed_overlay_error)?;
-    let workbook = Workbook::new(ComposedPositionalReader::new(candidate))?;
+    let workbook = Workbook::new(ComposedPositionalReader::new(candidate.clone()))?;
     require_public_worksheet_coverage(&workbook, &source.inner.sheets)?;
     require_unprotected_workbook(&workbook)?;
     require_macro_free_workbook(&workbook)?;
     verify_public_numeric_readback(&workbook, source, changes)?;
     drop(workbook);
-
-    // `composed_source` performs complete source/target fingerprint checks;
-    // invoking it after semantic parsing prevents a late stable-version
-    // mutation from being mistaken for the validated target.
-    plan.composed_source()
-        .map_err(source_backed_overlay_error)?
-        .version()
-        .map_err(Error::Io)
+    candidate.version().map_err(Error::Io)
 }
 
 fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBackedCommit> {
@@ -5475,6 +5460,12 @@ fn source_backed_overlay_error(error: OverlayError) -> Error {
         OverlayError::Io(error) => Error::Io(error),
         OverlayError::Allocation { resource, .. } => Error::Allocation(resource),
         other => Error::UnsafeEdit(format!("source-backed numeric overlay refused: {other}")),
+    }
+}
+
+impl From<OverlayError> for Error {
+    fn from(error: OverlayError) -> Self {
+        source_backed_overlay_error(error)
     }
 }
 

@@ -7,8 +7,9 @@
 
 use crate::protection::reject_protected_shared_container;
 use litchi_cfb::{
-    OverlayError, OverlayLimits, SameLengthStreamOverlay, SameLengthStreamSplice, SharedOleFile,
-    SharedOleFileLimits, StreamSpliceLimits, ValidatedOverlayPlan,
+    ComposedOverlaySource, OverlayError, OverlayLimits, SameLengthStreamOverlay,
+    SameLengthStreamSplice, SharedOleFile, SharedOleFileLimits, StreamSpliceLimits,
+    ValidatedOverlayPlan,
 };
 use litchi_core::{ReadAt, SourceVersion};
 use std::sync::Arc;
@@ -89,6 +90,27 @@ impl SourceBackedOverlayPublisher {
         limits: StreamSpliceLimits,
     ) -> Result<ValidatedOverlayPlan, OverlayError> {
         self.cfb.plan_same_length_stream_splices(splices, limits)
+    }
+
+    /// Builds a splice plan whose effective target is also checked by a
+    /// format-owner validator inside the complete CFB fingerprint fence.
+    ///
+    /// The owner receives only the lazy composed target and its native error
+    /// type is preserved. Exact byte no-ops skip the callback and return no
+    /// owner result. Protected-container refusal remains an ingress property
+    /// of this publisher and publication remains owned by the returned plan.
+    pub fn plan_splices_with_owner<T, E, F>(
+        &self,
+        splices: Vec<SameLengthStreamSplice>,
+        limits: StreamSpliceLimits,
+        validate_owner: F,
+    ) -> Result<(ValidatedOverlayPlan, Option<T>), E>
+    where
+        F: FnOnce(&ComposedOverlaySource) -> Result<T, E>,
+        E: From<OverlayError>,
+    {
+        self.cfb
+            .plan_same_length_stream_splices_with_owner(splices, limits, validate_owner)
     }
 }
 

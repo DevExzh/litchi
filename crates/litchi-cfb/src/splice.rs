@@ -4,9 +4,9 @@ use crate::SharedOleFile;
 use crate::consts::{ENDOFCHAIN, MAXREGSECT, STGTY_STREAM};
 use crate::file::ParsedOleIndex;
 use crate::overlay::{
-    OverlayError, OverlayLimits, PhysicalSpan, SourceSnapshot, ValidatedOverlayPlan,
-    collect_chain_exact, finish_overlay_plan, path_refs, sector_offset, unavailable,
-    validate_and_coalesce_spans,
+    ComposedOverlaySource, OverlayError, OverlayLimits, PhysicalSpan, SourceSnapshot,
+    ValidatedOverlayPlan, collect_chain_exact, finish_overlay_plan_with_owner, path_refs,
+    sector_offset, unavailable, validate_and_coalesce_spans,
 };
 use std::ops::Range;
 use std::sync::Arc;
@@ -181,40 +181,74 @@ impl SharedOleFile {
         splices: Vec<SameLengthStreamSplice>,
         limits: StreamSpliceLimits,
     ) -> Result<ValidatedOverlayPlan, OverlayError> {
-        self.check_source_version()?;
+        let (plan, _owner) =
+            self.plan_same_length_stream_splices_with_owner(splices, limits, |_candidate| {
+                Ok::<(), OverlayError>(())
+            })?;
+        Ok(plan)
+    }
+
+    /// Plans bounded checked stream edits and validates the composed target
+    /// through a format-owner callback inside the CFB fingerprint fence.
+    ///
+    /// The composed artifact is first reopened and checked by the CFB owner.
+    /// For an effective edit, `validate_owner` then receives the same lazy
+    /// positional target view before the final complete source and target
+    /// fingerprints are checked. Exact byte no-ops skip the callback and
+    /// return `None` for the owner result.
+    ///
+    /// The callback cannot publish bytes or access physical spans. This
+    /// additive low-level seam lets a format owner validate its semantic
+    /// payload without constructing another fingerprint-checked view after
+    /// planning.
+    pub fn plan_same_length_stream_splices_with_owner<T, E, F>(
+        &self,
+        splices: Vec<SameLengthStreamSplice>,
+        limits: StreamSpliceLimits,
+        validate_owner: F,
+    ) -> Result<(ValidatedOverlayPlan, Option<T>), E>
+    where
+        F: FnOnce(&ComposedOverlaySource) -> Result<T, E>,
+        E: From<OverlayError>,
+    {
+        self.check_source_version().map_err(OverlayError::from)?;
         if splices.len() > limits.max_splices {
-            return Err(unavailable(format!(
+            return Err(E::from(unavailable(format!(
                 "splice count {} exceeds limit {}",
                 splices.len(),
                 limits.max_splices
-            )));
+            ))));
         }
 
         let mut aggregate_bytes = 0_u64;
         let mut aggregate_path_bytes = 0_usize;
         for splice in &splices {
             if splice.path.is_empty() || splice.path.iter().any(String::is_empty) {
-                return Err(unavailable("splice path must contain non-empty names"));
+                return Err(E::from(unavailable(
+                    "splice path must contain non-empty names",
+                )));
             }
             if splice.expected.is_empty() {
-                return Err(unavailable("stream splice range must be non-empty"));
+                return Err(E::from(unavailable(
+                    "stream splice range must be non-empty",
+                )));
             }
             if splice.expected.len() != splice.replacement.len() {
-                return Err(unavailable(format!(
+                return Err(E::from(unavailable(format!(
                     "splice for {:?} changes range length from {} to {}",
                     splice.path,
                     splice.expected.len(),
                     splice.replacement.len()
-                )));
+                ))));
             }
             aggregate_bytes = aggregate_bytes
                 .checked_add(splice.expected.len() as u64)
                 .ok_or_else(|| unavailable("aggregate splice bytes overflow u64"))?;
             if aggregate_bytes > limits.max_splice_bytes {
-                return Err(unavailable(format!(
+                return Err(E::from(unavailable(format!(
                     "aggregate splice bytes {aggregate_bytes} exceed limit {}",
                     limits.max_splice_bytes
-                )));
+                ))));
             }
             for component in &splice.path {
                 aggregate_path_bytes = aggregate_path_bytes
@@ -222,10 +256,10 @@ impl SharedOleFile {
                     .ok_or_else(|| unavailable("aggregate splice path bytes overflow usize"))?;
             }
             if aggregate_path_bytes > limits.max_path_bytes {
-                return Err(unavailable(format!(
+                return Err(E::from(unavailable(format!(
                     "aggregate splice path bytes {aggregate_path_bytes} exceed limit {}",
                     limits.max_path_bytes
-                )));
+                ))));
             }
         }
 
@@ -245,22 +279,22 @@ impl SharedOleFile {
             })?;
         for splice in splices {
             let refs = path_refs(&splice.path)?;
-            let entry = self.find_entry(&refs)?;
+            let entry = self.find_entry(&refs).map_err(OverlayError::from)?;
             if entry.entry_type != STGTY_STREAM {
-                return Err(unavailable(format!(
+                return Err(E::from(unavailable(format!(
                     "splice path {:?} does not identify a stream",
                     splice.path
-                )));
+                ))));
             }
             let end = splice
                 .offset
                 .checked_add(splice.expected.len() as u64)
                 .ok_or_else(|| unavailable("stream splice end overflows u64"))?;
             if end > entry.size {
-                return Err(unavailable(format!(
+                return Err(E::from(unavailable(format!(
                     "splice range {}..{end} exceeds stream {:?} length {}",
                     splice.offset, splice.path, entry.size
-                )));
+                ))));
             }
             let checked = CheckedSplice {
                 offset: splice.offset,
@@ -278,10 +312,10 @@ impl SharedOleFile {
                 selection.splices.push(checked);
             } else {
                 if selections.len() == limits.max_streams {
-                    return Err(unavailable(format!(
+                    return Err(E::from(unavailable(format!(
                         "distinct splice stream count exceeds limit {}",
                         limits.max_streams
-                    )));
+                    ))));
                 }
                 let mut stream_splices = Vec::new();
                 stream_splices
@@ -308,10 +342,10 @@ impl SharedOleFile {
                 .sort_unstable_by_key(|splice| splice.offset);
             for pair in selection.splices.windows(2) {
                 if pair[0].end()? > pair[1].offset {
-                    return Err(unavailable(format!(
+                    return Err(E::from(unavailable(format!(
                         "splice ranges overlap in stream {:?}",
                         selection.path
-                    )));
+                    ))));
                 }
             }
         }
@@ -360,44 +394,49 @@ impl SharedOleFile {
             })?;
         verification.resize(verification_bytes, 0);
 
-        finish_overlay_plan(source, spans, |_source, candidate| {
-            for selection in &selections {
-                let refs = path_refs(&selection.path)?;
-                if candidate.stream_len(&refs)? != selection.size {
-                    return Err(unavailable(format!(
-                        "composed stream {:?} changed length after CFB reopen",
-                        selection.path
-                    )));
-                }
-                for splice in &selection.splices {
-                    let observed = &mut verification[..splice.replacement.len()];
-                    candidate.read_stream_range(&refs, splice.offset, observed)?;
-                    if observed != splice.replacement.as_ref() {
+        finish_overlay_plan_with_owner(
+            source,
+            spans,
+            |_source, candidate| {
+                for selection in &selections {
+                    let refs = path_refs(&selection.path)?;
+                    if candidate.stream_len(&refs)? != selection.size {
                         return Err(unavailable(format!(
-                            "composed stream {:?} range {}..{} differs after CFB reopen",
-                            selection.path,
-                            splice.offset,
-                            splice.end()?
+                            "composed stream {:?} changed length after CFB reopen",
+                            selection.path
                         )));
                     }
-                    self.read_stream_range(&refs, splice.offset, observed)?;
-                    if observed != splice.expected.as_ref() {
-                        let mismatch = observed
-                            .iter()
-                            .zip(splice.expected.iter())
-                            .position(|(left, right)| left != right)
-                            .unwrap_or(0);
-                        return Err(OverlayError::PreconditionFailed {
-                            path: selection.path.clone(),
-                            offset: splice.offset.checked_add(mismatch as u64).ok_or_else(
-                                || unavailable("precondition failure offset overflow"),
-                            )?,
-                        });
+                    for splice in &selection.splices {
+                        let observed = &mut verification[..splice.replacement.len()];
+                        candidate.read_stream_range(&refs, splice.offset, observed)?;
+                        if observed != splice.replacement.as_ref() {
+                            return Err(unavailable(format!(
+                                "composed stream {:?} range {}..{} differs after CFB reopen",
+                                selection.path,
+                                splice.offset,
+                                splice.end()?
+                            )));
+                        }
+                        self.read_stream_range(&refs, splice.offset, observed)?;
+                        if observed != splice.expected.as_ref() {
+                            let mismatch = observed
+                                .iter()
+                                .zip(splice.expected.iter())
+                                .position(|(left, right)| left != right)
+                                .unwrap_or(0);
+                            return Err(OverlayError::PreconditionFailed {
+                                path: selection.path.clone(),
+                                offset: splice.offset.checked_add(mismatch as u64).ok_or_else(
+                                    || unavailable("precondition failure offset overflow"),
+                                )?,
+                            });
+                        }
                     }
                 }
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+            validate_owner,
+        )
     }
 }
 

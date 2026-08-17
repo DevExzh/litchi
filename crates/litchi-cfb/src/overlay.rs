@@ -780,33 +780,66 @@ pub(crate) fn finish_overlay_plan<F>(
 where
     F: FnOnce(&SourceSnapshot, &SharedOleFile) -> Result<(), OverlayError>,
 {
-    let (source_fingerprint, target_fingerprint) = fingerprints(&source, &spans)?;
-    let view = composed_source(source.clone(), Arc::from(spans.clone()), target_fingerprint);
-    let candidate = SharedOleFile::open(Arc::new(view))?;
+    let (plan, _owner) = finish_overlay_plan_with_owner(source, spans, verify, |_candidate| {
+        Ok::<(), OverlayError>(())
+    })?;
+    Ok(plan)
+}
+
+pub(crate) fn finish_overlay_plan_with_owner<T, E, F, V>(
+    source: SourceSnapshot,
+    spans: Vec<PhysicalSpan>,
+    verify: F,
+    validate_owner: V,
+) -> Result<(ValidatedOverlayPlan, Option<T>), E>
+where
+    F: FnOnce(&SourceSnapshot, &SharedOleFile) -> Result<(), OverlayError>,
+    V: FnOnce(&ComposedOverlaySource) -> Result<T, E>,
+    E: From<OverlayError>,
+{
+    let (source_fingerprint, target_fingerprint) =
+        fingerprints(&source, &spans).map_err(E::from)?;
+    let view = Arc::new(composed_source(
+        source.clone(),
+        Arc::from(spans.clone()),
+        target_fingerprint,
+    ));
+    let candidate_source: Arc<dyn ReadAt> = view.clone();
+    let candidate = SharedOleFile::open(candidate_source)
+        .map_err(OverlayError::from)
+        .map_err(E::from)?;
     // Bracket caller-specific preconditions with complete fingerprints. This
     // ties checked logical ranges to the same stable source bytes retained by
     // the returned plan, even for adapters whose version token dishonestly
     // remains unchanged while bytes mutate.
-    verify(&source, &candidate)?;
-    let (observed_source, observed_target) = fingerprints(&source, &spans)?;
+    verify(&source, &candidate).map_err(E::from)?;
+    let owner = if spans.is_empty() {
+        None
+    } else {
+        Some(validate_owner(view.as_ref())?)
+    };
+    let (observed_source, observed_target) = fingerprints(&source, &spans).map_err(E::from)?;
     if observed_source != source_fingerprint {
-        return Err(OverlayError::SourceFingerprintChanged {
+        return Err(E::from(OverlayError::SourceFingerprintChanged {
             expected: source_fingerprint,
             observed: observed_source,
-        });
+        }));
     }
     if observed_target != target_fingerprint {
-        return Err(OverlayError::TargetFingerprintChanged {
+        return Err(E::from(OverlayError::TargetFingerprintChanged {
             expected: target_fingerprint,
             observed: observed_target,
-        });
+        }));
     }
-    Ok(ValidatedOverlayPlan {
-        source,
-        spans,
-        source_fingerprint,
-        target_fingerprint,
-    })
+    Ok((
+        ValidatedOverlayPlan {
+            source,
+            spans,
+            source_fingerprint,
+            target_fingerprint,
+        },
+        owner,
+    ))
 }
 
 fn composed_source(
