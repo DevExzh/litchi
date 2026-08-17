@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "change": "0176",
+  "artifacts": [
+    {"path": "rejected-reuse-0176-ods-a1.json.zst", "bytes": 4640, "sha256": "fee38d917504781e8d849f51fc221113d80d90237739af69e8479ec03a34d9bb", "uncompressed_bytes": 25583, "uncompressed_sha256": "551dee8cb744c19793e8e2edc5e4a0fb9ec3c78f74f3a57e775166c0c598b025"},
+    {"path": "rejected-reuse-0176-ods-b1.json.zst", "bytes": 4663, "sha256": "af709e9c00901082c371e68d69e6792e11a071277321cf5498d1e0d7b4a17a76", "uncompressed_bytes": 25573, "uncompressed_sha256": "4b28abb11dbdd9c0cb1e7519a4941124359ddf6e54102b964c55a5b50ebcb718"},
+    {"path": "rejected-reuse-0176-ods-b2.json.zst", "bytes": 4635, "sha256": "080a9a73ecc13d04e4c8929e2843ab03c7e2b6545971679d456476918375e32e", "uncompressed_bytes": 25580, "uncompressed_sha256": "227fe4c14cc0edb806e39f389a275e39d35edfd9d1ee53f943c03bd0658b891a"},
+    {"path": "rejected-reuse-0176-ods-a2.json.zst", "bytes": 4656, "sha256": "17afcf7079b295bd6f37268536fbb666982ffceee298a22afa419e062bd87276", "uncompressed_bytes": 25579, "uncompressed_sha256": "8fae61d35d7e4662e7ec2a839184d4620e6f8dc040d5913d8ccb48e595d72d7c"},
+    {"path": "rejected-reuse-0176-xlsx-a1.json.zst", "bytes": 3354, "sha256": "6ee5de19162c2d3b6490a722c6902daaceb712d36c58827e3be86ac854470f78", "uncompressed_bytes": 52979, "uncompressed_sha256": "96cf1fcdf65993fcab72b2da7216039769ab525a3bd56580a39ecf26e2f88521"},
+    {"path": "rejected-reuse-0176-xlsx-b1.json.zst", "bytes": 3386, "sha256": "b72492851a387528d4c6deec8cf6e653c3f54110392cc1a51bd152f8310ba2a7", "uncompressed_bytes": 52973, "uncompressed_sha256": "8d4da7c8ae3fa5c65939c9f769a09906995f456db21dd5bd10ef77681f678636"},
+    {"path": "rejected-reuse-0176-xlsx-b2.json.zst", "bytes": 3381, "sha256": "f34e8de8ff54ccb582bff0b7d3504a57a7d0dde120fcc6d38781a43ee7c0cce1", "uncompressed_bytes": 52975, "uncompressed_sha256": "0fddf1dcad7114f9cb123576b201d9ff5c49c1134b8ddb0415f349a1c92159bd"},
+    {"path": "rejected-reuse-0176-xlsx-a2.json.zst", "bytes": 3378, "sha256": "d5d6fc80a351ee36419181121b06ad3e81a63f0f69cb81611b929ca046dbb2c5", "uncompressed_bytes": 52978, "uncompressed_sha256": "76c94079f324b0d6b92f40ad7a8f8b1f9daec8c77eeccd5dc0d800c0bc1644f6"}
+  ]
+}

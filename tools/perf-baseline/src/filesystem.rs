@@ -423,6 +423,15 @@ impl ReadSizeBuckets {
             _ => self.bytes_over_65536 += 1,
         }
     }
+
+    const fn is_empty(&self) -> bool {
+        self.bytes_0 == 0
+            && self.bytes_1_to_512 == 0
+            && self.bytes_513_to_4096 == 0
+            && self.bytes_4097_to_16384 == 0
+            && self.bytes_16385_to_65536 == 0
+            && self.bytes_over_65536 == 0
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -1049,9 +1058,8 @@ fn record_sample(
     stem: &str,
     cfb_owned_evidence: &mut Vec<CfbOwnedSampleEvidence>,
 ) -> Result<(), Box<dyn Error>> {
-    if operation.is_cfb_owned() {
-        validate_cfb_owned_evidence(operation, &invocation.child)?;
-    } else {
+    validate_cfb_owned_evidence(operation, &invocation.child)?;
+    if !operation.is_cfb_owned() {
         validate_cfb_phase_evidence(operation, &invocation.child)?;
     }
     if operation.is_save() {
@@ -1213,6 +1221,7 @@ fn validate_cfb_owned_evidence(
         || child.logical_read_bytes != 0
         || child.max_concurrent_reads != 0
         || !child.logical_read_request_sizes.is_empty()
+        || !child.logical_read_request_size_buckets.is_empty()
     {
         return Err("owned CFB filesystem sample exposed fabricated logical-read counters".into());
     }

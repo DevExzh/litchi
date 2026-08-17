@@ -830,8 +830,8 @@ Confirmed source facts:
   making that matrix 295. Change 0154 adds six ODF publication selectors,
   making that matrix 301; change 0159 later made it 302, change 0160 made it
   303, change 0162 made the matrix 305, change 0163 made it 309, and change
-  0164 made that matrix 311; change 0166 made it 315 and change 0174 makes the
-  current matrix 319.
+  0164 made that matrix 311; change 0166 made it 315, change 0174 made it 319,
+  and change 0175 makes the current matrix 320.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
@@ -1513,3 +1513,20 @@ changes. Remaining gaps are:
 - Format-semantic preservation evidence beyond the generated
   DOC/XLS/PPT/DOCX/PPTX/RTF/ODT/ODS/ODP slices and native targeted-OPC raw
   passthrough corpus.
+
+## Change 0175-0176 update
+
+Owned CFB atomic save no longer repeats the two complete fingerprint scans
+whose source is sealed as `Arc<[u8]>`. The 16.9 MiB control drops 33,826,816
+logical source bytes and 34 large fingerprint reads while retaining the
+emission hashes and atomic durability sequence. This closes the safe owned
+variant of the atomic-publication hotspot; generic stable-token `ReadAt`
+sources remain deliberately fenced. Latency is withheld because control drift
+exceeded 5%, despite both candidate directions being lower.
+
+Two smaller duplicate-work hypotheses are now negative results. ODS retained
+content proof added a second hash and regressed both measured source-backed
+workflows; XLSX conditional-formatting readback reuse was directionally
+inconsistent. Both production experiments are reverted. The next ODF/OOXML
+work should target a larger retained allocation or complete physical/semantic
+pass rather than reviving either micro-handoff unchanged.
