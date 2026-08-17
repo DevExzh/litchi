@@ -188,10 +188,15 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **322 selectable cases**; 200 was the count before the
+harness contains **332 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
-do not inherit its performance results. That measured tranche includes six
+do not inherit its performance results. Change 0188 adds eight opt-in
+DOCX/PPTX fresh-open-plus-query lifecycle selectors. Its CPU-2 warm release
+ABBA records lower directional values but accepts no latency statistic because
+same-implementation p50/mean drift gates fail and every tail is conservatively
+withheld. No physical-I/O, cold-cache, resource, edit/save, producer, or broad
+OOXML claim is made. That measured tranche includes six
 opt-in simulated-range cases, two opt-in scaling cases, one opt-in XLSX
 commit/read attribution case, four opt-in opaque-heavy common OLE2
 stage/control cases, one opt-in source-backed OPC one-Part publication case,
@@ -1616,7 +1621,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 322 selectable cases. Change
+The current standalone harness provides 332 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors

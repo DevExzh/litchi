@@ -3,6 +3,12 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0188`](changes/0188-ooxml-root-lifecycle-evidence.md)
+(0188 adds matched fresh-open-plus-query DOCX/PPTX lifecycle controls. Every
+warm CPU-2 release direction is descriptively lower, but source-backed PPTX
+and paragraph-count p50/mean drift plus eager full-text drift miss the
+predeclared gates, so no latency statistic is accepted. Resource, physical-I/O,
+cold-cache, producer, edit/save, broad OOXML and iWork claims remain open.)
 [`change 0187`](changes/0187-xlsx-unified-source-ingress.md)
 (0187 routes high-level XLSX filesystem opening through the existing
 source-backed OPC/workbook owner. On one generated four-sheet media-rich
@@ -560,9 +566,11 @@ byte root for query phases; `list_slides` materializes all owned slides and
 separate untimed source replay classifies exact compressed ZIP payload-range
 overlap: open/count are catalog-only, selected reads only slide 100, and list
 reads all slides without media. This establishes a useful correctness and
-logical-read guard for the unified facade, but it is not a performance result:
-no latency, allocation, RSS, decompression, physical-I/O or cold-cache claim is
-accepted before release ABBA. Eager controls explicitly have no source replay.
+logical-read guard for the unified facade. Change 0188 adds fresh-open-plus-
+count/selected-slide lifecycles over the same corpus. Its final-source warm
+ABBA retains no latency claim because same-implementation drift gates fail;
+tails, allocation, RSS, decompression, physical-I/O and cold-cache remain
+withheld. Eager controls explicitly have no source replay.
 
 ## ODF paths
 

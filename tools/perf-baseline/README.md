@@ -83,7 +83,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 324
+provide their source-read counters. The current `Case` matrix exposes 332
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
@@ -143,6 +143,15 @@ logical compressed-range evidence only: it makes no latency, physical-I/O,
 decompression, allocation, RSS, cold-cache, ABBA, security, or Markdown claim.
 Together these additions bring the selectable matrix to 253 names while
 leaving the default 36 cases / 198 records unchanged;
+eight matched DOCX/PPTX ordinary-root lifecycle selectors additionally time a
+fresh eager byte-owner or source-backed filesystem open plus paragraph count,
+full text, slide count, or one selected slide. They reuse the same fixed
+media-rich corpora, fresh-child protocol, complete untimed semantic/archive
+gates, and independent positional replays. Change 0188 retains the selectors
+and raw warm release ABBA, but accepts no latency statistic because every
+p50/mean pair misses at least one same-implementation drift gate and all tails
+are conservatively withheld. These selectors bring the current matrix to 332
+names without changing the default 36 cases / 198 records;
 two matched ODS repeated-cell sweep selectors
 (`ods_file_eager_cell_sweep` and `ods_file_source_cell_sweep`) are also opt-in
 over the same two-sheet media-rich corpus. Each owner is opened before timing,

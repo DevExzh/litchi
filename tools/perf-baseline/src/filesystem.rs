@@ -542,6 +542,10 @@ enum Operation {
     PptxSourceSlideCount,
     PptxEagerSelectedSlide,
     PptxSourceSelectedSlide,
+    PptxEagerOpenSlideCountLifecycle,
+    PptxSourceOpenSlideCountLifecycle,
+    PptxEagerOpenSelectedSlideLifecycle,
+    PptxSourceOpenSelectedSlideLifecycle,
     DocxEagerOpen,
     DocxSourceOpen,
     DocxEagerParagraphCount,
@@ -550,6 +554,10 @@ enum Operation {
     DocxSourceListParagraphs,
     DocxEagerFullText,
     DocxSourceFullText,
+    DocxEagerOpenParagraphCountLifecycle,
+    DocxSourceOpenParagraphCountLifecycle,
+    DocxEagerOpenFullTextLifecycle,
+    DocxSourceOpenFullTextLifecycle,
 }
 
 impl Operation {
@@ -569,6 +577,18 @@ impl Operation {
             "pptx_file_source_slide_count" => Some(Self::PptxSourceSlideCount),
             "pptx_file_eager_selected_slide" => Some(Self::PptxEagerSelectedSlide),
             "pptx_file_source_selected_slide" => Some(Self::PptxSourceSelectedSlide),
+            "pptx_file_eager_open_slide_count_lifecycle" => {
+                Some(Self::PptxEagerOpenSlideCountLifecycle)
+            },
+            "pptx_file_source_open_slide_count_lifecycle" => {
+                Some(Self::PptxSourceOpenSlideCountLifecycle)
+            },
+            "pptx_file_eager_open_selected_slide_lifecycle" => {
+                Some(Self::PptxEagerOpenSelectedSlideLifecycle)
+            },
+            "pptx_file_source_open_selected_slide_lifecycle" => {
+                Some(Self::PptxSourceOpenSelectedSlideLifecycle)
+            },
             "docx_file_eager_open" => Some(Self::DocxEagerOpen),
             "docx_file_source_open" => Some(Self::DocxSourceOpen),
             "docx_file_eager_paragraph_count" => Some(Self::DocxEagerParagraphCount),
@@ -577,6 +597,18 @@ impl Operation {
             "docx_file_source_list_paragraphs" => Some(Self::DocxSourceListParagraphs),
             "docx_file_eager_full_text" => Some(Self::DocxEagerFullText),
             "docx_file_source_full_text" => Some(Self::DocxSourceFullText),
+            "docx_file_eager_open_paragraph_count_lifecycle" => {
+                Some(Self::DocxEagerOpenParagraphCountLifecycle)
+            },
+            "docx_file_source_open_paragraph_count_lifecycle" => {
+                Some(Self::DocxSourceOpenParagraphCountLifecycle)
+            },
+            "docx_file_eager_open_full_text_lifecycle" => {
+                Some(Self::DocxEagerOpenFullTextLifecycle)
+            },
+            "docx_file_source_open_full_text_lifecycle" => {
+                Some(Self::DocxSourceOpenFullTextLifecycle)
+            },
             _ => None,
         }
     }
@@ -597,6 +629,18 @@ impl Operation {
             Self::PptxSourceSlideCount => super::Case::PptxFileSourceSlideCount,
             Self::PptxEagerSelectedSlide => super::Case::PptxFileEagerSelectedSlide,
             Self::PptxSourceSelectedSlide => super::Case::PptxFileSourceSelectedSlide,
+            Self::PptxEagerOpenSlideCountLifecycle => {
+                super::Case::PptxFileEagerOpenSlideCountLifecycle
+            },
+            Self::PptxSourceOpenSlideCountLifecycle => {
+                super::Case::PptxFileSourceOpenSlideCountLifecycle
+            },
+            Self::PptxEagerOpenSelectedSlideLifecycle => {
+                super::Case::PptxFileEagerOpenSelectedSlideLifecycle
+            },
+            Self::PptxSourceOpenSelectedSlideLifecycle => {
+                super::Case::PptxFileSourceOpenSelectedSlideLifecycle
+            },
             Self::DocxEagerOpen => super::Case::DocxFileEagerOpen,
             Self::DocxSourceOpen => super::Case::DocxFileSourceOpen,
             Self::DocxEagerParagraphCount => super::Case::DocxFileEagerParagraphCount,
@@ -605,6 +649,16 @@ impl Operation {
             Self::DocxSourceListParagraphs => super::Case::DocxFileSourceListParagraphs,
             Self::DocxEagerFullText => super::Case::DocxFileEagerFullText,
             Self::DocxSourceFullText => super::Case::DocxFileSourceFullText,
+            Self::DocxEagerOpenParagraphCountLifecycle => {
+                super::Case::DocxFileEagerOpenParagraphCountLifecycle
+            },
+            Self::DocxSourceOpenParagraphCountLifecycle => {
+                super::Case::DocxFileSourceOpenParagraphCountLifecycle
+            },
+            Self::DocxEagerOpenFullTextLifecycle => super::Case::DocxFileEagerOpenFullTextLifecycle,
+            Self::DocxSourceOpenFullTextLifecycle => {
+                super::Case::DocxFileSourceOpenFullTextLifecycle
+            },
         }
     }
 
@@ -637,6 +691,10 @@ impl Operation {
                 | Self::PptxSourceSlideCount
                 | Self::PptxEagerSelectedSlide
                 | Self::PptxSourceSelectedSlide
+                | Self::PptxEagerOpenSlideCountLifecycle
+                | Self::PptxSourceOpenSlideCountLifecycle
+                | Self::PptxEagerOpenSelectedSlideLifecycle
+                | Self::PptxSourceOpenSelectedSlideLifecycle
         )
     }
 
@@ -651,6 +709,20 @@ impl Operation {
                 | Self::DocxSourceListParagraphs
                 | Self::DocxEagerFullText
                 | Self::DocxSourceFullText
+                | Self::DocxEagerOpenParagraphCountLifecycle
+                | Self::DocxSourceOpenParagraphCountLifecycle
+                | Self::DocxEagerOpenFullTextLifecycle
+                | Self::DocxSourceOpenFullTextLifecycle
+        )
+    }
+
+    const fn is_docx_lifecycle(self) -> bool {
+        matches!(
+            self,
+            Self::DocxEagerOpenParagraphCountLifecycle
+                | Self::DocxSourceOpenParagraphCountLifecycle
+                | Self::DocxEagerOpenFullTextLifecycle
+                | Self::DocxSourceOpenFullTextLifecycle
         )
     }
 
@@ -661,6 +733,8 @@ impl Operation {
                 | Self::DocxSourceParagraphCount
                 | Self::DocxSourceListParagraphs
                 | Self::DocxSourceFullText
+                | Self::DocxSourceOpenParagraphCountLifecycle
+                | Self::DocxSourceOpenFullTextLifecycle
         )
     }
 
@@ -686,6 +760,11 @@ impl Operation {
                 Some("list_paragraphs")
             },
             Self::DocxEagerFullText | Self::DocxSourceFullText => Some("full_text"),
+            Self::DocxEagerOpenParagraphCountLifecycle
+            | Self::DocxSourceOpenParagraphCountLifecycle => Some("open_paragraph_count_lifecycle"),
+            Self::DocxEagerOpenFullTextLifecycle | Self::DocxSourceOpenFullTextLifecycle => {
+                Some("open_full_text_lifecycle")
+            },
             _ => None,
         }
     }
@@ -697,6 +776,8 @@ impl Operation {
                 | Self::PptxSourceListSlides
                 | Self::PptxSourceSlideCount
                 | Self::PptxSourceSelectedSlide
+                | Self::PptxSourceOpenSlideCountLifecycle
+                | Self::PptxSourceOpenSelectedSlideLifecycle
         )
     }
 
@@ -718,6 +799,11 @@ impl Operation {
             Self::PptxEagerListSlides | Self::PptxSourceListSlides => Some("list_slides"),
             Self::PptxEagerSlideCount | Self::PptxSourceSlideCount => Some("slide_count"),
             Self::PptxEagerSelectedSlide | Self::PptxSourceSelectedSlide => Some("selected_slide"),
+            Self::PptxEagerOpenSlideCountLifecycle | Self::PptxSourceOpenSlideCountLifecycle => {
+                Some("open_slide_count_lifecycle")
+            },
+            Self::PptxEagerOpenSelectedSlideLifecycle
+            | Self::PptxSourceOpenSelectedSlideLifecycle => Some("open_selected_slide_lifecycle"),
             _ => None,
         }
     }
@@ -1269,6 +1355,10 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         | Operation::PptxSourceSlideCount
         | Operation::PptxEagerSelectedSlide
         | Operation::PptxSourceSelectedSlide
+        | Operation::PptxEagerOpenSlideCountLifecycle
+        | Operation::PptxSourceOpenSlideCountLifecycle
+        | Operation::PptxEagerOpenSelectedSlideLifecycle
+        | Operation::PptxSourceOpenSelectedSlideLifecycle
         | Operation::DocxEagerOpen
         | Operation::DocxSourceOpen
         | Operation::DocxEagerParagraphCount
@@ -1276,7 +1366,13 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         | Operation::DocxEagerListParagraphs
         | Operation::DocxSourceListParagraphs
         | Operation::DocxEagerFullText
-        | Operation::DocxSourceFullText => Err("open operation has no output digest".into()),
+        | Operation::DocxSourceFullText
+        | Operation::DocxEagerOpenParagraphCountLifecycle
+        | Operation::DocxSourceOpenParagraphCountLifecycle
+        | Operation::DocxEagerOpenFullTextLifecycle
+        | Operation::DocxSourceOpenFullTextLifecycle => {
+            Err("open operation has no output digest".into())
+        },
     }
 }
 
@@ -1392,9 +1488,10 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     } else {
         ColdAdvice::NotRequested
     };
-    // Query controls compare a prepared eager root with a prepared ordinary
-    // filesystem root. Root construction is therefore outside the query
-    // timer; the dedicated open cases measure construction itself.
+    // Existing query controls compare prepared eager/source roots, so root
+    // construction is outside their query timer. Lifecycle controls leave
+    // the root unprepared and include fresh open plus the selected query in
+    // the timed operation.
     let prepared_pptx = if operation.is_pptx_query() {
         if operation.is_source_pptx() {
             Some(litchi::Presentation::open(&source)?)
@@ -1446,7 +1543,11 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         | Operation::PptxEagerSlideCount
         | Operation::PptxSourceSlideCount
         | Operation::PptxEagerSelectedSlide
-        | Operation::PptxSourceSelectedSlide => {
+        | Operation::PptxSourceSelectedSlide
+        | Operation::PptxEagerOpenSlideCountLifecycle
+        | Operation::PptxSourceOpenSlideCountLifecycle
+        | Operation::PptxEagerOpenSelectedSlideLifecycle
+        | Operation::PptxSourceOpenSelectedSlideLifecycle => {
             run_pptx_operation(operation, &source, prepared_pptx.as_ref())?;
             None
         },
@@ -1457,7 +1558,11 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         | Operation::DocxEagerListParagraphs
         | Operation::DocxSourceListParagraphs
         | Operation::DocxEagerFullText
-        | Operation::DocxSourceFullText => {
+        | Operation::DocxSourceFullText
+        | Operation::DocxEagerOpenParagraphCountLifecycle
+        | Operation::DocxSourceOpenParagraphCountLifecycle
+        | Operation::DocxEagerOpenFullTextLifecycle
+        | Operation::DocxSourceOpenFullTextLifecycle => {
             run_docx_operation(operation, &source, prepared_docx.as_ref())?;
             None
         },
@@ -1924,12 +2029,12 @@ fn replay_pptx_source(
     let mut semantic = Sha256::new();
     match operation {
         Operation::PptxSourceOpen => {},
-        Operation::PptxSourceSlideCount => {
+        Operation::PptxSourceSlideCount | Operation::PptxSourceOpenSlideCountLifecycle => {
             if slide_count != super::PPTX_SOURCE_SLIDE_COUNT {
                 return Err("PPTX source replay slide count differs from corpus".into());
             }
         },
-        Operation::PptxSourceSelectedSlide => {
+        Operation::PptxSourceSelectedSlide | Operation::PptxSourceOpenSelectedSlideLifecycle => {
             let slide = presentation
                 .slide(PPTX_FILE_SELECTED_POSITION)
                 .ok_or("PPTX source replay selected slide is missing")?;
@@ -1970,7 +2075,9 @@ fn replay_pptx_source(
     let slide_payload_total_bytes = covered_bytes(&slide_ranges, &slide_ranges)?;
     let slide_range_count = u64::try_from(slide_ranges.len())?;
     let classification = match operation {
-        Operation::PptxSourceOpen | Operation::PptxSourceSlideCount
+        Operation::PptxSourceOpen
+        | Operation::PptxSourceSlideCount
+        | Operation::PptxSourceOpenSlideCountLifecycle
             if counters.slide_payload_read_bytes == 0
                 && counters.media_payload_read_bytes == 0
                 && slide_payload_covered_bytes == 0
@@ -1978,7 +2085,7 @@ fn replay_pptx_source(
         {
             "catalog-only:zero-slide-and-media-overlap"
         },
-        Operation::PptxSourceSelectedSlide
+        Operation::PptxSourceSelectedSlide | Operation::PptxSourceOpenSelectedSlideLifecycle
             if selected_slide_payload_fully_covered
                 && selected_slide_payload_covered_bytes
                     == selected_slide_range.end - selected_slide_range.start
@@ -2014,9 +2121,9 @@ fn replay_pptx_source(
         source_bytes: u64::try_from(bytes.len())?,
         source_sha256: super::sha256_hex(&bytes),
         slide_count,
-        selected_position: operation
-            .is_pptx_query()
-            .then_some(PPTX_FILE_SELECTED_POSITION),
+        selected_position: (operation.is_pptx_query()
+            || matches!(operation, Operation::PptxSourceOpenSelectedSlideLifecycle))
+        .then_some(PPTX_FILE_SELECTED_POSITION),
         read_calls: counters.read_calls,
         read_bytes: counters.read_bytes,
         read_range_sizes: request_sizes,
@@ -2278,11 +2385,12 @@ fn replay_docx_source(
     let open = replay.snapshot()?;
     let mut semantic = Sha256::new();
     let mut paragraph_count = super::SemanticShape::Medium.docx_paragraphs();
-    let (preparation, query) = if operation.is_docx_query() {
+    let (preparation, query) = if operation.is_docx_query() || operation.is_docx_lifecycle() {
         let document = package.document()?;
         let prepared = replay.snapshot()?;
         match operation {
-            Operation::DocxSourceParagraphCount => {
+            Operation::DocxSourceParagraphCount
+            | Operation::DocxSourceOpenParagraphCountLifecycle => {
                 paragraph_count = document.paragraph_count()?;
                 semantic.update(paragraph_count.to_le_bytes());
             },
@@ -2295,7 +2403,7 @@ fn replay_docx_source(
                     semantic.update([0]);
                 }
             },
-            Operation::DocxSourceFullText => {
+            Operation::DocxSourceFullText | Operation::DocxSourceOpenFullTextLifecycle => {
                 let text = document.extract_text()?;
                 paragraph_count = document.paragraph_count()?;
                 semantic.update(text.as_bytes());
@@ -2343,7 +2451,7 @@ fn replay_docx_source(
         && open_phase.counters.media_payload_overlap_bytes == 0
         && open_phase.counters.unselected_payload_overlap_bytes == 0
         && open_phase.counters.core_payload_overlap_bytes == 0
-        && (!operation.is_docx_query()
+        && (!(operation.is_docx_query() || operation.is_docx_lifecycle())
             || (preparation.counters.main_payload_overlap_bytes != 0
                 && preparation.main_payload_fully_covered
                 && preparation.counters.media_payload_overlap_bytes == 0
@@ -2354,7 +2462,7 @@ fn replay_docx_source(
                 && query.counters.unselected_payload_overlap_bytes == 0
                 && query.counters.core_payload_overlap_bytes == 0))
     {
-        if operation.is_docx_query() {
+        if operation.is_docx_query() || operation.is_docx_lifecycle() {
             "semantic-query:one-complete-main-range-preparation-zero-query-unselected-media-core"
         } else {
             "catalog-only:zero-main-media-unselected-core-overlap"
@@ -2609,6 +2717,32 @@ fn run_pptx_operation(
             // every slide on the source-backed path.
             std::hint::black_box(slide);
         },
+        Operation::PptxEagerOpenSlideCountLifecycle
+        | Operation::PptxSourceOpenSlideCountLifecycle => {
+            let presentation = if operation.is_source_pptx() {
+                litchi::Presentation::open(source)?
+            } else {
+                litchi::Presentation::from_bytes(fs::read(source)?)?
+            };
+            let count = presentation.slide_count()?;
+            if count != super::PPTX_SOURCE_SLIDE_COUNT {
+                return Err("PPTX lifecycle slide-count differs from fixed corpus".into());
+            }
+            std::hint::black_box((presentation, count));
+        },
+        Operation::PptxEagerOpenSelectedSlideLifecycle
+        | Operation::PptxSourceOpenSelectedSlideLifecycle => {
+            let presentation = if operation.is_source_pptx() {
+                litchi::Presentation::open(source)?
+            } else {
+                litchi::Presentation::from_bytes(fs::read(source)?)?
+            };
+            let slide = presentation
+                .slide(PPTX_FILE_SELECTED_POSITION)?
+                .ok_or("PPTX lifecycle selected slide is missing")?;
+            std::hint::black_box(slide);
+            std::hint::black_box(&presentation);
+        },
         _ => return Err("non-PPTX operation passed to run_pptx_operation".into()),
     }
     Ok(())
@@ -2645,6 +2779,28 @@ fn run_docx_operation(
             let document = prepared.ok_or("DOCX full-text operation has no prepared root")?;
             let text = document.text()?;
             std::hint::black_box(text);
+        },
+        Operation::DocxEagerOpenParagraphCountLifecycle
+        | Operation::DocxSourceOpenParagraphCountLifecycle => {
+            let document = if operation.is_source_docx() {
+                litchi::Document::open(source)?
+            } else {
+                litchi::Document::from_bytes(fs::read(source)?)?
+            };
+            let count = document.paragraph_count()?;
+            if count != super::SemanticShape::Medium.docx_paragraphs() {
+                return Err("DOCX lifecycle paragraph count differs from fixed corpus".into());
+            }
+            std::hint::black_box((document, count));
+        },
+        Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle => {
+            let document = if operation.is_source_docx() {
+                litchi::Document::open(source)?
+            } else {
+                litchi::Document::from_bytes(fs::read(source)?)?
+            };
+            let text = document.text()?;
+            std::hint::black_box((document, text));
         },
         _ => return Err("non-DOCX operation passed to run_docx_operation".into()),
     }
@@ -2881,7 +3037,11 @@ fn verify_child_output(
         | Operation::PptxEagerSlideCount
         | Operation::PptxSourceSlideCount
         | Operation::PptxEagerSelectedSlide
-        | Operation::PptxSourceSelectedSlide => verify_pptx_operation(source, corpus),
+        | Operation::PptxSourceSelectedSlide
+        | Operation::PptxEagerOpenSlideCountLifecycle
+        | Operation::PptxSourceOpenSlideCountLifecycle
+        | Operation::PptxEagerOpenSelectedSlideLifecycle
+        | Operation::PptxSourceOpenSelectedSlideLifecycle => verify_pptx_operation(source, corpus),
         Operation::DocxEagerOpen
         | Operation::DocxSourceOpen
         | Operation::DocxEagerParagraphCount
@@ -2889,7 +3049,11 @@ fn verify_child_output(
         | Operation::DocxEagerListParagraphs
         | Operation::DocxSourceListParagraphs
         | Operation::DocxEagerFullText
-        | Operation::DocxSourceFullText => verify_docx_operation(source, corpus),
+        | Operation::DocxSourceFullText
+        | Operation::DocxEagerOpenParagraphCountLifecycle
+        | Operation::DocxSourceOpenParagraphCountLifecycle
+        | Operation::DocxEagerOpenFullTextLifecycle
+        | Operation::DocxSourceOpenFullTextLifecycle => verify_docx_operation(source, corpus),
     }
 }
 
@@ -3155,6 +3319,10 @@ mod tests {
             "pptx_file_source_slide_count",
             "pptx_file_eager_selected_slide",
             "pptx_file_source_selected_slide",
+            "pptx_file_eager_open_slide_count_lifecycle",
+            "pptx_file_source_open_slide_count_lifecycle",
+            "pptx_file_eager_open_selected_slide_lifecycle",
+            "pptx_file_source_open_selected_slide_lifecycle",
             "docx_file_eager_open",
             "docx_file_source_open",
             "docx_file_eager_paragraph_count",
@@ -3163,6 +3331,10 @@ mod tests {
             "docx_file_source_list_paragraphs",
             "docx_file_eager_full_text",
             "docx_file_source_full_text",
+            "docx_file_eager_open_paragraph_count_lifecycle",
+            "docx_file_source_open_paragraph_count_lifecycle",
+            "docx_file_eager_open_full_text_lifecycle",
+            "docx_file_source_open_full_text_lifecycle",
         ] {
             assert!(Operation::parse(name).is_some(), "{name}");
         }
@@ -3188,6 +3360,8 @@ mod tests {
         assert!(Operation::PptxSourceSelectedSlide.is_source_pptx());
         assert!(Operation::PptxSourceSelectedSlide.is_pptx_query());
         assert!(!Operation::PptxSourceOpen.is_pptx_query());
+        assert!(!Operation::PptxSourceOpenSlideCountLifecycle.is_pptx_query());
+        assert!(Operation::PptxSourceOpenSlideCountLifecycle.is_source_pptx());
         assert_eq!(
             Operation::PptxSourceListSlides.pptx_query_name(),
             Some("list_slides")
@@ -3204,6 +3378,9 @@ mod tests {
         assert!(Operation::DocxSourceFullText.is_source_docx());
         assert!(Operation::DocxSourceFullText.is_docx_query());
         assert!(!Operation::DocxSourceOpen.is_docx_query());
+        assert!(Operation::DocxSourceOpenFullTextLifecycle.is_docx_lifecycle());
+        assert!(!Operation::DocxSourceOpenFullTextLifecycle.is_docx_query());
+        assert!(Operation::DocxSourceOpenFullTextLifecycle.is_source_docx());
         assert_eq!(
             Operation::DocxSourceParagraphCount.docx_query_name(),
             Some("paragraph_count")
