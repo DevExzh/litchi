@@ -586,6 +586,28 @@ fn source_backed_numeric_plan_refuses_structural_macro_and_signed_inputs() {
 }
 
 #[test]
+fn source_backed_numeric_plan_consumes_cached_source_policy_facts() {
+    for fact in 0..3 {
+        let mut source = Snapshot::from_bytes(package()).unwrap();
+        assert!(source.inner.source_policy.public_worksheet_coverage);
+        assert!(source.inner.source_policy.unprotected_workbook);
+        assert!(source.inner.source_policy.macro_free_workbook);
+        let inner = Arc::get_mut(&mut source.inner).unwrap();
+        match fact {
+            0 => inner.source_policy.public_worksheet_coverage = false,
+            1 => inner.source_policy.unprotected_workbook = false,
+            2 => inner.source_policy.macro_free_workbook = false,
+            _ => unreachable!(),
+        }
+
+        let mut edit = source.edit();
+        edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+            .unwrap();
+        assert!(edit.commit_source_backed_plan().is_err());
+    }
+}
+
+#[test]
 fn source_backed_numeric_noop_reuses_identity_and_fingerprint() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let reference = Reference::new(3, 2).unwrap();
