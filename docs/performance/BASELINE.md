@@ -845,6 +845,27 @@ producer claims are withheld. See
 [summary](results/cfb-owner-fusion-0171-summary.json), and the
 [manifest](results/cfb-owner-fusion-0171-manifest.json).
 
+Change 0172 carries the immutable `Arc<[u8]>` proof held by native XLS
+plan-only numeric snapshots into the CFB owner. Only direct sequential
+`write_to` uses that private provenance: it removes the complete pre-emission
+and post-emission fingerprint scans while retaining the 64 KiB emission pass,
+source and target SHA-256, exact progress/partial-output handling, and flush.
+Generic positional sources, composed views, and atomic saves retain their
+existing fences. The code-derived reduction is 33,991,680 logical bytes/34
+one-MiB reads for Number and 405,504 bytes/two reads for RK/MulRK.
+
+Clean CPU-2 release A/B/B/A runs used 20 warmups and 500 samples. Number
+complete-workflow p50/mean/p95/p99 improves by 37.54%-39.00% and direct
+publication by 64.44%-65.63%; RK/MulRK complete workflow improves by
+36.63%-38.96% and publication p50/mean/p95 by 65.54%-66.76%. Every accepted
+statistic agrees in both directions and passes the 5% same-implementation
+drift gate. RK/MulRK publication p99 is withheld because control drift is
+5.28%. Allocation/RSS, physical-I/O, cold-cache, producer, compression and
+atomic-save claims are withheld. See
+[`0172`](changes/0172-cfb-owned-numeric-publication.md), the
+[summary](results/cfb-owned-numeric-publication-0172-summary.json), and the
+[manifest](results/cfb-owned-numeric-publication-0172-manifest.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use

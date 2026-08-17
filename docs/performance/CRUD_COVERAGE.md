@@ -1344,6 +1344,20 @@ decompression, or producer claim. This does not extend CRUD coverage beyond
 existing fixed-width existing-cell numeric replacement. See
 [`0168`](changes/0168-xls-numeric-validation-fusion.md).
 
+Change 0172 keeps the same 315-case matrix and the same two native XLS
+plan-only fixed-width numeric selectors. An explicit owned-byte CFB ingress
+now preserves the immutable snapshot proof into direct sequential publication,
+which removes two redundant complete fingerprint scans while retaining the
+64 KiB emission pass and source/target hashes. Generic positional sources,
+composed views and atomic saves remain fully fenced. Clean CPU-2
+20-warmup/500-sample A/B/B/A records accept 37.54%-39.00% lower complete-
+workflow statistics and 64.44%-66.76% lower direct-publication statistics
+through p95 for Number and RK/MulRK; Number p99 also passes. RK/MulRK
+publication p99 and all resource/I/O/producer claims are withheld. This is a
+performance result for the existing fixed-width existing-cell replacement
+closure, not broader formula/string/structural CRUD coverage. See
+[`0172`](changes/0172-cfb-owned-numeric-publication.md).
+
 Change 0169 keeps the 315-case matrix and the existing
 `xlsx_streaming_create` selector unchanged. It removes transient hierarchical-
 budget ancestor-vector allocations and retains four reservation nodes inline,

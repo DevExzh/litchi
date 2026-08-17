@@ -1,0 +1,215 @@
+{
+  "configuration": {
+    "cases": [
+      "xls_numeric_plan_only_number_edit_save",
+      "xls_numeric_plan_only_rk_mulrk_edit_save"
+    ],
+    "execution_workers": [
+      1
+    ],
+    "samples_per_case": 500,
+    "warmup_iterations_per_case": 20
+  },
+  "results": [
+    {
+      "case": "xls_numeric_plan_only_number_edit_save",
+      "corpus": {
+        "archive_bytes": 16995840,
+        "archive_member_count": 10,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "compression": "none",
+        "entry_bytes": 2097152,
+        "entry_count": 257,
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "name": "xls-comments-opaque-heavy",
+        "package_format": "XLS/CFB",
+        "payload_kind": "incompressible",
+        "shape": "256-comments-opaque-heavy",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80946,
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+        "uncompressed_payload_bytes": 16858200,
+        "xlsx": null
+      },
+      "output_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+      "sink": {
+        "accepted_bytes": 16995840,
+        "largest_write": 65536,
+        "write_calls": 260,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 260,
+          "bytes_1_to_512": 0,
+          "bytes_4097_to_16384": 0,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [
+          16995840
+        ],
+        "read_calls": [
+          260
+        ],
+        "xls_numeric": {
+          "changed_spans": [
+            1
+          ],
+          "complete_target_materialized_bytes": [
+            0
+          ],
+          "expected_output_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+          "family": "Number",
+          "implementation": "plan_only",
+          "input_cfb_bytes": 16995840,
+          "output_cfb_bytes": 16995840,
+          "owned_input_scope": "complete in-memory CFB bytes; no positional/physical I/O",
+          "patch_or_inverse_supported": false,
+          "replacement_bytes": [
+            8
+          ],
+          "sample_count": 500,
+          "sink_bytes": [
+            16995840
+          ],
+          "sink_capacity_bytes": 16995840,
+          "sink_digests": [
+            "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03"
+          ],
+          "sink_write_calls": [
+            260
+          ],
+          "source_backed": true,
+          "source_bytes": [
+            16995840
+          ],
+          "source_counter_scope": "owned-source-ingress-only",
+          "source_fingerprints": [
+            "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+          ],
+          "source_workbook_bytes": 80946,
+          "source_workbook_bytes_per_sample": [
+            80946
+          ],
+          "splice_count": [
+            1
+          ],
+          "target_artifact_materialized_at_commit": false,
+          "target_artifact_retained_at_commit": false,
+          "target_fingerprints": [
+            "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03"
+          ],
+          "target_workbook_bytes": 80946,
+          "target_workbook_bytes_per_sample": [
+            80946
+          ],
+          "update_count": 1
+        }
+      }
+    },
+    {
+      "case": "xls_numeric_plan_only_rk_mulrk_edit_save",
+      "corpus": {
+        "archive_bytes": 202752,
+        "archive_member_count": 4,
+        "archive_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+        "compression": "none",
+        "entry_bytes": 98304,
+        "entry_count": 4,
+        "generator": "litchi-xls-rk-mulrk-publication-v1",
+        "name": "xls-rk-mulrk-deterministic",
+        "package_format": "XLS/CFB",
+        "payload_kind": "incompressible",
+        "shape": "one-rk-one-mulrk",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 1665,
+        "target_payload_sha256": "1b57f77d776cc8d0ed0f5154f7f7db2abca7f5fa7e23ecc69dd316c1c0b65967",
+        "uncompressed_payload_bytes": 198311,
+        "xlsx": null
+      },
+      "output_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+      "sink": {
+        "accepted_bytes": 202752,
+        "largest_write": 65536,
+        "write_calls": 4,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_16385_to_65536": 3,
+          "bytes_1_to_512": 0,
+          "bytes_4097_to_16384": 1,
+          "bytes_513_to_4096": 0,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [
+          202752
+        ],
+        "read_calls": [
+          4
+        ],
+        "xls_numeric": {
+          "changed_spans": [
+            3
+          ],
+          "complete_target_materialized_bytes": [
+            0
+          ],
+          "expected_output_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+          "family": "RK+MulRK",
+          "implementation": "plan_only",
+          "input_cfb_bytes": 202752,
+          "output_cfb_bytes": 202752,
+          "owned_input_scope": "complete in-memory CFB bytes; no positional/physical I/O",
+          "patch_or_inverse_supported": false,
+          "replacement_bytes": [
+            12
+          ],
+          "sample_count": 500,
+          "sink_bytes": [
+            202752
+          ],
+          "sink_capacity_bytes": 202752,
+          "sink_digests": [
+            "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260"
+          ],
+          "sink_write_calls": [
+            4
+          ],
+          "source_backed": true,
+          "source_bytes": [
+            202752
+          ],
+          "source_counter_scope": "owned-source-ingress-only",
+          "source_fingerprints": [
+            "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594"
+          ],
+          "source_workbook_bytes": 1665,
+          "source_workbook_bytes_per_sample": [
+            1665
+          ],
+          "splice_count": [
+            3
+          ],
+          "target_artifact_materialized_at_commit": false,
+          "target_artifact_retained_at_commit": false,
+          "target_fingerprints": [
+            "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260"
+          ],
+          "target_workbook_bytes": 1665,
+          "target_workbook_bytes_per_sample": [
+            1665
+          ],
+          "update_count": 3
+        }
+      }
+    }
+  ]
+}
