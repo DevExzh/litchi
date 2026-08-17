@@ -306,6 +306,7 @@ pub(crate) struct SourceSnapshot {
     pub(crate) source: Arc<dyn ReadAt>,
     pub(crate) version: SourceVersion,
     pub(crate) length: u64,
+    pub(crate) source_is_owned_immutable: bool,
 }
 
 impl SourceSnapshot {
@@ -481,6 +482,7 @@ impl SharedOleFile {
             source: Arc::clone(&self.source),
             version: self.expected_version,
             length: self.index.file_size,
+            source_is_owned_immutable: self.source_is_owned_immutable,
         };
         source.ensure_length()?;
 
@@ -623,11 +625,16 @@ impl ValidatedOverlayPlan {
 
     /// Streams the complete composed artifact to a sequential sink.
     ///
-    /// The full source and target fingerprints are rechecked before the first
-    /// sink byte. Source bytes are read and hashed again while emitting, so a
-    /// lying stable-version adapter is detected. Generic sinks are not called
-    /// atomic: failures after progress return [`OverlayError::IncompleteOutput`].
+    /// For a generic positional adapter, the full source and target
+    /// fingerprints are rechecked before the first sink byte and again after
+    /// emission. A plan created from explicitly owned immutable bytes relies
+    /// on that sealed ownership instead. Both paths read and hash the source
+    /// and target while emitting. Generic sinks are not called atomic:
+    /// failures after progress return [`OverlayError::IncompleteOutput`].
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
+        if self.source.source_is_owned_immutable {
+            return self.write_validated(writer, false);
+        }
         self.preflight_fingerprints()?;
         self.write_validated(writer, true)
     }

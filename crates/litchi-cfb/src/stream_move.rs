@@ -251,6 +251,7 @@ impl SharedOleFile {
             source: Arc::clone(&self.source),
             version: self.expected_version,
             length: self.index.file_size,
+            source_is_owned_immutable: self.source_is_owned_immutable,
         };
         source.ensure_length()?;
         let sectors = directory_sectors(self, directory_bytes)?;
@@ -293,6 +294,7 @@ impl SharedOleFile {
             source: inverse_source,
             version: inverse_view.expected_version,
             length: inverse_view.index.file_size,
+            source_is_owned_immutable: false,
         };
         let inverse_spans = directory_spans(
             &inverse_snapshot,

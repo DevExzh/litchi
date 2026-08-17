@@ -39,6 +39,18 @@ impl SourceBackedOverlayPublisher {
         Self::open_with_limits(source, SharedOleFileLimits::default())
     }
 
+    /// Opens exact immutable bytes without erasing their owned provenance.
+    ///
+    /// The common protected-container guard is identical to [`Self::open`].
+    /// Only the low-level CFB owner may use the provenance to specialize a
+    /// later direct sequential publication; composed views and atomic saves
+    /// retain their normal complete fingerprint fences.
+    pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OverlayError> {
+        let cfb = SharedOleFile::open_owned(source, version)?;
+        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+        Ok(Self { cfb: Arc::new(cfb) })
+    }
+
     /// Opens under a caller-selected positional CFB ingress ceiling, then
     /// applies the common signed/encrypted/DRM mutation guard.
     pub fn open_with_limits(
@@ -204,8 +216,15 @@ mod tests {
             });
             assert!(matches!(
                 SourceBackedOverlayPublisher::open_with_limits(
-                    Arc::new(OwnedSource::new(bytes)),
+                    Arc::new(OwnedSource::new(bytes.clone())),
                     SharedOleFileLimits::default(),
+                ),
+                Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
+            ));
+            assert!(matches!(
+                SourceBackedOverlayPublisher::open_owned(
+                    Arc::from(bytes),
+                    SourceVersion::new(0x0181, 0),
                 ),
                 Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
             ));
