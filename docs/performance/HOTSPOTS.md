@@ -3,6 +3,12 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0183`](changes/0183-ods-one-percent-release-evidence.md)
+(0183 closes the previously withheld fixed ODS 21-existing-cell result. A
+clean current-HEAD A/B/B/A rerun accepts complete source-backed lifecycle p50
+at 72.07%-72.61% lower than eager ownership; all distribution and stability
+gates pass. This is evidence closure, not a production change, and resource,
+physical-I/O, producer, structural and broad ODS claims remain withheld.)
 [`change 0182`](changes/0182-pptx-validation-catalog-graph-fusion.md)
 (0182 fuses the bounded PPTX validator's catalog and graph traversal. Package
 relationship passes change 2 -> 1 and per-Part relationship passes 4 -> 1.
@@ -1605,3 +1611,16 @@ tail same-path drift exceed policy despite a large apparent p50 advantage.
 ODS structural cells/rows, formulas, merges, insert/delete, real producers,
 resource profiles and physical I/O remain higher-value open work than another
 retained-content proof micro-handoff.
+
+## Change 0183 update
+
+A clean current-HEAD rerun now closes the previously withheld 21-existing-cell
+case. Both paired p50 directions are 72.07%-72.61% lower and all p50/mean/p95/
+p99 drift gates pass. This promotes only the fixed 1% complete lifecycle from
+correctness/phase evidence to accepted warm latency evidence; no production
+mechanism changed.
+
+The next larger ODS seams remain the entire touched-`Sheet` clone during a
+21-cell transaction and the complete XML layout/semantic reparse after the
+rewritten worksheet is assembled. Either needs separate implementation and
+matched evidence; neither is implied solved by this rerun.

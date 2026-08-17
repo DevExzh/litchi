@@ -11,6 +11,26 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ODS one-percent source-backed lifecycle (change 0183)
+
+[Change 0183](changes/0183-ods-one-percent-release-evidence.md) remeasures the
+previously withheld fixed 21-existing-cell ODS workload on clean current HEAD.
+It changes no production or harness code. One release binary runs fresh
+CPU-2-pinned A1/B1/B2/A2 processes with 20 warmups and 500 retained samples
+per leg.
+
+The complete source-backed open, stage, commit, and sequential-publication
+lifecycle is 72.07% and 72.61% lower at p50 than eager owned-snapshot control.
+Mean/p95/p99 are 68.20%-72.33% lower, and eager/source same-path drift passes
+the 5%/5%/10%/15% metric-specific gates. All four legs preserve the same
+output and semantic hashes over the two-sheet, 2,048-cell, eight-resource
+corpus.
+
+This accepts only the fixed warm generated 1% existing-cell lifecycle.
+Allocation/RSS, physical-I/O, decompression, cold-cache, real producers,
+durable ZIP patch, atomic save, formulas, merges, structural rows,
+insert/delete, and broad ODS CRUD remain withheld.
+
 ## PPTX validation catalog/graph fusion (change 0182)
 
 [Change 0182](changes/0182-pptx-validation-catalog-graph-fusion.md) fuses the
@@ -2069,6 +2089,12 @@ release A/B/B/A run with 500 samples per workload and leg, p50 is
 all pass. The deterministic 21-cell 1% path remains correctness and phase
 evidence only because same-implementation mean/tail drift exceeds policy.
 Logical source replay counters are explicitly not physical-I/O evidence.
+
+Change 0183 repeats only the previously withheld 21-existing-cell workload on
+clean current HEAD. The new A/B/B/A run passes every stability gate: complete
+source-backed lifecycle p50 is 72.07%/72.61% lower than eager ownership, and
+mean/p95/p99 improve in both directions. This is evidence closure for the
+existing path, not a production optimization or broader ODS claim.
 
 Change 0178 specializes only CFB plans rooted in sealed `Arc<[u8]>` ownership.
 After the initial complete fingerprint, candidate reopen, and optional native

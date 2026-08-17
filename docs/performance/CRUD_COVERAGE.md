@@ -1442,6 +1442,15 @@ because mean and tail stability gates fail. Structural cells/rows, formulas,
 merges, insert/delete, real-producer, allocation/RSS and physical-I/O coverage
 remain open.
 
+Change 0183 also adds no selector or CRUD closure and leaves the current matrix
+at 322. It repeats only the previously withheld deterministic ODS 21-existing-
+cell workload on clean current HEAD. Complete source-backed lifecycle p50 is
+72.07%/72.61% lower than eager ownership and p50/mean/p95/p99 stability gates
+all pass, so the fixed generated 1% warm-latency claim is now accepted. The
+result does not cover formulas, merges, structural rows, insert/delete,
+allocation/RSS, physical I/O, cold cache, real producers, durable ZIP patch,
+atomic save, or broad ODS CRUD.
+
 Change 0178 also left the then-current matrix at 320 and adds no CRUD closure. It removes
 one redundant final complete fingerprint only from plans rooted in sealed
 owned CFB bytes, after candidate reopen and optional format-owner validation.
