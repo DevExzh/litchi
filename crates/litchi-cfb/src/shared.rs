@@ -397,7 +397,12 @@ impl SharedOleFile {
     /// Returns an error when the source exceeds the default limit or is not a
     /// valid CFB file.
     pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OleError> {
-        let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource { source, version });
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
+            source,
+            version,
+            #[cfg(test)]
+            read_count: None,
+        });
         Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
     }
 
@@ -462,7 +467,15 @@ impl SharedOleFile {
     }
 
     #[cfg(test)]
-    pub(crate) fn open_owned_source_for_test(source: Arc<dyn ReadAt>) -> Result<Self, OleError> {
+    pub(crate) fn open_owned_arc_source_for_test(
+        source: Arc<[u8]>,
+        read_count: Arc<AtomicUsize>,
+    ) -> Result<Self, OleError> {
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
+            source,
+            version: SourceVersion::new(0xcafe_0181, 0),
+            read_count: Some(read_count),
+        });
         Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
     }
 
@@ -2217,6 +2230,8 @@ impl SharedOleFile {
 struct OwnedArcSource {
     source: Arc<[u8]>,
     version: SourceVersion,
+    #[cfg(test)]
+    read_count: Option<Arc<AtomicUsize>>,
 }
 
 impl ReadAt for OwnedArcSource {
@@ -2226,6 +2241,10 @@ impl ReadAt for OwnedArcSource {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        #[cfg(test)]
+        if let Some(read_count) = &self.read_count {
+            read_count.fetch_add(1, AtomicOrdering::SeqCst);
+        }
         if output.is_empty() {
             return Ok(0);
         }

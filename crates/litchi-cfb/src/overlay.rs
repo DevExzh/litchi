@@ -648,9 +648,16 @@ impl ValidatedOverlayPlan {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
         let path = path.as_ref();
         let parent = parent_directory(path);
-        // Complete the potentially expensive source/fingerprint validation
-        // before creating even a temporary file.
-        self.preflight_fingerprints()?;
+        // Explicitly owned immutable bytes cannot change while this plan is
+        // alive. Skip only the two outer complete-artifact fences in that
+        // sealed case; `write_validated` still hashes every source and target
+        // byte while emitting, and publication keeps all flush/fsync/rename
+        // durability steps below.
+        if !self.source.source_is_owned_immutable {
+            // Complete the potentially expensive source/fingerprint
+            // validation before creating even a temporary file.
+            self.preflight_fingerprints()?;
+        }
         let (temporary_path, file) = create_sibling_temp_file(path)?;
         let result = (|| {
             let mut buffered = BufWriter::new(file);
@@ -664,10 +671,12 @@ impl ValidatedOverlayPlan {
             buffered.flush()?;
             buffered.get_ref().sync_all()?;
 
-            // Close the staging window with the same full identity check. A
-            // stable but dishonest version token must not hide a late source
-            // byte change immediately before the atomic rename.
-            self.preflight_fingerprints()?;
+            if !self.source.source_is_owned_immutable {
+                // Close the staging window with the same full identity check.
+                // A stable but dishonest version token must not hide a late
+                // source byte change immediately before the atomic rename.
+                self.preflight_fingerprints()?;
+            }
             drop(buffered);
             atomic_replace(&temporary_path, path)?;
             sync_parent(parent).map_err(|source| OverlayError::Committed { source })?;
