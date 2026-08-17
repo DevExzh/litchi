@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "change": "0173-cfb-comment-publication-fusion",
+  "decision": {
+    "production_change": "retained; native XLS existing-comment publication validates the semantic owner inside the CFB fingerprint fence and preserves immutable Arc byte provenance for direct sequential write_to",
+    "accepted_latency_claim": "the scalar source-backed selector is lower for complete-workflow p50, mean, and p99 and for all semantic-plan and publication statistics in both clean ABBA directions; the bounded 256-comment selector is lower for all semantic-plan statistics",
+    "withheld": [
+      "scalar complete-workflow p95 because the second matched eager guard direction is 5.027675%, just above the 5% gate",
+      "bounded-batch complete-workflow and publication latency because candidate same-implementation drift reaches 6.673640% and 17.829569% respectively and the matched eager batch guard is unstable",
+      "allocation, RSS, peak-memory, physical-I/O, cold-cache, producer, compression, and throughput claims",
+      "atomic-save latency because save retains its complete initial and pre-rename fingerprint fences"
+    ]
+  },
+  "builds": {
+    "control": {
+      "revision": "709d217174dd53f7dd0b935b48df59d0272b2430",
+      "binary_sha256": "ca8719467f2c5995af9293daa2cb104755074e74f80e810703a3a5b8684b2dbc"
+    },
+    "candidate": {
+      "revision": "e204e184ea84da7b842816b03eecef016f99f9d5",
+      "binary_sha256": "cfc3737344e50e72378edee31ec6cfce2e3267bdc02e012a5aec3b31adf56a68"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "kernel": "Linux 6.8.0-101-generic",
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "execution_order": [
+      "control_a1",
+      "candidate_b1",
+      "candidate_b2",
+      "control_a2"
+    ],
+    "warmups_per_case_per_leg": 20,
+    "samples_per_case_per_leg": 500,
+    "selectors": [
+      "xls_comments_eager_edit_save",
+      "xls_comments_source_backed_edit_save",
+      "xls_comments_eager_batch_edit_save",
+      "xls_comments_source_backed_batch_edit_save"
+    ],
+    "p50": "integer midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "same_implementation_drift_gate_pct": 5.0
+  },
+  "validation": {
+    "all_raw_records_clean_exact_revision_affinity": true,
+    "all_timing_and_phase_vectors_length_500": true,
+    "semantic_projection_identical_across_all_four_legs": true,
+    "semantic_projection_sha256": "0d59a6b5d8facc9859bfbed875ff52015f0c66481e14c955570fdf122ee5fc8f",
+    "corpus_output_fingerprint_sink_and_source_topology_match": true,
+    "scalar_complete_p50_mean_p99_direction_agree_and_pass_guards": true,
+    "scalar_complete_p95_guard_passes": false,
+    "scalar_semantic_and_publication_all_statistics_pass": true,
+    "batch_semantic_all_statistics_pass": true,
+    "batch_complete_and_publication_drift_gate_passes": false,
+    "exact_noop_skips_owner_and_fallback_readback": true,
+    "owned_atomic_save_fences_unchanged": true
+  },
+  "code_derived_work_elimination": {
+    "scope": "each effective native XLS source-backed existing-comment transaction",
+    "artifact_bytes": 16995840,
+    "fingerprint_chunk_bytes": 1048576,
+    "publication_chunk_bytes": 65536,
+    "complete_source_scans_removed": 3,
+    "logical_source_bytes_removed": 50987520,
+    "read_at_calls_removed": 51,
+    "source_and_target_sha256_pairs_removed": 3,
+    "emission_source_scan_retained": true,
+    "emission_source_and_target_sha256_pair_retained": true,
+    "physical_io_claim": "none; the source is a complete owned in-memory CFB snapshot and harness source counters describe ingress rather than internal fingerprint reads"
+  },
+  "accepted_results_percent_candidate_lower": {
+    "xls_comments_source_backed_edit_save": {
+      "complete_workflow": {
+        "control_a1_to_candidate_b1": {
+          "p50": 47.189980,
+          "mean": 47.167013,
+          "p99": 45.537675
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 47.166150,
+          "mean": 46.957650,
+          "p99": 46.227398
+        }
+      },
+      "semantic_staging_and_plan": {
+        "control_a1_to_candidate_b1": {
+          "p50": 32.421897,
+          "mean": 32.375263,
+          "p95": 32.285051,
+          "p99": 30.781061
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 32.366056,
+          "mean": 32.168505,
+          "p95": 31.081994,
+          "p99": 31.680792
+        }
+      },
+      "direct_publication": {
+        "control_a1_to_candidate_b1": {
+          "p50": 61.024385,
+          "mean": 61.028363,
+          "p95": 60.982937,
+          "p99": 60.235569
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 60.988956,
+          "mean": 60.802550,
+          "p95": 59.681521,
+          "p99": 59.145755
+        }
+      }
+    },
+    "xls_comments_source_backed_batch_edit_save": {
+      "semantic_staging_and_plan": {
+        "control_a1_to_candidate_b1": {
+          "p50": 32.220903,
+          "mean": 32.279619,
+          "p95": 32.422512,
+          "p99": 32.571010
+        },
+        "candidate_b2_to_control_a2": {
+          "p50": 32.206418,
+          "mean": 32.077175,
+          "p95": 31.489980,
+          "p99": 30.526323
+        }
+      }
+    }
+  },
+  "same_implementation_drift_pct": {
+    "scalar_complete_max_control": 3.454746,
+    "scalar_complete_max_candidate": 4.238566,
+    "scalar_semantic_max_control": 3.600972,
+    "scalar_semantic_max_candidate": 3.883618,
+    "scalar_publication_max_control": 1.978910,
+    "scalar_publication_max_candidate": 4.773820,
+    "batch_semantic_max_control": 1.088568,
+    "batch_semantic_max_candidate": 1.910780,
+    "batch_complete_max_candidate": 6.673640,
+    "batch_publication_max_candidate": 17.829569,
+    "scalar_matched_eager_guard_p95_second_direction": 5.027675
+  },
+  "cases": [
+    {
+      "selector": "xls_comments_source_backed_edit_save",
+      "updates": 1,
+      "splice_count": 2,
+      "replacement_bytes": 109,
+      "artifact_bytes": 16995840,
+      "workbook_stream_bytes": 80946,
+      "source_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "output_sha256": "bd4f2f1b4e98781253503260ba19247fd01c159c784d9f114a449400d5ac1e6d",
+      "sink_write_calls": 260,
+      "sink_largest_write_bytes": 65536
+    },
+    {
+      "selector": "xls_comments_source_backed_batch_edit_save",
+      "updates": 256,
+      "splice_count": 512,
+      "replacement_bytes": 27904,
+      "artifact_bytes": 16995840,
+      "workbook_stream_bytes": 80946,
+      "source_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+      "output_sha256": "1b76467bd7a229adce1f94c7814e9d46f1cea15f8963b1c21e89bcb2e254e5fc",
+      "sink_write_calls": 260,
+      "sink_largest_write_bytes": 65536
+    }
+  ]
+}

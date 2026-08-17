@@ -866,6 +866,25 @@ atomic-save claims are withheld. See
 [summary](results/cfb-owned-numeric-publication-0172-summary.json), and the
 [manifest](results/cfb-owned-numeric-publication-0172-manifest.json).
 
+Change 0173 applies both proven CFB seams to native XLS existing-comment
+publication. Semantic readback now consumes the composed view inside the
+planner's final fingerprint bracket, and the immutable snapshot enters through
+the sealed owned-byte path. Each effective scalar or 256-comment transaction
+therefore removes three complete 16,995,840-byte scans, 51 one-MiB logical
+reads, and three source/target digest pairs while retaining 64 KiB emission
+hashing and every atomic-save fence.
+
+Clean CPU-2 release A/B/B/A used 20 warmups and 500 samples. The scalar
+complete workflow p50/mean/p99 is 45.54%-47.19% lower, semantic staging/plan is
+30.78%-32.42% lower, and direct publication is 59.15%-61.03% lower. The
+256-comment semantic phase is 30.53%-32.57% lower. Scalar complete p95 and
+batch complete/publication are withheld by the predeclared 5% drift/guard
+policy. Allocation/RSS, physical-I/O, cold-cache, producer, compression and
+atomic-save claims remain open. See
+[`0173`](changes/0173-cfb-comment-publication-fusion.md), the
+[summary](results/cfb-comment-fusion-0173-summary.json), and the
+[manifest](results/cfb-comment-fusion-0173-manifest.json).
+
 Change 0117 adds eight opt-in native PPT `Pictures` selectors and two pinned,
 balanced release attempts. The matched corpus has eight slides and 32
 deterministic 256 KiB PNG records. Source-backed timed samples use

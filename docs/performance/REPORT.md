@@ -414,6 +414,30 @@ compression, or throughput claim is made. See the
 [summary](results/cfb-owned-numeric-publication-0172-summary.json) and
 [manifest](results/cfb-owned-numeric-publication-0172-manifest.json).
 
+## Native XLS comment publication fusion (change 0173)
+
+[Change 0173](changes/0173-cfb-comment-publication-fusion.md) validates
+effective existing-comment edits on the exact composed CFB view already held
+inside the final fingerprint bracket. It also preserves the snapshot's sealed
+immutable ownership into direct sequential publication. The combined
+code-derived reduction is three full scans of the 16,995,840-byte artifact,
+50,987,520 logical bytes, 51 one-MiB reads, and three source/target SHA-256
+pairs per transaction. The 64 KiB emission/hash pass and atomic-save fences
+remain.
+
+Clean CPU-2 release A/B/B/A used 20 warmups and 500 samples. Accepted paired
+reductions are 45.54%-47.19% for scalar complete-workflow p50/mean/p99,
+30.78%-32.42% for scalar semantic staging/plan, 59.15%-61.03% for scalar direct
+publication, and 30.53%-32.57% for the 256-comment semantic phase. Scalar
+complete p95 misses the matched eager guard by 0.027675 percentage points;
+batch complete/publication has excessive candidate drift and is withheld.
+
+The evidence is warm, in-memory, generated XLS. It does not establish
+allocation/RSS, physical-I/O, cold-cache, independent-producer, compression,
+throughput, atomic-save, or broader comment-lifecycle improvements. See the
+[summary](results/cfb-comment-fusion-0173-summary.json) and
+[manifest](results/cfb-comment-fusion-0173-manifest.json).
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed

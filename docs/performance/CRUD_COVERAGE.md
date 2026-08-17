@@ -1358,6 +1358,20 @@ performance result for the existing fixed-width existing-cell replacement
 closure, not broader formula/string/structural CRUD coverage. See
 [`0172`](changes/0172-cfb-owned-numeric-publication.md).
 
+Change 0173 keeps the same 315-case matrix and the existing four native XLS
+comment selectors. Effective source-backed comment transactions now reuse the
+planner's exact composed candidate for semantic readback and preserve immutable
+snapshot provenance into direct sequential publication. This removes three
+complete artifact scans while retaining emission hashing, exact no-op,
+fixed-length/encoding-width refusals, semantic reopen, fingerprints,
+partial-sink typing, and atomic-save fences. Clean CPU-2
+20-warmup/500-sample A/B/B/A records accept scalar complete p50/mean/p99,
+scalar semantic/publication, and bounded-batch semantic improvements. Scalar
+p95 and batch complete/publication are withheld by the drift policy. This is
+performance evidence for existing NOTE/TXO updates only; add/remove, shape
+topology, and length-changing comment lifecycle CRUD remain uncovered. See
+[`0173`](changes/0173-cfb-comment-publication-fusion.md).
+
 Change 0169 keeps the 315-case matrix and the existing
 `xlsx_streaming_create` selector unchanged. It removes transient hierarchical-
 budget ancestor-vector allocations and retains four reservation nodes inline,
