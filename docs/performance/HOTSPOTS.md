@@ -830,7 +830,8 @@ Confirmed source facts:
   making that matrix 295. Change 0154 adds six ODF publication selectors,
   making that matrix 301; change 0159 later made it 302, change 0160 made it
   303, change 0162 made the matrix 305, change 0163 made it 309, and change
-  0164 made that matrix 311; change 0166 makes the current matrix 315.
+  0164 made that matrix 311; change 0166 made it 315 and change 0174 makes the
+  current matrix 319.
   Only `cfg(test)` source-event acceptance and tests changed in 0152. Root
   MiniStream cache and resource-accounting boundaries, broader performance
   gaps, and local/generic latency, allocation/RSS/peak-memory, physical
