@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "change": "0181",
+  "control_revision": "5b6eff5389a922f5f842479dff11d596d3ef9683",
+  "candidate_revision": "d3df35ffec3f68ce91dd8d59ebd447bc209482be",
+  "artifacts": [
+    {
+      "path": "xls-source-policy-0181-number-a1.json.zst",
+      "bytes": 10212,
+      "sha256": "d36bd79b55bd35e1951a7db1174204eafeb5c9f45b03ab8ddb88037434211f36",
+      "uncompressed_bytes": 283056,
+      "uncompressed_sha256": "51c7d8ac80f9dc706864e4b00123c7410545dc33824f7bd9e1721777059328eb"
+    },
+    {
+      "path": "xls-source-policy-0181-number-b1.json.zst",
+      "bytes": 10131,
+      "sha256": "47557e02445d08dfc2edfed1cd99d6dc2cf6dcbf445b6d3d6b503eeced22e775",
+      "uncompressed_bytes": 283089,
+      "uncompressed_sha256": "1cafd89b55898bcd8be7f04dc088048b18b34b43037c32c04adf47c73ed957d1"
+    },
+    {
+      "path": "xls-source-policy-0181-number-b2.json.zst",
+      "bytes": 10203,
+      "sha256": "b1e1a4ccd03cc39142ad3f81669285689b6410d6f483414558d4914bad108975",
+      "uncompressed_bytes": 283087,
+      "uncompressed_sha256": "0d0c3fff45a37731725f6b66dfcd5a86a5333aa395e685313f9410101fe75cb3"
+    },
+    {
+      "path": "xls-source-policy-0181-number-a2.json.zst",
+      "bytes": 10157,
+      "sha256": "3c63339a572b7696f41843742a831343c83edca8664ea8f4b0667d5d3091c725",
+      "uncompressed_bytes": 283054,
+      "uncompressed_sha256": "c4ef559d2e927bb9c2ed03ddada00dc2c73cf2e0df60cb5e3788cff42e0e3f02"
+    },
+    {
+      "path": "xls-source-policy-0181-rk-mulrk-a1.json.zst",
+      "bytes": 8490,
+      "sha256": "e3e10e4d9e17d4dd0040f4013afe5b48d79c92aa25fb041c540e5f88cf03c02b",
+      "uncompressed_bytes": 272634,
+      "uncompressed_sha256": "08fcf2959c979200323c23cbec5b84123a0250e00d8c66b9ee8177477fd80474"
+    },
+    {
+      "path": "xls-source-policy-0181-rk-mulrk-b1.json.zst",
+      "bytes": 8178,
+      "sha256": "7571fe01a7a1e841a32ebba00119137705ef7ac4b6c775f1104b69aea8a85c31",
+      "uncompressed_bytes": 272576,
+      "uncompressed_sha256": "231af437b6c038b0b583347ebf0025bc681c2a2d73d126aa805a70063515c003"
+    },
+    {
+      "path": "xls-source-policy-0181-rk-mulrk-b2.json.zst",
+      "bytes": 8443,
+      "sha256": "dad8be17e78bb18bf47a05f532787b159447ba07825790fc7cba6a5ed0c99c42",
+      "uncompressed_bytes": 272586,
+      "uncompressed_sha256": "a40e004008d789aaa1e704eebc3d7a97996779fde3d0eb892984e3d162777095"
+    },
+    {
+      "path": "xls-source-policy-0181-rk-mulrk-a2.json.zst",
+      "bytes": 8495,
+      "sha256": "da9db92dc37cef196db73f2885c5df7901d682af6200b56116dac09df3067014",
+      "uncompressed_bytes": 272608,
+      "uncompressed_sha256": "d16a34b734e15b03c862426526d49965fc9991ce29ed921083be4e17b2a1d035"
+    },
+    {
+      "path": "xls-source-policy-0181-summary.json",
+      "bytes": 7214,
+      "sha256": "8b9fade89b7667cce7916ded0fd46b4bb444e8e4a437477d54d8f7192ac52878"
+    }
+  ]
+}

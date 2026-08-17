@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "change": "0181",
+  "decision": "accept_number_total_and_commit_latency_withhold_rk_mulrk_latency",
+  "control_revision": "5b6eff5389a922f5f842479dff11d596d3ef9683",
+  "candidate_revision": "d3df35ffec3f68ce91dd8d59ebd447bc209482be",
+  "control_binary_sha256": "74663614cca8252ba6f29fbfcd14e5b5adbf01d70ba97dc04fc4b0f8e7bafd1c",
+  "candidate_binary_sha256": "001a771a1b7a44f89f0c5f0b449d7e211987ad8c64b8ddc5407798cfb358d911",
+  "protocol": {
+    "order": ["control-a1", "candidate-b1", "candidate-b2", "control-a2"],
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 20,
+    "samples_per_case_per_leg": 500,
+    "total_retained_samples": 4000,
+    "timed_scope": "edit, set, source-backed numeric plan commit, and direct sequential publication; phases retained separately",
+    "source_counter_scope": "owned-source ingress only; internal Cursor-based Workbook parsing is not a ReadAt or physical-I/O counter"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "deterministic_work_reduction": {
+    "source_workbook_policy_reopens_before": 1,
+    "source_workbook_policy_reopens_after": 0,
+    "cached_private_source_facts": [
+      "public worksheet coverage",
+      "workbook versus worksheet protection classification",
+      "workbook macro-free classification"
+    ],
+    "target_workbook_semantic_reopens_before": 1,
+    "target_workbook_semantic_reopens_after": 1,
+    "publication_fingerprint_or_emission_passes_removed": 0,
+    "logical_readat_or_physical_io_claim": null
+  },
+  "semantic_gates": {
+    "semantic_projection_equal_all_legs": true,
+    "source_and_output_hashes_equal_all_legs": true,
+    "source_and_target_fingerprints_equal_within_family_all_legs": true,
+    "splice_and_replacement_counts_equal_all_legs": true,
+    "opaque_streams_and_directory_topology_preserved_all_legs": true,
+    "complete_reopen_and_numeric_readback_all_samples": true,
+    "target_artifact_retained_at_commit": false,
+    "target_artifact_materialized_at_commit": false,
+    "partial_sink_and_no_op_security_gates": true,
+    "distinct_workbook_and_worksheet_protection_refusals_preserved": true
+  },
+  "number": {
+    "case": "xls_numeric_plan_only_number_edit_save",
+    "source_archive_bytes": 16995840,
+    "source_archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+    "source_workbook_bytes": 80946,
+    "source_workbook_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+    "output_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+    "updates": 1,
+    "splices": 1,
+    "elapsed_ns": {
+      "a1": {"p50": 34186699, "mean": 34670559.992, "p95": 37961991, "p99": 39395968},
+      "b1": {"p50": 32164964, "mean": 32812858.788, "p95": 35454968, "p99": 37035174},
+      "b2": {"p50": 32428788, "mean": 32941269.192, "p95": 35553409, "p99": 36517487},
+      "a2": {"p50": 33062609, "mean": 33586255.118, "p95": 35725451, "p99": 37125519}
+    },
+    "commit_ns": {
+      "a1": {"p50": 17672267, "mean": 17928347.116, "p95": 19701802, "p99": 20771219},
+      "b1": {"p50": 16211152, "mean": 16569693.552, "p95": 18091659, "p99": 18771940},
+      "b2": {"p50": 16391048, "mean": 16667266.674, "p95": 18046810, "p99": 18773614},
+      "a2": {"p50": 17065048, "mean": 17296897.844, "p95": 18419271, "p99": 19304882}
+    },
+    "publication_ns": {
+      "a1": {"p50": 16502660, "mean": 16737521, "p95": 18420217, "p99": 19436879},
+      "b1": {"p50": 15939412, "mean": 16238833.506, "p95": 17573879, "p99": 18499743},
+      "b2": {"p50": 16010202, "mean": 16269449.066, "p95": 17540443, "p99": 18328993},
+      "a2": {"p50": 16004530, "mean": 16284700.972, "p95": 17363026, "p99": 18283361}
+    },
+    "paired_total_reduction_percent": {
+      "p50": [5.913806, 1.917033],
+      "mean": [5.358152, 1.920387],
+      "p95": [6.604035, 0.481567],
+      "p99": [5.992476, 1.637774]
+    },
+    "paired_commit_reduction_percent": {
+      "p50": [8.267841, 3.949593],
+      "mean": [7.578242, 3.640139],
+      "p95": [8.172567, 2.022127],
+      "p99": [9.625237, 2.751988]
+    },
+    "same_implementation_total_drift_percent": {
+      "control": {"p50": 3.288092, "mean": 3.127451, "p95": 5.891524, "p99": 5.763151},
+      "candidate": {"p50": 0.820222, "mean": 0.391342, "p95": 0.277651, "p99": 1.397825}
+    },
+    "same_implementation_commit_drift_percent": {
+      "control": {"p50": 3.435999, "mean": 3.522072, "p95": 6.509714, "p99": 7.059465},
+      "candidate": {"p50": 1.109705, "mean": 0.588865, "p95": 0.247899, "p99": 0.008918}
+    },
+    "accepted_total_metrics": ["p50", "mean", "p95", "p99"],
+    "accepted_commit_metrics": ["p50", "mean", "p95", "p99"],
+    "publication_claim": null
+  },
+  "rk_mulrk": {
+    "case": "xls_numeric_plan_only_rk_mulrk_edit_save",
+    "source_archive_bytes": 202752,
+    "source_archive_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+    "source_workbook_bytes": 1665,
+    "source_workbook_sha256": "1b57f77d776cc8d0ed0f5154f7f7db2abca7f5fa7e23ecc69dd316c1c0b65967",
+    "output_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+    "updates": 3,
+    "splices": 3,
+    "elapsed_ns": {
+      "a1": {"p50": 416746, "mean": 420162.804, "p95": 451649, "p99": 489915},
+      "b1": {"p50": 381044, "mean": 382622, "p95": 399345, "p99": 412824},
+      "b2": {"p50": 409157, "mean": 413933.394, "p95": 464845, "p99": 490471},
+      "a2": {"p50": 434352, "mean": 439375.616, "p95": 500613, "p99": 535142}
+    },
+    "commit_ns": {
+      "a1": {"p50": 236190, "mean": 238878.434, "p95": 265080, "p99": 296144},
+      "b1": {"p50": 205800, "mean": 207767.466, "p95": 222840, "p99": 235497},
+      "b2": {"p50": 220351, "mean": 224386.018, "p95": 260922, "p99": 291373},
+      "a2": {"p50": 247108, "mean": 250799.236, "p95": 295670, "p99": 331600}
+    },
+    "paired_total_reduction_percent": {
+      "p50": [8.566849, 5.800595],
+      "mean": [8.934823, 5.790540],
+      "p95": [11.580674, 7.144840],
+      "p99": [15.735587, 8.347504]
+    },
+    "same_implementation_total_drift_percent": {
+      "control": {"p50": 4.224636, "mean": 4.572707, "p95": 10.841162, "p99": 9.231601},
+      "candidate": {"p50": 7.377888, "mean": 8.183375, "p95": 16.401858, "p99": 18.808742}
+    },
+    "latency_claim": null,
+    "latency_withheld_reason": "candidate p50, mean, p95, and p99 drift plus control p95 drift exceed the predeclared thresholds"
+  },
+  "accepted_claim": "for the exact Number plan-only corpus, reusing immutable source policy facts reduces complete workflow p50 by 1.92%-5.91%, mean by 1.92%-5.36%, p95 by 0.48%-6.60%, and p99 by 1.64%-5.99%; isolated commit reductions are 2.02%-9.63% across the same metrics",
+  "withheld_scope": [
+    "RK and MulRK latency",
+    "direct publication latency",
+    "physical I/O and ReadAt reductions",
+    "allocation, peak heap, and RSS",
+    "cold-cache, scaling, and hardware counters",
+    "atomic save and generic mutable positional sources",
+    "formula, string, structural, and broader native XLS CRUD",
+    "real-producer performance beyond existing untimed correctness gates"
+  ]
+}

@@ -3,6 +3,11 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0181`](changes/0181-xls-source-policy-reuse.md)
+(0181 reuses immutable native-XLS snapshot policy facts in the existing
+plan-only fixed-width numeric path. Number total and commit p50/mean/p95/p99
+pass the clean paired-direction/stability gates; RK/MulRK latency and all
+publication/resource/I/O claims remain withheld.)
 [`change 0180`](changes/0180-odt-source-text-cache.md)
 (0180 retains one bounded full-text projection on the first successful parse
 after the two-call source-backed ODT threshold. Four candidate public calls
@@ -148,6 +153,22 @@ accept p50 reductions of 47.01%-50.95% and mean reductions of
 withheld despite the clean retry. Every replay records zero post-preparation
 reads; allocation/RSS, physical I/O, single-call/open, producer, and broader
 ODF evidence remain open.
+
+## XLS immutable source policy reuse (change 0181)
+
+`Snapshot::from_bytes` already creates a complete validated public Workbook
+model before retaining the private fixed-width BIFF inventory. The plan-only
+numeric path formerly reopened the same immutable source to repeat worksheet
+coverage, protection, and macro checks. Those content-free facts now travel
+with the snapshot; target semantic validation, CFB verification, fingerprints,
+and publication are unchanged.
+
+The exact Number workload passes all clean total and commit
+p50/mean/p95/p99 gates, with 1.92%-5.91% lower total p50 and 3.95%-8.27% lower
+commit p50 across paired directions. RK/MulRK is directionally lower but fails
+stability, so its latency is withheld. The next native-XLS work should target a
+measured larger owner/candidate path rather than remove additional validation
+fences speculatively.
 
 ## ODP repeated full-text projection (change 0140)
 
