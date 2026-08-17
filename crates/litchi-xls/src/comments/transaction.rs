@@ -683,16 +683,22 @@ impl Edit {
             ));
         }
 
-        // Keep the source bytes in their existing Arc-backed allocation. The
-        // common publisher only needs a positional ReadAt view and never
-        // requires a second complete source Vec.
-        let source: Arc<dyn ReadAt> =
-            Arc::new(SnapshotSource::new(Arc::clone(&self.source.inner.bytes)));
-        let publisher = SourceBackedOverlayPublisher::open(source).map_err(overlay_to_error)?;
-        let plan = publisher
-            .plan_splices(splices, StreamSpliceLimits::default())
+        // Preserve the snapshot's immutable Arc ownership through CFB. This
+        // permits direct sequential publication to omit redundant outer
+        // mutation fences while retaining emission hashes; composed views and
+        // atomic save remain fully fenced.
+        let source = Arc::clone(&self.source.inner.bytes);
+        let source_version =
+            SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
+        let publisher = SourceBackedOverlayPublisher::open_owned(source, source_version)
             .map_err(overlay_to_error)?;
-        if !effective.is_empty() {
+        let (plan, owner_validated) = publisher
+            .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
+                verify_source_backed_candidate(candidate.clone(), &self.source, &effective)
+                    .map_err(CommentOwnerError::Owner)
+            })
+            .map_err(CommentOwnerError::into_error)?;
+        if owner_validated.is_none() && !effective.is_empty() {
             verify_source_backed_readback(&plan, &self.source, &effective)?;
         }
 
@@ -1018,8 +1024,10 @@ impl SourceBackedCommit {
 
     /// Streams the complete source-backed candidate to a sequential sink.
     ///
-    /// The common overlay publisher rechecks the exact source and target
-    /// fingerprints before and during output. A sink failure retains the
+    /// The common overlay publisher hashes the exact source and target during
+    /// output. Immutable snapshot provenance makes an additional outer
+    /// mutation preflight redundant for this direct sequential path; atomic
+    /// save retains its complete pre-rename fences. A sink failure retains the
     /// typed [`litchi_cfb::OutputProgress`] inside [`OverlayError`].
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
         self.plan.write_to(writer)
@@ -1048,45 +1056,6 @@ impl fmt::Debug for SourceBackedCommit {
             .field("plan", &self.plan)
             .field("diagnostics", &self.diagnostics)
             .finish()
-    }
-}
-
-#[derive(Clone)]
-struct SnapshotSource {
-    bytes: Arc<[u8]>,
-    version: SourceVersion,
-}
-
-impl SnapshotSource {
-    fn new(bytes: Arc<[u8]>) -> Self {
-        let identity = bytes.as_ptr() as usize as u64;
-        let length = bytes.len() as u64;
-        Self {
-            bytes,
-            version: SourceVersion::new(identity, length),
-        }
-    }
-}
-
-impl ReadAt for SnapshotSource {
-    fn len(&self) -> std::io::Result<u64> {
-        u64::try_from(self.bytes.len())
-            .map_err(|_error| std::io::Error::other("source length exceeds u64"))
-    }
-
-    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
-        if output.is_empty() || offset >= self.bytes.len() as u64 {
-            return Ok(0);
-        }
-        let start = usize::try_from(offset)
-            .map_err(|_error| std::io::Error::other("source offset exceeds usize"))?;
-        let count = output.len().min(self.bytes.len() - start);
-        output[..count].copy_from_slice(&self.bytes[start..start + count]);
-        Ok(count)
-    }
-
-    fn version(&self) -> std::io::Result<SourceVersion> {
-        Ok(self.version)
     }
 }
 
@@ -1139,6 +1108,26 @@ fn overlay_to_error(error: OverlayError) -> Error {
         OverlayError::Ole(error) => Error::Cfb(error),
         OverlayError::Io(error) => Error::Io(error),
         other => Error::UnsafeEdit(format!("source-backed comment overlay refused: {other}")),
+    }
+}
+
+enum CommentOwnerError {
+    Overlay(OverlayError),
+    Owner(Error),
+}
+
+impl CommentOwnerError {
+    fn into_error(self) -> Error {
+        match self {
+            Self::Overlay(error) => overlay_to_error(error),
+            Self::Owner(error) => error,
+        }
+    }
+}
+
+impl From<OverlayError> for CommentOwnerError {
+    fn from(error: OverlayError) -> Self {
+        Self::Overlay(error)
     }
 }
 
@@ -1263,6 +1252,14 @@ fn verify_source_backed_readback(
     changes: &[&Change],
 ) -> Result<()> {
     let candidate = plan.composed_source().map_err(overlay_to_error)?;
+    verify_source_backed_candidate(candidate, source, changes)
+}
+
+fn verify_source_backed_candidate(
+    candidate: ComposedOverlaySource,
+    source: &Snapshot,
+    changes: &[&Change],
+) -> Result<()> {
     let workbook = Workbook::new(PositionalReader::new(candidate))?;
     let worksheet_count = workbook
         .sheets()
