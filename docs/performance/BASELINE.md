@@ -14,6 +14,23 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained PPTX validation result (change 0182)
+
+The source-backed PPTX validator now collects catalog presence facts and
+relationship-graph facts in one ordered traversal. Package relationship-list
+passes change `2 -> 1`; every Part relationship-list changes `4 -> 1`. Graph
+target lookups, XML parsing, report topology, and logical source reads remain
+unchanged.
+
+A clean CPU-2 release A/B/B/A with 20 warmups and 500 samples per existing
+tiny/medium/large `pptx_validation_report` shape accepts the deterministic
+large corpus: complete validation p50 is 7.08%-11.50% lower, with mean/p95/p99
+directions and all stability gates also passing. Tiny and medium latency remain
+withheld because control drift and, for medium, paired mean/p95 directions fail.
+No physical-I/O, allocation/RSS, cold-cache, scaling, producer, or broader
+PPTX claim follows. See [change 0182](changes/0182-pptx-validation-catalog-graph-fusion.md)
+and its [machine-readable summary](results/pptx-validation-fusion-0182-summary.json).
+
 ## Latest retained XLS source-policy result (change 0181)
 
 The plan-only fixed-width numeric path now reuses the immutable snapshot's

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "change": "0182",
+  "control_binary_source_revision": "48122377c2cf43fa3a5e402d1f5409c495d37346",
+  "candidate_revision": "e11f06d2b85af4f147bbd36f517847b025eeb9b1",
+  "control_binary_sha256": "6d34aa99268c84b36b200cdf09e8041c67b22a5f885c8ebd211490477deac17c",
+  "candidate_binary_sha256": "cf89cac1954e1756da9ae58f50094da1735d3fd0d6a7ce096bdb742595ce8b90",
+  "artifacts": [
+    {
+      "path": "pptx-validation-fusion-0182-a1.json.zst",
+      "bytes": 5820,
+      "sha256": "60ccc1d45fcaef99ab6363406ebe6d3c9b953f17996bb8b92a637c2fb1e715a7",
+      "uncompressed_bytes": 146411,
+      "uncompressed_sha256": "868d455c014a477e350029e9e6a1eaec160c8f1bec7d11a4a0f7af10f62a763f"
+    },
+    {
+      "path": "pptx-validation-fusion-0182-b1.json.zst",
+      "bytes": 5858,
+      "sha256": "70f181651cbc3ce67f44354294db643c6372564dcb774532e41cd82da20b3bd6",
+      "uncompressed_bytes": 146421,
+      "uncompressed_sha256": "f308b2e45b63c72ceb4ade3df6d00f2953c2472a572f338f63191e854a2513e2"
+    },
+    {
+      "path": "pptx-validation-fusion-0182-b2.json.zst",
+      "bytes": 5911,
+      "sha256": "fb2de24c9c87ea02e8fe5f0a17f35ae098596769e57ccf994fc5328a4aa23c1f",
+      "uncompressed_bytes": 146423,
+      "uncompressed_sha256": "29ae705788f8a1041ba3d8380abb044fc98ab9612553ec568594e1d683b53087"
+    },
+    {
+      "path": "pptx-validation-fusion-0182-a2.json.zst",
+      "bytes": 5902,
+      "sha256": "b6f05fe85e62f6abdd1f4f45c688e57ae4a7b930f2b4731d469dd6e6e6704032",
+      "uncompressed_bytes": 146413,
+      "uncompressed_sha256": "d78e5b125da235d5e6bf656d8aa04403c4000ab573903fe839e290a997f7ed18"
+    },
+    {
+      "path": "pptx-validation-fusion-0182-summary.json",
+      "bytes": 5906,
+      "sha256": "90d54efa48840869b830ddd4daf07846ecbeee3cc6b7754651bf482593869390"
+    }
+  ]
+}
