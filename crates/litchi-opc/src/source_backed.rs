@@ -2836,6 +2836,24 @@ impl SourceBackedPackage {
         self.write_part_overlays_to_stream(writer, vec![(partname.clone(), replacement)])
     }
 
+    /// Replace one existing ordinary Part with caller-owned shared bytes and
+    /// publish to a sequential stream.
+    ///
+    /// The [`Arc<Vec<u8>>`] is retained by the bounded publication plan until
+    /// the selected ZIP member has been regenerated. This permits a caller
+    /// that already owns a shared immutable payload to hand it over without
+    /// copying the payload bytes. The same source, limit, validation,
+    /// signature, cancellation, and sink semantics as
+    /// [`Self::write_part_overlay_to_stream`] apply.
+    pub fn write_part_overlay_shared_to_stream<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.write_part_overlays_shared_to_stream(writer, vec![(partname.clone(), replacement)])
+    }
+
     /// Replace one ordinary Part while removing a bounded set of external
     /// relationships owned by that Part.
     ///
@@ -3197,8 +3215,39 @@ impl SourceBackedPackage {
     pub fn write_part_overlays_to_stream<W: Write>(
         self,
         writer: W,
-        mut replacements: Vec<(PackURI, Vec<u8>)>,
+        replacements: Vec<(PackURI, Vec<u8>)>,
     ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, Arc::new)
+    }
+
+    /// Replace a bounded set of existing ordinary Parts with caller-owned
+    /// shared payloads and publish to a sequential stream.
+    ///
+    /// This is the shared-ownership counterpart to
+    /// [`Self::write_part_overlays_to_stream`]. Each [`Arc<Vec<u8>>`] is moved
+    /// into the opaque publication plan; no payload-byte copy is performed.
+    /// The replacement set is sorted and checked for duplicate Part URIs. Its
+    /// maximum size is 64. Part URIs, content types, relationships, the
+    /// package catalog, and physical member topology are immutable. Every
+    /// unselected ZIP member and every selected exact no-op member is
+    /// raw-copied.
+    pub fn write_part_overlays_shared_to_stream<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, std::convert::identity)
+    }
+
+    fn write_part_overlays_impl<W: Write, P, F>(
+        self,
+        writer: W,
+        mut replacements: Vec<(PackURI, P)>,
+        mut into_shared: F,
+    ) -> Result<()>
+    where
+        F: FnMut(P) -> Arc<Vec<u8>>,
+    {
         if replacements.len() > MAX_SOURCE_OVERLAY_PARTS {
             return Err(overlay_unavailable(format!(
                 "replacement set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
@@ -3227,7 +3276,7 @@ impl SourceBackedPackage {
                 .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
             overlays.push(PendingOverlay {
                 target,
-                replacement: Arc::new(replacement),
+                replacement: into_shared(replacement),
             });
         }
         self.validate_overlay_limits(
@@ -7332,6 +7381,155 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn shared_single_overlay_matches_vec_changed_and_signed_noop_publication() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut vec_output = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+            .unwrap()
+            .write_part_overlay_to_stream(&mut vec_output, &target, b"<after/>".to_vec())
+            .unwrap();
+        let mut shared_output = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes)))
+            .unwrap()
+            .write_part_overlay_shared_to_stream(
+                &mut shared_output,
+                &target,
+                Arc::new(b"<after/>".to_vec()),
+            )
+            .unwrap();
+        assert_eq!(shared_output, vec_output);
+
+        let signed_bytes = signed_archive(b"<signed/>");
+        let signed_target = PackURI::new("/word/document.xml").unwrap();
+        let mut vec_noop = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(signed_bytes.clone())))
+            .unwrap()
+            .write_part_overlay_to_stream(&mut vec_noop, &signed_target, b"<signed/>".to_vec())
+            .unwrap();
+        let mut shared_noop = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(signed_bytes.clone())))
+            .unwrap()
+            .write_part_overlay_shared_to_stream(
+                &mut shared_noop,
+                &signed_target,
+                Arc::new(b"<signed/>".to_vec()),
+            )
+            .unwrap();
+        assert_eq!(vec_noop, signed_bytes);
+        assert_eq!(shared_noop, vec_noop);
+    }
+
+    #[test]
+    fn shared_multi_overlay_matches_vec_and_reopens() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+        let mut vec_output = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+            .unwrap()
+            .write_part_overlays_to_stream(
+                &mut vec_output,
+                vec![
+                    (orphan.clone(), b"<orphan-after/>".to_vec()),
+                    (document.clone(), b"<document-after/>".to_vec()),
+                ],
+            )
+            .unwrap();
+
+        let mut shared_output = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes)))
+            .unwrap()
+            .write_part_overlays_shared_to_stream(
+                &mut shared_output,
+                vec![
+                    (orphan.clone(), Arc::new(b"<orphan-after/>".to_vec())),
+                    (document.clone(), Arc::new(b"<document-after/>".to_vec())),
+                ],
+            )
+            .unwrap();
+        assert_eq!(shared_output, vec_output);
+        let reopened = OpcPackage::from_bytes(&shared_output).unwrap();
+        assert_eq!(
+            reopened.get_part(&document).unwrap().blob(),
+            b"<document-after/>"
+        );
+        assert_eq!(
+            reopened.get_part(&orphan).unwrap().blob(),
+            b"<orphan-after/>"
+        );
+    }
+
+    #[test]
+    fn shared_overlay_preserves_duplicate_and_limit_refusals_before_output() {
+        let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_part_overlays_shared_to_stream(
+                &mut output,
+                vec![
+                    (document.clone(), Arc::new(b"<first/>".to_vec())),
+                    (document.clone(), Arc::new(b"<second/>".to_vec())),
+                ],
+            ),
+            Err(OpcError::DuplicatePartName(_))
+        ));
+        assert!(output.is_empty());
+
+        let limits = ReadLimits::builder()
+            .max_part_bytes(10)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(
+            Arc::new(CountingSource::new(source_bytes)),
+            limits,
+        )
+        .unwrap();
+        assert!(matches!(
+            package.write_part_overlay_shared_to_stream(
+                &mut output,
+                &document,
+                Arc::new(vec![b'x'; 11]),
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                actual: 11,
+                maximum: 10,
+            })
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn shared_overlay_reports_partial_sink_failure_with_bounded_writes() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let mut sink = BoundedFailingSink {
+            accepted: 0,
+            limit: 100,
+            largest_write: 0,
+        };
+        let error = package
+            .write_part_overlay_shared_to_stream(&mut sink, &target, Arc::new(b"<after/>".to_vec()))
+            .unwrap_err();
+        match error {
+            OpcError::IncompleteOutput { written, .. } => assert_eq!(written, 100),
+            other => panic!("unexpected sink error: {other:?}"),
+        }
+        assert!(sink.largest_write <= SOURCE_PUBLICATION_CHUNK_BYTES);
     }
 
     #[test]

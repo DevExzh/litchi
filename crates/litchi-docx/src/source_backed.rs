@@ -565,22 +565,21 @@ impl Package {
                 current.snapshot.variables(),
             )?;
         }
-        let target_xml = target.shared_xml();
-        let mut replacement = Vec::new();
-        replacement
-            .try_reserve_exact(target_xml.len())
-            .map_err(|source| Error::Allocation {
-                resource: "source-backed document-variable replacement",
-                source,
-            })?;
-        replacement.extend_from_slice(target_xml.as_slice());
         let original_artifact = self.package.source_artifact();
         let mut output = FingerprintingWriter {
             inner: writer,
             hasher: Sha256::new(),
         };
-        self.package
-            .write_part_overlay_to_stream(&mut output, &current.partname, replacement)?;
+        if commit.patch().is_empty() {
+            self.package
+                .write_part_overlays_shared_to_stream(&mut output, Vec::new())?;
+        } else {
+            self.package.write_part_overlay_shared_to_stream(
+                &mut output,
+                &current.partname,
+                target.shared_xml(),
+            )?;
+        }
         let published_artifact =
             SourceArtifactFingerprint::from_sha256(output.hasher.finalize().into());
         Ok(DocumentVariablesPublication {
@@ -786,9 +785,15 @@ impl Package {
             }
             .into());
         }
-        self.package
-            .write_part_overlay_to_stream(writer, &main, target.xml_bytes().to_vec())
-            .map_err(Error::from)?;
+        if commit.patch().operations().is_empty() {
+            self.package
+                .write_part_overlays_shared_to_stream(writer, Vec::new())
+                .map_err(Error::from)?;
+        } else {
+            self.package
+                .write_part_overlay_shared_to_stream(writer, &main, target.shared_xml())
+                .map_err(Error::from)?;
+        }
         Ok(target)
     }
 
@@ -819,8 +824,13 @@ impl Package {
         let current =
             self.external_hyperlink_sanitization_snapshot_with_limits(commit.patch().limits())?;
         let target = commit.patch().apply(&current)?;
-        self.package
-            .write_part_overlay_to_stream(writer, &main, target.xml_bytes().to_vec())?;
+        if commit.patch().is_noop() {
+            self.package
+                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
+        } else {
+            self.package
+                .write_part_overlay_shared_to_stream(writer, &main, target.shared_xml())?;
+        }
         Ok(target)
     }
 

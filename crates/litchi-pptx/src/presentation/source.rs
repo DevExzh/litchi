@@ -171,6 +171,22 @@ impl SourcePayload {
             Self::Edited(data) => data.as_slice(),
         }
     }
+
+    /// Return the edit-owned payload allocation when this value is a changed
+    /// candidate. Original source payloads intentionally do not escape their
+    /// [`PartData`] handle: managed packages attach the caller's reservation
+    /// to that handle and must be published through the empty-overlay exact
+    /// source path for semantic no-ops.
+    fn edited_bytes(&self) -> Option<Arc<Vec<u8>>> {
+        match self {
+            Self::Original(_) => None,
+            Self::Edited(data) => Some(Arc::clone(data)),
+        }
+    }
+
+    fn is_edited(&self) -> bool {
+        matches!(self, Self::Edited(_))
+    }
 }
 
 fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
@@ -1093,11 +1109,18 @@ impl SourceBackedPresentationEditor {
         )?;
         let target = commit.patch.apply(&current)?;
         self.package.check_execution()?;
-        self.package.write_part_overlay_to_stream(
-            writer,
-            &current.part_uri,
-            target.xml.as_bytes().to_vec(),
-        )?;
+        if let Some(replacement) = target.xml.edited_bytes() {
+            self.package.write_part_overlay_shared_to_stream(
+                writer,
+                &current.part_uri,
+                replacement,
+            )?;
+        } else {
+            // An exact semantic no-op must retain the managed source PartData
+            // reservation and use the byte-for-byte source publication path.
+            self.package
+                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
+        }
         Ok(target)
     }
 
@@ -1131,17 +1154,25 @@ impl SourceBackedPresentationEditor {
         let target = commit.patch.apply(&current)?;
         self.package.check_execution()?;
         let mut replacements = Vec::new();
-        replacements
-            .try_reserve_exact(target.slide_count())
-            .map_err(|source| Error::Allocation {
-                resource: "source-backed slide batch publication payloads",
-                source,
-            })?;
+        let changed_slides = target
+            .slides()
+            .filter(|slide| slide.xml.is_edited())
+            .count();
+        if changed_slides != 0 {
+            replacements
+                .try_reserve_exact(changed_slides)
+                .map_err(|source| Error::Allocation {
+                    resource: "source-backed slide batch publication payloads",
+                    source,
+                })?;
+        }
         for slide in target.slides() {
-            replacements.push((slide.part_uri.clone(), slide.xml.as_bytes().to_vec()));
+            if let Some(replacement) = slide.xml.edited_bytes() {
+                replacements.push((slide.part_uri.clone(), replacement));
+            }
         }
         self.package
-            .write_part_overlays_to_stream(writer, replacements)?;
+            .write_part_overlays_shared_to_stream(writer, replacements)?;
         Ok(target)
     }
 

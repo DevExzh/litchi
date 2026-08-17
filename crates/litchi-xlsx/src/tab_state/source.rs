@@ -169,19 +169,24 @@ impl SourceBackedEditor {
         } else {
             commit.patch().after().clone()
         };
+        if commit.patch().is_empty() {
+            self.package
+                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
+            return Ok(target);
+        }
         let mut overlays = Vec::new();
         overlays
             .try_reserve_exact(1 + target.touched().len())
             .map_err(|source| allocation("tab-state source overlay plan", source))?;
         overlays.push((
             target.workbook_part_name().clone(),
-            target.workbook_xml().to_vec(),
+            target.workbook_source_arc()?,
         ));
         for part in target.touched() {
-            overlays.push((part.part.uri.clone(), part.part.bytes.as_bytes().to_vec()));
+            overlays.push((part.part.uri.clone(), part.part.bytes.detached_arc()?));
         }
         self.package
-            .write_part_overlays_to_stream(writer, overlays)?;
+            .write_part_overlays_shared_to_stream(writer, overlays)?;
         Ok(target)
     }
 }

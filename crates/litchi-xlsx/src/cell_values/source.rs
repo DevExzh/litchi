@@ -514,7 +514,12 @@ impl SourceBackedEditor {
         } else {
             patch.after().clone()
         };
-        self.write_snapshot_overlay_to_stream(writer, &target)?;
+        if patch.is_empty() {
+            self.package
+                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
+        } else {
+            self.write_snapshot_overlay_to_stream(writer, &target)?;
+        }
         Ok(target)
     }
 
@@ -524,10 +529,11 @@ impl SourceBackedEditor {
         target: &Snapshot,
     ) -> Result<()> {
         self.package.check_execution()?;
-        self.package.write_part_overlay_to_stream(
+        let replacement = target.source_arc()?;
+        self.package.write_part_overlay_shared_to_stream(
             writer,
             target.worksheet_part_name(),
-            target.source_xml().to_vec(),
+            replacement,
         )?;
         Ok(())
     }
@@ -577,20 +583,24 @@ impl SourceBackedEditor {
         } else {
             commit.patch().after().clone()
         };
-        let replacements = target
-            .sheets()
-            .iter()
-            .zip(before.sheets())
-            .filter(|(after, before)| after.source_xml() != before.source_xml())
-            .map(|(snapshot, _)| {
-                (
-                    snapshot.worksheet_part_name().clone(),
-                    snapshot.source_xml().to_vec(),
-                )
-            })
-            .collect();
+        let replacements = if commit.patch().is_empty() {
+            Vec::new()
+        } else {
+            target
+                .sheets()
+                .iter()
+                .zip(before.sheets())
+                .filter(|(after, before)| after.source_xml() != before.source_xml())
+                .map(|(snapshot, _)| {
+                    Ok((
+                        snapshot.worksheet_part_name().clone(),
+                        snapshot.source_arc()?,
+                    ))
+                })
+                .collect::<Result<Vec<_>>>()?
+        };
         self.package
-            .write_part_overlays_to_stream(writer, replacements)?;
+            .write_part_overlays_shared_to_stream(writer, replacements)?;
         Ok(target)
     }
 }
