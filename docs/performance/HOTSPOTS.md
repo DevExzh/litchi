@@ -1118,6 +1118,23 @@ for both families (plus Number p99). RK/MulRK publication p99, atomic-save,
 resource, physical-I/O, cold-cache and producer claims remain open. See
 [`0172`](changes/0172-cfb-owned-numeric-publication.md).
 
+Change 0173 closes the same duplicated validation/publication work for native
+XLS existing comments. The format owner validates the exact composed candidate
+inside the planner's final fingerprint bracket, and immutable `Arc<[u8]>`
+provenance removes direct `write_to`'s two outer mutation preflights. On the
+16,995,840-byte corpus this eliminates three complete scans, 50,987,520
+logical bytes, 51 one-MiB reads, and three source/target digest pairs per
+effective transaction. Emission hashing, generic-source mutation defenses,
+and atomic-save fences remain.
+
+Clean 20-warmup/500-sample release ABBA accepts 45.54%-47.19% lower scalar
+complete p50/mean/p99, 30.78%-32.42% lower scalar semantic staging/plan,
+59.15%-61.03% lower scalar direct publication, and 30.53%-32.57% lower batch
+semantic staging/plan. Scalar complete p95 and batch total/publication remain
+withheld for drift/guard instability; resource, physical-I/O, cold-cache and
+producer claims remain open. See
+[`0173`](changes/0173-cfb-comment-publication-fusion.md).
+
 The source-backed XLS worksheet-visibility overlay landed in committed
 production change `bac279116`. Change `0091` adds four opt-in eager/source-backed
 scalar and bounded-batch selectors for one-owner and 64-owner visibility edits.

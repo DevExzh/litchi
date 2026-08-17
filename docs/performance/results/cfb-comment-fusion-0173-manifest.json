@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "change": "0173-cfb-comment-publication-fusion",
+  "self_excluding": true,
+  "artifact_count": 6,
+  "artifacts": [
+    {
+      "path": "cfb-comment-fusion-0173-a1.json.gz",
+      "bytes": 35595,
+      "sha256": "fcc879468ac48968b0d9e604e4dca26d8aa2d66975772227350efb2b5e2b75f4",
+      "uncompressed_bytes": 679020,
+      "uncompressed_sha256": "c57fb9f0b16c4fceab2c3aa76cecb6b88d719882401767ec3117a98bb557bddf"
+    },
+    {
+      "path": "cfb-comment-fusion-0173-a2.json.gz",
+      "bytes": 35596,
+      "sha256": "7a1ad17673c3993b7e2417d381febdbedbbc759606a5c5c3d8d772956603c7c2",
+      "uncompressed_bytes": 679041,
+      "uncompressed_sha256": "0c3a53ab11380d85283b3f26ea1aa1cce15793cbeb5b9c6ec7cc8cbb5fcac2f7"
+    },
+    {
+      "path": "cfb-comment-fusion-0173-b1.json.gz",
+      "bytes": 35110,
+      "sha256": "846aa85b4e38a3e1722e4185afb1e16050eca53d1b722ed4818c84953dfa6b6f",
+      "uncompressed_bytes": 679022,
+      "uncompressed_sha256": "6e195f2fbd692734ef37545d87f50719b993830c924d05602f5a3d64e7eeaa47"
+    },
+    {
+      "path": "cfb-comment-fusion-0173-b2.json.gz",
+      "bytes": 35221,
+      "sha256": "fd8c0e6820ac722c1aabdf2d2d9913fc0b61fcf6ff503d337336cdfdfdfe64f8",
+      "uncompressed_bytes": 679115,
+      "uncompressed_sha256": "b72b9ed87f52b152a5793b35a9bfb4344671af54130ec803ab7fe17518b412b4"
+    },
+    {
+      "path": "cfb-comment-fusion-0173-semantic.json",
+      "bytes": 9475,
+      "sha256": "0d59a6b5d8facc9859bfbed875ff52015f0c66481e14c955570fdf122ee5fc8f"
+    },
+    {
+      "path": "cfb-comment-fusion-0173-summary.json",
+      "bytes": 6951,
+      "sha256": "47e1991913b6bdecdd8c6d873916a84a92c7aca040bd83f4b01141bf45797239"
+    }
+  ]
+}
