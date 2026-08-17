@@ -26,6 +26,7 @@ use crate::worksheet::{Cell, CellChange, CellValue, Merge, Selector, Sheet, vali
 pub struct SourceCellSnapshot<'source> {
     owner: &'source SourceBackedSpreadsheet,
     content_xml: Arc<str>,
+    content_proof: Option<litchi_odf_common::core::SourceContentProof>,
     sheets: Arc<[Sheet]>,
     source_version: SourceVersion,
 }
@@ -148,6 +149,7 @@ impl SourceBackedSpreadsheet {
         let snapshot = SourceCellSnapshot {
             owner: self,
             content_xml: Arc::clone(&self.content_xml),
+            content_proof: Some(self.content_proof.clone()),
             sheets: Arc::clone(&self.sheets),
             source_version: self.source_version,
         };
@@ -362,9 +364,10 @@ impl<'source> SourceCellEdit<'source> {
         self.before.check_source()?;
         if self.touched.is_empty() {
             let snapshot = self.before.clone();
+            let before = self.before;
             return Ok(SourceCellCommit {
                 patch: SourceCellPatch {
-                    before: self.before,
+                    before,
                     after: snapshot.clone(),
                 },
                 snapshot,
@@ -412,14 +415,17 @@ impl<'source> SourceCellEdit<'source> {
             ));
         }
         self.before.check_source()?;
+        let owner = self.before.owner;
         let snapshot = SourceCellSnapshot {
-            owner: self.before.owner,
+            owner,
             content_xml: Arc::from(content_xml),
+            content_proof: None,
             sheets: Arc::from(parsed),
             source_version: self.before.source_version,
         };
+        let before = self.before;
         let patch = SourceCellPatch {
-            before: self.before,
+            before,
             after: snapshot.clone(),
         };
         Ok(SourceCellCommit {
@@ -527,16 +533,22 @@ impl<'source> SourceCellCommit<'source> {
                 },
                 other => SourceContentPublicationError::Core(other),
             })?;
-        let content = self
-            .patch
-            .before
-            .owner
-            .package
-            .write_content_xml_to_stream_with_options(
+        let package = &self.patch.before.owner.package;
+        let content = if let Some(proof) = self.patch.before.content_proof.as_ref() {
+            package.write_content_xml_to_stream_with_known_source_content(
+                writer,
+                self.patch.before.content_xml.as_bytes(),
+                proof,
+                self.snapshot.content_xml.as_bytes(),
+                options,
+            )?
+        } else {
+            package.write_content_xml_to_stream_with_options(
                 writer,
                 self.snapshot.content_xml.as_bytes(),
                 options,
-            )?;
+            )?
+        };
         Ok(SourceCellPublicationReport {
             changed_cells: self.changed_cells,
             content,

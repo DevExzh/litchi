@@ -26,7 +26,9 @@ pub mod signature;
 pub mod style;
 pub mod validation;
 
-pub use core::{OwnedPackage, PreparedPackage, SourceBackedPackage, SourcePackageLimits};
+pub use core::{
+    OwnedPackage, PreparedPackage, SourceBackedPackage, SourceContentProof, SourcePackageLimits,
+};
 pub use core::{
     SourceContentPublicationError, SourceContentPublicationOptions,
     SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,

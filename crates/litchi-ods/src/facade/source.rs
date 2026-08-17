@@ -18,7 +18,7 @@ use std::{
 use litchi_core::FileSource;
 use litchi_core::{Error, Metadata, ReadAt, Result, SourceVersion};
 use litchi_odf_common::{
-    core::{SourceBackedPackage, SourcePackageLimits, validate_content_part},
+    core::{SourceBackedPackage, SourceContentProof, SourcePackageLimits, validate_content_part},
     package::{is_media_path, resolve_package_path},
 };
 #[cfg(any(unix, windows))]
@@ -55,6 +55,7 @@ pub struct SourceBackedSpreadsheet {
     source: Arc<dyn ReadAt>,
     pub(super) source_version: SourceVersion,
     pub(super) content_xml: Arc<str>,
+    pub(super) content_proof: SourceContentProof,
     pub(super) styles_xml: Option<Arc<str>>,
     definitions: Vec<Definition>,
     pub(super) sheets: Arc<[Sheet]>,
@@ -198,10 +199,10 @@ impl SourceBackedSpreadsheet {
                 )));
             }
 
-            let content_xml =
-                String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
-                    Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
-                })?;
+            let (content_bytes, content_proof) = package.get_content_xml_with_source_proof()?;
+            let content_xml = String::from_utf8(content_bytes).map_err(|error| {
+                Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+            })?;
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
             crate::authoring::validate_content_xml(&content_xml)?;
             let styles_xml = if package.has_file("styles.xml")? {
@@ -235,6 +236,7 @@ impl SourceBackedSpreadsheet {
             let sheets = crate::worksheet::codec::parse(&content_xml)?;
             Ok((
                 content_xml,
+                content_proof,
                 styles_xml,
                 definitions,
                 sheets,
@@ -242,7 +244,7 @@ impl SourceBackedSpreadsheet {
                 settings,
             ))
         })();
-        let (content_xml, styles_xml, definitions, sheets, metadata, settings) =
+        let (content_xml, content_proof, styles_xml, definitions, sheets, metadata, settings) =
             prefer_current(source.as_ref(), source_version, parsed)?;
 
         Ok(Self {
@@ -250,6 +252,7 @@ impl SourceBackedSpreadsheet {
             source,
             source_version,
             content_xml: Arc::from(content_xml),
+            content_proof,
             styles_xml: styles_xml.map(Arc::from),
             definitions,
             sheets: Arc::from(sheets),
