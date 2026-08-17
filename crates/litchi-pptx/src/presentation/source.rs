@@ -3893,15 +3893,20 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn filesystem_path_replacement_reports_source_change_without_retargeting() {
+    fn filesystem_path_replacement_does_not_retarget_and_pinned_change_is_detected() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("source.pptx");
+        let pinned = directory.path().join("pinned-source.pptx");
         let replacement = directory.path().join("replacement.pptx");
         fs::write(&path, source_backed_pptx()).unwrap();
+        fs::hard_link(&path, &pinned).unwrap();
         let presentation = SourceBackedPresentation::from_path(&path).unwrap();
         let first_slide = presentation.slide(0).unwrap();
         fs::write(&replacement, b"not a PPTX").unwrap();
         fs::rename(&replacement, &path).unwrap();
+        let mut changed_pinned_source = source_backed_pptx();
+        changed_pinned_source.extend_from_slice(b"changed pinned source");
+        fs::write(&pinned, changed_pinned_source).unwrap();
 
         assert!(matches!(
             first_slide.text(),
