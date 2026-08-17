@@ -4,7 +4,8 @@ use super::codec::capture_conditional_formatting;
 use super::*;
 
 use crate::color::Rgb;
-use litchi_opc::PackURI;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, TargetMode};
 
 use std::mem::size_of;
 
@@ -28,6 +29,106 @@ fn fixture(relative: &str, sheet: u32) -> (Vec<Differential>, Vec<Formatting>) {
             panic!("failed to parse conditional formatting in {relative}: {error}")
         });
     (differential_formats, values)
+}
+
+#[test]
+fn rewrite_readback_is_reused_and_public_noop_remains_exact() {
+    let source = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1"><formula>A1&gt;0</formula></cfRule></conditionalFormatting><hyperlinks/></worksheet>"#;
+    let before = parse_conditional_formattings(source, 0).unwrap();
+
+    package::reset_readback_parse_count();
+    let (rewritten, readback) =
+        package::replace_conditional_formattings_with_readback(source, &[], 0).unwrap();
+    assert!(readback.is_empty());
+    assert_eq!(
+        parse_conditional_formattings(&rewritten, 0).unwrap(),
+        readback
+    );
+    assert_eq!(package::readback_parse_count(), 1);
+
+    package::reset_readback_parse_count();
+    assert_eq!(
+        replace_conditional_formattings(source, &before, 0).unwrap(),
+        source
+    );
+    assert_eq!(package::readback_parse_count(), 0);
+
+    package::reset_readback_parse_count();
+    assert_eq!(
+        replace_conditional_formattings(source, &[], 0).unwrap(),
+        rewritten
+    );
+    assert_eq!(package::readback_parse_count(), 1);
+}
+
+fn owned_package_with_conditional_formatting() -> OpcPackage {
+    let mut package = OpcPackage::new();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/workbook.xml").unwrap(),
+            ct::SML_SHEET_MAIN.to_owned(),
+            br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/></sheets></workbook>"#.to_vec(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+            ct::SML_WORKSHEET.to_owned(),
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1"><formula>A1&gt;0</formula></cfRule></conditionalFormatting></worksheet>"#.to_vec(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/styles.xml").unwrap(),
+            ct::SML_STYLES.to_owned(),
+            br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dxfs count="0"/></styleSheet>"#.to_vec(),
+        )))
+        .unwrap();
+    let workbook = package
+        .get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap();
+    workbook
+        .rels_mut()
+        .try_add_relationship(
+            rt::WORKSHEET.to_owned(),
+            "worksheets/sheet1.xml".to_owned(),
+            "rIdSheet".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    workbook
+        .rels_mut()
+        .try_add_relationship(
+            rt::STYLES.to_owned(),
+            "styles.xml".to_owned(),
+            "rIdStyles".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+    package
+}
+
+#[test]
+fn source_edit_commit_reuses_one_rewrite_readback_and_noop_reuses_none() {
+    let package = owned_package_with_conditional_formatting();
+    let before = Snapshot::load(&package, "Sheet1").unwrap();
+    let mut edit = SourceEdit::from_snapshot_for_test(before);
+    assert!(edit.clear());
+
+    package::reset_readback_parse_count();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert!(commit.snapshot().collections().is_empty());
+    assert_eq!(package::readback_parse_count(), 1);
+
+    let package = owned_package_with_conditional_formatting();
+    let before = Snapshot::load(&package, "Sheet1").unwrap();
+    let edit = SourceEdit::from_snapshot_for_test(before);
+    package::reset_readback_parse_count();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.changed());
+    assert_eq!(package::readback_parse_count(), 0);
 }
 
 #[test]
