@@ -327,8 +327,14 @@ fn changed_edit_reopens_and_changes_only_the_selected_logical_part() {
     let source: Arc<dyn ReadAt> = Arc::new(VersionedSource::new(source_bytes.clone()));
     let editor = SourceBackedPresentationEditor::from_read_at(source).unwrap();
     assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    assert_eq!(editor.cache_diagnostics().hits, 0);
     let commit = edit_commit(&editor);
     assert_eq!(editor.cache_diagnostics().successful_loads, 2);
+    assert_eq!(
+        editor.cache_diagnostics().hits,
+        0,
+        "capturing a slide must reuse the validated presentation catalog"
+    );
     let mut output = Vec::new();
     editor
         .publish_slide_commit_to_stream(&mut output, &commit)
@@ -382,6 +388,7 @@ fn multi_slide_batch_is_atomic_sorted_and_raw_copies_unselected_members() {
     )))
     .unwrap();
     assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    assert_eq!(editor.cache_diagnostics().hits, 0);
     let mut edit = editor.edit_slides();
     assert_eq!(
         edit.set_shape_texts(2, &[ShapeTextReplacement::named("Title", "after-2")])
@@ -406,6 +413,11 @@ fn multi_slide_batch_is_atomic_sorted_and_raw_copies_unselected_members() {
     let replayed = commit.patch().apply(commit.patch().source()).unwrap();
     assert!(commit.patch().inverse().apply(&replayed).is_ok());
     assert_eq!(editor.cache_diagnostics().successful_loads, 3);
+    assert_eq!(
+        editor.cache_diagnostics().hits,
+        0,
+        "multi-slide capture must not reload the retained presentation root"
+    );
 
     let mut output = Vec::new();
     let published = editor

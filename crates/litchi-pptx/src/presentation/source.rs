@@ -9,6 +9,9 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
+#[cfg(test)]
+use std::cell::Cell;
+
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{ExecutionContext, ExecutionError, ReadAt, SourceVersion};
@@ -24,6 +27,21 @@ use quick_xml::reader::NsReader;
 use crate::parts::{PresentationPart, SlidePart, SlideReference};
 use crate::shape::{Bounds, Shape};
 use crate::{Error, Result};
+
+#[cfg(test)]
+thread_local! {
+    static SOURCE_CATALOG_BUILDS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+fn reset_source_catalog_builds() {
+    SOURCE_CATALOG_BUILDS.set(0);
+}
+
+#[cfg(test)]
+fn source_catalog_builds() -> usize {
+    SOURCE_CATALOG_BUILDS.get()
+}
 
 /// Maximum number of existing slides in one source-backed batch edit.
 pub const MAX_SOURCE_BACKED_SLIDE_BATCH: usize = 32;
@@ -355,8 +373,14 @@ impl SourceImage {
 /// It supports no package topology or relationship changes.
 pub struct SourceBackedPresentationEditor {
     pub(super) package: SourceBackedPackage,
+    // Retain the catalog validated at open so each selected slide does not
+    // reparse the immutable presentation root and rebuild the complete slide
+    // graph. Snapshot capture still checks execution, the selected Part, and
+    // the exact source version before publishing anything.
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
+    package_relationships: Box<[RelationshipBinding]>,
+    presentation_binding: PartBinding,
     pub(super) limits: ReadLimits,
 }
 
@@ -999,6 +1023,8 @@ impl SourceBackedPresentationEditor {
             package,
             _presentation: catalog.presentation,
             slides: catalog.slides,
+            package_relationships: catalog.package_relationships,
+            presentation_binding: catalog.presentation_binding,
             limits,
         })
     }
@@ -1086,7 +1112,6 @@ impl SourceBackedPresentationEditor {
         commit: &SourceBackedSlideBatchCommit,
     ) -> Result<SourceBackedSlideBatchSnapshot> {
         self.package.check_execution()?;
-        let catalog = source_catalog(&self.package)?;
         let mut slides = Vec::new();
         slides
             .try_reserve_exact(commit.patch.source().slide_count())
@@ -1095,8 +1120,7 @@ impl SourceBackedPresentationEditor {
                 source,
             })?;
         for source in commit.patch.source().slides() {
-            slides.push(self.slide_snapshot_from_catalog(
-                &catalog,
+            slides.push(self.slide_snapshot_from_retained_catalog(
                 source.position,
                 "publish_slide_batch_commit_to_stream",
             )?);
@@ -1127,25 +1151,23 @@ impl SourceBackedPresentationEditor {
         operation: &'static str,
     ) -> Result<SourceBackedSlideSnapshot> {
         self.package.check_execution()?;
-        let catalog = source_catalog(&self.package)?;
-        let snapshot = self.slide_snapshot_from_catalog(&catalog, position, operation)?;
+        let snapshot = self.slide_snapshot_from_retained_catalog(position, operation)?;
         self.package.check_execution()?;
         Ok(snapshot)
     }
 
-    fn slide_snapshot_from_catalog(
+    fn slide_snapshot_from_retained_catalog(
         &self,
-        catalog: &SourceCatalog,
         position: usize,
         operation: &'static str,
     ) -> Result<SourceBackedSlideSnapshot> {
         self.package.check_execution()?;
-        let data = catalog
+        let data = self
             .slides
             .get(position)
             .ok_or(Error::SlideIndexOutOfBounds {
                 index: position,
-                len: catalog.slides.len(),
+                len: self.slides.len(),
             })?;
         let view = self.package.part(&data.part_uri)?;
         let raw = view.data()?;
@@ -1168,9 +1190,9 @@ impl SourceBackedPresentationEditor {
             part_uri: data.part_uri.clone(),
             xml: SourcePayload::Original(raw),
             closure: SlideClosure {
-                package_relationships: catalog.package_relationships.clone(),
-                presentation: catalog.presentation_binding.clone(),
-                presentation_xml: catalog.presentation.data.clone(),
+                package_relationships: self.package_relationships.clone(),
+                presentation: self.presentation_binding.clone(),
+                presentation_xml: self._presentation.data.clone(),
                 slide: data.binding.clone(),
             },
             max_output_bytes: source_slide_output_limit(self.limits),
@@ -2398,6 +2420,8 @@ fn source_slide_output_limit(limits: ReadLimits) -> usize {
 }
 
 fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
+    #[cfg(test)]
+    SOURCE_CATALOG_BUILDS.set(SOURCE_CATALOG_BUILDS.get() + 1);
     package.check_execution()?;
     let view = package.main_document_part()?;
     let presentation = SourcePart::from_view(&view, view.data()?);
@@ -2459,7 +2483,10 @@ mod tests {
     #[cfg(any(unix, windows))]
     use tempfile::NamedTempFile;
 
-    use super::{SourceBackedPresentation, SourceBackedPresentationEditor, SourceImageTarget};
+    use super::{
+        SourceBackedPresentation, SourceBackedPresentationEditor, SourceImageTarget,
+        reset_source_catalog_builds, source_catalog_builds,
+    };
     use crate::Error;
 
     const SECOND_MARKER: &[u8] = b"source-backed-unrequested-second-slide";
@@ -2972,6 +2999,29 @@ mod tests {
         assert_eq!(output, archive);
         drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn editor_reuses_one_catalog_across_capture_and_publication() {
+        reset_source_catalog_builds();
+        let archive = source_backed_pptx();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            archive.clone(),
+        )))
+        .unwrap();
+        assert_eq!(source_catalog_builds(), 1);
+
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(!edit.clear_transition().unwrap());
+        let commit = edit.commit();
+        assert_eq!(source_catalog_builds(), 1);
+
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_eq!(source_catalog_builds(), 1);
+        assert_eq!(output, archive);
     }
 
     #[test]
