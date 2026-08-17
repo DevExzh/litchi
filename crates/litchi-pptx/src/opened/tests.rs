@@ -412,7 +412,7 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
     let destination_snapshot = mismatched_destination.opened_presentation()?;
     let layout = destination_snapshot
         .slides()
-        .get(0)
+        .first()
         .ok_or_else(|| Error::Invalid("missing test destination slide".into()))?;
     let layout_relationship = mismatched_destination
         .opc
@@ -969,7 +969,7 @@ fn rename_slide(package: &mut Package, index: usize, name: &str) -> Result<()> {
         .slides()
         .get(index)
         .cloned()
-        .ok_or_else(|| Error::SlideIndexOutOfBounds { index, len: index })?;
+        .ok_or(Error::SlideIndexOutOfBounds { index, len: index })?;
     let part_name = slide.part_name().clone();
     let xml = std::str::from_utf8(package.opc.get_part(&part_name)?.blob())
         .map_err(|error| Error::Xml(format!("slide XML is not UTF-8: {error}")))?;
