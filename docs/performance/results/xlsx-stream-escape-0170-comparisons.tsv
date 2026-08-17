@@ -1,0 +1,13 @@
+shape	comparison	p50_pct	mean_pct	p95_pct	p99_pct	classification
+tiny	a1_to_b1_reduction	7.737216	9.381876	16.912890	21.992758	p50_only
+tiny	b2_to_a2_reduction	5.025153	-3.145511	-17.598461	-4.288528	p50_only
+tiny	control_a1_to_a2_drift	-1.250102	-2.186368	-9.684952	-11.815126	within_tiered_gate
+tiny	candidate_b1_to_b2_drift	1.652649	11.335753	27.828620	17.895088	p50_within_gate_only
+medium	a1_to_b1_reduction	5.516514	5.057202	4.676902	-4.733631	p50_mean_p95_only
+medium	b2_to_a2_reduction	5.031389	4.641093	4.453641	2.360226	p50_mean_p95_only
+medium	control_a1_to_a2_drift	-0.394637	-0.561502	-0.276054	-3.219318	within_tiered_gate
+medium	candidate_b1_to_b2_drift	0.116787	-0.125689	-0.042486	-9.774504	within_tiered_gate
+large	a1_to_b1_reduction	5.663150	5.957557	6.985530	6.520584	accepted_all_statistics
+large	b2_to_a2_reduction	5.022612	5.187959	5.098823	6.628196	accepted_all_statistics
+large	control_a1_to_a2_drift	-0.556217	-0.888343	-2.900972	-2.245129	within_tiered_gate
+large	candidate_b1_to_b2_drift	0.118996	-0.077261	-0.931414	-2.357663	within_tiered_gate

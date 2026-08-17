@@ -340,6 +340,30 @@ shared-string/style/formula/date, real-producer, or broad `Budget` evidence.
 See the [summary](results/xlsx-stream-budget-charge-0169-summary.json) and
 [manifest](results/xlsx-stream-budget-charge-0169-manifest.json).
 
+## XLSX streaming UTF-8 escape runs (change 0170)
+
+[Change 0170](changes/0170-xlsx-streaming-escape-runs.md) batches contiguous
+ordinary UTF-8 between the five XML entities, skips scalar counting when byte
+length proves the finite character bound, and formats each row number once.
+The worksheet XML, ZIP write boundaries, archive bytes, limits, and public API
+remain unchanged.
+
+Clean CPU-2 release A/B/B/A used 20 warmups and 300 samples per shape. Large
+p50/mean/p95/p99 improve by 5.02%-6.99% in both paired directions. Medium
+p50/mean/p95 improve by 4.45%-5.52%, and tiny p50 by 5.03%/7.74%. Tiny
+mean/p95/p99 and medium p99 are withheld because paired directions disagree.
+Every accepted statistic passes its 5%/10%/15% same-implementation drift tier.
+Archive/worksheet hashes, semantic reopen, rows/cells, sink topology, zero
+retained output, and the 4 KiB authoring window remain exact.
+
+Matched whole-process large-shape counters record 6.15%-6.19% fewer
+instructions and 10.54%-10.57% fewer branches; branch misses regress
+8.99%-14.37%. GNU Time RSS differs by at most 380 KiB and the candidate is
+higher in both paired directions. These are descriptive process boundaries,
+not operation-local allocation, CPU, memory, physical-I/O, or cold-cache claims.
+See the [summary](results/xlsx-stream-escape-0170-summary.json) and
+[manifest](results/xlsx-stream-escape-0170-manifest.json).
+
 ## Managed XLSX source-editor production freeze (change 0151)
 
 [Change 0151](changes/0151-xlsx-managed-source-editors.md) freezes managed
@@ -458,7 +482,7 @@ See the [summary](results/pptx-additive-topology-abba-0158-summary.json) and
 | [Managed OPC source cache](changes/0086-opc-source-cache-budget-management.md) and [release contention](changes/0088-opc-source-cache-contention-evidence.md) | Managed source-backed OPC (`f8d417ac3`) charges exact physical `InputBytes`, cumulative declared cold-load `Work`, retained catalog/flight/payload `Objects`, and retained/in-flight payload `Memory` to hierarchical `Budget`; compatibility opens remain finite under unmanaged `SourceCacheLimits`; correctness tests cover resource charges, retained-resource releases, pinning, eviction, single-flight, cancellation, sibling competition and contention invariants | Release ABBA provides structural/distribution evidence only; no managed-versus-control speedup accepted. Allocation, peak-memory/RSS, hardware, copied/decompressed-byte, CPU-utilization and production-performance evidence remain missing |
 | XLSX source-provenance publication reuse | Matched scalar-cell source-backed p50 geomean **-21.66%/-22.65%** and p95 **-21.38%/-22.70%** across ABBA directions; exact output hashes | Removes the repeated semantic worksheet reload/reparse only; physical read/materialization counters are unchanged, and allocation/RSS/cold-I/O claims remain open |
 | Rejected generic XLSX publisher provenance reuse | Seven typed source-backed publishers: pooled p50 geomean **+1.04%**; individual pooled p50 **-1.52% to +3.84%**; whole-process allocation calls **-2.84%**; peak heap unchanged | Fully reverted by `a12387478`. The skipped reload usually hit retained cache state, source/materialization/sink/output evidence was unchanged, and the small allocation reduction did not justify the added snapshot/conflict complexity; see [change 0141](changes/0141-xlsx-source-provenance-negative-result.md) |
-| Bounded forward-only XLSX/RTF creation | RTF streaming p50 geomean **-76.41%/-76.47%**, p95 **-75.23%/-75.76%**; large sink calls **7,208,970 -> 1,441,802**. XLSX change 0169 accepts medium/large p50/mean/p95/p99 and tiny p50/mean/p95 reductions in both ABBA directions; matched whole-process Heaptrack descriptively records allocation calls **-48.81%** and temporary allocations **-69.77%**. Exact output hashes and bounded authoring windows remain | RTF claim is escape-free ASCII with a hard 32-byte request ceiling and unchanged 37-byte retained encoder state. XLSX claim is synthetic warm in-memory one-sheet inline-scalar creation; tiny p99 is withheld, RSS directions disagree, peak heap is flat, and total-memory/physical-I/O/cold-cache/richer authoring/producer claims remain pending |
+| Bounded forward-only XLSX/RTF creation | RTF streaming p50 geomean **-76.41%/-76.47%**, p95 **-75.23%/-75.76%**; large sink calls **7,208,970 -> 1,441,802**. XLSX change 0169 accepts hierarchical-budget improvements and descriptively records whole-process allocation calls **-48.81%**/temporary allocations **-69.77%**. Change 0170 additionally accepts large p50/mean/p95/p99 **-5.02% to -6.99%**, medium p50/mean/p95 **-4.45% to -5.52%**, and tiny p50 **-5.03%/-7.74%** from exact-output XML-run batching | RTF claim is escape-free ASCII with a hard 32-byte request ceiling and unchanged 37-byte retained encoder state. XLSX is synthetic warm in-memory one-sheet inline-scalar creation; change 0170 withholds tiny mean/tails and medium p99, branch misses regress, and total-memory/physical-I/O/cold-cache/richer authoring/producer claims remain pending |
 | Bounded semantic validation and ODF repair | DOCX, PPTX, RTF and XLS reports now complement CFB, OPC and ODF reports; one opt-in selector exercises ODF's typed non-destructive `mimetype` local-extra repair plan with exact forward/inverse and zero-retained-output sink evidence | Correctness-only, finite and fail-closed. Planning still performs a bounded full-candidate preflight, so no memory or latency claim is made; structural, encrypted, signed, macro and semantic repairs remain unsupported |
 | RTF logical-tail append | Two historical staging/commit/publication-timing cases plus four matched Commit/PublicationPlan controls cover tiny/medium/large append and exact no-op publication; the four new selectors use the pre-staged publication-call interval and a fixed 16 KiB non-seek counting sink, while separate planning/publication/reopen/lifecycle vectors and retained-byte fields are emitted. Planning/publication vectors are per-sample; reopen/lifecycle vectors are one-element preflight-only gates run outside the sample loop | Correctness/coverage only: candidate snapshot is not window-bounded, and no end-to-end, rich-format, release ABBA, allocation/RSS, physical-I/O, or speedup claim exists; see [changes 0090](changes/0090-rtf-logical-tail-append-evidence.md) and [0153](changes/0153-rtf-tail-publication-plan-evidence.md) |
 | DOCX/PPTX semantic selectors and edits | DOCX one paragraph **-4.72%** p50; PPTX 1% edit/save **-9.37%** p50 and mean; PPTX one-edit guardrail +0.28% p50 (neutral) | Generated text corpora; complete transaction capture dominates one edit; no ODF/iWork implication |

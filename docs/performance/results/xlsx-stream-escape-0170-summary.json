@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "change": "0170-xlsx-streaming-escape-runs",
+  "decision": {
+    "production_change": "retained; streaming text validates scalar/XML constraints in source order, appends contiguous ordinary UTF-8 runs between entity boundaries, skips scalar counting when byte length proves the character bound, and formats each row number once",
+    "latency_claim": "accepted for large complete XLSX streaming creation at p50, mean, p95, and p99; medium p50, mean, and p95; tiny p50 only",
+    "withheld_claims": "medium p99 and tiny mean/p95/p99 are withheld because paired directions disagree; no claim is made from the discarded post-build pilot",
+    "allocation_claim": "none; the changed loop writes into an already-reserved row scratch buffer and no operation-local allocator profile was captured",
+    "memory_claim": "no RSS or bounded-total-memory improvement claim; GNU Time RSS is descriptive whole-process evidence and the candidate is 380/12 KiB higher in the two paired directions",
+    "io_claim": "none; creation uses an in-memory non-seek hashing discard sink and does not measure physical or cold I/O"
+  },
+  "builds": {
+    "control": {
+      "revision": "c51bb95c8fb1daa206ae969b84541563db9d6266",
+      "binary_sha256": "ba2f2dfe1a534b694802b11b904087099671ff13ba60da41c19cd2ab4dfe30ea",
+      "binary_bytes": 43480656,
+      "worktree_clean": true
+    },
+    "candidate": {
+      "revision": "478bd9b2a05983ba7573e7c6454b23d5190d1f05",
+      "integrated_revision": "f2279b1210f68a5b8c58e8a8f4ff357540e54a60",
+      "candidate_and_integrated_diff_sha256": "0a78466cd51e7bda35cba505bb99450536e60b4ed94e71e69b15fbeccf210978",
+      "binary_sha256": "18e21f05192824478deb975c10aef59146419eba95053c575bb6b4097c2c84ac",
+      "binary_bytes": 43466256,
+      "worktree_clean": true
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "kernel": "Linux 6.8.0-101-generic",
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "execution_order": ["a1", "b1", "b2", "a2"],
+    "selector": "xlsx_streaming_create",
+    "shapes": ["tiny", "medium", "large"],
+    "warmups": 20,
+    "samples_per_leg_per_shape": 300,
+    "timing_scope": "writer construction, deterministic row text generation, row encoding, compression, ZIP finalization, and publication to the hashing discard sink",
+    "excluded_from_timing": "expected-artifact construction, complete Workbook reopen, semantic readback, sink construction, and final digest extraction",
+    "p50": "integer floor of the midpoint of the two central sorted values",
+    "p95_p99": "nearest rank",
+    "drift_gates_pct": {
+      "p50_and_mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    }
+  },
+  "validation": {
+    "all_records_clean_exact_revision_affinity": true,
+    "all_elapsed_vectors_length_300": true,
+    "all_artifacts_reopened_and_all_cells_verified_outside_timing": true,
+    "all_archive_and_worksheet_hashes_match_across_legs": true,
+    "all_sink_topology_and_counters_match_across_legs": true,
+    "canonical_semantic_projection": "xlsx-stream-escape-0170-semantic.json",
+    "semantic_projection_sha256": "ac45efd2aad893fa55321b94e79429ada9975deac9e061951194ef443fc47d4c",
+    "retained_output_bytes": 0,
+    "retained_authoring_window_bytes": 4096,
+    "same_implementation_drift_within_claimed_statistic_gates": true,
+    "large_direction_agrees_all_statistics_both_pairs": true,
+    "medium_direction_agrees_p50_mean_p95_both_pairs": true,
+    "medium_direction_agrees_p99_both_pairs": false,
+    "tiny_direction_agrees_p50_both_pairs": true,
+    "tiny_direction_agrees_mean_p95_p99_both_pairs": false
+  },
+  "latency_reduction_pct": {
+    "tiny": {
+      "a1_to_b1": {"p50": 7.737216, "mean": 9.381876, "p95": 16.912890, "p99": 21.992758},
+      "b2_to_a2": {"p50": 5.025153, "mean": -3.145511, "p95": -17.598461, "p99": -4.288528}
+    },
+    "medium": {
+      "a1_to_b1": {"p50": 5.516514, "mean": 5.057202, "p95": 4.676902, "p99": -4.733631},
+      "b2_to_a2": {"p50": 5.031389, "mean": 4.641093, "p95": 4.453641, "p99": 2.360226}
+    },
+    "large": {
+      "a1_to_b1": {"p50": 5.663150, "mean": 5.957557, "p95": 6.985530, "p99": 6.520584},
+      "b2_to_a2": {"p50": 5.022612, "mean": 5.187959, "p95": 5.098823, "p99": 6.628196}
+    }
+  },
+  "same_implementation_drift_pct": {
+    "tiny": {
+      "control_a1_to_a2": {"p50": -1.250102, "mean": -2.186368, "p95": -9.684952, "p99": -11.815126},
+      "candidate_b1_to_b2": {"p50": 1.652649, "mean": 11.335753, "p95": 27.828620, "p99": 17.895088}
+    },
+    "medium": {
+      "control_a1_to_a2": {"p50": -0.394637, "mean": -0.561502, "p95": -0.276054, "p99": -3.219318},
+      "candidate_b1_to_b2": {"p50": 0.116787, "mean": -0.125689, "p95": -0.042486, "p99": -9.774504}
+    },
+    "large": {
+      "control_a1_to_a2": {"p50": -0.556217, "mean": -0.888343, "p95": -2.900972, "p99": -2.245129},
+      "candidate_b1_to_b2": {"p50": 0.118996, "mean": -0.077261, "p95": -0.931414, "p99": -2.357663}
+    }
+  },
+  "resource_profiles": {
+    "perf_stat_scope": "whole process A/B/B/A with three warmups and twenty large-shape samples",
+    "cycles_reduction_pct": [3.895796, 2.658378],
+    "instructions_reduction_pct": [6.186246, 6.149925],
+    "branches_reduction_pct": [10.570084, 10.538774],
+    "branch_misses_reduction_pct": [-8.990358, -14.371947],
+    "branch_miss_result": "regressed in both process-wide directions and disclosed; no cache, branch-prediction, or operation-local CPU-counter claim is made",
+    "gnu_time_scope": "whole process with twenty warmups, 300 samples per shape, untimed construction/reopen, and harness overhead",
+    "gnu_time_max_rss_kib": {"a1": 252144, "b1": 252524, "b2": 252272, "a2": 252260}
+  },
+  "corpora": [
+    {
+      "shape": "tiny", "rows": 64, "cells": 256, "text_input_bytes": 3008,
+      "worksheet_xml_bytes": 13425, "archive_bytes": 3451,
+      "archive_sha256": "21e1f8267717fed447ef787285f154ccbf7a6d2ba460d385956e3d8546e7336c",
+      "worksheet_sha256": "0d133e59c766b109e74b7219d23ee9dde397f4eb55c58eea84fda53caebce1ee",
+      "sink_write_calls": 49, "largest_sink_write": 1519
+    },
+    {
+      "shape": "medium", "rows": 8192, "cells": 32768, "text_input_bytes": 385024,
+      "worksheet_xml_bytes": 1795765, "archive_bytes": 167418,
+      "archive_sha256": "c8ac0ef550b49fae025a43b9b1bbb26e3c33b6807851fc28b4a3a3aefd54013d",
+      "worksheet_sha256": "539f28638970fa5f207bd9686e0d0c7372e9cc9df0aec30e296ae9bdb4b3e226",
+      "sink_write_calls": 54, "largest_sink_write": 29338
+    },
+    {
+      "shape": "large", "rows": 131072, "cells": 524288, "text_input_bytes": 6160384,
+      "worksheet_xml_bytes": 29742241, "archive_bytes": 2563433,
+      "archive_sha256": "cf6965fc6ec2586d52f127fc58301aae68d2e10b51488312c88d20165153a3b1",
+      "worksheet_sha256": "e8e667f47810fbfc5e4924c5d878d70cbf299976c9ac39ef33a6f0f9673b65a4",
+      "sink_write_calls": 133, "largest_sink_write": 30832
+    }
+  ],
+  "tables": {
+    "primary_stats": "xlsx-stream-escape-0170-primary-stats.tsv",
+    "comparisons": "xlsx-stream-escape-0170-comparisons.tsv"
+  }
+}
