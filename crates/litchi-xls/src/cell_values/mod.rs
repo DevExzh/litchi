@@ -427,6 +427,44 @@ struct SheetData {
     entries: Arc<Vec<Entry>>,
 }
 
+#[derive(Clone, Copy)]
+struct SourcePolicyFacts {
+    public_worksheet_coverage: bool,
+    unprotected_workbook: bool,
+    macro_free_workbook: bool,
+}
+
+impl SourcePolicyFacts {
+    fn from_workbook<R: Read + Seek>(workbook: &Workbook<R>, sheets: &[SheetData]) -> Result<Self> {
+        require_public_worksheet_coverage(workbook, sheets)?;
+        Ok(Self {
+            public_worksheet_coverage: true,
+            unprotected_workbook: workbook_is_unprotected(workbook)?,
+            macro_free_workbook: workbook_is_macro_free(workbook),
+        })
+    }
+
+    fn require(self) -> Result<()> {
+        if !self.public_worksheet_coverage {
+            return Err(Error::UnsafeEdit(
+                "source-backed numeric source lost public worksheet coverage".into(),
+            ));
+        }
+        if !self.unprotected_workbook {
+            return Err(Error::UnsafeEdit(
+                "protected or shared workbooks are not eligible for source-backed numeric edits"
+                    .into(),
+            ));
+        }
+        if !self.macro_free_workbook {
+            return Err(Error::UnsafeEdit(
+                "macro-bearing XLS sources are not eligible for source-backed numeric edits".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 struct Inner {
     bytes: Arc<[u8]>,
     source_version: SourceVersion,
@@ -437,6 +475,7 @@ struct Inner {
     sst_total_offset: Option<usize>,
     xf_records: Arc<Vec<Vec<u8>>>,
     sheets: Vec<SheetData>,
+    source_policy: SourcePolicyFacts,
 }
 
 /// Immutable, cheaply cloned snapshot of an editable XLS package.
@@ -483,9 +522,9 @@ impl Snapshot {
         // The legacy reader intentionally skips some malformed optional sheet
         // projections, so this edit owner additionally requires every sheet
         // it can mutate to have survived that complete semantic open.
-        let (shared_strings, shared_string_properties) = {
+        let (shared_strings, shared_string_properties, source_policy) = {
             let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
-            require_public_worksheet_coverage(&workbook, &sheets)?;
+            let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
             let strings = workbook.shared_strings_shared();
             let mut properties = Vec::new();
             properties
@@ -501,7 +540,7 @@ impl Snapshot {
                         .map(Box::new),
                 );
             }
-            (strings, Arc::new(properties))
+            (strings, Arc::new(properties), source_policy)
         };
         resolve_shared_strings(&mut sheets, &shared_strings)?;
         Ok(Self {
@@ -515,6 +554,7 @@ impl Snapshot {
                 sst_total_offset,
                 xf_records: Arc::new(xf_records),
                 sheets,
+                source_policy,
             }),
         })
     }
@@ -534,7 +574,7 @@ impl Snapshot {
         // Only the private offset inventory is carried forward after proving
         // that every other Workbook-stream byte is unchanged.
         let workbook = Workbook::new(Cursor::new(source.as_slice()))?;
-        require_public_worksheet_coverage(&workbook, &sheets)?;
+        let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
         verify_public_numeric_readback(&workbook, source_snapshot, changes)?;
 
         Ok(Self {
@@ -550,6 +590,7 @@ impl Snapshot {
                 sst_total_offset: source_snapshot.inner.sst_total_offset,
                 xf_records: Arc::clone(&source_snapshot.inner.xf_records),
                 sheets,
+                source_policy,
             }),
         })
     }
@@ -570,6 +611,7 @@ impl Snapshot {
                 sst_total_offset: inner.sst_total_offset,
                 xf_records: Arc::clone(&inner.xf_records),
                 sheets: inner.sheets.clone(),
+                source_policy: inner.source_policy,
             }),
         }
     }
@@ -5085,13 +5127,10 @@ fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceB
         ));
     }
 
-    // Keep the source-side policy checks identical to the established
-    // source-backed publication contract. The target is checked again below
-    // over the composed positional reader.
-    let source_workbook = Workbook::new(Cursor::new(source.bytes()))?;
-    require_public_worksheet_coverage(&source_workbook, &source.inner.sheets)?;
-    require_unprotected_workbook(&source_workbook)?;
-    require_macro_free_workbook(&source_workbook)?;
+    // The complete source Workbook validation already ran when this immutable
+    // snapshot was opened. Reuse its private policy facts here; the target is
+    // still checked independently below over the composed positional reader.
+    source.inner.source_policy.require()?;
 
     let publisher = SourceBackedOverlayPublisher::open_owned(
         Arc::clone(&source.inner.bytes),
@@ -5471,7 +5510,7 @@ impl From<OverlayError> for Error {
     }
 }
 
-fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+fn workbook_is_unprotected<R: Read + Seek>(workbook: &Workbook<R>) -> Result<bool> {
     let protection = workbook.protection();
     if protection.structure_protected()
         || protection.windows_protected()
@@ -5481,9 +5520,7 @@ fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Resul
         || protection.write_protected()
         || protection.file_sharing().is_some()
     {
-        return Err(Error::UnsafeEdit(
-            "protected or shared workbooks are not eligible for source-backed numeric edits".into(),
-        ));
+        return Ok(false);
     }
     for metadata in workbook.sheets() {
         let Some(index) = metadata.parsed_worksheet_index() else {
@@ -5495,15 +5532,23 @@ fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Resul
             || protection.scenarios_protected()
             || protection.has_password()
         {
-            return Err(Error::UnsafeEdit(
-                "protected worksheets are not eligible for source-backed numeric edits".into(),
-            ));
+            return Ok(false);
         }
     }
-    Ok(())
+    Ok(true)
 }
 
-fn require_macro_free_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+fn require_unprotected_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+    if workbook_is_unprotected(workbook)? {
+        Ok(())
+    } else {
+        Err(Error::UnsafeEdit(
+            "protected or shared workbooks are not eligible for source-backed numeric edits".into(),
+        ))
+    }
+}
+
+fn workbook_is_macro_free<R: Read + Seek>(workbook: &Workbook<R>) -> bool {
     let metadata = workbook.vba_metadata();
     if metadata.has_project_marker()
         || workbook.vba_project_storage().is_some()
@@ -5512,11 +5557,19 @@ fn require_macro_free_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result
             .iter()
             .any(|sheet| matches!(sheet.kind(), SheetKind::MacroSheet | SheetKind::VbaModule))
     {
-        return Err(Error::UnsafeEdit(
-            "macro-bearing XLS sources are not eligible for source-backed numeric edits".into(),
-        ));
+        return false;
     }
-    Ok(())
+    true
+}
+
+fn require_macro_free_workbook<R: Read + Seek>(workbook: &Workbook<R>) -> Result<()> {
+    if workbook_is_macro_free(workbook) {
+        Ok(())
+    } else {
+        Err(Error::UnsafeEdit(
+            "macro-bearing XLS sources are not eligible for source-backed numeric edits".into(),
+        ))
+    }
 }
 
 fn require_macro_free_container(publisher: &SourceBackedOverlayPublisher) -> Result<()> {
