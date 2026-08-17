@@ -560,18 +560,25 @@ impl SharedOleFile {
 
         let (source_fingerprint, target_fingerprint) = fingerprints(&source, &spans)?;
         validate_composed_artifact(&source, &spans, &selections)?;
-        let (observed_source, observed_target) = fingerprints(&source, &spans)?;
-        if observed_source != source_fingerprint {
-            return Err(OverlayError::SourceFingerprintChanged {
-                expected: source_fingerprint,
-                observed: observed_source,
-            });
-        }
-        if observed_target != target_fingerprint {
-            return Err(OverlayError::TargetFingerprintChanged {
-                expected: target_fingerprint,
-                observed: observed_target,
-            });
+        // An explicitly owned source and every retained replacement/span are
+        // immutable. Candidate validation can only read that sealed composed
+        // view, so a second complete fingerprint cannot observe a change.
+        // Generic positional adapters retain the final bracket against a
+        // dishonest stable version token and interior byte mutation.
+        if !source.source_is_owned_immutable {
+            let (observed_source, observed_target) = fingerprints(&source, &spans)?;
+            if observed_source != source_fingerprint {
+                return Err(OverlayError::SourceFingerprintChanged {
+                    expected: source_fingerprint,
+                    observed: observed_source,
+                });
+            }
+            if observed_target != target_fingerprint {
+                return Err(OverlayError::TargetFingerprintChanged {
+                    expected: target_fingerprint,
+                    observed: observed_target,
+                });
+            }
         }
 
         Ok(ValidatedOverlayPlan {
@@ -834,18 +841,23 @@ where
     } else {
         Some(validate_owner(view.as_ref())?)
     };
-    let (observed_source, observed_target) = fingerprints(&source, &spans).map_err(E::from)?;
-    if observed_source != source_fingerprint {
-        return Err(E::from(OverlayError::SourceFingerprintChanged {
-            expected: source_fingerprint,
-            observed: observed_source,
-        }));
-    }
-    if observed_target != target_fingerprint {
-        return Err(E::from(OverlayError::TargetFingerprintChanged {
-            expected: target_fingerprint,
-            observed: observed_target,
-        }));
+    // Owned bytes and immutable spans cannot change while the owner callback
+    // reads the composed view. Keep the final complete bracket for arbitrary
+    // positional adapters, whose stable version token may be dishonest.
+    if !source.source_is_owned_immutable {
+        let (observed_source, observed_target) = fingerprints(&source, &spans).map_err(E::from)?;
+        if observed_source != source_fingerprint {
+            return Err(E::from(OverlayError::SourceFingerprintChanged {
+                expected: source_fingerprint,
+                observed: observed_source,
+            }));
+        }
+        if observed_target != target_fingerprint {
+            return Err(E::from(OverlayError::TargetFingerprintChanged {
+                expected: target_fingerprint,
+                observed: observed_target,
+            }));
+        }
     }
     Ok((
         ValidatedOverlayPlan {

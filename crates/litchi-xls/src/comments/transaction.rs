@@ -684,9 +684,10 @@ impl Edit {
         }
 
         // Preserve the snapshot's immutable Arc ownership through CFB. This
-        // permits direct sequential publication to omit redundant outer
-        // mutation fences while retaining emission hashes; composed views and
-        // atomic save remain fully fenced.
+        // permits planning, direct sequential publication, and atomic save to
+        // omit only their redundant outer mutation fences. Candidate reopen,
+        // owner validation, checked composed-view preflight, emission hashes,
+        // and atomic durability remain intact.
         let source = Arc::clone(&self.source.inner.bytes);
         let source_version =
             SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
@@ -1025,10 +1026,12 @@ impl SourceBackedCommit {
     /// Streams the complete source-backed candidate to a sequential sink.
     ///
     /// The common overlay publisher hashes the exact source and target during
-    /// output. Immutable snapshot provenance makes an additional outer
-    /// mutation preflight redundant for this direct sequential path; atomic
-    /// save retains its complete pre-rename fences. A sink failure retains the
-    /// typed [`litchi_cfb::OutputProgress`] inside [`OverlayError`].
+    /// output. Immutable snapshot provenance makes additional outer mutation
+    /// preflights redundant for direct sequential and atomic publication; the
+    /// atomic path still retains the complete source/target emission hashes
+    /// and its flush, sync, rename, and parent-sync durability sequence. A sink
+    /// failure retains the typed [`litchi_cfb::OutputProgress`] inside
+    /// [`OverlayError`].
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
         self.plan.write_to(writer)
     }
