@@ -11,6 +11,30 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## OPC shared source-overlay ownership (change 0185)
+
+[Change 0185](changes/0185-opc-shared-source-overlay.md) adds shared-Arc
+single- and bounded multi-Part overlay methods to the low-level source-backed
+OPC owner. Existing Vec methods remain compatibility adapters. Eligible DOCX,
+PPTX, and XLSX same-topology publishers now move their already immutable
+candidate allocation into OPC instead of performing a full selected-Part
+`Arc -> Vec -> Arc` copy. Exact no-ops use an empty overlay plan and preserve
+the complete source artifact; topology-changing relationship publishers are
+unchanged.
+
+All four CPU-2 A1/B1/B2/A2 legs use clean release revisions, 20 warmups, and
+500 samples for twelve existing XLSX scalar/row records. Their canonical
+non-timing projections are identical. Complete p50/mean/p95/p99 pass for the
+medium 1%, medium exact-256, and large row-batch records. Other accepted
+statistics and every withheld direction/drift are retained in the summary;
+dense multi-update and most row cases do not support a latency claim.
+
+The result accepts the deterministic format-to-OPC payload-copy removal and
+only the listed scenario statistics. A diagnostic Heaptrack pair has flat peak
+heap and no accepted allocation/RSS result. Physical I/O, decompression,
+cold-cache, throughput, scaling, producers, topology changes, broad OOXML, and
+iWork remain outside the claim.
+
 ## XLSX row-visibility cell-store reuse (change 0184)
 
 [Change 0184](changes/0184-xlsx-row-visibility-store-reuse.md) makes the

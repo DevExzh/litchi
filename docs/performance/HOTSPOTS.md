@@ -3,6 +3,13 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0185`](changes/0185-opc-shared-source-overlay.md)
+(0185 adds an additive Arc-owned source-overlay handoff in OPC and migrates
+eligible DOCX/PPTX/XLSX publishers. One complete selected-Part ownership copy
+is removed while selected source comparison, XML validation, compression,
+signatures, budgets, freshness and sink semantics remain. Matched XLSX results
+are mixed and scenario-scoped; no allocation/RSS, I/O, decompression,
+topology-changing or broad OOXML claim is made.)
 [`change 0184`](changes/0184-xlsx-row-visibility-store-reuse.md)
 (0184 removes one complete scalar-cell parse from each changed source-backed
 existing-row visibility commit through a private lifetime/source-bound rewrite

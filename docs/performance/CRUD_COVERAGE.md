@@ -148,7 +148,11 @@ conversion for other formats remain.
    removes the changed candidate's redundant complete scalar-cell parse through
    an exact-source, lifetime-bound validated-store handoff and accepts only the
    stable large-case and selected medium semantic-commit statistics; no
-   durable-source-patch claim is made.
+   durable-source-patch claim is made. Change 0185 then removes one
+   format-to-OPC selected-Part ownership copy from eligible changed scalar,
+   row, metadata, DOCX and PPTX same-topology publishers without adding a new
+   CRUD closure. Its matched XLSX result is scenario-scoped; topology-changing
+   publication and broad OOXML CRUD remain open.
    Conditional-formatting replacement is selectable
    without an ABBA claim and tab visibility remains unmeasured.
    Direct writer-local action regrouping was measured and rejected
@@ -1349,6 +1353,19 @@ correctness-equivalent work elimination only: it does not extend CRUD coverage
 beyond existing explicit row owners and makes no allocation/RSS, physical-I/O,
 cold-cache, decompression, independent-publication, or producer claim. See
 [`0184`](changes/0184-xlsx-row-visibility-store-reuse.md).
+
+Change 0185 likewise adds no selector or CRUD closure and leaves the matrix at
+322. It introduces additive shared-Arc OPC overlay methods and migrates
+eligible DOCX, PPTX, and XLSX source publishers, removing one complete
+selected-Part `Arc -> Vec -> Arc` ownership copy on changed same-topology
+publication. Exact no-ops continue byte-copying the source through an empty
+overlay plan; managed Arc escape, selected-member validation, signatures,
+limits, source fences, compression, reopen and partial-sink behavior remain.
+Clean matched XLSX evidence accepts only the statistics listed in the change
+record; dense multi-update and most row cases are withheld. No new formula,
+structural, topology-changing, producer, allocation/RSS, physical-I/O,
+decompression, cold-cache, broad OOXML, or iWork coverage follows. See
+[`0185`](changes/0185-opc-shared-source-overlay.md).
 
 Change 0168 keeps the same native XLS Number/RK/MulRK plan-only selectors and
 matrix counts while fusing BIFF semantic target validation into the common

@@ -14,6 +14,25 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained OPC shared-overlay result (change 0185)
+
+The source-backed OPC publisher now accepts caller-owned `Arc<Vec<u8>>`
+replacement payloads. Existing Vec APIs remain compatible, while changed DOCX,
+PPTX, and XLSX same-topology publishers avoid one complete selected-Part
+`Arc -> Vec -> Arc` ownership copy. Exact no-ops use the empty-overlay exact
+source path; selected-member comparison, XML validation, compression,
+signatures, managed budgets, source fences, and partial-sink behavior remain.
+
+Clean CPU-2 A/B/B/A release runs use 20 warmups and 500 samples for twelve
+existing XLSX scalar-cell and row-visibility records. Medium 1%, medium
+exact-256, and large row-batch complete p50/mean/p95/p99 pass paired-direction
+and stability gates; accepted p50 reductions are respectively 2.14%/1.98%,
+2.94%/1.15%, and 0.21%/3.13%. Other named statistics are reported
+individually, and unstable/directionally inconsistent dense and row cases are
+withheld. Heaptrack shows no accepted peak-memory or allocation result. See
+[change 0185](changes/0185-opc-shared-source-overlay.md) and its
+[machine-readable summary](results/opc-shared-overlay-0185-summary.json).
+
 ## Latest retained XLSX row-visibility result (change 0184)
 
 The existing-row visibility editor now carries a lifetime/source-bound proof
