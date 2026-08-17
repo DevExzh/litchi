@@ -156,11 +156,16 @@ impl SourceBackedEditor {
         } else {
             commit.patch().after().clone()
         };
-        self.package.write_part_overlay_to_stream(
-            writer,
-            target.workbook_part_name(),
-            target.source_xml().to_vec(),
-        )?;
+        if commit.patch().is_empty() {
+            self.package
+                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
+        } else {
+            self.package.write_part_overlay_shared_to_stream(
+                writer,
+                target.workbook_part_name(),
+                target.source_arc()?,
+            )?;
+        }
         target.check_execution()?;
         Ok(target)
     }

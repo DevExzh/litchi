@@ -665,6 +665,29 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
 }
 
 #[test]
+fn managed_scalar_exact_noop_publishes_without_detaching_source() {
+    let bytes = three_cells();
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
+    assert!(commit.patch().is_empty());
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
 fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
     let mut rows = String::new();
     for row in 1..=MAX_BATCH_EDITS + 1 {
@@ -853,6 +876,35 @@ fn multi_sheet_exact_noop_publishes_source_byte_for_byte() {
         .publish_multi_commit_to_stream(&mut output, &commit)
         .unwrap();
     assert_eq!(output, bytes);
+}
+
+#[test]
+fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
+    let bytes = two_sheets();
+    let exact = part_len(&bytes, MAIN)
+        + part_len(&bytes, SHEET)
+        + part_len(&bytes, "/xl/worksheets/sheet2.xml");
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let commit = editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .unwrap()
+        .commit()
+        .unwrap();
+    assert!(commit.patch().is_empty());
+
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
 }
 
 #[test]
