@@ -528,6 +528,30 @@ physical-I/O, cold-cache, and producer claims are also withheld. See the
 [summary](results/cfb-owner-fusion-0171-summary.json) and
 [manifest](results/cfb-owner-fusion-0171-manifest.json).
 
+## CFB stream-chain validation scratch (change 0190)
+
+[Change 0190](changes/0190-cfb-stream-chain-scratch.md) replaces the two
+transient allocations performed for every nonempty stream during
+`OleFile::open` allocation validation with private, fallible MiniFAT and FAT
+scratch buffers. Exact chain length, marker, cycle, bounds, ownership, overlap,
+root mini-stream and final physical-layout checks remain in the original order.
+
+For one matched Heaptrack process covering three warmups and 100 opens of both
+the 256-stream many-small and 2,048-stream wide-root corpora, whole-process
+allocation calls fall 988,558 -> 509,749 (-48.44%) and temporary allocations
+242,178 -> 2,567 (-98.94%). Peak heap is flat at the displayed 2.72 MiB. The
+control attributes exactly 237,312 calls to each removed per-stream site.
+
+The pinned 5,000-sample release A/B/B/A timing record accepts many-small p95
+reductions of 7.31%-18.36% and p99 reductions of 16.81%-19.94%; its p50 and
+mean remain withheld on control drift. Wide-root accepts 1.49%-2.18% p50,
+2.20%-3.90% mean, and 6.53%-12.51% p95 reductions; its p99 remains withheld on
+candidate drift. Operation-local bytes, peak RSS, physical/cold I/O,
+concurrent allocator contention, native DOC/XLS/PPT semantics, edit, and save
+performance remain open. See the
+[summary](results/cfb-chain-scratch-0190-summary.json) and
+[manifest](results/cfb-chain-scratch-0190-manifest.json).
+
 ## Immutable CFB numeric-plan publication (change 0172)
 
 [Change 0172](changes/0172-cfb-owned-numeric-publication.md) preserves the

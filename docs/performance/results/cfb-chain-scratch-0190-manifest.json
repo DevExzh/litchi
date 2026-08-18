@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "change": "0190",
+  "base_revision": "37404ccbbea582d4d242fc2fc9dbbecfc2e13679",
+  "control_binary_sha256": "6ecd31280f94e8925f14f727c3dd525be96abd7c6b0f7fd80d66cb58f8ed2922",
+  "candidate_binary_sha256": "7bfac888feaca859a391b6c2164aab8c1336008e73caf2a5ad6f7e489712d992",
+  "artifacts": [
+    {
+      "path": "cfb-chain-scratch-0190-a1.json.zst",
+      "bytes": 13762,
+      "sha256": "ffd9b617d781b753cc4bb6639fc898f8ff5038f0f01124ba271e9e7410d22267",
+      "uncompressed_bytes": 186298,
+      "uncompressed_sha256": "ee9af3914686f2ca4129ec20f872d08f405fbafd04ca8a04480b95dc67193ded"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-b1.json.zst",
+      "bytes": 10906,
+      "sha256": "8c04b897cf65f99b073f8c047dbc64528769a5e3972577358cfa39edea2ea2a1",
+      "uncompressed_bytes": 184953,
+      "uncompressed_sha256": "8f971e6208f9736c48977d6f83c32322061ccb5d3cfc3df709e22496b50e49c0"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-b2.json.zst",
+      "bytes": 12252,
+      "sha256": "e8f41305272992b20efa81ff6a30152f388359f2806bc50b56710acc8780fef8",
+      "uncompressed_bytes": 186349,
+      "uncompressed_sha256": "7ed6c16d37a54fc638eb4f2462c10d5b8fcf2c1719f81e20f981f015a61871b0"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-a2.json.zst",
+      "bytes": 13036,
+      "sha256": "18ac1de073a0617f199c55b220f8708fa27801f00ce6e34111c362abd0d63ec1",
+      "uncompressed_bytes": 187076,
+      "uncompressed_sha256": "a7a70ae537a87d3e0a426a4b1c0bb89ba604bd7e3104b6ed0b5becf4a39b1d8c"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-before.heaptrack.zst",
+      "bytes": 40326,
+      "sha256": "6787d946725e11de39a0b070a9c1f084103be7a7e44812d33f463f09cb81d57a"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-after.heaptrack.zst",
+      "bytes": 39327,
+      "sha256": "d66ae0f9518ccfe64a3ff1c4b2b9141bbc05557d689c468ddac8d6b6677e3a32"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-before-heaptrack.txt",
+      "bytes": 85266,
+      "sha256": "678489358bcb31028d5403af2dee78e340bf8a07b26320b7424a79d14f253cba"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-after-heaptrack.txt",
+      "bytes": 87954,
+      "sha256": "5407b057802b3997284e5f27fda83b0b1f91c8049a9c0ecf2f327102ca9b48c8"
+    },
+    {
+      "path": "cfb-chain-scratch-0190-summary.json",
+      "bytes": 6372,
+      "sha256": "fe12ce580797514a1038fb1948c23c612b2d5eeefec2d04e52e08bbf61dd5c7e"
+    }
+  ]
+}

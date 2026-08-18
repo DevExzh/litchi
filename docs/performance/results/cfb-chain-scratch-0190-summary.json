@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "change": "0190",
+  "decision": "accept_stream_chain_scratch_allocation_and_scoped_latency_reduction",
+  "base_revision": "37404ccbbea582d4d242fc2fc9dbbecfc2e13679",
+  "candidate_source_diff_sha256": "a1505b4939845bf4a5ecad0f3bc806a67a92bbcaa25a18e2e0fa21af09ad26ce",
+  "control_binary_sha256": "6ecd31280f94e8925f14f727c3dd525be96abd7c6b0f7fd80d66cb58f8ed2922",
+  "candidate_binary_sha256": "7bfac888feaca859a391b6c2164aab8c1336008e73caf2a5ad6f7e489712d992",
+  "protocol": {
+    "order": [
+      "control-a1",
+      "candidate-b1",
+      "candidate-b2",
+      "control-a2"
+    ],
+    "case": "cfb_open",
+    "shapes": [
+      "many-small",
+      "wide-root"
+    ],
+    "payload": "incompressible",
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "warmups": 200,
+    "samples_per_shape": 5000,
+    "timed_scope": "complete litchi_cfb::OleFile::open over an in-memory deterministic CFB corpus",
+    "runtime_metadata_note": "All four final legs report the base revision with a dirty worktree because schema-1 Git metadata is resolved at execution time; the distinct frozen binary hashes and candidate source-diff hash bind control and candidate code."
+  },
+  "environment": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "os": "linux",
+    "kernel": "Linux 6.8.0-101-generic",
+    "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+    "total_memory_bytes": 33605935104,
+    "page_size_bytes": 4096,
+    "allocator": "Rust system allocator",
+    "perf_event_paranoid": "1"
+  },
+  "stability_threshold_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "workloads": {
+    "many-small": {
+      "archive_sha256": "dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c",
+      "archive_bytes": 314880,
+      "streams": 256,
+      "stream_bytes": 1024,
+      "all_streams_use_minifat": true,
+      "elapsed_ns": {
+        "a1": {
+          "p50": 144729,
+          "mean": 149391.23600000012,
+          "p95": 178375,
+          "p99": 195939
+        },
+        "b1": {
+          "p50": 132863,
+          "mean": 135087.06859999985,
+          "p95": 145621,
+          "p99": 156866
+        },
+        "b2": {
+          "p50": 134306,
+          "mean": 137366.80099999983,
+          "p95": 148934,
+          "p99": 157336
+        },
+        "a2": {
+          "p50": 135862,
+          "mean": 140397.28740000035,
+          "p95": 160680,
+          "p99": 189120
+        }
+      },
+      "paired_reduction_percent": {
+        "p50": [8.198771, 1.145280],
+        "mean": [9.574971, 2.158508],
+        "p95": [18.362439, 7.310182],
+        "p99": [19.941410, 16.806261]
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 6.126623,
+          "mean": 6.020399,
+          "p95": 9.920112,
+          "p99": 3.480165
+        },
+        "candidate": {
+          "p50": 1.086081,
+          "mean": 1.687602,
+          "p95": 2.275084,
+          "p99": 0.299619
+        }
+      },
+      "latency_claim": "For this exact many-small corpus, p95 is 7.31%-18.36% lower and p99 is 16.81%-19.94% lower in both pairs with both implementations inside the predeclared tail-drift gates.",
+      "latency_withheld": {
+        "statistics": ["p50", "mean"],
+        "reason": "control p50 and mean drift exceed their predeclared 5% thresholds"
+      }
+    },
+    "wide-root": {
+      "archive_sha256": "2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+      "archive_bytes": 406016,
+      "streams": 2048,
+      "stream_bytes": 64,
+      "all_streams_use_minifat": true,
+      "elapsed_ns": {
+        "a1": {
+          "p50": 981284,
+          "mean": 1005439.0084000006,
+          "p95": 1160185,
+          "p99": 1273270
+        },
+        "b1": {
+          "p50": 959929,
+          "mean": 966252.1256000013,
+          "p95": 1015095,
+          "p99": 1071241
+        },
+        "b2": {
+          "p50": 986476,
+          "mean": 1000535.3176000012,
+          "p95": 1088637,
+          "p99": 1305967
+        },
+        "a2": {
+          "p50": 1001351,
+          "mean": 1023066.4158000011,
+          "p95": 1164732,
+          "p99": 1357817
+        }
+      },
+      "paired_reduction_percent": {
+        "p50": [2.176230, 1.485493],
+        "mean": [3.897490, 2.202310],
+        "p95": [12.505764, 6.533263],
+        "p99": [15.866941, 3.818629]
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 2.044974,
+          "mean": 1.753205,
+          "p95": 0.391920,
+          "p99": 6.640147
+        },
+        "candidate": {
+          "p50": 2.765517,
+          "mean": 3.548059,
+          "p95": 7.244839,
+          "p99": 21.911596
+        }
+      },
+      "latency_claim": "For this exact wide-root corpus, p50 is 1.49%-2.18% lower, mean is 2.20%-3.90% lower, and p95 is 6.53%-12.51% lower in both pairs with both implementations inside the corresponding drift gates.",
+      "latency_withheld": {
+        "statistics": ["p99"],
+        "reason": "candidate p99 drift exceeds the predeclared 15% threshold"
+      }
+    }
+  },
+  "heaptrack": {
+    "scope": "whole process: deterministic corpus construction, three warmups, 100 timed opens per shape, verification, and report generation",
+    "tool": "heaptrack 1.5.0",
+    "before": {
+      "allocation_calls": 988558,
+      "temporary_allocations": 242178,
+      "peak_heap_bytes_display": "2.72M",
+      "peak_rss_bytes_display": "14.59M",
+      "leaked_bytes": 544,
+      "per_stream_chain_vector_calls": 237312,
+      "per_stream_chain_bitset_calls": 237312
+    },
+    "after": {
+      "allocation_calls": 509749,
+      "temporary_allocations": 2567,
+      "peak_heap_bytes_display": "2.72M",
+      "peak_rss_bytes_display": "14.88M",
+      "leaked_bytes": 544
+    },
+    "reduction_percent": {
+      "allocation_calls": 48.435094,
+      "temporary_allocations": 98.940036
+    },
+    "accepted_claim": "For this exact two-shape process profile, reusable stream-chain scratch removes the two per-stream allocation sites and reduces whole-process allocation calls by 48.44% and Heaptrack-classified temporary allocations by 98.94%.",
+    "withheld": [
+      "operation-local allocated bytes",
+      "peak RSS improvement",
+      "cold or physical I/O",
+      "concurrent allocator contention",
+      "native DOC, XLS, or PPT semantic performance"
+    ]
+  }
+}
