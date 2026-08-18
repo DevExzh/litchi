@@ -7,7 +7,7 @@
 //! For format-specific parsing (e.g., ODT track changes, ODP animations), see the
 //! format-specific parsers in `odt/parser.rs`, `ods/parser.rs`, etc.
 
-use crate::elements::element::ElementBase;
+use crate::elements::element::{ElementBase, try_owned_string, try_prefixed_name};
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
 use litchi_core::{Error, Result};
@@ -21,6 +21,14 @@ const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_DOCUMENT_DEPTH: usize = 4_096;
+
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
+}
 
 /// Represents a document element in its original position
 #[derive(Debug, Clone)]
@@ -115,36 +123,52 @@ impl Parser {
                     match tag_name.as_str() {
                         "text:p" if table_depth == 0 && list_depth == 0 => {
                             // Start a paragraph outside of tables and lists
-                            let mut element = super::element::Element::new(&tag_name);
+                            let mut element = super::element::Element::try_new(&tag_name)?;
 
                             copy_attributes(&reader, e, &mut element)?;
 
-                            element_stack.push((tag_name, element));
+                            try_push(
+                                &mut element_stack,
+                                (tag_name, element),
+                                "ODT ordered-element parser stack",
+                            )?;
                         },
                         "text:numbered-paragraph" if table_depth == 0 && list_depth == 0 => {
                             // Start a numbered paragraph outside of tables and lists
-                            let mut element = super::element::Element::new(&tag_name);
+                            let mut element = super::element::Element::try_new(&tag_name)?;
 
                             copy_attributes(&reader, e, &mut element)?;
 
-                            element_stack.push((tag_name, element));
+                            try_push(
+                                &mut element_stack,
+                                (tag_name, element),
+                                "ODT ordered-element parser stack",
+                            )?;
                         },
                         "text:h" if table_depth == 0 && list_depth == 0 => {
                             // Start a heading outside of tables and lists
-                            let mut element = super::element::Element::new(&tag_name);
+                            let mut element = super::element::Element::try_new(&tag_name)?;
 
                             copy_attributes(&reader, e, &mut element)?;
 
-                            element_stack.push((tag_name, element));
+                            try_push(
+                                &mut element_stack,
+                                (tag_name, element),
+                                "ODT ordered-element parser stack",
+                            )?;
                         },
                         "table:table" if table_depth == 0 => {
                             // Start a table
                             table_depth += 1;
-                            let mut element = super::element::Element::new(&tag_name);
+                            let mut element = super::element::Element::try_new(&tag_name)?;
 
                             copy_attributes(&reader, e, &mut element)?;
 
-                            element_stack.push((tag_name, element));
+                            try_push(
+                                &mut element_stack,
+                                (tag_name, element),
+                                "ODT ordered-element parser stack",
+                            )?;
                         },
                         "table:table" => {
                             // Nested table
@@ -153,11 +177,15 @@ impl Parser {
                         "text:list" if list_depth == 0 && table_depth == 0 => {
                             // Start a list outside of tables
                             list_depth += 1;
-                            let mut element = super::element::Element::new(&tag_name);
+                            let mut element = super::element::Element::try_new(&tag_name)?;
 
                             copy_attributes(&reader, e, &mut element)?;
 
-                            element_stack.push((tag_name, element));
+                            try_push(
+                                &mut element_stack,
+                                (tag_name, element),
+                                "ODT ordered-element parser stack",
+                            )?;
                         },
                         "text:list" => {
                             // Nested list
@@ -174,11 +202,15 @@ impl Parser {
                         },
                         // Handle nested elements within tracked elements
                         _ if !element_stack.is_empty() && table_depth <= 1 && list_depth <= 1 => {
-                            let mut element = super::element::Element::new(&tag_name);
+                            let mut element = super::element::Element::try_new(&tag_name)?;
 
                             copy_attributes(&reader, e, &mut element)?;
 
-                            element_stack.push((tag_name, element));
+                            try_push(
+                                &mut element_stack,
+                                (tag_name, element),
+                                "ODT ordered-element parser stack",
+                            )?;
                         },
                         _ => {},
                     }
@@ -189,8 +221,7 @@ impl Parser {
                         let text = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                             Error::InvalidFormat(format!("invalid ODF element text: {error}"))
                         })?;
-                        let current_text = element.text().to_string();
-                        element.set_text(&format!("{current_text}{text}"));
+                        element.try_append_text(&text, "ODT ordered-element text")?;
                     }
                 },
                 Event::CData(ref value) => {
@@ -200,15 +231,13 @@ impl Parser {
                             .map_err(|error| {
                                 Error::InvalidFormat(format!("invalid ODF element CDATA: {error}"))
                             })?;
-                        let current_text = element.text().to_string();
-                        element.set_text(&format!("{current_text}{text}"));
+                        element.try_append_text(&text, "ODT ordered-element CDATA")?;
                     }
                 },
                 Event::GeneralRef(ref reference) => {
                     if let Some((_, element)) = element_stack.last_mut() {
                         let text = decode_reference(reference)?;
-                        let current_text = element.text().to_string();
-                        element.set_text(&format!("{current_text}{text}"));
+                        element.try_append_text(&text, "ODT ordered-element reference")?;
                     }
                 },
                 Event::End(ref e) => {
@@ -224,41 +253,80 @@ impl Parser {
                     match tag_name.as_str() {
                         "text:p" if table_depth == 0 && list_depth == 0 => {
                             // Complete a top-level paragraph
-                            if let Some((tag, element)) = element_stack.pop()
-                                && tag == "text:p"
-                                && let Ok(para) = Paragraph::from_element(element)
-                            {
-                                elements.push(OrderElement::Paragraph(para));
+                            let (tag, element) = element_stack.pop().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODF paragraph end has no projected start".to_string(),
+                                )
+                            })?;
+                            if tag != "text:p" {
+                                return Err(Error::InvalidFormat(
+                                    "ODF paragraph projection stack mismatch".to_string(),
+                                ));
                             }
+                            let para = Paragraph::from_element(element)?;
+                            try_push(
+                                &mut elements,
+                                OrderElement::Paragraph(para),
+                                "ODT ordered-element projection",
+                            )?;
                         },
                         "text:numbered-paragraph" if table_depth == 0 && list_depth == 0 => {
                             // Complete a top-level numbered paragraph
-                            if let Some((tag, element)) = element_stack.pop()
-                                && tag == "text:numbered-paragraph"
-                                && let Ok(para) =
-                                    super::text::NumberedParagraph::from_element(element)
-                            {
-                                elements.push(OrderElement::NumberedParagraph(para));
+                            let (tag, element) = element_stack.pop().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODF numbered paragraph end has no projected start".to_string(),
+                                )
+                            })?;
+                            if tag != "text:numbered-paragraph" {
+                                return Err(Error::InvalidFormat(
+                                    "ODF numbered paragraph projection stack mismatch".to_string(),
+                                ));
                             }
+                            let para = super::text::NumberedParagraph::from_element(element)?;
+                            try_push(
+                                &mut elements,
+                                OrderElement::NumberedParagraph(para),
+                                "ODT ordered-element projection",
+                            )?;
                         },
                         "text:h" if table_depth == 0 && list_depth == 0 => {
                             // Complete a top-level heading
-                            if let Some((tag, element)) = element_stack.pop()
-                                && tag == "text:h"
-                                && let Ok(heading) = Heading::from_element(element)
-                            {
-                                elements.push(OrderElement::Heading(heading));
+                            let (tag, element) = element_stack.pop().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODF heading end has no projected start".to_string(),
+                                )
+                            })?;
+                            if tag != "text:h" {
+                                return Err(Error::InvalidFormat(
+                                    "ODF heading projection stack mismatch".to_string(),
+                                ));
                             }
+                            let heading = Heading::from_element(element)?;
+                            try_push(
+                                &mut elements,
+                                OrderElement::Heading(heading),
+                                "ODT ordered-element projection",
+                            )?;
                         },
                         "table:table" if table_depth == 1 => {
                             // Complete a top-level table
                             table_depth -= 1;
-                            if let Some((tag, element)) = element_stack.pop()
-                                && tag == "table:table"
-                                && let Ok(table) = Table::from_element(element)
-                            {
-                                elements.push(OrderElement::Table(table));
+                            let (tag, element) = element_stack.pop().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODF table end has no projected start".to_string(),
+                                )
+                            })?;
+                            if tag != "table:table" {
+                                return Err(Error::InvalidFormat(
+                                    "ODF table projection stack mismatch".to_string(),
+                                ));
                             }
+                            let table = Table::from_element(element)?;
+                            try_push(
+                                &mut elements,
+                                OrderElement::Table(table),
+                                "ODT ordered-element projection",
+                            )?;
                         },
                         "table:table" => {
                             table_depth -= 1;
@@ -266,12 +334,22 @@ impl Parser {
                         "text:list" if list_depth == 1 && table_depth == 0 => {
                             // Complete a top-level list
                             list_depth -= 1;
-                            if let Some((tag, element)) = element_stack.pop()
-                                && tag == "text:list"
-                                && let Ok(list) = List::from_element(element)
-                            {
-                                elements.push(OrderElement::List(list));
+                            let (tag, element) = element_stack.pop().ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODF list end has no projected start".to_string(),
+                                )
+                            })?;
+                            if tag != "text:list" {
+                                return Err(Error::InvalidFormat(
+                                    "ODF list projection stack mismatch".to_string(),
+                                ));
                             }
+                            let list = List::from_element(element)?;
+                            try_push(
+                                &mut elements,
+                                OrderElement::List(list),
+                                "ODT ordered-element projection",
+                            )?;
                         },
                         "text:list" => {
                             list_depth -= 1;
@@ -285,7 +363,10 @@ impl Parser {
                                     )
                                 })?;
                                 if let Some((_, parent_element)) = element_stack.last_mut() {
-                                    parent_element.add_child(child_element);
+                                    parent_element.try_add_child(
+                                        child_element,
+                                        "ODT ordered-element child projection",
+                                    )?;
                                 }
                             } else {
                                 // Single element on stack, check if it should be completed
@@ -325,17 +406,12 @@ impl Parser {
 
         for element in elements {
             match element {
-                OrderElement::Paragraph(para) => paragraphs.push(para),
+                OrderElement::Paragraph(para) => {
+                    try_push(&mut paragraphs, para, "ODT paragraph projection")?;
+                },
                 OrderElement::Heading(heading) => {
-                    // Convert heading to paragraph for unified handling
-                    if let Ok(text) = heading.text() {
-                        let mut para = Paragraph::new();
-                        para.set_text(&text);
-                        if let Some(style) = heading.style_name() {
-                            para.set_style_name(style);
-                        }
-                        paragraphs.push(para);
-                    }
+                    let para = heading.try_into_paragraph()?;
+                    try_push(&mut paragraphs, para, "ODT paragraph projection")?;
                 },
                 _ => {},
             }
@@ -354,7 +430,7 @@ impl Parser {
 
         for element in elements {
             if let OrderElement::Table(table) = element {
-                tables.push(table);
+                try_push(&mut tables, table, "ODT table projection")?;
             }
         }
 
@@ -371,14 +447,14 @@ fn canonical_element_name(
         .map_err(|_error| Error::InvalidFormat("non-UTF-8 ODF element name".to_string()))?;
     match namespace {
         ResolveResult::Bound(Namespace(uri)) if *uri == TEXT_NAMESPACE => {
-            Ok(format!("text:{local_name}"))
+            try_prefixed_name("text", local_name, "ODT element name")
         },
         ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_NAMESPACE => {
-            Ok(format!("table:{local_name}"))
+            try_prefixed_name("table", local_name, "ODT element name")
         },
         ResolveResult::Bound(_) | ResolveResult::Unbound => std::str::from_utf8(qualified_name)
-            .map(str::to_string)
-            .map_err(|_error| Error::InvalidFormat("non-UTF-8 ODF element name".to_string())),
+            .map_err(|_error| Error::InvalidFormat("non-UTF-8 ODF element name".to_string()))
+            .and_then(|name| try_owned_string(name, "ODT element name")),
         ResolveResult::Unknown(prefix) => Err(Error::InvalidFormat(format!(
             "unknown ODF element namespace prefix '{}'",
             String::from_utf8_lossy(prefix)
@@ -402,23 +478,23 @@ fn copy_attributes(
             .map_err(|_error| Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string()))?;
         let name = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
-                format!("text:{local_name}")
+                try_prefixed_name("text", local_name, "ODT attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == TABLE_NAMESPACE => {
-                format!("table:{local_name}")
+                try_prefixed_name("table", local_name, "ODT attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
-                format!("xlink:{local_name}")
+                try_prefixed_name("xlink", local_name, "ODT attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
-                format!("xml:{local_name}")
+                try_prefixed_name("xml", local_name, "ODT attribute name")?
             },
             ResolveResult::Bound(_) | ResolveResult::Unbound => {
                 std::str::from_utf8(attribute.key.as_ref())
-                    .map(str::to_string)
                     .map_err(|_error| {
                         Error::InvalidFormat("non-UTF-8 ODF attribute name".to_string())
-                    })?
+                    })
+                    .and_then(|name| try_owned_string(name, "ODT attribute name"))?
             },
             ResolveResult::Unknown(prefix) => {
                 return Err(Error::InvalidFormat(format!(
@@ -437,7 +513,7 @@ fn copy_attributes(
                 "duplicate ODF attribute '{name}'"
             )));
         }
-        element.set_attribute(&name, &value);
+        element.try_set_attribute(&name, &value, "ODT ordered-element attribute")?;
     }
     Ok(())
 }
@@ -481,32 +557,35 @@ fn append_text_control(
                     "text:s count exceeds 1000000".to_string(),
                 ));
             }
-            " ".repeat(count)
+            element.try_append_spaces(count, "ODT ordered-element text")?;
+            return Ok(());
         },
-        "text:tab" => "\t".to_string(),
-        "text:line-break" => "\n".to_string(),
+        "text:tab" => "\t",
+        "text:line-break" => "\n",
         _ => return Ok(()),
     };
-    let current = element.text().to_string();
-    element.set_text(&format!("{current}{value}"));
-    Ok(())
+    element.try_append_text(value, "ODT ordered-element text")
 }
 
-fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
+pub(super) fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
     if let Some(character) = reference.resolve_char_ref().map_err(|error| {
         Error::InvalidFormat(format!("invalid ODF character reference: {error}"))
     })? {
-        return Ok(character.to_string());
+        let mut encoded = [0_u8; 4];
+        return try_owned_string(
+            character.encode_utf8(&mut encoded),
+            "ODT character reference",
+        );
     }
     let name = reference
         .decode()
         .map_err(|error| Error::InvalidFormat(format!("invalid ODF entity: {error}")))?;
     match name.as_ref() {
-        "amp" => Ok("&".to_string()),
-        "lt" => Ok("<".to_string()),
-        "gt" => Ok(">".to_string()),
-        "quot" => Ok("\"".to_string()),
-        "apos" => Ok("'".to_string()),
+        "amp" => try_owned_string("&", "ODT entity reference"),
+        "lt" => try_owned_string("<", "ODT entity reference"),
+        "gt" => try_owned_string(">", "ODT entity reference"),
+        "quot" => try_owned_string("\"", "ODT entity reference"),
+        "apos" => try_owned_string("'", "ODT entity reference"),
         _ => Err(Error::InvalidFormat(format!(
             "unsupported ODF entity '&{name};'"
         ))),

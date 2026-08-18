@@ -11,6 +11,26 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## High-level ODT source-backed path ingress (change 0191)
+
+[Change 0191](changes/0191-odt-unified-source-ingress.md) routes validated ODT
+files opened through `litchi::Document::open(Path)` into one positional ODF
+package and source-backed semantic owner. It preserves eager byte ingress,
+OOXML precedence, typed source-change/I/O errors, and ODS/ODP non-ownership.
+
+CPU-2 A1/B1/B2/A2 release legs used 30 warmups and 500 samples over one
+16.8 MB media-rich ODT. Open-only samples are directionally lower but remain
+withheld because same-implementation drift fails every tier. Open-plus-full-text
+p50/mean/p95/p99 reductions are 31.41%/31.35%/35.36%/30.02% and
+31.74%/32.44%/32.77%/32.50% in the paired directions; both implementation
+drifts pass the predeclared 5%/5%/10%/15% ceilings.
+
+Separate untimed typed-source replay records 30 reads/29,080 bytes for owner
+preparation, zero picture range bytes, and zero extra full-text reads. The
+claim is warm in-process elapsed and logical-range evidence only; physical
+I/O, cold-cache, allocation/RSS, producer breadth, edit/save, and broad ODF
+remain open.
+
 ## High-level XLSX source-backed path ingress (change 0187)
 
 [Change 0187](changes/0187-xlsx-unified-source-ingress.md) routes validated
@@ -188,7 +208,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **336 selectable cases**; 200 was the count before the
+harness contains **340 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -1650,7 +1670,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 336 selectable cases. Change
+The current standalone harness provides 340 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors

@@ -3,8 +3,8 @@
 //! This module provides comprehensive support for ODF style definitions,
 //! including parsing, inheritance, and property resolution.
 
-use super::element::{Element, ElementBase};
-use litchi_core::Result;
+use super::element::{Element, ElementBase, try_owned_string};
+use litchi_core::{Error, Result};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -278,22 +278,22 @@ impl Style {
     fn parse_properties(&mut self) -> Result<()> {
         // Parse text properties
         if let Some(text_prop_elem) = self.find_property_element("style:text-properties") {
-            self.properties.text = Self::parse_text_properties(text_prop_elem);
+            self.properties.text = Self::parse_text_properties(text_prop_elem)?;
         }
 
         // Parse paragraph properties
         if let Some(para_prop_elem) = self.find_property_element("style:paragraph-properties") {
-            self.properties.paragraph = Self::parse_paragraph_properties(para_prop_elem);
+            self.properties.paragraph = Self::parse_paragraph_properties(para_prop_elem)?;
         }
 
         // Parse table properties
         if let Some(table_prop_elem) = self.find_property_element("style:table-properties") {
-            self.properties.table = Self::parse_table_properties(table_prop_elem);
+            self.properties.table = Self::parse_table_properties(table_prop_elem)?;
         }
 
         // Parse graphic properties
         if let Some(graphic_prop_elem) = self.find_property_element("style:graphic-properties") {
-            self.properties.graphic = Self::parse_graphic_properties(graphic_prop_elem);
+            self.properties.graphic = Self::parse_graphic_properties(graphic_prop_elem)?;
         }
 
         Ok(())
@@ -308,99 +308,90 @@ impl Style {
     }
 
     /// Parse text properties from element
-    fn parse_text_properties(element: &Element) -> TextProperties<'static> {
-        TextProperties {
-            font_name: element
-                .get_attribute("style:font-name")
-                .map(|s| Cow::Owned(s.to_string())),
-            font_size: element
-                .get_attribute("fo:font-size")
-                .map(|s| Cow::Owned(s.to_string())),
-            font_weight: element
-                .get_attribute("fo:font-weight")
-                .map(|s| Cow::Owned(s.to_string())),
-            font_style: element
-                .get_attribute("fo:font-style")
-                .map(|s| Cow::Owned(s.to_string())),
-            color: element
-                .get_attribute("fo:color")
-                .map(|s| Cow::Owned(s.to_string())),
-            background_color: element
-                .get_attribute("fo:background-color")
-                .map(|s| Cow::Owned(s.to_string())),
-            underline: element
-                .get_attribute("style:text-underline-style")
-                .map(|s| Cow::Owned(s.to_string())),
-            strikethrough: element
-                .get_attribute("style:text-line-through-style")
-                .map(|s| Cow::Owned(s.to_string())),
-            text_shadow: element
-                .get_attribute("fo:text-shadow")
-                .map(|s| Cow::Owned(s.to_string())),
-        }
+    fn try_property(
+        element: &Element,
+        name: &str,
+        resource: &'static str,
+    ) -> Result<Option<Cow<'static, str>>> {
+        element
+            .get_attribute(name)
+            .map(|value| try_owned_string(value, resource).map(Cow::Owned))
+            .transpose()
+    }
+
+    fn parse_text_properties(element: &Element) -> Result<TextProperties<'static>> {
+        Ok(TextProperties {
+            font_name: Self::try_property(element, "style:font-name", "ODT style font name")?,
+            font_size: Self::try_property(element, "fo:font-size", "ODT style font size")?,
+            font_weight: Self::try_property(element, "fo:font-weight", "ODT style font weight")?,
+            font_style: Self::try_property(element, "fo:font-style", "ODT style font style")?,
+            color: Self::try_property(element, "fo:color", "ODT style text color")?,
+            background_color: Self::try_property(
+                element,
+                "fo:background-color",
+                "ODT style text background color",
+            )?,
+            underline: Self::try_property(
+                element,
+                "style:text-underline-style",
+                "ODT style underline",
+            )?,
+            strikethrough: Self::try_property(
+                element,
+                "style:text-line-through-style",
+                "ODT style strikethrough",
+            )?,
+            text_shadow: Self::try_property(element, "fo:text-shadow", "ODT style text shadow")?,
+        })
     }
 
     /// Parse paragraph properties from element
-    fn parse_paragraph_properties(element: &Element) -> ParagraphProperties<'static> {
-        ParagraphProperties {
-            margin_left: element
-                .get_attribute("fo:margin-left")
-                .map(|s| Cow::Owned(s.to_string())),
-            margin_right: element
-                .get_attribute("fo:margin-right")
-                .map(|s| Cow::Owned(s.to_string())),
-            margin_top: element
-                .get_attribute("fo:margin-top")
-                .map(|s| Cow::Owned(s.to_string())),
-            margin_bottom: element
-                .get_attribute("fo:margin-bottom")
-                .map(|s| Cow::Owned(s.to_string())),
-            text_align: element
-                .get_attribute("fo:text-align")
-                .map(|s| Cow::Owned(s.to_string())),
-            line_height: element
-                .get_attribute("fo:line-height")
-                .map(|s| Cow::Owned(s.to_string())),
-            background_color: element
-                .get_attribute("fo:background-color")
-                .map(|s| Cow::Owned(s.to_string())),
-            border: element
-                .get_attribute("fo:border")
-                .map(|s| Cow::Owned(s.to_string())),
-        }
+    fn parse_paragraph_properties(element: &Element) -> Result<ParagraphProperties<'static>> {
+        Ok(ParagraphProperties {
+            margin_left: Self::try_property(element, "fo:margin-left", "ODT style left margin")?,
+            margin_right: Self::try_property(element, "fo:margin-right", "ODT style right margin")?,
+            margin_top: Self::try_property(element, "fo:margin-top", "ODT style top margin")?,
+            margin_bottom: Self::try_property(
+                element,
+                "fo:margin-bottom",
+                "ODT style bottom margin",
+            )?,
+            text_align: Self::try_property(element, "fo:text-align", "ODT style text alignment")?,
+            line_height: Self::try_property(element, "fo:line-height", "ODT style line height")?,
+            background_color: Self::try_property(
+                element,
+                "fo:background-color",
+                "ODT style paragraph background color",
+            )?,
+            border: Self::try_property(element, "fo:border", "ODT style paragraph border")?,
+        })
     }
 
     /// Parse table properties from element
-    fn parse_table_properties(element: &Element) -> TableProperties<'static> {
-        TableProperties {
-            width: element
-                .get_attribute("style:width")
-                .map(|s| Cow::Owned(s.to_string())),
-            background_color: element
-                .get_attribute("fo:background-color")
-                .map(|s| Cow::Owned(s.to_string())),
-            border: element
-                .get_attribute("fo:border")
-                .map(|s| Cow::Owned(s.to_string())),
-            align: element
-                .get_attribute("table:align")
-                .map(|s| Cow::Owned(s.to_string())),
-        }
+    fn parse_table_properties(element: &Element) -> Result<TableProperties<'static>> {
+        Ok(TableProperties {
+            width: Self::try_property(element, "style:width", "ODT style table width")?,
+            background_color: Self::try_property(
+                element,
+                "fo:background-color",
+                "ODT style table background color",
+            )?,
+            border: Self::try_property(element, "fo:border", "ODT style table border")?,
+            align: Self::try_property(element, "table:align", "ODT style table alignment")?,
+        })
     }
 
     /// Parse graphic properties from element
-    fn parse_graphic_properties(element: &Element) -> GraphicProperties<'static> {
-        GraphicProperties {
-            background_color: element
-                .get_attribute("draw:fill-color")
-                .map(|s| Cow::Owned(s.to_string())),
-            border: element
-                .get_attribute("draw:stroke")
-                .map(|s| Cow::Owned(s.to_string())),
-            shadow: element
-                .get_attribute("draw:shadow")
-                .map(|s| Cow::Owned(s.to_string())),
-        }
+    fn parse_graphic_properties(element: &Element) -> Result<GraphicProperties<'static>> {
+        Ok(GraphicProperties {
+            background_color: Self::try_property(
+                element,
+                "draw:fill-color",
+                "ODT style graphic fill color",
+            )?,
+            border: Self::try_property(element, "draw:stroke", "ODT style graphic stroke")?,
+            shadow: Self::try_property(element, "draw:shadow", "ODT style graphic shadow")?,
+        })
     }
 
     /// Get the style name
@@ -451,6 +442,33 @@ impl StyleRegistry {
         }
     }
 
+    pub(crate) fn try_add_style(&mut self, style: Style) -> Result<()> {
+        if let Some(name) = style.name() {
+            self.styles
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT style registry",
+                    source,
+                })?;
+            let name = try_owned_string(name, "ODT style registry name")?;
+            self.styles.insert(name, style);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn try_extend(&mut self, other: Self) -> Result<()> {
+        for (name, style) in other.styles {
+            self.styles
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT style registry",
+                    source,
+                })?;
+            self.styles.insert(name, style);
+        }
+        Ok(())
+    }
+
     /// Get a style by name
     pub fn get_style(&self, name: &str) -> Option<&Style> {
         self.styles.get(name)
@@ -473,6 +491,27 @@ impl StyleRegistry {
         }
 
         resolved
+    }
+
+    pub(crate) fn try_get_resolved_properties(
+        &self,
+        style_name: &str,
+    ) -> Result<StyleProperties<'static>> {
+        let mut resolved = StyleProperties::default();
+        let mut current_name = Some(style_name);
+        let mut remaining = self.styles.len().saturating_add(1);
+        while let Some(name) = current_name {
+            remaining = remaining
+                .checked_sub(1)
+                .ok_or_else(|| Error::InvalidFormat("ODT style inheritance cycle".to_string()))?;
+            if let Some(style) = self.styles.get(name) {
+                Self::try_merge_properties(&mut resolved, &style.properties)?;
+                current_name = style.parent_style_name();
+            } else {
+                break;
+            }
+        }
+        Ok(resolved)
     }
 
     /// Merge source properties into target (source takes precedence)
@@ -531,6 +570,141 @@ impl StyleRegistry {
         merge_prop!(target.graphic.shadow, source.graphic.shadow);
     }
 
+    fn try_merge_properties(
+        target: &mut StyleProperties<'static>,
+        source: &StyleProperties<'static>,
+    ) -> Result<()> {
+        macro_rules! merge_prop {
+            ($target_field:expr, $source_field:expr, $resource:literal) => {
+                if let Some(value) = $source_field.as_deref() {
+                    $target_field = Some(Cow::Owned(try_owned_string(value, $resource)?));
+                }
+            };
+        }
+
+        merge_prop!(
+            target.text.font_name,
+            source.text.font_name,
+            "ODT resolved style font name"
+        );
+        merge_prop!(
+            target.text.font_size,
+            source.text.font_size,
+            "ODT resolved style font size"
+        );
+        merge_prop!(
+            target.text.font_weight,
+            source.text.font_weight,
+            "ODT resolved style font weight"
+        );
+        merge_prop!(
+            target.text.font_style,
+            source.text.font_style,
+            "ODT resolved style font style"
+        );
+        merge_prop!(
+            target.text.color,
+            source.text.color,
+            "ODT resolved style text color"
+        );
+        merge_prop!(
+            target.text.background_color,
+            source.text.background_color,
+            "ODT resolved style text background"
+        );
+        merge_prop!(
+            target.text.underline,
+            source.text.underline,
+            "ODT resolved style underline"
+        );
+        merge_prop!(
+            target.text.strikethrough,
+            source.text.strikethrough,
+            "ODT resolved style strikethrough"
+        );
+        merge_prop!(
+            target.text.text_shadow,
+            source.text.text_shadow,
+            "ODT resolved style text shadow"
+        );
+        merge_prop!(
+            target.paragraph.margin_left,
+            source.paragraph.margin_left,
+            "ODT resolved style left margin"
+        );
+        merge_prop!(
+            target.paragraph.margin_right,
+            source.paragraph.margin_right,
+            "ODT resolved style right margin"
+        );
+        merge_prop!(
+            target.paragraph.margin_top,
+            source.paragraph.margin_top,
+            "ODT resolved style top margin"
+        );
+        merge_prop!(
+            target.paragraph.margin_bottom,
+            source.paragraph.margin_bottom,
+            "ODT resolved style bottom margin"
+        );
+        merge_prop!(
+            target.paragraph.text_align,
+            source.paragraph.text_align,
+            "ODT resolved style text alignment"
+        );
+        merge_prop!(
+            target.paragraph.line_height,
+            source.paragraph.line_height,
+            "ODT resolved style line height"
+        );
+        merge_prop!(
+            target.paragraph.background_color,
+            source.paragraph.background_color,
+            "ODT resolved style paragraph background"
+        );
+        merge_prop!(
+            target.paragraph.border,
+            source.paragraph.border,
+            "ODT resolved style paragraph border"
+        );
+        merge_prop!(
+            target.table.width,
+            source.table.width,
+            "ODT resolved style table width"
+        );
+        merge_prop!(
+            target.table.background_color,
+            source.table.background_color,
+            "ODT resolved style table background"
+        );
+        merge_prop!(
+            target.table.border,
+            source.table.border,
+            "ODT resolved style table border"
+        );
+        merge_prop!(
+            target.table.align,
+            source.table.align,
+            "ODT resolved style table alignment"
+        );
+        merge_prop!(
+            target.graphic.background_color,
+            source.graphic.background_color,
+            "ODT resolved style graphic background"
+        );
+        merge_prop!(
+            target.graphic.border,
+            source.graphic.border,
+            "ODT resolved style graphic border"
+        );
+        merge_prop!(
+            target.graphic.shadow,
+            source.graphic.shadow,
+            "ODT resolved style graphic shadow"
+        );
+        Ok(())
+    }
+
     /// Parse styles from XML content
     pub fn from_xml(xml_content: &str) -> Result<Self> {
         let mut registry = Self::default();
@@ -538,40 +712,46 @@ impl StyleRegistry {
         // For now, use a simple approach that just parses style attributes
         // Full property parsing can be added later
         let mut reader = quick_xml::Reader::from_str(xml_content);
-        let mut buf = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
-
-                    if tag_name == "style:style" {
-                        let mut element = Element::new("style:style");
+                    if e.name().as_ref() == b"style:style" {
+                        let mut element = Element::try_new("style:style")?;
 
                         // Parse attributes
                         for attr_result in e.attributes() {
-                            if let Ok(attr) = attr_result
-                                && let (Ok(key), Ok(value)) = (
-                                    String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec()),
-                                )
-                            {
-                                element.set_attribute(&key, &value);
-                            }
+                            let attr = attr_result.map_err(|error| {
+                                Error::XmlError(format!("invalid ODT style attribute: {error}"))
+                            })?;
+                            let key = std::str::from_utf8(attr.key.as_ref()).map_err(|error| {
+                                Error::XmlError(format!(
+                                    "invalid UTF-8 in ODT style attribute name: {error}"
+                                ))
+                            })?;
+                            let value =
+                                std::str::from_utf8(attr.value.as_ref()).map_err(|error| {
+                                    Error::XmlError(format!(
+                                        "invalid UTF-8 in ODT style attribute value: {error}"
+                                    ))
+                                })?;
+                            element.try_set_attribute(
+                                key,
+                                value,
+                                "ODT style registry attribute",
+                            )?;
                         }
 
                         // Create style from element
-                        if let Ok(style) = Style::from_element(element) {
-                            registry.add_style(style);
-                        }
+                        registry.try_add_style(Style::from_element(element)?)?;
                     }
                 },
                 Ok(quick_xml::events::Event::Eof) => break,
-                Err(_) => break,
+                Err(error) => {
+                    return Err(Error::XmlError(format!("invalid ODT style XML: {error}")));
+                },
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(registry)

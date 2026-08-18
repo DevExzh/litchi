@@ -5,7 +5,9 @@
 //! their full representation.
 
 use super::table::{Table, TableCell, TableRow};
-use litchi_core::Result;
+use litchi_core::{Error, Result};
+
+const MAX_EXPANDED_ITEMS: usize = 1_000_000;
 
 /// Utilities for expanding repeated table elements
 pub struct TableExpander;
@@ -37,24 +39,33 @@ impl TableExpander {
     /// let expanded = TableExpander::expand_table(&table).unwrap();
     /// ```
     pub fn expand_table(table: &Table) -> Result<Table> {
-        let mut expanded_table = Table::new();
+        let mut expanded_table = Table::try_new()?;
 
         // Copy table metadata
         if let Some(name) = table.name() {
-            expanded_table.set_name(name);
+            expanded_table.try_set_name(name)?;
         }
         if let Some(style) = table.style_name() {
-            expanded_table.set_style_name(style);
+            expanded_table.try_set_style_name(style)?;
         }
 
         // Expand all rows
+        let mut expanded_rows = 0usize;
         for row in table.rows()? {
             // Check for row repetition
-            let row_repeat_count = Self::get_row_repeat_count(&row);
+            let row_repeat_count = Self::get_row_repeat_count(&row)?;
+            expanded_rows = expanded_rows.checked_add(row_repeat_count).ok_or_else(|| {
+                Error::InvalidFormat("ODT expanded table row count overflow".to_string())
+            })?;
+            if expanded_rows > MAX_EXPANDED_ITEMS {
+                return Err(Error::InvalidFormat(
+                    "ODT expanded table exceeds 1000000 rows".to_string(),
+                ));
+            }
 
             for _ in 0..row_repeat_count {
                 let expanded_row = Self::expand_row(&row)?;
-                expanded_table.add_row(expanded_row);
+                expanded_table.try_add_row(expanded_row)?;
             }
         }
 
@@ -71,20 +82,29 @@ impl TableExpander {
     ///
     /// A new `TableRow` with all repeated cells expanded
     fn expand_row(row: &TableRow) -> Result<TableRow> {
-        let mut expanded_row = TableRow::new();
+        let mut expanded_row = TableRow::try_new()?;
 
         // Copy row metadata
         if let Some(style) = row.style_name() {
-            expanded_row.set_style_name(style);
+            expanded_row.try_set_style_name(style)?;
         }
 
         // Expand all cells
+        let mut expanded_cells = 0usize;
         for cell in row.cells()? {
-            let repeat_count = Self::get_cell_repeat_count(&cell);
+            let repeat_count = Self::get_cell_repeat_count(&cell)?;
+            expanded_cells = expanded_cells.checked_add(repeat_count).ok_or_else(|| {
+                Error::InvalidFormat("ODT expanded table cell count overflow".to_string())
+            })?;
+            if expanded_cells > MAX_EXPANDED_ITEMS {
+                return Err(Error::InvalidFormat(
+                    "ODT expanded table row exceeds 1000000 cells".to_string(),
+                ));
+            }
 
             for _ in 0..repeat_count {
                 let expanded_cell = Self::clone_cell(&cell)?;
-                expanded_row.add_cell(expanded_cell);
+                expanded_row.try_add_cell(expanded_cell)?;
             }
         }
 
@@ -94,15 +114,27 @@ impl TableExpander {
     /// Get the number of times a row should be repeated.
     ///
     /// Returns 1 if no repetition is specified.
-    fn get_row_repeat_count(row: &TableRow) -> usize {
-        row.repeat_count()
+    fn get_row_repeat_count(row: &TableRow) -> Result<usize> {
+        let count = row.try_repeat_count()?;
+        if count == 0 || count > MAX_EXPANDED_ITEMS {
+            return Err(Error::InvalidFormat(
+                "ODT table row repetition must be between 1 and 1000000".to_string(),
+            ));
+        }
+        Ok(count)
     }
 
     /// Get the number of times a cell should be repeated.
     ///
     /// Returns 1 if no repetition is specified.
-    fn get_cell_repeat_count(cell: &TableCell) -> usize {
-        cell.repeat_count()
+    fn get_cell_repeat_count(cell: &TableCell) -> Result<usize> {
+        let count = cell.try_repeat_count()?;
+        if count == 0 || count > MAX_EXPANDED_ITEMS {
+            return Err(Error::InvalidFormat(
+                "ODT table cell repetition must be between 1 and 1000000".to_string(),
+            ));
+        }
+        Ok(count)
     }
 
     /// Clone a cell with all its properties.
@@ -115,27 +147,27 @@ impl TableExpander {
     ///
     /// A new `TableCell` with the same properties
     fn clone_cell(cell: &TableCell) -> Result<TableCell> {
-        let mut new_cell = TableCell::new();
+        let mut new_cell = TableCell::try_new()?;
 
         // Copy text content
-        new_cell.set_text(&cell.text()?);
+        new_cell.try_set_text(&cell.text()?)?;
 
         // Copy formula
         if let Some(formula) = cell.formula() {
-            new_cell.set_formula(formula);
+            new_cell.try_set_formula(formula)?;
         }
 
         // Copy style
         if let Some(style) = cell.style_name() {
-            new_cell.set_style_name(style);
+            new_cell.try_set_style_name(style)?;
         }
 
         // Copy span attributes (but not if they're from repetition)
         if cell.colspan() > 1 {
-            new_cell.set_colspan(cell.colspan());
+            new_cell.try_set_colspan(cell.colspan())?;
         }
         if cell.rowspan() > 1 {
-            new_cell.set_rowspan(cell.rowspan());
+            new_cell.try_set_rowspan(cell.rowspan())?;
         }
 
         Ok(new_cell)
@@ -153,7 +185,13 @@ impl TableExpander {
     ///
     /// A new vector of expanded tables
     pub fn expand_tables(tables: Vec<Table>) -> Result<Vec<Table>> {
-        let mut expanded_tables = Vec::with_capacity(tables.len());
+        let mut expanded_tables = Vec::new();
+        expanded_tables
+            .try_reserve_exact(tables.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT expanded tables",
+                source,
+            })?;
 
         for table in tables {
             expanded_tables.push(Self::expand_table(&table)?);

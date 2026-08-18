@@ -8,10 +8,29 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use soapberry_zip::office::ArchiveReader;
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 const MANIFEST_PATHS: [&str; 2] = ["META-INF/manifest.xml", "manifest.xml"];
+
+fn try_copy_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.extend_from_slice(value);
+    Ok(output)
+}
+
+fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
 
 impl<'data> Archive<'data> {
     /// Open an ODF ZIP archive from a borrowed byte slice.
@@ -146,23 +165,33 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
                 validate_manifest_path(&path)?;
-                if entries.insert(path.clone(), entry).is_some() {
+                if entries.contains_key(&path) {
                     return Err(Error::InvalidFormat(format!(
                         "Duplicate manifest file entry '{path}'"
                     )));
                 }
-                current_path = Some(path);
+                entries.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "ODF manifest entry index",
+                    source,
+                })?;
+                current_path = Some(try_copy_string(&path, "ODF manifest current path")?);
+                entries.insert(path, entry);
             },
             Event::Empty(element) if is_manifest_element(&namespace, &element, b"file-entry") => {
                 let (path, entry) = parse_entry(&reader, &element)?.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
                 validate_manifest_path(&path)?;
-                if entries.insert(path.clone(), entry).is_some() {
+                if entries.contains_key(&path) {
                     return Err(Error::InvalidFormat(format!(
                         "Duplicate manifest file entry '{path}'"
                     )));
                 }
+                entries.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "ODF manifest entry index",
+                    source,
+                })?;
+                entries.insert(path, entry);
             },
             Event::End(element)
                 if namespace_is_manifest(&namespace)
@@ -192,7 +221,8 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
     }
     let mimetype = entries
         .get("/")
-        .map(|entry| entry.media_type.clone())
+        .map(|entry| try_copy_string(&entry.media_type, "ODF manifest mimetype"))
+        .transpose()?
         .unwrap_or_default();
     Ok(Manifest { mimetype, entries })
 }
@@ -239,13 +269,22 @@ fn manifest_attributes(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| {
                 Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
-            })?
-            .into_owned();
-        if values.insert(local.as_ref().to_vec(), value).is_some() {
+            })?;
+        if values.contains_key(local.as_ref()) {
             return Err(Error::InvalidFormat(
                 "Duplicate manifest attribute".to_string(),
             ));
         }
+        values.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODF manifest attributes",
+            source,
+        })?;
+        let key = try_copy_bytes(local.as_ref(), "ODF manifest attribute name")?;
+        let value = match value {
+            Cow::Owned(value) => value,
+            Cow::Borrowed(value) => try_copy_string(value, "ODF manifest attribute value")?,
+        };
+        values.insert(key, value);
     }
     Ok(values)
 }
@@ -254,8 +293,8 @@ fn parse_entry(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<Option<(String, Entry)>> {
-    let attributes = manifest_attributes(reader, element)?;
-    let Some(full_path) = attributes.get(b"full-path".as_slice()).cloned() else {
+    let mut attributes = manifest_attributes(reader, element)?;
+    let Some(full_path) = attributes.remove(b"full-path".as_slice()) else {
         return Ok(None);
     };
     if full_path.is_empty() {
@@ -273,8 +312,7 @@ fn parse_entry(
         full_path,
         Entry {
             media_type: attributes
-                .get(b"media-type".as_slice())
-                .cloned()
+                .remove(b"media-type".as_slice())
                 .unwrap_or_default(),
             size,
         },

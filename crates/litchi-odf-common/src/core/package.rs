@@ -660,6 +660,16 @@ impl SourceBackedPackage {
         Ok(self.source_version)
     }
 
+    /// Clone the immutable positional source retained by this package.
+    ///
+    /// This is an internal facade handoff used by format owners that adopt an
+    /// already validated package index. It does not materialize any member.
+    #[doc(hidden)]
+    #[must_use = "the cloned source keeps the prepared package snapshot alive"]
+    pub fn source_arc(&self) -> Arc<dyn ReadAt> {
+        Arc::clone(&self.source)
+    }
+
     /// Return the physical source length captured at open.
     #[must_use]
     pub const fn len(&self) -> u64 {

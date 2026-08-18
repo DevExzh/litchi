@@ -21,6 +21,14 @@ const MAX_DEPTH: usize = 4_096;
 const MAX_NOTES: usize = 1_000_000;
 const MAX_NOTE_TEXT_BYTES: usize = 1_048_576;
 
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteClass {
     Footnote,
@@ -290,25 +298,32 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                         },
                     };
                     let id = namespaced_attribute(&reader, element, TEXT_NAMESPACE, b"id", "note")?;
-                    active.push(ActiveNote {
-                        note: Note {
-                            class,
-                            id,
-                            citation: String::new(),
-                            label: None,
-                            body: String::new(),
-                            rich_body: None,
+                    if let Some(id) = id.as_deref() {
+                        validate_note_text(id, "note ID")?;
+                    }
+                    try_push(
+                        &mut active,
+                        ActiveNote {
+                            note: Note {
+                                class,
+                                id,
+                                citation: String::new(),
+                                label: None,
+                                body: String::new(),
+                                rich_body: None,
+                            },
+                            depth: 1,
+                            citation_depth: None,
+                            citation_seen: false,
+                            body_depth: None,
+                            body_seen: false,
+                            paragraph_depth: None,
+                            seen_paragraph: false,
+                            skip_body_depth: None,
+                            order: next_order,
                         },
-                        depth: 1,
-                        citation_depth: None,
-                        citation_seen: false,
-                        body_depth: None,
-                        body_seen: false,
-                        paragraph_depth: None,
-                        seen_paragraph: false,
-                        skip_body_depth: None,
-                        order: next_order,
-                    });
+                        "ODT active-note parser stack",
+                    )?;
                     next_order += 1;
                 } else if !active.is_empty() {
                     let last = active.len() - 1;
@@ -330,6 +345,9 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                             b"label",
                             "note citation",
                         )?;
+                        if let Some(label) = active[last].note.label.as_deref() {
+                            validate_note_text(label, "note citation label")?;
+                        }
                     } else if text_element && element.local_name().as_ref() == b"note-body" {
                         if active[last].depth != 2
                             || !active[last].citation_seen
@@ -355,7 +373,11 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                                 && matches!(element.local_name().as_ref(), b"p" | b"h")
                             {
                                 if note.seen_paragraph {
-                                    append_checked(&mut note.note.body, "\n")?;
+                                    append_bounded_note_text(
+                                        &mut note.note.body,
+                                        "\n",
+                                        "note body",
+                                    )?;
                                 }
                                 note.seen_paragraph = true;
                                 note.paragraph_depth = Some(note.depth);
@@ -365,6 +387,7 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                                 && note.skip_body_depth.is_none()
                             {
                                 append_text_control(&reader, element, &mut note.note.body)?;
+                                validate_note_text(&note.note.body, "note body")?;
                             }
                         }
                     }
@@ -393,6 +416,9 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                         b"label",
                         "note citation",
                     )?;
+                    if let Some(label) = active[last].note.label.as_deref() {
+                        validate_note_text(label, "note citation label")?;
+                    }
                 } else if text_element && element.local_name().as_ref() == b"note-body" {
                     if active[last].depth != 1
                         || !active[last].citation_seen
@@ -411,7 +437,7 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                             && matches!(element.local_name().as_ref(), b"p" | b"h")
                         {
                             if note.seen_paragraph {
-                                append_checked(&mut note.note.body, "\n")?;
+                                append_bounded_note_text(&mut note.note.body, "\n", "note body")?;
                             }
                             note.seen_paragraph = true;
                         } else if text_element
@@ -419,6 +445,7 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                             && note.skip_body_depth.is_none()
                         {
                             append_text_control(&reader, element, &mut note.note.body)?;
+                            validate_note_text(&note.note.body, "note body")?;
                         }
                     }
                 }
@@ -473,7 +500,12 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
                             "text:note requires citation and body".to_string(),
                         ));
                     }
-                    notes.push((finished.order, finished.note));
+                    finished.note.validate()?;
+                    try_push(
+                        &mut notes,
+                        (finished.order, finished.note),
+                        "ODT note projection",
+                    )?;
                 }
             },
             Event::Eof => break,
@@ -487,7 +519,17 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
         ));
     }
     notes.sort_by_key(|(order, _)| *order);
-    let mut notes = notes.into_iter().map(|(_, note)| note).collect::<Vec<_>>();
+    let mut projected = Vec::new();
+    projected
+        .try_reserve_exact(notes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT sorted note projection",
+            source,
+        })?;
+    for (_, note) in notes {
+        projected.push(note);
+    }
+    let mut notes = projected;
     if notes.is_empty() {
         return Ok(notes);
     }
@@ -504,6 +546,7 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
             ));
         }
         note.rich_body = Some(rich_body);
+        note.validate()?;
     }
     Ok(notes)
 }
@@ -511,12 +554,24 @@ pub(crate) fn parse_notes(xml: &str) -> Result<Vec<Note>> {
 fn append_note_text(active: &mut [ActiveNote], value: &str) -> Result<()> {
     for note in active {
         if note.citation_depth.is_some() {
-            append_checked(&mut note.note.citation, value)?;
+            append_bounded_note_text(&mut note.note.citation, value, "note citation")?;
         } else if note.paragraph_depth.is_some() && note.skip_body_depth.is_none() {
-            append_checked(&mut note.note.body, value)?;
+            append_bounded_note_text(&mut note.note.body, value, "note body")?;
         }
     }
     Ok(())
+}
+
+fn append_bounded_note_text(target: &mut String, value: &str, context: &str) -> Result<()> {
+    let new_len = target
+        .len()
+        .checked_add(value.len())
+        .ok_or_else(|| Error::InvalidFormat(format!("invalid {context}")))?;
+    if new_len > MAX_NOTE_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!("invalid {context}")));
+    }
+    validate_note_text(value, context)?;
+    append_checked(target, value)
 }
 
 fn checked_depth(depth: usize) -> Result<usize> {

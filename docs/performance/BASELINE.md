@@ -14,6 +14,25 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+## Latest retained high-level ODT source-ingress result (change 0191)
+
+`litchi::Document::open(Path)` now retains validated ODT files through one
+positional ODF package and source-backed semantic owner. Eager `from_bytes`,
+OOXML-before-ODF precedence, and ODS/ODP ownership are unchanged.
+
+CPU-2 A1/B1/B2/A2 release runs used 30 warmups and 500 samples over one
+16.8 MB package with 10,000 paragraphs and eight 2 MiB pictures. Open-only
+statistics remain withheld because same-implementation drift fails each tier.
+Open-plus-full-text p50/mean/p95/p99 reductions are
+31.41%/31.35%/35.36%/30.02% and 31.74%/32.44%/32.77%/32.50% in the paired
+directions; all four pass their predeclared drift ceilings.
+
+An untimed typed-source replay reads 29,080 logical bytes and zero picture
+range bytes. This is warm in-process and logical-range evidence, not a
+physical-I/O, cold-cache, allocation/RSS, producer, edit/save, or broad ODF
+claim. See [change 0191](changes/0191-odt-unified-source-ingress.md) and its
+[summary](results/odt-unified-ingress-0199-summary.json).
+
 ## Latest retained high-level XLSX source-ingress result (change 0187)
 
 `litchi::Workbook::open(Path)` now hands validated XLSX files from one
@@ -810,7 +829,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**336 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**340 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.

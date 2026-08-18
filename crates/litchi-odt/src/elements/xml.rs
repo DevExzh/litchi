@@ -1,4 +1,4 @@
-use super::element::{Element, ElementBase};
+use super::element::{Element, ElementBase, try_owned_string, try_prefixed_name};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart};
@@ -43,14 +43,15 @@ pub(crate) fn namespaced_attribute(
                     String::from_utf8_lossy(expected_local_name)
                 )));
             }
-            value = Some(
-                attribute
-                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid {context} attribute value: {error}"))
-                    })?
-                    .into_owned(),
-            );
+            let decoded = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid {context} attribute value: {error}"))
+                })?;
+            value = Some(try_owned_string(
+                &decoded,
+                "ODT namespaced attribute value",
+            )?);
         }
     }
     Ok(value)
@@ -75,35 +76,35 @@ pub(crate) fn copy_canonical_attributes(
         })?;
         let name = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE => {
-                format!("office:{local_name}")
+                try_prefixed_name("office", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
-                format!("text:{local_name}")
+                try_prefixed_name("text", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == DRAW_NAMESPACE => {
-                format!("draw:{local_name}")
+                try_prefixed_name("draw", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == STYLE_NAMESPACE => {
-                format!("style:{local_name}")
+                try_prefixed_name("style", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == NUMBER_NAMESPACE => {
-                format!("number:{local_name}")
+                try_prefixed_name("number", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == SCRIPT_NAMESPACE => {
-                format!("script:{local_name}")
+                try_prefixed_name("script", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
-                format!("xlink:{local_name}")
+                try_prefixed_name("xlink", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
-                format!("xml:{local_name}")
+                try_prefixed_name("xml", local_name, "ODT inline attribute name")?
             },
             ResolveResult::Bound(_) | ResolveResult::Unbound => {
                 std::str::from_utf8(attribute.key.as_ref())
-                    .map(str::to_string)
                     .map_err(|_error| {
                         Error::InvalidFormat(format!("non-UTF-8 {context} attribute name"))
-                    })?
+                    })
+                    .and_then(|name| try_owned_string(name, "ODT inline attribute name"))?
             },
             ResolveResult::Unknown(prefix) => {
                 return Err(Error::InvalidFormat(format!(
@@ -122,7 +123,7 @@ pub(crate) fn copy_canonical_attributes(
             .map_err(|error| {
                 Error::InvalidFormat(format!("invalid {context} attribute value: {error}"))
             })?;
-        element.set_attribute(&name, &value);
+        element.try_set_attribute(&name, &value, "ODT inline element attribute")?;
     }
     Ok(())
 }
@@ -163,7 +164,7 @@ pub(crate) fn append_checked(output: &mut String, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn ensure_text_capacity(output: &str, additional: usize) -> Result<()> {
+fn ensure_text_capacity(output: &mut String, additional: usize) -> Result<()> {
     let length = output
         .len()
         .checked_add(additional)
@@ -173,6 +174,12 @@ fn ensure_text_capacity(output: &str, additional: usize) -> Result<()> {
             "ODF inline text exceeds {MAX_INLINE_TEXT_BYTES} bytes"
         )));
     }
+    output
+        .try_reserve(additional)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT inline text projection",
+            source,
+        })?;
     Ok(())
 }
 

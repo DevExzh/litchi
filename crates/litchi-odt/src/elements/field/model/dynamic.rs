@@ -1002,12 +1002,7 @@ impl DynamicTextField {
                     false,
                     &mut aggregate,
                 )?;
-                let rebuilt = MetaFieldContent::new(content.nodes().to_vec())?;
-                if &rebuilt != content {
-                    return Err(Error::InvalidFormat(
-                        "inconsistent text:meta-field content cache".to_string(),
-                    ));
-                }
+                content.validate()?;
             },
         }
         Ok(())

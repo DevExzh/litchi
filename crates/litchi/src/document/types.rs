@@ -44,6 +44,9 @@ pub(super) enum DocumentImpl {
     /// OpenDocument Text format
     #[cfg(feature = "odt")]
     Odt(litchi_odt::Document),
+    /// Filesystem-backed OpenDocument Text with deferred package payloads.
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    OdtSource(litchi_odt::SourceBackedDocument),
 }
 
 /// Document format detection.

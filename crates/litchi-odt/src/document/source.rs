@@ -26,6 +26,7 @@ use litchi_odf_common::core::{
 use litchi_odf_common::package::{is_media_path, resolve_package_path};
 use zeroize::Zeroizing;
 
+use super::codec::parse_hyperlinks;
 use crate::elements::style::{StyleElements, StyleRegistry};
 use crate::elements::table::Table as ElementTable;
 use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
@@ -156,6 +157,17 @@ impl SourceBackedDocument {
         Self::from_read_at_inner(source, limits)
     }
 
+    /// Adopt an already validated positional ODF package without rebuilding
+    /// its ZIP index.
+    ///
+    /// This hidden handoff is used by the unified format detector after it has
+    /// arbitrated any competing OOXML catalog on the same physical source.
+    #[doc(hidden)]
+    pub fn from_source_package(package: SourceBackedPackage) -> Result<Self> {
+        let source = package.source_arc();
+        Self::from_package(source, package)
+    }
+
     /// Open a password-protected ODT from a positional source with explicit
     /// finite limits.
     pub fn from_read_at_with_limits_and_password(
@@ -193,12 +205,12 @@ impl SourceBackedDocument {
             super::package::validate_mimetype(mimetype)?;
 
             let content_bytes = package.get_file(crate::constants::ODF_CONTENT)?;
-            let content = Content::from_bytes(&content_bytes)?;
+            let content = Content::from_vec(content_bytes)?;
             validate_content_document_part(content.xml_content(), CONTENT_ROOT, FAMILY_NAME)?;
 
             let styles = if package.has_file(crate::constants::ODF_STYLES)? {
-                Some(Styles::from_bytes(
-                    &package.get_file(crate::constants::ODF_STYLES)?,
+                Some(Styles::from_vec(
+                    package.get_file(crate::constants::ODF_STYLES)?,
                 )?)
             } else {
                 None
@@ -208,24 +220,18 @@ impl SourceBackedDocument {
             // while retaining semantic metadata validation for metadata()
             // and odf_metadata().
             let meta = if package.has_file(crate::constants::ODF_META)? {
-                Some(Meta::from_bytes(
-                    &package.get_file(crate::constants::ODF_META)?,
+                Some(Meta::from_vec(
+                    package.get_file(crate::constants::ODF_META)?,
                 )?)
             } else {
                 None
             };
 
             let mut style_registry = StyleRegistry::default();
-            if let Some(styles_part) = styles.as_ref()
-                && let Ok(registry) = StyleElements::parse_styles(styles_part.xml_content())
-            {
-                style_registry = registry;
+            if let Some(styles_part) = styles.as_ref() {
+                style_registry = StyleElements::parse_styles(styles_part.xml_content())?;
             }
-            if let Ok(content_registry) = StyleElements::parse_styles(content.xml_content()) {
-                for (_name, style) in content_registry.styles {
-                    style_registry.add_style(style);
-                }
-            }
+            style_registry.try_extend(StyleElements::parse_styles(content.xml_content())?)?;
 
             Ok((content, styles, meta, style_registry))
         })();
@@ -435,6 +441,61 @@ impl SourceBackedDocument {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
+    /// Return all semantic notes in document order without materializing the
+    /// remaining package members.
+    pub fn notes(&self) -> Result<Vec<crate::Note>> {
+        self.check_source()?;
+        let result = crate::note::parse_notes(self.content.xml_content());
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Return semantic footnotes in document order.
+    pub fn footnotes(&self) -> Result<Vec<crate::Note>> {
+        let result = self.notes().and_then(|notes| {
+            let mut filtered = Vec::new();
+            filtered
+                .try_reserve_exact(notes.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT source footnote projection",
+                    source,
+                })?;
+            for note in notes {
+                if note.class() == crate::NoteClass::Footnote {
+                    filtered.push(note);
+                }
+            }
+            Ok(filtered)
+        });
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Return semantic endnotes in document order.
+    pub fn endnotes(&self) -> Result<Vec<crate::Note>> {
+        let result = self.notes().and_then(|notes| {
+            let mut filtered = Vec::new();
+            filtered
+                .try_reserve_exact(notes.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT source endnote projection",
+                    source,
+                })?;
+            for note in notes {
+                if note.class() == crate::NoteClass::Endnote {
+                    filtered.push(note);
+                }
+            }
+            Ok(filtered)
+        });
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Extract hyperlinks from the retained content projection.
+    pub fn hyperlinks(&self) -> Result<Vec<(String, String)>> {
+        self.check_source()?;
+        let result = parse_hyperlinks(self.content.xml_content());
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
     /// Return the complete format-specific ODF metadata model.
     pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
         self.check_source()?;
@@ -456,9 +517,8 @@ impl SourceBackedDocument {
         style_name: &str,
     ) -> Result<crate::elements::style::StyleProperties<'static>> {
         self.check_source()?;
-        let value = self.style_registry.get_resolved_properties(style_name);
-        self.check_source()?;
-        Ok(value)
+        let value = self.style_registry.try_get_resolved_properties(style_name);
+        prefer_current(self.source.as_ref(), self.source_version, value)
     }
 
     /// Discover referenced, inline, missing, and inert linked images.
@@ -477,7 +537,16 @@ impl SourceBackedDocument {
     pub fn image_bytes(&self, image: &crate::Image) -> Result<Option<Vec<u8>>> {
         self.check_source()?;
         let result = match &image.source {
-            litchi_odf_common::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
+            litchi_odf_common::media::Source::Inline { bytes, .. } => (|| {
+                let mut copy = Vec::new();
+                copy.try_reserve_exact(bytes.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT inline image bytes",
+                        source,
+                    })?;
+                copy.extend_from_slice(bytes);
+                Ok(Some(copy))
+            })(),
             litchi_odf_common::media::Source::PackagePart { path, .. } => self.media_data(path),
             litchi_odf_common::media::Source::MissingPackagePart { .. }
             | litchi_odf_common::media::Source::Linked { .. }

@@ -21,6 +21,17 @@ impl Meta {
         })
     }
 
+    /// Parse `meta.xml` while consuming owned bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes are not valid UTF-8.
+    pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+        Ok(Self {
+            xml: XmlPart::from_vec(bytes)?,
+        })
+    }
+
     /// Borrow the raw `meta.xml` text.
     #[must_use]
     pub fn xml_content(&self) -> &str {
@@ -42,6 +53,6 @@ impl Meta {
     ///
     /// Returns an error when the metadata XML is malformed or invalid.
     pub fn try_extract_metadata(&self) -> Result<litchi_core::Metadata> {
-        Ok(self.odf_metadata()?.into())
+        self.odf_metadata()?.try_into_core()
     }
 }

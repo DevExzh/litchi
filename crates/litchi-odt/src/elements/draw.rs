@@ -65,7 +65,7 @@ impl TextBox {
 
     /// Get the text content
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 }
 

@@ -18,6 +18,15 @@ struct ActiveHyperlink {
     depth: usize,
 }
 
+fn try_push_link(links: &mut Vec<(String, String)>, value: (String, String)) -> Result<()> {
+    links.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODT hyperlink projection",
+        source,
+    })?;
+    links.push(value);
+    Ok(())
+}
+
 pub(super) fn parse_hyperlinks(xml: &str) -> Result<Vec<(String, String)>> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -73,7 +82,7 @@ pub(super) fn parse_hyperlinks(xml: &str) -> Result<Vec<(String, String)>> {
                         namespaced_attribute(&reader, element, XLINK_NAMESPACE, b"href", "text:a")?
                 {
                     validation::ensure_reference_capacity(links.len(), "hyperlinks")?;
-                    links.push((String::new(), href));
+                    try_push_link(&mut links, (String::new(), href))?;
                 }
             },
             Event::Text(ref value) if active.is_some() => {
@@ -134,7 +143,7 @@ pub(super) fn parse_hyperlinks(xml: &str) -> Result<Vec<(String, String)>> {
                         })?;
                         if let Some(href) = link.href {
                             validation::ensure_reference_capacity(links.len(), "hyperlinks")?;
-                            links.push((link.text, href));
+                            try_push_link(&mut links, (link.text, href))?;
                         }
                     }
                 }

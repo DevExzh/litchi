@@ -7,7 +7,7 @@ mod codec;
 mod model;
 mod validation;
 
-use super::element::{Element, ElementBase};
+use super::element::{Element, ElementBase, try_owned_string, try_prefixed_name};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
@@ -32,6 +32,14 @@ const MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
 const MAX_SPACE_COUNT: usize = 1_000_000;
 /// Qualified name of the unnumbered leading block of an ODF list.
 const LIST_HEADER_TAG: &str = "text:list-header";
+
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
+}
 
 /// A text paragraph element
 #[derive(Debug, Clone)]
@@ -80,7 +88,7 @@ impl Paragraph {
 
     /// Get the text content of the paragraph
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 
     pub(crate) fn into_text(self) -> String {
@@ -96,10 +104,9 @@ impl Paragraph {
     pub fn spans(&self) -> Result<Vec<Span>> {
         let mut spans = Vec::new();
         for child in &self.element.children {
-            if child.tag_name() == "text:span"
-                && let Ok(span) = Span::from_element(child.clone())
-            {
-                spans.push(span);
+            if child.tag_name() == "text:span" {
+                let span = Span::from_element(child.try_clone()?)?;
+                try_push(&mut spans, span, "ODT span projection")?;
             }
         }
         Ok(spans)
@@ -129,13 +136,17 @@ impl Paragraph {
 
     /// Return direct `text:a` hyperlink children in document order.
     pub fn hyperlinks(&self) -> Result<Vec<Hyperlink>> {
-        self.element
-            .children
-            .iter()
-            .filter(|child| child.tag_name() == "text:a")
-            .cloned()
-            .map(Hyperlink::from_element)
-            .collect()
+        let mut hyperlinks = Vec::new();
+        for child in &self.element.children {
+            if child.tag_name() == "text:a" {
+                try_push(
+                    &mut hyperlinks,
+                    Hyperlink::from_element(child.try_clone()?)?,
+                    "ODT hyperlink projection",
+                )?;
+            }
+        }
+        Ok(hyperlinks)
     }
 
     /// Check if this paragraph is a heading
@@ -189,7 +200,7 @@ impl NumberedParagraph {
 
     /// Get the text content of the paragraph.
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 
     /// Set the text content of the paragraph.
@@ -278,7 +289,7 @@ impl Span {
 
     /// Get the text content of the span
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 
     /// Set the text content of the span
@@ -433,7 +444,7 @@ impl Hyperlink {
 
     /// Get the link text content
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 
     /// Set the link text content
@@ -593,11 +604,22 @@ impl Heading {
 
     /// Get the text content of the heading
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 
     pub(crate) fn into_text(self) -> String {
         self.element.into_text_recursive()
+    }
+
+    /// Convert this heading to a paragraph with fallible text/style projection.
+    pub fn try_into_paragraph(self) -> Result<Paragraph> {
+        let text = self.element.try_get_text_recursive()?;
+        let mut element = Element::try_new("text:p")?;
+        element.try_set_text(&text, "ODT heading paragraph text")?;
+        if let Some(style) = self.element.get_attribute("text:style-name") {
+            element.try_set_attribute("text:style-name", style, "ODT heading paragraph style")?;
+        }
+        Ok(Paragraph { element })
     }
 
     /// Set the text content of the heading
@@ -672,10 +694,9 @@ impl List {
     pub fn items(&self) -> Result<Vec<ListItem>> {
         let mut items = Vec::new();
         for child in &self.element.children {
-            if child.tag_name() == "text:list-item"
-                && let Ok(item) = ListItem::from_element(child.clone())
-            {
-                items.push(item);
+            if child.tag_name() == "text:list-item" {
+                let item = ListItem::from_element(child.try_clone()?)?;
+                try_push(&mut items, item, "ODT list-item projection")?;
             }
         }
         Ok(items)
@@ -690,7 +711,7 @@ impl List {
     pub fn header(&self) -> Result<Option<ListHeader>> {
         for child in &self.element.children {
             if child.tag_name() == LIST_HEADER_TAG {
-                return ListHeader::from_element(child.clone()).map(Some);
+                return ListHeader::from_element(child.try_clone()?).map(Some);
             }
         }
         Ok(None)
@@ -762,7 +783,7 @@ impl ListHeader {
 
     /// Get the flattened text content of the header.
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 
     /// Set the text content of the header.
@@ -774,10 +795,9 @@ impl ListHeader {
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut paragraphs = Vec::new();
         for child in &self.element.children {
-            if child.tag_name() == "text:p"
-                && let Ok(paragraph) = Paragraph::from_element(child.clone())
-            {
-                paragraphs.push(paragraph);
+            if child.tag_name() == "text:p" {
+                let paragraph = Paragraph::from_element(child.try_clone()?)?;
+                try_push(&mut paragraphs, paragraph, "ODT paragraph projection")?;
             }
         }
         Ok(paragraphs)
@@ -827,7 +847,7 @@ impl ListItem {
 
     /// Get the text content of the list item
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive())
+        self.element.try_get_text_recursive()
     }
 
     /// Set the text content of the list item
@@ -839,10 +859,9 @@ impl ListItem {
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut paragraphs = Vec::new();
         for child in &self.element.children {
-            if child.tag_name() == "text:p"
-                && let Ok(para) = Paragraph::from_element(child.clone())
-            {
-                paragraphs.push(para);
+            if child.tag_name() == "text:p" {
+                let para = Paragraph::from_element(child.try_clone()?)?;
+                try_push(&mut paragraphs, para, "ODT paragraph projection")?;
             }
         }
         Ok(paragraphs)
@@ -941,6 +960,12 @@ impl RetainedText {
             )));
         }
         if let Some(output) = &mut self.value {
+            output
+                .try_reserve(value.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT selected text projection",
+                    source,
+                })?;
             output.push_str(value);
         }
         Ok(())
@@ -957,6 +982,12 @@ impl RetainedText {
             )));
         }
         if let Some(output) = &mut self.value {
+            output
+                .try_reserve(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT selected text projection",
+                    source,
+                })?;
             output.extend(std::iter::repeat_n(' ', count));
         }
         Ok(())
@@ -1065,6 +1096,10 @@ fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result
                 }
 
                 if starts_block {
+                    active.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "ODT active text-block stack",
+                        source,
+                    })?;
                     active.push(ActiveTextBlock {
                         element: make_text_block_element(&reader, element)?,
                         depth: 1,
@@ -1171,7 +1206,16 @@ fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result
             "incomplete ODF text XML structure".to_string(),
         ));
     }
-    Ok(blocks.into_iter().flatten().collect())
+    let completed = blocks.iter().filter(|block| block.is_some()).count();
+    let mut output = Vec::new();
+    output
+        .try_reserve(completed)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT completed text-block projection",
+            source,
+        })?;
+    output.extend(blocks.into_iter().flatten());
+    Ok(output)
 }
 
 fn parse_selected_paragraph(xml_content: &str, output: &mut ParagraphOutput) -> Result<()> {
@@ -1220,6 +1264,10 @@ fn parse_selected_paragraph(xml_content: &str, output: &mut ParagraphOutput) -> 
                 if starts_block {
                     count_text_block(&mut block_count)?;
                     let retain = output.begin(element);
+                    active.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "ODT selected text-block stack",
+                        source,
+                    })?;
                     active.push(ActiveSelectedTextBlock {
                         element: parse_selected_text_block_element(&reader, element, retain)?,
                         depth: 1,
@@ -1353,7 +1401,7 @@ fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) ->
             ));
         },
     };
-    let mut element = Element::new(tag_name);
+    let mut element = Element::try_new(tag_name)?;
     for attribute in source.attributes() {
         let attribute = attribute.map_err(|error| {
             Error::InvalidFormat(format!("invalid ODF text attribute: {error}"))
@@ -1367,20 +1415,20 @@ fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) ->
         })?;
         let name = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
-                format!("text:{local_name}")
+                try_prefixed_name("text", local_name, "ODT text attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
-                format!("xlink:{local_name}")
+                try_prefixed_name("xlink", local_name, "ODT text attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
-                format!("xml:{local_name}")
+                try_prefixed_name("xml", local_name, "ODT text attribute name")?
             },
             ResolveResult::Bound(_) | ResolveResult::Unbound => {
                 std::str::from_utf8(attribute.key.as_ref())
                     .map_err(|_error| {
                         Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
-                    })?
-                    .to_string()
+                    })
+                    .and_then(|name| try_owned_string(name, "ODT text attribute name"))?
             },
             ResolveResult::Unknown(prefix) => {
                 return Err(Error::InvalidFormat(format!(
@@ -1399,7 +1447,7 @@ fn make_text_block_element(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) ->
                 "duplicate ODF text attribute '{name}'"
             )));
         }
-        element.set_attribute(&name, &value);
+        element.try_set_attribute(&name, &value, "ODT text-block attribute")?;
     }
     Ok(element)
 }
@@ -1435,20 +1483,20 @@ fn parse_selected_text_block_element(
         })?;
         let name = match namespace {
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
-                format!("text:{local_name}")
+                try_prefixed_name("text", local_name, "ODT text attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
-                format!("xlink:{local_name}")
+                try_prefixed_name("xlink", local_name, "ODT text attribute name")?
             },
             ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
-                format!("xml:{local_name}")
+                try_prefixed_name("xml", local_name, "ODT text attribute name")?
             },
             ResolveResult::Bound(_) | ResolveResult::Unbound => {
                 std::str::from_utf8(attribute.key.as_ref())
                     .map_err(|_error| {
                         Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
-                    })?
-                    .to_string()
+                    })
+                    .and_then(|name| try_owned_string(name, "ODT text attribute name"))?
             },
             ResolveResult::Unknown(prefix) => {
                 return Err(Error::InvalidFormat(format!(
@@ -1467,7 +1515,11 @@ fn parse_selected_text_block_element(
                 "duplicate ODF text attribute '{name}'"
             )));
         }
-        discarded_names.push(name);
+        try_push(
+            &mut discarded_names,
+            name,
+            "ODT discarded attribute-name projection",
+        )?;
     }
     Ok(None)
 }
@@ -1524,6 +1576,12 @@ fn append_text_control(
                     "ODF text exceeds {MAX_TEXT_BYTES} bytes"
                 )));
             }
+            output
+                .try_reserve(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT text projection",
+                    source,
+                })?;
             output.extend(std::iter::repeat_n(' ', count));
         },
         b"tab" => append_checked(output, "\t")?,
@@ -1571,6 +1629,12 @@ fn append_checked(output: &mut String, value: &str) -> Result<()> {
             "ODF text exceeds {MAX_TEXT_BYTES} bytes"
         )));
     }
+    output
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT text projection",
+            source,
+        })?;
     output.push_str(value);
     Ok(())
 }
@@ -1587,6 +1651,10 @@ fn reserve_text_block(blocks: &mut Vec<Option<TextBlock>>) -> Result<usize> {
         )));
     }
     let slot = blocks.len();
+    blocks.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODT text-block projection",
+        source,
+    })?;
     blocks.push(None);
     Ok(slot)
 }
@@ -1612,7 +1680,7 @@ fn store_text_block(
     if own_text {
         element.set_text_owned(text);
     } else {
-        element.set_text(&text);
+        element.try_set_text(&text, "ODT text-block content")?;
     }
     let block = match element.tag_name() {
         "text:p" => TextBlock::Paragraph(Paragraph::from_element(element)?),
@@ -1668,17 +1736,21 @@ fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
     if let Some(character) = reference.resolve_char_ref().map_err(|error| {
         Error::InvalidFormat(format!("invalid ODF text character reference: {error}"))
     })? {
-        return Ok(character.to_string());
+        let mut encoded = [0_u8; 4];
+        return try_owned_string(
+            character.encode_utf8(&mut encoded),
+            "ODT text character reference",
+        );
     }
     let name = reference
         .decode()
         .map_err(|error| Error::InvalidFormat(format!("invalid ODF text entity: {error}")))?;
     match name.as_ref() {
-        "amp" => Ok("&".to_string()),
-        "lt" => Ok("<".to_string()),
-        "gt" => Ok(">".to_string()),
-        "quot" => Ok("\"".to_string()),
-        "apos" => Ok("'".to_string()),
+        "amp" => try_owned_string("&", "ODT text entity reference"),
+        "lt" => try_owned_string("<", "ODT text entity reference"),
+        "gt" => try_owned_string(">", "ODT text entity reference"),
+        "quot" => try_owned_string("\"", "ODT text entity reference"),
+        "apos" => try_owned_string("'", "ODT text entity reference"),
         _ => Err(Error::InvalidFormat(format!(
             "unsupported ODF text entity '&{name};'"
         ))),

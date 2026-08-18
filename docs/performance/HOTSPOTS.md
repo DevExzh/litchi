@@ -3,6 +3,14 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0191`](changes/0191-odt-unified-source-ingress.md)
+(0191 routes high-level ODT filesystem opening through one retained
+source-backed ODF owner. Fixed-corpus open-only samples remain withheld because
+same-implementation drift fails each tier. Open-plus-full-text p50/mean/p95/p99
+reductions of 30.02% to 35.36% pass both paired-direction and drift gates. An
+untimed replay reads 29,080 logical bytes and zero picture range bytes.
+Physical-I/O, cold-cache, resource, producer, edit/save, broad ODF and iWork
+claims remain withheld.)
 [`change 0190`](changes/0190-cfb-stream-chain-scratch.md)
 (0190 reuses fallible MiniFAT/FAT stream-chain validation scratch. On its exact
 two-shape process profile, allocation calls fall 48.44% and Heaptrack temporary
@@ -581,7 +589,9 @@ withheld. Eager controls explicitly have no source replay.
 
 ## ODF paths
 
-ODT, ODS and ODP ordinary opens eagerly read and parse their ZIP packages.
+ODS and ODP ordinary opens eagerly read and parse their ZIP packages. The
+high-level ODT filesystem path now retains a source-backed package and owner;
+byte-backed ODT opening remains eager.
 The opt-in public semantic matrix now measures owned open, listing, one object,
 full text, small creation, exact no-op and one supported edit/save across all
 three owners. ODT indexed paragraph lookup still scans complete XML for

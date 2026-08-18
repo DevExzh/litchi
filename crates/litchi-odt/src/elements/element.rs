@@ -8,6 +8,35 @@ use litchi_odf_common::namespace::{NamespaceContext, QualifiedName};
 use quick_xml::events::Event;
 use std::collections::HashMap;
 
+pub(crate) fn try_owned_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
+
+pub(crate) fn try_prefixed_name(
+    prefix: &str,
+    local_name: &str,
+    resource: &'static str,
+) -> Result<String> {
+    let len = prefix
+        .len()
+        .checked_add(1)
+        .and_then(|len| len.checked_add(local_name.len()))
+        .ok_or_else(|| Error::InvalidFormat("ODT qualified name size overflow".to_string()))?;
+    let mut output = String::new();
+    output
+        .try_reserve(len)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(prefix);
+    output.push(':');
+    output.push_str(local_name);
+    Ok(output)
+}
+
 /// Property definition for element attributes
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -108,9 +137,151 @@ pub struct Element {
 }
 
 impl Element {
+    pub(crate) fn try_new(tag_name: &str) -> Result<Self> {
+        Ok(Self {
+            tag_name: try_owned_string(tag_name, "ODT element tag name")?,
+            qualified_name: QualifiedName::try_from_string(tag_name)?,
+            attributes: HashMap::new(),
+            namespace_context: NamespaceContext::default(),
+            text_content: String::new(),
+            encode_text_as_references: false,
+            children: Vec::new(),
+        })
+    }
+
+    pub(crate) fn try_clone(&self) -> Result<Self> {
+        let qualified_name = QualifiedName {
+            namespace_uri: self
+                .qualified_name
+                .namespace_uri
+                .as_deref()
+                .map(|value| try_owned_string(value, "ODT element namespace URI"))
+                .transpose()?,
+            local_name: try_owned_string(
+                &self.qualified_name.local_name,
+                "ODT element local name",
+            )?,
+            qualified_name: try_owned_string(
+                &self.qualified_name.qualified_name,
+                "ODT element qualified name",
+            )?,
+        };
+        let mut namespace_context = NamespaceContext::default();
+        namespace_context
+            .prefixes
+            .try_reserve(self.namespace_context.prefixes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT element namespace context",
+                source,
+            })?;
+        for (prefix, uri) in &self.namespace_context.prefixes {
+            namespace_context.prefixes.insert(
+                try_owned_string(prefix, "ODT element namespace prefix")?,
+                try_owned_string(uri, "ODT element namespace URI")?,
+            );
+        }
+        namespace_context.default_namespace = self
+            .namespace_context
+            .default_namespace
+            .as_deref()
+            .map(|value| try_owned_string(value, "ODT element default namespace"))
+            .transpose()?;
+
+        let mut attributes = HashMap::new();
+        attributes
+            .try_reserve(self.attributes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT element attributes",
+                source,
+            })?;
+        for (name, value) in &self.attributes {
+            attributes.insert(
+                try_owned_string(name, "ODT element attribute name")?,
+                try_owned_string(value, "ODT element attribute value")?,
+            );
+        }
+
+        let mut children = Vec::new();
+        children
+            .try_reserve_exact(self.children.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT element children",
+                source,
+            })?;
+        for child in &self.children {
+            children.push(child.try_clone()?);
+        }
+
+        Ok(Self {
+            tag_name: try_owned_string(&self.tag_name, "ODT element tag name")?,
+            qualified_name,
+            attributes,
+            namespace_context,
+            text_content: try_owned_string(&self.text_content, "ODT element text")?,
+            encode_text_as_references: self.encode_text_as_references,
+            children,
+        })
+    }
+
     /// Add a child element (concrete Element type)
     pub fn add_child(&mut self, child: Element) {
         self.children.push(child);
+    }
+
+    pub(crate) fn try_add_child(&mut self, child: Element, resource: &'static str) -> Result<()> {
+        self.children
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation { resource, source })?;
+        self.children.push(child);
+        Ok(())
+    }
+
+    pub(crate) fn try_append_text(&mut self, value: &str, resource: &'static str) -> Result<()> {
+        self.text_content
+            .try_reserve(value.len())
+            .map_err(|source| Error::Allocation { resource, source })?;
+        self.text_content.push_str(value);
+        Ok(())
+    }
+
+    pub(crate) fn try_append_spaces(&mut self, count: usize, resource: &'static str) -> Result<()> {
+        self.text_content
+            .try_reserve(count)
+            .map_err(|source| Error::Allocation { resource, source })?;
+        self.text_content.extend(std::iter::repeat_n(' ', count));
+        Ok(())
+    }
+
+    pub(crate) fn try_set_text(&mut self, value: &str, resource: &'static str) -> Result<()> {
+        self.text_content.clear();
+        self.text_content
+            .try_reserve(value.len())
+            .map_err(|source| Error::Allocation { resource, source })?;
+        self.text_content.push_str(value);
+        Ok(())
+    }
+
+    pub(crate) fn try_set_attribute(
+        &mut self,
+        name: &str,
+        value: &str,
+        resource: &'static str,
+    ) -> Result<()> {
+        self.attributes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation { resource, source })?;
+        let mut owned_name = String::new();
+        owned_name
+            .try_reserve(name.len())
+            .map_err(|source| Error::Allocation { resource, source })?;
+        owned_name.push_str(name);
+        let mut owned_value = String::new();
+        owned_value
+            .try_reserve(value.len())
+            .map_err(|source| Error::Allocation { resource, source })?;
+        owned_value.push_str(value);
+        self.attributes.insert(owned_name, owned_value);
+        Ok(())
     }
 
     /// Get children as concrete Elements
@@ -130,6 +301,26 @@ impl Element {
             text.push_str(&child.get_text_recursive());
         }
         text
+    }
+
+    pub(crate) fn try_get_text_recursive(&self) -> Result<String> {
+        let mut text = String::new();
+        self.try_append_text_recursive(&mut text)?;
+        Ok(text)
+    }
+
+    fn try_append_text_recursive(&self, output: &mut String) -> Result<()> {
+        output
+            .try_reserve(self.text_content.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT recursive text projection",
+                source,
+            })?;
+        output.push_str(&self.text_content);
+        for child in &self.children {
+            child.try_append_text_recursive(output)?;
+        }
+        Ok(())
     }
 
     pub(crate) fn set_text_owned(&mut self, text: String) {

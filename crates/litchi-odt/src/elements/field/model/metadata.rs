@@ -182,6 +182,18 @@ impl MetaFieldContent {
         &self.display_text
     }
 
+    /// Revalidate the borrowed mixed-content nodes and cached text projection.
+    pub fn validate(&self) -> Result<()> {
+        let display_text =
+            validated_meta_display_text(&self.nodes, MetaContentGrammar::ParagraphOrHyperlink)?;
+        if display_text != self.display_text {
+            return Err(Error::InvalidFormat(
+                "text:meta-field cached display text is inconsistent".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(super) fn write_xml(&self, output: &mut String) {
         for node in &self.nodes {
             write_meta_node(node, output);
@@ -245,7 +257,23 @@ impl NoteBodyContent {
 
     /// Revalidate this value's bounded XML and resource constraints.
     pub fn validate(&self) -> Result<()> {
-        Self::new(self.nodes.clone()).map(|_| ())
+        if self
+            .nodes
+            .iter()
+            .any(|node| matches!(node, MetaFieldNode::Text(_)))
+        {
+            return Err(Error::InvalidFormat(
+                "text:note-body cannot contain direct character data".to_string(),
+            ));
+        }
+        validated_meta_display_text(&self.nodes, MetaContentGrammar::NoteBody)?;
+        let display_text = note_body_display_text(&self.nodes)?;
+        if display_text != self.display_text {
+            return Err(Error::InvalidFormat(
+                "text:note-body cached display text is inconsistent".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn write_xml(&self, output: &mut String) {
@@ -364,6 +392,12 @@ fn append_note_body_display_value(output: &mut String, value: &str) -> Result<()
             "text:note-body display text exceeds {MAX_DYNAMIC_FIELD_AGGREGATE} bytes"
         )));
     }
+    output
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT note-body display text",
+            source,
+        })?;
     output.push_str(value);
     Ok(())
 }
@@ -390,6 +424,12 @@ fn append_note_body_spaces(output: &mut String, element: &MetaFieldElement) -> R
             "text:note-body display text exceeds {MAX_DYNAMIC_FIELD_AGGREGATE} bytes"
         )));
     }
+    output
+        .try_reserve(count)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT note-body display text",
+            source,
+        })?;
     output.extend(std::iter::repeat_n(' ', count));
     Ok(())
 }
@@ -655,6 +695,12 @@ fn validate_meta_nodes(
                     ));
                 }
                 validate_dynamic_value("meta-field text", Some(value), false, aggregate)?;
+                display_text
+                    .try_reserve(value.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT meta-field display text",
+                        source,
+                    })?;
                 display_text.push_str(value);
             },
             MetaFieldNode::Element(element) => {
@@ -792,6 +838,12 @@ fn validate_meta_drop_down(
             MetaFieldNode::Text(value) => {
                 display_started = true;
                 validate_dynamic_value("meta-field drop-down text", Some(value), false, aggregate)?;
+                display_text
+                    .try_reserve(value.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT meta-field display text",
+                        source,
+                    })?;
                 display_text.push_str(value);
             },
             MetaFieldNode::Element(element) => {

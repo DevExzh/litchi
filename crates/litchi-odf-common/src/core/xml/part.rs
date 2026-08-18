@@ -9,7 +9,7 @@ use litchi_core::{Error, Result};
 )]
 #[derive(Debug)]
 pub struct XmlPart {
-    content: Box<str>,
+    content: String,
 }
 
 impl XmlPart {
@@ -19,11 +19,29 @@ impl XmlPart {
     ///
     /// Returns an error when the bytes are not valid UTF-8.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let content = String::from_utf8(bytes.to_vec())
-            .map_err(|error| {
-                Error::InvalidFormat(format!("Invalid UTF-8 in XML content: {error}"))
-            })?
-            .into_boxed_str();
+        let value = std::str::from_utf8(bytes).map_err(|error| {
+            Error::InvalidFormat(format!("Invalid UTF-8 in XML content: {error}"))
+        })?;
+        let mut content = String::new();
+        content
+            .try_reserve_exact(value.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODF XML part",
+                source,
+            })?;
+        content.push_str(value);
+        Ok(Self { content })
+    }
+
+    /// Parse XML content while consuming an owned byte buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes are not valid UTF-8.
+    pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+        let content = String::from_utf8(bytes).map_err(|error| {
+            Error::InvalidFormat(format!("Invalid UTF-8 in XML content: {error}"))
+        })?;
         Ok(Self { content })
     }
 

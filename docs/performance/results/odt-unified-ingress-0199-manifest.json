@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0191-odt-unified-source-ingress",
+  "artifacts": [
+    {
+      "path": "odt-unified-ingress-0199-a1.json.zst",
+      "role": "eager_a1",
+      "compressed_bytes": 5151,
+      "compressed_sha256": "c829cc36288051245b2f14ef9edec3b679a3d96026b53e0f1f4b5eceabc36b53",
+      "uncompressed_bytes": 28108,
+      "uncompressed_sha256": "0fee652357b9a2256a500d2e77a9ad50f1012fd275d01a748daea9a3c195c5e5"
+    },
+    {
+      "path": "odt-unified-ingress-0199-b1.json.zst",
+      "role": "source_backed_b1",
+      "compressed_bytes": 5331,
+      "compressed_sha256": "be3488fec77c298e3268a1a0f9d183d161fb54b8600e28c5e03ef084a9b9eaf9",
+      "uncompressed_bytes": 339190,
+      "uncompressed_sha256": "be7fe00a9eb975aa7f18df7d00cb0db3e9733b813dfdb30dd9bfdf1cf51da7c4"
+    },
+    {
+      "path": "odt-unified-ingress-0199-b2.json.zst",
+      "role": "source_backed_b2",
+      "compressed_bytes": 5150,
+      "compressed_sha256": "68d266b79bd5c5556d5208a9565bbe0ce1d54837e11b6eac2cc5067f0606937a",
+      "uncompressed_bytes": 339185,
+      "uncompressed_sha256": "551ae2ec7e3700f51395c97faf121b6808811ee76188a772fc3f2fa79be58a97"
+    },
+    {
+      "path": "odt-unified-ingress-0199-a2.json.zst",
+      "role": "eager_a2",
+      "compressed_bytes": 5211,
+      "compressed_sha256": "d18eecd56bdd484428c67f06fea45a1eb2f5bdbfdee6a355270451a0af288b9a",
+      "uncompressed_bytes": 28149,
+      "uncompressed_sha256": "59d966a76f90fbf8068f467227000d4007c44b491a6d7cec541774b828abfd85"
+    },
+    {
+      "path": "odt-unified-ingress-0199-summary.json",
+      "role": "derived_summary",
+      "bytes": 6774,
+      "sha256": "eb1d4519c9ade614158a6f4183fea84babc8e1c287e131bfce6ccb2dac431f4b"
+    }
+  ]
+}

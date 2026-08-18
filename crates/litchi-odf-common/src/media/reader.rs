@@ -36,6 +36,50 @@ const MAX_TOTAL_INLINE_IMAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ACCESSIBILITY_TEXT_BYTES: usize = 64 * 1024;
 const MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES: usize = 8 * 1024 * 1024;
 
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
+}
+
+fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
+
+fn try_clone_option(value: Option<&str>, resource: &'static str) -> Result<Option<String>> {
+    value
+        .map(|value| try_copy_string(value, resource))
+        .transpose()
+}
+
+fn try_clone_frame(frame: &Frame) -> Result<Frame> {
+    Ok(Frame {
+        name: try_clone_option(frame.name.as_deref(), "ODF image frame name")?,
+        xml_id: try_clone_option(frame.xml_id.as_deref(), "ODF image frame xml:id")?,
+        title: try_clone_option(frame.title.as_deref(), "ODF image frame title")?,
+        description: try_clone_option(frame.description.as_deref(), "ODF image frame description")?,
+        anchor_type: try_clone_option(frame.anchor_type.as_deref(), "ODF image frame anchor type")?,
+        x: try_clone_option(frame.x.as_deref(), "ODF image frame x")?,
+        y: try_clone_option(frame.y.as_deref(), "ODF image frame y")?,
+        width: try_clone_option(frame.width.as_deref(), "ODF image frame width")?,
+        height: try_clone_option(frame.height.as_deref(), "ODF image frame height")?,
+        end_cell_address: try_clone_option(
+            frame.end_cell_address.as_deref(),
+            "ODF image frame end-cell address",
+        )?,
+        page_name: try_clone_option(frame.page_name.as_deref(), "ODF image page name")?,
+        sheet_name: try_clone_option(frame.sheet_name.as_deref(), "ODF image sheet name")?,
+        sheet_shape: frame.sheet_shape,
+    })
+}
+
 #[derive(Clone)]
 struct FrameState {
     depth: usize,
@@ -214,17 +258,25 @@ fn scan_xml(
                 } else if bound_to(&namespace, DRAW_NAMESPACE)
                     && element.local_name().as_ref() == b"page"
                 {
-                    pages.push(NamedContext {
-                        depth,
-                        name: attribute(&reader, &element, DRAW_NAMESPACE, b"name")?,
-                    });
+                    try_push(
+                        &mut pages,
+                        NamedContext {
+                            depth,
+                            name: attribute(&reader, &element, DRAW_NAMESPACE, b"name")?,
+                        },
+                        "ODF image page stack",
+                    )?;
                 } else if bound_to(&namespace, TABLE_NAMESPACE)
                     && element.local_name().as_ref() == b"table"
                 {
-                    sheets.push(NamedContext {
-                        depth,
-                        name: attribute(&reader, &element, TABLE_NAMESPACE, b"name")?,
-                    });
+                    try_push(
+                        &mut sheets,
+                        NamedContext {
+                            depth,
+                            name: attribute(&reader, &element, TABLE_NAMESPACE, b"name")?,
+                        },
+                        "ODF image sheet stack",
+                    )?;
                 } else if element.local_name().as_ref() == b"shapes"
                     && sheets.last().is_some_and(|sheet| depth == sheet.depth + 1)
                     && !bound_to(&namespace, TABLE_NAMESPACE)
@@ -237,12 +289,19 @@ fn scan_xml(
                     && sheets.last().is_some_and(|sheet| depth == sheet.depth + 1)
                 {
                     let sheet_depth = required!(sheets.last(), "table:shapes has no sheet").depth;
-                    if !sheets_with_shapes.insert(sheet_depth) {
+                    if sheets_with_shapes.contains(&sheet_depth) {
                         return Err(Error::InvalidFormat(
                             "a table must not contain multiple table:shapes elements".to_string(),
                         ));
                     }
-                    sheet_shapes.push(depth);
+                    sheets_with_shapes
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODF image sheet-shape index",
+                            source,
+                        })?;
+                    sheets_with_shapes.insert(sheet_depth);
+                    try_push(&mut sheet_shapes, depth, "ODF image sheet-shape stack")?;
                 } else if element.local_name().as_ref() == b"frame"
                     && sheet_shapes
                         .last()
@@ -255,7 +314,7 @@ fn scan_xml(
                 } else if bound_to(&namespace, DRAW_NAMESPACE)
                     && element.local_name().as_ref() == b"frame"
                 {
-                    frames.push(FrameState {
+                    let frame = FrameState {
                         depth,
                         frame: parse_frame(
                             &reader,
@@ -268,7 +327,8 @@ fn scan_xml(
                         )?,
                         image_count: 0,
                         image_indices: Vec::new(),
-                    });
+                    };
+                    try_push(&mut frames, frame, "ODF image frame stack")?;
                 } else if element.local_name().as_ref() == b"image"
                     && frames
                         .last()
@@ -334,11 +394,18 @@ fn scan_xml(
                     && sheets.last().is_some_and(|sheet| depth == sheet.depth)
                 {
                     let sheet_depth = required!(sheets.last(), "table:shapes has no sheet").depth;
-                    if !sheets_with_shapes.insert(sheet_depth) {
+                    if sheets_with_shapes.contains(&sheet_depth) {
                         return Err(Error::InvalidFormat(
                             "a table must not contain multiple table:shapes elements".to_string(),
                         ));
                     }
+                    sheets_with_shapes
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODF image sheet-shape index",
+                            source,
+                        })?;
+                    sheets_with_shapes.insert(sheet_depth);
                 } else if frames.last().is_some_and(|frame| depth == frame.depth)
                     && let Some(kind) =
                         accessibility_kind(&namespace, element.local_name().as_ref())
@@ -363,7 +430,8 @@ fn scan_xml(
                         images.len(),
                         frames.last_mut(),
                     )?;
-                    images.push(finish_image(image, part, package, total_inline_bytes)?);
+                    let image = finish_image(image, part, package, total_inline_bytes)?;
+                    try_push(images, image, "ODF image projection")?;
                 } else if bound_to(&namespace, OFFICE_NAMESPACE)
                     && element.local_name().as_ref() == b"binary-data"
                     && let Some(image) = active.as_mut()
@@ -484,7 +552,8 @@ fn scan_xml(
                         ));
                     }
                     let image = required!(active.take(), "embedded image is missing");
-                    images.push(finish_image(image, part, package, total_inline_bytes)?);
+                    let image = finish_image(image, part, package, total_inline_bytes)?;
+                    try_push(images, image, "ODF image projection")?;
                 }
 
                 if frames.last().map(|frame| frame.depth) == Some(depth) {
@@ -495,7 +564,7 @@ fn scan_xml(
                                 "image frame occurrence index is invalid".to_string(),
                             )
                         })?;
-                        image.frame = Some(frame.frame.clone());
+                        image.frame = Some(try_clone_frame(&frame.frame)?);
                     }
                 }
                 if pages.last().map(|page| page.depth) == Some(depth) {
@@ -574,8 +643,14 @@ fn parse_frame(
         width: attribute(reader, element, SVG_NAMESPACE, b"width")?,
         height: attribute(reader, element, SVG_NAMESPACE, b"height")?,
         end_cell_address: attribute(reader, element, TABLE_NAMESPACE, b"end-cell-address")?,
-        page_name: pages.last().and_then(|page| page.name.clone()),
-        sheet_name: sheets.last().and_then(|sheet| sheet.name.clone()),
+        page_name: try_clone_option(
+            pages.last().and_then(|page| page.name.as_deref()),
+            "ODF image page name",
+        )?,
+        sheet_name: try_clone_option(
+            sheets.last().and_then(|sheet| sheet.name.as_deref()),
+            "ODF image sheet name",
+        )?,
         sheet_shape,
     })
 }
@@ -593,8 +668,12 @@ fn start_image(
             state.image_count = state.image_count.checked_add(1).ok_or_else(|| {
                 Error::InvalidFormat("image alternative count overflow".to_string())
             })?;
-            state.image_indices.push(image_index);
-            (Some(state.frame.clone()), alternative_index)
+            try_push(
+                &mut state.image_indices,
+                image_index,
+                "ODF image frame occurrence index",
+            )?;
+            (None, alternative_index)
         },
         None => (None, 0),
     };
@@ -702,6 +781,13 @@ fn append_accessibility(
             "total image accessibility text exceeds {MAX_TOTAL_ACCESSIBILITY_TEXT_BYTES} bytes"
         )));
     }
+    active
+        .value
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODF image accessibility text",
+            source,
+        })?;
     active.value.push_str(value);
     Ok(())
 }
@@ -712,7 +798,11 @@ fn resolve_accessibility_reference(value: &quick_xml::events::BytesRef<'_>) -> R
             "invalid image accessibility character reference: {error}"
         ))
     })? {
-        return Ok(character.to_string());
+        let mut encoded = [0_u8; 4];
+        return try_copy_string(
+            character.encode_utf8(&mut encoded),
+            "ODF image accessibility character reference",
+        );
     }
     let entity_name: &[u8] = value.as_ref();
     let character = match entity_name {
@@ -727,7 +817,11 @@ fn resolve_accessibility_reference(value: &quick_xml::events::BytesRef<'_>) -> R
             ));
         },
     };
-    Ok(character.to_string())
+    let mut encoded = [0_u8; 4];
+    try_copy_string(
+        character.encode_utf8(&mut encoded),
+        "ODF image accessibility entity reference",
+    )
 }
 
 fn append_inline(image: &mut ImageBuilder, value: &str) -> Result<()> {
@@ -741,6 +835,13 @@ fn append_inline(image: &mut ImageBuilder, value: &str) -> Result<()> {
             "inline image encoding exceeds {MAX_INLINE_ENCODED_BYTES} bytes"
         )));
     }
+    image
+        .inline_encoded
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODF inline image encoding",
+            source,
+        })?;
     image.inline_encoded.push_str(value);
     Ok(())
 }
@@ -751,9 +852,29 @@ fn finish_image(
     package: Option<&dyn PackageLookup>,
     total_inline_bytes: &mut usize,
 ) -> Result<Image> {
-    let source = if image.inline_present {
-        let mut compact = Vec::with_capacity(image.inline_encoded.len());
-        for byte in image.inline_encoded.bytes() {
+    let ImageBuilder {
+        href,
+        frame,
+        xml_id,
+        filter_name,
+        declared_media_type,
+        link_type,
+        show,
+        actuate,
+        alternative_index,
+        inline_present,
+        inline_encoded,
+        ..
+    } = image;
+    let source = if inline_present {
+        let mut compact = Vec::new();
+        compact
+            .try_reserve_exact(inline_encoded.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODF compact inline image encoding",
+                source,
+            })?;
+        for byte in inline_encoded.bytes() {
             if matches!(byte, b' ' | b'\t' | b'\r' | b'\n') {
                 continue;
             }
@@ -764,9 +885,19 @@ fn finish_image(
             }
             compact.push(byte);
         }
-        let bytes = BASE64_STANDARD.decode(&compact).map_err(|error| {
-            Error::InvalidFormat(format!("invalid office:binary-data base64: {error}"))
-        })?;
+        let estimated = base64::decoded_len_estimate(compact.len());
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(estimated)
+            .map_err(|source| Error::Allocation {
+                resource: "ODF decoded inline image",
+                source,
+            })?;
+        BASE64_STANDARD
+            .decode_vec(&compact, &mut bytes)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid office:binary-data base64: {error}"))
+            })?;
         if bytes.len() > MAX_INLINE_IMAGE_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "inline image exceeds {MAX_INLINE_IMAGE_BYTES} decoded bytes"
@@ -782,9 +913,9 @@ fn finish_image(
         }
         Source::Inline {
             bytes,
-            ignored_href: image.href.clone(),
+            ignored_href: href,
         }
-    } else if let Some(href) = image.href.clone().filter(|href| !href.is_empty()) {
+    } else if let Some(href) = href.filter(|href| !href.is_empty()) {
         match package {
             None => Source::Linked { href },
             Some(_) if is_linked_href(&href) => Source::Linked { href },
@@ -793,7 +924,10 @@ fn finish_image(
                 if package_lookup.has_file(&path) {
                     Source::PackagePart {
                         href,
-                        manifest_media_type: package_lookup.media_type(&path).map(str::to_owned),
+                        manifest_media_type: package_lookup
+                            .media_type(&path)
+                            .map(|value| try_copy_string(value, "ODF image media type"))
+                            .transpose()?,
                         path,
                     }
                 } else {
@@ -811,14 +945,14 @@ fn finish_image(
     Ok(Image {
         part,
         source,
-        frame: image.frame,
-        xml_id: image.xml_id,
-        filter_name: image.filter_name,
-        declared_media_type: image.declared_media_type,
-        link_type: image.link_type,
-        show: image.show,
-        actuate: image.actuate,
-        alternative_index: image.alternative_index,
+        frame,
+        xml_id,
+        filter_name,
+        declared_media_type,
+        link_type,
+        show,
+        actuate,
+        alternative_index,
     })
 }
 

@@ -5,6 +5,7 @@ use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::borrow::Cow;
 
 use super::model::{Key, Policy};
 use super::validation::{validate_type, validate_xml_size};
@@ -92,6 +93,32 @@ struct Patch {
     start: usize,
     end: usize,
     replacement: Vec<u8>,
+}
+
+fn try_copy_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.extend_from_slice(value);
+    Ok(output)
+}
+
+fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
+
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
 }
 
 pub(crate) fn parse(source: &[u8], kind: Kind) -> Result<Policy> {
@@ -252,16 +279,31 @@ fn policy_from_xml(xml: &str, kind: Kind) -> Result<Policy> {
             },
             Field::ReadOnly => policy.read_only = Some(parse_boolean(&text, field.name())?),
             Field::RedlineKey => {
-                let normalized = text
-                    .bytes()
-                    .filter(|byte| !byte.is_ascii_whitespace())
-                    .collect::<Vec<_>>();
-                let value = BASE64.decode(normalized).map_err(|_error| {
-                    Error::InvalidFormat(format!(
-                        "configuration item '{}' has invalid base64",
-                        field.name()
-                    ))
-                })?;
+                let mut normalized = Vec::new();
+                normalized
+                    .try_reserve_exact(text.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT protection base64 text",
+                        source,
+                    })?;
+                for byte in text.bytes().filter(|byte| !byte.is_ascii_whitespace()) {
+                    normalized.push(byte);
+                }
+                let mut value = Vec::new();
+                value
+                    .try_reserve_exact(base64::decoded_len_estimate(normalized.len()))
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT protection decoded key",
+                        source,
+                    })?;
+                BASE64
+                    .decode_vec(normalized, &mut value)
+                    .map_err(|_error| {
+                        Error::InvalidFormat(format!(
+                            "configuration item '{}' has invalid base64",
+                            field.name()
+                        ))
+                    })?;
                 policy.redline_key = Some(Key::new(value)?);
             },
         }
@@ -300,14 +342,16 @@ fn item_text(xml: &str, item: &ItemSpan) -> Result<String> {
             item.field.name()
         ));
     }
-    quick_xml::escape::unescape(content)
-        .map(std::borrow::Cow::into_owned)
-        .map_err(|error| {
-            Error::InvalidFormat(format!(
-                "configuration item '{}' has invalid escaped text: {error}",
-                item.field.name()
-            ))
-        })
+    let value = quick_xml::escape::unescape(content).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "configuration item '{}' has invalid escaped text: {error}",
+            item.field.name()
+        ))
+    })?;
+    match value {
+        Cow::Owned(value) => Ok(value),
+        Cow::Borrowed(value) => try_copy_string(value, "ODT protection item text"),
+    }
 }
 
 fn value(policy: &Policy, field: Field) -> Option<Value<'_>> {
@@ -495,16 +539,23 @@ fn scan_sites(xml: &str, kind: Kind) -> Result<Sites> {
                         }
                     }
                 }
-                stack.push(Frame {
-                    local: element.local_name().as_ref().to_vec(),
-                    qname: element.name().as_ref().to_vec(),
+                let frame = Frame {
+                    local: try_copy_bytes(
+                        element.local_name().as_ref(),
+                        "ODT protection local name",
+                    )?,
+                    qname: try_copy_bytes(
+                        element.name().as_ref(),
+                        "ODT protection qualified name",
+                    )?,
                     start,
                     content_start: end,
                     root,
                     settings,
                     configuration,
                     item,
-                });
+                };
+                try_push(&mut stack, frame, "ODT protection XML stack")?;
             },
             Event::Empty(element) => {
                 let end = reader.buffer_position() as usize;
@@ -535,7 +586,10 @@ fn scan_sites(xml: &str, kind: Kind) -> Result<Sites> {
                         start,
                         end,
                         content_end: None,
-                        qname: element.name().as_ref().to_vec(),
+                        qname: try_copy_bytes(
+                            element.name().as_ref(),
+                            "ODT protection qualified name",
+                        )?,
                     });
                 }
                 if settings {
@@ -543,7 +597,10 @@ fn scan_sites(xml: &str, kind: Kind) -> Result<Sites> {
                         start,
                         end,
                         content_end: None,
-                        qname: element.name().as_ref().to_vec(),
+                        qname: try_copy_bytes(
+                            element.name().as_ref(),
+                            "ODT protection qualified name",
+                        )?,
                     });
                 }
                 if config_namespace
@@ -565,14 +622,18 @@ fn scan_sites(xml: &str, kind: Kind) -> Result<Sites> {
                             field.name()
                         ));
                     }
-                    sites.items.push(ItemSpan {
+                    let item = ItemSpan {
                         field,
                         start,
                         end,
                         content_start: None,
                         content_end: None,
-                        qname: element.name().as_ref().to_vec(),
-                    });
+                        qname: try_copy_bytes(
+                            element.name().as_ref(),
+                            "ODT protection item qualified name",
+                        )?,
+                    };
+                    try_push(&mut sites.items, item, "ODT protection item index")?;
                 }
             },
             Event::End(element) => {
@@ -593,7 +654,7 @@ fn scan_sites(xml: &str, kind: Kind) -> Result<Sites> {
                         start: frame.start,
                         end,
                         content_end: Some(close_start),
-                        qname: frame.qname.clone(),
+                        qname: try_copy_bytes(&frame.qname, "ODT protection root qualified name")?,
                     });
                 }
                 if frame.settings {
@@ -601,7 +662,10 @@ fn scan_sites(xml: &str, kind: Kind) -> Result<Sites> {
                         start: frame.start,
                         end,
                         content_end: Some(close_start),
-                        qname: frame.qname.clone(),
+                        qname: try_copy_bytes(
+                            &frame.qname,
+                            "ODT protection settings qualified name",
+                        )?,
                     });
                 }
                 if frame.configuration {
@@ -609,18 +673,22 @@ fn scan_sites(xml: &str, kind: Kind) -> Result<Sites> {
                         start: frame.start,
                         end,
                         content_end: Some(close_start),
-                        qname: frame.qname.clone(),
+                        qname: try_copy_bytes(
+                            &frame.qname,
+                            "ODT protection configuration qualified name",
+                        )?,
                     });
                 }
                 if let Some(field) = frame.item {
-                    sites.items.push(ItemSpan {
+                    let item = ItemSpan {
                         field,
                         start: frame.start,
                         end,
                         content_start: Some(frame.content_start),
                         content_end: Some(close_start),
                         qname: frame.qname,
-                    });
+                    };
+                    try_push(&mut sites.items, item, "ODT protection item index")?;
                 }
             },
             Event::Eof => break,
@@ -659,16 +727,15 @@ fn attr_value(
                     String::from_utf8_lossy(local_name)
                 ));
             }
-            result = Some(
-                attribute
-                    .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!(
-                            "invalid protection XML attribute value: {error}"
-                        ))
-                    })?
-                    .into_owned(),
-            );
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protection XML attribute value: {error}"))
+                })?;
+            result = Some(match value {
+                Cow::Owned(value) => value,
+                Cow::Borrowed(value) => try_copy_string(value, "ODT protection attribute value")?,
+            });
         }
     }
     Ok(result)
