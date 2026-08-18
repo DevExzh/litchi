@@ -1,0 +1,1577 @@
+reading file "/tmp/cfb-scratch-after-final-0198.heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-perf-cfb-scratch-after-final-0198 --case cfb_open --shape many-small,wide-root --payload incompressible --warmup 3 --samples 100 --json /tmp/cfb-scratch-after-final-heaptrack-run-0198.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+244436 calls to allocation functions with 266.28K peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+237312 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::decode_utf16le::hfee93bd9e096c587
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h2bda459d64951b96
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::build_storage_tree_iterative::h092cd6b4655c7bff
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 53.25K peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::own_path::h7a9e35a18a4528f1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::create_stream_owned::h2e604c4939a80603
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::directory::clone_string::h1788d4fd2c6ba8b5
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::directory::DirectoryBuilder::add_stream_path::hc83fdc05f7cd5893
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::write_to::h15c6aadc8e792903
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 212.99K peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::decode_utf16le::hfee93bd9e096c587
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h2bda459d64951b96
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::build_storage_tree_iterative::h092cd6b4655c7bff
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::decode_utf16le::hfee93bd9e096c587
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h2bda459d64951b96
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 6 from 2 other places
+
+239824 calls to allocation functions with 53.26K peak consumption from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+237518 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2306 calls with 53.26K peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+10720 calls to allocation functions with 151.90K peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6197f72551aa33d4E.llvm.4609476996323699947
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 49.15K peak consumption from:
+    litchi_cfb::writer::core::own_path::h7a9e35a18a4528f1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::create_stream_owned::h2e604c4939a80603
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2302 calls with 0B peak consumption from:
+    litchi_cfb::writer::minifat::MiniFatBuilder::allocate_mini_chain::h29524eb67773a5ba
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::write_to::h15c6aadc8e792903
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2302 calls with 0B peak consumption from:
+    litchi_cfb::writer::minifat::MiniFatBuilder::allocate_mini_chain_len::hc94f97c92e9747f7
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::minifat::MiniFatBuilder::allocate_mini_chain::h29524eb67773a5ba
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::write_to::h15c6aadc8e792903
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1339 calls with 0B peak consumption from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 calls with 0B peak consumption from:
+    litchi_cfb::file::SectorChainScratch::collect_exact::h5fb52486200ceb88
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h516ae5b45a668f1c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 2267 from 53 other places
+
+4826 calls to allocation functions with 193B peak consumption from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::h10b48ba645e1d13e
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 0B peak consumption from:
+    _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hdad069d13a7d3814
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::h10b48ba645e1d13e
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 calls with 0B peak consumption from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h0f8945878c1cdb6d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 calls with 10B peak consumption from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h0f8945878c1cdb6d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 calls with 0B peak consumption from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 8 from 4 other places
+
+2823 calls to allocation functions with 2.04M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h1b7fb715f7c606e7E.llvm.14119518303414308307
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+515 calls with 0B peak consumption from:
+    litchi_cfb::file::try_push::h92ecf6491fe4d41b
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_minifat::hfe5fda435c5b06f5
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 calls with 0B peak consumption from:
+    litchi_cfb::file::try_filled_vec::h8ec29062d4b4eaca
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::build_storage_tree_iterative::h092cd6b4655c7bff
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 calls with 0B peak consumption from:
+    litchi_cfb::file::try_filled_vec::h9666d4eb8ac21b1b
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 1484 from 28 other places
+
+2308 calls to allocation functions with 42B peak consumption from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 0B peak consumption from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 calls with 42B peak consumption from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 calls with 0B peak consumption from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+2306 calls to allocation functions with 131.14K peak consumption from
+litchi_perf_baseline::payload_bytes::h6d531c582651cfda
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 131.07K peak consumption from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 calls with 64B peak consumption from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+2304 calls to allocation functions with 0B peak consumption from
+_$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hdad069d13a7d3814
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2304 calls with 0B peak consumption from:
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::h10b48ba645e1d13e
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+50 calls to allocation functions with 0B peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjrHSEGnQ3l9_3std
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+10 calls with 0B peak consumption from:
+    _RINvNtCsjrHSEGnQ3l9_3std2io19default_read_to_endNtNtB4_2fs4FileEB4_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNvNtCsjrHSEGnQ3l9_3std2fs14read_to_string5inner
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+6 calls with 0B peak consumption from:
+    _RINvNtCsjrHSEGnQ3l9_3std2io19default_read_to_endNtNtB4_2fs4FileEB4_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNvNtCsjrHSEGnQ3l9_3std2fs14read_to_string5inner
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+6 calls with 0B peak consumption from:
+    _RINvNtCsjrHSEGnQ3l9_3std2io19default_read_to_endNtNtB4_2fs4FileEB4_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNvNtCsjrHSEGnQ3l9_3std2fs14read_to_string5inner
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+5 calls with 0B peak consumption from:
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::git_output::h3104bdfcbaab55bb
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::environment::h46ef545320901995
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 calls with 0B peak consumption from:
+    _RNvMs3_NtCslNYArtu3iFV_5alloc7raw_vecINtB5_6RawVecNtNtB7_6string6StringE8grow_oneCsjrHSEGnQ3l9_3std
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::h10b48ba645e1d13e
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 21 from 21 other places
+
+28 calls to allocation functions with 52B peak consumption from
+_RNvNtCsjrHSEGnQ3l9_3std3env7args_os
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+13 calls with 0B peak consumption from:
+    litchi_perf_baseline::filesystem::run_child_if_requested::h989532e764cd0e4a
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+13 calls with 52B peak consumption from:
+    litchi_perf_baseline::parse_options::hd21cd50297949aac
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1 calls with 0B peak consumption from:
+    litchi_perf_baseline::filesystem::run_child_if_requested::h989532e764cd0e4a
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1 calls with 0B peak consumption from:
+    litchi_perf_baseline::parse_options::hd21cd50297949aac
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+
+PEAK MEMORY CONSUMERS
+2.04M peak memory consumed over 2823 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h1b7fb715f7c606e7E.llvm.14119518303414308307
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+787.71K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1b5e306c91aaa4cb
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::write_sector_aligned::h906dcd1f742f7160
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::write_to::h15c6aadc8e792903
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+426.82K consumed over 2 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+328.32K consumed over 2 calls from:
+    litchi_cfb::file::try_filled_vec::h8ec29062d4b4eaca
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+262.66K consumed over 2 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+213.41K consumed over 2 calls from:
+    litchi_cfb::file::try_filled_vec::h9666d4eb8ac21b1b
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 21.71K from 28 other places
+
+266.28K peak memory consumed over 244436 calls from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+212.99K consumed over 2304 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::decode_utf16le::hfee93bd9e096c587
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h2bda459d64951b96
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::build_storage_tree_iterative::h092cd6b4655c7bff
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+53.25K consumed over 2304 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::own_path::h7a9e35a18a4528f1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::create_stream_owned::h2e604c4939a80603
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+40B consumed over 2 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::decode_utf16le::hfee93bd9e096c587
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::parse_directory_entry::h2bda459d64951b96
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 0B from 2 other places
+
+151.90K peak memory consumed over 10720 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6197f72551aa33d4E.llvm.4609476996323699947
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+98.30K consumed over 15 calls from:
+    litchi_cfb::writer::core::OleWriter::create_stream_owned::h2e604c4939a80603
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+49.15K consumed over 2304 calls from:
+    litchi_cfb::writer::core::own_path::h7a9e35a18a4528f1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::create_stream_owned::h2e604c4939a80603
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+4.10K consumed over 13 calls from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+352B consumed over 2 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::hd05d4b32a3dbe48d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::with_valid_sector_size::hf7c759e3d40c94f5
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::new::h1f281b6a14ad4219
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 0B from 53 other places
+
+131.14K peak memory consumed over 2306 calls from
+litchi_perf_baseline::payload_bytes::h6d531c582651cfda
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+131.07K consumed over 2304 calls from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+64B consumed over 2 calls from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+73.73K peak memory consumed over 1 calls from
+0x77e7428b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+53.26K peak memory consumed over 239824 calls from
+_RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String10from_utf16
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+53.26K consumed over 2306 calls from:
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+800B peak memory consumed over 2 calls from
+litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+800B consumed over 2 calls from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+548B peak memory consumed over 2 calls from
+_RNvNtNtNtNtNtCsjrHSEGnQ3l9_3std3sys3pal4unix14stack_overflow11thread_info16set_current_info
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+544B consumed over 1 calls from:
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+4B consumed over 1 calls from:
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+193B peak memory consumed over 4826 calls from
+_RNvXs4_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core5clone5Clone5clone
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+64B consumed over 2 calls from:
+    _ZN75_$LT$litchi_perf_baseline..CorpusManifest$u20$as$u20$core..clone..Clone$GT$5clone17h741a58422dfe7f55E.llvm.8924654909885157840
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+64B consumed over 2 calls from:
+    _ZN75_$LT$litchi_perf_baseline..CorpusManifest$u20$as$u20$core..clone..Clone$GT$5clone17h741a58422dfe7f55E.llvm.8924654909885157840
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+29B consumed over 2 calls from:
+    _ZN75_$LT$litchi_perf_baseline..CorpusManifest$u20$as$u20$core..clone..Clone$GT$5clone17h741a58422dfe7f55E.llvm.8924654909885157840
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+26B consumed over 2 calls from:
+    _ZN75_$LT$litchi_perf_baseline..CorpusManifest$u20$as$u20$core..clone..Clone$GT$5clone17h741a58422dfe7f55E.llvm.8924654909885157840
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+10B consumed over 2 calls from:
+    _$LT$litchi_cfb..file..DirectoryEntry$u20$as$u20$core..clone..Clone$GT$::clone::h0f8945878c1cdb6d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 0B from 4 other places
+
+52B peak memory consumed over 28 calls from
+_RNvNtCsjrHSEGnQ3l9_3std3env7args_os
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+52B consumed over 13 calls from:
+    litchi_perf_baseline::parse_options::hd21cd50297949aac
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+
+MOST TEMPORARY ALLOCATIONS
+1787 temporary allocations of 10720 allocations in total (16.67%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h6197f72551aa33d4E.llvm.4609476996323699947
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1133 temporary allocations of 1339 allocations in total (84.62%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 temporary allocations of 206 allocations in total (100.00%) from:
+    litchi_cfb::file::collect_sector_chain_exact::hfe4fd0dcdba4355f
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_minifat::hfe5fda435c5b06f5
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 temporary allocations of 206 allocations in total (100.00%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 temporary allocations of 206 allocations in total (100.00%) from:
+    litchi_cfb::file::collect_sector_chain_exact::hfe4fd0dcdba4355f
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::validate_stream_allocations::h516ae5b45a668f1c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+11 temporary allocations of 13 allocations in total (84.62%) from:
+    litchi_cfb::file::collect_sector_chain::hac0b26816498e014
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 25B from 53 other places
+
+733 temporary allocations of 2823 allocations in total (25.97%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h1b7fb715f7c606e7E.llvm.14119518303414308307
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+515 temporary allocations of 515 allocations in total (100.00%) from:
+    litchi_cfb::file::try_push::h92ecf6491fe4d41b
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+206 temporary allocations of 206 allocations in total (100.00%) from:
+    litchi_cfb::file::try_vec_with_capacity::h28872464b4afb6c6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::run_cfb_open::h08bc177b303dd15d
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+5 temporary allocations of 5 allocations in total (100.00%) from:
+    litchi_cfb::file::try_push::h92ecf6491fe4d41b
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h1b5e306c91aaa4cb
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _$LT$std..io..cursor..Cursor$LT$alloc..vec..Vec$LT$u8$C$A$GT$$GT$$u20$as$u20$std..io..Write$GT$::write_all::h7f18753aa0490fd6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::writer::core::OleWriter::write_to::h15c6aadc8e792903
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    litchi_cfb::file::try_vec_with_capacity::h28872464b4afb6c6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::load_directory::hd25d04328c52f91c
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::open::h25d1f5792e9f4bb6
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 3B from 28 other places
+
+31 temporary allocations of 50 allocations in total (62.00%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjrHSEGnQ3l9_3std
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+9 temporary allocations of 10 allocations in total (90.00%) from:
+    _RINvNtCsjrHSEGnQ3l9_3std2io19default_read_to_endNtNtB4_2fs4FileEB4_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNvNtCsjrHSEGnQ3l9_3std2fs14read_to_string5inner
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+6 temporary allocations of 6 allocations in total (100.00%) from:
+    _RINvNtCsjrHSEGnQ3l9_3std2io19default_read_to_endNtNtB4_2fs4FileEB4_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNvNtCsjrHSEGnQ3l9_3std2fs14read_to_string5inner
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+5 temporary allocations of 6 allocations in total (83.33%) from:
+    _RINvNtCsjrHSEGnQ3l9_3std2io19default_read_to_endNtNtB4_2fs4FileEB4_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNvNtCsjrHSEGnQ3l9_3std2fs14read_to_string5inner
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+4 temporary allocations of 5 allocations in total (80.00%) from:
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::git_output::h3104bdfcbaab55bb
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::environment::h46ef545320901995
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalECsjrHSEGnQ3l9_3std
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RINvNvNtCsjrHSEGnQ3l9_3std2io19default_read_to_end16small_probe_readRNtNtNtNtB6_3sys2fd4unix8FileDescEB6_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMNtNtNtCsjrHSEGnQ3l9_3std3sys2fd4unixNtB2_8FileDesc11read_to_end
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix6common11read_output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::command_output::h26c151d3fd1f4aa7
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 6B from 21 other places
+
+5 temporary allocations of 5 allocations in total (100.00%) from
+__posix_spawn_file_actions_realloc
+  at ./posix/spawn_faction_init.c:32
+  in /lib/x86_64-linux-gnu/libc.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::command_output::h26c151d3fd1f4aa7
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::command_output::h26c151d3fd1f4aa7
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::filesystem::host_evidence::h175bb46303d0fa30
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::command_output::h49dd0ad25cd9698e
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::environment::h46ef545320901995
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::git_output::h3104bdfcbaab55bb
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::environment::h46ef545320901995
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __posix_spawn_file_actions_adddup2
+      at ./posix/spawn_faction_adddup2.c:37
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvMNtNtNtNtCsjrHSEGnQ3l9_3std3sys7process4unix4unixNtNtB4_6common7Command5spawn
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvMsk_NtCsjrHSEGnQ3l9_3std7processNtB5_7Command6output
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::git_output::h3104bdfcbaab55bb
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::environment::h46ef545320901995
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+5 temporary allocations of 24 allocations in total (20.83%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h7d50ed4d834407aeE.llvm.3425103864789317744
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+3 temporary allocations of 5 allocations in total (60.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4d5fb286227cd130
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::h10b48ba645e1d13e
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h4d5fb286227cd130
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_cfb::file::OleFile$LT$R$GT$::list_streams::h10b48ba645e1d13e
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+2 temporary allocations of 244436 allocations in total (0.00%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 temporary allocations of 4 allocations in total (50.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+  and 0B from 2 other places
+
+2 temporary allocations of 2308 allocations in total (0.09%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /tmp/litchi-perf-cfb-scratch-after-final-0198
+2 temporary allocations of 2 allocations in total (100.00%) from:
+    litchi_perf_baseline::main::he2a3c78f5f8bf0b1
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    std::sys::backtrace::__rust_begin_short_backtrace::h8e9de528a75ee656
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17hc0f6b4afc83acddeE.llvm.4301364967721362222
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+__GI___getdelim
+  at ./libio/iogetdelim.c:107
+  in /lib/x86_64-linux-gnu/libc.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __pthread_getattr_np
+      at ./nptl/pthread_getattr_np.c:122
+      in /lib/x86_64-linux-gnu/libc.so.6
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+    main
+      in /tmp/litchi-perf-cfb-scratch-after-final-0198
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+0x77e7428b738e
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+
+total runtime: 0.39s.
+calls to allocation functions: 509749 (1317180/s)
+temporary memory allocations: 2567 (6633/s)
+peak heap memory consumption: 2.72M
+peak RSS (including heaptrack overhead): 14.88M
+total memory leaked: 544B

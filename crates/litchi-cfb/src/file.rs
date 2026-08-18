@@ -18,7 +18,7 @@ const BITSET_WORD_BITS: usize = u64::BITS as usize;
 /// operation intentionally panic on allocation and bounds failures.  CFB
 /// indexes are untrusted, so the read path uses this small equivalent with
 /// fallible allocation and checked insertion instead.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct CheckedBitSet {
     words: Vec<u64>,
     bit_len: usize,
@@ -877,6 +877,12 @@ impl<R: Read + Seek> OleFile<R> {
             })?;
         let mut claimed_mini_sectors =
             CheckedBitSet::try_with_capacity(mini_sector_capacity, "mini-sector ownership map")?;
+        // MiniFAT and FAT normally have different table lengths. Separate
+        // scratch instances avoid retaining the larger map in the smaller
+        // table's validation path while still eliminating per-stream
+        // allocations within each table.
+        let mut mini_scratch = SectorChainScratch::default();
+        let mut regular_scratch = SectorChainScratch::default();
 
         for index in 0..self.dir_entries.len() {
             let Some(entry) = self.dir_entries[index].as_ref() else {
@@ -892,13 +898,13 @@ impl<R: Read + Seek> OleFile<R> {
                     .map_err(|_err| {
                         OleError::CorruptedFile("Mini stream is too large".to_string())
                     })?;
-                let chain = collect_sector_chain_exact(
+                mini_scratch.collect_exact(
                     &self.minifat,
                     start_sector,
                     sector_count,
                     "mini stream",
                 )?;
-                for sector in chain {
+                for &sector in mini_scratch.sectors() {
                     let sector_index = usize::try_from(sector).map_err(|_err| {
                         OleError::CorruptedFile(
                             "mini stream sector index does not fit usize".to_string(),
@@ -922,13 +928,13 @@ impl<R: Read + Seek> OleFile<R> {
                     .map_err(|_err| {
                         OleError::CorruptedFile("Regular stream is too large".to_string())
                     })?;
-                let chain = collect_sector_chain_exact(
+                regular_scratch.collect_exact(
                     &self.fat,
                     start_sector,
                     sector_count,
                     "regular stream",
                 )?;
-                self.claim_chain(&chain, PhysicalSectorRole::RegularStream)?;
+                self.claim_chain(regular_scratch.sectors(), PhysicalSectorRole::RegularStream)?;
             }
         }
         Ok(())
@@ -2038,6 +2044,139 @@ fn collect_sector_chain_exact(
     Ok(sectors)
 }
 
+/// Reusable fallible buffers for exact chain validation.
+///
+/// `collect_sector_chain_exact` remains the general-purpose helper for
+/// callers that need an owned result. Stream-allocation validation walks many
+/// chains against the same FAT or MiniFAT, so retaining these buffers removes
+/// the two transient allocations that would otherwise occur for every
+/// stream. The buffers are deliberately private to that validation path.
+#[derive(Debug, Default)]
+struct SectorChainScratch {
+    sectors: Vec<u32>,
+    visited: CheckedBitSet,
+}
+
+impl SectorChainScratch {
+    fn sectors(&self) -> &[u32] {
+        &self.sectors
+    }
+
+    fn reset_visited(&mut self) {
+        self.visited.bit_len = 0;
+    }
+
+    fn reset(&mut self) {
+        self.sectors.clear();
+        self.reset_visited();
+    }
+
+    fn prepare_visited(&mut self, bit_len: usize) -> Result<(), OleError> {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        let visited = &mut self.visited;
+        if visited.words.len() < word_count {
+            visited
+                .words
+                .try_reserve_exact(word_count - visited.words.len())
+                .map_err(|source| OleError::allocation("sector-chain map", source))?;
+            // The fallible reserve above makes this resize infallible.
+            visited.words.resize(word_count, 0);
+        }
+        visited.bit_len = bit_len;
+        visited.words.fill(0);
+        Ok(())
+    }
+
+    fn collect_exact(
+        &mut self,
+        allocation_table: &[u32],
+        start_sector: u32,
+        expected_count: usize,
+        table_name: &str,
+    ) -> Result<(), OleError> {
+        self.reset();
+        let result = (|| {
+            if expected_count == 0 {
+                if start_sector != ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Empty {table_name} chain must start with ENDOFCHAIN"
+                    )));
+                }
+                return Ok(());
+            }
+            if start_sector >= MAXREGSECT {
+                return Err(OleError::CorruptedFile(format!(
+                    "Invalid start marker for {table_name} chain"
+                )));
+            }
+            if expected_count > allocation_table.len() {
+                return Err(OleError::CorruptedFile(format!(
+                    "{table_name} chain length exceeds its allocation table"
+                )));
+            }
+
+            // Preserve the original allocation order: the chain vector is
+            // reserved before the visited map, with the same resource labels
+            // as the owned-result helper.
+            if self.sectors.capacity() < expected_count {
+                self.sectors
+                    .try_reserve_exact(expected_count)
+                    .map_err(|source| OleError::allocation("sector-chain entries", source))?;
+            }
+            self.prepare_visited(allocation_table.len())?;
+            let mut sector = start_sector;
+            for index in 0..expected_count {
+                let slot = usize::try_from(sector).map_err(|_err| {
+                    OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    ))
+                })?;
+                if slot >= allocation_table.len() {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    )));
+                }
+                if self.visited.contains(slot) {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Cycle detected in {table_name} chain at sector {sector}"
+                    )));
+                }
+                self.visited.insert(slot)?;
+                try_push(&mut self.sectors, sector, "sector-chain entries")?;
+                let next = *allocation_table.get(slot).ok_or_else(|| {
+                    OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    ))
+                })?;
+                if index + 1 == expected_count {
+                    if next != ENDOFCHAIN {
+                        return Err(OleError::CorruptedFile(format!(
+                            "{table_name} chain exceeds its declared length"
+                        )));
+                    }
+                } else {
+                    if next == ENDOFCHAIN {
+                        return Err(OleError::CorruptedFile(format!(
+                            "{table_name} chain ends before its declared length"
+                        )));
+                    }
+                    if next >= MAXREGSECT {
+                        return Err(OleError::CorruptedFile(format!(
+                            "Invalid sector marker 0x{next:08X} in {table_name} chain"
+                        )));
+                    }
+                    sector = next;
+                }
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            self.reset();
+        }
+        result
+    }
+}
+
 /// Drop the high stream-size word that version 3 compound files do not use.
 ///
 /// MS-CFB 2.6.1 requires a version 3 stream size to be at most 2 GB, so the
@@ -2298,6 +2437,110 @@ mod tests {
             Err(OleError::CorruptedFile(message))
                 if message.contains("exceeds its allocation table")
         ));
+    }
+
+    #[test]
+    fn reusable_chain_scratch_reuses_buffers_for_different_lengths() {
+        let mut scratch = SectorChainScratch::default();
+        let long_table = [
+            1, 2, 3, ENDOFCHAIN, ENDOFCHAIN, ENDOFCHAIN, ENDOFCHAIN, ENDOFCHAIN,
+        ];
+        scratch
+            .collect_exact(&long_table, 0, 4, "regular stream")
+            .unwrap();
+        let sectors_ptr = scratch.sectors.as_ptr();
+        let sectors_capacity = scratch.sectors.capacity();
+        let visited_ptr = scratch.visited.words.as_ptr();
+        let visited_words = scratch.visited.words.len();
+        assert_eq!(scratch.sectors(), &[0, 1, 2, 3]);
+
+        scratch.reset();
+        scratch
+            .collect_exact(&[ENDOFCHAIN], 0, 1, "mini stream")
+            .unwrap();
+
+        assert_eq!(scratch.sectors(), &[0]);
+        assert_eq!(scratch.sectors.as_ptr(), sectors_ptr);
+        assert_eq!(scratch.sectors.capacity(), sectors_capacity);
+        assert_eq!(scratch.visited.words.as_ptr(), visited_ptr);
+        assert_eq!(scratch.visited.words.len(), visited_words);
+        assert_eq!(scratch.visited.bit_len, 1);
+    }
+
+    #[test]
+    fn reusable_chain_scratch_reserves_growth_before_walking() {
+        let mut scratch = SectorChainScratch::default();
+        scratch
+            .collect_exact(&[ENDOFCHAIN], 0, 1, "mini stream")
+            .unwrap();
+
+        let early = scratch.collect_exact(&[ENDOFCHAIN; 8], 0, 8, "mini stream");
+        assert!(matches!(
+            early,
+            Err(OleError::CorruptedFile(message))
+                if message == "mini stream chain ends before its declared length"
+        ));
+        assert!(scratch.sectors.capacity() >= 8);
+        assert!(scratch.sectors.is_empty());
+    }
+
+    #[test]
+    fn reusable_chain_scratch_resets_after_success_and_empty_chain() {
+        let mut scratch = SectorChainScratch::default();
+        scratch
+            .collect_exact(&[1, ENDOFCHAIN], 0, 2, "regular stream")
+            .unwrap();
+        assert!(!scratch.sectors.is_empty());
+
+        scratch.reset();
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
+
+        scratch
+            .collect_exact(&[], ENDOFCHAIN, 0, "empty stream")
+            .unwrap();
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
+    }
+
+    #[test]
+    fn reusable_chain_scratch_resets_after_cycle_and_reuses_after_error() {
+        let mut scratch = SectorChainScratch::default();
+        let result = scratch.collect_exact(&[1, 0, ENDOFCHAIN], 0, 3, "regular stream");
+        assert!(matches!(
+            result,
+            Err(OleError::CorruptedFile(message))
+                if message == "Cycle detected in regular stream chain at sector 0"
+        ));
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
+
+        scratch
+            .collect_exact(&[ENDOFCHAIN], 0, 1, "regular stream")
+            .unwrap();
+        assert_eq!(scratch.sectors(), &[0]);
+    }
+
+    #[test]
+    fn reusable_chain_scratch_preserves_early_and_late_end_errors() {
+        let mut scratch = SectorChainScratch::default();
+
+        let early = scratch.collect_exact(&[ENDOFCHAIN, ENDOFCHAIN], 0, 2, "mini stream");
+        assert!(matches!(
+            early,
+            Err(OleError::CorruptedFile(message))
+                if message == "mini stream chain ends before its declared length"
+        ));
+        assert!(scratch.sectors.is_empty());
+
+        let late = scratch.collect_exact(&[1, ENDOFCHAIN], 0, 1, "mini stream");
+        assert!(matches!(
+            late,
+            Err(OleError::CorruptedFile(message))
+                if message == "mini stream chain exceeds its declared length"
+        ));
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
     }
 
     #[test]

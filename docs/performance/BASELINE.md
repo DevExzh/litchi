@@ -404,6 +404,23 @@ The complete CFB matrix took 0.29 seconds wall, 0.19 seconds user CPU, 0.11
 seconds system CPU, and 44,468 KiB maximum RSS. These figures include corpus
 generation and all 40 measurement cells, so they are not per-case peaks.
 
+## CFB stream-chain validation scratch (change 0190)
+
+CFB open validation now reuses one fallible chain vector and visited map for
+MiniFAT streams and one pair for FAT streams. Root, directory, allocation-table,
+ownership and physical-layout validation are unchanged. On the exact
+many-small plus wide-root Heaptrack process (three warmups and 100 samples per
+shape), allocation calls fall 988,558 -> 509,749 (-48.44%) and temporary
+allocations 242,178 -> 2,567 (-98.94%); peak heap is flat at the displayed
+2.72 MiB. The control attributes 237,312 calls to each removed per-stream site.
+
+Release A/B/B/A timing used 200 warmups and 5,000 samples per shape. Accepted
+many-small tail reductions are 7.31%-18.36% p95 and 16.81%-19.94% p99;
+p50/mean are withheld on control drift. Accepted wide-root reductions are
+1.49%-2.18% p50, 2.20%-3.90% mean, and 6.53%-12.51% p95; p99 is withheld on
+candidate drift. See [change 0190](changes/0190-cfb-stream-chain-scratch.md), the
+[summary](results/cfb-chain-scratch-0190-summary.json), and the [manifest](results/cfb-chain-scratch-0190-manifest.json).
+
 ## CFB selective exact-range ABBA
 
 Change 0094 measures the public `SharedOleFile::read_stream_range` seam against
