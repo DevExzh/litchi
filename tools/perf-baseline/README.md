@@ -11,7 +11,10 @@ append and ordinary-paragraph split/adjacent-merge transactions, bounded RTF/XLS
 source-backed DOCX section inventory. It creates every corpus in memory; it also exercises
 source-backed XLSX catalog, worksheet reads, and guarded calculation-metadata,
 defined-name, page-break/page-margin/page-setup/print-options/sheet-protection/data-validation/auto-filter
-publication over positional I/O. The scalar-cell controls use deterministic
+publication over positional I/O. Four additional XLSX composition selectors
+exercise disjoint `Edit::join`, overlapping join refusal, disjoint three-way
+planning, and explicit three-way conflict resolution over the same deterministic
+cell CRUD corpus. The scalar-cell controls use deterministic
 medium and dense/sparse four-sheet corpora with untouched media Parts. Their
 timed interval covers open, selector planning, commit, and sequential
 publication; reopen, semantic equality, exact hashes, raw media identity,
@@ -61,7 +64,8 @@ two matched XLSX sheet-protection publication cases,
 two matched XLSX data-validation publication cases,
 two matched XLSX auto-filter/sort-state publication cases,
 two matched XLSX conditional-formatting publication cases,
-two XLSX merge/unmerge commit-plus-save cases, four matched eager/source-backed
+two XLSX merge/unmerge commit-plus-save cases, four opt-in XLSX edit-composition
+selectors, four matched eager/source-backed
 XLSX scalar-cell clear/remove lifecycle cases, six matched eager/source-backed
 XLSX scalar-cell publication cases (one cell, `ceil(1%)`, and the exact 256-cell
 bound), one bounded unmanaged source-backed two-worksheet case, and four
@@ -83,12 +87,13 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 332
+provide their source-read counters. The current `Case` matrix exposes 336
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
-four opt-in XLSX existing-row visibility lifecycle selectors, and four opt-in
-ODS existing-cell publication selectors.
+four opt-in XLSX existing-row visibility lifecycle selectors, four opt-in ODS
+existing-cell publication selectors, and four opt-in XLSX edit-composition
+selectors.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
 and a temporary source file. The first times exactly
@@ -1001,6 +1006,30 @@ views, anchor/unrelated-cell retention, exact durable patch apply/inverse, and
 stale-source refusal are verified outside timing. These cases add selectable
 correctness evidence only and make no latency claim without controlled ABBA
 evidence.
+
+Measure the four opt-in XLSX edit-composition controls:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_join_disjoint_commit_save,xlsx_join_conflict_plan,\
+xlsx_three_way_disjoint_commit_save,xlsx_three_way_conflict_resolve_save \
+  --xlsx-cell-crud-shape medium,dense-sparse \
+  --json target/perf/xlsx-edit-composition.json
+```
+
+These selectors reuse the deterministic media-rich four-sheet scalar corpus.
+Both branches are prepared from one immutable workbook lineage outside timing.
+The disjoint join case times `join`, `commit`, and 64 KiB write-call-bounded
+sequential `write_to` into an output-retaining sink; the join-conflict case
+times only the typed overlap refusal. The disjoint three-way case times plan,
+finish, commit, and that publication, while the conflict case also times
+explicit `MergeChoice::Left` resolution. Exact no-op, empty-join identity, and
+`MergeChoice::Neither` gates are outside every timed interval. Reopen, exact
+output, package/media identity, durable JSON determinism, forward/inverse
+replay, and stale/foreign refusal additionally gate the three save-bearing
+selectors. These are correctness and phase evidence only; no latency or
+speedup claim is made.
 
 Measure the matched native XLS existing-comment publication controls:
 
@@ -2019,6 +2048,21 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   semantics, unrelated-cell retention, exact durable patch apply/inverse, and
   stale-source refusal are checked outside timing. These cases make no latency
   claim without controlled ABBA evidence.
+- `xlsx_join_disjoint_commit_save` and `xlsx_join_conflict_plan`: prepare two
+  one-cell branches from the same immutable media-rich cell CRUD workbook before
+  timing. The disjoint case times typed join, commit, and 64 KiB
+  write-call-bounded sequential `write_to` into an output-retaining sink; the
+  overlap case times only the recoverable conflict refusal and retains the
+  rejected branch.
+- `xlsx_three_way_disjoint_commit_save` and
+  `xlsx_three_way_conflict_resolve_save`: prepare the same one-cell branches
+  outside timing, then time non-applying three-way planning, finish, commit, and
+  the same publication; the conflict case additionally times explicit
+  left-branch resolution. Exact no-op, empty-join identity, and `Neither`
+  resolution gate all four cases outside timing; durable replay/inverse,
+  stale/foreign refusal, reopen, and media preservation additionally gate the
+  save-bearing cases. All four selectors are correctness/phase evidence only
+  and make no latency claim.
 - `xlsx_{eager,source_backed}_cell_{clear,remove}_edit_save`: on the fixed
   media-rich four-sheet scalar corpus, clear or remove one existing numeric
   owner. Eager controls use `WorksheetEdit`; source-backed controls use the

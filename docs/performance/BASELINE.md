@@ -793,7 +793,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**332 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**336 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
@@ -806,6 +806,12 @@ drift plus eager full-text p50/mean drift miss the predeclared gates, and every
 tail is conservatively withheld. This is correctness/attribution evidence, not
 physical-I/O, cold-cache, allocation/RSS, edit/save, producer, or broad OOXML
 evidence.
+
+Change 0189 adds four opt-in XLSX edit-composition selectors for disjoint join,
+recoverable overlap, disjoint three-way planning, and explicit conflict
+resolution. Its two-shape debug smoke is correctness and phase evidence only;
+no latency, allocation, memory, I/O, source-backed, or filesystem-save result
+is accepted.
 
 Change 0160 adds one opt-in native DOC owner/public-reader attribution case.
 For each retained sample it records strict-owner, complete public-reader,
