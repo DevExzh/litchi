@@ -188,7 +188,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **332 selectable cases**; 200 was the count before the
+harness contains **336 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -211,6 +211,11 @@ capability-bounded variants (39 tiny / 70 tiny-plus-large rows), 24
 shape-selected ODT/ODS/ODP semantic cases, twelve fixed media-rich ODF cases,
 and 22 opt-in native DOC/XLS/PPT semantic/phase-attribution cases. It
 is still not broad program or CRUD coverage.
+
+Change 0189 adds four opt-in XLSX join/three-way composition selectors. Their
+two-shape smoke verifies lineage, conflicts, explicit resolution, durable
+replay/inverse, stale/foreign refusal, output reopen, and media preservation.
+It is correctness/phase evidence only and accepts no performance statistic.
 
 ## Native DOC owner/public-reader phase attribution (change 0160)
 
@@ -1621,7 +1626,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 332 selectable cases. Change
+The current standalone harness provides 336 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors

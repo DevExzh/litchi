@@ -46,8 +46,9 @@ use litchi_opc::{
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_xlsx::{
-    Cell as XlsxCell, Rect, RowIndex, SourceBackedWorkbook, StreamingCell, StreamingCellValue,
-    StreamingWorkbookLimits, StreamingWorkbookWriter, Value as XlsxValue, Workbook,
+    Cell as XlsxCell, MergeChoice, MergeLimits, Rect, RowIndex, SourceBackedWorkbook,
+    StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
+    Value as XlsxValue, Workbook,
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -665,6 +666,10 @@ enum Case {
     XlsxSourceBackedConditionalFormattingEditSave,
     XlsxEagerMergeCommitSave,
     XlsxEagerUnmergeCommitSave,
+    XlsxJoinDisjointCommitSave,
+    XlsxJoinConflictPlan,
+    XlsxThreeWayDisjointCommitSave,
+    XlsxThreeWayConflictResolveSave,
     XlsxEagerCellValuesOneEditSave,
     XlsxSourceBackedCellValuesOneEditSave,
     XlsxEagerCellValuesOnePercentEditSave,
@@ -1075,6 +1080,10 @@ impl Case {
             },
             Self::XlsxEagerMergeCommitSave => "xlsx_eager_merge_commit_save",
             Self::XlsxEagerUnmergeCommitSave => "xlsx_eager_unmerge_commit_save",
+            Self::XlsxJoinDisjointCommitSave => "xlsx_join_disjoint_commit_save",
+            Self::XlsxJoinConflictPlan => "xlsx_join_conflict_plan",
+            Self::XlsxThreeWayDisjointCommitSave => "xlsx_three_way_disjoint_commit_save",
+            Self::XlsxThreeWayConflictResolveSave => "xlsx_three_way_conflict_resolve_save",
             Self::XlsxEagerCellValuesOneEditSave => "xlsx_eager_cell_values_one_edit_save",
             Self::XlsxSourceBackedCellValuesOneEditSave => {
                 "xlsx_source_backed_cell_values_one_edit_save"
@@ -2210,6 +2219,16 @@ impl Case {
         )
     }
 
+    const fn is_xlsx_edit_composition(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxJoinDisjointCommitSave
+                | Self::XlsxJoinConflictPlan
+                | Self::XlsxThreeWayDisjointCommitSave
+                | Self::XlsxThreeWayConflictResolveSave
+        )
+    }
+
     const fn is_xlsx_cell_values_edit_save(self) -> bool {
         matches!(
             self,
@@ -2561,6 +2580,69 @@ struct CaseResult {
     operation_metrics: Option<operation_metrics::OperationMetrics>,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct XlsxEditCompositionSummary {
+    implementation: &'static str,
+    operation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    shape: &'static str,
+    source_sha256: String,
+    source_bytes: u64,
+    expected_output_sha256: Option<String>,
+    expected_output_bytes: Option<u64>,
+    left_effect_count: usize,
+    right_effect_count: usize,
+    automatic_branch_count: Option<usize>,
+    conflict_count: Option<usize>,
+    branch_preparation_untimed: bool,
+    branch_preparation_concurrent: bool,
+    output_sha256: Vec<String>,
+    join_ns: Vec<u64>,
+    plan_ns: Vec<u64>,
+    resolve_ns: Vec<u64>,
+    finish_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    reopen_ns: Vec<u64>,
+    gates: XlsxEditCompositionGateSummary,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+struct XlsxEditCompositionGateSummary {
+    source_immutability_verified: bool,
+    branch_lineage_verified: bool,
+    different_snapshot_refusal_verified: bool,
+    disjoint_composition_verified: bool,
+    conflict_refusal_verified: bool,
+    three_way_conflict_verified: bool,
+    explicit_resolution_verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    right_resolution_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unresolved_finish_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    durable_patch_deterministic_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    durable_forward_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    durable_inverse_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stale_source_refusal_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    foreign_source_refusal_verified: Option<bool>,
+    exact_noop_verified: bool,
+    empty_join_identity_verified: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    neither_resolution_noop_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exact_output_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    semantic_reopen_verified: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sink_write_bound_verified: Option<bool>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct CfbSelectiveImplementationEvidence {
     implementation: &'static str,
@@ -2833,6 +2915,8 @@ struct SourceSummary {
     ordinary_payload_materializations: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_edit_composition: Option<XlsxEditCompositionSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_cell_values: Option<XlsxCellValuesSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -6432,6 +6516,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_auto_filter_edit_save()
                     && !case.is_xlsx_conditional_formatting_edit_save()
                     && !case.is_xlsx_merge_edit_save()
+                    && !case.is_xlsx_edit_composition()
                     && !case.is_xls_comments_edit_save()
                     && !case.is_xls_numeric_edit_save()
                     && !case.is_xls_visibility_edit_save()
@@ -6936,6 +7021,29 @@ fn main() -> Result<(), Box<dyn Error>> {
                 options.warmup_iterations,
                 options.samples,
             )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xlsx_edit_composition())
+    {
+        for shape in &options.xlsx_cell_crud_shapes {
+            let corpus = build_xlsx_cell_crud_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.is_xlsx_edit_composition())
+            {
+                results.push(run_xlsx_edit_composition(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
         }
     }
 
@@ -8131,6 +8239,10 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_eager_merge_commit_save" => Some(Case::XlsxEagerMergeCommitSave),
         "xlsx_eager_unmerge_commit_save" => Some(Case::XlsxEagerUnmergeCommitSave),
+        "xlsx_join_disjoint_commit_save" => Some(Case::XlsxJoinDisjointCommitSave),
+        "xlsx_join_conflict_plan" => Some(Case::XlsxJoinConflictPlan),
+        "xlsx_three_way_disjoint_commit_save" => Some(Case::XlsxThreeWayDisjointCommitSave),
+        "xlsx_three_way_conflict_resolve_save" => Some(Case::XlsxThreeWayConflictResolveSave),
         "xlsx_eager_cell_values_one_edit_save" => Some(Case::XlsxEagerCellValuesOneEditSave),
         "xlsx_source_backed_cell_values_one_edit_save" => {
             Some(Case::XlsxSourceBackedCellValuesOneEditSave)
@@ -8554,6 +8666,10 @@ fn print_usage() {
                                        xlsx_source_backed_conditional_formatting_edit_save,\n\
                                        xlsx_eager_merge_commit_save,\n\
                                        xlsx_eager_unmerge_commit_save,\n\
+                                       xlsx_join_disjoint_commit_save,\n\
+                                       xlsx_join_conflict_plan,\n\
+                                       xlsx_three_way_disjoint_commit_save,\n\
+                                       xlsx_three_way_conflict_resolve_save,\n\
                                        cfb_open,cfb_list_streams,cfb_read_one,\n\
                                        cfb_create_stream_borrowed,cfb_create_stream_owned,\n\
                                        ole_common_open,ole_common_put_stream_publish,\n\
@@ -8736,7 +8852,7 @@ fn print_usage() {
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
-           --xlsx-cell-crud-shape LIST medium,dense-sparse (only used by matched scalar-cell cases)\n\
+           --xlsx-cell-crud-shape LIST medium,dense-sparse (used by matched scalar-cell and edit-composition cases)\n\
            --xlsx-row-visibility-shape LIST medium,large (only used by matched row-visibility cases)\n\
            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
            --rtf-variant LIST          plain,byte1252,lzfu,watermark (default: plain)\n\
@@ -14843,6 +14959,12 @@ fn run_case_with_config(
         },
         Case::XlsxEagerMergeCommitSave | Case::XlsxEagerUnmergeCommitSave => {
             run_xlsx_merge_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxJoinDisjointCommitSave
+        | Case::XlsxJoinConflictPlan
+        | Case::XlsxThreeWayDisjointCommitSave
+        | Case::XlsxThreeWayConflictResolveSave => {
+            Err("XLSX edit-composition cases use their dedicated corpus runner".into())
         },
         Case::XlsNumericEagerNumberEditSave
         | Case::XlsNumericSourceBackedNumberEditSave
@@ -30023,6 +30145,789 @@ fn run_xlsx_merge_edit_save(
     })
 }
 
+fn xlsx_edit_composition_coordinates(
+    spec: &XlsxCorpus,
+    case: Case,
+) -> Result<(XlsxCoordinate, XlsxCoordinate), Box<dyn Error>> {
+    if !case.is_xlsx_edit_composition() {
+        return Err("non-composition case passed to XLSX composition coordinates".into());
+    }
+    let inventory = spec
+        .cell_inventory
+        .as_ref()
+        .ok_or("XLSX composition corpus has no cell inventory")?;
+    let left = *inventory
+        .first()
+        .and_then(|cells| cells.first())
+        .ok_or("XLSX composition corpus has no left target")?;
+    let right = *inventory
+        .get(1)
+        .and_then(|cells| cells.first())
+        .ok_or("XLSX composition corpus has no right target")?;
+    Ok((
+        left,
+        if matches!(
+            case,
+            Case::XlsxJoinConflictPlan | Case::XlsxThreeWayConflictResolveSave
+        ) {
+            left
+        } else {
+            right
+        },
+    ))
+}
+
+fn prepare_xlsx_composition_branch(
+    workbook: &Workbook,
+    coordinate: XlsxCoordinate,
+    value: i32,
+) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
+    let mut edit = workbook.edit()?;
+    edit.sheet(xlsx_sheet_name(coordinate.sheet))?
+        .ok_or("XLSX composition target sheet is missing")?
+        .set(xlsx_address(coordinate.row, coordinate.column)?, value)?;
+    Ok(edit)
+}
+
+fn prepare_xlsx_composition_branches(
+    workbook: &Workbook,
+    left_coordinate: XlsxCoordinate,
+    left_value: i32,
+    right_coordinate: XlsxCoordinate,
+    right_value: i32,
+) -> Result<(litchi_xlsx::Edit, litchi_xlsx::Edit), Box<dyn Error>> {
+    std::thread::scope(|scope| {
+        let left = scope.spawn(|| {
+            prepare_xlsx_composition_branch(workbook, left_coordinate, left_value)
+                .map_err(|error| error.to_string())
+        });
+        let right = scope.spawn(|| {
+            prepare_xlsx_composition_branch(workbook, right_coordinate, right_value)
+                .map_err(|error| error.to_string())
+        });
+        let left = left
+            .join()
+            .map_err(|_| "XLSX composition left branch thread panicked".to_owned())?
+            .map_err(|error| -> Box<dyn Error> { error.into() })?;
+        let right = right
+            .join()
+            .map_err(|_| "XLSX composition right branch thread panicked".to_owned())?
+            .map_err(|error| -> Box<dyn Error> { error.into() })?;
+        Ok((left, right))
+    })
+}
+
+fn verify_xlsx_edit_composition_cells(
+    corpus: &Corpus,
+    output: &[u8],
+    expected: &[(XlsxCoordinate, i32)],
+) -> Result<(), Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let workbook = Workbook::from_bytes(output.to_vec())?;
+    if workbook.len() != spec.sheet_count {
+        return Err("XLSX composition output changed sheet count".into());
+    }
+    let inventory = spec
+        .cell_inventory
+        .as_ref()
+        .ok_or("XLSX composition corpus has no cell inventory")?;
+    for sheet_index in 0..spec.sheet_count {
+        let sheet = workbook
+            .sheet(xlsx_sheet_name(sheet_index).as_str())?
+            .ok_or("XLSX composition output is missing source sheet")?;
+        let coordinates = inventory
+            .get(sheet_index)
+            .ok_or("XLSX composition output is missing sheet inventory")?;
+        if sheet.cells("A1:XFD1048576")?.count() != coordinates.len() {
+            return Err("XLSX composition output changed stored cell count".into());
+        }
+        for coordinate in coordinates {
+            let expected_value = expected
+                .iter()
+                .find_map(|(target, value)| (target == coordinate).then_some(*value))
+                .unwrap_or_else(|| xlsx_value(*coordinate));
+            let address = xlsx_address(coordinate.row, coordinate.column)?;
+            let actual = sheet
+                .cell(address.as_str())?
+                .stored()
+                .ok_or("XLSX composition output is missing source cell")?;
+            let XlsxCell::Value(XlsxValue::Number(actual)) = actual else {
+                return Err("XLSX composition output cell is not numeric".into());
+            };
+            if actual.as_str() != expected_value.to_string() {
+                return Err("XLSX composition output cell differs from expected value".into());
+            }
+        }
+    }
+    verify_xlsx_cell_crud_package_identity(corpus, output)
+}
+
+fn verify_xlsx_edit_composition_commit(
+    corpus: &Corpus,
+    source: &Workbook,
+    commit: &litchi_xlsx::Commit,
+    output: &[u8],
+    expected: &[u8],
+    expected_cells: &[(XlsxCoordinate, i32)],
+) -> Result<(), Box<dyn Error>> {
+    if output != expected {
+        return Err("XLSX composition output differs from deterministic output".into());
+    }
+    verify_xlsx_edit_composition_cells(corpus, output, expected_cells)?;
+    let reopened = Workbook::from_bytes(output.to_vec())?;
+    verify_xlsx_edit_composition_cells(corpus, &reopened.to_bytes()?, expected_cells)?;
+
+    let durable = commit.patch().durable()?;
+    let json = durable.to_deterministic_json()?;
+    if json != durable.to_deterministic_json()? {
+        return Err("XLSX composition durable patch encoding is not deterministic".into());
+    }
+    let parsed = litchi_xlsx::DurablePatch::from_deterministic_json(&json)?;
+    let applied = parsed.apply(source)?;
+    if applied.to_bytes()? != expected {
+        return Err("XLSX composition durable patch did not reproduce output".into());
+    }
+    let restored = parsed.inverse().apply(&applied)?;
+    if restored.to_bytes()? != source.to_bytes()? {
+        return Err("XLSX composition durable inverse did not restore source".into());
+    }
+
+    let stale =
+        prepare_xlsx_composition_branch(source, expected_cells[0].0, expected_cells[0].1 + 99)?
+            .commit()?
+            .into_workbook();
+    if parsed.apply(&stale).is_ok() {
+        return Err("XLSX composition durable patch accepted a stale source".into());
+    }
+    let foreign_coordinate = xlsx_spec(corpus)?
+        .cell_inventory
+        .as_ref()
+        .and_then(|inventory| inventory.get(3))
+        .and_then(|cells| cells.first())
+        .copied()
+        .ok_or("XLSX composition corpus has no foreign target")?;
+    let foreign = prepare_xlsx_composition_branch(
+        source,
+        foreign_coordinate,
+        xlsx_value(foreign_coordinate) + 77,
+    )?
+    .commit()?
+    .into_workbook();
+    if parsed.apply(&foreign).is_ok() {
+        return Err("XLSX composition durable patch accepted a foreign source".into());
+    }
+    if source.to_bytes()? != corpus.archive {
+        return Err("XLSX composition mutated its immutable source".into());
+    }
+    Ok(())
+}
+
+fn run_xlsx_edit_composition(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+        || !case.is_xlsx_edit_composition()
+    {
+        return Err("XLSX composition case requires the cell CRUD corpus".into());
+    }
+    let spec = xlsx_spec(corpus)?;
+    let (left_coordinate, right_coordinate) = xlsx_edit_composition_coordinates(spec, case)?;
+    let left_value = xlsx_value(left_coordinate) + 1;
+    let right_value = xlsx_value(right_coordinate) + 2;
+    let expected_cells = if left_coordinate == right_coordinate {
+        vec![(left_coordinate, left_value)]
+    } else {
+        vec![
+            (left_coordinate, left_value),
+            (right_coordinate, right_value),
+        ]
+    };
+    let source = Workbook::from_bytes(corpus.archive.clone())?;
+    if source.to_bytes()? != corpus.archive {
+        return Err("XLSX composition source round trip changed source bytes".into());
+    }
+    let noop = source.edit()?.commit()?.into_workbook();
+    if noop.to_bytes()? != corpus.archive {
+        return Err("XLSX composition exact no-op changed source bytes".into());
+    }
+    let merge_limits = MergeLimits::new(2, 64, 128, 64);
+    let exact_noop_verified = true;
+    let empty_join_identity_verified = {
+        let mut empty = source.edit()?;
+        let incoming = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?;
+        empty
+            .join(incoming)
+            .map_err(|error| format!("XLSX empty-transaction join identity failed: {error}"))?;
+        let joined_bytes = empty.commit()?.workbook().to_bytes()?;
+        let single_bytes = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?
+            .commit()?
+            .workbook()
+            .to_bytes()?;
+        joined_bytes == single_bytes
+    };
+    if !empty_join_identity_verified {
+        return Err("XLSX empty-transaction join changed the incoming edit".into());
+    }
+    let different_snapshot_refusal_verified = {
+        let mut local = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?;
+        let foreign_source = Workbook::from_bytes(corpus.archive.clone())?;
+        let foreign =
+            prepare_xlsx_composition_branch(&foreign_source, right_coordinate, right_value)?;
+        let join_refused = match local.join(foreign) {
+            Ok(_) => false,
+            Err(error) => matches!(error.failure(), litchi_xlsx::JoinFailure::DifferentSnapshot),
+        };
+
+        let local = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?;
+        let foreign_source = Workbook::from_bytes(corpus.archive.clone())?;
+        let foreign =
+            prepare_xlsx_composition_branch(&foreign_source, right_coordinate, right_value)?;
+        let plan_refused = local.plan_three_way(foreign, merge_limits).is_err();
+        join_refused && plan_refused
+    };
+    if !different_snapshot_refusal_verified {
+        return Err("XLSX different-snapshot lineage refusal gate failed".into());
+    }
+    let neither_resolution_noop_verified = if matches!(
+        case,
+        Case::XlsxJoinConflictPlan | Case::XlsxThreeWayConflictResolveSave
+    ) {
+        let (left, right) = prepare_xlsx_composition_branches(
+            &source,
+            left_coordinate,
+            left_value,
+            right_coordinate,
+            right_value,
+        )?;
+        let mut plan = left.plan_three_way(right, merge_limits)?;
+        if plan.conflicts().is_empty() {
+            return Err("XLSX Neither preflight had no conflict group".into());
+        }
+        plan.resolve(MergeChoice::Neither);
+        let commit = plan.finish()?.commit()?;
+        let bytes = commit.workbook().to_bytes()?;
+        Some(bytes == corpus.archive && commit.patch().is_empty())
+    } else {
+        None
+    };
+    if neither_resolution_noop_verified == Some(false) {
+        return Err("XLSX Neither resolution did not produce an exact no-op".into());
+    }
+
+    let (right_resolution_verified, unresolved_finish_refusal_verified) =
+        if matches!(case, Case::XlsxThreeWayConflictResolveSave) {
+            let (left, right) = prepare_xlsx_composition_branches(
+                &source,
+                left_coordinate,
+                left_value,
+                right_coordinate,
+                right_value,
+            )?;
+            let unresolved = left.plan_three_way(right, merge_limits)?;
+            let unresolved_finish_refusal_verified = unresolved.finish().is_err();
+
+            let (left, right) = prepare_xlsx_composition_branches(
+                &source,
+                left_coordinate,
+                left_value,
+                right_coordinate,
+                right_value,
+            )?;
+            let mut right_plan = left.plan_three_way(right, merge_limits)?;
+            if right_plan.conflicts().is_empty() {
+                return Err("XLSX Right-resolution preflight had no conflict group".into());
+            }
+            right_plan.resolve(MergeChoice::Right);
+            let right_commit = right_plan.finish()?.commit()?;
+            let right_output = right_commit.workbook().to_bytes()?;
+            let right_expected_cells = vec![(right_coordinate, right_value)];
+            verify_xlsx_edit_composition_cells(corpus, &right_output, &right_expected_cells)?;
+            let right_resolution_verified = right_output != corpus.archive;
+            (
+                Some(right_resolution_verified),
+                Some(unresolved_finish_refusal_verified),
+            )
+        } else {
+            (None, None)
+        };
+    if unresolved_finish_refusal_verified == Some(false) {
+        return Err("XLSX unresolved three-way finish was unexpectedly accepted".into());
+    }
+    if right_resolution_verified == Some(false) {
+        return Err("XLSX Right resolution did not change the source".into());
+    }
+
+    let (expected_output, automatic_branch_count, conflict_count, branch_lineage_verified) =
+        match case {
+            Case::XlsxJoinDisjointCommitSave => {
+                let (mut left, right) = prepare_xlsx_composition_branches(
+                    &source,
+                    left_coordinate,
+                    left_value,
+                    right_coordinate,
+                    right_value,
+                )?;
+                left.join(right)
+                    .map_err(|error| format!("XLSX disjoint join preflight failed: {error}"))?;
+                let commit = left.commit()?;
+                let expected = commit.workbook().to_bytes()?;
+                verify_xlsx_edit_composition_commit(
+                    corpus,
+                    &source,
+                    &commit,
+                    &expected,
+                    &expected,
+                    &expected_cells,
+                )?;
+                (Some(expected), None, None, true)
+            },
+            Case::XlsxJoinConflictPlan => {
+                let (mut left, right) = prepare_xlsx_composition_branches(
+                    &source,
+                    left_coordinate,
+                    left_value,
+                    right_coordinate,
+                    right_value,
+                )?;
+                let error = left
+                    .join(right)
+                    .expect_err("XLSX overlapping join unexpectedly succeeded");
+                let conflicts = error
+                    .conflicts()
+                    .ok_or("XLSX overlapping join returned a non-overlap failure")?;
+                if conflicts.is_empty() || error.rejected().len() != 1 || left.len() != 1 {
+                    return Err("XLSX overlapping join lost conflict or branch state".into());
+                }
+                (None, None, Some(conflicts.len()), true)
+            },
+            Case::XlsxThreeWayDisjointCommitSave => {
+                let (left, right) = prepare_xlsx_composition_branches(
+                    &source,
+                    left_coordinate,
+                    left_value,
+                    right_coordinate,
+                    right_value,
+                )?;
+                let plan = left.plan_three_way(right, merge_limits)?;
+                if !plan.conflicts().is_empty() || plan.automatic_len() != 2 {
+                    return Err("XLSX disjoint three-way plan was not automatic".into());
+                }
+                let commit = plan.finish()?.commit()?;
+                let expected = commit.workbook().to_bytes()?;
+                verify_xlsx_edit_composition_commit(
+                    corpus,
+                    &source,
+                    &commit,
+                    &expected,
+                    &expected,
+                    &expected_cells,
+                )?;
+                (Some(expected), Some(2), Some(0), true)
+            },
+            Case::XlsxThreeWayConflictResolveSave => {
+                let (left, right) = prepare_xlsx_composition_branches(
+                    &source,
+                    left_coordinate,
+                    left_value,
+                    right_coordinate,
+                    right_value,
+                )?;
+                let mut plan = left.plan_three_way(right, merge_limits)?;
+                if plan.conflicts().is_empty() || plan.automatic_len() != 0 {
+                    return Err("XLSX conflicting three-way plan lacked a conflict".into());
+                }
+                plan.resolve(MergeChoice::Left);
+                let commit = plan.finish()?.commit()?;
+                let expected = commit.workbook().to_bytes()?;
+                verify_xlsx_edit_composition_commit(
+                    corpus,
+                    &source,
+                    &commit,
+                    &expected,
+                    &expected,
+                    &expected_cells,
+                )?;
+                (Some(expected), Some(0), Some(1), true)
+            },
+            _ => return Err("invalid XLSX composition case".into()),
+        };
+    let branch_lineage_verified = branch_lineage_verified && different_snapshot_refusal_verified;
+    let expected_digest = expected_output.as_ref().map(|bytes| sha256_hex(bytes));
+    let expected_bytes = expected_output
+        .as_ref()
+        .map(|bytes| u64::try_from(bytes.len()))
+        .transpose()?;
+    let maximum = expected_output
+        .as_ref()
+        .map(|bytes| xlsx_output_ceiling(bytes.len()))
+        .transpose()?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut output_digests = Vec::with_capacity(samples);
+    let mut sink_summaries = Vec::with_capacity(samples);
+    let mut join_ns = Vec::with_capacity(samples);
+    let mut plan_ns = Vec::with_capacity(samples);
+    let mut resolve_ns = Vec::with_capacity(samples);
+    let mut finish_ns = Vec::with_capacity(samples);
+    let mut commit_ns = Vec::with_capacity(samples);
+    let mut publication_ns = Vec::with_capacity(samples);
+    let mut reopen_ns = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Branch construction is deliberately before the timed composition
+        // interval. Both edits therefore retain the exact immutable source
+        // lineage without charging parser or semantic staging work to join or
+        // three-way planning.
+        let (left, right) = prepare_xlsx_composition_branches(
+            &source,
+            left_coordinate,
+            left_value,
+            right_coordinate,
+            right_value,
+        )?;
+        let mut timed_ns = 0u128;
+        let mut join_duration = None;
+        let mut plan_duration = None;
+        let mut resolve_duration = None;
+        let mut finish_duration = None;
+        let mut commit_duration = None;
+        let mut publication_duration = None;
+        let mut sink_summary = None;
+        let mut output = None;
+
+        match case {
+            Case::XlsxJoinDisjointCommitSave => {
+                let mut left = left;
+                let started = Instant::now();
+                left.join(right)
+                    .map_err(|error| format!("XLSX disjoint join failed: {error}"))?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                join_duration = Some(duration);
+                let started = Instant::now();
+                let commit = left.commit()?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                commit_duration = Some(duration);
+                let mut sink =
+                    CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
+                sink.reserve_budget()?;
+                let started = Instant::now();
+                commit.workbook().write_to(&mut sink)?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                publication_duration = Some(duration);
+                let summary = sink.summary();
+                output = Some(sink.bytes);
+                sink_summary = Some(summary);
+                verify_xlsx_edit_composition_commit(
+                    corpus,
+                    &source,
+                    &commit,
+                    output.as_ref().ok_or("missing XLSX output")?,
+                    expected_output
+                        .as_ref()
+                        .ok_or("missing XLSX expected output")?,
+                    &expected_cells,
+                )?;
+            },
+            Case::XlsxJoinConflictPlan => {
+                let mut left = left;
+                let started = Instant::now();
+                let error = left
+                    .join(right)
+                    .expect_err("XLSX overlapping join unexpectedly succeeded");
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                if error
+                    .conflicts()
+                    .is_none_or(|conflicts| conflicts.is_empty())
+                    || error.rejected().len() != 1
+                    || left.len() != 1
+                {
+                    return Err("XLSX overlapping join conflict gate failed".into());
+                }
+                join_duration = Some(duration);
+            },
+            Case::XlsxThreeWayDisjointCommitSave => {
+                let started = Instant::now();
+                let plan = left.plan_three_way(right, merge_limits)?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                if !plan.conflicts().is_empty() || plan.automatic_len() != 2 {
+                    return Err("XLSX disjoint three-way conflict gate failed".into());
+                }
+                plan_duration = Some(duration);
+                let started = Instant::now();
+                let merged = plan.finish()?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                finish_duration = Some(duration);
+                let started = Instant::now();
+                let commit = merged.commit()?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                commit_duration = Some(duration);
+                let mut sink =
+                    CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
+                sink.reserve_budget()?;
+                let started = Instant::now();
+                commit.workbook().write_to(&mut sink)?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                publication_duration = Some(duration);
+                let summary = sink.summary();
+                output = Some(sink.bytes);
+                sink_summary = Some(summary);
+                verify_xlsx_edit_composition_commit(
+                    corpus,
+                    &source,
+                    &commit,
+                    output.as_ref().ok_or("missing XLSX output")?,
+                    expected_output
+                        .as_ref()
+                        .ok_or("missing XLSX expected output")?,
+                    &expected_cells,
+                )?;
+            },
+            Case::XlsxThreeWayConflictResolveSave => {
+                let started = Instant::now();
+                let mut plan = left.plan_three_way(right, merge_limits)?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                if plan.conflicts().is_empty() || plan.automatic_len() != 0 {
+                    return Err("XLSX conflicting three-way plan gate failed".into());
+                }
+                plan_duration = Some(duration);
+                let started = Instant::now();
+                plan.resolve(MergeChoice::Left);
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                resolve_duration = Some(duration);
+                let started = Instant::now();
+                let merged = plan.finish()?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                finish_duration = Some(duration);
+                let started = Instant::now();
+                let commit = merged.commit()?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                commit_duration = Some(duration);
+                let mut sink =
+                    CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
+                sink.reserve_budget()?;
+                let started = Instant::now();
+                commit.workbook().write_to(&mut sink)?;
+                let duration = started.elapsed();
+                timed_ns = timed_ns
+                    .checked_add(u128::from(elapsed_ns(duration)?))
+                    .ok_or("XLSX composition timed duration overflow")?;
+                publication_duration = Some(duration);
+                let summary = sink.summary();
+                output = Some(sink.bytes);
+                sink_summary = Some(summary);
+                verify_xlsx_edit_composition_commit(
+                    corpus,
+                    &source,
+                    &commit,
+                    output.as_ref().ok_or("missing XLSX output")?,
+                    expected_output
+                        .as_ref()
+                        .ok_or("missing XLSX expected output")?,
+                    &expected_cells,
+                )?;
+            },
+            _ => return Err("invalid XLSX composition case".into()),
+        }
+        let timed = Duration::from_nanos(u64::try_from(timed_ns)?);
+        let reopen_duration =
+            if let (Some(output), Some(expected)) = (output.as_ref(), expected_output.as_ref()) {
+                let started = Instant::now();
+                if output != expected {
+                    return Err("XLSX composition output digest gate failed".into());
+                }
+                let reopened = Workbook::from_bytes(output.to_vec())?;
+                verify_xlsx_edit_composition_cells(corpus, &reopened.to_bytes()?, &expected_cells)?;
+                Some(started.elapsed())
+            } else {
+                None
+            };
+        if let Some(summary) = sink_summary {
+            if summary.largest_write > 64 * 1024 {
+                return Err("XLSX composition save exceeded sink write bound".into());
+            }
+            if iteration >= warmup_iterations {
+                sink_summaries.push(summary);
+            }
+        }
+        if iteration >= warmup_iterations {
+            if let Some(output) = output {
+                output_digests.push(sha256_hex(&output));
+            }
+            if let Some(duration) = join_duration {
+                join_ns.push(elapsed_ns(duration)?);
+            }
+            if let Some(duration) = plan_duration {
+                plan_ns.push(elapsed_ns(duration)?);
+            }
+            if let Some(duration) = resolve_duration {
+                resolve_ns.push(elapsed_ns(duration)?);
+            }
+            if let Some(duration) = finish_duration {
+                finish_ns.push(elapsed_ns(duration)?);
+            }
+            if let Some(duration) = commit_duration {
+                commit_ns.push(elapsed_ns(duration)?);
+            }
+            if let Some(duration) = publication_duration {
+                publication_ns.push(elapsed_ns(duration)?);
+            }
+            if let Some(duration) = reopen_duration {
+                reopen_ns.push(elapsed_ns(duration)?);
+            }
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, timed)?;
+    }
+
+    if output_digests.windows(2).any(|pair| pair[0] != pair[1]) {
+        return Err("XLSX composition output hashes are not deterministic".into());
+    }
+    if !sink_summaries.is_empty() {
+        let first = sink_summaries[0];
+        if sink_summaries.iter().any(|summary| *summary != first) {
+            return Err("XLSX composition sink summaries are not deterministic".into());
+        }
+    }
+    let conflict_case = matches!(
+        case,
+        Case::XlsxJoinConflictPlan | Case::XlsxThreeWayConflictResolveSave
+    );
+    let save_case = !matches!(case, Case::XlsxJoinConflictPlan);
+    let gates = XlsxEditCompositionGateSummary {
+        source_immutability_verified: source.to_bytes()? == corpus.archive,
+        branch_lineage_verified,
+        different_snapshot_refusal_verified,
+        disjoint_composition_verified: matches!(
+            case,
+            Case::XlsxJoinDisjointCommitSave | Case::XlsxThreeWayDisjointCommitSave
+        ),
+        conflict_refusal_verified: conflict_case,
+        three_way_conflict_verified: matches!(case, Case::XlsxThreeWayConflictResolveSave),
+        explicit_resolution_verified: matches!(case, Case::XlsxThreeWayConflictResolveSave),
+        right_resolution_verified,
+        unresolved_finish_refusal_verified,
+        durable_patch_deterministic_verified: save_case.then_some(true),
+        durable_forward_verified: save_case.then_some(true),
+        durable_inverse_verified: save_case.then_some(true),
+        stale_source_refusal_verified: save_case.then_some(true),
+        foreign_source_refusal_verified: save_case.then_some(true),
+        exact_noop_verified,
+        empty_join_identity_verified,
+        neither_resolution_noop_verified,
+        exact_output_verified: save_case.then_some(
+            output_digests.iter().all(|digest| {
+                expected_digest
+                    .as_ref()
+                    .is_some_and(|expected| digest == expected)
+            }),
+        ),
+        semantic_reopen_verified: save_case.then_some(reopen_ns.len() == samples),
+        sink_write_bound_verified: save_case.then_some(sink_summaries.len() == samples),
+    };
+    if !gates.source_immutability_verified
+        || !gates.branch_lineage_verified
+        || !gates.different_snapshot_refusal_verified
+        || !gates.exact_noop_verified
+        || !gates.empty_join_identity_verified
+        || gates.neither_resolution_noop_verified == Some(false)
+        || gates.exact_output_verified == Some(false)
+        || gates.semantic_reopen_verified == Some(false)
+        || gates.sink_write_bound_verified == Some(false)
+    {
+        return Err("XLSX composition correctness gates failed".into());
+    }
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: sink_summaries.first().copied(),
+        execution: None,
+        output_sha256: expected_digest.clone(),
+        operation_metrics: None,
+        source: Some(SourceSummary {
+            xlsx_edit_composition: Some(XlsxEditCompositionSummary {
+                implementation: "owned-workbook",
+                operation: case.name(),
+                timing_scope: match case {
+                    Case::XlsxJoinDisjointCommitSave => {
+                        "prepared branches outside timer; timed disjoint join, commit, and 64 KiB write-call-bounded sequential write_to"
+                    },
+                    Case::XlsxJoinConflictPlan => {
+                        "prepared overlapping branches outside timer; timed join refusal only"
+                    },
+                    Case::XlsxThreeWayDisjointCommitSave => {
+                        "prepared branches outside timer; timed three-way plan, finish, commit, and 64 KiB write-call-bounded sequential write_to"
+                    },
+                    Case::XlsxThreeWayConflictResolveSave => {
+                        "prepared branches outside timer; timed three-way plan, explicit resolve, finish, commit, and 64 KiB write-call-bounded sequential write_to"
+                    },
+                    _ => unreachable!(),
+                },
+                performance_claim: "correctness-and-phase evidence only; no latency or speedup claim",
+                shape: corpus.manifest.shape,
+                source_sha256: corpus.manifest.archive_sha256.clone(),
+                source_bytes: u64::try_from(corpus.archive.len())?,
+                expected_output_sha256: expected_digest,
+                expected_output_bytes: expected_bytes,
+                left_effect_count: 1,
+                right_effect_count: 1,
+                automatic_branch_count,
+                conflict_count,
+                branch_preparation_untimed: true,
+                branch_preparation_concurrent: true,
+                output_sha256: output_digests,
+                join_ns,
+                plan_ns,
+                resolve_ns,
+                finish_ns,
+                commit_ns,
+                publication_ns,
+                reopen_ns,
+                gates,
+            }),
+            ..SourceSummary::default()
+        }),
+    })
+}
+
 fn xlsx_expected_output(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
@@ -38544,8 +39449,7 @@ mod tests {
         build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
         build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
         build_odt_repeated_text_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
-        build_opc_corpus,
-        build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
+        build_opc_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
         build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
         build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
         build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
@@ -38571,7 +39475,7 @@ mod tests {
         run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
-        run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
+        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
         run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
         updated_writer_text, writer_shape, xlsx_cell_count,
@@ -38974,8 +39878,80 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 332);
+        assert_eq!(selectable_count, 336);
         assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn xlsx_edit_composition_selectors_are_opt_in_and_gate_complete() {
+        let cases = [
+            Case::XlsxJoinDisjointCommitSave,
+            Case::XlsxJoinConflictPlan,
+            Case::XlsxThreeWayDisjointCommitSave,
+            Case::XlsxThreeWayConflictResolveSave,
+        ];
+        for shape in XlsxCellCrudShape::ALL {
+            let corpus = build_xlsx_cell_crud_corpus(shape).unwrap();
+            for case in cases {
+                assert_eq!(parse_case(case.name()), Some(case));
+                let result = run_xlsx_edit_composition(case, &corpus, 0, 1).unwrap();
+                let evidence = result
+                    .source
+                    .expect("composition source evidence is present")
+                    .xlsx_edit_composition
+                    .expect("composition evidence is present");
+                assert_eq!(evidence.shape, shape.name());
+                assert!(evidence.branch_preparation_untimed);
+                assert!(evidence.branch_preparation_concurrent);
+                assert!(evidence.gates.source_immutability_verified);
+                assert!(evidence.gates.branch_lineage_verified);
+                assert!(evidence.gates.different_snapshot_refusal_verified);
+                assert!(evidence.gates.exact_noop_verified);
+                assert!(evidence.gates.empty_join_identity_verified);
+                if matches!(
+                    case,
+                    Case::XlsxJoinConflictPlan | Case::XlsxThreeWayConflictResolveSave
+                ) {
+                    assert_eq!(evidence.conflict_count, Some(1));
+                    assert!(evidence.gates.conflict_refusal_verified);
+                    assert_eq!(evidence.gates.neither_resolution_noop_verified, Some(true));
+                    if case == Case::XlsxThreeWayConflictResolveSave {
+                        assert_eq!(evidence.gates.right_resolution_verified, Some(true));
+                        assert_eq!(
+                            evidence.gates.unresolved_finish_refusal_verified,
+                            Some(true)
+                        );
+                    } else {
+                        assert_eq!(evidence.gates.right_resolution_verified, None);
+                        assert_eq!(evidence.gates.unresolved_finish_refusal_verified, None);
+                    }
+                } else {
+                    assert_eq!(
+                        evidence.conflict_count,
+                        if case == Case::XlsxThreeWayDisjointCommitSave {
+                            Some(0)
+                        } else {
+                            None
+                        }
+                    );
+                    assert!(evidence.gates.disjoint_composition_verified);
+                }
+                if case == Case::XlsxJoinConflictPlan {
+                    assert_eq!(evidence.gates.exact_output_verified, None);
+                    assert_eq!(evidence.gates.semantic_reopen_verified, None);
+                    assert_eq!(evidence.gates.sink_write_bound_verified, None);
+                } else {
+                    assert_eq!(evidence.gates.exact_output_verified, Some(true));
+                    assert!(evidence.gates.durable_patch_deterministic_verified == Some(true));
+                    assert!(evidence.gates.durable_forward_verified == Some(true));
+                    assert!(evidence.gates.durable_inverse_verified == Some(true));
+                    assert!(evidence.gates.stale_source_refusal_verified == Some(true));
+                    assert!(evidence.gates.foreign_source_refusal_verified == Some(true));
+                    assert_eq!(evidence.gates.semantic_reopen_verified, Some(true));
+                    assert_eq!(evidence.gates.sink_write_bound_verified, Some(true));
+                }
+            }
+        }
     }
 
     #[test]
