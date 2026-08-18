@@ -87,7 +87,7 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 336
+provide their source-read counters. The current `Case` matrix exposes 340
 selectable case names in total, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
@@ -1751,6 +1751,37 @@ eight freshness observations (`[2, 2, 2, 2]`), and zero source reads after
 owner preparation. The candidate records either that pre-cache shape or the
 cache-enabled `[2, 4, 2, 2]` shape (ten total observations). This is
 phase/correctness evidence only; no latency claim is made.
+
+Four unified-root ODT filesystem selectors (`odt_file_eager_open`,
+`odt_file_source_open`, `odt_file_eager_open_full_text_lifecycle`, and
+`odt_file_source_open_full_text_lifecycle`) are also opt-in over this same
+large 10,000-paragraph/eight-2 MiB-picture corpus. Eager timing includes the
+filesystem `fs::read` and `litchi::Document::from_bytes`; source timing calls
+`litchi::Document::open(path)`. The two lifecycle selectors additionally keep
+`Document::text()` inside the timer. Corpus creation and temporary-file setup,
+eager/source paragraph, text, table, element, and metadata parity, archive
+member/hash identity, and compressed-range/media payload identity remain
+outside timing. Each source selector has an independent untimed
+`InstrumentedSource` replay proving that preparation and the full-text query
+overlap zero `Pictures/*` payload bytes. These selectors add filesystem/root
+correctness and source-range evidence directly. The separately frozen
+[change 0191](../../docs/performance/changes/0191-odt-unified-source-ingress.md)
+A1/B1/B2/A2 run retains the correctness and logical-range evidence but accepts
+no open-only latency statistic because same-implementation drift fails every
+tier. The full-text lifecycle accepts p50/mean/p95/p99 reductions of 30.02% to
+35.36% after both paired directions and implementation drifts pass. It makes no
+allocation, RSS, physical-I/O, decompression, cold-cache, producer, edit/save,
+or broad ODF claim.
+
+Run the four ingress phases with:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 \
+  --case odt_file_eager_open,odt_file_source_open,\
+odt_file_eager_open_full_text_lifecycle,odt_file_source_open_full_text_lifecycle \
+  --json target/perf/odt-root-filesystem.json
+```
 
 `odt_embedded_resource_scalar_replace_save` and
 `odt_embedded_resource_batch_replace_save` share a deterministic extension of

@@ -8,6 +8,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
@@ -20,6 +21,24 @@ pub(crate) const MAX_ARGON2_ITERATIONS: u32 = 10;
 pub(crate) const MAX_ARGON2_MEMORY_KIB: u32 = 262_144;
 pub(crate) const MAX_ARGON2_LANES: u32 = 16;
 pub(crate) const MAX_ARGON2_WORK_KIB_PASSES: u64 = 1_048_576;
+
+fn try_copy_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.extend_from_slice(value);
+    Ok(output)
+}
+
+fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
 
 /// ODF manifest (`META-INF/manifest.xml`).
 #[derive(Debug, Clone)]
@@ -147,19 +166,23 @@ impl Manifest {
             mimetype,
             entries: neutral_entries,
         } = common_package::parse_manifest(xml)?;
-        let mut entries: HashMap<String, ManifestEntry> = neutral_entries
-            .into_iter()
-            .map(|(path, entry)| {
-                (
-                    path,
-                    ManifestEntry {
-                        media_type: entry.media_type,
-                        size: entry.size,
-                        encryption: None,
-                    },
-                )
-            })
-            .collect();
+        let mut entries: HashMap<String, ManifestEntry> = HashMap::new();
+        entries
+            .try_reserve(neutral_entries.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODF typed manifest entries",
+                source,
+            })?;
+        for (path, entry) in neutral_entries {
+            entries.insert(
+                path,
+                ManifestEntry {
+                    media_type: entry.media_type,
+                    size: entry.size,
+                    encryption: None,
+                },
+            );
+        }
         let mut reader = NsReader::from_str(xml);
         let mut buffer = Vec::new();
         let mut current_path: Option<String> = None;
@@ -181,7 +204,7 @@ impl Manifest {
                     let attributes = manifest_attributes(&reader, &element)?;
                     let path = required(&attributes, b"full-path")?;
                     common_package::validate_manifest_path(path)?;
-                    current_path = Some(path.to_string());
+                    current_path = Some(try_copy_string(path, "ODF encrypted manifest path")?);
                 },
                 Event::Empty(element)
                     if is_manifest_element(&namespace, &element, b"file-entry") =>
@@ -356,13 +379,22 @@ fn manifest_attributes(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| {
                 Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
-            })?
-            .into_owned();
-        if values.insert(local.as_ref().to_vec(), value).is_some() {
+            })?;
+        if values.contains_key(local.as_ref()) {
             return Err(Error::InvalidFormat(
                 "Duplicate manifest attribute".to_string(),
             ));
         }
+        values.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODF typed manifest attributes",
+            source,
+        })?;
+        let key = try_copy_bytes(local.as_ref(), "ODF typed manifest attribute name")?;
+        let value = match value {
+            Cow::Owned(value) => value,
+            Cow::Borrowed(value) => try_copy_string(value, "ODF typed manifest attribute value")?,
+        };
+        values.insert(key, value);
     }
     Ok(values)
 }
@@ -395,13 +427,22 @@ fn manifest_and_loext_attributes(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|error| {
                 Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
-            })?
-            .into_owned();
-        if target.insert(local.as_ref().to_vec(), value).is_some() {
+            })?;
+        if target.contains_key(local.as_ref()) {
             return Err(Error::InvalidFormat(
                 "Duplicate manifest key-derivation attribute".to_string(),
             ));
         }
+        target.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODF key-derivation attributes",
+            source,
+        })?;
+        let key = try_copy_bytes(local.as_ref(), "ODF key-derivation attribute name")?;
+        let value = match value {
+            Cow::Owned(value) => value,
+            Cow::Borrowed(value) => try_copy_string(value, "ODF key-derivation attribute value")?,
+        };
+        target.insert(key, value);
     }
     Ok((manifest, loext))
 }
@@ -416,9 +457,19 @@ fn required<'a>(attributes: &'a HashMap<Vec<u8>, String>, name: &[u8]) -> Result
 }
 
 fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
-    BASE64_STANDARD.decode(value).map_err(|error| {
-        Error::InvalidFormat(format!("Invalid Base64 in manifest {field}: {error}"))
-    })
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(base64::decoded_len_estimate(value.len()))
+        .map_err(|source| Error::Allocation {
+            resource: "ODF manifest Base64 value",
+            source,
+        })?;
+    BASE64_STANDARD
+        .decode_vec(value, &mut output)
+        .map_err(|error| {
+            Error::InvalidFormat(format!("Invalid Base64 in manifest {field}: {error}"))
+        })?;
+    Ok(output)
 }
 
 fn parse_checksum(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ManifestChecksum> {
@@ -617,7 +668,16 @@ fn parse_key_derivation(
             }
             let mut parameters = loext_attributes;
             if let Some(key_size) = attributes.get(b"key-size".as_slice()) {
-                parameters.insert(b"key-size".to_vec(), key_size.clone());
+                parameters
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODF Argon2id parameters",
+                        source,
+                    })?;
+                parameters.insert(
+                    try_copy_bytes(b"key-size", "ODF Argon2id parameter name")?,
+                    try_copy_string(key_size, "ODF Argon2id key size")?,
+                );
             }
             parse_argon2id(&parameters, salt)
         },

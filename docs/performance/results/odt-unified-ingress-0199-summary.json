@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "change": "0191-odt-unified-source-ingress",
+  "decision": "retain_correctness_accept_full_text_lifecycle_latency",
+  "claim_scope": "fixed-corpus high-level litchi::Document ODT path-ingress correctness and logical source-range evidence; warm full-text lifecycle p50/mean/p95/p99 accepted, open-only elapsed distributions retained without an accepted latency statistic",
+  "protocol": {
+    "order": [
+      "a1_eager",
+      "b1_source_backed",
+      "b2_source_backed",
+      "a2_eager"
+    ],
+    "cpu_affinity": "2",
+    "logical_cpus_visible": 1,
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when source-backed elapsed time is lower in both paired directions and eager/source-backed same-implementation drift stays within that statistic's threshold"
+  },
+  "provenance": {
+    "source_revision": "61154e014d81b31dfa434f0186d40e4e33868afa",
+    "source_state": "the final implementation and harness are applied in one dirty worktree; all four legs use the same release binary",
+    "binary_sha256": "981ed4fbea8625b7d3feb4721262d992400bd522c51ce4be7b41071447129e59",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-repeated-text-media",
+    "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "archive_bytes": 16812034,
+    "archive_member_count": 13,
+    "paragraph_count": 10000,
+    "element_count": 10000,
+    "pictures_count": 8,
+    "pictures_compressed_range_bytes": 16782376,
+    "pictures_uncompressed_payload_bytes": 16777216
+  },
+  "cases": {
+    "odt_file_open": {
+      "timing_scope": "eager fs::read plus Document::from_bytes, or source-backed Document::open(Path)",
+      "legs_ns": {
+        "a1": {
+          "p50": 3565062,
+          "mean": 3599122.6659999993,
+          "p95": 4022869,
+          "p99": 4425535
+        },
+        "b1": {
+          "p50": 1922462,
+          "mean": 2067616.9880000008,
+          "p95": 2725099,
+          "p99": 2760057
+        },
+        "b2": {
+          "p50": 1709638,
+          "mean": 1730827.6780000008,
+          "p95": 1867447,
+          "p99": 2332388
+        },
+        "a2": {
+          "p50": 3688262,
+          "mean": 3884463.8000000017,
+          "p95": 5045480,
+          "p99": 5196458
+        }
+      },
+      "source_backed_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 46.074935,
+          "mean": 42.552195,
+          "p95": 32.259813,
+          "p99": 37.633371
+        },
+        "a2_to_b2": {
+          "p50": 53.646514,
+          "mean": 55.442301,
+          "p95": 62.987724,
+          "p99": 55.115812
+        }
+      },
+      "same_implementation_drift_percent": {
+        "eager": {
+          "p50": 3.455760,
+          "mean": 7.928075,
+          "p95": 25.419943,
+          "p99": 17.419883
+        },
+        "source_backed": {
+          "p50": 11.070388,
+          "mean": 16.288767,
+          "p95": 31.472324,
+          "p99": 15.494934
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "source-backed same-implementation drift 11.070388% exceeds the 5% ceiling",
+        "mean": "eager and source-backed same-implementation drift exceed the 5% ceiling",
+        "p95": "eager and source-backed same-implementation drift exceed the 10% ceiling",
+        "p99": "eager and source-backed same-implementation drift exceed the 15% ceiling"
+      }
+    },
+    "odt_file_open_full_text_lifecycle": {
+      "timing_scope": "the corresponding ODT open plus Document::text",
+      "legs_ns": {
+        "a1": {
+          "p50": 9238931,
+          "mean": 9498191.868000003,
+          "p95": 12186531,
+          "p99": 13707981
+        },
+        "b1": {
+          "p50": 6336862,
+          "mean": 6520352.021999993,
+          "p95": 7877927,
+          "p99": 9592854
+        },
+        "b2": {
+          "p50": 6364980,
+          "mean": 6496010.353999994,
+          "p95": 7748299,
+          "p99": 8928928
+        },
+        "a2": {
+          "p50": 9325239,
+          "mean": 9615007.236000016,
+          "p95": 11525168,
+          "p99": 13227476
+        }
+      },
+      "source_backed_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 31.411307,
+          "mean": 31.351650,
+          "p95": 35.355459,
+          "p99": 30.019935
+        },
+        "a2_to_b2": {
+          "p50": 31.744591,
+          "mean": 32.438841,
+          "p95": 32.770620,
+          "p99": 32.497114
+        }
+      },
+      "same_implementation_drift_percent": {
+        "eager": {
+          "p50": 0.934177,
+          "mean": 1.229870,
+          "p95": 5.427000,
+          "p99": 3.505294
+        },
+        "source_backed": {
+          "p50": 0.443721,
+          "mean": 0.373318,
+          "p95": 1.645458,
+          "p99": 6.921048
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    }
+  },
+  "untimed_source_evidence": {
+    "preparation_read_calls_per_sample": 30,
+    "preparation_read_bytes_per_sample": 29080,
+    "preparation_content_read_calls_per_sample": 1,
+    "preparation_content_read_bytes_per_sample": 26697,
+    "preparation_pictures_read_calls_per_sample": 0,
+    "preparation_pictures_read_bytes_per_sample": 0,
+    "full_text_query_read_calls_per_sample": 0,
+    "full_text_query_read_bytes_per_sample": 0,
+    "zero_picture_payload_overlap_verified": true
+  },
+  "untimed_gates": [
+    "paragraph count/text, full text, tables, elements, and metadata match eager Document::from_bytes",
+    "archive member names and every Pictures payload match the deterministic corpus",
+    "source length and SHA-256 match the deterministic corpus",
+    "source preparation and full-text replay overlap zero Pictures compressed ranges"
+  ],
+  "limitations": [
+    "the direct selector runner does not use the fresh-child filesystem cache-state protocol",
+    "no physical-I/O, cold-cache, decompression, allocation, RSS, throughput, scaling, edit/save, real-producer, broad ODF, or iWork claim",
+    "the source-read evidence is from a separate untimed InstrumentedSource replay, not the timed FileSource",
+    "the result covers one generated media-rich ODT corpus"
+  ]
+}

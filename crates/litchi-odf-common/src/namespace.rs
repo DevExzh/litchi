@@ -464,6 +464,39 @@ pub struct QualifiedName {
 }
 
 impl QualifiedName {
+    fn try_copy(value: &str, resource: &'static str) -> Result<String> {
+        let mut output = String::new();
+        output
+            .try_reserve(value.len())
+            .map_err(|source| Error::Allocation { resource, source })?;
+        output.push_str(value);
+        Ok(output)
+    }
+
+    /// Parse a qualified name while reporting allocation failure.
+    pub fn try_from_string(name: &str) -> Result<Self> {
+        let qualified_name = Self::try_copy(name, "ODF qualified name")?;
+        if let Some(colon_pos) = name.find(':') {
+            let prefix = &name[..colon_pos];
+            let local_name = Self::try_copy(&name[colon_pos + 1..], "ODF local name")?;
+            let namespace_uri = PREFIX_TO_URI
+                .get(prefix)
+                .map(|uri| Self::try_copy(uri, "ODF namespace URI"))
+                .transpose()?;
+            Ok(Self {
+                namespace_uri,
+                local_name,
+                qualified_name,
+            })
+        } else {
+            Ok(Self {
+                namespace_uri: None,
+                local_name: Self::try_copy(name, "ODF local name")?,
+                qualified_name,
+            })
+        }
+    }
+
     /// Create a new qualified name
     ///
     /// Note: A clone of `local_name` is necessary when no prefix is needed,

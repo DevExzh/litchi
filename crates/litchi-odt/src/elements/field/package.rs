@@ -10,7 +10,7 @@ use super::model::*;
     reason = "the package facade shares the owner-level field vocabulary"
 )]
 use super::*;
-use crate::elements::element::{Element, ElementBase};
+use crate::elements::element::{Element, ElementBase, try_prefixed_name};
 use crate::elements::xml::{
     TEXT_NAMESPACE, append_checked, append_text_control, copy_canonical_attributes,
     decode_reference, is_bound,
@@ -19,6 +19,14 @@ use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
+
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
+}
 
 /// Utilities for parsing fields from documents
 pub struct FieldParser;
@@ -42,7 +50,7 @@ impl FieldParser {
                 Event::Start(ref source) => {
                     document_depth = codec::checked_field_depth(document_depth)?;
                     for field in &mut active {
-                        field.depth += 1;
+                        field.depth = codec::checked_field_depth(field.depth)?;
                     }
                     if active
                         .iter()
@@ -56,28 +64,31 @@ impl FieldParser {
                         for field in &mut active {
                             append_text_control(&reader, source, &mut field.text)?;
                         }
-                        let tag_name = format!(
-                            "text:{}",
-                            std::str::from_utf8(source.local_name().as_ref()).map_err(
-                                |_error| {
-                                    Error::InvalidFormat("non-UTF-8 field element name".to_string())
-                                }
-                            )?
-                        );
+                        let raw_local_name = source.local_name();
+                        let local_name =
+                            std::str::from_utf8(raw_local_name.as_ref()).map_err(|_error| {
+                                Error::InvalidFormat("non-UTF-8 field element name".to_string())
+                            })?;
+                        let tag_name =
+                            try_prefixed_name("text", local_name, "ODT field element name")?;
                         if Field::is_field_tag(&tag_name) {
                             if next_order >= MAX_FIELDS {
                                 return Err(Error::InvalidFormat(format!(
                                     "document exceeds {MAX_FIELDS} fields"
                                 )));
                             }
-                            let mut element = Element::new(&tag_name);
+                            let mut element = Element::try_new(&tag_name)?;
                             copy_canonical_attributes(&reader, source, &mut element, "field")?;
-                            active.push(ActiveField {
-                                element,
-                                text: String::new(),
-                                depth: 1,
-                                order: next_order,
-                            });
+                            try_push(
+                                &mut active,
+                                ActiveField {
+                                    element,
+                                    text: String::new(),
+                                    depth: 1,
+                                    order: next_order,
+                                },
+                                "ODT active-field parser stack",
+                            )?;
                             next_order += 1;
                         }
                     }
@@ -95,21 +106,22 @@ impl FieldParser {
                     for field in &mut active {
                         append_text_control(&reader, source, &mut field.text)?;
                     }
-                    let tag_name = format!(
-                        "text:{}",
-                        std::str::from_utf8(source.local_name().as_ref()).map_err(|_error| {
+                    let raw_local_name = source.local_name();
+                    let local_name =
+                        std::str::from_utf8(raw_local_name.as_ref()).map_err(|_error| {
                             Error::InvalidFormat("non-UTF-8 field element name".to_string())
-                        })?
-                    );
+                        })?;
+                    let tag_name = try_prefixed_name("text", local_name, "ODT field element name")?;
                     if Field::is_field_tag(&tag_name) {
                         if next_order >= MAX_FIELDS {
                             return Err(Error::InvalidFormat(format!(
                                 "document exceeds {MAX_FIELDS} fields"
                             )));
                         }
-                        let mut element = Element::new(&tag_name);
+                        let mut element = Element::try_new(&tag_name)?;
                         copy_canonical_attributes(&reader, source, &mut element, "field")?;
-                        fields.push((next_order, Field::from_element(element)?));
+                        let field = Field::from_element(element)?;
+                        try_push(&mut fields, (next_order, field), "ODT field projection")?;
                         next_order += 1;
                     }
                 },
@@ -149,8 +161,11 @@ impl FieldParser {
                         })?;
                     }
                     if let Some(mut field) = active.pop_if(|field| field.depth == 0) {
-                        field.element.set_text(&field.text);
-                        fields.push((field.order, Field::from_element(field.element)?));
+                        field
+                            .element
+                            .try_set_text(&field.text, "ODT field element text")?;
+                        let value = Field::from_element(field.element)?;
+                        try_push(&mut fields, (field.order, value), "ODT field projection")?;
                     }
                 },
                 Event::DocType(_)
@@ -182,7 +197,17 @@ impl FieldParser {
             ));
         }
         fields.sort_by_key(|(order, _)| *order);
-        Ok(fields.into_iter().map(|(_, field)| field).collect())
+        let mut projected = Vec::new();
+        projected
+            .try_reserve_exact(fields.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT sorted field projection",
+                source,
+            })?;
+        for (_, field) in fields {
+            projected.push(field);
+        }
+        Ok(projected)
     }
 
     /// Parse database fields without contacting any declared database resource.
@@ -197,15 +222,17 @@ impl FieldParser {
         let mut result = Vec::new();
         for field in Self::parse_fields(xml_content)? {
             if field.field_type() == "text:meta-field" {
-                result.push(meta_fields.next().ok_or_else(|| {
+                let field = meta_fields.next().ok_or_else(|| {
                     Error::InvalidFormat("missing parsed text:meta-field".to_string())
-                })?);
+                })?;
+                try_push(&mut result, field, "ODT dynamic-field projection")?;
             } else if field.field_type() == "text:drop-down" {
-                result.push(drop_down_fields.next().ok_or_else(|| {
+                let field = drop_down_fields.next().ok_or_else(|| {
                     Error::InvalidFormat("missing parsed text:drop-down".to_string())
-                })?);
+                })?;
+                try_push(&mut result, field, "ODT dynamic-field projection")?;
             } else if let Some(field) = field.dynamic_text_field()? {
-                result.push(field);
+                try_push(&mut result, field, "ODT dynamic-field projection")?;
             }
         }
         if meta_fields.next().is_some() {

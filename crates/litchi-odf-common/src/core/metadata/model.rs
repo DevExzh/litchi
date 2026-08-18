@@ -1,7 +1,7 @@
 //! Semantic ODF metadata values and conversion to common document metadata.
 
 use chrono::{DateTime, Utc};
-use litchi_core::Metadata as CoreMetadata;
+use litchi_core::{Error, Metadata as CoreMetadata, Result};
 use std::collections::HashMap;
 
 /// Comprehensive ODF metadata
@@ -170,6 +170,95 @@ impl Metadata {
             crate::datatype::DateTime::decode(&value)
                 .ok()
                 .map(|date| date.with_timezone(&Utc))
+        })
+    }
+
+    /// Convert to common metadata while reporting every required allocation.
+    pub fn try_into_core(self) -> Result<CoreMetadata> {
+        let Self {
+            title,
+            description,
+            subject,
+            keywords,
+            creator,
+            initial_creator,
+            editing_cycles,
+            creation_date,
+            modification_date,
+            print_date,
+            template,
+            statistics,
+            generator,
+            ..
+        } = self;
+
+        let (author, last_modified_by) = match (initial_creator, creator) {
+            (Some(initial), creator) => (Some(initial), creator),
+            (None, Some(creator)) => {
+                let mut author = String::new();
+                author
+                    .try_reserve_exact(creator.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODF common metadata author",
+                        source,
+                    })?;
+                author.push_str(&creator);
+                (Some(author), Some(creator))
+            },
+            (None, None) => (None, None),
+        };
+
+        let keywords = if keywords.is_empty() {
+            None
+        } else if keywords.len() == 1 {
+            keywords.into_iter().next()
+        } else {
+            let keyword_bytes = keywords
+                .iter()
+                .try_fold(0usize, |total, keyword| total.checked_add(keyword.len()))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODF metadata keyword size overflow".to_string())
+                })?;
+            let bytes = keyword_bytes
+                .checked_add((keywords.len() - 1).checked_mul(2).ok_or_else(|| {
+                    Error::InvalidFormat("ODF metadata keyword size overflow".to_string())
+                })?)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODF metadata keyword size overflow".to_string())
+                })?;
+            let mut joined = String::new();
+            joined
+                .try_reserve_exact(bytes)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODF common metadata keywords",
+                    source,
+                })?;
+            for (index, keyword) in keywords.into_iter().enumerate() {
+                if index != 0 {
+                    joined.push_str(", ");
+                }
+                joined.push_str(&keyword);
+            }
+            Some(joined)
+        };
+
+        Ok(CoreMetadata {
+            title,
+            author,
+            subject,
+            keywords,
+            description,
+            template: template.and_then(|template| template.href),
+            last_modified_by,
+            revision: editing_cycles,
+            created: Self::parse_date(creation_date),
+            modified: Self::parse_date(modification_date),
+            page_count: parse_u32_count(statistics.page_count),
+            word_count: parse_u32_count(statistics.word_count),
+            character_count: parse_u32_count(statistics.character_count),
+            application: generator,
+            last_printed_time: Self::parse_date(print_date),
+            ..Default::default()
         })
     }
 }

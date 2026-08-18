@@ -108,8 +108,7 @@ const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
 const ODF_REPAIR_LOCAL_EXTRA: &[u8] = &[0x55, 0x54, 0x05, 0x00, 0x01, 0, 0, 0, 0];
 const ODF_REPAIR_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
-const ODT_REPEATED_TEXT_CORPUS_GENERATOR: &str =
-    "litchi-odt-source-backed-repeated-text-media-v1";
+const ODT_REPEATED_TEXT_CORPUS_GENERATOR: &str = "litchi-odt-source-backed-repeated-text-media-v1";
 const ODT_RESOURCE_BATCH_CORPUS_GENERATOR: &str =
     "litchi-odt-embedded-resource-batch-publication-v1";
 const ODT_MEDIA_APPEND_RUN_TEXT: &str = " appended run";
@@ -635,6 +634,10 @@ enum Case {
     DocxFileSourceOpenParagraphCountLifecycle,
     DocxFileEagerOpenFullTextLifecycle,
     DocxFileSourceOpenFullTextLifecycle,
+    OdtFileEagerOpen,
+    OdtFileSourceOpen,
+    OdtFileEagerOpenFullTextLifecycle,
+    OdtFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
     PptxEagerBatchEditSave,
@@ -1031,6 +1034,10 @@ impl Case {
             Self::DocxFileSourceOpenFullTextLifecycle => {
                 "docx_file_source_open_full_text_lifecycle"
             },
+            Self::OdtFileEagerOpen => "odt_file_eager_open",
+            Self::OdtFileSourceOpen => "odt_file_source_open",
+            Self::OdtFileEagerOpenFullTextLifecycle => "odt_file_eager_open_full_text_lifecycle",
+            Self::OdtFileSourceOpenFullTextLifecycle => "odt_file_source_open_full_text_lifecycle",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
@@ -1353,9 +1360,7 @@ impl Case {
             Self::OdtEmbeddedResourceBatchReplaceSave => "odt_embedded_resource_batch_replace_save",
             Self::OdtContentCowOwnedRebuild => "odt_content_cow_owned_rebuild",
             Self::OdtContentCowPositional => "odt_content_cow_positional",
-            Self::OdtSourceBackedRepeatedTextUncached => {
-                "odt_source_backed_repeated_text_uncached"
-            },
+            Self::OdtSourceBackedRepeatedTextUncached => "odt_source_backed_repeated_text_uncached",
             Self::OdtSourceBackedRepeatedTextCached => "odt_source_backed_repeated_text_cached",
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
@@ -1744,8 +1749,17 @@ impl Case {
     const fn is_odt_repeated_text(self) -> bool {
         matches!(
             self,
-            Self::OdtSourceBackedRepeatedTextUncached
-                | Self::OdtSourceBackedRepeatedTextCached
+            Self::OdtSourceBackedRepeatedTextUncached | Self::OdtSourceBackedRepeatedTextCached
+        )
+    }
+
+    const fn is_odt_root_file(self) -> bool {
+        matches!(
+            self,
+            Self::OdtFileEagerOpen
+                | Self::OdtFileSourceOpen
+                | Self::OdtFileEagerOpenFullTextLifecycle
+                | Self::OdtFileSourceOpenFullTextLifecycle
         )
     }
 
@@ -2074,6 +2088,10 @@ impl Case {
                 | Self::DocxFileSourceOpenParagraphCountLifecycle
                 | Self::DocxFileEagerOpenFullTextLifecycle
                 | Self::DocxFileSourceOpenFullTextLifecycle
+                | Self::OdtFileEagerOpen
+                | Self::OdtFileSourceOpen
+                | Self::OdtFileEagerOpenFullTextLifecycle
+                | Self::OdtFileSourceOpenFullTextLifecycle
         )
     }
 
@@ -2958,6 +2976,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_repeated_text: Option<OdtRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    odt_root: Option<OdtFileRootSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ods_root: Option<OdsRootSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_cell_sweep: Option<OdsCellSweepSummary>,
@@ -3312,6 +3332,84 @@ struct OdtRepeatedTextSummary {
     source_replay_version_observations_per_call: Vec<Vec<u64>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     projection_text_sha256: Vec<String>,
+}
+
+/// Unified-root ODT filesystem ingress evidence over the fixed large
+/// media-rich source.  The four selectors below deliberately keep corpus
+/// creation, temporary-file setup, parity, archive identity, and the
+/// independent positional replay outside the elapsed interval.  This is
+/// correctness/source-range evidence only; it makes no latency, allocation,
+/// RSS, or physical-I/O claim.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdtFileRootSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    timed_root_adapter: &'static str,
+    read_evidence_adapter: &'static str,
+    read_evidence_scope: &'static str,
+    source_path_bytes: u64,
+    source_path_sha256: String,
+    archive_member_count: usize,
+    archive_member_names_sha256: String,
+    pictures_count: usize,
+    pictures_member_names_sha256: String,
+    pictures_compressed_range_bytes: u64,
+    pictures_uncompressed_payload_bytes: u64,
+    pictures_uncompressed_payload_sha256: String,
+    canonical_text_sha256: String,
+    paragraph_count: usize,
+    paragraph_text_sha256: String,
+    table_count: usize,
+    element_count: usize,
+    element_text_sha256: String,
+    metadata_sha256: String,
+    semantic_parity_verified: bool,
+    archive_identity_verified: bool,
+    media_identity_verified: bool,
+    source_ranges_verified: bool,
+    zero_picture_payload_overlap_verified: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_query_pictures_read_bytes: Vec<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct OdtRootSemanticProjection {
+    text: String,
+    paragraphs: Vec<String>,
+    tables: Vec<String>,
+    elements: Vec<String>,
+    metadata_sha256: String,
 }
 
 /// Matched ODS filesystem/root and typed selected-owner evidence. Root open
@@ -6485,6 +6583,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_odt()
                     && !case.uses_odt_media()
                     && !case.is_odt_repeated_text()
+                    && !case.is_odt_root_file()
                     && !case.uses_odt_resource_batch()
                     && !case.uses_odf_content_cow()
                     && !case.uses_semantic_ods()
@@ -7450,6 +7549,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.is_odt_root_file()) {
+        let corpus = build_odt_repeated_text_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_odt_root_file())
+        {
+            results.push(run_odt_file_root(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -8126,6 +8242,12 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_file_source_open_full_text_lifecycle" => {
             Some(Case::DocxFileSourceOpenFullTextLifecycle)
         },
+        "odt_file_eager_open" => Some(Case::OdtFileEagerOpen),
+        "odt_file_source_open" => Some(Case::OdtFileSourceOpen),
+        "odt_file_eager_open_full_text_lifecycle" => Some(Case::OdtFileEagerOpenFullTextLifecycle),
+        "odt_file_source_open_full_text_lifecycle" => {
+            Some(Case::OdtFileSourceOpenFullTextLifecycle)
+        },
         "cfb_selective_mini_legacy_read" => Some(Case::CfbSelectiveMiniLegacyRead),
         "cfb_selective_mini_shared_read" => Some(Case::CfbSelectiveMiniSharedRead),
         "cfb_selective_mini_4095_legacy_read" => Some(Case::CfbSelectiveMini4095LegacyRead),
@@ -8471,9 +8593,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_source_backed_repeated_text_uncached" => {
             Some(Case::OdtSourceBackedRepeatedTextUncached)
         },
-        "odt_source_backed_repeated_text_cached" => {
-            Some(Case::OdtSourceBackedRepeatedTextCached)
-        },
+        "odt_source_backed_repeated_text_cached" => Some(Case::OdtSourceBackedRepeatedTextCached),
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
@@ -8636,6 +8756,9 @@ fn print_usage() {
                                        docx_file_source_open_paragraph_count_lifecycle,\n\
                                        docx_file_eager_open_full_text_lifecycle,\n\
                                        docx_file_source_open_full_text_lifecycle,\n\
+                                       odt_file_eager_open,odt_file_source_open,\n\
+                                       odt_file_eager_open_full_text_lifecycle,\n\
+                                       odt_file_source_open_full_text_lifecycle,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        pptx_eager_batch_edit_save,\n\
@@ -14907,6 +15030,12 @@ fn run_case_with_config(
         | Case::DocxFileEagerOpenFullTextLifecycle
         | Case::DocxFileSourceOpenFullTextLifecycle => {
             Err("filesystem cases are dispatched by the child-process evidence runner".into())
+        },
+        Case::OdtFileEagerOpen
+        | Case::OdtFileSourceOpen
+        | Case::OdtFileEagerOpenFullTextLifecycle
+        | Case::OdtFileSourceOpenFullTextLifecycle => {
+            run_odt_file_root(case, corpus, warmup_iterations, samples)
         },
         Case::DocxSourceBackedOneEditSave => {
             run_docx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
@@ -24429,10 +24558,9 @@ fn verify_ods_source_cell_gates(
     if !matches!(
         partial_error,
         litchi_odf_common::core::SourceContentPublicationError::Sink {
-            progress:
-                litchi_odf_common::core::SourceContentPublicationProgress::Indeterminate {
-                    accepted_before: 7
-                },
+            progress: litchi_odf_common::core::SourceContentPublicationProgress::Indeterminate {
+                accepted_before: 7
+            },
             ..
         }
     ) || partial_error.written() != 7
@@ -25679,6 +25807,439 @@ fn odt_repeated_text_ranges(
     Ok((content_range, untouched_ranges, picture_ranges))
 }
 
+fn odt_root_case_parameters(case: Case) -> Result<(&'static str, bool), Box<dyn Error>> {
+    match case {
+        Case::OdtFileEagerOpen => Ok(("eager_root", false)),
+        Case::OdtFileSourceOpen => Ok(("source_backed_root", false)),
+        Case::OdtFileEagerOpenFullTextLifecycle => Ok(("eager_root", true)),
+        Case::OdtFileSourceOpenFullTextLifecycle => Ok(("source_backed_root", true)),
+        _ => Err("non-root ODT case passed to ODT root case parameters".into()),
+    }
+}
+
+fn odt_root_table_text(table: &litchi::document::Table) -> Result<String, Box<dyn Error>> {
+    let mut text = String::new();
+    for row in table.rows()? {
+        for cell in row.cells()? {
+            text.push_str(&cell.text()?);
+        }
+    }
+    Ok(text)
+}
+
+fn odt_root_semantic_projection(
+    document: &litchi::Document,
+) -> Result<OdtRootSemanticProjection, Box<dyn Error>> {
+    let text = document.text()?;
+    let paragraphs = document
+        .paragraphs()?
+        .into_iter()
+        .map(|paragraph| paragraph.text())
+        .collect::<Result<Vec<_>, _>>()?;
+    let tables = document
+        .tables()?
+        .into_iter()
+        .map(|table| odt_root_table_text(&table))
+        .collect::<Result<Vec<_>, _>>()?;
+    let elements = document
+        .elements()?
+        .into_iter()
+        .map(|element| {
+            if let Some(paragraph) = element.as_paragraph() {
+                Ok(format!("paragraph:{}", paragraph.text()?))
+            } else if let Some(table) = element.as_table() {
+                Ok(format!("table:{}", odt_root_table_text(table)?))
+            } else {
+                Err("ODT unified root returned an unsupported document element".into())
+            }
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    let metadata_sha256 = sha256_hex(&serde_json::to_vec(&document.metadata()?)?);
+    Ok(OdtRootSemanticProjection {
+        text,
+        paragraphs,
+        tables,
+        elements,
+        metadata_sha256,
+    })
+}
+
+fn odt_root_values_digest(values: &[String]) -> String {
+    let mut digest = Sha256::new();
+    for (index, value) in values.iter().enumerate() {
+        digest.update((index as u64).to_le_bytes());
+        digest.update((value.len() as u64).to_le_bytes());
+        digest.update(value.as_bytes());
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn odt_root_names_digest(names: &[String]) -> String {
+    odt_root_values_digest(names)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct OdtRootArchiveIdentity {
+    archive_member_count: usize,
+    archive_member_names_sha256: String,
+    pictures_count: usize,
+    pictures_member_names_sha256: String,
+    pictures_compressed_range_bytes: u64,
+    pictures_uncompressed_payload_bytes: u64,
+    pictures_uncompressed_payload_sha256: String,
+}
+
+fn odt_root_archive_identity(bytes: &[u8]) -> Result<OdtRootArchiveIdentity, Box<dyn Error>> {
+    let archive = ArchiveReader::new(bytes)?;
+    let mut member_names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
+    member_names.sort();
+
+    let mut picture_members = zip_member_ranges(bytes)?
+        .into_iter()
+        .filter(|(name, _range)| name.starts_with("Pictures/"))
+        .collect::<Vec<_>>();
+    picture_members.sort_by(|left, right| left.0.cmp(&right.0));
+    if picture_members.len() != ODS_MEDIA_ENTRY_COUNT {
+        return Err("ODT unified root archive has an unexpected Pictures count".into());
+    }
+    let picture_names = picture_members
+        .iter()
+        .map(|(name, _range)| name.clone())
+        .collect::<Vec<_>>();
+    let pictures_compressed_range_bytes =
+        picture_members
+            .iter()
+            .try_fold(0_u64, |total, (_name, range)| {
+                total
+                    .checked_add(range.end.saturating_sub(range.start))
+                    .ok_or("ODT unified root compressed Pictures byte count overflows u64")
+            })?;
+
+    let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
+    let package = package.package()?;
+    for index in 0..ODS_MEDIA_ENTRY_COUNT {
+        let path = odt_media_path(index);
+        if package.manifest().get_media_type(&path) != Some("application/octet-stream") {
+            return Err(format!("ODT unified root manifest entry differs for '{path}'").into());
+        }
+        if package.get_file(&path)? != odt_media_payload(index) {
+            return Err(format!("ODT unified root payload differs for '{path}'").into());
+        }
+    }
+
+    Ok(OdtRootArchiveIdentity {
+        archive_member_count: member_names.len(),
+        archive_member_names_sha256: odt_root_names_digest(&member_names),
+        pictures_count: picture_members.len(),
+        pictures_member_names_sha256: odt_root_names_digest(&picture_names),
+        pictures_compressed_range_bytes,
+        pictures_uncompressed_payload_bytes: u64::try_from(
+            ODS_MEDIA_ENTRY_COUNT
+                .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+                .ok_or("ODT unified root uncompressed Pictures byte count overflows usize")?,
+        )?,
+        pictures_uncompressed_payload_sha256: odt_repeated_text_media_payload_digest(),
+    })
+}
+
+fn create_odt_root_source_file(archive: &[u8]) -> Result<PathBuf, Box<dyn Error>> {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("ODT root source timestamp is before epoch: {error}"))?
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "litchi-perf-baseline-odt-root-{}-{stamp}.odt",
+        std::process::id()
+    ));
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)?;
+    if let Err(error) = file.write_all(archive).and_then(|()| file.flush()) {
+        drop(file);
+        let _ = fs::remove_file(&path);
+        return Err(error.into());
+    }
+    Ok(path)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct OdtRootReplay {
+    preparation: SourceSnapshot,
+    query: SourceSnapshot,
+}
+
+fn replay_odt_root_source(
+    corpus: &Corpus,
+    expected_text: &str,
+) -> Result<OdtRootReplay, Box<dyn Error>> {
+    let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
+    let source = Arc::new(InstrumentedSource::new_odf(
+        corpus.archive.clone(),
+        vec![content_range],
+        untouched_ranges,
+        picture_ranges,
+    ));
+    let document = litchi_odt::SourceBackedDocument::from_read_at(source.clone())?;
+    let preparation = source.snapshot();
+    if preparation.read_calls == 0
+        || preparation.read_bytes == 0
+        || preparation.odf.content.read_calls == 0
+        || preparation.odf.content.read_bytes == 0
+        || preparation.odf.pictures.read_calls != 0
+        || preparation.odf.pictures.read_bytes != 0
+    {
+        return Err("ODT unified root source preparation failed source-range gates".into());
+    }
+    source.reset();
+    if document.text()? != expected_text {
+        return Err("ODT unified root source query differs from eager text".into());
+    }
+    let query = source.snapshot();
+    if query.odf.pictures.read_calls != 0 || query.odf.pictures.read_bytes != 0 {
+        return Err("ODT unified root source query overlapped Pictures payload".into());
+    }
+    Ok(OdtRootReplay { preparation, query })
+}
+
+fn run_odt_file_root(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_odt_root_file() {
+        return Err("non-root ODT case passed to ODT root runner".into());
+    }
+    if corpus.manifest.generator != ODT_REPEATED_TEXT_CORPUS_GENERATOR {
+        return Err("ODT root filesystem cases require the fixed large media-rich corpus".into());
+    }
+    let (implementation, lifecycle) = odt_root_case_parameters(case)?;
+    let source_path = create_odt_root_source_file(&corpus.archive)?;
+    let result = (|| {
+        let source_bytes = fs::read(&source_path)?;
+        if source_bytes != corpus.archive
+            || sha256_hex(&source_bytes) != corpus.manifest.archive_sha256
+            || source_bytes.len() != corpus.manifest.archive_bytes
+        {
+            return Err("ODT unified root source file differs from deterministic archive".into());
+        }
+        let archive_identity = odt_root_archive_identity(&corpus.archive)?;
+        let source_identity = odt_root_archive_identity(&source_bytes)?;
+        if source_identity != archive_identity
+            || archive_identity.archive_member_count != corpus.manifest.archive_member_count
+        {
+            return Err("ODT unified root source archive identity differs from corpus".into());
+        }
+
+        let eager = litchi::Document::from_bytes(corpus.archive.clone())?;
+        let source = litchi::Document::open(&source_path)?;
+        let eager_semantics = odt_root_semantic_projection(&eager)?;
+        let source_semantics = odt_root_semantic_projection(&source)?;
+        if source_semantics != eager_semantics {
+            return Err("ODT unified root eager/source semantic parity failed".into());
+        }
+        if eager_semantics.paragraphs.len() != SemanticShape::Large.docx_paragraphs()
+            || eager_semantics
+                .paragraphs
+                .iter()
+                .enumerate()
+                .any(|(index, value)| value != &semantic_odt_text(index, false))
+        {
+            return Err("ODT unified root paragraph content differs from corpus".into());
+        }
+        if eager_semantics.text != eager_semantics.paragraphs.join("\n") {
+            return Err("ODT unified root text differs from paragraph content".into());
+        }
+
+        let mut elapsed = Vec::with_capacity(samples);
+        let mut summary = OdtFileRootSummary {
+            implementation,
+            phase: if lifecycle {
+                "open_and_full_text_lifecycle"
+            } else {
+                "open_only"
+            },
+            timing_scope: if lifecycle {
+                "filesystem_read_or_path_open_and_unified_document_full_text_query_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer"
+            } else {
+                "filesystem_read_or_path_open_and_unified_document_ownership_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer"
+            },
+            timed_root_adapter: if implementation == "source_backed_root" {
+                if lifecycle {
+                    "litchi::Document::open(Path)+Document::text"
+                } else {
+                    "litchi::Document::open(Path)"
+                }
+            } else if lifecycle {
+                "fs::read(Path)+litchi::Document::from_bytes(Vec<u8>)+Document::text"
+            } else {
+                "fs::read(Path)+litchi::Document::from_bytes(Vec<u8>)"
+            },
+            read_evidence_adapter: if implementation == "source_backed_root" {
+                "litchi_odt::SourceBackedDocument+harness::InstrumentedSource"
+            } else {
+                "not_applicable"
+            },
+            read_evidence_scope: if implementation == "source_backed_root" {
+                "separate_untimed_instrumented_source_replay_per_measured_sample"
+            } else {
+                "not_applicable"
+            },
+            source_path_bytes: u64::try_from(source_bytes.len())?,
+            source_path_sha256: sha256_hex(&source_bytes),
+            archive_member_count: archive_identity.archive_member_count,
+            archive_member_names_sha256: archive_identity.archive_member_names_sha256.clone(),
+            pictures_count: archive_identity.pictures_count,
+            pictures_member_names_sha256: archive_identity.pictures_member_names_sha256.clone(),
+            pictures_compressed_range_bytes: archive_identity.pictures_compressed_range_bytes,
+            pictures_uncompressed_payload_bytes: archive_identity
+                .pictures_uncompressed_payload_bytes,
+            pictures_uncompressed_payload_sha256: archive_identity
+                .pictures_uncompressed_payload_sha256
+                .clone(),
+            canonical_text_sha256: sha256_hex(eager_semantics.text.as_bytes()),
+            paragraph_count: eager_semantics.paragraphs.len(),
+            paragraph_text_sha256: odt_root_values_digest(&eager_semantics.paragraphs),
+            table_count: eager_semantics.tables.len(),
+            element_count: eager_semantics.elements.len(),
+            element_text_sha256: odt_root_values_digest(&eager_semantics.elements),
+            metadata_sha256: eager_semantics.metadata_sha256.clone(),
+            semantic_parity_verified: true,
+            archive_identity_verified: true,
+            media_identity_verified: true,
+            source_ranges_verified: implementation != "source_backed_root",
+            zero_picture_payload_overlap_verified: implementation != "source_backed_root",
+            ..OdtFileRootSummary::default()
+        };
+
+        for iteration in 0..iteration_count(warmup_iterations, samples)? {
+            let started = Instant::now();
+            let document = if implementation == "source_backed_root" {
+                litchi::Document::open(&source_path)?
+            } else {
+                let bytes = fs::read(&source_path)?;
+                litchi::Document::from_bytes(bytes)?
+            };
+            let text = if lifecycle {
+                Some(document.text()?)
+            } else {
+                None
+            };
+            let duration = started.elapsed();
+            if let Some(text) = text.as_deref()
+                && text != eager_semantics.text
+            {
+                return Err(
+                    "ODT unified root timed full-text lifecycle differs from oracle".into(),
+                );
+            }
+            std::hint::black_box(document);
+            std::hint::black_box(text);
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+
+        if implementation == "source_backed_root" {
+            let mut expected_replay = None;
+            for _ in 0..samples {
+                let replay = replay_odt_root_source(corpus, &eager_semantics.text)?;
+                let tuple = (replay.preparation, replay.query);
+                if let Some(expected) = expected_replay {
+                    if expected != tuple {
+                        return Err(
+                            "ODT unified root source replay counters are not deterministic".into(),
+                        );
+                    }
+                } else {
+                    expected_replay = Some(tuple);
+                }
+                summary
+                    .source_preparation_read_calls
+                    .push(replay.preparation.read_calls);
+                summary
+                    .source_preparation_read_bytes
+                    .push(replay.preparation.read_bytes);
+                summary
+                    .source_preparation_content_read_calls
+                    .push(replay.preparation.odf.content.read_calls);
+                summary
+                    .source_preparation_content_read_bytes
+                    .push(replay.preparation.odf.content.read_bytes);
+                summary
+                    .source_preparation_untouched_read_calls
+                    .push(replay.preparation.odf.untouched.read_calls);
+                summary
+                    .source_preparation_untouched_read_bytes
+                    .push(replay.preparation.odf.untouched.read_bytes);
+                summary
+                    .source_preparation_pictures_read_calls
+                    .push(replay.preparation.odf.pictures.read_calls);
+                summary
+                    .source_preparation_pictures_read_bytes
+                    .push(replay.preparation.odf.pictures.read_bytes);
+                summary
+                    .source_query_read_calls
+                    .push(replay.query.read_calls);
+                summary
+                    .source_query_read_bytes
+                    .push(replay.query.read_bytes);
+                summary
+                    .source_query_content_read_calls
+                    .push(replay.query.odf.content.read_calls);
+                summary
+                    .source_query_content_read_bytes
+                    .push(replay.query.odf.content.read_bytes);
+                summary
+                    .source_query_untouched_read_calls
+                    .push(replay.query.odf.untouched.read_calls);
+                summary
+                    .source_query_untouched_read_bytes
+                    .push(replay.query.odf.untouched.read_bytes);
+                summary
+                    .source_query_pictures_read_calls
+                    .push(replay.query.odf.pictures.read_calls);
+                summary
+                    .source_query_pictures_read_bytes
+                    .push(replay.query.odf.pictures.read_bytes);
+            }
+            summary.source_ranges_verified = true;
+            summary.zero_picture_payload_overlap_verified = summary
+                .source_preparation_pictures_read_calls
+                .iter()
+                .chain(summary.source_query_pictures_read_calls.iter())
+                .all(|&calls| calls == 0)
+                && summary
+                    .source_preparation_pictures_read_bytes
+                    .iter()
+                    .chain(summary.source_query_pictures_read_bytes.iter())
+                    .all(|&bytes| bytes == 0);
+            if !summary.zero_picture_payload_overlap_verified {
+                return Err("ODT unified root source replay picture overlap gate failed".into());
+            }
+        }
+
+        Ok(result_with_source(
+            case,
+            corpus,
+            elapsed,
+            SourceSummary {
+                read_calls: summary.source_preparation_read_calls.clone(),
+                read_bytes: summary.source_preparation_read_bytes.clone(),
+                ordinary_payload_read_calls: vec![0; summary.source_preparation_read_calls.len()],
+                ordinary_payload_read_bytes: vec![0; summary.source_preparation_read_calls.len()],
+                odt_root: Some(summary),
+                ..SourceSummary::default()
+            },
+        ))
+    })();
+    let cleanup = fs::remove_file(&source_path);
+    match (result, cleanup) {
+        (Ok(result), Ok(())) => Ok(result),
+        (Ok(_), Err(error)) => Err(error.into()),
+        (Err(error), _) => Err(error),
+    }
+}
+
 fn odt_repeated_text_media_payload_digest() -> String {
     let mut digest = Sha256::new();
     for index in 0..ODS_MEDIA_ENTRY_COUNT {
@@ -25792,13 +26353,34 @@ fn run_odt_repeated_text(
     reserve_summary_vec!(projection_text_sha256, "digest");
     reserve_summary_vec!(source_preparation_read_calls, "preparation-call");
     reserve_summary_vec!(source_preparation_read_bytes, "preparation-byte");
-    reserve_summary_vec!(source_preparation_content_read_calls, "preparation-content-call");
-    reserve_summary_vec!(source_preparation_content_read_bytes, "preparation-content-byte");
-    reserve_summary_vec!(source_preparation_untouched_read_calls, "preparation-untouched-call");
-    reserve_summary_vec!(source_preparation_untouched_read_bytes, "preparation-untouched-byte");
-    reserve_summary_vec!(source_preparation_pictures_read_calls, "preparation-pictures-call");
-    reserve_summary_vec!(source_preparation_pictures_read_bytes, "preparation-pictures-byte");
-    reserve_summary_vec!(source_preparation_version_observations, "preparation-version");
+    reserve_summary_vec!(
+        source_preparation_content_read_calls,
+        "preparation-content-call"
+    );
+    reserve_summary_vec!(
+        source_preparation_content_read_bytes,
+        "preparation-content-byte"
+    );
+    reserve_summary_vec!(
+        source_preparation_untouched_read_calls,
+        "preparation-untouched-call"
+    );
+    reserve_summary_vec!(
+        source_preparation_untouched_read_bytes,
+        "preparation-untouched-byte"
+    );
+    reserve_summary_vec!(
+        source_preparation_pictures_read_calls,
+        "preparation-pictures-call"
+    );
+    reserve_summary_vec!(
+        source_preparation_pictures_read_bytes,
+        "preparation-pictures-byte"
+    );
+    reserve_summary_vec!(
+        source_preparation_version_observations,
+        "preparation-version"
+    );
     reserve_summary_vec!(source_replay_read_calls, "replay-call");
     reserve_summary_vec!(source_replay_read_bytes, "replay-byte");
     reserve_summary_vec!(source_replay_range_overlap_bytes, "replay-overlap");
@@ -25895,7 +26477,9 @@ fn run_odt_repeated_text(
         let mut outputs = Vec::new();
         outputs
             .try_reserve_exact(ODT_REPEATED_TEXT_CALLS)
-            .map_err(|error| format!("ODT repeated-text replay output allocation failed: {error}"))?;
+            .map_err(|error| {
+                format!("ODT repeated-text replay output allocation failed: {error}")
+            })?;
         let mut per_call_version_observations = Vec::new();
         per_call_version_observations
             .try_reserve_exact(ODT_REPEATED_TEXT_CALLS)
@@ -26015,8 +26599,12 @@ fn run_odt_repeated_text(
             expected_replay = Some(replay_tuple);
         }
 
-        summary.source_preparation_read_calls.push(preparation.read_calls);
-        summary.source_preparation_read_bytes.push(preparation.read_bytes);
+        summary
+            .source_preparation_read_calls
+            .push(preparation.read_calls);
+        summary
+            .source_preparation_read_bytes
+            .push(preparation.read_bytes);
         summary
             .source_preparation_content_read_calls
             .push(preparation.odf.content.read_calls);
@@ -26074,12 +26662,9 @@ fn run_odt_repeated_text(
         let document = litchi_odt::SourceBackedDocument::from_read_at(source)?;
         let paragraphs = document.paragraphs()?;
         paragraphs.len() == expected_paragraph_count
-            && paragraphs
-                .iter()
-                .enumerate()
-                .all(|(index, paragraph)| {
-                    paragraph.text().ok().as_deref() == Some(semantic_odt_text(index, false).as_str())
-                })
+            && paragraphs.iter().enumerate().all(|(index, paragraph)| {
+                paragraph.text().ok().as_deref() == Some(semantic_odt_text(index, false).as_str())
+            })
             && document.text()? == expected_text
     };
     if !semantic_parity_verified {
@@ -28426,8 +29011,8 @@ fn run_xlsx_root_file_access(
         );
     }
     let lifecycle = xlsx_root_file_case_parameters(case)?;
-    let oracle = litchi::Workbook::from_bytes(corpus.archive.clone())
-        .map_err(|error| error.to_string())?;
+    let oracle =
+        litchi::Workbook::from_bytes(corpus.archive.clone()).map_err(|error| error.to_string())?;
     let expected_names = oracle
         .worksheet_names()
         .map_err(|error| error.to_string())?;
@@ -28435,9 +29020,8 @@ fn run_xlsx_root_file_access(
         .worksheet_count()
         .map_err(|error| error.to_string())?;
     let expected_text = oracle.text().map_err(|error| error.to_string())?;
-    let expected_metadata_sha256 = xlsx_root_metadata_digest(
-        &oracle.metadata().map_err(|error| error.to_string())?,
-    )?;
+    let expected_metadata_sha256 =
+        xlsx_root_metadata_digest(&oracle.metadata().map_err(|error| error.to_string())?)?;
     if expected_names.len() != spec.sheet_count || expected_count != spec.sheet_count {
         return Err("XLSX root oracle worksheet shape differs from corpus".into());
     }
@@ -30851,13 +31435,11 @@ fn run_xlsx_edit_composition(
         exact_noop_verified,
         empty_join_identity_verified,
         neither_resolution_noop_verified,
-        exact_output_verified: save_case.then_some(
-            output_digests.iter().all(|digest| {
-                expected_digest
-                    .as_ref()
-                    .is_some_and(|expected| digest == expected)
-            }),
-        ),
+        exact_output_verified: save_case.then_some(output_digests.iter().all(|digest| {
+            expected_digest
+                .as_ref()
+                .is_some_and(|expected| digest == expected)
+        })),
         semantic_reopen_verified: save_case.then_some(reopen_ns.len() == samples),
         sink_write_bound_verified: save_case.then_some(sink_summaries.len() == samples),
     };
@@ -39878,7 +40460,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 336);
+        assert_eq!(selectable_count, 340);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -42825,10 +43407,12 @@ mod tests {
             assert!(evidence.exact_output_verified);
             assert!(evidence.exact_sink_verified);
             let json = serde_json::to_value(&evidence).unwrap();
-            assert!(json["production_contracts_outside_selector"]
-                .as_str()
-                .unwrap()
-                .contains("stale/version"));
+            assert!(
+                json["production_contracts_outside_selector"]
+                    .as_str()
+                    .unwrap()
+                    .contains("stale/version")
+            );
             if matches!(
                 case,
                 Case::OdsSourceBackedOneEditSave | Case::OdsSourceBackedOnePercentEditSave
@@ -42963,7 +43547,10 @@ mod tests {
         let first = build_odt_repeated_text_corpus().unwrap();
         let second = build_odt_repeated_text_corpus().unwrap();
         assert_eq!(first.archive, second.archive);
-        assert_eq!(first.manifest.generator, super::ODT_REPEATED_TEXT_CORPUS_GENERATOR);
+        assert_eq!(
+            first.manifest.generator,
+            super::ODT_REPEATED_TEXT_CORPUS_GENERATOR
+        );
         assert_eq!(first.manifest.shape, "large-media-rich");
         assert_eq!(first.manifest.entry_count, 10_008);
         assert_eq!(first.manifest.entry_bytes, 2 * 1024 * 1024);
@@ -42981,11 +43568,17 @@ mod tests {
             .odt_repeated_text
             .unwrap();
 
-        assert_eq!(uncached.implementation, "source_backed_uncached_public_control");
+        assert_eq!(
+            uncached.implementation,
+            "source_backed_uncached_public_control"
+        );
         assert_eq!(cached.implementation, "source_backed_text_cache_candidate");
         assert_eq!(uncached.projection_calls, super::ODT_REPEATED_TEXT_CALLS);
         assert_eq!(cached.projection_calls, uncached.projection_calls);
-        assert_eq!(uncached.paragraph_count, SemanticShape::Large.docx_paragraphs());
+        assert_eq!(
+            uncached.paragraph_count,
+            SemanticShape::Large.docx_paragraphs()
+        );
         assert_eq!(cached.paragraph_count, uncached.paragraph_count);
         assert_eq!(uncached.pictures_count, super::ODS_MEDIA_ENTRY_COUNT);
         assert_eq!(cached.pictures_count, uncached.pictures_count);
@@ -42999,7 +43592,10 @@ mod tests {
         );
         assert_eq!(uncached.canonical_text_sha256, cached.canonical_text_sha256);
         assert_eq!(uncached.content_xml_sha256, cached.content_xml_sha256);
-        assert_eq!(uncached.projection_text_sha256, cached.projection_text_sha256);
+        assert_eq!(
+            uncached.projection_text_sha256,
+            cached.projection_text_sha256
+        );
         assert_eq!(uncached.freshness_shape, "baseline_two_checks");
         for evidence in [&uncached, &cached] {
             assert!(evidence.semantic_parity_verified);
@@ -43043,6 +43639,75 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[test]
+    fn large_odt_unified_root_filesystem_selectors_are_opt_in_and_matched() {
+        let cases = [
+            Case::OdtFileEagerOpen,
+            Case::OdtFileSourceOpen,
+            Case::OdtFileEagerOpenFullTextLifecycle,
+            Case::OdtFileSourceOpenFullTextLifecycle,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(case.is_filesystem());
+            assert!(case.is_odt_root_file());
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let corpus = build_odt_repeated_text_corpus().unwrap();
+        let results = cases
+            .into_iter()
+            .map(|case| run_case(case, &corpus, 0, 1).unwrap())
+            .collect::<Vec<_>>();
+        let evidence = results
+            .iter()
+            .map(|result| result.source.as_ref().unwrap().odt_root.as_ref().unwrap())
+            .collect::<Vec<_>>();
+        for current in &evidence {
+            assert!(current.semantic_parity_verified);
+            assert!(current.archive_identity_verified);
+            assert!(current.media_identity_verified);
+            assert_eq!(
+                current.archive_member_count,
+                corpus.manifest.archive_member_count
+            );
+            assert_eq!(current.source_path_sha256, corpus.manifest.archive_sha256);
+            assert_eq!(
+                current.paragraph_count,
+                SemanticShape::Large.docx_paragraphs()
+            );
+        }
+        assert_eq!(
+            evidence[0].canonical_text_sha256,
+            evidence[1].canonical_text_sha256
+        );
+        assert_eq!(
+            evidence[0].canonical_text_sha256,
+            evidence[2].canonical_text_sha256
+        );
+        assert_eq!(
+            evidence[0].canonical_text_sha256,
+            evidence[3].canonical_text_sha256
+        );
+        assert_eq!(
+            evidence[0].archive_member_names_sha256,
+            evidence[1].archive_member_names_sha256
+        );
+        assert_eq!(
+            evidence[0].pictures_member_names_sha256,
+            evidence[1].pictures_member_names_sha256
+        );
+        assert!(evidence[1].source_ranges_verified);
+        assert!(evidence[1].zero_picture_payload_overlap_verified);
+        assert_eq!(evidence[1].source_preparation_pictures_read_calls, vec![0]);
+        assert_eq!(evidence[1].source_query_pictures_read_calls, vec![0]);
+        assert!(evidence[3].source_ranges_verified);
+        assert!(evidence[3].zero_picture_payload_overlap_verified);
+        assert_eq!(evidence[3].source_preparation_pictures_read_calls, vec![0]);
+        assert_eq!(evidence[3].source_query_pictures_read_calls, vec![0]);
     }
 
     #[test]
@@ -43820,10 +44485,7 @@ mod tests {
                 result.corpus.generator,
                 XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
             );
-            assert_eq!(
-                result.corpus.archive_sha256,
-                corpus.manifest.archive_sha256
-            );
+            assert_eq!(result.corpus.archive_sha256, corpus.manifest.archive_sha256);
         }
     }
 

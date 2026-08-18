@@ -30,6 +30,37 @@ const PATCH_INSERTION_ORDER: [PatchField; PATCH_FIELD_COUNT] = [
     PatchField::ModificationDate,
 ];
 
+fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
+
+fn retain_user_defined(metadata: &mut Metadata, property: UserDefinedMetadata) -> Result<()> {
+    metadata
+        .custom_properties
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODF custom metadata map",
+            source,
+        })?;
+    metadata
+        .user_defined
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODF user-defined metadata projection",
+            source,
+        })?;
+    let name = try_copy_string(&property.name, "ODF custom metadata name")?;
+    let value = try_copy_string(&property.value, "ODF custom metadata value")?;
+    metadata.custom_properties.insert(name, value);
+    metadata.user_defined.push(property);
+    Ok(())
+}
+
 impl Metadata {
     /// Parse metadata from `meta.xml` content.
     ///
@@ -61,17 +92,14 @@ impl Metadata {
                     } else if meta_depth == Some(depth) {
                         if let Some(field) = text_field(namespace, local_name.as_ref()) {
                             let value = extract_text_content(&mut reader)?;
-                            assign_text_field(&mut metadata, field, value);
+                            assign_text_field(&mut metadata, field, value)?;
                         } else if namespace == KnownNamespace::Meta
                             && local_name.as_ref() == b"user-defined"
                         {
                             let mut property =
                                 parse_user_defined_property(element, &reader, String::new())?;
                             property.value = extract_text_content(&mut reader)?;
-                            metadata
-                                .custom_properties
-                                .insert(property.name.clone(), property.value.clone());
-                            metadata.user_defined.push(property);
+                            retain_user_defined(&mut metadata, property)?;
                         } else {
                             parse_metadata_attributes(
                                 &mut metadata,
@@ -90,16 +118,13 @@ impl Metadata {
                     let local_name = element.local_name();
                     if meta_depth == Some(depth) {
                         if let Some(field) = text_field(namespace, local_name.as_ref()) {
-                            assign_text_field(&mut metadata, field, String::new());
+                            assign_text_field(&mut metadata, field, String::new())?;
                         } else if namespace == KnownNamespace::Meta
                             && local_name.as_ref() == b"user-defined"
                         {
                             let property =
                                 parse_user_defined_property(element, &reader, String::new())?;
-                            metadata
-                                .custom_properties
-                                .insert(property.name.clone(), property.value.clone());
-                            metadata.user_defined.push(property);
+                            retain_user_defined(&mut metadata, property)?;
                         } else {
                             parse_metadata_attributes(
                                 &mut metadata,
@@ -454,12 +479,21 @@ fn text_field(namespace: KnownNamespace, local_name: &[u8]) -> Option<TextField>
     None
 }
 
-fn assign_text_field(metadata: &mut Metadata, field: TextField, value: String) {
+fn assign_text_field(metadata: &mut Metadata, field: TextField, value: String) -> Result<()> {
     match field {
         TextField::Title => metadata.title = Some(value),
         TextField::Description => metadata.description = Some(value),
         TextField::Subject => metadata.subject = Some(value),
-        TextField::Keyword => metadata.keywords.push(value),
+        TextField::Keyword => {
+            metadata
+                .keywords
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "ODF metadata keyword projection",
+                    source,
+                })?;
+            metadata.keywords.push(value);
+        },
         TextField::Creator => metadata.creator = Some(value),
         TextField::Language => metadata.language = Some(value),
         TextField::Contributor => metadata.contributor = Some(value),
@@ -480,6 +514,7 @@ fn assign_text_field(metadata: &mut Metadata, field: TextField, value: String) {
         TextField::EditingCycles => metadata.editing_cycles = Some(value),
         TextField::EditingDuration => metadata.editing_duration = Some(value),
     }
+    Ok(())
 }
 
 /// Map a direct `office:meta` child to the field a patch manages.
@@ -728,8 +763,10 @@ fn skip_element_body(reader: &mut NsReader<&[u8]>) -> Result<BytesEnd<'static>> 
 
 /// Qualified name of an element as UTF-8.
 fn element_name(element: &BytesStart<'_>) -> Result<String> {
-    String::from_utf8(element.name().as_ref().to_vec())
-        .map_err(|error| Error::InvalidFormat(format!("invalid metadata element name: {error}")))
+    let raw_name = element.name();
+    let name = std::str::from_utf8(raw_name.as_ref())
+        .map_err(|error| Error::InvalidFormat(format!("invalid metadata element name: {error}")))?;
+    try_copy_string(name, "ODF metadata element name")
 }
 
 fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
@@ -740,18 +777,38 @@ fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
             .read_event_into(&mut buffer)
             .map_err(metadata_xml_error)?;
         match event {
-            Event::Text(text) => content.push_str(
-                &text
+            Event::Text(text) => {
+                let value = text
                     .xml_content(XmlVersion::Implicit1_0)
-                    .map_err(metadata_xml_error)?,
-            ),
-            Event::CData(text) => content.push_str(
-                &text
+                    .map_err(metadata_xml_error)?;
+                content
+                    .try_reserve(value.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODF metadata text projection",
+                        source,
+                    })?;
+                content.push_str(&value);
+            },
+            Event::CData(text) => {
+                let value = text
                     .xml_content(XmlVersion::Implicit1_0)
-                    .map_err(metadata_xml_error)?,
-            ),
+                    .map_err(metadata_xml_error)?;
+                content
+                    .try_reserve(value.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODF metadata text projection",
+                        source,
+                    })?;
+                content.push_str(&value);
+            },
             Event::GeneralRef(reference) => {
                 if let Some(character) = reference.resolve_char_ref().map_err(metadata_xml_error)? {
+                    content
+                        .try_reserve(character.len_utf8())
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODF metadata text projection",
+                            source,
+                        })?;
                     content.push(character);
                 } else {
                     let name = reference.decode().map_err(metadata_xml_error)?;
@@ -760,6 +817,12 @@ fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
                             Error::InvalidFormat(format!(
                                 "unresolved entity '&{name};' in OpenDocument metadata"
                             ))
+                        })?;
+                    content
+                        .try_reserve(replacement.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODF metadata text projection",
+                            source,
                         })?;
                     content.push_str(replacement);
                 }
@@ -838,15 +901,15 @@ fn parse_document_statistics(
         if !namespace_is(&namespace, META_NAMESPACE) {
             continue;
         }
-        let value = attribute
+        let decoded = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(metadata_xml_error)?
-            .into_owned();
-        if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+            .map_err(metadata_xml_error)?;
+        if decoded.is_empty() || !decoded.bytes().all(|byte| byte.is_ascii_digit()) {
             return Err(Error::InvalidFormat(format!(
-                "invalid non-negative ODF statistic '{value}'"
+                "invalid non-negative ODF statistic '{decoded}'"
             )));
         }
+        let value = try_copy_string(&decoded, "ODF document statistic value")?;
         match local_name.as_ref() {
             b"page-count" => statistics.page_count = Some(value),
             b"paragraph-count" => statistics.paragraph_count = Some(value),
@@ -913,12 +976,10 @@ fn attribute_value(
         if namespace_is(&namespace, expected_namespace)
             && local_name.as_ref() == expected_local_name
         {
-            return Ok(Some(
-                attribute
-                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                    .map_err(metadata_xml_error)?
-                    .into_owned(),
-            ));
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(metadata_xml_error)?;
+            return try_copy_string(&value, "ODF metadata attribute value").map(Some);
         }
     }
     Ok(None)

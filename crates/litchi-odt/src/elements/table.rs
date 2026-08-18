@@ -3,9 +3,68 @@
 //! This module provides classes for table elements like tables, rows, cells,
 //! and other table-related content.
 
-use super::element::{Element, ElementBase};
+use super::element::{Element, ElementBase, try_owned_string};
 use crate::CellValue;
 use litchi_core::{Error, Result};
+use quick_xml::XmlVersion;
+use quick_xml::events::BytesStart;
+use std::fmt::Write as _;
+
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
+}
+
+fn try_usize_string(value: usize, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(usize::BITS as usize / 3 + 1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    write!(&mut output, "{value}")
+        .map_err(|_error| Error::InvalidFormat("failed to format ODT integer".to_string()))?;
+    Ok(output)
+}
+
+fn append_text_control(
+    reader: &quick_xml::Reader<&[u8]>,
+    source: &BytesStart<'_>,
+    element: &mut Element,
+) -> Result<()> {
+    match source.name().as_ref() {
+        b"text:s" => {
+            let mut count = 1usize;
+            for attribute in source.attributes() {
+                let attribute = attribute.map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODT table text:s attribute: {error}"))
+                })?;
+                if attribute.key.as_ref() == b"text:c" {
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODT table text:s count: {error}"))
+                        })?;
+                    count = value.parse().map_err(|_error| {
+                        Error::InvalidFormat(
+                            "ODT table text:s count must be a non-negative integer".to_string(),
+                        )
+                    })?;
+                }
+            }
+            if count > 1_000_000 {
+                return Err(Error::InvalidFormat(
+                    "ODT table text:s count exceeds 1000000".to_string(),
+                ));
+            }
+            element.try_append_spaces(count, "ODT table text control")
+        },
+        b"text:tab" => element.try_append_text("\t", "ODT table text control"),
+        b"text:line-break" => element.try_append_text("\n", "ODT table text control"),
+        _ => Ok(()),
+    }
+}
 
 /// A table element
 #[derive(Debug, Clone)]
@@ -20,6 +79,12 @@ impl Default for Table {
 }
 
 impl Table {
+    pub(crate) fn try_new() -> Result<Self> {
+        Ok(Self {
+            element: Element::try_new("table:table")?,
+        })
+    }
+
     /// Create a new table
     pub fn new() -> Self {
         Self {
@@ -45,6 +110,11 @@ impl Table {
         self.element.set_attribute("table:name", name);
     }
 
+    pub(crate) fn try_set_name(&mut self, name: &str) -> Result<()> {
+        self.element
+            .try_set_attribute("table:name", name, "ODT expanded table name")
+    }
+
     /// Get the style name
     pub fn style_name(&self) -> Option<&str> {
         self.element.get_attribute("table:style-name")
@@ -55,14 +125,18 @@ impl Table {
         self.element.set_attribute("table:style-name", name);
     }
 
+    pub(crate) fn try_set_style_name(&mut self, name: &str) -> Result<()> {
+        self.element
+            .try_set_attribute("table:style-name", name, "ODT expanded table style name")
+    }
+
     /// Get all rows in the table
     pub fn rows(&self) -> Result<Vec<TableRow>> {
         let mut rows = Vec::new();
         for child in &self.element.children {
-            if child.tag_name() == "table:table-row"
-                && let Ok(row) = TableRow::from_element(child.clone())
-            {
-                rows.push(row);
+            if child.tag_name() == "table:table-row" {
+                let row = TableRow::from_element(child.try_clone()?)?;
+                try_push(&mut rows, row, "ODT table row projection")?;
             }
         }
         Ok(rows)
@@ -87,6 +161,11 @@ impl Table {
     /// Add a row to the table
     pub fn add_row(&mut self, row: TableRow) {
         self.element.add_child(row.element);
+    }
+
+    pub(crate) fn try_add_row(&mut self, row: TableRow) -> Result<()> {
+        self.element
+            .try_add_child(row.element, "ODT expanded table rows")
     }
 
     /// Add a column definition to the table
@@ -127,12 +206,10 @@ impl Table {
 
     /// Get the number of columns (based on the widest row)
     pub fn column_count(&self) -> Result<usize> {
-        let rows = self.rows()?;
-        let max_cols = rows
-            .iter()
-            .map(|row| row.cells().map_or(0, |cells| cells.len()))
-            .max()
-            .unwrap_or(0);
+        let mut max_cols = 0usize;
+        for row in self.rows()? {
+            max_cols = max_cols.max(row.cells()?.len());
+        }
         Ok(max_cols)
     }
 }
@@ -156,6 +233,12 @@ impl Default for TableRow {
 }
 
 impl TableRow {
+    pub(crate) fn try_new() -> Result<Self> {
+        Ok(Self {
+            element: Element::try_new("table:table-row")?,
+        })
+    }
+
     /// Create a new table row
     pub fn new() -> Self {
         Self {
@@ -177,10 +260,9 @@ impl TableRow {
     pub fn cells(&self) -> Result<Vec<TableCell>> {
         let mut cells = Vec::new();
         for child in &self.element.children {
-            if child.tag_name() == "table:table-cell"
-                && let Ok(cell) = TableCell::from_element(child.clone())
-            {
-                cells.push(cell);
+            if child.tag_name() == "table:table-cell" {
+                let cell = TableCell::from_element(child.try_clone()?)?;
+                try_push(&mut cells, cell, "ODT table cell projection")?;
             }
         }
         Ok(cells)
@@ -207,6 +289,11 @@ impl TableRow {
         self.element.add_child(cell.element);
     }
 
+    pub(crate) fn try_add_cell(&mut self, cell: TableCell) -> Result<()> {
+        self.element
+            .try_add_child(cell.element, "ODT expanded table cells")
+    }
+
     /// Get the style name (for row height)
     pub fn style_name(&self) -> Option<&str> {
         self.element.get_attribute("table:style-name")
@@ -218,6 +305,28 @@ impl TableRow {
     /// document's automatic styles section.
     pub fn set_style_name(&mut self, name: &str) {
         self.element.set_attribute("table:style-name", name);
+    }
+
+    pub(crate) fn try_set_style_name(&mut self, name: &str) -> Result<()> {
+        self.element.try_set_attribute(
+            "table:style-name",
+            name,
+            "ODT expanded table-row style name",
+        )
+    }
+
+    pub(crate) fn try_repeat_count(&self) -> Result<usize> {
+        self.element
+            .get_attribute("table:number-rows-repeated")
+            .map(|value| {
+                value.parse::<usize>().map_err(|_error| {
+                    Error::InvalidFormat(
+                        "table:number-rows-repeated must be a non-negative integer".to_string(),
+                    )
+                })
+            })
+            .transpose()
+            .map(|value| value.unwrap_or(1))
     }
 
     /// Get the number of times this row is repeated.
@@ -273,6 +382,12 @@ impl Default for TableCell {
 }
 
 impl TableCell {
+    pub(crate) fn try_new() -> Result<Self> {
+        Ok(Self {
+            element: Element::try_new("table:table-cell")?,
+        })
+    }
+
     /// Create a new table cell
     pub fn new() -> Self {
         Self {
@@ -292,12 +407,30 @@ impl TableCell {
 
     /// Get the text content of the cell
     pub fn text(&self) -> Result<String> {
-        Ok(self.element.get_text_recursive().trim().to_string())
+        let text = self.element.try_get_text_recursive()?;
+        let trimmed = text.trim();
+        if trimmed.len() == text.len() {
+            return Ok(text);
+        }
+        let mut output = String::new();
+        output
+            .try_reserve(trimmed.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODT table-cell text projection",
+                source,
+            })?;
+        output.push_str(trimmed);
+        Ok(output)
     }
 
     /// Set the text content of the cell
     pub fn set_text(&mut self, text: &str) {
         self.element.set_text(text);
+    }
+
+    pub(crate) fn try_set_text(&mut self, text: &str) -> Result<()> {
+        self.element
+            .try_set_text(text, "ODT expanded table-cell text")
     }
 
     /// Get the cell value (parsed from attributes and content)
@@ -321,7 +454,10 @@ impl TableCell {
                         .element
                         .get_attribute("office:currency")
                         .unwrap_or("USD");
-                    return Ok(CellValue::Currency(num, currency.to_string()));
+                    return Ok(CellValue::Currency(
+                        num,
+                        try_owned_string(currency, "ODT table-cell currency")?,
+                    ));
                 }
             },
             Some("percentage") => {
@@ -342,12 +478,18 @@ impl TableCell {
             },
             Some("date") => {
                 if let Some(val_str) = self.element.get_attribute("office:value") {
-                    return Ok(CellValue::Date(val_str.to_string()));
+                    return Ok(CellValue::Date(try_owned_string(
+                        val_str,
+                        "ODT table-cell date",
+                    )?));
                 }
             },
             Some("time") => {
                 if let Some(val_str) = self.element.get_attribute("office:value") {
-                    return Ok(CellValue::Time(val_str.to_string()));
+                    return Ok(CellValue::Time(try_owned_string(
+                        val_str,
+                        "ODT table-cell time",
+                    )?));
                 }
             },
             _ => {
@@ -378,6 +520,11 @@ impl TableCell {
         self.element.set_attribute("table:formula", formula);
     }
 
+    pub(crate) fn try_set_formula(&mut self, formula: &str) -> Result<()> {
+        self.element
+            .try_set_attribute("table:formula", formula, "ODT expanded table-cell formula")
+    }
+
     /// Get the style name
     pub fn style_name(&self) -> Option<&str> {
         self.element.get_attribute("table:style-name")
@@ -386,6 +533,14 @@ impl TableCell {
     /// Set the style name
     pub fn set_style_name(&mut self, name: &str) {
         self.element.set_attribute("table:style-name", name);
+    }
+
+    pub(crate) fn try_set_style_name(&mut self, name: &str) -> Result<()> {
+        self.element.try_set_attribute(
+            "table:style-name",
+            name,
+            "ODT expanded table-cell style name",
+        )
     }
 
     /// Get the number of columns this cell spans
@@ -402,6 +557,15 @@ impl TableCell {
             .set_attribute("table:number-columns-spanned", &span.to_string());
     }
 
+    pub(crate) fn try_set_colspan(&mut self, span: usize) -> Result<()> {
+        let value = try_usize_string(span, "ODT expanded table-cell column span")?;
+        self.element.try_set_attribute(
+            "table:number-columns-spanned",
+            &value,
+            "ODT expanded table-cell column span",
+        )
+    }
+
     /// Get the number of rows this cell spans
     pub fn rowspan(&self) -> usize {
         self.element
@@ -414,6 +578,15 @@ impl TableCell {
     pub fn set_rowspan(&mut self, span: usize) {
         self.element
             .set_attribute("table:number-rows-spanned", &span.to_string());
+    }
+
+    pub(crate) fn try_set_rowspan(&mut self, span: usize) -> Result<()> {
+        let value = try_usize_string(span, "ODT expanded table-cell row span")?;
+        self.element.try_set_attribute(
+            "table:number-rows-spanned",
+            &value,
+            "ODT expanded table-cell row span",
+        )
     }
 
     /// Check if the cell is empty
@@ -434,6 +607,20 @@ impl TableCell {
             .get_int_attribute("table:number-columns-repeated")
             .and_then(|value| usize::try_from(value).ok())
             .unwrap_or(1)
+    }
+
+    pub(crate) fn try_repeat_count(&self) -> Result<usize> {
+        self.element
+            .get_attribute("table:number-columns-repeated")
+            .map(|value| {
+                value.parse::<usize>().map_err(|_error| {
+                    Error::InvalidFormat(
+                        "table:number-columns-repeated must be a non-negative integer".to_string(),
+                    )
+                })
+            })
+            .transpose()
+            .map(|value| value.unwrap_or(1))
     }
 
     /// Set the number of times this cell should be repeated.
@@ -546,80 +733,178 @@ impl TableElements {
     /// Parse all tables from XML content
     pub fn parse_tables(xml_content: &str) -> Result<Vec<Table>> {
         let mut reader = quick_xml::Reader::from_str(xml_content);
-        let mut buf = Vec::new();
         let mut tables = Vec::new();
         let mut stack: Vec<Element> = Vec::new();
 
         loop {
-            match reader.read_event_into(&mut buf) {
+            match reader.read_event() {
                 Ok(quick_xml::events::Event::Start(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
+                    let raw_name = e.name();
+                    let tag_name = std::str::from_utf8(raw_name.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid UTF-8 in ODT table element name: {error}"
+                        ))
+                    })?;
 
                     if tag_name == "table:table" {
-                        let mut element = Element::new(&tag_name);
+                        let mut element = Element::try_new(tag_name)?;
 
                         // Parse attributes
                         for attr_result in e.attributes() {
-                            if let Ok(attr) = attr_result
-                                && let (Ok(key), Ok(value)) = (
-                                    String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec()),
-                                )
-                            {
-                                element.set_attribute(&key, &value);
-                            }
+                            let attr = attr_result.map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid ODT table attribute: {error}"
+                                ))
+                            })?;
+                            let key = std::str::from_utf8(attr.key.as_ref()).map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid UTF-8 in ODT table attribute name: {error}"
+                                ))
+                            })?;
+                            let value =
+                                std::str::from_utf8(attr.value.as_ref()).map_err(|error| {
+                                    Error::InvalidFormat(format!(
+                                        "invalid UTF-8 in ODT table attribute value: {error}"
+                                    ))
+                                })?;
+                            element.try_set_attribute(key, value, "ODT table attribute")?;
                         }
 
-                        stack.push(element);
+                        append_text_control(&reader, e, &mut element)?;
+                        try_push(&mut stack, element, "ODT table parser stack")?;
                     } else if !stack.is_empty() {
                         // Handle nested elements within table
-                        let mut element = Element::new(&tag_name);
+                        let mut element = Element::try_new(tag_name)?;
 
                         // Parse attributes
                         for attr_result in e.attributes() {
-                            if let Ok(attr) = attr_result
-                                && let (Ok(key), Ok(value)) = (
-                                    String::from_utf8(attr.key.as_ref().to_vec()),
-                                    String::from_utf8(attr.value.to_vec()),
-                                )
-                            {
-                                element.set_attribute(&key, &value);
-                            }
+                            let attr = attr_result.map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid ODT table attribute: {error}"
+                                ))
+                            })?;
+                            let key = std::str::from_utf8(attr.key.as_ref()).map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid UTF-8 in ODT table attribute name: {error}"
+                                ))
+                            })?;
+                            let value =
+                                std::str::from_utf8(attr.value.as_ref()).map_err(|error| {
+                                    Error::InvalidFormat(format!(
+                                        "invalid UTF-8 in ODT table attribute value: {error}"
+                                    ))
+                                })?;
+                            element.try_set_attribute(key, value, "ODT table attribute")?;
                         }
 
-                        stack.push(element);
+                        append_text_control(&reader, e, &mut element)?;
+                        try_push(&mut stack, element, "ODT table parser stack")?;
+                    }
+                },
+                Ok(quick_xml::events::Event::Empty(ref e)) => {
+                    let raw_name = e.name();
+                    let tag_name = std::str::from_utf8(raw_name.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid UTF-8 in empty ODT table element name: {error}"
+                        ))
+                    })?;
+                    if matches!(tag_name, "text:s" | "text:tab" | "text:line-break")
+                        && let Some(parent) = stack.last_mut()
+                    {
+                        append_text_control(&reader, e, parent)?;
+                        continue;
+                    }
+                    if tag_name == "table:table" || !stack.is_empty() {
+                        let mut element = Element::try_new(tag_name)?;
+                        for attr_result in e.attributes() {
+                            let attr = attr_result.map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid empty ODT table attribute: {error}"
+                                ))
+                            })?;
+                            let key = std::str::from_utf8(attr.key.as_ref()).map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid UTF-8 in empty ODT table attribute name: {error}"
+                                ))
+                            })?;
+                            let value =
+                                std::str::from_utf8(attr.value.as_ref()).map_err(|error| {
+                                    Error::InvalidFormat(format!(
+                                        "invalid UTF-8 in empty ODT table attribute value: {error}"
+                                    ))
+                                })?;
+                            element.try_set_attribute(key, value, "ODT table attribute")?;
+                        }
+                        append_text_control(&reader, e, &mut element)?;
+                        if let Some(parent) = stack.last_mut() {
+                            parent.try_add_child(element, "ODT empty table child projection")?;
+                        } else {
+                            let table = Table::from_element(element)?;
+                            try_push(&mut tables, table, "ODT table projection")?;
+                        }
                     }
                 },
                 Ok(quick_xml::events::Event::Text(ref t)) => {
-                    if let Some(current) = stack.last_mut()
-                        && let Ok(text) = String::from_utf8(t.to_vec())
-                    {
-                        let current_text = current.text().to_string();
-                        current.set_text(&format!("{current_text}{text}"));
+                    if let Some(current) = stack.last_mut() {
+                        let text = t.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODT table text: {error}"))
+                        })?;
+                        current.try_append_text(&text, "ODT table text projection")?;
+                    }
+                },
+                Ok(quick_xml::events::Event::CData(ref value)) => {
+                    if let Some(current) = stack.last_mut() {
+                        let text = value
+                            .xml_content(XmlVersion::Explicit1_0)
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!("invalid ODT table CDATA: {error}"))
+                            })?;
+                        current.try_append_text(&text, "ODT table CDATA projection")?;
+                    }
+                },
+                Ok(quick_xml::events::Event::GeneralRef(ref reference)) => {
+                    if let Some(current) = stack.last_mut() {
+                        let text = super::parser::decode_reference(reference)?;
+                        current.try_append_text(&text, "ODT table entity projection")?;
                     }
                 },
                 Ok(quick_xml::events::Event::End(ref e)) => {
-                    let tag_name =
-                        String::from_utf8(e.name().as_ref().to_vec()).unwrap_or_default();
+                    let raw_name = e.name();
+                    let tag_name = std::str::from_utf8(raw_name.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid UTF-8 in ODT table end name: {error}"
+                        ))
+                    })?;
 
                     if tag_name == "table:table" {
-                        if let Some(table_element) = stack.pop()
-                            && let Ok(table) = Table::from_element(table_element)
-                        {
-                            tables.push(table);
-                        }
+                        let table_element = stack.pop().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODT table end tag has no matching start tag".to_string(),
+                            )
+                        })?;
+                        let table = Table::from_element(table_element)?;
+                        try_push(&mut tables, table, "ODT table projection")?;
                     } else if let Some(element) = stack.pop() {
                         if let Some(parent) = stack.last_mut() {
-                            parent.add_child(element);
+                            parent.try_add_child(element, "ODT table child projection")?;
                         }
                     }
                 },
-                Ok(quick_xml::events::Event::Eof) => break,
-                Err(_) => break,
+                Ok(quick_xml::events::Event::Eof) => {
+                    if !stack.is_empty() {
+                        return Err(Error::InvalidFormat(
+                            "ODT table XML ended with open table elements".to_string(),
+                        ));
+                    }
+                    break;
+                },
+                Err(error) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "invalid ODT table XML: {error}"
+                    )));
+                },
                 _ => {},
             }
-            buf.clear();
         }
 
         Ok(tables)
@@ -678,7 +963,11 @@ impl TableElements {
                             // Copy value attributes
                             for (key, value) in cell.element.attributes() {
                                 if key.starts_with("office:") {
-                                    new_cell.element.set_attribute(key, value);
+                                    new_cell.element.try_set_attribute(
+                                        key,
+                                        value,
+                                        "ODT expanded table-cell attribute",
+                                    )?;
                                 }
                             }
 
@@ -1077,6 +1366,22 @@ mod tests {
         let tables = TableElements::parse_tables(xml).unwrap();
         assert_eq!(tables.len(), 1);
         assert_eq!(tables[0].name(), Some("Table1"));
+    }
+
+    #[test]
+    fn test_table_elements_preserve_cdata_entities_and_empty_text_controls() {
+        let xml = r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><table:table><table:table-row><table:table-cell><text:p><![CDATA[A]]>&amp;<text:s text:c="2"/><text:tab/><text:line-break/>B</text:p></table:table-cell></table:table-row></table:table></office:document>"#;
+
+        let tables = TableElements::parse_tables(xml).unwrap();
+        let rows = tables[0].rows().unwrap();
+        let cells = rows[0].cells().unwrap();
+        assert_eq!(cells[0].text().unwrap(), "A&  \t\nB");
+    }
+
+    #[test]
+    fn test_table_elements_propagate_malformed_xml() {
+        let xml = r#"<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><table:table-row></table:table>"#;
+        assert!(TableElements::parse_tables(xml).is_err());
     }
 
     #[test]

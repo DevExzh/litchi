@@ -167,18 +167,18 @@ impl Document {
             "<office:text",
             "ODT",
         )?;
-        let content = Content::from_bytes(&content_bytes)?;
+        let content = Content::from_vec(content_bytes)?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
-            Some(Styles::from_bytes(&styles_bytes)?)
+            Some(Styles::from_vec(styles_bytes)?)
         } else {
             None
         };
 
         let meta = if package.has_file("meta.xml") {
             let meta_bytes = package.get_file("meta.xml")?;
-            Some(Meta::from_bytes(&meta_bytes)?)
+            Some(Meta::from_vec(meta_bytes)?)
         } else {
             None
         };
@@ -187,19 +187,13 @@ impl Document {
         let mut style_registry = StyleRegistry::default();
 
         // Parse styles from styles.xml if available
-        if let Some(ref styles_part) = styles
-            && let Ok(registry) = StyleElements::parse_styles(styles_part.xml_content())
-        {
-            style_registry = registry;
+        if let Some(ref styles_part) = styles {
+            style_registry = StyleElements::parse_styles(styles_part.xml_content())?;
         }
 
         // Also parse styles from content.xml (automatic styles)
-        if let Ok(content_registry) = StyleElements::parse_styles(content.xml_content()) {
-            // Merge content styles into main registry (content styles take precedence)
-            for (_name, style) in content_registry.styles {
-                style_registry.add_style(style);
-            }
-        }
+        // Merge content styles into main registry (content styles take precedence)
+        style_registry.try_extend(StyleElements::parse_styles(content.xml_content())?)?;
 
         Ok(Self {
             package: owned_package,

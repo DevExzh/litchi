@@ -7,7 +7,7 @@
 
 use super::model::Block;
 use super::{Heading, Paragraph, parse_paragraph_at, parse_text_blocks, parse_text_blocks_owned};
-use litchi_core::Result;
+use litchi_core::{Error, Result};
 
 /// Collection of typed text-element codec operations.
 pub struct Elements;
@@ -25,11 +25,20 @@ impl Elements {
 
     /// Decode all paragraphs from an XML reader.
     pub fn parse_paragraphs(xml_content: &str) -> Result<Vec<Paragraph>> {
-        Self::parse(xml_content).map(|blocks| {
-            blocks
-                .into_iter()
-                .filter_map(Block::into_paragraph)
-                .collect()
+        Self::parse(xml_content).and_then(|blocks| {
+            let mut paragraphs = Vec::new();
+            paragraphs
+                .try_reserve_exact(blocks.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT paragraph projection",
+                    source,
+                })?;
+            for block in blocks {
+                if let Some(paragraph) = block.into_paragraph() {
+                    paragraphs.push(paragraph);
+                }
+            }
+            Ok(paragraphs)
         })
     }
 
@@ -43,8 +52,21 @@ impl Elements {
 
     /// Decode all headings from XML content.
     pub fn parse_headings(xml_content: &str) -> Result<Vec<Heading>> {
-        Self::parse(xml_content)
-            .map(|blocks| blocks.into_iter().filter_map(Block::into_heading).collect())
+        Self::parse(xml_content).and_then(|blocks| {
+            let mut headings = Vec::new();
+            headings
+                .try_reserve_exact(blocks.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT heading projection",
+                    source,
+                })?;
+            for block in blocks {
+                if let Some(heading) = block.into_heading() {
+                    headings.push(heading);
+                }
+            }
+            Ok(headings)
+        })
     }
 
     /// Extract visible text from all decoded blocks, preserving block breaks.
@@ -59,8 +81,15 @@ impl Elements {
         };
         let mut output = first.into_text();
         for block in blocks {
+            let text = block.into_text();
+            output
+                .try_reserve(1usize.saturating_add(text.len()))
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT full-text projection",
+                    source,
+                })?;
             output.push('\n');
-            output.push_str(&block.into_text());
+            output.push_str(&text);
         }
         Ok(output)
     }

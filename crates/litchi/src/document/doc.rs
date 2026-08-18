@@ -127,6 +127,21 @@ mod flat_odt_tests {
             Err(litchi_core::Error::Unsupported(_))
         ));
     }
+
+    #[test]
+    #[cfg(any(unix, windows))]
+    fn flat_odt_path_remains_explicitly_unsupported() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".fodt")
+            .tempfile()
+            .expect("temporary flat ODT path");
+        std::fs::write(temporary.path(), FLAT_ODT).expect("write flat ODT");
+
+        assert!(matches!(
+            Document::open(temporary.path()),
+            Err(litchi_core::Error::Unsupported(_))
+        ));
+    }
 }
 
 #[cfg(feature = "rtf")]
@@ -217,7 +232,10 @@ impl Document {
     /// the unified facade boundary. The generic `From<OpcError>` mapping is
     /// intentionally lossy for legacy callers, so source-backed DOCX paths
     /// must translate this variant explicitly.
-    #[cfg(all(feature = "docx", any(unix, windows)))]
+    #[cfg(all(
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+        any(unix, windows)
+    ))]
     fn map_source_opc_error(error: crate::opc::OpcError) -> Error {
         match error {
             crate::opc::OpcError::SourceChanged { expected, actual } => Error::SourceChanged {
@@ -238,6 +256,19 @@ impl Document {
         result: Result<T>,
     ) -> Result<T> {
         match source.source_version().map_err(Self::map_source_docx_error) {
+            Err(error) => Err(error),
+            Ok(_) => result,
+        }
+    }
+
+    /// Prefer a final ODT source-revision failure over any semantic projection
+    /// result produced after the source-backed leaf performed its own check.
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn finish_source_odt_result<T>(
+        source: &litchi_odt::SourceBackedDocument,
+        result: Result<T>,
+    ) -> Result<T> {
+        match source.source_version() {
             Err(error) => Err(error),
             Ok(_) => result,
         }
@@ -380,6 +411,22 @@ impl Document {
                     return Err(unsupported("ODT images"));
                 }
             },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(document) => {
+                let result = (|| {
+                    if !document.hyperlinks()?.is_empty() {
+                        return Err(unsupported("ODT hyperlinks"));
+                    }
+                    if !document.footnotes()?.is_empty() {
+                        return Err(unsupported("ODT footnotes"));
+                    }
+                    if !document.images()?.is_empty() {
+                        return Err(unsupported("ODT images"));
+                    }
+                    Ok(())
+                })();
+                Self::finish_source_odt_result(document, result)?;
+            },
             _ => {},
         }
         Ok(())
@@ -483,6 +530,44 @@ impl Document {
                 }
                 Ok(levels)
             },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(document) => {
+                let result = (|| {
+                    use litchi_odt::elements::parser::OrderElement;
+
+                    let source = document.elements()?;
+                    let mut levels = Vec::new();
+                    levels
+                        .try_reserve_exact(source.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "Markdown ODT source heading metadata",
+                            source,
+                        })?;
+                    for element in source {
+                        match element {
+                            OrderElement::Paragraph(_)
+                            | OrderElement::NumberedParagraph(_)
+                            | OrderElement::Table(_) => levels.push(None),
+                            OrderElement::Heading(heading) => {
+                                let level = heading.level().ok_or_else(|| {
+                                    Error::Unsupported(
+                                        "ODT heading has no representable outline level".to_owned(),
+                                    )
+                                })?;
+                                if !(1..=6).contains(&level) {
+                                    return Err(Error::Unsupported(format!(
+                                        "ODT heading outline level {level} is outside Markdown's range"
+                                    )));
+                                }
+                                levels.push(Some(level));
+                            },
+                            OrderElement::List(_) => {},
+                        }
+                    }
+                    Ok(levels)
+                })();
+                Self::finish_source_odt_result(document, result)
+            },
             _ => Ok(Vec::new()),
         }
     }
@@ -527,6 +612,10 @@ impl Document {
                 .source_version()
                 .map_err(Self::map_source_docx_error)?;
         }
+        #[cfg(all(feature = "odt", any(unix, windows)))]
+        if let DocumentImpl::OdtSource(source) = &self.inner {
+            source.source_version()?;
+        }
         Ok(())
     }
 
@@ -563,6 +652,29 @@ impl Document {
 
         #[cfg(not(feature = "docx"))]
         {
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            if let Some(candidate) =
+                crate::detection_smart::detected::detect_odt_source_path(path.as_ref())?
+            {
+                let has_ooxml_catalog = candidate.has_ooxml_catalog()?;
+                #[cfg(any(feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+                if has_ooxml_catalog
+                    && crate::detection_smart::detected::odt_source_candidate_has_ooxml_owner(
+                        &candidate,
+                    )
+                    .map_err(Self::map_source_opc_error)?
+                {
+                    return Err(Error::InvalidFormat(
+                        "Detected format is not a document format or feature not enabled"
+                            .to_owned(),
+                    ));
+                }
+                let _ = has_ooxml_catalog;
+                return Ok(Self {
+                    inner: DocumentImpl::OdtSource(candidate.into_document()?),
+                });
+            }
+
             let bytes = std::fs::read(path.as_ref())?;
             Self::from_bytes(bytes)
         }
@@ -578,20 +690,35 @@ impl Document {
         path: P,
         limits: crate::docx::ReadLimits,
     ) -> Result<Self> {
-        #[cfg(any(unix, windows))]
-        if let Some(detected) =
-            crate::detection_smart::detected::detect_docx_source_path_with_limits(
-                path.as_ref(),
-                limits,
-            )
-            .map_err(|error| match error {
-                crate::detection_smart::detected::DocxSourcePathError::Opc(error) => {
-                    Self::map_source_opc_error(error)
-                },
-                crate::detection_smart::detected::DocxSourcePathError::Docx(error) => {
-                    Self::map_source_docx_error(error)
-                },
-            })?
+        #[cfg(all(feature = "odt", any(unix, windows)))]
+        let odt_candidate =
+            crate::detection_smart::detected::detect_odt_source_path(path.as_ref())?;
+        #[cfg(all(feature = "odt", any(unix, windows)))]
+        let odt_candidate = if let Some(candidate) = odt_candidate {
+            if !candidate.has_ooxml_catalog()? {
+                return Ok(Self {
+                    inner: DocumentImpl::OdtSource(candidate.into_document()?),
+                });
+            }
+            Some(candidate)
+        } else {
+            None
+        };
+
+        #[cfg(all(feature = "odt", any(unix, windows)))]
+        if let Some(candidate) = odt_candidate.as_ref()
+            && let Some(detected) =
+                crate::detection_smart::detected::detect_docx_from_odt_source_candidate_with_limits(
+                    candidate, limits,
+                )
+                .map_err(|error| match error {
+                    crate::detection_smart::detected::DocxSourcePathError::Opc(error) => {
+                        Self::map_source_opc_error(error)
+                    },
+                    crate::detection_smart::detected::DocxSourcePathError::Docx(error) => {
+                        Self::map_source_docx_error(error)
+                    },
+                })?
         {
             match detected {
                 crate::detection_smart::detected::DocxSourcePathDetection::Docx(package) => {
@@ -613,6 +740,63 @@ impl Document {
                     return Err(Error::NotOfficeFile);
                 },
             }
+        }
+
+        #[cfg(any(unix, windows))]
+        let should_probe_docx = {
+            #[cfg(feature = "odt")]
+            {
+                odt_candidate.is_none()
+            }
+            #[cfg(not(feature = "odt"))]
+            {
+                true
+            }
+        };
+
+        #[cfg(any(unix, windows))]
+        if should_probe_docx
+            && let Some(detected) =
+                crate::detection_smart::detected::detect_docx_source_path_with_limits(
+                    path.as_ref(),
+                    limits,
+                )
+                .map_err(|error| match error {
+                    crate::detection_smart::detected::DocxSourcePathError::Opc(error) => {
+                        Self::map_source_opc_error(error)
+                    },
+                    crate::detection_smart::detected::DocxSourcePathError::Docx(error) => {
+                        Self::map_source_docx_error(error)
+                    },
+                })?
+        {
+            match detected {
+                crate::detection_smart::detected::DocxSourcePathDetection::Docx(package) => {
+                    return Ok(Self {
+                        inner: DocumentImpl::DocxSource(package, Default::default()),
+                    });
+                },
+                crate::detection_smart::detected::DocxSourcePathDetection::OtherOoxml(format) => {
+                    let _ = format;
+                    return Err(Error::InvalidFormat(
+                        "Detected format is not a document format or feature not enabled"
+                            .to_owned(),
+                    ));
+                },
+                crate::detection_smart::detected::DocxSourcePathDetection::DisabledOtherOoxml(
+                    format,
+                ) => {
+                    let _ = format;
+                    return Err(Error::NotOfficeFile);
+                },
+            }
+        }
+
+        #[cfg(all(feature = "odt", any(unix, windows)))]
+        if let Some(candidate) = odt_candidate {
+            return Ok(Self {
+                inner: DocumentImpl::OdtSource(candidate.into_document()?),
+            });
         }
 
         #[cfg(not(any(unix, windows)))]
@@ -820,6 +1004,11 @@ impl Document {
             DocumentImpl::Odt(doc) => doc
                 .text()
                 .map_err(|e| Error::ParseError(format!("Failed to extract text from ODT: {}", e))),
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = doc.text();
+                Self::finish_source_odt_result(doc, result)
+            },
         }
     }
 
@@ -863,6 +1052,11 @@ impl Document {
             DocumentImpl::Odt(doc) => doc
                 .paragraph_count()
                 .map_err(|e| Error::ParseError(format!("Failed to get paragraph count: {}", e))),
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = doc.paragraph_count();
+                Self::finish_source_odt_result(doc, result)
+            },
         }
     }
 
@@ -953,6 +1147,24 @@ impl Document {
                     .map_err(|e| Error::ParseError(format!("Failed to get paragraphs: {}", e)))?;
                 Ok(paras.into_iter().map(Paragraph::Odt).collect())
             },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = (|| {
+                    let paras = doc.paragraphs()?;
+                    let mut projected = Vec::new();
+                    projected.try_reserve_exact(paras.len()).map_err(|source| {
+                        Error::Allocation {
+                            resource: "unified source-backed ODT paragraphs",
+                            source,
+                        }
+                    })?;
+                    for paragraph in paras {
+                        projected.push(Paragraph::Odt(paragraph));
+                    }
+                    Ok(projected)
+                })();
+                Self::finish_source_odt_result(doc, result)
+            },
         }
     }
 
@@ -1038,6 +1250,24 @@ impl Document {
                     .into_iter()
                     .map(|table| Table::Odt(Box::new(table)))
                     .collect())
+            },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = (|| {
+                    let tables = doc.tables()?;
+                    let mut projected = Vec::new();
+                    projected
+                        .try_reserve_exact(tables.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "unified source-backed ODT tables",
+                            source,
+                        })?;
+                    for table in tables {
+                        projected.push(Table::Odt(Box::new(table)));
+                    }
+                    Ok(projected)
+                })();
+                Self::finish_source_odt_result(doc, result)
             },
         }
     }
@@ -1258,6 +1488,49 @@ impl Document {
 
                 Ok(elements)
             },
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = (|| {
+                    use super::DocumentElement;
+                    use litchi_odt::elements::parser::OrderElement;
+
+                    let odf_elements = doc.elements()?;
+                    let mut elements = Vec::new();
+                    elements
+                        .try_reserve_exact(odf_elements.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "unified source-backed ODT document elements",
+                            source,
+                        })?;
+                    for element in odf_elements {
+                        match element {
+                            OrderElement::Paragraph(para) => {
+                                elements.push(DocumentElement::Paragraph(Box::new(
+                                    Paragraph::Odt(para),
+                                )));
+                            },
+                            OrderElement::NumberedParagraph(para) => {
+                                elements.push(DocumentElement::Paragraph(Box::new(
+                                    Paragraph::Odt(para.into_paragraph()),
+                                )));
+                            },
+                            OrderElement::Heading(heading) => {
+                                elements.push(DocumentElement::Paragraph(Box::new(
+                                    Paragraph::Odt(heading.try_into_paragraph()?),
+                                )));
+                            },
+                            OrderElement::Table(table) => {
+                                elements.push(DocumentElement::Table(Box::new(Table::Odt(
+                                    Box::new(table),
+                                ))));
+                            },
+                            OrderElement::List(_) => {},
+                        }
+                    }
+                    Ok(elements)
+                })();
+                Self::finish_source_odt_result(doc, result)
+            },
         }
     }
 
@@ -1300,17 +1573,25 @@ impl Document {
             DocumentImpl::Odt(doc) => doc
                 .metadata()
                 .map_err(|e| Error::ParseError(format!("Failed to get metadata: {}", e))),
+            #[cfg(all(feature = "odt", any(unix, windows)))]
+            DocumentImpl::OdtSource(doc) => {
+                let result = doc.metadata();
+                Self::finish_source_odt_result(doc, result)
+            },
         }
     }
 }
 
-#[cfg(all(test, any(feature = "doc", feature = "docx", feature = "rtf")))]
+#[cfg(all(
+    test,
+    any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt")
+))]
 mod tests {
     use super::*;
-    #[cfg(feature = "docx")]
+    #[cfg(any(feature = "docx", feature = "odt"))]
     use crate::document::DocumentElement;
-    #[cfg(feature = "docx")]
-    use std::io::{Cursor, Write};
+    #[cfg(any(feature = "docx", feature = "odt"))]
+    use std::io::{Cursor, Read, Write};
     use std::path::PathBuf;
 
     #[cfg(feature = "markdown")]
@@ -1320,7 +1601,7 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data")
     }
 
-    #[cfg(feature = "docx")]
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx"))]
     fn minimal_ooxml(
         main_part: &str,
         content_type: &str,
@@ -1364,7 +1645,65 @@ mod tests {
         )
     }
 
-    #[cfg(all(feature = "docx", any(unix, windows)))]
+    #[cfg(feature = "odt")]
+    fn minimal_odt() -> Vec<u8> {
+        let mut builder = litchi_odt::Builder::new();
+        builder
+            .add_paragraph("Source-backed ODT")
+            .expect("add ODT paragraph");
+        builder.build().expect("build ODT")
+    }
+
+    #[cfg(feature = "odt")]
+    fn malformed_odt() -> Vec<u8> {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("mimetype", options).unwrap();
+        writer
+            .write_all(litchi_odf_common::constants::ODF_TEXT.as_bytes())
+            .unwrap();
+        writer.start_file("META-INF/manifest.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.text"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#,
+            )
+            .unwrap();
+        writer.start_file("content.xml", options).unwrap();
+        writer.write_all(b"<office:document-content>").unwrap();
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[cfg(feature = "odt")]
+    fn add_odt_member(bytes: &[u8], path: &str, payload: &[u8]) -> Vec<u8> {
+        let mut archive = zip::ZipArchive::new(Cursor::new(bytes.to_vec())).unwrap();
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).unwrap();
+            let name = entry.name().to_owned();
+            let mut data = Vec::new();
+            entry.read_to_end(&mut data).unwrap();
+            writer.start_file(name, options).unwrap();
+            writer.write_all(&data).unwrap();
+        }
+        writer.start_file(path, options).unwrap();
+        writer.write_all(payload).unwrap();
+        writer.finish().unwrap().into_inner()
+    }
+
+    #[cfg(any(feature = "ods", feature = "odp"))]
+    fn minimal_odf_family(mimetype: &str, body: &[u8]) -> Vec<u8> {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer.set_mimetype(mimetype).unwrap();
+        writer
+            .add_file(litchi_odf_common::constants::ODF_CONTENT, body)
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    #[cfg(all(any(feature = "docx", feature = "odt"), any(unix, windows)))]
     fn assert_source_changed(error: Error, expected: litchi_core::SourceVersion) {
         match error {
             Error::SourceChanged {
@@ -1378,7 +1717,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "docx")]
+    #[cfg(any(feature = "docx", feature = "odt"))]
     fn table_text(table: &Table) -> String {
         let mut text = String::new();
         for row in table.rows().expect("table rows") {
@@ -1730,6 +2069,287 @@ mod tests {
         let document = Document::open(temporary.path()).expect("OOXML precedence");
         assert!(matches!(&document.inner, DocumentImpl::DocxSource(_, _)));
         assert_eq!(document.text().unwrap(), "OOXML wins");
+    }
+
+    #[test]
+    #[cfg(all(
+        feature = "odt",
+        feature = "pptx",
+        not(feature = "docx"),
+        any(unix, windows)
+    ))]
+    fn filesystem_other_ooxml_wins_without_docx_feature() {
+        let bytes = minimal_ooxml(
+            "ppt/presentation.xml",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+            br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+            Some("application/vnd.oasis.opendocument.text"),
+        );
+        let temporary = tempfile::Builder::new()
+            .suffix(".odt")
+            .tempfile()
+            .expect("temporary OOXML/ODF polyglot path");
+        std::fs::write(temporary.path(), bytes).expect("write OOXML/ODF polyglot");
+
+        let error = match Document::open(temporary.path()) {
+            Ok(_) => panic!("presentation OOXML must not be claimed as ODT"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, Error::InvalidFormat(_)));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_does_not_hide_malformed_ooxml_catalog() {
+        let bytes = add_odt_member(&minimal_odt(), "[Content_Types].xml", b"<Types><broken>");
+        let temporary = tempfile::Builder::new()
+            .suffix(".odt")
+            .tempfile()
+            .expect("temporary malformed polyglot path");
+        std::fs::write(temporary.path(), bytes).expect("write malformed OOXML/ODF package");
+
+        assert!(Document::open(temporary.path()).is_err());
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_source_matches_eager_projection() {
+        let path = test_data_path().join("odf/odt/table-cell-column-span.odt");
+        let bytes = std::fs::read(&path).expect("read ODT fixture");
+        let source = Document::open(&path).expect("open source-backed ODT");
+        let eager = Document::from_bytes(bytes).expect("open eager ODT");
+
+        assert!(matches!(&source.inner, DocumentImpl::OdtSource(_)));
+        assert!(matches!(&eager.inner, DocumentImpl::Odt(_)));
+        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+        assert_eq!(
+            source.paragraph_count().unwrap(),
+            eager.paragraph_count().unwrap()
+        );
+
+        let source_paragraphs = source
+            .paragraphs()
+            .unwrap()
+            .into_iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect::<Vec<_>>();
+        let eager_paragraphs = eager
+            .paragraphs()
+            .unwrap()
+            .into_iter()
+            .map(|paragraph| paragraph.text().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(source_paragraphs, eager_paragraphs);
+
+        let source_tables = source
+            .tables()
+            .unwrap()
+            .into_iter()
+            .map(|table| table_text(&table))
+            .collect::<Vec<_>>();
+        let eager_tables = eager
+            .tables()
+            .unwrap()
+            .into_iter()
+            .map(|table| table_text(&table))
+            .collect::<Vec<_>>();
+        assert_eq!(source_tables, eager_tables);
+
+        let source_elements = source
+            .elements()
+            .unwrap()
+            .into_iter()
+            .map(|element| match element {
+                DocumentElement::Paragraph(paragraph) => {
+                    format!("p:{}", paragraph.text().unwrap())
+                },
+                DocumentElement::Table(table) => format!("t:{}", table_text(&table)),
+            })
+            .collect::<Vec<_>>();
+        let eager_elements = eager
+            .elements()
+            .unwrap()
+            .into_iter()
+            .map(|element| match element {
+                DocumentElement::Paragraph(paragraph) => {
+                    format!("p:{}", paragraph.text().unwrap())
+                },
+                DocumentElement::Table(table) => format!("t:{}", table_text(&table)),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(source_elements, eager_elements);
+
+        let source_metadata = source.metadata().unwrap();
+        let eager_metadata = eager.metadata().unwrap();
+        assert_eq!(source_metadata.has_data(), eager_metadata.has_data());
+        assert_eq!(source_metadata.title, eager_metadata.title);
+        assert_eq!(source_metadata.author, eager_metadata.author);
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_keeps_unselected_media_cold() {
+        let bytes = add_odt_member(&minimal_odt(), "Pictures/deferred.bin", b"not read yet");
+        let temporary = tempfile::NamedTempFile::new().expect("temporary ODT path");
+        std::fs::write(temporary.path(), bytes).expect("write ODT with media");
+        let document = Document::open(temporary.path()).expect("open source-backed ODT");
+
+        let media = match &document.inner {
+            DocumentImpl::OdtSource(source) => source.media_files().expect("list ODT media"),
+            _ => unreachable!("filesystem ODT must retain source owner"),
+        };
+        assert!(media.iter().any(|path| path == "Pictures/deferred.bin"));
+        assert_eq!(document.text().unwrap(), "Source-backed ODT");
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_ignores_suffix_and_accepts_extensionless_paths() {
+        let bytes = minimal_odt();
+        for temporary in [
+            tempfile::NamedTempFile::new().expect("extensionless ODT path"),
+            tempfile::Builder::new()
+                .suffix(".wrong")
+                .tempfile()
+                .expect("wrong-suffix ODT path"),
+        ] {
+            std::fs::write(temporary.path(), &bytes).expect("write ODT package");
+            let document = Document::open(temporary.path()).expect("open ODT by package MIME");
+            assert!(matches!(&document.inner, DocumentImpl::OdtSource(_)));
+            assert_eq!(document.text().unwrap(), "Source-backed ODT");
+        }
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_does_not_use_docx_limits() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".odt")
+            .tempfile()
+            .expect("temporary ODT path");
+        std::fs::write(temporary.path(), minimal_odt()).expect("write ODT package");
+        let limits = crate::docx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive DOCX input limit")
+            .build()
+            .expect("valid DOCX limits");
+
+        let document = Document::open_with_limits(temporary.path(), limits)
+            .expect("ODT opening must use the ODT source policy");
+        assert!(matches!(&document.inner, DocumentImpl::OdtSource(_)));
+        assert_eq!(document.text().unwrap(), "Source-backed ODT");
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_refuses_malformed_content_with_typed_error() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".odt")
+            .tempfile()
+            .expect("temporary malformed ODT path");
+        let bytes = malformed_odt();
+        std::fs::write(temporary.path(), &bytes).expect("write malformed ODT");
+
+        let error = match Document::open(temporary.path()) {
+            Ok(_) => panic!("malformed ODT must be refused"),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                error,
+                Error::InvalidFormat(_) | Error::XmlError(_) | Error::ParseError(_)
+            ),
+            "unexpected malformed ODT error: {error:?}"
+        );
+        assert!(Document::from_bytes(bytes).is_err());
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", any(unix, windows)))]
+    fn filesystem_odt_reports_source_mutation_on_deferred_queries() {
+        let temporary = tempfile::NamedTempFile::new().expect("temporary source-backed ODT path");
+        std::fs::write(temporary.path(), minimal_odt()).expect("write source-backed ODT");
+        let document = Document::open(temporary.path()).expect("open source-backed ODT");
+        let expected = match &document.inner {
+            DocumentImpl::OdtSource(source) => source.source_version().expect("capture version"),
+            _ => unreachable!("filesystem ODT must retain source owner"),
+        };
+
+        document.text().expect("initial source query");
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen ODT source");
+        file.write_all(b"source mutation")
+            .expect("mutate ODT source");
+
+        assert_source_changed(
+            document.text().expect_err("text must reject stale source"),
+            expected,
+        );
+        assert_source_changed(
+            document
+                .metadata()
+                .expect_err("metadata must reject stale source"),
+            expected,
+        );
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", feature = "markdown", any(unix, windows)))]
+    fn filesystem_odt_reports_source_mutation_after_markdown() {
+        let temporary = tempfile::NamedTempFile::new().expect("temporary source-backed ODT path");
+        std::fs::write(temporary.path(), minimal_odt()).expect("write source-backed ODT");
+        let document = Document::open(temporary.path()).expect("open source-backed ODT");
+        let expected = match &document.inner {
+            DocumentImpl::OdtSource(source) => source.source_version().expect("capture version"),
+            _ => unreachable!("filesystem ODT must retain source owner"),
+        };
+
+        document
+            .to_markdown()
+            .expect("initial ODT Markdown conversion");
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(temporary.path())
+            .expect("reopen ODT source");
+        file.write_all(b"source mutation")
+            .expect("mutate ODT source");
+
+        assert_source_changed(
+            document
+                .to_markdown()
+                .expect_err("Markdown must reject stale ODT source"),
+            expected,
+        );
+    }
+
+    #[test]
+    #[cfg(all(
+        feature = "odt",
+        any(feature = "ods", feature = "odp"),
+        any(unix, windows)
+    ))]
+    fn filesystem_odt_probe_does_not_claim_other_odf_families() {
+        #[cfg(feature = "ods")]
+        let (mimetype, body) = (
+            litchi_odf_common::constants::ODF_SPREADSHEET,
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:spreadsheet/></office:body></office:document-content>"#.as_slice(),
+        );
+        #[cfg(all(not(feature = "ods"), feature = "odp"))]
+        let (mimetype, body) = (
+            litchi_odf_common::constants::ODF_PRESENTATION,
+            br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#.as_slice(),
+        );
+        let temporary = tempfile::NamedTempFile::new().expect("temporary other ODF path");
+        std::fs::write(temporary.path(), minimal_odf_family(mimetype, body))
+            .expect("write other ODF package");
+
+        let error = match Document::open(temporary.path()) {
+            Ok(_) => panic!("other ODF must not be ODT"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, Error::InvalidFormat(_)));
     }
 
     #[test]

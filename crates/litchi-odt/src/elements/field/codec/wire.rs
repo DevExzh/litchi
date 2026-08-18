@@ -20,7 +20,46 @@ use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+
+fn try_push<T>(items: &mut Vec<T>, value: T, resource: &'static str) -> Result<()> {
+    items
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    items.push(value);
+    Ok(())
+}
+
+fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
+
+fn try_clone_meta_attributes(attributes: &[MetaFieldAttribute]) -> Result<Vec<MetaFieldAttribute>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(attributes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT note-body attribute projection",
+            source,
+        })?;
+    for attribute in attributes {
+        output.push(MetaFieldAttribute {
+            namespace_uri: try_copy_string(
+                &attribute.namespace_uri,
+                "ODT note-body attribute namespace",
+            )?,
+            local_name: try_copy_string(&attribute.local_name, "ODT note-body attribute name")?,
+            value: try_copy_string(&attribute.value, "ODT note-body attribute value")?,
+        });
+    }
+    Ok(output)
+}
 
 struct ActiveDatabaseField {
     depth: usize,
@@ -97,11 +136,20 @@ impl MetaContentBuilder {
         }
         add_meta_size(&mut self.aggregate, value.len())?;
         if let Some(MetaFieldNode::Text(text)) = self.current_nodes_mut().last_mut() {
+            text.try_reserve(value.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT note-body text projection",
+                    source,
+                })?;
             text.push_str(value);
         } else {
             self.add_node()?;
-            self.current_nodes_mut()
-                .push(MetaFieldNode::Text(value.to_string()));
+            let text = try_copy_string(value, "ODT note-body text projection")?;
+            try_push(
+                self.current_nodes_mut(),
+                MetaFieldNode::Text(text),
+                "ODT note-body node projection",
+            )?;
         }
         Ok(())
     }
@@ -132,12 +180,16 @@ impl MetaContentBuilder {
             )));
         }
         self.add_node()?;
-        self.stack.push(MetaFieldElement {
-            namespace_uri,
-            local_name,
-            attributes,
-            children: Vec::new(),
-        });
+        try_push(
+            &mut self.stack,
+            MetaFieldElement {
+                namespace_uri,
+                local_name,
+                attributes,
+                children: Vec::new(),
+            },
+            "ODT note-body element stack",
+        )?;
         Ok(())
     }
 
@@ -155,8 +207,11 @@ impl MetaContentBuilder {
         let element = self.stack.pop().ok_or_else(|| {
             Error::InvalidFormat("text:meta-field content stack underflow".to_string())
         })?;
-        self.current_nodes_mut()
-            .push(MetaFieldNode::Element(element));
+        try_push(
+            self.current_nodes_mut(),
+            MetaFieldNode::Element(element),
+            "ODT note-body node projection",
+        )?;
         Ok(())
     }
 
@@ -229,13 +284,16 @@ pub(in crate::elements::field) fn parse_meta_fields(xml: &str) -> Result<Vec<Dyn
                     let attributes = parse_meta_node_attributes(&reader, source)?;
                     for field in &mut active {
                         field.builder.start_element(
-                            namespace_uri.clone().ok_or_else(|| {
-                                Error::InvalidFormat(
-                                    "unqualified meta-field child element".to_string(),
-                                )
-                            })?,
-                            local.clone(),
-                            attributes.clone(),
+                            try_copy_string(
+                                namespace_uri.as_deref().ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "unqualified meta-field child element".to_string(),
+                                    )
+                                })?,
+                                "ODT meta-field child namespace",
+                            )?,
+                            try_copy_string(&local, "ODT meta-field child name")?,
+                            try_clone_meta_attributes(&attributes)?,
                         )?;
                     }
                 }
@@ -252,16 +310,24 @@ pub(in crate::elements::field) fn parse_meta_fields(xml: &str) -> Result<Vec<Dyn
                             "too many text:meta-field elements".to_string(),
                         ));
                     }
-                    active.push(ActiveMetaField {
-                        depth,
-                        order: next_order,
-                        xml_id,
-                        data_style_name,
-                        builder: MetaContentBuilder::default(),
-                    });
+                    try_push(
+                        &mut active,
+                        ActiveMetaField {
+                            depth,
+                            order: next_order,
+                            xml_id,
+                            data_style_name,
+                            builder: MetaContentBuilder::default(),
+                        },
+                        "ODT active meta-field projection",
+                    )?;
                     next_order += 1;
                 }
-                stack.push((namespace_uri, local));
+                try_push(
+                    &mut stack,
+                    (namespace_uri, local),
+                    "ODT meta-field XML stack",
+                )?;
             },
             Event::Empty(ref source) => {
                 let namespace_uri = resolved_namespace(&namespace)?;
@@ -271,13 +337,16 @@ pub(in crate::elements::field) fn parse_meta_fields(xml: &str) -> Result<Vec<Dyn
                     let attributes = parse_meta_node_attributes(&reader, source)?;
                     for field in &mut active {
                         field.builder.empty_element(
-                            namespace_uri.clone().ok_or_else(|| {
-                                Error::InvalidFormat(
-                                    "unqualified meta-field child element".to_string(),
-                                )
-                            })?,
-                            local.clone(),
-                            attributes.clone(),
+                            try_copy_string(
+                                namespace_uri.as_deref().ok_or_else(|| {
+                                    Error::InvalidFormat(
+                                        "unqualified meta-field child element".to_string(),
+                                    )
+                                })?,
+                                "ODT meta-field child namespace",
+                            )?,
+                            try_copy_string(&local, "ODT meta-field child name")?,
+                            try_clone_meta_attributes(&attributes)?,
                         )?;
                     }
                 }
@@ -286,14 +355,18 @@ pub(in crate::elements::field) fn parse_meta_fields(xml: &str) -> Result<Vec<Dyn
                 {
                     validate_meta_field_parent(stack.last())?;
                     let (xml_id, data_style_name) = parse_meta_root_attributes(&reader, source)?;
-                    completed.push((
-                        next_order,
-                        DynamicTextField::MetaField {
-                            xml_id,
-                            data_style_name,
-                            content: MetaFieldContent::new(Vec::new())?,
-                        },
-                    ));
+                    try_push(
+                        &mut completed,
+                        (
+                            next_order,
+                            DynamicTextField::MetaField {
+                                xml_id,
+                                data_style_name,
+                                content: MetaFieldContent::new(Vec::new())?,
+                            },
+                        ),
+                        "ODT completed meta-field projection",
+                    )?;
                     next_order += 1;
                 }
             },
@@ -330,14 +403,18 @@ pub(in crate::elements::field) fn parse_meta_fields(xml: &str) -> Result<Vec<Dyn
                     }
                 }
                 if let Some(field) = active.pop_if(|field| field.depth == depth) {
-                    completed.push((
-                        field.order,
-                        DynamicTextField::MetaField {
-                            xml_id: field.xml_id,
-                            data_style_name: field.data_style_name,
-                            content: field.builder.finish_meta_field()?,
-                        },
-                    ));
+                    try_push(
+                        &mut completed,
+                        (
+                            field.order,
+                            DynamicTextField::MetaField {
+                                xml_id: field.xml_id,
+                                data_style_name: field.data_style_name,
+                                content: field.builder.finish_meta_field()?,
+                            },
+                        ),
+                        "ODT completed meta-field projection",
+                    )?;
                 }
                 stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("meta-field XML stack underflow".to_string())
@@ -367,7 +444,17 @@ pub(in crate::elements::field) fn parse_meta_fields(xml: &str) -> Result<Vec<Dyn
         ));
     }
     completed.sort_by_key(|(order, _)| *order);
-    Ok(completed.into_iter().map(|(_, field)| field).collect())
+    let mut fields = Vec::new();
+    fields
+        .try_reserve_exact(completed.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT sorted meta-field projection",
+            source,
+        })?;
+    for (_, field) in completed {
+        fields.push(field);
+    }
+    Ok(fields)
 }
 
 /// Parse every direct `text:note-body` child of an ODF `text:note` into the
@@ -407,14 +494,14 @@ pub(in crate::elements::field) fn parse_note_body_contents(
                 }
                 if !active.is_empty() {
                     let attributes = parse_meta_node_attributes(&reader, source)?;
-                    let namespace_uri = namespace_uri.clone().ok_or_else(|| {
+                    let namespace_uri = namespace_uri.as_deref().ok_or_else(|| {
                         Error::InvalidFormat("unqualified note-body child element".to_string())
                     })?;
                     for body in &mut active {
                         body.builder.start_element(
-                            namespace_uri.clone(),
-                            local.clone(),
-                            attributes.clone(),
+                            try_copy_string(namespace_uri, "ODT note-body element namespace")?,
+                            try_copy_string(&local, "ODT note-body element name")?,
+                            try_clone_meta_attributes(&attributes)?,
                         )?;
                     }
                 }
@@ -432,14 +519,22 @@ pub(in crate::elements::field) fn parse_note_body_contents(
                             "document exceeds note-body limit".to_string(),
                         ));
                     }
-                    active.push(ActiveNoteBody {
-                        depth,
-                        order: next_order,
-                        builder: MetaContentBuilder::note_body(),
-                    });
+                    try_push(
+                        &mut active,
+                        ActiveNoteBody {
+                            depth,
+                            order: next_order,
+                            builder: MetaContentBuilder::note_body(),
+                        },
+                        "ODT active note-body projection",
+                    )?;
                     next_order += 1;
                 }
-                stack.push((namespace_uri, local));
+                try_push(
+                    &mut stack,
+                    (namespace_uri, local),
+                    "ODT note-body XML stack",
+                )?;
             },
             Event::Empty(ref source) => {
                 let namespace_uri = resolved_namespace(&namespace)?;
@@ -457,14 +552,14 @@ pub(in crate::elements::field) fn parse_note_body_contents(
                 }
                 if !active.is_empty() {
                     let attributes = parse_meta_node_attributes(&reader, source)?;
-                    let namespace_uri = namespace_uri.clone().ok_or_else(|| {
+                    let namespace_uri = namespace_uri.as_deref().ok_or_else(|| {
                         Error::InvalidFormat("unqualified note-body child element".to_string())
                     })?;
                     for body in &mut active {
                         body.builder.empty_element(
-                            namespace_uri.clone(),
-                            local.clone(),
-                            attributes.clone(),
+                            try_copy_string(namespace_uri, "ODT note-body element namespace")?,
+                            try_copy_string(&local, "ODT note-body element name")?,
+                            try_clone_meta_attributes(&attributes)?,
                         )?;
                     }
                 }
@@ -474,7 +569,11 @@ pub(in crate::elements::field) fn parse_note_body_contents(
                             "document exceeds note-body limit".to_string(),
                         ));
                     }
-                    completed.push((next_order, NoteBodyContent::new(Vec::new())?));
+                    try_push(
+                        &mut completed,
+                        (next_order, NoteBodyContent::new(Vec::new())?),
+                        "ODT completed note-body projection",
+                    )?;
                     next_order += 1;
                 }
             },
@@ -511,7 +610,11 @@ pub(in crate::elements::field) fn parse_note_body_contents(
                     }
                 }
                 if let Some(body) = active.pop_if(|body| body.depth == depth) {
-                    completed.push((body.order, body.builder.finish_note_body()?));
+                    try_push(
+                        &mut completed,
+                        (body.order, body.builder.finish_note_body()?),
+                        "ODT completed note-body projection",
+                    )?;
                 }
                 stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("note-body XML stack underflow".to_string())
@@ -539,7 +642,17 @@ pub(in crate::elements::field) fn parse_note_body_contents(
         return Err(Error::InvalidFormat("incomplete note-body XML".to_string()));
     }
     completed.sort_by_key(|(order, _)| *order);
-    Ok(completed.into_iter().map(|(_, body)| body).collect())
+    let mut bodies = Vec::new();
+    bodies
+        .try_reserve_exact(completed.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODT sorted note-body projection",
+            source,
+        })?;
+    for (_, body) in completed {
+        bodies.push(body);
+    }
+    Ok(bodies)
 }
 
 fn collect_document_xml_id(
@@ -561,14 +674,22 @@ fn collect_document_xml_id(
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-            .map_err(|error| Error::InvalidFormat(format!("invalid xml:id value: {error}")))?
-            .into_owned();
+            .map_err(|error| Error::InvalidFormat(format!("invalid xml:id value: {error}")))?;
         validate_xml_id(&value)?;
-        if !ids.insert(value.clone()) {
+        if ids.contains(value.as_ref()) {
             return Err(Error::InvalidFormat(format!(
                 "duplicate document xml:id '{value}'"
             )));
         }
+        ids.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODT document xml:id index",
+            source,
+        })?;
+        let value = match value {
+            Cow::Owned(value) => value,
+            Cow::Borrowed(value) => try_copy_string(value, "ODT document xml:id")?,
+        };
+        ids.insert(value);
     }
     Ok(())
 }
@@ -640,16 +761,20 @@ fn parse_meta_node_attributes(
                 "foreign meta-field attribute namespace '{namespace_uri}'"
             )));
         }
-        attributes.push(MetaFieldAttribute {
-            namespace_uri,
-            local_name: utf8(local.as_ref(), "meta-field attribute name")?,
-            value: attribute
-                .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-                .map_err(|error| {
-                    Error::InvalidFormat(format!("invalid meta-field attribute: {error}"))
-                })?
-                .into_owned(),
-        });
+        let decoded = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid meta-field attribute: {error}"))
+            })?;
+        try_push(
+            &mut attributes,
+            MetaFieldAttribute {
+                namespace_uri,
+                local_name: utf8(local.as_ref(), "meta-field attribute name")?,
+                value: try_copy_string(&decoded, "ODT meta-field attribute value")?,
+            },
+            "ODT meta-field attribute projection",
+        )?;
     }
     Ok(attributes)
 }
@@ -711,7 +836,11 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                     });
                 }
                 depth = checked_field_depth(depth)?;
-                stack.push((namespace_uri, local));
+                try_push(
+                    &mut stack,
+                    (namespace_uri, local),
+                    "ODT database-field XML stack",
+                )?;
             },
             Event::Empty(ref element) => {
                 let local = utf8(element.local_name().as_ref(), "database field element")?;
@@ -739,7 +868,11 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                         )));
                     }
                     let field = parse_database_field(&reader, element, kind, &mut aggregate)?;
-                    fields.push(validate_database_field(field)?);
+                    try_push(
+                        &mut fields,
+                        validate_database_field(field)?,
+                        "ODT database-field projection",
+                    )?;
                 }
             },
             Event::End(_) => {
@@ -757,7 +890,11 @@ pub(in crate::elements::field) fn parse_database_fields(xml: &str) -> Result<Vec
                             Error::InvalidFormat("missing completed database field".to_string())
                         })?
                         .field;
-                    fields.push(validate_database_field(field)?);
+                    try_push(
+                        &mut fields,
+                        validate_database_field(field)?,
+                        "ODT database-field projection",
+                    )?;
                 }
                 stack.pop().ok_or_else(|| {
                     Error::InvalidFormat("database field XML stack underflow".to_string())
@@ -874,7 +1011,11 @@ pub(in crate::elements::field) fn parse_drop_down_fields(
                     active = Some(field);
                 }
                 depth = checked_field_depth(depth)?;
-                stack.push((namespace_uri, local));
+                try_push(
+                    &mut stack,
+                    (namespace_uri, local),
+                    "ODT drop-down field XML stack",
+                )?;
             },
             Event::Empty(ref element) => {
                 let local = utf8(element.local_name().as_ref(), "drop-down field element")?;
@@ -896,9 +1037,8 @@ pub(in crate::elements::field) fn parse_drop_down_fields(
                             "document exceeds {MAX_FIELDS} drop-down fields"
                         )));
                     }
-                    fields.push(finish_drop_down_field(parse_drop_down_field(
-                        &reader, element,
-                    )?)?);
+                    let field = finish_drop_down_field(parse_drop_down_field(&reader, element)?)?;
+                    try_push(&mut fields, field, "ODT drop-down field projection")?;
                 }
             },
             Event::End(_) => {
@@ -909,7 +1049,8 @@ pub(in crate::elements::field) fn parse_drop_down_fields(
                         let field = active.take().ok_or_else(|| {
                             Error::InvalidFormat("missing completed drop-down field".to_string())
                         })?;
-                        fields.push(finish_drop_down_field(field)?);
+                        let field = finish_drop_down_field(field)?;
+                        try_push(&mut fields, field, "ODT drop-down field projection")?;
                     }
                 }
                 stack.pop().ok_or_else(|| {
@@ -1035,11 +1176,8 @@ fn push_drop_down_label(
             "text:drop-down exceeds {MAX_DROP_DOWN_LABELS} labels"
         )));
     }
-    field.labels.push(parse_drop_down_label(
-        reader,
-        element,
-        &mut field.aggregate,
-    )?);
+    let label = parse_drop_down_label(reader, element, &mut field.aggregate)?;
+    try_push(&mut field.labels, label, "ODT drop-down label projection")?;
     Ok(())
 }
 
@@ -1364,9 +1502,9 @@ fn resolved_namespace(namespace: &quick_xml::name::ResolveResult<'_>) -> Result<
 }
 
 fn utf8(value: &[u8], description: &str) -> Result<String> {
-    std::str::from_utf8(value)
-        .map(str::to_string)
-        .map_err(|_error| Error::InvalidFormat(format!("invalid UTF-8 {description}")))
+    let value = std::str::from_utf8(value)
+        .map_err(|_error| Error::InvalidFormat(format!("invalid UTF-8 {description}")))?;
+    try_copy_string(value, "ODT field wire string")
 }
 
 fn resolve_database_reference(name: &str) -> Result<String> {
