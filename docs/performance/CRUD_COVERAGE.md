@@ -1833,6 +1833,29 @@ lower; all guardrails clean or within-floor, and the 0220 watch-listed
 cleared. See
 [`0221`](changes/0221-odt-openparse-borrowing-reads.md).
 
+Change 0222 adds no selector or CRUD closure and leaves the matrix
+unchanged. It promotes the fused `OpenParse` to the owned ODT open path
+(`from_owned_package`): one borrowing, depth-gated pass replaces the
+standalone validator scan plus the content-styles rescan, with
+stage-by-stage error precedence preserved byte-exactly (pinned by
+cross-stage parity tests against the cfg(test) sequential oracle).
+Provisionally withheld under the pre-floor rule (lifecycle p50 adverse
+reproduced at max 1.76%), re-verdicted **banked** under the 0223 floors:
+`odt_semantic_open` p50/mean/p95 6.33%-6.45% / 10.02%-11.55% /
+31.02%-33.20% lower and `odt_file_eager_open` p50/mean/p95/p99
+12.05%-17.05% / 12.29%-16.82% / 11.46%-18.86% / 13.40%-17.27% lower. See
+[`0222`](changes/0222-odt-owned-open-fused-parse.md).
+
+Change 0223 is a measurement-methodology calibration (no code change, no
+selector or CRUD closure; matrix unchanged) — the 0218 analog extended to
+the ODT source-path and eager-open phases. Probe binaries carrying
+never-executed parser-shaped padding (.text +6.1KB to +14.6KB) measured
+pure layout noise; effective floors: file-source-open p95 2.5% / p99
+28.0%, file-source-lifecycle 3.8%/2.5%/4.0%/6.5% (p50/mean/p95/p99),
+file-eager-open 5.6%/5.7%/9.3%/9.2%. The 0205 banking rule extends to
+these phases unchanged. See
+[`0223`](changes/0223-odt-source-path-floor-calibration.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

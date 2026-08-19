@@ -3,6 +3,34 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0223`](changes/0223-odt-source-path-floor-calibration.md)
+(0223 is a methodology calibration, not a code change — the 0218 analog
+extended to the ODT source-path and eager-open phases 0218 did not cover.
+Three probe binaries (banked 0221 tree plus never-executed parser-shaped
+padding of +6.1KB/+12.1KB/+14.6KB text in `litchi-odt::document` and
+`elements`, retained via `#[used]`, .text deltas bracketing 0222's
+−10,016) measured pure layout noise under the full A1/B1/B2/A2 protocol.
+Effective floors, folding in the 0222 historical adverse-both readings:
+file-source-open p95 2.5%, p99 28.0% (p50/mean uncalibrated — no
+adverse-both evidence); file-source-lifecycle p50/mean/p95/p99
+3.8%/2.5%/4.0%/6.5%; file-eager-open 5.6%/5.7%/9.3%/9.2% (eager is the
+most layout-sensitive ODT open phase — probe a was adverse-both on all
+four statistics with zero changed code). Under this rule 0222 was
+re-verdicted **banked** — see below.)
+[`change 0222`](changes/0222-odt-owned-open-fused-parse.md)
+(0222 promotes the fused `OpenParse` to the owned ODT open path
+(`from_owned_package`): one borrowing, depth-gated pass replaces the
+standalone validator scan + `StyleElements::parse_styles(content.xml)`
+rescan, with stage-by-stage error precedence preserved and pinned by 2
+new cross-stage parity tests against the cfg(test) sequential oracle
+(895 litchi-odt tests). Provisionally withheld under the pre-floor rule
+(lifecycle p50 reproduced at max 1.76%), re-verdicted **banked** under
+the 0223 floors. Claims: `odt_semantic_open` p50/mean/p95
+**6.33%-6.45% / 10.02%-11.55% / 31.02%-33.20%** lower (0218 floors) and
+`odt_file_eager_open` ALL FOUR statistics **12.05%-17.05% /
+12.29%-16.82% / 11.46%-18.86% / 13.40%-17.27%** lower (0223 floors).
+Re-applied bit-exact — rebuilt harness matches the measured candidate
+`f53a43f1…`, the control for the next change.)
 [`change 0221`](changes/0221-odt-openparse-borrowing-reads.md)
 (0221 replays the banked 0220 transformation on the fused source-backed
 ODT open (`OpenParse::run`, litchi-odt): borrowing `read_event()` +

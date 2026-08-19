@@ -11,6 +11,40 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ODT source-path layout noise floor calibration (change 0223)
+
+[Change 0223](changes/0223-odt-source-path-floor-calibration.md) is a
+measurement-methodology calibration, not a code change — the 0218 analog
+for the ODT source-path and eager-open phases. Change 0222 was
+provisionally withheld under the pre-floor rule after the byte-identical
+`odt_file_source_open_full_text_lifecycle` p50 adverse-both reading
+reproduced in its rerun (max 1.76%/1.24%). Three probe binaries (banked
+0221 tree + never-executed parser-shaped padding, .text +6.1KB to +14.6KB
+bracketing 0222's −10,016) measured pure layout noise under the full
+protocol. Effective floors (folding in the 0222 historical readings):
+file-source-open p95 2.5% / p99 28.0% (p50/mean uncalibrated),
+file-source-lifecycle 3.8%/2.5%/4.0%/6.5% (p50/mean/p95/p99),
+file-eager-open 5.6%/5.7%/9.3%/9.2%. Probe a alone reproduces adverse-both
+p50 at 1.70% on the lifecycle phase with zero changed code — the 0222
+blocker magnitude is pure layout noise. Raw artifacts:
+`results/*-0223{a,b,c}-*`.
+
+## ODT owned open promoted to the fused parse — banked (change 0222, re-verdicted under 0223)
+
+[Change 0222](changes/0222-odt-owned-open-fused-parse.md) replaces the
+owned ODT open path's two full `content.xml` scans (standalone validator
++ content-styles rescan) with one fused `OpenParse` pass (the 0221
+borrowing, depth-gated loop), preserving stage-by-stage error precedence
+byte-exactly (pinned by new cross-stage precedence parity tests against
+the cfg(test) sequential oracle; 895 litchi-odt tests). **Banked** after
+the 0223 calibration: `odt_semantic_open` p50/mean/p95
+**6.33%-6.45% / 10.02%-11.55% / 31.02%-33.20%** lower (all over the 0218
+floors) and `odt_file_eager_open` ALL FOUR statistics
+**12.05%-17.05% / 12.29%-16.82% / 11.46%-18.86% / 13.40%-17.27%** lower
+(all over the new 0223 eager floors). All byte-identical guardrails clean
+or within-floor. Raw artifacts: `results/*-0222-*` and
+`results/*-0222r-*`.
+
 ## ODT fused open-parse borrowing reads — banked (change 0221)
 
 [Change 0221](changes/0221-odt-openparse-borrowing-reads.md) replays the
