@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0217-odt-discard-validate-text",
+  "decision": "banked",
+  "claim_scope": "p50/mean/p95/p99 42.12%-52.07% lower, both directions, clean drifts",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "6c7fcfb9572f79bbfc2a9dd06289f733e370b34f96662980c5d59b7e972471eb",
+      "candidate_sha256": "8425066ab6b43f08486c5a808d16e31bf6e758f3ff1205096c1a5e21af4a2a5d",
+      "note": "control is the banked 0215 binary; candidate adds the 0216 discard-but-validate text extraction in litchi-odt"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, 0207, 0209-0212, and 0215 (both binaries); the candidate additionally carries the 0216 discard-but-validate text extraction in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-semantic-tiny",
+    "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+    "archive_bytes": 2148,
+    "archive_member_count": 5
+  },
+  "selector": "odt_semantic_full_text",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 11947.0,
+          "mean": 12478.83,
+          "p95": 16994.0,
+          "p99": 21210.0
+        },
+        "b1": {
+          "p50": 6593.5,
+          "mean": 6920.888,
+          "p95": 9553.0,
+          "p99": 10165.0
+        },
+        "b2": {
+          "p50": 6559.0,
+          "mean": 6809.04,
+          "p95": 9413.0,
+          "p99": 10274.0
+        },
+        "a2": {
+          "p50": 11776.0,
+          "mean": 12409.122,
+          "p95": 16262.0,
+          "p99": 20549.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 44.810413,
+          "mean": 44.538967,
+          "p95": 43.786042,
+          "p99": 52.074493
+        },
+        "a2_to_b2": {
+          "p50": 44.30197,
+          "mean": 45.128753,
+          "p95": 42.116591,
+          "p99": 50.002433
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.431322,
+          "mean": -0.55861,
+          "p95": -4.307403,
+          "p99": -3.116455
+        },
+        "candidate": {
+          "p50": -0.523243,
+          "mean": -1.616093,
+          "p95": -1.465508,
+          "p99": 1.072307
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

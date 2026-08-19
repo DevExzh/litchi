@@ -91,6 +91,7 @@ impl Paragraph {
         self.element.try_get_text_recursive()
     }
 
+    #[cfg(test)]
     pub(crate) fn into_text(self) -> String {
         self.element.into_text_recursive()
     }
@@ -607,6 +608,7 @@ impl Heading {
         self.element.try_get_text_recursive()
     }
 
+    #[cfg(test)]
     pub(crate) fn into_text(self) -> String {
         self.element.into_text_recursive()
     }
@@ -930,6 +932,16 @@ struct ActiveTextBlock {
     slot: usize,
 }
 
+/// Text-only counterpart of [`ActiveTextBlock`] for the discard-but-validate
+/// extraction path: identical depth/slot bookkeeping, no retained `Element`.
+struct ActiveTextBlockText {
+    depth: usize,
+    text: String,
+    /// Index of the reserved output slot, so completed blocks keep the order in
+    /// which they *started* rather than the order in which they closed.
+    slot: usize,
+}
+
 struct ActiveSelectedTextBlock {
     element: Option<Element>,
     depth: usize,
@@ -1032,6 +1044,9 @@ pub(crate) fn parse_text_blocks(xml_content: &str) -> Result<Vec<TextBlock>> {
     parse_text_blocks_with_ownership(xml_content, false)
 }
 
+/// Retained-element owned variant, now used only as the test oracle for the
+/// discard-but-validate extraction path ([`parse_text_block_texts`]).
+#[cfg(test)]
 pub(crate) fn parse_text_blocks_owned(xml_content: &str) -> Result<Vec<TextBlock>> {
     parse_text_blocks_with_ownership(xml_content, true)
 }
@@ -1190,6 +1205,193 @@ fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result
                             &mut blocks,
                             &mut total_text_bytes,
                             own_text,
+                        )?;
+                    }
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+
+    if !active.is_empty() || tracked_changes_depth != 0 || skipped_depth != 0 || document_depth != 0
+    {
+        return Err(Error::InvalidFormat(
+            "incomplete ODF text XML structure".to_string(),
+        ));
+    }
+    let completed = blocks.iter().filter(|block| block.is_some()).count();
+    let mut output = Vec::new();
+    output
+        .try_reserve(completed)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT completed text-block projection",
+            source,
+        })?;
+    output.extend(blocks.into_iter().flatten());
+    Ok(output)
+}
+
+/// Parse every `text:p` and `text:h`, retaining only the collected text.
+///
+/// Behaves exactly like [`parse_text_blocks_owned`] followed by
+/// `Block::into_text` on every block — same event handling, suppression
+/// rules, limits, and start-ordered output — but validates each block's
+/// attributes without building the retained `Element`, using the established
+/// discard pattern of `parse_selected_text_block_element` with
+/// `retain = false` ([`validate_text_block_attributes`]): no tag-name copy,
+/// no `QualifiedName` triple-allocation, no attribute map, and no owned
+/// attribute values. Block elements never have children in this parser, so
+/// `into_text_recursive` equals the accumulated text and dropping the tree
+/// loses nothing. Only OOM-only `Error::Allocation` sites vanish
+/// (`Element::try_new`, `QualifiedName::try_from_string`, `try_set_attribute`,
+/// `try_set_text`); the `from_element` tag check that disappears is
+/// unreachable, since the tag derives from the same `b"p" | b"h"` match that
+/// started the block.
+pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
+    let mut reader = NsReader::from_str(xml_content);
+    let mut buffer = Vec::new();
+    let mut blocks: Vec<Option<String>> = Vec::new();
+    let mut active: Vec<ActiveTextBlockText> = Vec::new();
+    let mut document_depth = 0usize;
+    let mut tracked_changes_depth = 0usize;
+    // Depth of the note-body/ruby-text subtree whose content is suppressed.
+    let mut skipped_depth = 0usize;
+    let mut total_text_bytes = 0usize;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))?;
+        let text_namespace =
+            matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE);
+        match event {
+            Event::Start(ref element) => {
+                document_depth = document_depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text nesting depth overflow".to_string())
+                })?;
+                if document_depth > MAX_TEXT_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODF text nesting exceeds {MAX_TEXT_DEPTH} levels"
+                    )));
+                }
+
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth += 1;
+                    buffer.clear();
+                    continue;
+                }
+                if is_text_element(text_namespace, element, b"tracked-changes") {
+                    tracked_changes_depth = 1;
+                    buffer.clear();
+                    continue;
+                }
+
+                // A nested block owns its whole subtree, so the element that
+                // opens it is counted once — against the new block, never also
+                // against the block that encloses it. Every other element counts
+                // against the innermost open block so that block still closes on
+                // the right end tag.
+                let starts_block = skipped_depth == 0 && is_text_block(text_namespace, element);
+                if !starts_block && let Some(current) = active.last_mut() {
+                    current.depth += 1;
+                }
+
+                if starts_block {
+                    active.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "ODT active text-block stack",
+                        source,
+                    })?;
+                    // Attribute validation precedes slot reservation, matching
+                    // the retained path's `make_text_block_element`-before-
+                    // `reserve_text_block` evaluation order.
+                    validate_text_block_attributes(&reader, element)?;
+                    let slot = reserve_text_block_text(&mut blocks)?;
+                    active.push(ActiveTextBlockText {
+                        depth: 1,
+                        text: String::new(),
+                        slot,
+                    });
+                } else if skipped_depth > 0 {
+                    skipped_depth += 1;
+                } else if let Some(current) = active.last_mut() {
+                    if is_text_element(text_namespace, element, b"note-body")
+                        || is_text_element(text_namespace, element, b"ruby-text")
+                    {
+                        skipped_depth = 1;
+                    } else {
+                        append_text_control(&reader, text_namespace, element, &mut current.text)?;
+                    }
+                }
+            },
+            Event::Empty(ref element) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if is_text_element(text_namespace, element, b"note-body")
+                    || is_text_element(text_namespace, element, b"ruby-text")
+                {
+                    // An empty suppressed run contributes nothing either way.
+                } else if is_text_block(text_namespace, element) {
+                    // The retained path reserves the slot before validating
+                    // (`reserve_text_block` before `make_text_block_element`);
+                    // keep that order.
+                    let slot = reserve_text_block_text(&mut blocks)?;
+                    validate_text_block_attributes(&reader, element)?;
+                    store_text_block_text(String::new(), slot, &mut blocks, &mut total_text_bytes)?;
+                } else if let Some(current) = active.last_mut() {
+                    append_text_control(&reader, text_namespace, element, &mut current.text)?;
+                }
+            },
+            Event::Text(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text content: {error}"))
+                        })?;
+                    append_checked(&mut current.text, &decoded)?;
+                }
+            },
+            Event::CData(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+                if let Some(current) = active.last_mut() {
+                    let decoded = value
+                        .xml_content(XmlVersion::Explicit1_0)
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!("invalid ODF text CDATA: {error}"))
+                        })?;
+                    append_checked(&mut current.text, &decoded)?;
+                }
+            },
+            Event::GeneralRef(ref reference)
+                if tracked_changes_depth == 0 && skipped_depth == 0 =>
+            {
+                if let Some(current) = active.last_mut() {
+                    let decoded = decode_reference(reference)?;
+                    append_checked(&mut current.text, &decoded)?;
+                }
+            },
+            Event::End(_) => {
+                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODF text element stack underflow".to_string())
+                })?;
+                if tracked_changes_depth > 0 {
+                    tracked_changes_depth -= 1;
+                    buffer.clear();
+                    continue;
+                }
+                skipped_depth = skipped_depth.saturating_sub(1);
+                if let Some(current) = active.last_mut() {
+                    current.depth = current.depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF text block stack underflow".to_string())
+                    })?;
+                    if current.depth == 0 {
+                        let current = active
+                            .pop()
+                            .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?;
+                        store_text_block_text(
+                            current.text,
+                            current.slot,
+                            &mut blocks,
+                            &mut total_text_bytes,
                         )?;
                     }
                 }
@@ -1524,6 +1726,69 @@ fn parse_selected_text_block_element(
     Ok(None)
 }
 
+/// Validate one text block's attributes exactly like
+/// [`make_text_block_element`] — same checks in the same order producing the
+/// same errors, including decode-before-duplicate — but retain nothing:
+/// names live only in a scratch `Vec` for duplicate detection. This is the
+/// discard branch of [`parse_selected_text_block_element`] lifted into a
+/// shared shape; both copies must stay in lockstep with
+/// [`make_text_block_element`].
+fn validate_text_block_attributes(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) -> Result<()> {
+    let mut discarded_names = Vec::new();
+    for attribute in source.attributes() {
+        let attribute = attribute.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODF text attribute: {error}"))
+        })?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        let local_name = std::str::from_utf8(local_name.as_ref()).map_err(|_error| {
+            Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
+        })?;
+        let name = match namespace {
+            ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE => {
+                try_prefixed_name("text", local_name, "ODT text attribute name")?
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XLINK_NAMESPACE => {
+                try_prefixed_name("xlink", local_name, "ODT text attribute name")?
+            },
+            ResolveResult::Bound(Namespace(uri)) if uri == XML_NAMESPACE => {
+                try_prefixed_name("xml", local_name, "ODT text attribute name")?
+            },
+            ResolveResult::Bound(_) | ResolveResult::Unbound => {
+                std::str::from_utf8(attribute.key.as_ref())
+                    .map_err(|_error| {
+                        Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
+                    })
+                    .and_then(|name| try_owned_string(name, "ODT text attribute name"))?
+            },
+            ResolveResult::Unknown(prefix) => {
+                return Err(Error::InvalidFormat(format!(
+                    "unknown ODF text attribute namespace prefix '{}'",
+                    String::from_utf8_lossy(&prefix)
+                )));
+            },
+        };
+        let _value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODF text attribute value: {error}"))
+            })?;
+        if discarded_names.iter().any(|existing| existing == &name) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate ODF text attribute '{name}'"
+            )));
+        }
+        try_push(
+            &mut discarded_names,
+            name,
+            "ODT discarded attribute-name projection",
+        )?;
+    }
+    Ok(())
+}
+
 fn append_selected_text_control(
     reader: &NsReader<&[u8]>,
     text_namespace: bool,
@@ -1695,6 +1960,47 @@ fn store_text_block(
         .get_mut(slot)
         .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?;
     *target = Some(block);
+    Ok(())
+}
+
+/// Text-only counterpart of [`reserve_text_block`] with the identical limit
+/// and message, for the discard-but-validate extraction path.
+fn reserve_text_block_text(blocks: &mut Vec<Option<String>>) -> Result<usize> {
+    if blocks.len() >= MAX_TEXT_BLOCKS {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BLOCKS} paragraphs and headings"
+        )));
+    }
+    let slot = blocks.len();
+    blocks.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODT text-block projection",
+        source,
+    })?;
+    blocks.push(None);
+    Ok(slot)
+}
+
+/// Text-only counterpart of [`store_text_block`]: fill a previously reserved
+/// slot with the finished block's text, accounting it against the overall
+/// size budget with the identical checks and messages.
+fn store_text_block_text(
+    text: String,
+    slot: usize,
+    blocks: &mut [Option<String>],
+    total_text_bytes: &mut usize,
+) -> Result<()> {
+    *total_text_bytes = total_text_bytes
+        .checked_add(text.len())
+        .ok_or_else(|| Error::InvalidFormat("ODF text size overflow".to_string()))?;
+    if *total_text_bytes > MAX_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODF text exceeds {MAX_TEXT_BYTES} bytes"
+        )));
+    }
+    let target = blocks
+        .get_mut(slot)
+        .ok_or_else(|| Error::InvalidFormat(BLOCK_STACK_ERROR.to_string()))?;
+    *target = Some(text);
     Ok(())
 }
 
@@ -2186,5 +2492,151 @@ mod tests {
     fn keeps_ruby_base_but_excludes_pronunciation_from_visible_text() {
         let xml = r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:p>Before<t:ruby><t:ruby-base>漢字</t:ruby-base><t:ruby-text>かんじ</t:ruby-text></t:ruby>After</t:p></o:text>"#;
         assert_eq!(TextElements::extract_text(xml).unwrap(), "Before漢字After");
+    }
+
+    // ========== 0216 discard-but-validate extraction pins ==========
+
+    /// The pre-0216 `extract_text` implementation, kept as the parity
+    /// oracle: retained owned blocks, `into_text` per block, '\n' join.
+    fn oracle_extract_text(xml_content: &str) -> String {
+        let mut blocks = parse_text_blocks_owned(xml_content)
+            .expect("oracle parse must succeed for parity inputs")
+            .into_iter();
+        let Some(first) = blocks.next() else {
+            return String::new();
+        };
+        let mut output = first.into_text();
+        for block in blocks {
+            output.push('\n');
+            output.push_str(&block.into_text());
+        }
+        output
+    }
+
+    fn assert_extract_text_parity(xml: &str) {
+        assert_eq!(
+            TextElements::extract_text(xml).unwrap(),
+            oracle_extract_text(xml),
+            "discard-mode extract_text diverges from the retained path"
+        );
+    }
+
+    #[test]
+    fn discard_mode_matches_retained_path_across_block_shapes() {
+        let text_ns = std::str::from_utf8(TEXT_NAMESPACE).unwrap();
+        let fixtures = [
+            // Plain paragraphs.
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:p>First</t:p><t:p>Second</t:p></o:text>"#,
+            // Heading, styled paragraph, entities, CDATA, whitespace controls,
+            // general reference, empty block.
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:h t:outline-level="3">A &amp; <![CDATA[B]]></t:h><t:p t:style-name="Body">C<t:s t:c="2"/>D<t:tab/>E<t:line-break/>F&#x21;</t:p><t:p/></o:text>"#,
+            // Lists.
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><t:list><t:list-item><t:p>Item 1</t:p></t:list-item><t:list-item><t:p>Item 2</t:p></t:list-item></t:list></o:text>"#,
+            // Nested frame text box: the inner block completes before the
+            // outer one, but start order must be preserved.
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><t:p>Outer<d:frame><d:text-box><t:p>Inner</t:p></d:text-box></d:frame></t:p></o:text>"#,
+            // Attribute-carrying blocks: text/xlink/xml prefixes, unbound and
+            // foreign-bound attribute names.
+            r##"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:f="urn:example:foreign"><t:p t:style-name="B" xlink:href="#x" xml:id="i1" plain="p" f:extra="e">Text</t:p></o:text>"##,
+            // No blocks at all.
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"></o:text>"#,
+        ];
+        for xml in fixtures {
+            assert_extract_text_parity(xml);
+        }
+        // Tracked-change definitions stay excluded.
+        let tracked = format!(
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{text_ns}"><t:tracked-changes><t:changed-region><t:deletion><t:p>Deleted</t:p></t:deletion></t:changed-region></t:tracked-changes><t:p>Visible</t:p></o:text>"#
+        );
+        assert_extract_text_parity(&tracked);
+        // Note bodies stay suppressed while citations remain.
+        let note = format!(
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{text_ns}"><t:p>Before<t:note t:note-class="footnote" t:id="n1"><t:note-citation>1</t:note-citation><t:note-body><t:p>Hidden</t:p></t:note-body></t:note>After</t:p></o:text>"#
+        );
+        assert_extract_text_parity(&note);
+        // Ruby pronunciation stays excluded.
+        let ruby = format!(
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{text_ns}"><t:p>Before<t:ruby><t:ruby-base>漢字</t:ruby-base><t:ruby-text>かんじ</t:ruby-text></t:ruby>After</t:p></o:text>"#
+        );
+        assert_extract_text_parity(&ruby);
+    }
+
+    fn extract_text_error(xml: &str) -> String {
+        match TextElements::extract_text(xml) {
+            Err(error) => error.to_string(),
+            Ok(text) => panic!("expected invalid-format error, got {text:?}"),
+        }
+    }
+
+    fn oracle_extract_text_error(xml: &str) -> String {
+        match parse_text_blocks_owned(xml) {
+            Err(error) => error.to_string(),
+            Ok(blocks) => panic!("expected invalid-format error, got {} blocks", blocks.len()),
+        }
+    }
+
+    #[test]
+    fn discard_mode_preserves_attribute_error_messages_and_precedence() {
+        let text_ns = std::str::from_utf8(TEXT_NAMESPACE).unwrap();
+        // Malformed attribute syntax.
+        let malformed = format!(r#"<t:p xmlns:t="{text_ns}" broken>x</t:p>"#);
+        let message = extract_text_error(&malformed);
+        assert_eq!(message, oracle_extract_text_error(&malformed));
+        assert!(message.starts_with("Invalid format: invalid ODF text attribute:"));
+        // Malformed attribute in the second block, after retained text.
+        let second_block = format!(
+            r#"<o:text xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="{text_ns}"><t:p>First</t:p><t:p broken>Second</t:p></o:text>"#
+        );
+        assert_eq!(
+            extract_text_error(&second_block),
+            oracle_extract_text_error(&second_block)
+        );
+        // Raw duplicate qualified name (iterator-level detection).
+        let raw_duplicate =
+            format!(r#"<t:p xmlns:t="{text_ns}" t:style-name="a" t:style-name="b">x</t:p>"#);
+        let message = extract_text_error(&raw_duplicate);
+        assert_eq!(message, oracle_extract_text_error(&raw_duplicate));
+        assert!(message.starts_with("Invalid format: invalid ODF text attribute:"));
+        // Duplicate resolved name through two prefixes (decode precedes the
+        // duplicate error in both paths).
+        let resolved_duplicate = format!(
+            r#"<t:p xmlns:t="{text_ns}" xmlns:a="{text_ns}" xmlns:b="{text_ns}" a:style-name="one" b:style-name="two">x</t:p>"#
+        );
+        let message = extract_text_error(&resolved_duplicate);
+        assert_eq!(message, oracle_extract_text_error(&resolved_duplicate));
+        assert!(message.contains("duplicate ODF text attribute 'text:style-name'"));
+        // Unknown namespace prefix, on both a paired and an empty block.
+        let unknown = format!(r#"<t:p xmlns:t="{text_ns}" u:foo="1">x</t:p>"#);
+        let message = extract_text_error(&unknown);
+        assert_eq!(message, oracle_extract_text_error(&unknown));
+        assert!(message.contains("unknown ODF text attribute namespace prefix 'u'"));
+        let unknown_empty = format!(r#"<t:p xmlns:t="{text_ns}" u:foo="1"/>"#);
+        assert_eq!(
+            extract_text_error(&unknown_empty),
+            oracle_extract_text_error(&unknown_empty)
+        );
+        // Undecodable attribute value.
+        let bad_value = format!(r#"<t:p xmlns:t="{text_ns}" t:style-name="&#xD800;">x</t:p>"#);
+        let message = extract_text_error(&bad_value);
+        assert_eq!(message, oracle_extract_text_error(&bad_value));
+        assert!(message.starts_with("Invalid format: invalid ODF text attribute value:"));
+    }
+
+    #[test]
+    fn discard_mode_preserves_depth_and_structure_limits() {
+        let text_ns = std::str::from_utf8(TEXT_NAMESPACE).unwrap();
+        // Nesting beyond MAX_TEXT_DEPTH fails identically in both paths.
+        let deep = format!(
+            r#"<t:p xmlns:t="{text_ns}">{}x{}</t:p>"#,
+            "<t:a>".repeat(MAX_TEXT_DEPTH),
+            "</t:a>".repeat(MAX_TEXT_DEPTH),
+        );
+        assert_eq!(extract_text_error(&deep), oracle_extract_text_error(&deep));
+        // Incomplete structure fails identically.
+        let incomplete = format!(r#"<t:p xmlns:t="{text_ns}">unfinished"#);
+        assert_eq!(
+            extract_text_error(&incomplete),
+            oracle_extract_text_error(&incomplete)
+        );
     }
 }

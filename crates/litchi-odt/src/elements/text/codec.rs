@@ -6,7 +6,7 @@
 //! semantic [`Block`] model without coupling to parser state or wire details.
 
 use super::model::Block;
-use super::{Heading, Paragraph, parse_paragraph_at, parse_text_blocks, parse_text_blocks_owned};
+use super::{Heading, Paragraph, parse_paragraph_at, parse_text_block_texts, parse_text_blocks};
 use litchi_core::{Error, Result};
 
 /// Collection of typed text-element codec operations.
@@ -74,14 +74,16 @@ impl Elements {
     /// Namespace-aware parsing includes blocks nested in lists, sections, and
     /// text boxes. Tracked-change definitions, note bodies, and ruby
     /// pronunciation runs remain excluded by the decoder.
+    ///
+    /// The decoder validates every block's attributes exactly like the
+    /// retained-element parsers but builds no `Element` tree; only the
+    /// per-block text is retained (see `parse_text_block_texts`).
     pub fn extract_text(xml_content: &str) -> Result<String> {
-        let mut blocks = parse_text_blocks_owned(xml_content)?.into_iter();
-        let Some(first) = blocks.next() else {
+        let mut texts = parse_text_block_texts(xml_content)?.into_iter();
+        let Some(mut output) = texts.next() else {
             return Ok(String::new());
         };
-        let mut output = first.into_text();
-        for block in blocks {
-            let text = block.into_text();
+        for text in texts {
             output
                 .try_reserve(1usize.saturating_add(text.len()))
                 .map_err(|source| Error::Allocation {

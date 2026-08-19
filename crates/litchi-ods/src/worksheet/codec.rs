@@ -5,8 +5,9 @@ use super::{model::Merge, validation};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
+    encoding::Decoder,
     events::{BytesStart, Event},
-    name::{Namespace, ResolveResult},
+    name::{Namespace, NamespaceResolver, ResolveResult},
     reader::NsReader,
 };
 use std::num::NonZeroUsize;
@@ -32,7 +33,7 @@ enum Kind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum NamespaceKind {
+pub(crate) enum NamespaceKind {
     Office,
     Table,
     Text,
@@ -80,9 +81,20 @@ impl Default for Attributes {
 }
 
 impl Attributes {
+    /// Decode from a standalone reader; used by the historical inline loop in
+    /// `parse_impl`, which predates the extracted handler.
     fn from_element(
         element: &BytesStart<'_>,
         reader: &NsReader<&[u8]>,
+        covered: bool,
+    ) -> Result<Self> {
+        Self::from_resolved(element, reader.resolver(), reader.decoder(), covered)
+    }
+
+    fn from_resolved(
+        element: &BytesStart<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
         covered: bool,
     ) -> Result<Self> {
         let mut result = Self {
@@ -92,17 +104,21 @@ impl Attributes {
         for raw in element.attributes().with_checks(true) {
             let raw = raw
                 .map_err(|error| Error::InvalidFormat(format!("invalid ODS attribute: {error}")))?;
-            let (namespace, local) = reader.resolver().resolve_attribute(raw.key);
-            let local = String::from_utf8_lossy(local.as_ref());
+            let (namespace, local) = resolver.resolve_attribute(raw.key);
+            let local = local.as_ref();
+            // Decode and normalize every attribute value, including values of
+            // attributes this codec ignores: malformed entity and character
+            // references are rejected here, ahead of the unknown-prefix error,
+            // regardless of whether the value is consumed.  Only consumed
+            // values are copied into an owned `String`.
             let value = raw
-                .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                 .map_err(|error| {
                     Error::InvalidFormat(format!("invalid ODS attribute value: {error}"))
-                })?
-                .into_owned();
-            let namespace = match namespace {
-                ResolveResult::Bound(Namespace(uri)) => String::from_utf8_lossy(uri).into_owned(),
-                ResolveResult::Unbound => String::new(),
+                })?;
+            let namespace: &[u8] = match namespace {
+                ResolveResult::Bound(Namespace(uri)) => uri,
+                ResolveResult::Unbound => b"",
                 ResolveResult::Unknown(prefix) => {
                     return Err(Error::InvalidFormat(format!(
                         "unbound ODS attribute prefix '{}'",
@@ -110,34 +126,36 @@ impl Attributes {
                     )));
                 },
             };
-            if namespace == TABLE_NAMESPACE {
-                match local.as_ref() {
-                    "name" => result.name = Some(value),
-                    "style-name" => result.style_name = Some(value),
-                    "default-cell-style-name" => result.default_cell_style_name = Some(value),
-                    "formula" => result.formula = Some(value),
-                    "number-rows-repeated" => {
+            if namespace == TABLE_NAMESPACE.as_bytes() {
+                match local {
+                    b"name" => result.name = Some(value.into_owned()),
+                    b"style-name" => result.style_name = Some(value.into_owned()),
+                    b"default-cell-style-name" => {
+                        result.default_cell_style_name = Some(value.into_owned())
+                    },
+                    b"formula" => result.formula = Some(value.into_owned()),
+                    b"number-rows-repeated" => {
                         result.rows_repeated = positive(&value, "number-rows-repeated")?;
                     },
-                    "number-columns-repeated" => {
+                    b"number-columns-repeated" => {
                         result.columns_repeated = positive(&value, "number-columns-repeated")?;
                     },
-                    "number-rows-spanned" => {
+                    b"number-rows-spanned" => {
                         result.rows_spanned = positive(&value, "number-rows-spanned")?;
                     },
-                    "number-columns-spanned" => {
+                    b"number-columns-spanned" => {
                         result.columns_spanned = positive(&value, "number-columns-spanned")?;
                     },
                     _ => {},
                 }
-            } else if namespace == OFFICE_NAMESPACE {
-                match local.as_ref() {
-                    "value-type" => result.value_type = Some(value),
-                    "value" => result.value = Some(value),
-                    "date-value" => result.date_value = Some(value),
-                    "time-value" => result.time_value = Some(value),
-                    "boolean-value" => result.boolean_value = Some(value),
-                    "currency" => result.currency = Some(value),
+            } else if namespace == OFFICE_NAMESPACE.as_bytes() {
+                match local {
+                    b"value-type" => result.value_type = Some(value.into_owned()),
+                    b"value" => result.value = Some(value.into_owned()),
+                    b"date-value" => result.date_value = Some(value.into_owned()),
+                    b"time-value" => result.time_value = Some(value.into_owned()),
+                    b"boolean-value" => result.boolean_value = Some(value.into_owned()),
+                    b"currency" => result.currency = Some(value.into_owned()),
                     _ => {},
                 }
             }
@@ -226,6 +244,11 @@ pub(crate) fn parse_flat(xml: &str) -> Result<Vec<Sheet>> {
     parse_impl(xml, false)
 }
 
+/// Shared worksheet parse over one dedicated reader.
+///
+/// This standalone path intentionally keeps the historical inline event loop
+/// for latency parity on non-fused callers (eager open, commit readback); the
+/// fused open parse drives the equivalent [`WorksheetHandler`] instead.
 fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
     validation::validate_content_xml_size(xml)?;
     let mut reader = NsReader::from_str(xml);
@@ -244,7 +267,6 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid ODS XML: {error}")))?;
         let namespace = namespace_kind(&namespace);
-        let event = event.into_owned();
         match event {
             Event::Start(element) => {
                 if stack.len() >= MAX_XML_DEPTH {
@@ -515,6 +537,333 @@ fn parse_impl(xml: &str, require_unique_names: bool) -> Result<Vec<Sheet>> {
     Ok(sheets)
 }
 
+/// Streaming event handler holding the [`parse_impl`] state.
+///
+/// The fused open parse ([`crate::open_parse`]) drives one shared tokenizer
+/// through this handler, while [`parse_impl`] keeps its historical inline
+/// loop for latency parity on non-fused callers; both apply the same checks,
+/// limits, and error messages at the same events.
+pub(crate) struct WorksheetHandler {
+    stack: Vec<Kind>,
+    dde_cache_depth: Option<usize>,
+    sheets: Vec<Sheet>,
+    current_sheet: Option<Sheet>,
+    current_row: Option<Row>,
+    current_cell: Option<OpenCell>,
+    require_unique_names: bool,
+}
+
+impl WorksheetHandler {
+    /// Create a handler with the [`parse_impl`] validation mode.
+    pub(crate) fn new(require_unique_names: bool) -> Self {
+        Self {
+            stack: Vec::new(),
+            dde_cache_depth: None,
+            sheets: Vec::new(),
+            current_sheet: None,
+            current_row: None,
+            current_cell: None,
+            require_unique_names,
+        }
+    }
+
+    /// Process one resolved event at byte positions `pos_before`/`pos_after`.
+    ///
+    /// `namespace` is the caller-classified resolution of the event's
+    /// namespace; the resolved value borrows the reader mutably, so callers
+    /// classify it immediately after the read exactly as the historical loop
+    /// body did.
+    pub(crate) fn on_event(
+        &mut self,
+        namespace: NamespaceKind,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        pos_before: u64,
+        pos_after: u64,
+    ) -> Result<()> {
+        let _ = (pos_before, pos_after);
+        match event {
+            Event::Start(element) => {
+                if self.stack.len() >= MAX_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS worksheet XML nesting exceeds {MAX_XML_DEPTH} elements"
+                    )));
+                }
+                let local = element.local_name();
+                let mut kind = classify(namespace, local.as_ref());
+                if self.dde_cache_depth.is_some() {
+                    kind = Kind::Other;
+                } else if kind == Kind::Table && self.stack.last() == Some(&Kind::DdeLink) {
+                    kind = Kind::DdeCache;
+                    self.dde_cache_depth = Some(self.stack.len() + 1);
+                }
+                match kind {
+                    Kind::Root => {},
+                    Kind::Body
+                    | Kind::Spreadsheet
+                    | Kind::DdeLink
+                    | Kind::DdeCache
+                    | Kind::Other
+                    | Kind::Text => {},
+                    Kind::Table => {
+                        if self.stack.last() != Some(&Kind::Spreadsheet) {
+                            return Err(Error::InvalidFormat(
+                                "table:table must be a direct child of office:spreadsheet"
+                                    .to_string(),
+                            ));
+                        }
+                        if self.current_sheet.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "ODS worksheet parser encountered a nested table".to_string(),
+                            ));
+                        }
+                        let attributes =
+                            Attributes::from_resolved(element, resolver, decoder, false)?;
+                        self.current_sheet = Some(Sheet {
+                            name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
+                            rows: Vec::new(),
+                            style_name: attributes.style_name,
+                        });
+                    },
+                    Kind::Row => {
+                        if self.current_sheet.is_none() || self.current_row.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "table:table-row is outside a worksheet row context".to_string(),
+                            ));
+                        }
+                        let attributes =
+                            Attributes::from_resolved(element, resolver, decoder, false)?;
+                        self.current_row = Some(Row {
+                            cells: Vec::new(),
+                            style_name: attributes.style_name,
+                            default_cell_style_name: attributes.default_cell_style_name,
+                            repeat: NonZeroUsize::new(attributes.rows_repeated).ok_or_else(
+                                || {
+                                    Error::InvalidFormat(
+                                        "table:number-rows-repeated must be positive".to_string(),
+                                    )
+                                },
+                            )?,
+                        });
+                    },
+                    Kind::Cell => {
+                        if self.current_row.is_none() || self.current_cell.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "table cell is outside a worksheet row context".to_string(),
+                            ));
+                        }
+                        self.current_cell = Some(OpenCell {
+                            attributes: Attributes::from_resolved(
+                                element,
+                                resolver,
+                                decoder,
+                                is_covered(namespace, local.as_ref()),
+                            )?,
+                            text: String::new(),
+                            text_depth: 0,
+                        });
+                    },
+                }
+                if kind == Kind::Text
+                    && let Some(cell) = self.current_cell.as_mut()
+                {
+                    cell.text_depth += 1;
+                }
+                self.stack.push(kind);
+            },
+            Event::Empty(element) => {
+                if self.stack.len() >= MAX_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS worksheet XML nesting exceeds {MAX_XML_DEPTH} elements"
+                    )));
+                }
+                let local = element.local_name();
+                let mut kind = classify(namespace, local.as_ref());
+                if self.dde_cache_depth.is_some() {
+                    kind = Kind::Other;
+                } else if kind == Kind::Table && self.stack.last() == Some(&Kind::DdeLink) {
+                    kind = Kind::DdeCache;
+                }
+                match kind {
+                    Kind::Table => {
+                        if self.stack.last() != Some(&Kind::Spreadsheet) {
+                            return Err(Error::InvalidFormat(
+                                "table:table must be a direct child of office:spreadsheet"
+                                    .to_string(),
+                            ));
+                        }
+                        let attributes =
+                            Attributes::from_resolved(element, resolver, decoder, false)?;
+                        self.sheets.push(Sheet {
+                            name: attributes.name.unwrap_or_else(|| "Sheet1".to_string()),
+                            rows: Vec::new(),
+                            style_name: attributes.style_name,
+                        });
+                    },
+                    Kind::Row => {
+                        let attributes =
+                            Attributes::from_resolved(element, resolver, decoder, false)?;
+                        let sheet = self.current_sheet.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "empty table row is outside a worksheet".to_string(),
+                            )
+                        })?;
+                        sheet.rows.push(Row {
+                            cells: Vec::new(),
+                            style_name: attributes.style_name,
+                            default_cell_style_name: attributes.default_cell_style_name,
+                            repeat: NonZeroUsize::new(attributes.rows_repeated).ok_or_else(
+                                || {
+                                    Error::InvalidFormat(
+                                        "table:number-rows-repeated must be positive".to_string(),
+                                    )
+                                },
+                            )?,
+                        });
+                    },
+                    Kind::Cell => {
+                        let row = self.current_row.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "empty table cell is outside a worksheet row".to_string(),
+                            )
+                        })?;
+                        let attributes = Attributes::from_resolved(
+                            element,
+                            resolver,
+                            decoder,
+                            is_covered(namespace, local.as_ref()),
+                        )?;
+                        row.cells.push(attributes.cell(String::new())?);
+                    },
+                    Kind::Text if self.current_cell.is_some() => {
+                        append_empty_text_resolved(
+                            &mut self.current_cell,
+                            namespace,
+                            local.as_ref(),
+                            element,
+                            resolver,
+                            decoder,
+                        )?;
+                    },
+                    Kind::Root
+                    | Kind::Body
+                    | Kind::Spreadsheet
+                    | Kind::DdeLink
+                    | Kind::DdeCache
+                    | Kind::Text
+                    | Kind::Other => {},
+                }
+            },
+            Event::Text(text) => {
+                if let Some(cell) = self.current_cell.as_mut()
+                    && cell.text_depth > 0
+                {
+                    let value = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODS cell text: {error}"))
+                    })?;
+                    cell.text.push_str(&value);
+                }
+            },
+            Event::CData(text) => {
+                if let Some(cell) = self.current_cell.as_mut()
+                    && cell.text_depth > 0
+                {
+                    let value = text.decode().map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODS cell text: {error}"))
+                    })?;
+                    cell.text.push_str(&value);
+                }
+            },
+            Event::End(element) => {
+                let kind = self.stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("ODS XML element stack underflow".to_string())
+                })?;
+                if kind == Kind::DdeCache {
+                    self.dde_cache_depth = None;
+                }
+                if kind == Kind::Text
+                    && let Some(cell) = self.current_cell.as_mut()
+                {
+                    cell.text_depth = cell.text_depth.saturating_sub(1);
+                }
+                match kind {
+                    Kind::Cell => {
+                        let open = self.current_cell.take().ok_or_else(|| {
+                            Error::InvalidFormat("ODS cell close has no open cell".to_string())
+                        })?;
+                        let row = self.current_row.as_mut().ok_or_else(|| {
+                            Error::InvalidFormat("ODS cell closed outside a row".to_string())
+                        })?;
+                        row.cells.push(open.attributes.cell(open.text)?);
+                    },
+                    Kind::Row => {
+                        let row = self.current_row.take().ok_or_else(|| {
+                            Error::InvalidFormat("ODS row close has no open row".to_string())
+                        })?;
+                        self.current_sheet
+                            .as_mut()
+                            .ok_or_else(|| {
+                                Error::InvalidFormat("ODS row closed outside a sheet".to_string())
+                            })?
+                            .rows
+                            .push(row);
+                    },
+                    Kind::Table => {
+                        let sheet = self.current_sheet.take().ok_or_else(|| {
+                            Error::InvalidFormat("ODS table close has no open table".to_string())
+                        })?;
+                        self.sheets.push(sheet);
+                    },
+                    Kind::Root
+                    | Kind::Body
+                    | Kind::Spreadsheet
+                    | Kind::DdeLink
+                    | Kind::DdeCache
+                    | Kind::Text
+                    | Kind::Other => {},
+                }
+                let _ = element;
+            },
+            Event::Eof => {},
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+        Ok(())
+    }
+
+    /// Validate the end-of-document state and build the worksheet list.
+    pub(crate) fn finish(self) -> Result<Vec<Sheet>> {
+        if !self.stack.is_empty()
+            || self.current_sheet.is_some()
+            || self.current_row.is_some()
+            || self.current_cell.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "ODS content ended with an unfinished worksheet object".to_string(),
+            ));
+        }
+        let sheets = self.sheets;
+        if self.require_unique_names {
+            validation::validate_sheets(&sheets)?;
+        } else {
+            if sheets.len() > validation::MAX_PHYSICAL_RUNS {
+                return Err(Error::InvalidFormat(format!(
+                    "ODS sheet count exceeds the {} safety limit",
+                    validation::MAX_PHYSICAL_RUNS
+                )));
+            }
+            for sheet in &sheets {
+                validation::validate_sheet(sheet)?;
+            }
+        }
+        Ok(sheets)
+    }
+}
+
 #[cfg(test)]
 mod bounded_depth_tests {
     use super::{MAX_XML_DEPTH, parse};
@@ -569,7 +918,78 @@ mod bounded_depth_tests {
     }
 }
 
-fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
+#[cfg(test)]
+mod attribute_error_order_tests {
+    use super::parse;
+
+    const PREFIX: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:x="urn:litchi:test"><office:body><office:spreadsheet><table:table table:name="S"><table:table-row>"#;
+    const SUFFIX: &str = "</table:table-row></table:table></office:spreadsheet></office:body></office:document-content>";
+
+    fn document(cell: &str) -> String {
+        format!("{PREFIX}{cell}{SUFFIX}")
+    }
+
+    #[test]
+    fn ignored_attributes_with_clean_values_are_accepted() {
+        // Bound-but-foreign and unbound attribute namespaces are ignored.
+        let xml = document(r#"<table:table-cell x:ignored="1" plain="2"/>"#);
+        parse(&xml).expect("ignored attributes are inert");
+    }
+
+    #[test]
+    fn malformed_entity_in_ignored_attribute_is_rejected() {
+        // The value decode runs for ignored attributes as well.
+        for value in ["&bogus;", "&bogus", "&#xD800;", "&#x110000;"] {
+            let xml = document(&format!(r#"<table:table-cell x:ignored="{value}"/>"#));
+            let error = parse(&xml).expect_err("malformed value must fail: {value}");
+            assert!(
+                error
+                    .to_string()
+                    .starts_with("Invalid format: invalid ODS attribute value: "),
+                "unexpected error for {value}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn value_decode_error_beats_unknown_prefix_error() {
+        // Historical per-attribute order is syntax, then value decode, then
+        // the unknown-prefix check; an attribute failing both must report the
+        // decode error.
+        let xml = document(r#"<table:table-cell undeclared:ignored="&bogus;"/>"#);
+        let error = parse(&xml).expect_err("malformed value must fail");
+        assert!(
+            error
+                .to_string()
+                .starts_with("Invalid format: invalid ODS attribute value: "),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn unknown_prefix_on_ignored_attribute_is_rejected() {
+        let xml = document(r#"<table:table-cell undeclared:ignored="clean"/>"#);
+        let error = parse(&xml).expect_err("undeclared prefix must fail");
+        assert_eq!(
+            error.to_string(),
+            "Invalid format: unbound ODS attribute prefix 'undeclared'"
+        );
+    }
+
+    #[test]
+    fn consumed_values_keep_entity_normalization() {
+        let xml = document(
+            r#"<table:table-cell office:value-type="string" table:style-name="a&#x20;b"><text:p>x</text:p></table:table-cell>"#,
+        );
+        let sheets = parse(&xml).expect("consumed values decode");
+        assert_eq!(
+            sheets[0].rows[0].cells[0].style_name.as_deref(),
+            Some("a b")
+        );
+    }
+}
+
+pub(crate) fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(value)) if *value == OFFICE_NAMESPACE.as_bytes() => {
             NamespaceKind::Office
@@ -621,12 +1041,32 @@ fn is_covered(namespace: NamespaceKind, local: &[u8]) -> bool {
     namespace == NamespaceKind::Table && local == b"covered-table-cell"
 }
 
+/// Append empty text markup from a standalone reader; used by the historical
+/// inline loop in `parse_impl`, which predates the extracted handler.
 fn append_empty_text(
     current_cell: &mut Option<OpenCell>,
     namespace: NamespaceKind,
     local: &[u8],
     element: &BytesStart<'_>,
     reader: &NsReader<&[u8]>,
+) -> Result<()> {
+    append_empty_text_resolved(
+        current_cell,
+        namespace,
+        local,
+        element,
+        reader.resolver(),
+        reader.decoder(),
+    )
+}
+
+fn append_empty_text_resolved(
+    current_cell: &mut Option<OpenCell>,
+    namespace: NamespaceKind,
+    local: &[u8],
+    element: &BytesStart<'_>,
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
 ) -> Result<()> {
     let Some(cell) = current_cell.as_mut() else {
         return Ok(());
@@ -645,13 +1085,13 @@ fn append_empty_text(
             let raw = raw.map_err(|error| {
                 Error::InvalidFormat(format!("invalid text:s attribute: {error}"))
             })?;
-            let (namespace, local_name) = reader.resolver().resolve_attribute(raw.key);
+            let (namespace, local_name) = resolver.resolve_attribute(raw.key);
             let is_count = matches!(namespace, ResolveResult::Bound(Namespace(value))
                 if value == TEXT_NAMESPACE.as_bytes())
                 && local_name.as_ref() == b"c";
             if is_count {
                 let value = raw
-                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
                     .map_err(|error| {
                         Error::InvalidFormat(format!("invalid text:s count: {error}"))
                     })?;

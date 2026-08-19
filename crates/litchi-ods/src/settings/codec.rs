@@ -6,6 +6,7 @@
 
 use litchi_core::{Error, Result};
 use litchi_odf_common::calculation::{Settings, write};
+use quick_xml::encoding::Decoder;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -44,7 +45,7 @@ enum Kind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NamespaceKind {
+pub(crate) enum NamespaceKind {
     Office,
     Table,
     Other,
@@ -58,7 +59,21 @@ struct OpenElement {
     qname: String,
 }
 
+/// Enforce the pre-parse byte-size limit of the calculation-settings source.
+pub(crate) fn validate_size(xml: &str) -> Result<()> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "ODS calculation-settings source exceeds the size limit".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Locate the direct ODS spreadsheet host and calculation-settings child.
+///
+/// This standalone path intentionally keeps the historical inline event loop
+/// for latency parity on non-fused callers (settings edits); the fused open
+/// parse drives the equivalent [`LocateHandler`] instead.
 pub(crate) fn locate(xml: &str) -> Result<Location> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(
@@ -92,7 +107,6 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid ODS content.xml: {error}")))?;
         let namespace = namespace_kind(&namespace);
-        let event = event.into_owned();
         let event_end = position(&reader)?;
 
         match event {
@@ -117,10 +131,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 {
                     validate_attributes(&element, reader.resolver())?;
                 }
-                let qname =
-                    String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
-                        Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
-                    })?;
+                let qname = qualified_name(&element, kind)?;
                 stack.push(OpenElement {
                     kind,
                     start: event_start,
@@ -150,10 +161,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 {
                     validate_attributes(&element, reader.resolver())?;
                 }
-                let qname =
-                    String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
-                        Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
-                    })?;
+                let qname = qualified_name(&element, kind)?;
                 let span = Span {
                     start: event_start,
                     tag_end: event_end,
@@ -209,6 +217,188 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
         calculation,
         opaque,
     })
+}
+
+/// Streaming event handler holding the [`locate`] scan state.
+///
+/// The fused open parse ([`crate::open_parse`]) drives one shared tokenizer
+/// through this handler, while [`locate`] keeps its historical inline loop
+/// for latency parity on non-fused callers; both apply the same checks,
+/// limits, and error messages at the same events.
+#[derive(Debug, Default)]
+pub(crate) struct LocateHandler {
+    stack: Vec<OpenElement>,
+    spreadsheet: Option<Span>,
+    calculation: Option<Span>,
+    root_seen: bool,
+    root_closed: bool,
+    events: usize,
+    opaque: bool,
+}
+
+impl LocateHandler {
+    /// Process one resolved event at byte positions `pos_before`/`pos_after`.
+    ///
+    /// `namespace` is the caller-classified resolution of the event's
+    /// namespace; the resolved value borrows the reader mutably, so callers
+    /// classify it immediately after the read exactly as the historical loop
+    /// body did.
+    pub(crate) fn on_event(
+        &mut self,
+        namespace: NamespaceKind,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        pos_before: u64,
+        pos_after: u64,
+    ) -> Result<()> {
+        let _ = decoder;
+        self.events = self
+            .events
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("XML event count overflow".to_string()))?;
+        if self.events > MAX_EVENTS {
+            return Err(Error::InvalidFormat(
+                "ODS calculation-settings source exceeds the event limit".to_string(),
+            ));
+        }
+
+        let event_start = position_from(pos_before)?;
+        let event_end = position_from(pos_after)?;
+
+        match event {
+            Event::Start(element) => {
+                if self.stack.is_empty() {
+                    if self.root_seen || self.root_closed {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one root element".to_string(),
+                        ));
+                    }
+                    self.root_seen = true;
+                }
+                if self.stack.len() >= MAX_DEPTH {
+                    return Err(Error::InvalidFormat(
+                        "ODS calculation-settings source exceeds the nesting limit".to_string(),
+                    ));
+                }
+                let parent = self.stack.last().map(|open| open.kind);
+                let kind = classify(parent, namespace, element.local_name().as_ref());
+                if kind == Kind::Calculation
+                    || self.stack.iter().any(|open| open.kind == Kind::Calculation)
+                {
+                    validate_attributes(element, resolver)?;
+                }
+                let qname = qualified_name(element, kind)?;
+                self.stack.push(OpenElement {
+                    kind,
+                    start: event_start,
+                    tag_end: event_end,
+                    qname,
+                });
+            },
+            Event::Empty(element) => {
+                if self.stack.is_empty() {
+                    if self.root_seen || self.root_closed {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one root element".to_string(),
+                        ));
+                    }
+                    self.root_seen = true;
+                    self.root_closed = true;
+                }
+                if self.stack.len() >= MAX_DEPTH {
+                    return Err(Error::InvalidFormat(
+                        "ODS calculation-settings source exceeds the nesting limit".to_string(),
+                    ));
+                }
+                let parent = self.stack.last().map(|open| open.kind);
+                let kind = classify(parent, namespace, element.local_name().as_ref());
+                if kind == Kind::Calculation
+                    || self.stack.iter().any(|open| open.kind == Kind::Calculation)
+                {
+                    validate_attributes(element, resolver)?;
+                }
+                let qname = qualified_name(element, kind)?;
+                let span = Span {
+                    start: event_start,
+                    tag_end: event_end,
+                    end: event_end,
+                    empty: true,
+                    qname,
+                };
+                record(kind, span, &mut self.spreadsheet, &mut self.calculation)?;
+            },
+            Event::End(_) => {
+                let open = self.stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("unbalanced ODS content.xml elements".to_string())
+                })?;
+                let span = Span {
+                    start: open.start,
+                    tag_end: open.tag_end,
+                    end: event_end,
+                    empty: false,
+                    qname: open.qname,
+                };
+                record(
+                    open.kind,
+                    span,
+                    &mut self.spreadsheet,
+                    &mut self.calculation,
+                )?;
+                if self.stack.is_empty() {
+                    self.root_closed = true;
+                }
+            },
+            Event::Comment(_) | Event::PI(_)
+                if self.stack.iter().any(|open| open.kind == Kind::Calculation) =>
+            {
+                self.opaque = true;
+            },
+            Event::Eof => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+        Ok(())
+    }
+
+    /// Validate the end-of-document state and build the located spans.
+    pub(crate) fn finish(self) -> Result<Location> {
+        if !self.root_seen || !self.root_closed || !self.stack.is_empty() {
+            return Err(Error::InvalidFormat(
+                "incomplete ODS content.xml document".to_string(),
+            ));
+        }
+        let spreadsheet = self.spreadsheet.ok_or_else(|| {
+            Error::InvalidFormat("ODS content.xml has no office:spreadsheet host".to_string())
+        })?;
+        Ok(Location {
+            spreadsheet,
+            calculation: self.calculation,
+            opaque: self.opaque,
+        })
+    }
+}
+
+/// Materialize the qualified element name only for spans that `record`
+/// keeps (`Spreadsheet` and `Calculation`); every other element's name is
+/// constructed and dropped, so per-element allocation is wasted work.  The
+/// source is a `&str` and element names are subslices delimited by ASCII
+/// markup bytes, so a name is always valid UTF-8 and the conversion error
+/// is unreachable for non-recorded kinds — removing it there changes no
+/// observable error behavior.
+fn qualified_name(element: &quick_xml::events::BytesStart<'_>, kind: Kind) -> Result<String> {
+    if matches!(kind, Kind::Spreadsheet | Kind::Calculation) {
+        String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
+            Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
+        })
+    } else {
+        Ok(String::new())
+    }
 }
 
 fn classify(parent: Option<Kind>, namespace: NamespaceKind, local: &[u8]) -> Kind {
@@ -354,6 +544,11 @@ fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
         .map_err(|_error| Error::InvalidFormat("ODS XML position overflows usize".to_string()))
 }
 
+fn position_from(raw: u64) -> Result<usize> {
+    usize::try_from(raw)
+        .map_err(|_error| Error::InvalidFormat("ODS XML position overflows usize".to_string()))
+}
+
 fn is_element(
     namespace: NamespaceKind,
     expected_namespace: NamespaceKind,
@@ -419,7 +614,7 @@ fn allowed_attribute(element: &[u8], attribute: &[u8]) -> bool {
     }
 }
 
-fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
+pub(crate) fn namespace_kind(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_NAMESPACE => NamespaceKind::Table,

@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "change": "0198-ods-content-layout-topology-cache",
+  "decision": "accepted",
+  "claim_scope": "ODS one-edit guardrail: lifecycle mean/p95 and commit p99 only",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "db708afa17eddc7dab9911429c51d6d0cd676550f8c33f4458893f2ea1201cff",
+      "candidate_sha256": "4e5662b270a30fc93af0b72bbe8c80d03adc82a73612a85085e6e3ac020954e1",
+      "note": "both binaries contain changes 0193-0196 as baseline plus the identical 341-case selector matrix; the candidate binary additionally caches the derived table/row topology inside ContentLayout in litchi-ods worksheet/package.rs; control is bit-identical to the 0196 candidate"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193-0196 (both binaries) plus the uncommitted ContentLayout topology cache (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_one_edit_save",
+  "timing_scope": "open + stage + commit + sequential publication through the fixed-window hashing sink",
+  "cases": {
+    "lifecycle_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 16922190.0,
+          "mean": 17019260.528,
+          "p95": 17809525.0,
+          "p99": 18587084.0
+        },
+        "b1": {
+          "p50": 16949154.0,
+          "mean": 16993719.564,
+          "p95": 17714781.0,
+          "p99": 18317376.0
+        },
+        "b2": {
+          "p50": 16862225.5,
+          "mean": 16929065.068,
+          "p95": 17565851.0,
+          "p99": 18278058.0
+        },
+        "a2": {
+          "p50": 16946444.0,
+          "mean": 17048981.106,
+          "p95": 17803988.0,
+          "p99": 18205665.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.159341,
+          "mean": 0.150071,
+          "p95": 0.531985,
+          "p99": 1.451051
+        },
+        "a2_to_b2": {
+          "p50": 0.496969,
+          "mean": 0.703362,
+          "p95": 1.337549,
+          "p99": -0.39764
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.143327,
+          "mean": 0.174629,
+          "p95": -0.03109,
+          "p99": -2.052065
+        },
+        "candidate": {
+          "p50": -0.512878,
+          "mean": -0.380461,
+          "p95": -0.84071,
+          "p99": -0.214649
+        }
+      },
+      "accepted_statistics": [
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2472653.0,
+          "mean": 2511397.354,
+          "p95": 2771072.0,
+          "p99": 3041056.0
+        },
+        "b1": {
+          "p50": 2513404.5,
+          "mean": 2542586.81,
+          "p95": 2782358.0,
+          "p99": 2973082.0
+        },
+        "b2": {
+          "p50": 2458232.5,
+          "mean": 2483330.098,
+          "p95": 2657094.0,
+          "p99": 2798390.0
+        },
+        "a2": {
+          "p50": 2502042.5,
+          "mean": 2528555.638,
+          "p95": 2713261.0,
+          "p99": 2907390.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.648088,
+          "mean": -1.241916,
+          "p95": -0.407279,
+          "p99": 2.23521
+        },
+        "a2_to_b2": {
+          "p50": 1.750969,
+          "mean": 1.788592,
+          "p95": 2.070092,
+          "p99": 3.749067
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.188582,
+          "mean": 0.683217,
+          "p95": -2.086232,
+          "p99": -4.395381
+        },
+        "candidate": {
+          "p50": -2.19511,
+          "mean": -2.330568,
+          "p95": -4.502081,
+          "p99": -5.875788
+        }
+      },
+      "accepted_statistics": [
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "a2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    }
+  }
+}

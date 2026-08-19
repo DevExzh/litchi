@@ -122,6 +122,21 @@ pub(crate) fn replace_tables(xml: &str, sheets: &[Sheet]) -> Result<String> {
     Ok(updated)
 }
 
+/// The scanned element layout of one immutable `content.xml` projection.
+///
+/// Spans are owned offsets into the scanned XML, and `tables`/`rows` are the
+/// spreadsheet's direct table children and each table's sorted direct
+/// table-row children, derived deterministically from the spans. A layout
+/// computed for one document must only be reused with byte-identical input.
+/// The `SourceBackedSpreadsheet` owner satisfies this by construction: its
+/// retained `content_xml` never changes for the owner's lifetime.
+#[derive(Debug)]
+pub(crate) struct ContentLayout {
+    spans: Vec<Span>,
+    tables: Vec<usize>,
+    rows: Vec<Vec<usize>>,
+}
+
 /// Patch only changed physical row runs in flat spreadsheet XML.
 ///
 /// Direct table children outside the changed rows remain byte-exact. A row
@@ -133,29 +148,60 @@ pub(crate) fn replace_changed_rows(
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
 ) -> Result<String> {
-    let edits =
-        changed_row_edits(xml, original, candidate, max_output_bytes, false)?.ok_or_else(|| {
+    let edits = changed_row_edits(xml, None, original, candidate, max_output_bytes, false)?
+        .0
+        .ok_or_else(|| {
             invalid("flat ODS row transaction is not eligible for row-local publication")
         })?;
     apply_edits_bounded(xml, edits, max_output_bytes)
 }
 
-/// Rewrite only the changed physical rows of a source-backed package.
+/// Rewrite only the changed physical rows of a source-backed package using a
+/// previously scanned layout of the same `xml`.
 ///
-/// `None` means the source layout is not eligible for this exact row-local
-/// contract (for example, a structural table change or a producer extension
-/// outside the modeled row grammar). Callers must fail closed instead of
-/// falling back to a complete package materialization.
-pub(crate) fn replace_changed_rows_from_content_xml(
+/// The layout must come from a successful scan of byte-identical `xml`
+/// (see [`replace_changed_rows_from_content_xml_retaining_layout`]); the
+/// per-call gates still run before the layout is consulted, in the same order
+/// as the scanning variant.
+pub(crate) fn replace_changed_rows_from_content_xml_with_layout(
     xml: &str,
+    layout: &ContentLayout,
     original: &[Sheet],
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
 ) -> Result<Option<String>> {
-    let edits = changed_row_edits(xml, original, candidate, max_output_bytes, true)?;
+    let (edits, _layout) = changed_row_edits(
+        xml,
+        Some(layout),
+        original,
+        candidate,
+        max_output_bytes,
+        true,
+    )?;
     edits
         .map(|edits| apply_edits_bounded(xml, edits, max_output_bytes))
         .transpose()
+}
+
+/// Rewrite only the changed physical rows of a source-backed package,
+/// retaining the scanned layout so the caller can cache it for later
+/// transactions over the same immutable `xml`.
+///
+/// The layout is returned only when the scan actually ran and succeeded; a
+/// gate refusal before the scan returns `(None, None)` and a scan failure
+/// propagates the error without a layout, so errors are never cached.
+pub(crate) fn replace_changed_rows_from_content_xml_retaining_layout(
+    xml: &str,
+    original: &[Sheet],
+    candidate: &[Option<&Sheet>],
+    max_output_bytes: usize,
+) -> Result<(Option<String>, Option<ContentLayout>)> {
+    let (edits, layout) =
+        changed_row_edits(xml, None, original, candidate, max_output_bytes, true)?;
+    let content = edits
+        .map(|edits| apply_edits_bounded(xml, edits, max_output_bytes))
+        .transpose()?;
+    Ok((content, layout))
 }
 
 /// Try a provenance-bearing row-local packaged worksheet publication without
@@ -177,7 +223,9 @@ pub(crate) fn try_replace_changed_rows_spliced(
         .zip(candidate)
         .map(|(before, after)| (before != after).then_some(after))
         .collect::<Vec<_>>();
-    let Some(edits) = changed_row_edits(xml, original, &changed, max_output_bytes, true)? else {
+    let (Some(edits), _layout) =
+        changed_row_edits(xml, None, original, &changed, max_output_bytes, true)?
+    else {
         return Ok(None);
     };
     let content = apply_edits_bounded(xml, edits.clone(), max_output_bytes)?;
@@ -206,11 +254,12 @@ pub(crate) fn try_replace_changed_rows_spliced(
 
 fn changed_row_edits(
     xml: &str,
+    layout: Option<&ContentLayout>,
     original: &[Sheet],
     candidate: &[Option<&Sheet>],
     max_output_bytes: usize,
     allow_ineligible: bool,
-) -> Result<Option<Vec<RowEdit>>> {
+) -> Result<(Option<Vec<RowEdit>>, Option<ContentLayout>)> {
     validation::validate_content_xml_size(xml)?;
     if candidate.len() > validation::MAX_PHYSICAL_RUNS {
         return Err(Error::InvalidFormat(format!(
@@ -223,33 +272,42 @@ fn changed_row_edits(
     }
     if original.len() != candidate.len() {
         if allow_ineligible {
-            return Ok(None);
+            return Ok((None, None));
         }
         return Err(invalid(
             "flat ODS row transaction cannot add or remove worksheets",
         ));
     }
 
-    let spans = scan(xml)?;
-    let spreadsheet = one_spreadsheet(&spans)?;
-    let mut tables = direct_children(&spans, spreadsheet, TABLE_NAMESPACE, "table");
-    tables.sort_unstable_by_key(|index| spans[*index].start);
-    if tables.len() != original.len() {
+    // Scan and derive the table/row topology only when no cached layout was
+    // supplied; the gates above always run first, preserving the established
+    // error ordering on both paths. `owned_layout` stays empty (no
+    // allocation) when a cached layout is used.
+    let mut owned_layout = None;
+    let layout: &ContentLayout = match layout {
+        Some(layout) => layout,
+        None => {
+            owned_layout = Some(build_layout(scan(xml)?)?);
+            owned_layout
+                .as_ref()
+                .ok_or_else(|| invalid("flat ODS layout is missing"))?
+        },
+    };
+    let spans: &[Span] = &layout.spans;
+    if layout.tables.len() != original.len() {
         return Err(invalid("flat ODS table inventory changed since parsing"));
     }
     let mut edits = Vec::new();
-    for (sheet_index, ((before, after), table)) in
-        original.iter().zip(candidate).zip(tables).enumerate()
+    for (sheet_index, ((before, after), rows)) in
+        original.iter().zip(candidate).zip(&layout.rows).enumerate()
     {
         let Some(after) = after else { continue };
         if before.name != after.name || before.style_name != after.style_name {
             if allow_ineligible {
-                return Ok(None);
+                return Ok((None, None));
             }
             return Err(invalid("flat ODS row transaction cannot rename worksheets"));
         }
-        let mut rows = direct_children(&spans, table, TABLE_NAMESPACE, "table-row");
-        rows.sort_unstable_by_key(|index| spans[*index].start);
         if rows.len() != before.rows.len() {
             return Err(Error::InvalidFormat(format!(
                 "flat ODS sheet {sheet_index} row inventory changed since parsing"
@@ -272,7 +330,7 @@ fn changed_row_edits(
         let new_end = after.rows.len() - suffix;
         if prefix == old_end {
             if allow_ineligible {
-                return Ok(None);
+                return Ok((None, None));
             }
             return Err(invalid(
                 "flat ODS row insertion requires an existing physical row anchor",
@@ -291,7 +349,7 @@ fn changed_row_edits(
         }
 
         for row in &rows[prefix..old_end] {
-            validate_rewritable_row(xml, &spans, *row)?;
+            validate_rewritable_row(xml, spans, *row)?;
         }
         edits.push(RowEdit {
             start: spans[rows[prefix]].start,
@@ -300,7 +358,26 @@ fn changed_row_edits(
         });
     }
 
-    Ok(Some(edits))
+    // `owned_layout` is `Some` exactly when this call ran the scan; cached
+    // calls return `None`, matching the established retention contract.
+    Ok((Some(edits), owned_layout))
+}
+
+fn build_layout(spans: Vec<Span>) -> Result<ContentLayout> {
+    let spreadsheet = one_spreadsheet(&spans)?;
+    let mut tables = direct_children(&spans, spreadsheet, TABLE_NAMESPACE, "table");
+    tables.sort_unstable_by_key(|index| spans[*index].start);
+    let mut rows = Vec::with_capacity(tables.len());
+    for table in &tables {
+        let mut table_rows = direct_children(&spans, *table, TABLE_NAMESPACE, "table-row");
+        table_rows.sort_unstable_by_key(|index| spans[*index].start);
+        rows.push(table_rows);
+    }
+    Ok(ContentLayout {
+        spans,
+        tables,
+        rows,
+    })
 }
 
 fn apply_edits_bounded(

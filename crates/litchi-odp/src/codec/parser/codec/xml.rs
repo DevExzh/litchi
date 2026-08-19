@@ -6,5 +6,7 @@
 //! methods remain exposed through the same crate-local facade.
 
 mod codec;
+#[cfg(test)]
+mod oracle;
 mod semantic;
 mod validation;

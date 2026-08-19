@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0200-ods-fused-open-parse",
+  "artifacts": [
+    {
+      "path": "ods-repeated-edit-0200v2-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 11214,
+      "compressed_sha256": "444f02d37fdb48a0d5b453881867f841926f089fbd88e70a20b8d43b36ae12cb",
+      "uncompressed_bytes": 59599,
+      "uncompressed_sha256": "62b5779592a0b7ef8a9188375ba7268f5969c24e83865dd92209d677c12e872e"
+    },
+    {
+      "path": "ods-repeated-edit-0200v2-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 11360,
+      "compressed_sha256": "d23add3837fa20c7206f7ae257a6f86fa6c6b1a81f2d83970900048a27ee9b08",
+      "uncompressed_bytes": 59597,
+      "uncompressed_sha256": "ac6dfe1a52f1d298ae785e129d162cbdaea49dd46c315c618adad3bfa3343db0"
+    },
+    {
+      "path": "ods-repeated-edit-0200v2-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 11187,
+      "compressed_sha256": "453ce203a288cf3eba59361e25fb79290a1de84278f3513c7d0ec5c296b53c82",
+      "uncompressed_bytes": 59600,
+      "uncompressed_sha256": "591640825dfce9513e13f5b627e9b5685ead68a337b65bf6caf438ef262e0b1f"
+    },
+    {
+      "path": "ods-repeated-edit-0200v2-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 11196,
+      "compressed_sha256": "1d95eb7633747a46d9d9d84617382d242b83a837e16111658b0b9eb4a352f322",
+      "uncompressed_bytes": 59599,
+      "uncompressed_sha256": "e57727d0dd665fa1bc2e47475d9e89687d4a0e4694224c0f4420af5e1ce62e68"
+    },
+    {
+      "path": "ods-repeated-edit-0200v2-summary.json",
+      "role": "derived_summary",
+      "bytes": 9747,
+      "sha256": "5eb29cb05085e67249824b64640387f67cdaaedbd63b7d86b409e0e06bb2036a"
+    }
+  ]
+}

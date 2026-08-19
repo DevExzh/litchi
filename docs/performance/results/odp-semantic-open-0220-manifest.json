@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0220-odf-validator-borrowing-reads",
+  "artifacts": [
+    {
+      "path": "odp-semantic-open-0220-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 3677,
+      "compressed_sha256": "b6de4c895684b84c62fad63ad894430930014c6f71660a5084329b1c2d337b69",
+      "uncompressed_bytes": 31278,
+      "uncompressed_sha256": "c36d370971a875e992bfc7b0270c745e9b2e41e38a1ef4dd28dd0f19c079e3c4"
+    },
+    {
+      "path": "odp-semantic-open-0220-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 3611,
+      "compressed_sha256": "dfe7633e5a6e62cdd3837d45b42c3f9a3c99c94f893e9116126b3ba2df0bfab7",
+      "uncompressed_bytes": 31278,
+      "uncompressed_sha256": "32829ae06f01bca79d46f796d4b41419514470f509dfa0c46dc372113585f099"
+    },
+    {
+      "path": "odp-semantic-open-0220-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 3648,
+      "compressed_sha256": "f30181664f63d4e364fb34bbfcca73d3e3fd9126c4a3f1caf29de67317084791",
+      "uncompressed_bytes": 31269,
+      "uncompressed_sha256": "3d3a6cc4505050fe6ed7023d1abda98a7eb15f8e8ddfe48a9846f3737a89d5e7"
+    },
+    {
+      "path": "odp-semantic-open-0220-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 3743,
+      "compressed_sha256": "723aed592b6688792dbefe9fc4907e0c5ef399b6ca1af0450ee2561459de1d13",
+      "uncompressed_bytes": 31275,
+      "uncompressed_sha256": "51c5a76c76e4292a5d92b0d87eb5b2cc0d493b45ce9b01a8ee9f5ec1f8bb90dd"
+    },
+    {
+      "path": "odp-semantic-open-0220-summary.json",
+      "role": "derived_summary",
+      "bytes": 3997,
+      "sha256": "0d446bd52a0fe8ab5db9d40cbbdf6c78eb38371a80bb7a9944e0d8079ef3f2fc"
+    }
+  ]
+}

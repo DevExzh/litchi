@@ -194,10 +194,7 @@ impl<'source> SourceCellSnapshot<'source> {
     /// Start an isolated sparse transaction from this snapshot.
     pub fn edit(&self) -> Result<SourceCellEdit<'source>> {
         self.check_source()?;
-        let (structure_protected, protected_sheets) = crate::protection::source_edit_protection(
-            &self.content_xml,
-            self.owner.styles_xml.as_deref(),
-        )?;
+        let (structure_protected, protected_sheets) = self.owner.edit_protection()?.clone();
         self.check_source()?;
         Ok(SourceCellEdit {
             before: self.clone(),
@@ -386,12 +383,31 @@ impl<'source> SourceCellEdit<'source> {
                 .enumerate()
                 .map(|(index, _)| self.touched.get(&index)),
         );
-        let content_xml = crate::worksheet::package::replace_changed_rows_from_content_xml(
-            &self.before.content_xml,
-            &self.before.sheets,
-            &candidates,
-            validation::MAX_CONTENT_XML_BYTES,
-        )?
+        // Reuse the owner's cached content layout when a previous transaction
+        // already scanned this immutable projection; otherwise scan now and
+        // retain the layout for later transactions. Both paths run the same
+        // gates before the scan in the same order.
+        let content_xml = if let Some(layout) = self.before.owner.cached_content_layout() {
+            crate::worksheet::package::replace_changed_rows_from_content_xml_with_layout(
+                &self.before.content_xml,
+                layout,
+                &self.before.sheets,
+                &candidates,
+                validation::MAX_CONTENT_XML_BYTES,
+            )?
+        } else {
+            let (content, layout) =
+                crate::worksheet::package::replace_changed_rows_from_content_xml_retaining_layout(
+                    &self.before.content_xml,
+                    &self.before.sheets,
+                    &candidates,
+                    validation::MAX_CONTENT_XML_BYTES,
+                )?;
+            if let Some(layout) = layout {
+                self.before.owner.cache_content_layout(layout);
+            }
+            content
+        }
         .ok_or_else(|| {
             Error::InvalidFormat(
                 "ODS source cell edit is not eligible for exact row-local publication".to_string(),

@@ -138,3 +138,81 @@ mod chart_document_tests {
         assert!(parse(xml).is_err());
     }
 }
+
+#[cfg(test)]
+mod handler_tests {
+    use super::super::codec::{CalculationHandler, classify, validate_size};
+    use super::parse;
+    use litchi_core::{Error, Result};
+    use quick_xml::events::Event;
+    use quick_xml::reader::NsReader;
+
+    /// Drive the fused-parser handler over one tokenization, mirroring the
+    /// family owners' driver loop (classification immediately after the
+    /// read, Eof dispatched before the break).
+    fn handler_parse(xml: &str) -> Result<Option<super::Settings>> {
+        validate_size(xml)?;
+        let mut reader = NsReader::from_str(xml);
+        let mut buffer = Vec::new();
+        let mut handler = CalculationHandler::default();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let (is_table, is_office) = classify(&namespace);
+            let is_eof = matches!(event, Event::Eof);
+            handler.on_event(
+                is_table,
+                is_office,
+                &event,
+                reader.resolver(),
+                reader.decoder(),
+            )?;
+            buffer.clear();
+            if is_eof {
+                break;
+            }
+        }
+        handler.finish()
+    }
+
+    #[test]
+    fn handler_matches_standalone_parse() {
+        const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+        const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+        let no_settings = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}"><o:body><o:spreadsheet/></o:body></o:document-content>"#
+        );
+        let full_settings = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}"><o:body><o:spreadsheet><t:calculation-settings t:case-sensitive="1" t:null-year="1930"><t:null-date t:value-type="date" t:date-value="1899-12-30+08:00"/><t:iteration t:status="enable" t:steps="100" t:maximum-difference="NaN"/></t:calculation-settings></o:spreadsheet></o:body></o:document-content>"#
+        );
+        let duplicate = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}"><o:body><o:spreadsheet><t:calculation-settings/><t:calculation-settings/></o:spreadsheet></o:body></o:document-content>"#
+        );
+        let misplaced = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}"><o:body><t:calculation-settings/></o:body></o:document-content>"#
+        );
+        let text_inside = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}"><o:body><o:spreadsheet><t:calculation-settings>text</t:calculation-settings></o:spreadsheet></o:body></o:document-content>"#
+        );
+        let unterminated = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}"><o:body><o:spreadsheet><t:calculation-settings>"#
+        );
+        for xml in [
+            no_settings,
+            full_settings,
+            duplicate,
+            misplaced,
+            text_inside,
+            unterminated,
+        ] {
+            let expected = parse(&xml)
+                .map(|settings| format!("{settings:?}"))
+                .map_err(|error| error.to_string());
+            let actual = handler_parse(&xml)
+                .map(|settings| format!("{settings:?}"))
+                .map_err(|error| error.to_string());
+            assert_eq!(expected, actual, "handler and standalone disagree");
+        }
+    }
+}

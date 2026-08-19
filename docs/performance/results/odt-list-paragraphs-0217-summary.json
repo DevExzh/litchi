@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0217-odt-discard-validate-text",
+  "decision": "banked",
+  "claim_scope": "byte-identical phase; p50/mean/p95 adverse-both readings within the 0218 floors (5.2%/6.7%/22.4%) - layout readings, not claimed",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "6c7fcfb9572f79bbfc2a9dd06289f733e370b34f96662980c5d59b7e972471eb",
+      "candidate_sha256": "8425066ab6b43f08486c5a808d16e31bf6e758f3ff1205096c1a5e21af4a2a5d",
+      "note": "control is the banked 0215 binary; candidate adds the 0216 discard-but-validate text extraction in litchi-odt"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, 0207, 0209-0212, and 0215 (both binaries); the candidate additionally carries the 0216 discard-but-validate text extraction in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-semantic-tiny",
+    "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+    "archive_bytes": 2148,
+    "archive_member_count": 5
+  },
+  "selector": "odt_semantic_list_paragraphs",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 11185.0,
+          "mean": 11369.22,
+          "p95": 11445.0,
+          "p99": 17846.0
+        },
+        "b1": {
+          "p50": 11225.0,
+          "mean": 11475.326,
+          "p95": 11785.0,
+          "p99": 19046.0
+        },
+        "b2": {
+          "p50": 11605.5,
+          "mean": 11975.134,
+          "p95": 14801.0,
+          "p99": 17836.0
+        },
+        "a2": {
+          "p50": 11426.0,
+          "mean": 11748.36,
+          "p95": 12087.0,
+          "p99": 19486.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.357622,
+          "mean": -0.933274,
+          "p95": -2.97073,
+          "p99": -6.724196
+        },
+        "a2_to_b2": {
+          "p50": -1.570978,
+          "mean": -1.930261,
+          "p95": -22.453876,
+          "p99": 8.467618
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 2.154671,
+          "mean": 3.334793,
+          "p95": 5.609436,
+          "p99": 9.189734
+        },
+        "candidate": {
+          "p50": 3.389755,
+          "mean": 4.355502,
+          "p95": 25.591854,
+          "p99": -6.35304
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree; candidate drift +25.59% exceeds 10%",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

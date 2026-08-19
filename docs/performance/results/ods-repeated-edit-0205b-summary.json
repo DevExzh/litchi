@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "change": "0205-layout-noise-floor-calibration",
+  "decision": "calibration-only",
+  "claim_scope": "pure layout noise floor reading",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "475cf2898880363517eec9e0a9ac6b582eed1f78054f161f394bdd635bb19d7d",
+      "candidate_sha256": "915040c2a59010812c15611dcc6c77a1d0717b90b8ce2d86c7f8a376425f3b15",
+      "note": "calibration pair: control is the banked 0202 binary; probe adds never-executed parser-shaped code (+5.5KB text) to litchi-ods::worksheet; every paired-direction reading is pure per-binary-pair layout noise"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196 and 0198-0202 (both binaries); the probe binary additionally carries never-executed layout padding removed after the build (tree verified to rebuild bit-exact to control)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_repeated_edit",
+  "timing_scope": "one source-backed owner and four fixed-window hashing sinks prepared outside the timer; the timer covers exactly four sequential edit_cells + set_cell + commit + write_to transactions with per-transaction stage/commit/publication durations summed per sample",
+  "cases": {
+    "total_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 41334220.5,
+          "mean": 41492797.35,
+          "p95": 42661499.0,
+          "p99": 43107033.0
+        },
+        "b1": {
+          "p50": 41600246.5,
+          "mean": 41755391.234,
+          "p95": 43153687.0,
+          "p99": 44349222.0
+        },
+        "b2": {
+          "p50": 41470904.0,
+          "mean": 41581434.384,
+          "p95": 42674407.0,
+          "p99": 43425292.0
+        },
+        "a2": {
+          "p50": 41977872.0,
+          "mean": 42105048.23,
+          "p95": 43371607.0,
+          "p99": 44357806.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.643597,
+          "mean": -0.632866,
+          "p95": -1.153705,
+          "p99": -2.881639
+        },
+        "a2_to_b2": {
+          "p50": 1.207703,
+          "mean": 1.243589,
+          "p95": 1.607503,
+          "p99": 2.102255
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.557188,
+          "mean": 1.475559,
+          "p95": 1.664517,
+          "p99": 2.901552
+        },
+        "candidate": {
+          "p50": -0.310918,
+          "mean": -0.416609,
+          "p95": -1.110635,
+          "p99": -2.083306
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "stage_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1885026.5,
+          "mean": 1901090.48,
+          "p95": 2032170.0,
+          "p99": 2190449.0
+        },
+        "b1": {
+          "p50": 1878092.5,
+          "mean": 1899586.382,
+          "p95": 2039208.0,
+          "p99": 2202916.0
+        },
+        "b2": {
+          "p50": 1885662.5,
+          "mean": 1896470.554,
+          "p95": 2022036.0,
+          "p99": 2084621.0
+        },
+        "a2": {
+          "p50": 1880269.5,
+          "mean": 1893660.062,
+          "p95": 2025959.0,
+          "p99": 2133990.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.367846,
+          "mean": 0.079118,
+          "p95": -0.346329,
+          "p99": -0.569153
+        },
+        "a2_to_b2": {
+          "p50": -0.286821,
+          "mean": -0.148416,
+          "p95": 0.193637,
+          "p99": 2.31346
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.252357,
+          "mean": -0.39085,
+          "p95": -0.305634,
+          "p99": -2.577508
+        },
+        "candidate": {
+          "p50": 0.403069,
+          "mean": -0.164027,
+          "p95": -0.842092,
+          "p99": -5.369928
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 6462231.0,
+          "mean": 6506314.02,
+          "p95": 6844158.0,
+          "p99": 7152983.0
+        },
+        "b1": {
+          "p50": 6547057.0,
+          "mean": 6599251.132,
+          "p95": 7026118.0,
+          "p99": 7385274.0
+        },
+        "b2": {
+          "p50": 6469917.0,
+          "mean": 6508263.632,
+          "p95": 6795721.0,
+          "p99": 7151211.0
+        },
+        "a2": {
+          "p50": 6738067.5,
+          "mean": 6774469.198,
+          "p95": 7052818.0,
+          "p99": 7320355.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.312643,
+          "mean": -1.428414,
+          "p95": -2.658618,
+          "p99": -3.24747
+        },
+        "a2_to_b2": {
+          "p50": 3.979635,
+          "mean": 3.929541,
+          "p95": 3.645309,
+          "p99": 2.310598
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 4.268441,
+          "mean": 4.121461,
+          "p95": 3.048731,
+          "p99": 2.339891
+        },
+        "candidate": {
+          "p50": -1.178239,
+          "mean": -1.378755,
+          "p95": -3.279151,
+          "p99": -3.16932
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "publication_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 32786981.0,
+          "mean": 32881211.57,
+          "p95": 33613122.0,
+          "p99": 33955086.0
+        },
+        "b1": {
+          "p50": 32947792.5,
+          "mean": 33069236.474,
+          "p95": 33961954.0,
+          "p99": 34547743.0
+        },
+        "b2": {
+          "p50": 32883363.0,
+          "mean": 32960199.07,
+          "p95": 33553263.0,
+          "p99": 33985166.0
+        },
+        "a2": {
+          "p50": 33106582.0,
+          "mean": 33197300.518,
+          "p95": 34126603.0,
+          "p99": 34789425.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.490474,
+          "mean": -0.571831,
+          "p95": -1.037785,
+          "p99": -1.745415
+        },
+        "a2_to_b2": {
+          "p50": 0.674244,
+          "mean": 0.714219,
+          "p95": 1.680038,
+          "p99": 2.311792
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.97478,
+          "mean": 0.961306,
+          "p95": 1.527621,
+          "p99": 2.457184
+        },
+        "candidate": {
+          "p50": -0.19555,
+          "mean": -0.329725,
+          "p95": -1.203379,
+          "p99": -1.628404
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "a2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    }
+  }
+}

@@ -6,6 +6,7 @@
 
 mod codec;
 mod model;
+mod open_parse;
 mod package;
 mod semantic;
 mod source;

@@ -1,0 +1,340 @@
+{
+  "schema_version": 1,
+  "change": "0199-ods-parse-event-copy-elision",
+  "decision": "accepted",
+  "claim_scope": "ODS repeated-edit: total/commit/publication p50-p99 and stage p50/mean/p95",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "4e5662b270a30fc93af0b72bbe8c80d03adc82a73612a85085e6e3ac020954e1",
+      "candidate_sha256": "6acae4dbfcac07185cba1047c5c157d52b096d0bdcc5642083cc6055e977c8ff",
+      "note": "both binaries contain changes 0193-0196 and 0198 as baseline plus the identical 341-case selector matrix; the candidate binary additionally removes per-event into_owned copies from the litchi-ods worksheet and settings parse loops; control is bit-identical to the 0198 candidate"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193-0196 and 0198 (both binaries) plus the uncommitted litchi-ods parse-loop into_owned removals (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_repeated_edit",
+  "timing_scope": "one source-backed owner and four fixed-window hashing sinks prepared outside the timer; the timer covers exactly four sequential edit_cells + set_cell + commit + write_to transactions with per-transaction stage/commit/publication durations summed per sample",
+  "cases": {
+    "total_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 43803913.5,
+          "mean": 44078684.21,
+          "p95": 45849177.0,
+          "p99": 48205681.0
+        },
+        "b1": {
+          "p50": 42781100.0,
+          "mean": 42911039.736,
+          "p95": 44076319.0,
+          "p99": 45658429.0
+        },
+        "b2": {
+          "p50": 42516426.5,
+          "mean": 42641195.13,
+          "p95": 43711237.0,
+          "p99": 45320547.0
+        },
+        "a2": {
+          "p50": 43446739.0,
+          "mean": 43640664.66,
+          "p95": 45221967.0,
+          "p99": 46402405.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 2.334982,
+          "mean": 2.649,
+          "p95": 3.866717,
+          "p99": 5.284132
+        },
+        "a2_to_b2": {
+          "p50": 2.141271,
+          "mean": 2.290225,
+          "p95": 3.340699,
+          "p99": 2.33147
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.815394,
+          "mean": -0.993722,
+          "p95": -1.367985,
+          "p99": -3.740796
+        },
+        "candidate": {
+          "p50": -0.618669,
+          "mean": -0.628847,
+          "p95": -0.828295,
+          "p99": -0.740021
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    },
+    "stage_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2048516.5,
+          "mean": 2070415.674,
+          "p95": 2239721.0,
+          "p99": 2467661.0
+        },
+        "b1": {
+          "p50": 2030957.5,
+          "mean": 2046517.718,
+          "p95": 2193809.0,
+          "p99": 2301548.0
+        },
+        "b2": {
+          "p50": 1992756.5,
+          "mean": 2016779.648,
+          "p95": 2175594.0,
+          "p99": 2675731.0
+        },
+        "a2": {
+          "p50": 2041201.0,
+          "mean": 2056699.546,
+          "p95": 2230944.0,
+          "p99": 2401688.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.857157,
+          "mean": 1.154259,
+          "p95": 2.049898,
+          "p99": 6.731597
+        },
+        "a2_to_b2": {
+          "p50": 2.373333,
+          "mean": 1.940969,
+          "p95": 2.481013,
+          "p99": -11.410433
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.357112,
+          "mean": -0.662482,
+          "p95": -0.391879,
+          "p99": -2.673503
+        },
+        "candidate": {
+          "p50": -1.880935,
+          "mean": -1.453106,
+          "p95": -0.830291,
+          "p99": 16.257884
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "paired directions disagree; candidate drift +16.26% exceeds 15%"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 7769760.5,
+          "mean": 7853855.356,
+          "p95": 8434232.0,
+          "p99": 9043401.0
+        },
+        "b1": {
+          "p50": 6801610.5,
+          "mean": 6853230.684,
+          "p95": 7278871.0,
+          "p99": 7705071.0
+        },
+        "b2": {
+          "p50": 6728802.5,
+          "mean": 6792653.93,
+          "p95": 7195617.0,
+          "p99": 7866429.0
+        },
+        "a2": {
+          "p50": 7559361.0,
+          "mean": 7626005.024,
+          "p95": 8180625.0,
+          "p99": 8607477.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 12.460487,
+          "mean": 12.740554,
+          "p95": 13.698473,
+          "p99": 14.798968
+        },
+        "a2_to_b2": {
+          "p50": 10.987152,
+          "mean": 10.927754,
+          "p95": 12.040743,
+          "p99": 8.609352
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -2.707928,
+          "mean": -2.901127,
+          "p95": -3.006877,
+          "p99": -4.820355
+        },
+        "candidate": {
+          "p50": -1.070452,
+          "mean": -0.883915,
+          "p95": -1.143776,
+          "p99": 2.094179
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    },
+    "publication_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 33696220.0,
+          "mean": 33882987.488,
+          "p95": 35204299.0,
+          "p99": 36488919.0
+        },
+        "b1": {
+          "p50": 33638048.0,
+          "mean": 33705271.854,
+          "p95": 34430413.0,
+          "p99": 35384818.0
+        },
+        "b2": {
+          "p50": 33479342.0,
+          "mean": 33532631.26,
+          "p95": 34047864.0,
+          "p99": 34864975.0
+        },
+        "a2": {
+          "p50": 33561082.0,
+          "mean": 33673425.342,
+          "p95": 34713240.0,
+          "p99": 35354280.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.172637,
+          "mean": 0.524498,
+          "p95": 2.198271,
+          "p99": 3.025853
+        },
+        "a2_to_b2": {
+          "p50": 0.243556,
+          "mean": 0.418116,
+          "p95": 1.916779,
+          "p99": 1.384005
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.401048,
+          "mean": -0.618488,
+          "p95": -1.394884,
+          "p99": -3.109544
+        },
+        "candidate": {
+          "p50": -0.471805,
+          "mean": -0.512207,
+          "p95": -1.111079,
+          "p99": -1.469113
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "a2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    }
+  }
+}

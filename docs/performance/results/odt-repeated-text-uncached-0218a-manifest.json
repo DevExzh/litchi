@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0218-odt-layout-floor-calibration",
+  "artifacts": [
+    {
+      "path": "odt-repeated-text-uncached-0218a-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 3909,
+      "compressed_sha256": "a2822fdd259571c7190e98c0dcb5c727fca9f7b3e74bcfa3bd853b6eee4ff22d",
+      "uncompressed_bytes": 279452,
+      "uncompressed_sha256": "03772162b9f208b7f7cfaa737d0fad727728533093c5d6aa20971b009ed652c7"
+    },
+    {
+      "path": "odt-repeated-text-uncached-0218a-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 3903,
+      "compressed_sha256": "083937251fb210f1d65017b2ed51a9d3f1fa2c69b66a716fdcbebd9df9da59c3",
+      "uncompressed_bytes": 279452,
+      "uncompressed_sha256": "a373402cd059578a066dee08ad8f06708a90e4a1ffd5390196f46a26e390ee6f"
+    },
+    {
+      "path": "odt-repeated-text-uncached-0218a-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 3925,
+      "compressed_sha256": "fdaa0fcd8a2013fd88d99ba9a8652633309b5b5fe295d1cf7bfa64ef761b86dd",
+      "uncompressed_bytes": 279451,
+      "uncompressed_sha256": "74ec1127dde38416838f4e4d1b222e6b97dd5a5910100c7b5f2fe14cfaf51f29"
+    },
+    {
+      "path": "odt-repeated-text-uncached-0218a-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 3928,
+      "compressed_sha256": "88151afaf6ab7abc9f1083d9bd430266941066ee7c59ed23e0a15eb907590762",
+      "uncompressed_bytes": 279451,
+      "uncompressed_sha256": "7256d13b3af0b517fae7ed3d2541362249041b98c83b1bccedc1808826658928"
+    },
+    {
+      "path": "odt-repeated-text-uncached-0218a-summary.json",
+      "role": "derived_summary",
+      "bytes": 4210,
+      "sha256": "851c9eb7f47a945642ddd07055e1404a98397e309bd428a31b3e11afab03c487"
+    }
+  ]
+}

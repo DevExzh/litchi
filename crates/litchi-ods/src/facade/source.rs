@@ -27,7 +27,6 @@ use zeroize::Zeroizing;
 
 use super::CellSelector;
 use crate::{
-    codec::names,
     model::names::Definition,
     settings::Settings,
     worksheet::{CellView, Sheet},
@@ -62,6 +61,8 @@ pub struct SourceBackedSpreadsheet {
     settings: Option<Settings>,
     cell_queries: AtomicUsize,
     cell_locator: OnceLock<Option<super::cell_locator::CellLocator>>,
+    edit_protection: OnceLock<(bool, Vec<String>)>,
+    content_layout: OnceLock<crate::worksheet::package::ContentLayout>,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheet {
@@ -203,7 +204,7 @@ impl SourceBackedSpreadsheet {
                     Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
                 })?;
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
-            crate::authoring::validate_content_xml(&content_xml)?;
+            let open_parse = crate::open_parse::OpenParse::run(&content_xml)?;
             let styles_xml = if package.has_file("styles.xml")? {
                 Some(
                     String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
@@ -228,11 +229,16 @@ impl SourceBackedSpreadsheet {
                 None
             };
             let metadata = crate::metadata::Snapshot::from_source(metadata_source)?;
-            let settings = crate::settings::Snapshot::from_content_xml(&content_xml)?
-                .calculation()
-                .cloned();
-            let definitions = names::parse(&content_xml)?;
-            let sheets = crate::worksheet::codec::parse(&content_xml)?;
+            let (settings, outputs) = open_parse.finish()?;
+            // The location spans are validated by the fused parse (including
+            // the semantic/XML disagreement check) but are not retained by
+            // the source-backed facade, exactly as the previous
+            // `Snapshot::from_content_xml` projection discarded them.
+            let crate::open_parse::OpenOutputs {
+                location: _location,
+                definitions,
+                sheets,
+            } = outputs;
             Ok((
                 content_xml,
                 styles_xml,
@@ -257,7 +263,48 @@ impl SourceBackedSpreadsheet {
             settings,
             cell_queries: AtomicUsize::new(0),
             cell_locator: OnceLock::new(),
+            edit_protection: OnceLock::new(),
+            content_layout: OnceLock::new(),
         })
+    }
+
+    /// Return the cached row-edit layout of the retained `content.xml`.
+    ///
+    /// The layout is a pure function of the immutable `content_xml`
+    /// projection, so it is scanned at most once per owner. Only successful
+    /// scans are cached; a failed scan re-runs on the next commit and returns
+    /// the same error. The first commit on an owner populates the cache as a
+    /// side effect of its normal scan, so single-transaction lifecycles pay
+    /// exactly one scan, unchanged.
+    pub(crate) fn cached_content_layout(
+        &self,
+    ) -> Option<&crate::worksheet::package::ContentLayout> {
+        self.content_layout.get()
+    }
+
+    /// Cache a layout scanned from this owner's `content.xml`.
+    ///
+    /// A concurrent first commit may scan twice; one result is published and
+    /// the other is dropped, and both are pure functions of the same input.
+    pub(crate) fn cache_content_layout(&self, layout: crate::worksheet::package::ContentLayout) {
+        let _unused = self.content_layout.set(layout);
+    }
+
+    /// Return the cached protection facts used by source-backed cell edits.
+    ///
+    /// The facts are a pure function of the retained, immutable `content.xml`
+    /// and `styles.xml` projections, so they are computed at most once per
+    /// owner. Parse failures are not cached: every failed call re-runs the
+    /// same validation and returns the same error.
+    pub(crate) fn edit_protection(&self) -> Result<&(bool, Vec<String>)> {
+        if let Some(protection) = self.edit_protection.get() {
+            return Ok(protection);
+        }
+        let computed = crate::protection::source_edit_protection(
+            &self.content_xml,
+            self.styles_xml.as_deref(),
+        )?;
+        Ok(self.edit_protection.get_or_init(|| computed))
     }
 
     /// Check the source identity and revision without reading a member.
@@ -754,6 +801,55 @@ mod tests {
     }
 
     #[test]
+    fn content_validation_eof_error_beats_styles_member_load() {
+        // The fused open parse completes content validation (pass 1) before
+        // the styles.xml member loads, exactly as the standalone check did:
+        // an unclosed content.xml root must beat a non-UTF-8 styles.xml.
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet/>"#
+        );
+        let mut archive = ZipArchive::new(Cursor::new(package())).expect("ZIP archive");
+        let mut output = Cursor::new(Vec::new());
+        {
+            let mut writer = ZipWriter::new(&mut output);
+            let options =
+                SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            for index in 0..archive.len() {
+                let (name, mut data) = {
+                    let mut entry = archive.by_index(index).expect("ZIP entry");
+                    let name = entry.name().to_owned();
+                    let mut data = Vec::new();
+                    entry.read_to_end(&mut data).expect("ZIP entry bytes");
+                    (name, data)
+                };
+                if name == "content.xml" {
+                    data = content.clone().into_bytes();
+                } else if name == "META-INF/manifest.xml" {
+                    let manifest = String::from_utf8(data).expect("manifest UTF-8");
+                    data = manifest
+                        .replace(
+                            "</manifest:manifest>",
+                            r#"<manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
+                        )
+                        .into_bytes();
+                }
+                writer.start_file(name, options).expect("ZIP entry");
+                writer.write_all(&data).expect("ZIP entry write");
+            }
+            writer.start_file("styles.xml", options).expect("ZIP entry");
+            writer.write_all(&[0xff, 0xfe]).expect("ZIP entry write");
+            writer.finish().expect("ZIP finish");
+        }
+        let error =
+            SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(output.into_inner())))
+                .expect_err("unclosed content.xml must fail");
+        assert_eq!(
+            error.to_string(),
+            "Invalid format: ODS content.xml ended before its root element was closed"
+        );
+    }
+
+    #[test]
     fn source_checks_revision_and_is_send_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<SourceBackedSpreadsheet>();
@@ -779,6 +875,114 @@ mod tests {
             spreadsheet.materialize(),
             Err(litchi_core::Error::SourceChanged { .. })
         ));
+    }
+
+    #[test]
+    fn source_edit_protection_is_lazy_and_shared_across_sequential_edits() {
+        let source = Arc::new(CountingSource::new(package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        let after_open = source.reads();
+
+        assert!(spreadsheet.edit_protection.get().is_none());
+        let mut first = spreadsheet.edit_cells().expect("first edit");
+        let cached = spreadsheet
+            .edit_protection
+            .get()
+            .expect("protection cached after first edit");
+        assert_eq!(*cached, (false, Vec::new()));
+        assert_eq!(source.reads(), after_open);
+
+        // The repeated physical row refusal is identical on the cached path.
+        assert!(
+            first
+                .set_cell(
+                    "Sheet1",
+                    0,
+                    0,
+                    Cell::new(CellValue::Text("changed".to_string()), "changed"),
+                )
+                .is_err()
+        );
+        drop(first);
+
+        let mut second = spreadsheet.edit_cells().expect("second edit");
+        let reused = spreadsheet
+            .edit_protection
+            .get()
+            .expect("protection remains cached");
+        assert!(ptr::eq(cached, reused));
+        assert_eq!(source.reads(), after_open);
+        assert!(
+            second
+                .set_cell(
+                    "Sheet1",
+                    0,
+                    0,
+                    Cell::new(CellValue::Text("changed".to_string()), "changed"),
+                )
+                .is_err()
+        );
+        assert_eq!(second.changed_cells(), 0);
+    }
+
+    fn editable_package() -> Vec<u8> {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell office:value-type="string"><text:p>beta</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
+        );
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer.set_mimetype(MIME).expect("ODS MIME");
+        writer
+            .add_file("content.xml", content.as_bytes())
+            .expect("ODS content");
+        writer.finish_to_bytes().expect("ODS package")
+    }
+
+    #[test]
+    fn source_content_layout_is_scanned_once_and_shared_across_sequential_commits() {
+        let source = Arc::new(CountingSource::new(editable_package()));
+        let spreadsheet =
+            SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
+        let after_open = source.reads();
+
+        assert!(spreadsheet.content_layout.get().is_none());
+
+        let mut first = spreadsheet.edit_cells().expect("first edit");
+        first
+            .set_cell(
+                "Data",
+                0,
+                0,
+                Cell::new(CellValue::Text("one".to_string()), "one"),
+            )
+            .expect("first set_cell");
+        let first_commit = first.commit().expect("first commit");
+        assert!(first_commit.changed());
+        assert!(first_commit.snapshot().content_xml().contains("one"));
+        let cached = spreadsheet
+            .content_layout
+            .get()
+            .expect("layout cached after first commit");
+        assert_eq!(source.reads(), after_open);
+
+        let mut second = spreadsheet.edit_cells().expect("second edit");
+        second
+            .set_cell(
+                "Data",
+                1,
+                0,
+                Cell::new(CellValue::Text("two".to_string()), "two"),
+            )
+            .expect("second set_cell");
+        let second_commit = second.commit().expect("second commit");
+        assert!(second_commit.changed());
+        assert!(second_commit.snapshot().content_xml().contains("two"));
+        let reused = spreadsheet
+            .content_layout
+            .get()
+            .expect("layout remains cached");
+        assert!(ptr::eq(cached, reused));
+        assert_eq!(source.reads(), after_open);
     }
 
     #[test]

@@ -1044,6 +1044,7 @@ impl Presentation {
                 };
                 Ok(Some(Slide::Keynote {
                     number: position + 1,
+                    name: slide.name().map(str::to_owned),
                     title,
                     text,
                 }))

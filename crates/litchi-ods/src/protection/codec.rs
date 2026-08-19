@@ -6,8 +6,9 @@ use crate::model::style_protection::{self, PreservedXmlFragment};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
+    encoding::Decoder,
     events::{BytesStart, Event},
-    name::{Namespace, ResolveResult},
+    name::{Namespace, NamespaceResolver, ResolveResult},
     reader::NsReader,
 };
 use std::ops::Range;
@@ -18,6 +19,16 @@ const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0
 const LOEXT_NAMESPACE: &[u8] =
     b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 const OFFICE_EXT_NAMESPACE: &[u8] = b"http://openoffice.org/2009/office";
+
+/// Enforce the pre-parse byte-size limit of the protection source.
+pub(crate) fn validate_size(source: &str) -> Result<()> {
+    if source.len() > MAX_CONTENT_BYTES {
+        return Err(Error::InvalidFormat(
+            "ODS protection content.xml exceeds the snapshot limit".to_string(),
+        ));
+    }
+    Ok(())
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct ElementLocation {
@@ -60,6 +71,11 @@ pub(crate) struct Location {
 }
 
 impl Location {
+    /// This standalone path intentionally keeps the historical inline event
+    /// loop as the oracle for the fused protection parse ([`super::fused`]),
+    /// which drives the equivalent [`LocationHandler`] over the same event
+    /// stream.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn parse(source: &str, styles_xml: Option<&str>) -> Result<Self> {
         if source.len() > MAX_CONTENT_BYTES {
             return Err(Error::InvalidFormat(
@@ -353,6 +369,356 @@ impl Location {
     }
 }
 
+/// The namespace classification the fused protection parse passes to
+/// [`LocationHandler::on_event`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LocationNamespace {
+    Office,
+    Table,
+    Loext,
+    OfficeExt,
+    Other,
+}
+
+impl LocationNamespace {
+    /// The URI bytes [`classify`] compares against; `Other` maps to the same
+    /// empty slice the historical `namespace_uri` produced for unbound,
+    /// unknown, or foreign resolutions.
+    fn uri(self) -> &'static [u8] {
+        match self {
+            Self::Office => OFFICE_NAMESPACE,
+            Self::Table => TABLE_NAMESPACE,
+            Self::Loext => LOEXT_NAMESPACE,
+            Self::OfficeExt => OFFICE_EXT_NAMESPACE,
+            Self::Other => b"",
+        }
+    }
+}
+
+/// Classify the resolved event namespace for the source-locator pass.
+///
+/// The resolved value borrows the reader mutably, so callers classify it
+/// immediately after the read exactly as the historical loop body did.
+pub(crate) fn location_namespace(namespace: &ResolveResult<'_>) -> LocationNamespace {
+    match namespace {
+        ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE => {
+            LocationNamespace::Office
+        },
+        ResolveResult::Bound(Namespace(uri)) if *uri == TABLE_NAMESPACE => LocationNamespace::Table,
+        ResolveResult::Bound(Namespace(uri)) if *uri == LOEXT_NAMESPACE => LocationNamespace::Loext,
+        ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_EXT_NAMESPACE => {
+            LocationNamespace::OfficeExt
+        },
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => {
+            LocationNamespace::Other
+        },
+    }
+}
+
+/// Streaming event handler holding the [`Location::parse`] scan state.
+///
+/// The fused protection parse ([`super::fused`]) drives one shared tokenizer
+/// through this handler, while [`Location::parse`] keeps its historical
+/// inline loop as the standalone oracle; both apply the same checks and
+/// error messages at the same events.
+#[derive(Debug)]
+pub(crate) struct LocationHandler<'a> {
+    source: &'a str,
+    styles_xml: Option<&'a str>,
+    stack: Vec<OpenElement>,
+    spreadsheet: Option<ElementLocation>,
+    body_start: Option<usize>,
+    sheets: Vec<SheetLocation>,
+    automatic: Option<ElementLocation>,
+    table_prefix: Option<String>,
+    loext_prefix: Option<String>,
+}
+
+impl<'a> LocationHandler<'a> {
+    /// Start the locator scan over `source`, carrying `styles_xml` into the
+    /// resulting [`Location`].
+    pub(crate) fn new(source: &'a str, styles_xml: Option<&'a str>) -> Self {
+        Self {
+            source,
+            styles_xml,
+            stack: Vec::new(),
+            spreadsheet: None,
+            body_start: None,
+            sheets: Vec::new(),
+            automatic: None,
+            table_prefix: None,
+            loext_prefix: None,
+        }
+    }
+
+    /// Process one resolved event at byte positions `pos_before`/`pos_after`.
+    ///
+    /// `namespace` is the caller-classified resolution of the event's
+    /// namespace; the resolved value borrows the reader mutably, so callers
+    /// classify it immediately after the read exactly as the historical loop
+    /// body did.
+    pub(crate) fn on_event(
+        &mut self,
+        namespace: LocationNamespace,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        pos_before: u64,
+        pos_after: u64,
+    ) -> Result<()> {
+        let event_start = usize::try_from(pos_before).map_err(|_error| {
+            Error::InvalidFormat("protection XML position exceeds usize".to_string())
+        })?;
+        let event_end = usize::try_from(pos_after).map_err(|_error| {
+            Error::InvalidFormat("protection XML position exceeds usize".to_string())
+        })?;
+        match event {
+            Event::Start(element) => {
+                let info = element_location_resolved(
+                    self.source,
+                    resolver,
+                    element,
+                    event_start,
+                    event_end,
+                )?;
+                let kind = classify(
+                    namespace.uri(),
+                    element.local_name().as_ref(),
+                    self.stack.last().map(|open| open.kind),
+                );
+                if matches!(kind, ElementKind::DocumentContent) {
+                    collect_prefixes_resolved(
+                        decoder,
+                        element,
+                        &mut self.table_prefix,
+                        &mut self.loext_prefix,
+                    )?;
+                }
+                let sheet_index = match kind {
+                    ElementKind::Spreadsheet => {
+                        if self.spreadsheet.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "duplicate office:spreadsheet element".to_string(),
+                            ));
+                        }
+                        self.spreadsheet = Some(info.clone());
+                        None
+                    },
+                    ElementKind::Body => {
+                        self.body_start = Some(event_start);
+                        None
+                    },
+                    ElementKind::Sheet => {
+                        let name = attribute_value_resolved(
+                            resolver,
+                            decoder,
+                            element,
+                            TABLE_NAMESPACE,
+                            b"name",
+                        )?
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODS protected table is missing table:name".to_string(),
+                            )
+                        })?;
+                        let index = self.sheets.len();
+                        self.sheets.push(SheetLocation {
+                            name,
+                            start: info.clone(),
+                            end_start: None,
+                            protection: None,
+                        });
+                        Some(index)
+                    },
+                    ElementKind::Protection => {
+                        let index = self.stack.iter().rev().find_map(|open| open.sheet_index);
+                        if let Some(index) = index {
+                            if self.sheets[index].protection.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "duplicate ODS table-protection element".to_string(),
+                                ));
+                            }
+                            self.sheets[index].protection = Some(info.clone());
+                        }
+                        index
+                    },
+                    ElementKind::Automatic => {
+                        if self.automatic.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "duplicate office:automatic-styles element".to_string(),
+                            ));
+                        }
+                        self.automatic = Some(info.clone());
+                        None
+                    },
+                    ElementKind::Other | ElementKind::DocumentContent => None,
+                };
+                self.stack.push(OpenElement {
+                    kind,
+                    info,
+                    sheet_index,
+                });
+            },
+            Event::Empty(element) => {
+                let info = element_location_resolved(
+                    self.source,
+                    resolver,
+                    element,
+                    event_start,
+                    event_end,
+                )?;
+                let kind = classify(
+                    namespace.uri(),
+                    element.local_name().as_ref(),
+                    self.stack.last().map(|open| open.kind),
+                );
+                if matches!(kind, ElementKind::DocumentContent) {
+                    collect_prefixes_resolved(
+                        decoder,
+                        element,
+                        &mut self.table_prefix,
+                        &mut self.loext_prefix,
+                    )?;
+                }
+                match kind {
+                    ElementKind::Spreadsheet => {
+                        if self.spreadsheet.replace(info).is_some() {
+                            return Err(Error::InvalidFormat(
+                                "duplicate office:spreadsheet element".to_string(),
+                            ));
+                        }
+                    },
+                    ElementKind::Body => self.body_start = Some(event_start),
+                    ElementKind::Sheet => {
+                        let name = attribute_value_resolved(
+                            resolver,
+                            decoder,
+                            element,
+                            TABLE_NAMESPACE,
+                            b"name",
+                        )?
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODS protected table is missing table:name".to_string(),
+                            )
+                        })?;
+                        self.sheets.push(SheetLocation {
+                            name,
+                            start: info,
+                            end_start: None,
+                            protection: None,
+                        });
+                    },
+                    ElementKind::Protection => {
+                        if let Some(index) =
+                            self.stack.iter().rev().find_map(|open| open.sheet_index)
+                        {
+                            if self.sheets[index].protection.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "duplicate ODS table-protection element".to_string(),
+                                ));
+                            }
+                            self.sheets[index].protection = Some(info);
+                        }
+                    },
+                    ElementKind::Automatic if self.automatic.replace(info).is_some() => {
+                        return Err(Error::InvalidFormat(
+                            "duplicate office:automatic-styles element".to_string(),
+                        ));
+                    },
+                    ElementKind::Other | ElementKind::DocumentContent | ElementKind::Automatic => {
+                    },
+                }
+            },
+            Event::End(_) => {
+                let open = self.stack.pop().ok_or_else(|| {
+                    Error::InvalidFormat("unexpected ODS XML closing tag".to_string())
+                })?;
+                let full_end = event_end;
+                match open.kind {
+                    ElementKind::Sheet => {
+                        let index = open.sheet_index.ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODS protection sheet index is missing".to_string(),
+                            )
+                        })?;
+                        let sheet = self.sheets.get_mut(index).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODS protection sheet index is out of bounds".to_string(),
+                            )
+                        })?;
+                        sheet.start.full = open.info.start.start..full_end;
+                        sheet.end_start = Some(event_start);
+                    },
+                    ElementKind::Protection => {
+                        if let Some(index) = open.sheet_index
+                            && let Some(protection) = self.sheets[index].protection.as_mut()
+                        {
+                            protection.full = protection.start.start..full_end;
+                        }
+                    },
+                    ElementKind::Automatic => {
+                        if let Some(value) = self.automatic.as_mut() {
+                            value.full = value.start.start..full_end;
+                        }
+                    },
+                    ElementKind::Other
+                    | ElementKind::DocumentContent
+                    | ElementKind::Body
+                    | ElementKind::Spreadsheet => {},
+                }
+            },
+            Event::Eof => {},
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+        Ok(())
+    }
+
+    /// Validate the end-of-document state and build the located source
+    /// context.
+    pub(crate) fn finish(self) -> Result<Location> {
+        if !self.stack.is_empty() {
+            return Err(Error::InvalidFormat(
+                "unterminated ODS protection XML element".to_string(),
+            ));
+        }
+        let spreadsheet = self.spreadsheet.ok_or_else(|| {
+            Error::InvalidFormat("missing office:spreadsheet element".to_string())
+        })?;
+        let automatic_fragment = self
+            .automatic
+            .as_ref()
+            .map(|_| style_protection::extract_automatic_styles(self.source))
+            .transpose()?
+            .flatten();
+        let automatic_fragment = automatic_fragment.map(|mut fragment| {
+            fragment.xml = validation_fragment(&fragment);
+            fragment
+        });
+        let automatic_validation_xml = automatic_fragment.as_ref().map(validation_fragment);
+
+        Ok(Location {
+            source_length: self.source.len(),
+            fingerprint: fingerprint(self.source.as_bytes()),
+            spreadsheet,
+            body_start: self.body_start,
+            sheets: self.sheets,
+            automatic: self.automatic,
+            automatic_fragment,
+            automatic_validation_xml,
+            styles_xml: self.styles_xml.map(str::to_owned),
+            table_prefix: self.table_prefix,
+            loext_prefix: self.loext_prefix,
+        })
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ElementKind {
     Other,
@@ -364,6 +730,7 @@ enum ElementKind {
     Automatic,
 }
 
+#[derive(Debug)]
 struct OpenElement {
     kind: ElementKind,
     info: ElementLocation,
@@ -402,6 +769,16 @@ fn element_location(
     start: usize,
     end: usize,
 ) -> Result<ElementLocation> {
+    element_location_resolved(source, reader.resolver(), element, start, end)
+}
+
+fn element_location_resolved(
+    source: &str,
+    resolver: &NamespaceResolver,
+    element: &BytesStart<'_>,
+    start: usize,
+    end: usize,
+) -> Result<ElementLocation> {
     let raw = source.get(start..end).ok_or_else(|| {
         Error::InvalidFormat("ODS XML element range is outside content.xml".to_string())
     })?;
@@ -419,7 +796,7 @@ fn element_location(
         .into_iter()
         .zip(ranges)
         .map(|(attribute, range)| {
-            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            let (namespace, local) = resolver.resolve_attribute(attribute.key);
             let namespace = match namespace {
                 ResolveResult::Bound(Namespace(value)) => value.to_vec(),
                 ResolveResult::Unbound | ResolveResult::Unknown(_) => Vec::new(),
@@ -524,6 +901,15 @@ fn collect_prefixes(
     table_prefix: &mut Option<String>,
     loext_prefix: &mut Option<String>,
 ) -> Result<()> {
+    collect_prefixes_resolved(reader.decoder(), element, table_prefix, loext_prefix)
+}
+
+fn collect_prefixes_resolved(
+    decoder: Decoder,
+    element: &BytesStart<'_>,
+    table_prefix: &mut Option<String>,
+    loext_prefix: &mut Option<String>,
+) -> Result<()> {
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
@@ -538,7 +924,7 @@ fn collect_prefixes(
             continue;
         };
         let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(|error| Error::InvalidFormat(format!("invalid XML namespace: {error}")))?;
         if value.as_bytes() == TABLE_NAMESPACE && table_prefix.is_none() {
             *table_prefix = Some(prefix.clone());
@@ -556,13 +942,29 @@ fn attribute_value(
     namespace: &[u8],
     local_name: &[u8],
 ) -> Result<Option<String>> {
+    attribute_value_resolved(
+        reader.resolver(),
+        reader.decoder(),
+        element,
+        namespace,
+        local_name,
+    )
+}
+
+fn attribute_value_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
+    element: &BytesStart<'_>,
+    namespace: &[u8],
+    local_name: &[u8],
+) -> Result<Option<String>> {
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
-        let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (resolved, local) = resolver.resolve_attribute(attribute.key);
         if is_namespace(&resolved, namespace) && local.as_ref() == local_name {
             return attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
                 .map(|value| Some(value.into_owned()))
                 .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")));
         }
@@ -1005,8 +1407,7 @@ pub(crate) fn parse(
     source: &str,
     styles_xml: Option<&str>,
 ) -> Result<(Location, Document, Vec<Sheet>, Styles)> {
-    let location = Location::parse(source, styles_xml)?;
-    let (document, wire_sheets) = crate::model::protection::parse_protection(source)?;
+    let (location, document, wire_sheets) = super::fused::parse(source, styles_xml)?;
     if wire_sheets.len() != location.sheets.len() {
         return Err(Error::InvalidFormat(
             "ODS protection sheet parser and source locator disagree".to_string(),

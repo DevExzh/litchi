@@ -20,9 +20,7 @@ use std::path::Path;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{Error, Metadata, ReadAt, Result, SourceVersion};
-use litchi_odf_common::core::{
-    Content, Meta, SourceBackedPackage, SourcePackageLimits, Styles, validate_content_document_part,
-};
+use litchi_odf_common::core::{Content, Meta, SourceBackedPackage, SourcePackageLimits, Styles};
 use litchi_odf_common::package::{is_media_path, resolve_package_path};
 use zeroize::Zeroizing;
 
@@ -34,8 +32,8 @@ use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
 /// The bounded ZIP-index policy used by positional ODF facades.
 pub type ReadLimits = SourcePackageLimits;
 
-const FAMILY_NAME: &str = "ODT";
-const CONTENT_ROOT: &str = "<office:text";
+pub(super) const FAMILY_NAME: &str = "ODT";
+pub(super) const CONTENT_ROOT: &str = "<office:text";
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
 const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
 
@@ -206,7 +204,11 @@ impl SourceBackedDocument {
 
             let content_bytes = package.get_file(crate::constants::ODF_CONTENT)?;
             let content = Content::from_vec(content_bytes)?;
-            validate_content_document_part(content.xml_content(), CONTENT_ROOT, FAMILY_NAME)?;
+            // One fused tokenization validates the content structure and
+            // collects the automatic styles; a validation error returns
+            // here, before styles.xml is fetched, exactly as the historical
+            // first pass early-returned.
+            let content_styles = super::open_parse::OpenParse::run(content.xml_content())?;
 
             let styles = if package.has_file(crate::constants::ODF_STYLES)? {
                 Some(Styles::from_vec(
@@ -231,7 +233,7 @@ impl SourceBackedDocument {
             if let Some(styles_part) = styles.as_ref() {
                 style_registry = StyleElements::parse_styles(styles_part.xml_content())?;
             }
-            style_registry.try_extend(StyleElements::parse_styles(content.xml_content())?)?;
+            style_registry.try_extend(content_styles.finish()?)?;
 
             Ok((content, styles, meta, style_registry))
         })();

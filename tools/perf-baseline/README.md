@@ -94,6 +94,15 @@ selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
 four opt-in XLSX existing-row visibility lifecycle selectors, four opt-in ODS
 existing-cell publication selectors, and four opt-in XLSX edit-composition
 selectors.
+One additional matched source-backed ODS repeated-edit selector
+(`ods_source_backed_repeated_edit`) is also opt-in over the same two-sheet
+media-rich corpus. One `SourceBackedSpreadsheet` owner and four fixed-window
+hashing sinks are prepared outside the timer; the timer covers exactly four
+sequential one-cell edit/commit/publish transactions, each verified
+byte-exactly against the eager owned oracle, with per-sample
+stage/commit/publication phase sums and a single untimed `InstrumentedSource`
+replay. This brings the selectable matrix to 341 names while leaving the
+default 36 cases / 198 records unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
 and a temporary source file. The first times exactly

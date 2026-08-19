@@ -3,6 +3,422 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0218`](changes/0218-odt-layout-floor-calibration.md)
+(0218 is a methodology calibration, not a code change — the litchi-odt
+analog of 0205/0213: three probe binaries — banked 0215 tree plus
+never-executed parser-shaped padding (+5.8KB to +14.6KB text, in
+`elements::text`, `document`, and `parser`) retained via a `#[used]`
+table — measured under the full A1/B1/B2/A2 protocol, so every
+paired-direction reading is pure per-binary-pair layout noise. The
+effective floor for adverse both-directions patterns on unexecuted
+phases, folding in historical 0217 byte-identical-phase readings: open
+p50/mean 3.3%/7.2% (p95 27.6%, p99 28.2%), list-paragraphs p50/mean
+5.2%/6.7% (p95 22.4%), one-paragraph p50/mean 4.8%/8.3% (p95 52.6%),
+full-text p50 4.1% (p95 16.1%, p99 9.3%), repeated-text-cached p50/mean
+7.1%/7.4% (p95 7.5%, p99 29.2%), repeated-text-uncached p50/mean
+4.8%/4.1% (p95 3.2%, p99 8.2%). ODT tails are far more layout-sensitive
+than ODS/ODP; p50/mean are the operative banking statistics. The 0205
+banking rule extends unchanged to litchi-odt. Under this rule 0217 was
+re-verdicted **banked** — see below.)
+[`change 0217`](changes/0217-odt-discard-validate-text.md)
+(0217 gives the ODT `extract_text` path a discard-but-validate parse mode:
+`parse_text_block_texts` runs the identical event loop, suppression rules,
+depth accounting, and `make_text_block_element`-ordered attribute
+validation, but never builds the retained `Element` (no QualifiedName
+triple-alloc, no attributes HashMap, no owned attr strings) — the banked
+in-file precedent `parse_selected_text_block_element(retain=false)` made
+this low-risk; 3 new parity/precedence/limit tests against the
+cfg(test)-gated pre-change path as a live oracle (891 litchi-odt tests).
+**Banked** under the 0218 floor rule after re-verdict: all three executed
+workloads accept ALL FOUR statistics in both directions —
+`odt_semantic_full_text` **42.12%-52.07%**,
+`odt_source_backed_repeated_text_cached` **51.91%-57.18%**,
+`odt_source_backed_repeated_text_uncached` **40.31%-53.85%** lower; the
+reproduced guardrail layout readings (open p50 max 3.26% vs floor 3.3%;
+list-paragraphs mean max 6.67% vs floor 6.7%) are within-floor and no
+longer block. Re-applied bit-exact — the rebuilt harness matches the
+measured candidate `8425066a…`, which is the control for the next
+change.)
+[`change 0216`](changes/0216-odt-query-reprofile.md)
+(0216 is an analysis, not a code change: post-0215 `perf record` profiles
+of the four ODT semantic workloads refuted the double-tokenization
+hypothesis (each query call tokenizes `content.xml` exactly once) and
+located the real `full_text` cost — per-block retained `Element`
+materialization immediately discarded by `into_text` — selecting the
+discard-but-validate extraction (implemented as 0217). Open's dominant
+cost (69% of the timed call) is `validate_content_document_part`, a full
+`content.xml` tokenization in litchi-odf-common shared with all ODF
+families — rejected as a target for rerun-exposure reasons. No
+measurement legs; profiling data under `/tmp/0216-prof/`.)
+[`change 0215`](changes/0215-odp-shape-attr-harvest.md)
+(0215 folds the ODP `drawing_attributes` fresh attribute re-scan
+(12.7%-13.7% inclusive of every ODP workload post-0212) into the shared
+`ElementAttrs` incremental scan: a new `ElementAttrs::drawing_attributes`
+replays the cached prefix and continues the shared iterator, harvesting
+non-modeled DRAW/SVG/DR3D/TABLE attributes from both halves, and
+`shape_builder` drops its per-element `element.attributes()` re-scan (the
+deleted fresh-scan body survives verbatim as a test oracle). Exactness
+pinned by 7 new tests (157 lib + 111 integration): document order,
+error-message identity by first reach (`"invalid XML attribute"` vs
+`"invalid ODP shape attribute"`), duplicate detection, decode positions.
+**Banked** under the 0213 floor rule: `odp_semantic_list_slides` p50/mean
+**6.53%-9.97%**, `odp_semantic_one_slide` p50/mean **8.80%-15.10%**,
+`odp_semantic_full_text` p50/mean **5.44%-11.32%** lower, all far above
+floor; executed-phase p95/p99 withheld (corpus-tail drift). The
+byte-identical open workload's adverse p50 reading (max 2.48%) is a
+within-floor layout reading (floor 3.1%; floor invoked for a −2.1KB text
+delta, sign-agnostic reasoning documented in the change doc). The 0215
+candidate binary `6c7fcfb9…` is the control for the next change.)
+[`change 0214`](changes/0214-odp-post-0212-reprofile.md)
+(0214 is profiling/analysis, not a code change — dwarf call-graph profiles
+of all four litchi-odp semantic workloads on the post-0212 banked tree.
+Post-0212 the attribute cluster still dominates: `ElementAttrs::get` self
+6.4%-7.8% / inclusive 25.3%-27.7% on every workload;
+`Parser::drawing_attributes` inclusive 12.7%-13.7% is the largest removable
+block — every shape element is attribute-scanned twice (shape_builder's
+lazy lookups, then a fresh `element.attributes()` pass for unmodeled
+attributes). `resolve_prefix` fell from 24.56% to 5.5%-7.0% inclusive after
+0212. `odp_semantic_open` has no unique hotspot — same cluster plus inflate
+≈3.1%, memchr ≈4.5%, allocator ≈5-6% self. Selected next target: fold
+`drawing_attributes` into the shared `ElementAttrs` scan (single-scan
+shape-attribute harvest), expected 6-10% on all four workloads, with
+document-order and error-message-identity exactness constraints recorded in
+the change doc.)
+[`change 0213`](changes/0213-odp-layout-floor-calibration.md)
+(0213 is a methodology calibration, not a code change — the litchi-odp
+analog of 0205: three probe binaries — banked 0211 tree plus
+never-executed parser-shaped padding (+5.5KB to +14.5KB text, in
+`codec::xml`, `model`, and `package`) retained via a `#[used]` table —
+measured under the full A1/B1/B2/A2 protocol, so every paired-direction
+reading is pure per-binary-pair layout noise. The effective floor for
+adverse both-directions patterns on unexecuted phases, folding in
+historical 0211/0212 byte-identical-phase readings: open p50/mean
+3.1%/2.5% (p95 7.8%, p99 17.2%), list-slides p50/mean 2.0%/3.6% (p95
+6.3%, p99 10.1%), one-slide p50/mean 2.5%/3.2% (p95 17.8%, p99 14.4%),
+full-text p50/mean 0.1%/0.5% (p95 1.8%, p99 19.4%). The 0205 banking
+rule extends unchanged to litchi-odp: within-floor adverse readings on
+phases executing no changed code are layout readings and do not block;
+adverse readings on executed phases still block unless cleared by the
+single rerun; accepts are claimed only above the floor. Under this rule
+0212 was re-verdicted **banked** — see below.)
+[`change 0212`](changes/0212-odp-cached-attr-resolution.md)
+(0212 caches attribute namespace resolution in the litchi-odp slide
+parser: `ElementAttrs::get` was 39.66% inclusive of
+`odp_semantic_full_text`, dominated by replaying
+`resolver().resolve_attribute(key)` for every cached attribute on every
+lookup (`NamespaceResolver::resolve_prefix` 24.56% inclusive). Each
+attribute key is now resolved ONCE when the incremental scan first
+reaches it, storing a `ResolvedAttributeNamespace` snapshot
+(`Bound`/`Unbound`/`Unknown`) plus the borrowed local name; lookup replay
+compares the snapshot via `matches()` — semantically identical to
+`is_namespace` on the live `ResolveResult` — with no resolver calls, and
+value decoding still happens per-match at lookup time. The exactness
+invariant (namespace stack constant between `ElementAttrs::new` and last
+use) was audited at all 12 call sites; two new tests pin cached-vs-fresh
+parity across an 8-target matrix and nested prefix shadowing; 150 lib +
+111 integration litchi-odp tests pass. Originally withheld under the
+pre-floor rule for a reproduced adverse open p50 reading (max 1.63%) on
+a phase executing no changed code; **banked** after the 0213 floor
+(open p50 3.1%) reclassified it as a layout reading. Claim scope:
+`odp_semantic_full_text` p50/mean/p95/p99 **20.82%-29.50%**,
+`odp_semantic_list_slides` p50/mean **19.15%-25.51%**,
+`odp_semantic_one_slide` p50/mean/p99 **17.48%-31.16%** lower.
+Re-applied bit-exact — the rebuilt harness matches the measured
+candidate `246c6b1f…`, which is the control for the next change.)
+[`change 0211`](changes/0211-odp-fused-query-parse.md)
+(0211 fuses the per-query double scan of `content.xml` in litchi-odp's
+`parse_pages_with_styles`: the transition-style definitions pass (14.95%
+inclusive of `odp_semantic_full_text`) becomes an event-fed
+`TransitionStyleCollector` inside the single slide-parse tokenization,
+with record-first-error and deferred-error plumbing preserving the
+historical two-pass error precedence exactly (all six nested parsers
+feed the collector; the standalone transition shell stays byte-identical
+as the oracle anchor). Equivalence oracle: verbatim sequential reference
+cross-checked on 19 fixtures across all four entry points plus 14
+synthetic precedence pins; 148 lib + 111 integration litchi-odp tests
+pass. **Banked** under pre-floor acceptance: `odp_semantic_list_slides`
+p50/mean **15.56%-17.84%**, `odp_semantic_one_slide` p50/mean
+**18.88%-19.50%**, `odp_semantic_full_text` p50 **15.85%-16.43%** lower;
+the byte-identical open workload's adverse mean/p95 primary reading did
+not reproduce in the single permitted rerun. The 0211 candidate binary
+`ceba155b…` — tree rebuilds bit-exact — is the control for the next
+change.)
+[`change 0210`](changes/0210-odp-lazy-element-attrs.md)
+(0210 eliminates the O(n·k) attribute re-scan in the litchi-odp slide
+parser: `get_attr` re-iterated `element.attributes()` from scratch per
+lookup (24.61% self of `odp_semantic_full_text`, plus ~18% quick-xml
+attribute-iteration machinery), and handlers like `shape_builder` make
+14 sequential lookups per element. The new `ElementAttrs` lazy
+incremental cache parses each element's attributes once into raw
+zero-copy entries; namespace resolution and value decoding still happen
+at lookup time with the current reader, so error messages, malformed/
+duplicate-attribute positions, and decode behavior are per-lookup
+identical (pinned by 6 new tests; 245 litchi-odp tests pass). Ten
+multi-lookup handlers migrated. **Banked** under pre-floor acceptance —
+every executed workload accepts ALL FOUR statistics in both directions:
+`odp_semantic_list_slides` **16.77%-47.07%**, `odp_semantic_one_slide`
+**7.45%-19.70%**, `odp_semantic_full_text` **13.11%-21.71%** lower; the
+non-executed open p50/mean (1.01%-3.92%) is layout-favorable and
+recorded as such. No adverse pattern anywhere; no rerun needed. The 0210
+candidate binary `c4b2b568…` — tree rebuilds bit-exact — is the control
+for the next change.)
+[`change 0209`](changes/0209-odt-fused-open-parse.md)
+(0209 fuses the two complete `content.xml` tokenizations on the ODT
+source-backed open path — `validate_content_document_part` (26.23%
+inclusive of the workload) and the `StyleRegistry::from_xml`
+content-styles scan (6.58%) — into one `NsReader` pass with two
+handlers in `litchi-odt::document::open_parse`, the litchi-odt analog of
+0201. Validation errors keep their historical early-return (styles.xml
+is never fetched on a validation failure); the style handler replicates
+`from_xml` byte-exactly including the literal `b"style:style"` raw-qname
+match and raw undecoded attribute values; error precedence
+validate → styles.xml → content-styles → `try_extend` is exact. An
+equivalence oracle cross-checks fused vs sequential on 69 fixtures plus
+15 synthetic malformed cases; 888 litchi-odt tests pass (+3). **Banked**
+under pre-floor acceptance (the 0205 floor is ODS-only):
+`odt_file_source_open` p50/mean/p95 **14.63%-18.99% lower** in both
+directions with clean drifts; source-open full-text lifecycle mean
+0.71%-4.53% lower; the sub-1.2% eager-open p50/mean adverse reading on
+the byte-identical phase did not reproduce in the single permitted
+rerun. The 0209 candidate binary `41b5f923…` — tree rebuilds bit-exact —
+is the control for the next change.)
+[`change 0208`](changes/0208-ods-borrowed-validate-decode.md)
+(0208 tried borrowed `decode_borrowed`/`resolve_namespace_borrowed`
+decoding in the ODS commit validate-reparse (`worksheet/package.rs`),
+with a URI-equality `NamespaceKind` partition replacing owned-String
+namespace comparisons. The deterministic allocation win was large —
+counting-allocator driver measured 36,616 → 20,863 allocations per
+commit transaction (-43.0%; commit-only 29,473 → 13,720, -53.5%) — but
+the latency gate failed: both executed-phase workloads with an adverse
+both-directions pattern **reproduced** it in their single permitted
+rule-2 reruns (one-edit commit p50/mean/p95 -2.12% to -6.94%;
+repeated-edit commit all-four -2.40% to -5.84%, clean drifts). Per
+banking rule 2, **withheld regardless of floor** and reverted; the tree
+rebuilds bit-exact to the banked 0207 control `57270d24…`. Lesson: on
+this corpus the commit phase is layout-sensitive enough that an
+allocation-only change can produce a reproducible sub-5% adverse
+reading; allocation-only commit changes should expect this outcome
+unless paired with an above-floor latency mechanism. The banked control
+for the next change remains `57270d24…`.)
+[`change 0207`](changes/0207-ods-byte-matched-attributes.md)
+(0207 rewrites `worksheet::codec::Attributes::from_resolved` to
+byte-match resolved namespace/local names and allocate owned strings only
+for consumed attribute values, while still decoding EVERY attribute so
+the historical per-attribute error order (syntax → decode/normalize →
+unknown prefix) and messages are preserved exactly — pinned by five new
+error-order tests; the 0200 shell-oracle pair shares one implementation.
+**Banked with an allocation claim only**: counting-allocator driver
+measured 10,727 → 8,665 allocations per source-open (-19.22%) and
+1,928,711 → 1,829,857 bytes (-5.13%); cumulative with 0206, source-open
+allocations are 14,891 → 8,665 (-41.81%). Latency neutral everywhere
+under the 0205 floor rule — source-open p50 accepted at 5.46% against
+the 5.5% floor, everything else below floor, no adverse both-directions
+pattern on any workload. The retained per-attribute decode scan is
+semantics-mandated. The 0207 candidate binary `57270d24…` is the control
+for the next change.)
+[`change 0206`](changes/0206-ods-lazy-settings-qname.md)
+(0206 removes dead per-element work in the ODS settings location scan:
+the qualified element name was materialized (alloc + copy + UTF-8
+validation + free) for EVERY Start/Empty element, but spans are recorded
+only for the spreadsheet host and calculation-settings element, and the
+only qname consumer is the empty-spreadsheet `replace()` expansion. The
+name is now materialized only for recorded kinds, identically in the
+locate shell and the fused handler; the dropped UTF-8 error is
+structurally unreachable (ASCII-delimited subslices of a `&str` source).
+**Banked with an allocation claim only**: a counting-allocator driver
+measured 14,891 → 10,727 allocations per source-open (-27.96%) and
+1,974,783 → 1,928,711 allocated bytes (-2.33%) — deterministic counts,
+not timing. All accepted latency statistics landed below the
+0205-calibrated layout floor (neutral; no latency claim); the one
+adverse both-directions reading (one-percent commit p99 -12.18%) is
+within its 13.5% floor. Lesson: profile-attributed ~4-6% latency
+expectations can vanish under the layout floor; allocation-count evidence
+is the robust claim channel for work elimination at this scale. The 0206
+candidate binary `8e17ab3e…` is the control for the next change.)
+[`change 0205`](changes/0205-layout-noise-floor-calibration.md)
+(0205 is a methodology calibration, not a code change: three probe
+binaries — banked 0202 tree plus never-executed parser-shaped padding
+(+5.5KB to +16.5KB text) retained via a `#[used]` table — measured under
+the full A1/B1/B2/A2 protocol, so every paired-direction reading is pure
+per-binary-pair layout noise. The measured floor for adverse
+both-directions patterns on unexecuted phases: source-open 5.5% (p99 up
+to 35%), eager-open 3.0%, one-edit lifecycle 2.8%, one-edit commit
+5.8% (p99 17%), one-percent lifecycle 2.6%, one-percent commit 4.6%
+(p99 13.5%), repeated-edit stage 5.3% (p99 11%), repeated commit 6.7%,
+totals/publication ~1-2.5%. The refined banking rule: within-floor
+adverse readings on phases executing no changed code are layout readings
+and do not block; adverse readings on executed phases still block unless
+cleared by the single rerun; accepts are claimed only above the floor.
+Under this rule 0204 was re-verdicted **banked** — see below.)
+[`change 0204`](changes/0204-ods-protection-fused-parse.md)
+(0204 fuses the ODS protection double-parse of `content.xml`
+(`Location::parse` + `parse_protection`, two `NsReader` passes per fresh
+owner's first edit) into one tokenization with the 0200-0202
+handler/driver pattern, error selection preserving the historical
+interleave exactly and standalone shells kept byte-identical as
+equivalence oracles (369 tests, +13). **Banked** under the 0205 refined
+rule — originally withheld for reproduced adverse patterns on
+non-executed phases, all later shown to be within the calibrated layout
+floor. Claim scope: repeated-edit stage p50/mean/p95/p99 20.01%-25.86%
+lower (floor 3.8%/5.3%/11%); one-percent lifecycle p50/mean/p95 marginal
+(≤0.25pp over floor, not claimed); repeated-edit total and one-edit
+lifecycle within floor (neutral). Harness rebuild bit-identical to the
+measured candidate `5f0dab64…`; this binary is the control for the next
+change.)
+[`change 0203`](changes/0203-ods-open-namespace-classify-memo.md)
+(0203 explored memoizing the fused open driver's element-name namespace
+classifications — the quick_xml `resolve_event` reverse bindings scan,
+6.25% of post-0202 source-open self samples — first with a SipHash
+HashMap (v1: mechanism-confirmed regression on every workload, e.g.
+source-open 5.05%-15.22% slower in both directions) and then with a
+direct-mapped 64-slot generation-tagged array cache with conservative
+`xmlns` mutation tracking (v2: targeted source-open neutral, guardrails
+broadly adverse in both directions including source-identical phases).
+Both withheld and reverted per the no-regression-pattern standard; the
+tree is restored byte-exact to the 0202 state (harness SHA match, 356
+litchi-ods tests). A content-fingerprint invalidation scheme was rejected
+by counterexample (`xmlns:p="xy"` vs `xmlns:px="y"`). The remaining
+namespace-machinery seam is `NsReader::process_event`'s per-tag attribute
+scan, likely requiring a litchi-owned incremental resolver.)
+[`change 0202`](changes/0202-ods-single-tokenization-open.md)
+(0202 folds the pass-2a calculation-settings parse
+(`litchi_odf_common::calculation::parse`) into the fused open tokenization
+as a fifth handler, so the source-backed open tokenizes `content.xml`
+exactly once; the standalone parse keeps its original inline loop
+byte-identical for the eager facade and commit-side callers, the 64 MiB
+size limit moves to the deferred record-first-error pattern, and the
+two-phase driver preserves the exact validate → calculation → locate →
+names → worksheet pass order and error selection. Frozen cross-binary
+CPU-2 A/B/B/A accepts the source-backed open p50/mean/p95/p99
+(17.41%-23.21% lower, stacking on 0201), the one-edit lifecycle
+p50/mean/p95/p99 (0.81%-10.47% lower) and commit p50/mean, the
+one-percent lifecycle p50/mean/p95 in both the primary run and the
+single rerun (whose commit accepts all four statistics), the
+repeated-edit total p50/mean, stage p50/mean/p95, and commit
+p50/mean/p95/p99, and the eager-open mean. The one-percent lifecycle p99
+primary adverse reading did not reproduce in the single permitted rerun;
+a sub-0.5% repeated-edit publication p50/mean reading on
+source-identical phases is documented as code-layout wobble.
+Allocation/RSS, physical-I/O, cold-cache, producer, and broad ODF claims
+remain withheld.)
+[`change 0201`](changes/0201-ods-fused-open-validate-fold.md)
+(0201 folds the ODS `content.xml` structural validation pass into the 0200
+fused open tokenization as a fourth handler, cutting the source-backed open
+from three tokenizations to two; the two-phase driver preserves the exact
+validate → styles/meta/metadata → semantic-calculation-parse interleave and
+the pass-ordered error selection, and the standalone validator keeps its
+original inline loop for its five other call sites. Frozen cross-binary
+CPU-2 A/B/B/A accepts the source-backed open p50/mean/p95/p99
+(9.32%-17.88% lower, stacking on 0200), the one-edit lifecycle
+p50/mean/p95/p99 (1.87%-5.23% lower) and commit p50/mean, the one-percent
+lifecycle p95, and the repeated-edit total p95/p99 plus publication
+p50/mean/p95/p99. The eager-open primary adverse reading did not reproduce
+in the single permitted rerun; a sub-1.5% repeated-edit commit p50/mean
+reading on source-identical phases is documented as code-layout wobble.
+Allocation/RSS, physical-I/O, cold-cache, producer, and broad ODF claims
+remain withheld.)
+[`change 0200`](changes/0200-ods-fused-open-parse.md)
+(0200 fuses the three litchi-ods-owned open passes over `content.xml` —
+settings locate, named definitions, and the worksheet parse — into one
+shared `NsReader` tokenization with per-pass handler state machines and
+pass-ordered error selection; the standalone shells keep the original inline
+loops byte-identical so eager-open, commit-readback, and settings-edit paths
+are unchanged. Frozen cross-binary CPU-2 A/B/B/A accepts the source-backed
+open p50/mean/p95/p99 (19.72%-24.55% lower), the one-percent lifecycle
+p50/mean/p95/p99 (3.26%-5.72% lower), the one-edit lifecycle p50/mean
+(2.81%-5.38% lower), the eager-open p99, and the repeated-edit total
+mean/p95/p99, stage p99, and publication mean/p95/p99. A reproduced
+both-directions sub-1% slower reading on repeated-edit total p50 and
+publication p50 — phases source-identical to control whose p95/p99 tails
+accept — is documented as per-binary-pair code-layout wobble, not a
+regression pattern. Allocation/RSS, physical-I/O, cold-cache, producer, and
+broad ODF claims remain withheld.)
+[`change 0199`](changes/0199-ods-parse-event-copy-elision.md)
+(0199 removes the per-event `Event::into_owned()` deep copies from the two
+full-document `NsReader` parse loops in litchi-ods (`worksheet::codec::parse`
+and `settings::codec::locate`); both loops only borrow each event within its
+iteration, so the elision is byte-exact. Frozen cross-binary CPU-2 A/B/B/A
+accepts the source-backed open p50/mean/p95/p99 (6.42%-9.70% lower) and the
+eager open p50/mean/p95/p99 (9.46%-15.17% lower); the one-cell guardrail
+lifecycle p50/mean/p95 (0.97%-3.42% lower) and commit p50/mean/p95
+(6.62%-9.43% lower); the one-percent guardrail lifecycle p50/mean/p95
+(0.05%-2.71% lower) and commit p50/mean/p95 (4.16%-7.52% lower); and the
+four-transaction repeated-edit total, commit, and publication
+p50/mean/p95/p99 (2.14%-5.28%, 8.61%-14.80%, and 0.17%-3.03% lower
+respectively) plus stage p50/mean/p95. The lifecycle/commit p99 tails and
+stage p99 are withheld as neutral and no regression pattern fired.
+Allocation/RSS, physical-I/O, cold-cache, producer, and broad ODF claims
+remain withheld.)
+[`change 0198`](changes/0198-ods-content-layout-topology-cache.md)
+(0198 extends the 0195 per-owner ODS content-layout cache with the derived
+table/row topology, eliminating the per-commit span-vector re-scans for the
+table inventory and per-sheet row lists on cached-layout commits. Frozen
+cross-binary CPU-2 A/B/B/A accepts the four-transaction repeated-edit total
+p50/mean/p95/p99 (0.19%-5.77% lower), commit p50/mean/p95/p99 (2.20%-7.72%
+lower), stage mean/p95/p99 and publication p50; the one-cell guardrail
+lifecycle mean/p95 and commit p99; and the one-percent guardrail lifecycle
+p50/mean/p95 plus commit p50/mean/p95; all other statistics are withheld as
+neutral and no regression pattern fired. Allocation/RSS, physical-I/O,
+cold-cache, producer, and broad ODF claims remain withheld.)
+[`change 0197`](changes/0197-ods-batched-row-window-reparse.md)
+(0197 explored batching the per-row synthetic-document reparse in the ODS
+`changed_row_edits` validation into one reparse per changed window. The
+commit-phase win reproduced (one-percent commit p50/mean/p95 0.10%-2.10%
+lower, accepted in two independent runs), but the one-percent lifecycle
+measured the candidate slower in both paired directions on all four
+statistics in both runs, and the repeated-edit stage phase showed the same
+adverse pattern — a systematic per-binary code-layout effect on untouched
+phases. Withheld and reverted per the no-regression-pattern standard; the
+two added multi-row window regression tests remain. The seam stays open:
+a future attempt should eliminate the synthetic reparse entirely rather
+than amortize it.)
+[`change 0196`](changes/0196-xml-escape-byte-scan.md)
+(0196 replaces the Aho-Corasick automata behind
+`litchi_core::xml::{escape_xml, unescape_xml}` with exactly equivalent
+left-to-right byte scans (fuzz-verified byte-identical over 2M randomized
+cases against the original automata) and drops the dependency from
+litchi-core. Frozen cross-binary CPU-2 A/B/B/A accepts the escape-heavier
+one-percent ODS lifecycle p50/mean (0.44%-3.02% lower) and commit
+p50/mean/p99 (1.53%-20.15% lower); the repeated-edit and one-edit selectors
+are neutral-withheld throughout. Allocation/RSS, physical-I/O, cold-cache,
+producer, and broad ODF claims remain withheld.)
+[`change 0195`](changes/0195-ods-source-content-layout-cache.md)
+(0195 caches the row-local edit layout scan of `content.xml` at most once
+per source-backed ODS owner through a private success-only `OnceLock`,
+removing three of four full-document scans in the four-transaction
+repeated-edit selector. Frozen cross-binary CPU-2 A/B/B/A accepts
+four-transaction total p50/mean/p95/p99 at 5.55%-12.49% lower and
+commit-phase p50/mean/p95/p99 at 25.13%-36.98% lower, plus the one-cell
+guardrail commit p50/mean/p95/p99 and the one-percent guardrail lifecycle
+p99 and commit p50/mean/p99; all other statistics are withheld as neutral.
+Single-transaction lifecycles still pay one scan by design; allocation/RSS,
+physical-I/O, cold-cache, producer, and broad ODF claims remain withheld.)
+[`change 0194`](changes/0194-ods-validate-text-byte-scan.md)
+(0194 rewrites the litchi-ods worksheet `validate_text` forbidden-character
+check from a per-`char` scan to an exactly equivalent per-byte scan; profiling
+attributed 9.15% of source-backed commit-phase samples to it. Frozen
+cross-binary CPU-2 A/B/B/A accepts the four-transaction repeated-edit total
+p50/mean and commit-phase p50/mean/p99, the one-cell guardrail commit p50,
+and the one-percent guardrail lifecycle p50/mean plus commit p50/mean/p95;
+all other statistics are withheld as neutral. Allocation/RSS, physical-I/O,
+cold-cache, producer, and broad ODF claims remain withheld.)
+[`change 0193`](changes/0193-ods-source-edit-protection-cache.md)
+(0193 computes the ODS source-backed edit protection parse at most once per
+owner through a private `OnceLock`, removing three of four complete
+protection-domain parses in the new four-transaction repeated-edit selector.
+Frozen cross-binary CPU-2 A/B/B/A accepts four-transaction total
+p50/mean/p95/p99 at 9.31%-10.68% lower and stage-phase p50/mean/p95/p99 at
+67.87%-71.61% lower; commit and publication phases are neutral-withheld.
+Single-transaction lifecycles are unchanged by design; allocation/RSS,
+physical-I/O, cold-cache, producer, and broad ODF claims remain withheld.)
+[`change 0192`](changes/0192-odt-open-only-rerun-evidence.md)
+(0192 repeats only the withheld change 0191 ODT open-only workload on clean
+current HEAD with a bit-identical release binary. Warm open-only p50 and p99
+are now accepted at 49.01%-59.56% lower than eager byte ownership across both
+paired directions; mean and p95 remain withheld on eager same-implementation
+drift (5.10% and 11.58% against 5%/10% ceilings). This is evidence closure,
+not a production change; allocation/RSS, physical-I/O, cold-cache, edit/save,
+producer, and broad ODF claims remain withheld.)
 [`change 0191`](changes/0191-odt-unified-source-ingress.md)
 (0191 routes high-level ODT filesystem opening through one retained
 source-backed ODF owner. Fixed-corpus open-only samples remain withheld because

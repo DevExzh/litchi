@@ -66,6 +66,7 @@ pub mod media;
 pub mod metadata;
 pub mod metadata_graphs;
 pub mod model;
+mod open_parse;
 pub mod package;
 pub mod protection;
 pub mod settings;

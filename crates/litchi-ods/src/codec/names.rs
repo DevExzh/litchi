@@ -37,8 +37,8 @@ struct TableFrame {
 }
 
 #[derive(Debug)]
-struct Scan {
-    definitions: Vec<Definition>,
+pub(crate) struct Scan {
+    pub(crate) definitions: Vec<Definition>,
     containers: Vec<Span>,
     spreadsheet: Option<Host>,
     tables: Vec<Host>,
@@ -202,6 +202,19 @@ fn missing_host(scope: &Scope) -> Error {
     })
 }
 
+/// Enforce the pre-parse byte-size limit of the named-definition scan.
+pub(crate) fn validate_size(xml: &str) -> Result<()> {
+    if xml.len() > MAX_CONTENT_BYTES {
+        return invalid("ODS content.xml exceeds the mutation limit");
+    }
+    Ok(())
+}
+
+/// Scan the named-definition hosts and catalog in one dedicated pass.
+///
+/// This standalone path intentionally keeps the historical inline event loop
+/// for latency parity on non-fused callers (definition replacement); the
+/// fused open parse drives the equivalent [`NamesHandler`] instead.
 fn scan(xml: &str) -> Result<Scan> {
     if xml.len() > MAX_CONTENT_BYTES {
         return invalid("ODS content.xml exceeds the mutation limit");
@@ -346,6 +359,179 @@ fn scan(xml: &str) -> Result<Scan> {
         spreadsheet,
         tables,
     })
+}
+
+/// Classify one resolved namespace as the named-definition scan did.
+///
+/// The resolved value borrows the reader mutably, so callers classify it
+/// immediately after the read exactly as the historical loop body did.
+pub(crate) fn classify(namespace: &ResolveResult<'_>) -> (bool, bool) {
+    (
+        is_namespace(namespace, TABLE_NAMESPACE),
+        is_namespace(namespace, OFFICE_NAMESPACE),
+    )
+}
+
+/// Streaming event handler holding the [`scan`] state.
+///
+/// The fused open parse ([`crate::open_parse`]) drives one shared tokenizer
+/// through this handler, while [`scan`] keeps its historical inline loop for
+/// latency parity on non-fused callers; both apply the same checks, limits,
+/// and error messages at the same events.
+#[derive(Debug, Default)]
+pub(crate) struct NamesHandler {
+    tables: Vec<Host>,
+    table_stack: Vec<TableFrame>,
+    containers: Vec<Span>,
+    definitions: Vec<Definition>,
+    active: Option<(usize, Scope)>,
+    spreadsheet: Option<Host>,
+}
+
+impl NamesHandler {
+    /// Process one resolved event at byte positions `pos_before`/`pos_after`.
+    ///
+    /// `is_table`/`is_office` are the caller-classified namespace flags; the
+    /// resolved value borrows the reader mutably, so callers classify it
+    /// immediately after the read exactly as the historical loop body did.
+    pub(crate) fn on_event(
+        &mut self,
+        is_table: bool,
+        is_office: bool,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+        pos_before: u64,
+        pos_after: u64,
+    ) -> Result<()> {
+        let start =
+            usize::try_from(pos_before).map_err(|_error| invalid_error("XML position overflow"))?;
+        let end =
+            usize::try_from(pos_after).map_err(|_error| invalid_error("XML position overflow"))?;
+
+        match event {
+            Event::Start(element)
+                if is_office && element.local_name().as_ref() == b"spreadsheet" =>
+            {
+                if self.spreadsheet.is_some() {
+                    return invalid("multiple office:spreadsheet elements");
+                }
+                self.spreadsheet = Some(host(element, start, end, Some(end), None)?);
+            },
+            Event::Empty(element)
+                if is_office && element.local_name().as_ref() == b"spreadsheet" =>
+            {
+                if self.spreadsheet.is_some() {
+                    return invalid("multiple office:spreadsheet elements");
+                }
+                self.spreadsheet = Some(host(element, start, end, None, None)?);
+            },
+            Event::Start(element) if is_table && element.local_name().as_ref() == b"table" => {
+                let name = table_attribute(resolver, decoder, element, b"name")?;
+                self.tables
+                    .push(host(element, start, end, Some(end), name.clone())?);
+                self.table_stack.push(TableFrame { name });
+            },
+            Event::Empty(element) if is_table && element.local_name().as_ref() == b"table" => {
+                let name = table_attribute(resolver, decoder, element, b"name")?;
+                self.tables.push(host(element, start, end, None, name)?);
+            },
+            Event::Start(element) if is_table => match element.local_name().as_ref() {
+                b"named-expressions" => {
+                    if self.active.is_some() {
+                        return invalid("nested table:named-expressions element");
+                    }
+                    let scope = scope(&self.table_stack)?;
+                    let index = self.containers.len();
+                    self.containers.push(Span {
+                        start,
+                        end,
+                        scope: scope.clone(),
+                    });
+                    self.active = Some((index, scope));
+                },
+                b"named-range" | b"named-expression" => {
+                    if let Some((_, scope)) = &self.active {
+                        if self.definitions.len() >= MAX_DEFINITIONS {
+                            return invalid("named-definition count exceeds the safety limit");
+                        }
+                        self.definitions.push(parse_definition(
+                            resolver,
+                            decoder,
+                            element,
+                            scope.clone(),
+                        )?);
+                    }
+                },
+                _ => {},
+            },
+            Event::Empty(element) if is_table => match element.local_name().as_ref() {
+                b"named-expressions" => {
+                    if self.active.is_some() {
+                        return invalid("nested table:named-expressions element");
+                    }
+                    let scope = scope(&self.table_stack)?;
+                    self.containers.push(Span { start, end, scope });
+                },
+                b"named-range" | b"named-expression" => {
+                    if let Some((_, scope)) = &self.active {
+                        if self.definitions.len() >= MAX_DEFINITIONS {
+                            return invalid("named-definition count exceeds the safety limit");
+                        }
+                        self.definitions.push(parse_definition(
+                            resolver,
+                            decoder,
+                            element,
+                            scope.clone(),
+                        )?);
+                    }
+                },
+                _ => {},
+            },
+            Event::End(element) if is_table => match element.local_name().as_ref() {
+                b"named-expressions" => {
+                    let Some((index, _)) = self.active.take() else {
+                        return invalid("unmatched table:named-expressions end element");
+                    };
+                    self.containers[index].end = end;
+                },
+                b"table" => {
+                    if self.active.is_some() {
+                        return invalid("unterminated table:named-expressions element");
+                    }
+                    self.table_stack
+                        .pop()
+                        .ok_or_else(|| invalid_error("table element stack underflow"))?;
+                },
+                _ => {},
+            },
+            Event::Eof => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+        Ok(())
+    }
+
+    /// Validate the end-of-document state and build the scan result.
+    pub(crate) fn finish(self) -> Result<Scan> {
+        if self.active.is_some() || !self.table_stack.is_empty() {
+            return invalid("ODS content.xml contains an unclosed named-definition host");
+        }
+        Ok(Scan {
+            definitions: self.definitions,
+            containers: self.containers,
+            spreadsheet: self.spreadsheet,
+            tables: self.tables,
+        })
+    }
 }
 
 fn host(

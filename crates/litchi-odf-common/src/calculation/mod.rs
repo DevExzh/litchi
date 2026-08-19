@@ -13,6 +13,12 @@ mod tests;
 pub use codec::{parse, write};
 pub use model::{Iteration, IterationStatus, NullDate, Settings};
 
+// Fused-parser plumbing — kept `pub` (not `pub(crate)`) because family owner
+// crates drive the handler across the crate boundary. `#[doc(hidden)]`
+// suppresses the public docs surface.
+#[doc(hidden)]
+pub use codec::{CalculationHandler, classify, validate_size};
+
 pub(crate) const MAX_XML_BYTES: usize = 64 * 1_048_576;
 pub(crate) const MAX_DEPTH: usize = 256;
 pub(crate) const MAX_EVENTS: usize = 1_000_000;

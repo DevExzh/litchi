@@ -1,0 +1,340 @@
+{
+  "schema_version": 1,
+  "change": "0208-ods-borrowed-validate-decode",
+  "decision": "withheld",
+  "claim_scope": "none - adverse both-directions pattern on executed commit phases reproduced in the rule-2 reruns",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "57270d24894a7047682146f4a6a68d428ecc51b3d1270e5b93d90d0fddcb284b",
+      "candidate_sha256": "6edff9a2858b17b3904c06106edfabdfd7e81765de11be2512e1a2f783754a6b",
+      "note": "control is the banked 0207 binary; candidate adds the 0208 borrowed decode in litchi-ods::worksheet::package validate-reparse"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, and 0207 (both binaries); the candidate additionally carries the 0208 borrowed decode change in litchi-ods::worksheet::package",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_repeated_edit",
+  "timing_scope": "one source-backed owner and four fixed-window hashing sinks prepared outside the timer; the timer covers exactly four sequential edit_cells + set_cell + commit + write_to transactions with per-transaction stage/commit/publication durations summed per sample",
+  "cases": {
+    "total_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 40701273.0,
+          "mean": 40853757.388,
+          "p95": 42010787.0,
+          "p99": 42750967.0
+        },
+        "b1": {
+          "p50": 41122535.5,
+          "mean": 41181573.214,
+          "p95": 42134298.0,
+          "p99": 43051599.0
+        },
+        "b2": {
+          "p50": 40923396.5,
+          "mean": 41070203.492,
+          "p95": 42062103.0,
+          "p99": 43439028.0
+        },
+        "a2": {
+          "p50": 40693997.0,
+          "mean": 40874645.816,
+          "p95": 42130485.0,
+          "p99": 42950429.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.035011,
+          "mean": -0.802413,
+          "p95": -0.293998,
+          "p99": -0.703217
+        },
+        "a2_to_b2": {
+          "p50": -0.563718,
+          "mean": -0.478433,
+          "p95": 0.16231,
+          "p99": -1.137588
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.017877,
+          "mean": 0.05113,
+          "p95": 0.284922,
+          "p99": 0.466567
+        },
+        "candidate": {
+          "p50": -0.484258,
+          "mean": -0.270436,
+          "p95": -0.171345,
+          "p99": 0.899918
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "stage_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1400938.5,
+          "mean": 1412670.57,
+          "p95": 1510124.0,
+          "p99": 1631853.0
+        },
+        "b1": {
+          "p50": 1397656.5,
+          "mean": 1411748.328,
+          "p95": 1529992.0,
+          "p99": 1735358.0
+        },
+        "b2": {
+          "p50": 1361259.5,
+          "mean": 1371287.83,
+          "p95": 1486600.0,
+          "p99": 1590976.0
+        },
+        "a2": {
+          "p50": 1391015.0,
+          "mean": 1404577.642,
+          "p95": 1529783.0,
+          "p99": 1631193.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.234272,
+          "mean": 0.065284,
+          "p95": -1.315654,
+          "p99": -6.342789
+        },
+        "a2_to_b2": {
+          "p50": 2.139121,
+          "mean": 2.370094,
+          "p95": 2.822819,
+          "p99": 2.465496
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.708347,
+          "mean": -0.572881,
+          "p95": 1.301814,
+          "p99": -0.040445
+        },
+        "candidate": {
+          "p50": -2.604145,
+          "mean": -2.865985,
+          "p95": -2.836093,
+          "p99": -8.320012
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean"
+      ],
+      "rejected_statistics": {
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 6277970.0,
+          "mean": 6317549.866,
+          "p95": 6660331.0,
+          "p99": 6961200.0
+        },
+        "b1": {
+          "p50": 6486649.0,
+          "mean": 6532095.256,
+          "p95": 6860508.0,
+          "p99": 7201942.0
+        },
+        "b2": {
+          "p50": 6451592.5,
+          "mean": 6503936.118,
+          "p95": 6839637.0,
+          "p99": 7357452.0
+        },
+        "a2": {
+          "p50": 6290196.0,
+          "mean": 6341384.74,
+          "p95": 6679113.0,
+          "p99": 6951519.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -3.323988,
+          "mean": -3.396022,
+          "p95": -3.005511,
+          "p99": -3.458341
+        },
+        "a2_to_b2": {
+          "p50": -2.565842,
+          "mean": -2.563342,
+          "p95": -2.403373,
+          "p99": -5.839486
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.194744,
+          "mean": 0.37728,
+          "p95": 0.281998,
+          "p99": -0.139071
+        },
+        "candidate": {
+          "p50": -0.540441,
+          "mean": -0.431089,
+          "p95": -0.304219,
+          "p99": 2.159279
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "publication_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 32856279.5,
+          "mean": 32950286.362,
+          "p95": 33675583.0,
+          "p99": 34122842.0
+        },
+        "b1": {
+          "p50": 33016024.5,
+          "mean": 33062776.082,
+          "p95": 33723389.0,
+          "p99": 34169511.0
+        },
+        "b2": {
+          "p50": 32923612.0,
+          "mean": 32996698.816,
+          "p95": 33672347.0,
+          "p99": 34906109.0
+        },
+        "a2": {
+          "p50": 32836741.0,
+          "mean": 32953155.026,
+          "p95": 33753507.0,
+          "p99": 34357043.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.486193,
+          "mean": -0.341392,
+          "p95": -0.14196,
+          "p99": -0.136768
+        },
+        "a2_to_b2": {
+          "p50": -0.264554,
+          "mean": -0.132138,
+          "p95": 0.240449,
+          "p99": -1.598118
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.059467,
+          "mean": 0.008706,
+          "p95": 0.231396,
+          "p99": 0.686347
+        },
+        "candidate": {
+          "p50": -0.279902,
+          "mean": -0.199854,
+          "p95": -0.151355,
+          "p99": 2.155717
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "a2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0205-layout-noise-floor-calibration",
+  "decision": "calibration-only",
+  "claim_scope": "pure layout noise floor reading",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "475cf2898880363517eec9e0a9ac6b582eed1f78054f161f394bdd635bb19d7d",
+      "candidate_sha256": "4effcc1bfc44c84331be9dfa1eca41c06fab81474e31e865cecc517a812a5449",
+      "note": "calibration pair: control is the banked 0202 binary; probe adds never-executed parser-shaped code (+15.1KB text) to litchi-ods::authoring; every paired-direction reading is pure per-binary-pair layout noise"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196 and 0198-0202 (both binaries); the probe binary additionally carries never-executed layout padding removed after the build (tree verified to rebuild bit-exact to control)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_source_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1393124.0,
+          "mean": 1402291.642,
+          "p95": 1496432.0,
+          "p99": 1598181.0
+        },
+        "b1": {
+          "p50": 1443418.5,
+          "mean": 1459498.282,
+          "p95": 1555462.0,
+          "p99": 1806679.0
+        },
+        "b2": {
+          "p50": 1451519.5,
+          "mean": 1471883.564,
+          "p95": 1605981.0,
+          "p99": 1861654.0
+        },
+        "a2": {
+          "p50": 1409682.5,
+          "mean": 1431505.694,
+          "p95": 1540942.0,
+          "p99": 2091170.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -3.610196,
+          "mean": -4.079511,
+          "p95": -3.944716,
+          "p99": -13.045957
+        },
+        "a2_to_b2": {
+          "p50": -2.967831,
+          "mean": -2.820657,
+          "p95": -4.22073,
+          "p99": 10.975483
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.188588,
+          "mean": 2.083308,
+          "p95": 2.974408,
+          "p99": 30.846882
+        },
+        "candidate": {
+          "p50": 0.561237,
+          "mean": 0.848599,
+          "p95": 3.247845,
+          "p99": 3.042876
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; control drift +30.85% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

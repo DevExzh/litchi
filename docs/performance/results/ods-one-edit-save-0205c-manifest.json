@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0205-layout-noise-floor-calibration",
+  "artifacts": [
+    {
+      "path": "ods-one-edit-save-0205c-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 11289,
+      "compressed_sha256": "1025ac8b94bb8930c61299063efccca89da9111a2dfb286d3cd9a792cc49da45",
+      "uncompressed_bytes": 178282,
+      "uncompressed_sha256": "fb552c8b90f02b41013a33e97a1f6caf08fd58e3ce1abed8d4527a45b2057035"
+    },
+    {
+      "path": "ods-one-edit-save-0205c-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 11127,
+      "compressed_sha256": "457ffde87528e3c203d2ba1aca74b2335aae45dc2164ff572b7948eaf56639cd",
+      "uncompressed_bytes": 178281,
+      "uncompressed_sha256": "aa02e47e744c90aea5e1522b8f299caf1713465e4edd70adc0469c2ffd21256f"
+    },
+    {
+      "path": "ods-one-edit-save-0205c-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 11213,
+      "compressed_sha256": "0bc3ac0dd198490000c2d7d401dc06a58e18c254ef63a6f22fcec31244149034",
+      "uncompressed_bytes": 178274,
+      "uncompressed_sha256": "57419825a0c3a2b5b983e6ad363240e6fab15f6a0cccc0f243cec31f5fec0310"
+    },
+    {
+      "path": "ods-one-edit-save-0205c-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 11393,
+      "compressed_sha256": "9c7528c42455221be0effc7e1f4147dd7a765c2caa995134843e786f6920a3ea",
+      "uncompressed_bytes": 178282,
+      "uncompressed_sha256": "a5e0e7aab033d070fbaea4630bc564376de3d07f0cf30ae76d2e1c3b42527c27"
+    },
+    {
+      "path": "ods-one-edit-save-0205c-summary.json",
+      "role": "derived_summary",
+      "bytes": 8090,
+      "sha256": "9f29d6142b0820d6cc7654095a4b1ae22f39b49489f93ea3b0c44c8bdae9757b"
+    }
+  ]
+}

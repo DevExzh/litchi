@@ -223,9 +223,14 @@ pub(crate) fn validate_text(value: &str, label: &str) -> Result<()> {
             "{label} exceeds the {MAX_TEXT_BYTES} byte safety limit"
         )));
     }
-    if value.chars().any(|character| {
-        matches!(character, '\u{0000}'..='\u{0008}' | '\u{000B}'..='\u{000C}' | '\u{000E}'..='\u{001F}')
-    }) {
+    // The forbidden characters (U+0000..=U+0008, U+000B..=U+000C,
+    // U+000E..=U+001F) are all ASCII, so they are single identical bytes in
+    // UTF-8, while every non-ASCII code point encodes to bytes >= 0x80.
+    // Scanning bytes is therefore exactly equivalent to scanning `char`s.
+    if value
+        .bytes()
+        .any(|byte| byte < 0x20 && !matches!(byte, 0x09 | 0x0A | 0x0D))
+    {
         return Err(Error::InvalidFormat(format!(
             "{label} contains an XML-forbidden control character"
         )));
@@ -301,5 +306,46 @@ mod sparse_accounting_tests {
             columns: NonZeroUsize::new(5).expect("test fixture or operation should succeed"),
         };
         assert!(validate_sheet(&sheet(vec![row(span, 1)])).is_err());
+    }
+}
+
+#[cfg(test)]
+mod text_validation_tests {
+    use super::validate_text;
+
+    fn rejects(value: &str) {
+        let result = validate_text(value, "ODS test text");
+        assert!(result.is_err(), "expected rejection of {value:?}");
+    }
+
+    #[test]
+    fn forbidden_control_characters_are_rejected() {
+        // Boundary bytes: 0x08 is forbidden, 0x09/0x0A/0x0D are allowed,
+        // 0x0B/0x0C and 0x0E..=0x1F are forbidden, 0x00 is forbidden.
+        rejects("\u{0000}");
+        rejects("\u{0008}");
+        rejects("\u{000B}");
+        rejects("\u{000C}");
+        rejects("\u{000E}");
+        rejects("\u{001F}");
+        rejects("prefix\u{0001}suffix");
+    }
+
+    #[test]
+    fn allowed_characters_are_accepted() {
+        for value in [
+            "",
+            "plain text",
+            "\t",          // 0x09
+            "\n",          // 0x0A
+            "\r",          // 0x0D
+            "\u{007F}",    // DEL is not forbidden
+            "caf\u{00E9}", // two-byte UTF-8 (0xC3 0xA9)
+            "\u{1F600}",   // four-byte UTF-8 emoji
+            "cell A1\tok\r\n",
+        ] {
+            let result = validate_text(value, "ODS test text");
+            assert!(result.is_ok(), "expected acceptance of {value:?}");
+        }
     }
 }

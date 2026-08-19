@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0220-odf-validator-borrowing-reads",
+  "decision": "analysis-pending",
+  "claim_scope": "pending",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "8425066ab6b43f08486c5a808d16e31bf6e758f3ff1205096c1a5e21af4a2a5d",
+      "candidate_sha256": "1971c3adf37536d1fa0963d111b79dade639ea5b624150b985faa6ab02bf8713",
+      "note": "control is the banked 0217 binary; candidate adds the 0220 borrowing-reads + depth-gated resolution validator in litchi-odf-common"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, 0207, 0209-0212, 0215, and 0217 (both binaries); the candidate additionally carries the 0220 validator borrowing-reads change in litchi-odf-common",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_source_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1314311.0,
+          "mean": 1330875.918,
+          "p95": 1427574.0,
+          "p99": 1951326.0
+        },
+        "b1": {
+          "p50": 1367423.0,
+          "mean": 1375927.166,
+          "p95": 1461241.0,
+          "p99": 1556381.0
+        },
+        "b2": {
+          "p50": 1375425.0,
+          "mean": 1398702.316,
+          "p95": 1543975.0,
+          "p99": 1849120.0
+        },
+        "a2": {
+          "p50": 1332101.0,
+          "mean": 1347122.076,
+          "p95": 1442146.0,
+          "p99": 1656178.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -4.041053,
+          "mean": -3.385083,
+          "p95": -2.358337,
+          "p99": 20.239827
+        },
+        "a2_to_b2": {
+          "p50": -3.252306,
+          "mean": -3.828921,
+          "p95": -7.060936,
+          "p99": -11.649835
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.353561,
+          "mean": 1.220712,
+          "p95": 1.020753,
+          "p99": -15.12551
+        },
+        "candidate": {
+          "p50": 0.585188,
+          "mean": 1.655258,
+          "p95": 5.6619,
+          "p99": 18.808955
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; control drift -15.13% exceeds 15%; candidate drift +18.81% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

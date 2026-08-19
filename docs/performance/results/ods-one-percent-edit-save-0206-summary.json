@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "change": "0206-ods-lazy-settings-qname",
+  "decision": "neutral-below-floor",
+  "claim_scope": "allocation claim only",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "5f0dab648cdf8f693ec01c171bfb81b2776e9e5abfe117b5be85c42a5bd89f66",
+      "candidate_sha256": "8e17ab3e9857cb5c7d6b28ea31ef85ec7512e779270f72bd11361c980e1a0eb8",
+      "note": "control is the banked 0204 binary (protection fused parse); candidate adds the 0206 lazy qualified-name materialization in litchi-ods::settings::codec"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, and 0204 (both binaries); the candidate additionally carries the 0206 lazy qualified-name change in litchi-ods::settings::codec",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_one_percent_edit_save",
+  "timing_scope": "open + stage + commit + sequential publication through the fixed-window hashing sink",
+  "cases": {
+    "lifecycle_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 15254915.5,
+          "mean": 15343023.3,
+          "p95": 15856115.0,
+          "p99": 16975957.0
+        },
+        "b1": {
+          "p50": 15096262.0,
+          "mean": 15185602.288,
+          "p95": 15736730.0,
+          "p99": 16952685.0
+        },
+        "b2": {
+          "p50": 15078797.5,
+          "mean": 15189655.286,
+          "p95": 15836027.0,
+          "p99": 16461919.0
+        },
+        "a2": {
+          "p50": 15219752.5,
+          "mean": 15242012.906,
+          "p95": 15530515.0,
+          "p99": 15691437.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.040016,
+          "mean": 1.02601,
+          "p95": 0.752927,
+          "p99": 0.137088
+        },
+        "a2_to_b2": {
+          "p50": 0.926132,
+          "mean": 0.343509,
+          "p95": -1.967172,
+          "p99": -4.910207
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.230503,
+          "mean": -0.658347,
+          "p95": -2.053466,
+          "p99": -7.566702
+        },
+        "candidate": {
+          "p50": -0.115688,
+          "mean": 0.02669,
+          "p95": 0.630989,
+          "p99": -2.894916
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean"
+      ],
+      "rejected_statistics": {
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3394383.5,
+          "mean": 3432307.65,
+          "p95": 3612098.0,
+          "p99": 4071363.0
+        },
+        "b1": {
+          "p50": 3358919.5,
+          "mean": 3396271.118,
+          "p95": 3579043.0,
+          "p99": 4191867.0
+        },
+        "b2": {
+          "p50": 3355675.5,
+          "mean": 3390452.238,
+          "p95": 3590438.0,
+          "p99": 4050643.0
+        },
+        "a2": {
+          "p50": 3369825.0,
+          "mean": 3380311.09,
+          "p95": 3480847.0,
+          "p99": 3610806.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.044785,
+          "mean": 1.049921,
+          "p95": 0.915119,
+          "p99": -2.959795
+        },
+        "a2_to_b2": {
+          "p50": 0.419888,
+          "mean": -0.300006,
+          "p95": -3.1484,
+          "p99": -12.181131
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.723504,
+          "mean": -1.514915,
+          "p95": -3.63365,
+          "p99": -11.312109
+        },
+        "candidate": {
+          "p50": -0.096579,
+          "mean": -0.171331,
+          "p95": 0.318381,
+          "p99": -3.369
+        }
+      },
+      "accepted_statistics": [
+        "p50"
+      ],
+      "rejected_statistics": {
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "a2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    }
+  }
+}

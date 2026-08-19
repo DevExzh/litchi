@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0209-odt-fused-open-parse",
+  "decision": "banked",
+  "claim_scope": "odt_file_source_open p50/mean/p95 14.63%-18.99% lower; odt_file_source_open_full_text_lifecycle mean 0.71%-4.53% lower; odt_file_eager_open_full_text_lifecycle p50/mean 1.28%-2.75% lower; odt_file_eager_open mean 0.49%-0.83% lower (single permitted rerun)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "57270d24894a7047682146f4a6a68d428ecc51b3d1270e5b93d90d0fddcb284b",
+      "candidate_sha256": "41b5f923638fa6fb0065318ce09edaf27588cf7aecd83c6c923c6d050f011efd",
+      "note": "control is the banked 0207 binary (tree verified bit-exact after the 0208 revert); candidate adds the 0209 fused open parse in litchi-odt::document"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, and 0207 (both binaries); the candidate additionally carries the 0209 fused open parse change in litchi-odt::document",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-source-backed-repeated-text-media",
+    "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "archive_bytes": 16812034,
+    "archive_member_count": 13
+  },
+  "selector": "odt_file_eager_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3021040.0,
+          "mean": 3045775.346,
+          "p95": 3238387.0,
+          "p99": 3620006.0
+        },
+        "b1": {
+          "p50": 3036020.5,
+          "mean": 3048112.498,
+          "p95": 3181640.0,
+          "p99": 3310324.0
+        },
+        "b2": {
+          "p50": 3051451.5,
+          "mean": 3092785.676,
+          "p95": 3372539.0,
+          "p99": 4341056.0
+        },
+        "a2": {
+          "p50": 3029487.5,
+          "mean": 3057131.752,
+          "p95": 3275988.0,
+          "p99": 3449334.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.495872,
+          "mean": -0.076734,
+          "p95": 1.752323,
+          "p99": 8.554737
+        },
+        "a2_to_b2": {
+          "p50": -0.725007,
+          "mean": -1.166254,
+          "p95": -2.947233,
+          "p99": -25.852005
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.279622,
+          "mean": 0.372858,
+          "p95": 1.161103,
+          "p99": -4.714688
+        },
+        "candidate": {
+          "p50": 0.508264,
+          "mean": 1.465601,
+          "p95": 6.000019,
+          "p99": 31.136892
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; candidate drift +31.14% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

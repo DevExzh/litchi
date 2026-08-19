@@ -9,13 +9,13 @@ use crate::model::{
 use litchi_core::ShapeType;
 use std::collections::HashMap;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct TransitionStyleDefinition {
     pub(super) parent: Option<String>,
     pub(super) transition: Transition,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct TransitionStyles {
     pub(super) named: HashMap<String, TransitionStyleDefinition>,
     pub(super) default: Transition,

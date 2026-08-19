@@ -1,0 +1,339 @@
+{
+  "schema_version": 1,
+  "change": "0196-xml-escape-byte-scan",
+  "decision": "retain_byte_scan_repeated_edit_neutral",
+  "claim_scope": "fixed-corpus source-backed ODS four-transaction repeated-edit warm latency: all statistics withheld as neutral (paired directions straddle zero); no regression trigger fired; no allocation/RSS/physical-I/O/cold-cache/producer claim",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "4df50556e468396d1f1ff6f4a89d5b17459976f349bf240a70e52be7fe428bc3",
+      "candidate_sha256": "db708afa17eddc7dab9911429c51d6d0cd676550f8c33f4458893f2ea1201cff",
+      "note": "both binaries contain changes 0193, 0194, and 0195 as baseline plus the identical 341-case selector matrix; the candidate binary additionally carries the litchi-core XML escape byte scan"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193, 0194, and 0195 (both binaries) plus the uncommitted litchi-core XML escape byte scan (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_repeated_edit",
+  "timing_scope": "one source-backed owner and four fixed-window hashing sinks prepared outside the timer; the timer covers exactly four sequential edit_cells + set_cell + commit + write_to transactions with per-transaction stage/commit/publication durations summed per sample",
+  "cases": {
+    "total_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 43523696.5,
+          "mean": 43666776.188,
+          "p95": 45112859.0,
+          "p99": 46431041.0
+        },
+        "b1": {
+          "p50": 43068911.5,
+          "mean": 43226664.356,
+          "p95": 44646698.0,
+          "p99": 45717717.0
+        },
+        "b2": {
+          "p50": 43165594.0,
+          "mean": 43346156.81,
+          "p95": 45130028.0,
+          "p99": 46604309.0
+        },
+        "a2": {
+          "p50": 43022693.0,
+          "mean": 43120728.656,
+          "p95": 44198914.0,
+          "p99": 44744393.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.044914,
+          "mean": 1.007887,
+          "p95": 1.033322,
+          "p99": 1.536308
+        },
+        "a2_to_b2": {
+          "p50": -0.332153,
+          "mean": -0.522784,
+          "p95": -2.106645,
+          "p99": -4.156758
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.151105,
+          "mean": -1.250487,
+          "p95": -2.025908,
+          "p99": -3.632587
+        },
+        "candidate": {
+          "p50": 0.224483,
+          "mean": 0.276432,
+          "p95": 1.082566,
+          "p99": 1.939274
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "stage_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1986746.0,
+          "mean": 2010053.938,
+          "p95": 2200606.0,
+          "p99": 2490696.0
+        },
+        "b1": {
+          "p50": 1947442.0,
+          "mean": 1969749.32,
+          "p95": 2135669.0,
+          "p99": 2272589.0
+        },
+        "b2": {
+          "p50": 1978806.5,
+          "mean": 2004142.15,
+          "p95": 2173953.0,
+          "p99": 2418797.0
+        },
+        "a2": {
+          "p50": 1933890.5,
+          "mean": 1945666.154,
+          "p95": 2063656.0,
+          "p99": 2225225.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.97831,
+          "mean": 2.005151,
+          "p95": 2.950869,
+          "p99": 8.75687
+        },
+        "a2_to_b2": {
+          "p50": -2.322572,
+          "mean": -3.005449,
+          "p95": -5.344738,
+          "p99": -8.698985
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -2.660406,
+          "mean": -3.203286,
+          "p95": -6.223286,
+          "p99": -10.658507
+        },
+        "candidate": {
+          "p50": 1.610549,
+          "mean": 1.746051,
+          "p95": 1.7926,
+          "p99": 6.433543
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 7554584.0,
+          "mean": 7622651.468,
+          "p95": 8100750.0,
+          "p99": 8872716.0
+        },
+        "b1": {
+          "p50": 7526509.5,
+          "mean": 7610437.106,
+          "p95": 8118188.0,
+          "p99": 8652507.0
+        },
+        "b2": {
+          "p50": 7581372.0,
+          "mean": 7653179.864,
+          "p95": 8224608.0,
+          "p99": 8792326.0
+        },
+        "a2": {
+          "p50": 7485803.5,
+          "mean": 7519742.608,
+          "p95": 7876957.0,
+          "p99": 8137493.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.371622,
+          "mean": 0.160238,
+          "p95": -0.215264,
+          "p99": 2.481867
+        },
+        "a2_to_b2": {
+          "p50": -1.276663,
+          "mean": -1.774492,
+          "p95": -4.413519,
+          "p99": -8.04711
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.910447,
+          "mean": -1.35004,
+          "p95": -2.762621,
+          "p99": -8.286335
+        },
+        "candidate": {
+          "p50": 0.728924,
+          "mean": 0.561633,
+          "p95": 1.310884,
+          "p99": 1.615936
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "publication_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 33730236.0,
+          "mean": 33812788.424,
+          "p95": 34827071.0,
+          "p99": 35521683.0
+        },
+        "b1": {
+          "p50": 33363118.0,
+          "mean": 33431097.08,
+          "p95": 34327316.0,
+          "p99": 34880372.0
+        },
+        "b2": {
+          "p50": 33381673.5,
+          "mean": 33476407.998,
+          "p95": 34501207.0,
+          "p99": 35566583.0
+        },
+        "a2": {
+          "p50": 33374359.0,
+          "mean": 33438923.802,
+          "p95": 34154983.0,
+          "p99": 34509475.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.088394,
+          "mean": 1.128837,
+          "p95": 1.434961,
+          "p99": 1.805407
+        },
+        "a2_to_b2": {
+          "p50": -0.021917,
+          "mean": -0.112097,
+          "p95": -1.013685,
+          "p99": -3.06324
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.055068,
+          "mean": -1.10569,
+          "p95": -1.929786,
+          "p99": -2.84955
+        },
+        "candidate": {
+          "p50": 0.055617,
+          "mean": 0.135535,
+          "p95": 0.506567,
+          "p99": 1.967327
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "a2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    }
+  }
+}

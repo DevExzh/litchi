@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "change": "0197-ods-batched-row-window-reparse",
+  "decision": "withheld",
+  "claim_scope": "none; all statistics withheld as neutral (single-row window guardrail); change reverted",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "db708afa17eddc7dab9911429c51d6d0cd676550f8c33f4458893f2ea1201cff",
+      "candidate_sha256": "fe3da69fae3a125183f2a9416cb49cf78314bf41c2a9a7743db7bd2af7de0ef3",
+      "note": "both binaries contain changes 0193-0196 as baseline plus the identical 341-case selector matrix; the candidate binary additionally carries the batched per-window row reparse in litchi-ods worksheet/package.rs; control is bit-identical to the 0196 candidate"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193-0196 (both binaries) plus the uncommitted batched row-window reparse (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_one_edit_save",
+  "timing_scope": "open + stage + commit + sequential publication through the fixed-window hashing sink",
+  "cases": {
+    "lifecycle_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 16953109.0,
+          "mean": 17034224.582,
+          "p95": 17706408.0,
+          "p99": 18464711.0
+        },
+        "b1": {
+          "p50": 16922311.5,
+          "mean": 16996825.346,
+          "p95": 17715440.0,
+          "p99": 18288439.0
+        },
+        "b2": {
+          "p50": 17176016.0,
+          "mean": 17331833.46,
+          "p95": 18464801.0,
+          "p99": 19054043.0
+        },
+        "a2": {
+          "p50": 16902639.5,
+          "mean": 17042075.212,
+          "p95": 18011596.0,
+          "p99": 18697782.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.181663,
+          "mean": 0.219553,
+          "p95": -0.05101,
+          "p99": 0.954643
+        },
+        "a2_to_b2": {
+          "p50": -1.61736,
+          "mean": -1.700252,
+          "p95": -2.516185,
+          "p99": -1.905365
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.297701,
+          "mean": 0.046087,
+          "p95": 1.723602,
+          "p99": 1.262251
+        },
+        "candidate": {
+          "p50": 1.499231,
+          "mean": 1.971004,
+          "p95": 4.229988,
+          "p99": 4.186273
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2475571.0,
+          "mean": 2504298.14,
+          "p95": 2708012.0,
+          "p99": 2968510.0
+        },
+        "b1": {
+          "p50": 2485700.0,
+          "mean": 2506835.802,
+          "p95": 2684630.0,
+          "p99": 2845281.0
+        },
+        "b2": {
+          "p50": 2543509.5,
+          "mean": 2592856.262,
+          "p95": 2909989.0,
+          "p99": 3272729.0
+        },
+        "a2": {
+          "p50": 2479361.5,
+          "mean": 2510449.472,
+          "p95": 2758100.0,
+          "p99": 3000303.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.409158,
+          "mean": -0.101332,
+          "p95": 0.863438,
+          "p99": 4.151207
+        },
+        "a2_to_b2": {
+          "p50": -2.587279,
+          "mean": -3.282551,
+          "p95": -5.507016,
+          "p99": -9.07995
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.153116,
+          "mean": 0.245631,
+          "p95": 1.849623,
+          "p99": 1.071009
+        },
+        "candidate": {
+          "p50": 2.325683,
+          "mean": 3.431436,
+          "p95": 8.394416,
+          "p99": 15.02305
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; candidate drift +15.02% exceeds 15%"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "a2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    }
+  }
+}
