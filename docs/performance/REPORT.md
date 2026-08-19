@@ -11,6 +11,27 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ODT open-parse hand-rolled binding tracker — banked (change 0224)
+
+[Change 0224](changes/0224-odt-openparse-binding-tracker.md) removes
+`NsReader`'s per-event binding maintenance (`process_event`, 46.8%-54.8%
+of the timed ODT open post-0222) from `OpenParse::run`: a plain `Reader`
+plus a hand-rolled `BindingTracker` replicates the push/error stream
+byte-exactly (real `NamespaceError` values — messages identical by
+construction), with an `xmlns` prefilter (length-gated inline fast path)
+and a flat-buffer binding layout. Differential oracles pin resolutions at
+every depth across adversarial cases and the full corpus (898 tests). The
+v1 candidate reproduced a tiny-shape p50 regression; differential
+diagnosis (`perf stat` instruction fitting) found a real fixed
+~1.5 µs/open overhead crossing the per-paragraph saving at ~70 paragraphs,
+and the v2 revision eliminated it. **Banked**: `odt_file_eager_open`
+p50/mean/p99 **9.41%-13.07% / 9.86%-14.48% / 14.01%-25.39%** lower,
+`odt_file_source_open` p50 **21.85%-23.05%** lower,
+`odt_file_source_open_full_text_lifecycle` mean **9.39%-11.77%** lower.
+`odt_semantic_open` records no protocol claim (its reported `results[0]`
+is the tiny 24-paragraph shape; medium/large shapes improved −11.6%/−24.1%
+p50 per the diagnosis). Raw artifacts: `results/*-0224-*`.
+
 ## ODT source-path layout noise floor calibration (change 0223)
 
 [Change 0223](changes/0223-odt-source-path-floor-calibration.md) is a

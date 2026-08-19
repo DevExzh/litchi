@@ -1856,6 +1856,18 @@ file-eager-open 5.6%/5.7%/9.3%/9.2%. The 0205 banking rule extends to
 these phases unchanged. See
 [`0223`](changes/0223-odt-source-path-floor-calibration.md).
 
+Change 0224 adds no selector or CRUD closure and leaves the matrix
+unchanged. It replaces `NsReader` in the fused ODT open parse with a
+plain `Reader` plus a hand-rolled `BindingTracker` whose error stream and
+resolutions are byte-exact by construction (differential oracles at every
+depth; 898 litchi-odt tests). A v1 tiny-shape p50 regression was
+diagnosed as a real fixed per-open overhead (crossover ~70 paragraphs)
+and eliminated in v2. **Banked**: `odt_file_eager_open` p50/mean/p99
+9.41%-13.07% / 9.86%-14.48% / 14.01%-25.39% lower, `odt_file_source_open`
+p50 21.85%-23.05% lower, `odt_file_source_open_full_text_lifecycle` mean
+9.39%-11.77% lower; all guardrails clean or within-floor. See
+[`0224`](changes/0224-odt-openparse-binding-tracker.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

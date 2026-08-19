@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0224-odt-openparse-binding-tracker",
+  "decision": "banked",
+  "claim_scope": "executed phase (results[0] = tiny 24-paragraph shape); v1's reproduced tiny-p50 adverse (fixed +1.5us/open overhead vs -17ns/paragraph saving, crossover ~70 paragraphs) was fixed in v2 (len-gated push fast path + flat-buffer tracker) - p50 disagreeing this run (-0.56/+13.45), no adverse-both. p50/mean rejected on control drift (+16.83/+14.87); p95/p99 accepted but within the 0218 floors (27.6/28.2) - neutral. Per-shape diagnosis (perf stat instruction counters): medium -11.6%, large -24.1% p50",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "f53a43f12c405238561bac89fddca861ce14a35bb90136b31a2bdfe528e04987",
+      "candidate_sha256": "48bd4072fdc10f6be60c01fd3cc908c79f3cde07fa7768187ea3166ebd329ca2",
+      "note": "control is the banked 0222 binary; candidate adds the 0224 plain-Reader + binding-tracker OpenParse::run change in litchi-odt"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD a93e65c13 (banked through 0222, both binaries); the candidate additionally carries the 0224 binding-tracker OpenParse::run change in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-semantic-tiny",
+    "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+    "archive_bytes": 2148,
+    "archive_member_count": 5
+  },
+  "selector": "odt_semantic_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 17815.0,
+          "mean": 19265.688,
+          "p95": 25955.0,
+          "p99": 32254.0
+        },
+        "b1": {
+          "p50": 17914.0,
+          "mean": 18748.362,
+          "p95": 23573.0,
+          "p99": 26287.0
+        },
+        "b2": {
+          "p50": 18014.0,
+          "mean": 18907.012,
+          "p95": 23813.0,
+          "p99": 28689.0
+        },
+        "a2": {
+          "p50": 20813.5,
+          "mean": 22131.116,
+          "p95": 28079.0,
+          "p99": 35599.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.555711,
+          "mean": 2.685219,
+          "p95": 9.177422,
+          "p99": 18.500031
+        },
+        "a2_to_b2": {
+          "p50": 13.450405,
+          "mean": 14.568194,
+          "p95": 15.192849,
+          "p99": 19.410658
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 16.831322,
+          "mean": 14.873219,
+          "p95": 8.183394,
+          "p99": 10.370807
+        },
+        "candidate": {
+          "p50": 0.558223,
+          "mean": 0.846207,
+          "p95": 1.018114,
+          "p99": 9.137597
+        }
+      },
+      "accepted_statistics": [
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree; control drift +16.83% exceeds 5%",
+        "mean": "control drift +14.87% exceeds 5%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}
