@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0225-odt-text-resolution-memo",
+  "decision": "banked",
+  "claim_scope": "rerun: mean/p99 adverse-both reproduced within the 0226-calibrated floors (max 4.57 vs 6.1; 4.90 vs 38.7) - within-floor layout readings per change 0226; p50/p95 directions disagree; no claim (byte-identical phase)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "48bd4072fdc10f6be60c01fd3cc908c79f3cde07fa7768187ea3166ebd329ca2",
+      "candidate_sha256": "ec3dc81d69238edc4b8fe86e59529f5397d725628b56d24ff002285fb3a7d30a",
+      "note": "control is the banked 0224 binary; candidate adds the 0225 text-path resolution memo in litchi-odt"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD c6b94046e (banked through 0224, both binaries); the candidate additionally carries the 0225 text-path resolution memo in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-source-backed-repeated-text-media",
+    "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "archive_bytes": 16812034,
+    "archive_member_count": 13
+  },
+  "selector": "odt_file_source_open",
+  "timing_scope": "filesystem_read_or_path_open_and_unified_document_ownership_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 613325.0,
+          "mean": 618831.996,
+          "p95": 664496.0,
+          "p99": 708097.0
+        },
+        "b1": {
+          "p50": 612529.0,
+          "mean": 619063.346,
+          "p95": 663695.0,
+          "p99": 727442.0
+        },
+        "b2": {
+          "p50": 629438.0,
+          "mean": 636617.11,
+          "p95": 677664.0,
+          "p99": 725741.0
+        },
+        "a2": {
+          "p50": 604067.5,
+          "mean": 608813.992,
+          "p95": 650026.0,
+          "p99": 691873.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.129784,
+          "mean": -0.037385,
+          "p95": 0.120542,
+          "p99": -2.73197
+        },
+        "a2_to_b2": {
+          "p50": -4.199945,
+          "mean": -4.566767,
+          "p95": -4.25183,
+          "p99": -4.895118
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.509396,
+          "mean": -1.618857,
+          "p95": -2.17759,
+          "p99": -2.291212
+        },
+        "candidate": {
+          "p50": 2.760522,
+          "mean": 2.835536,
+          "p95": 2.104732,
+          "p99": -0.233833
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

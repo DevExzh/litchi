@@ -9,6 +9,7 @@ mod validation;
 
 use super::element::{Element, ElementBase, try_owned_string, try_prefixed_name};
 use litchi_core::{Error, Result};
+use memchr::memmem;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -1233,6 +1234,102 @@ fn parse_text_blocks_with_ownership(xml_content: &str, own_text: bool) -> Result
     Ok(output)
 }
 
+/// Whether the raw attributes of an element could declare a namespace.
+///
+/// `NamespaceResolver::push` adds a binding only for attribute keys that are
+/// exactly `xmlns` or start with `xmlns:` (`as_namespace_binding`), and both
+/// shapes contain the literal substring `xmlns` in the raw attribute slice, so
+/// a slice without that substring can never change the binding content. The
+/// converse does not hold — an attribute *value* may contain the substring —
+/// so `true` is only a conservative "maybe declares".
+fn may_declare_namespace(element: &BytesStart<'_>) -> bool {
+    let raw = element.attributes_raw();
+    raw.len() >= b"xmlns".len() && memmem::find(raw, b"xmlns").is_some()
+}
+
+/// Last-resolution memo for the text-namespace classification of
+/// [`parse_text_block_texts`].
+///
+/// quick-xml resolves every element event by reverse-scanning all live
+/// bindings (`NamespaceResolver::resolve_prefix`), which dominates the
+/// discard path when a document repeats the same prefix on thousands of
+/// sibling blocks. The resolution is a pure function of the binding-stack
+/// content and the queried prefix, and the content changes only when a
+/// binding is pushed or popped:
+///
+/// - A `push` adds bindings only for `xmlns`/`xmlns:*` attribute keys, so a
+///   `Start`/`Empty` element failing [`may_declare_namespace`] cannot change
+///   the content; one passing it conservatively invalidates the memo *before*
+///   the element's own resolution (its declarations are already in scope).
+/// - A `pop` removes exactly the bindings of the scope being closed, so only
+///   a scope that declared can lose bindings. `NsReader` defers the pop into
+///   the next read, so the caller tracks declaring scopes on a stack and
+///   bumps the content version before the first resolution after the pop.
+///
+/// A memo hit therefore means byte-identical binding content for the same
+/// prefix, and reusing the verdict is exact — never a stale approximation.
+struct TextNamespaceMemo {
+    /// Content version the cached verdict was resolved against
+    /// (`u64::MAX` before the first resolution, so no real version matches).
+    version: u64,
+    /// Whether the cached element name carried a prefix.
+    has_prefix: bool,
+    /// Cached prefix bytes; meaningful only when `has_prefix` is set.
+    prefix: Vec<u8>,
+    /// Cached verdict: whether the name resolves to `TEXT_NAMESPACE`.
+    is_text: bool,
+}
+
+impl TextNamespaceMemo {
+    fn new() -> Self {
+        Self {
+            version: u64::MAX,
+            has_prefix: false,
+            prefix: Vec::new(),
+            is_text: false,
+        }
+    }
+
+    /// Classify an element name as belonging to the text namespace, reusing
+    /// the last verdict when the binding content and prefix are unchanged.
+    fn is_text_namespace(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        content_version: u64,
+        element: &BytesStart<'_>,
+    ) -> Result<bool> {
+        let prefix = element.name().prefix().map(|prefix| prefix.into_inner());
+        if self.version == content_version
+            && self.has_prefix == prefix.is_some()
+            && (!self.has_prefix || self.prefix.as_slice() == prefix.unwrap_or(b""))
+        {
+            return Ok(self.is_text);
+        }
+        // Miss: resolve directly, exactly as `resolve_event` does for element
+        // events (`use_default = true`).
+        let is_text = matches!(
+            reader.resolver().resolve_prefix(element.name().prefix(), true),
+            ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE
+        );
+        self.has_prefix = prefix.is_some();
+        if let Some(prefix) = prefix {
+            self.prefix
+                .try_reserve(prefix.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "ODT namespace memo prefix",
+                    source,
+                })?;
+            self.prefix.clear();
+            self.prefix.extend_from_slice(prefix);
+        }
+        self.is_text = is_text;
+        // Stamp the version last so a failed refresh leaves the memo
+        // conservatively stale rather than falsely current.
+        self.version = content_version;
+        Ok(is_text)
+    }
+}
+
 /// Parse every `text:p` and `text:h`, retaining only the collected text.
 ///
 /// Behaves exactly like [`parse_text_blocks_owned`] followed by
@@ -1259,13 +1356,59 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
     // Depth of the note-body/ruby-text subtree whose content is suppressed.
     let mut skipped_depth = 0usize;
     let mut total_text_bytes = 0usize;
+    // Last-resolution memo state (see `TextNamespaceMemo`): a monotone
+    // content version of the binding stack, one flag per open `Start` scope
+    // recording whether that scope could declare namespaces, and a marker
+    // that the previous event's deferred pop (executed inside the next read)
+    // removed bindings.
+    let mut memo = TextNamespaceMemo::new();
+    let mut content_version = 0u64;
+    let mut declared_stack: Vec<bool> = Vec::new();
+    let mut pop_removed_bindings = false;
 
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
+        let event = reader
+            .read_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))?;
-        let text_namespace =
-            matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE);
+        // The deferred pop of the previous `End`/`Empty` scope ran inside
+        // that read; invalidate the memo before any resolution below.
+        if pop_removed_bindings {
+            content_version += 1;
+            pop_removed_bindings = false;
+        }
+        // This bookkeeping precedes every `continue` below because the
+        // reader maintains bindings inside skipped subtrees too.
+        //
+        // `resolve_event` maps `Start`/`Empty` to
+        // `resolve_prefix(name().prefix(), use_default = true)` and every
+        // other event to `Unbound` (the `End` verdict was computed but never
+        // consumed here), so only `Start`/`Empty` go through the memo.
+        let text_namespace = match event {
+            Event::Start(ref element) => {
+                let declares = may_declare_namespace(element);
+                try_push(
+                    &mut declared_stack,
+                    declares,
+                    "ODT namespace-declaration stack",
+                )?;
+                // The element's own declarations are in scope for its
+                // resolution (the push ran inside the read).
+                if declares {
+                    content_version += 1;
+                }
+                memo.is_text_namespace(&reader, content_version, element)?
+            },
+            Event::Empty(ref element) => {
+                if may_declare_namespace(element) {
+                    // Push for this event, then a deferred pop before the
+                    // next one: both change the binding content.
+                    content_version += 1;
+                    pop_removed_bindings = true;
+                }
+                memo.is_text_namespace(&reader, content_version, element)?
+            },
+            _ => false,
+        };
         match event {
             Event::Start(ref element) => {
                 document_depth = document_depth.checked_add(1).ok_or_else(|| {
@@ -1370,6 +1513,13 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                 }
             },
             Event::End(_) => {
+                // The deferred pop of this scope executes inside the next
+                // read; record now whether it will remove bindings. An
+                // unbalanced stack is malformed input the reader rejects
+                // anyway, so conservatively treat it as declaring.
+                if declared_stack.pop().unwrap_or(true) {
+                    pop_removed_bindings = true;
+                }
                 document_depth = document_depth.checked_sub(1).ok_or_else(|| {
                     Error::InvalidFormat("ODF text element stack underflow".to_string())
                 })?;
@@ -1381,7 +1531,7 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                 skipped_depth = skipped_depth.saturating_sub(1);
                 if let Some(current) = active.last_mut() {
                     current.depth = current.depth.checked_sub(1).ok_or_else(|| {
-                        Error::InvalidFormat("ODF text block stack underflow".to_string())
+                        Error::InvalidFormat("ODT text block stack underflow".to_string())
                     })?;
                     if current.depth == 0 {
                         let current = active
@@ -2066,6 +2216,7 @@ fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::{Path, PathBuf};
 
     // ========== Paragraph Tests ==========
     #[test]
@@ -2638,5 +2789,217 @@ mod tests {
             extract_text_error(&incomplete),
             oracle_extract_text_error(&incomplete)
         );
+    }
+
+    // ========== 0225 namespace-memo differential pins ==========
+
+    /// Drive both the memoized discard path and the direct-resolution
+    /// retained oracle over `xml`, asserting identical per-block text or an
+    /// identical error message.
+    fn assert_memo_matches_direct_resolution(xml: &str) {
+        let memoized = parse_text_block_texts(xml);
+        let oracle = parse_text_blocks_owned(xml)
+            .map(|blocks| blocks.into_iter().map(Block::into_text).collect::<Vec<_>>());
+        match (memoized, oracle) {
+            (Ok(memoized), Ok(oracle)) => assert_eq!(
+                memoized, oracle,
+                "memoized classification diverges from direct resolution"
+            ),
+            (Err(memoized), Err(oracle)) => assert_eq!(
+                memoized.to_string(),
+                oracle.to_string(),
+                "memoized error diverges from direct resolution"
+            ),
+            (memoized, oracle) => panic!(
+                "memoized/direct outcome mismatch: {memoized:?} vs {:?}",
+                oracle.map(|blocks| blocks.len())
+            ),
+        }
+    }
+
+    /// Replay the bookkeeping of `parse_text_block_texts` event by event,
+    /// asserting every memo verdict equals a fresh direct resolution against
+    /// the live resolver. Panic-free here is not a concern: test-only.
+    fn assert_memo_classification_matches(xml: &str) {
+        let mut reader = NsReader::from_str(xml);
+        let mut buffer = Vec::new();
+        let mut memo = TextNamespaceMemo::new();
+        let mut content_version = 0u64;
+        let mut declared_stack: Vec<bool> = Vec::new();
+        let mut pop_removed_bindings = false;
+        loop {
+            let event = reader
+                .read_event_into(&mut buffer)
+                .expect("test XML must parse");
+            if pop_removed_bindings {
+                content_version += 1;
+                pop_removed_bindings = false;
+            }
+            match event {
+                Event::Start(ref element) => {
+                    let declares = may_declare_namespace(element);
+                    declared_stack.push(declares);
+                    if declares {
+                        content_version += 1;
+                    }
+                    assert_memo_hit_matches(&reader, &mut memo, content_version, element);
+                },
+                Event::Empty(ref element) => {
+                    if may_declare_namespace(element) {
+                        content_version += 1;
+                        pop_removed_bindings = true;
+                    }
+                    assert_memo_hit_matches(&reader, &mut memo, content_version, element);
+                },
+                Event::End(_) => {
+                    if declared_stack.pop().unwrap_or(true) {
+                        pop_removed_bindings = true;
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+            buffer.clear();
+        }
+    }
+
+    fn assert_memo_hit_matches(
+        reader: &NsReader<&[u8]>,
+        memo: &mut TextNamespaceMemo,
+        content_version: u64,
+        element: &BytesStart<'_>,
+    ) {
+        let direct = matches!(
+            reader.resolver().resolve_prefix(element.name().prefix(), true),
+            ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE
+        );
+        let memoized = memo
+            .is_text_namespace(reader, content_version, element)
+            .expect("test XML fits the memo prefix buffer");
+        assert_eq!(
+            memoized,
+            direct,
+            "memo verdict diverges from direct resolution for {:?}",
+            element.name()
+        );
+    }
+
+    #[test]
+    fn memoized_resolution_matches_direct_resolution_under_rebinding() {
+        let text_ns = std::str::from_utf8(TEXT_NAMESPACE).unwrap();
+        let office_ns = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+        let fixtures: Vec<String> = vec![
+            // Same prefix rebound to a foreign namespace at depth: the block
+            // inside the scope is not text, the sibling after the scope
+            // closes is (catches a memo stale across the deferred pop).
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}"><t:p>Before</t:p><o:wrapper xmlns:t="urn:example:foreign"><t:p>Shadowed</t:p></o:wrapper><t:p>After</t:p></o:text>"#
+            ),
+            // Nested rebinding: rebound to foreign, rebound back to the text
+            // namespace at a deeper level, then restored outward.
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}"><o:a xmlns:t="urn:example:one"><t:p>S1</t:p><o:b xmlns:t="{text_ns}"><t:p>Inner</t:p></o:b><t:p>S2</t:p></o:a><t:p>Outer</t:p></o:text>"#
+            ),
+            // Unbinding via `xmlns:t=""` (resolution becomes `Unknown`), then
+            // the outer declaration takes over again after the scope closes.
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}"><t:p>Before</t:p><o:wrapper xmlns:t=""><t:p>Shadowed</t:p></o:wrapper><t:p>After</t:p></o:text>"#
+            ),
+            // Default namespace makes prefix-less `<p>` a text block,
+            // interleaved with prefixed blocks; a scope unsetting the default
+            // suppresses prefix-less blocks inside it.
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}" xmlns="{text_ns}"><p>Plain</p><t:p>Prefixed</t:p><o:wrapper xmlns=""><p>NotText</p></o:wrapper><p>PlainAgain</p></o:text>"#
+            ),
+            // An `Empty` element carrying a declaration: its push and
+            // deferred pop bracket the event itself, and the following
+            // sibling must resolve against the restored outer binding.
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}"><o:marker xmlns:t="urn:example:foreign"/><t:p>After</t:p></o:text>"#
+            ),
+            // An attribute *value* containing the substring `xmlns` forces a
+            // conservative invalidation without declaring anything.
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}"><t:p t:style-name="xmlns:shadow">A</t:p><t:p>B</t:p></o:text>"#
+            ),
+            // Foreign-prefix blocks before and after a rebinding scope.
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}" xmlns:f="urn:example:foreign"><f:p>Foreign</f:p><t:p>Text1</t:p><o:w xmlns:t="urn:example:foreign"><t:p>Shadowed</t:p></o:w><f:p>Foreign2</f:p><t:p>Text2</t:p></o:text>"#
+            ),
+            // Error parity: an unknown attribute prefix on a block after a
+            // rebinding scope closes fails identically in both paths.
+            format!(
+                r#"<o:text xmlns:o="{office_ns}" xmlns:t="{text_ns}"><o:w xmlns:t="urn:example:foreign"><t:p>S</t:p></o:w><t:p u:foo="1">x</t:p></o:text>"#
+            ),
+        ];
+        let expected: [&[&str]; 7] = [
+            &["Before", "After"],
+            &["Inner", "Outer"],
+            &["Before", "After"],
+            &["Plain", "Prefixed", "PlainAgain"],
+            &["After"],
+            &["A", "B"],
+            &["Text1", "Text2"],
+        ];
+        for (index, xml) in fixtures.iter().enumerate() {
+            assert_memo_matches_direct_resolution(xml);
+            assert_memo_classification_matches(xml);
+            if let Some(expected) = expected.get(index) {
+                assert_eq!(
+                    parse_text_block_texts(xml).unwrap(),
+                    *expected,
+                    "unexpected extracted text for fixture {index}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn memoized_classification_matches_direct_resolution_on_odt_corpus() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+        let mut files = Vec::new();
+        collect_odt_corpus(&root, &mut files);
+        files.sort();
+        assert!(!files.is_empty(), "no .odt corpus fixtures discovered");
+        let mut compared = 0usize;
+        for path in &files {
+            let Some(xml) = odt_content_xml(path) else {
+                continue;
+            };
+            assert_memo_matches_direct_resolution(&xml);
+            assert_memo_classification_matches(&xml);
+            compared += 1;
+        }
+        assert!(compared > 0, "no .odt corpus fixtures yielded content.xml");
+    }
+
+    fn collect_odt_corpus(directory: &Path, files: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_odt_corpus(&path, files);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "odt" || extension == "fodt")
+            {
+                files.push(path);
+            }
+        }
+    }
+
+    fn odt_content_xml(path: &Path) -> Option<String> {
+        let bytes = std::fs::read(path).ok()?;
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "fodt")
+        {
+            return String::from_utf8(bytes).ok();
+        }
+        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+        let entry = reader.read("content.xml").ok()?;
+        String::from_utf8(entry).ok()
     }
 }

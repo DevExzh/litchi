@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0225-odt-text-resolution-memo",
+  "decision": "banked",
+  "claim_scope": "rerun: primary adverse-both readings on all four stats did not reproduce; p50 accepted (+0.05/+0.21, mechanism-absent); mean/p95/p99 directions disagree or drift-rejected; clears the primary guardrail reading",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "48bd4072fdc10f6be60c01fd3cc908c79f3cde07fa7768187ea3166ebd329ca2",
+      "candidate_sha256": "ec3dc81d69238edc4b8fe86e59529f5397d725628b56d24ff002285fb3a7d30a",
+      "note": "control is the banked 0224 binary; candidate adds the 0225 text-path resolution memo in litchi-odt"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD c6b94046e (banked through 0224, both binaries); the candidate additionally carries the 0225 text-path resolution memo in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odp-semantic-tiny",
+    "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+    "archive_bytes": 2229,
+    "archive_member_count": 5
+  },
+  "selector": "odp_semantic_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 43190.0,
+          "mean": 44707.73,
+          "p95": 51711.0,
+          "p99": 58822.0
+        },
+        "b1": {
+          "p50": 43169.5,
+          "mean": 44199.372,
+          "p95": 49919.0,
+          "p99": 53653.0
+        },
+        "b2": {
+          "p50": 42839.5,
+          "mean": 45105.828,
+          "p95": 51791.0,
+          "p99": 63407.0
+        },
+        "a2": {
+          "p50": 42929.5,
+          "mean": 43742.524,
+          "p95": 48718.0,
+          "p99": 52913.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.047465,
+          "mean": 1.13707,
+          "p95": 3.465414,
+          "p99": 8.787528
+        },
+        "a2_to_b2": {
+          "p50": 0.209646,
+          "mean": -3.116656,
+          "p95": -6.30773,
+          "p99": -19.832555
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.603149,
+          "mean": -2.158924,
+          "p95": -5.787937,
+          "p99": -10.045561
+        },
+        "candidate": {
+          "p50": -0.764429,
+          "mean": 2.050835,
+          "p95": 3.750075,
+          "p99": 18.179785
+        }
+      },
+      "accepted_statistics": [
+        "p50"
+      ],
+      "rejected_statistics": {
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; candidate drift +18.18% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

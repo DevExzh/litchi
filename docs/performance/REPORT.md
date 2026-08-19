@@ -11,6 +11,54 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ODT file-source-open layout noise floor calibration (change 0226)
+
+[Change 0226](changes/0226-odt-source-open-floor-calibration.md) is a
+measurement-methodology calibration, not a code change — the 0223 analog
+completing the `odt_file_source_open` floor set. Change 0225's verdict
+was blocked by an adverse both-directions p50 reading (max 6.65%) on
+that byte-identical guardrail phase, whose p50/mean statistics 0223 had
+left uncalibrated; following the 0217→0218 precedent, the verdict was
+deferred pending calibration. Three probe binaries (banked 0224 tree +
+never-executed parser-shaped padding, .text +3,872/+5,984/+7,744 B
+bracketing 0225's −6,064 B shift in magnitude) measured pure layout
+noise over 12 legs: probe a adverse-both p50 3.50%/mean 5.75%, probe c
+mean 6.09%/p95 45.02%/p99 38.69% — same sign and comparable magnitude
+as the 0225 blocker, with zero changed code. Folding in the 0225
+byte-identical-phase history per the 0223 rule (worst observed
+adverse-both magnitude, no margin), the `odt_file_source_open`
+effective floor is now **p50 6.7% / mean 6.1% / p95 45.0% / p99
+38.7%** (p95/p99 supersede 0223's 2.5%/28.0%; the 0223 lifecycle and
+eager-open floors are unchanged). All 0225 source-open adverse readings
+fall within floor; 0225 was re-verdicted **banked**. Raw artifacts:
+`results/odt-file-source-open-0226{a,b,c}-*`.
+
+## ODT text-path resolution memo — banked (change 0225)
+
+[Change 0225](changes/0225-odt-text-resolution-memo.md) removes the
+per-event namespace reverse-scan (~37 live bindings per element event)
+from the 0217 discard-but-validate text path behind `extract_text` and
+the full-text phases: a content-versioned last-prefix memo
+(`TextNamespaceMemo`) reuses the previous verdict whenever the binding
+stack is provably unchanged (`xmlns` memmem prefilter on pushes,
+scope-tracked deferred pops), with infallible lookups only and an
+unchanged error stream. Exactness is pinned by a rebinding battery
+(8 synthetic fixtures with pinned text), a per-event classification
+replay against direct resolution, and corpus-wide parity (900 litchi-odt
+tests). Provisionally withheld pending 0226, then **banked**:
+`odt_semantic_full_text` p50/mean **15.79%-17.44% / 19.03%-20.70%**
+lower, `odt_repeated_text_cached` p50/mean/p95
+**20.10%-20.24% / 19.85%-20.68% / 19.02%-21.93%** lower,
+`odt_repeated_text_uncached` ALL FOUR statistics
+**21.79%-23.51% / 22.56%-23.42% / 23.58%-24.96% / 26.73%-26.96%**
+lower, and `odt_file_source_open_full_text_lifecycle` p50
+**15.96%-16.50%** lower (its mean/p95/p99 were favorable up to 43.97%
+but control-drift-rejected). Guardrails: `odt_semantic_open` clean,
+`ods_file_source_open` within-floor layout, `odt_file_eager_open` and
+`odp_semantic_open` cleared by rerun, `odt_file_source_open` within
+floor under the 0226 calibration. Raw artifacts: `results/*-0225-*` and
+`results/*-0225r-*`.
+
 ## ODT open-parse hand-rolled binding tracker — banked (change 0224)
 
 [Change 0224](changes/0224-odt-openparse-binding-tracker.md) removes
