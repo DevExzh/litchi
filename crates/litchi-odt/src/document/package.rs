@@ -162,11 +162,15 @@ impl Document {
         let content_xml = std::str::from_utf8(&content_bytes).map_err(|error| {
             Error::InvalidFormat(format!("ODT content.xml is not UTF-8: {error}"))
         })?;
-        litchi_odf_common::core::validate_content_document_part(
-            content_xml,
-            "<office:text",
-            "ODT",
-        )?;
+        // One fused tokenization validates the content structure and collects
+        // the automatic styles (the same `OpenParse` the source-backed facade
+        // uses). Error precedence is identical to the historical sequential
+        // passes: content validation (mid-stream and end-of-stream) returns
+        // here, before `Content` adoption and before styles.xml/meta.xml are
+        // fetched; a content-styles error is only recorded and surfaces via
+        // `finish` after the styles.xml parse, and a `try_extend` conflict
+        // still loses to it — the historical call order.
+        let content_styles = super::open_parse::OpenParse::run(content_xml)?;
         let content = Content::from_vec(content_bytes)?;
 
         let styles = if package.has_file("styles.xml") {
@@ -191,9 +195,11 @@ impl Document {
             style_registry = StyleElements::parse_styles(styles_part.xml_content())?;
         }
 
-        // Also parse styles from content.xml (automatic styles)
+        // Also parse styles from content.xml (automatic styles), collected by
+        // the fused pass above; its recorded error surfaces at this point,
+        // after the styles.xml parse.
         // Merge content styles into main registry (content styles take precedence)
-        style_registry.try_extend(StyleElements::parse_styles(content.xml_content())?)?;
+        style_registry.try_extend(content_styles.finish()?)?;
 
         Ok(Self {
             package: owned_package,
@@ -792,5 +798,362 @@ fn transaction_index(commit: &crate::transaction::Commit) -> Result<usize> {
         _ => Err(Error::InvalidFormat(
             "ODT transaction did not return an allocated index".to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Document;
+    use crate::core::OwnedPackage;
+    use crate::elements::style::StyleElements;
+    use litchi_core::Result;
+    use soapberry_zip::ZipArchiveWriter;
+
+    const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
+    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+
+    /// Pre-0222 oracle: the historical sequential owned-path open — full
+    /// `validate_content_document_part` scan, then `styles.xml` parse, then
+    /// the `content.xml` automatic-styles rescan, then `try_extend` —
+    /// retained verbatim to cross-check the fused `OpenParse` open on error
+    /// precedence, error messages, and the resulting document state.
+    fn from_owned_package_sequential_oracle(owned_package: OwnedPackage) -> Result<Document> {
+        let package = owned_package.package()?;
+
+        // Verify this is a text document.
+        super::validate_mimetype(package.mimetype())?;
+
+        // Parse core components
+        let content_bytes = package.get_file("content.xml")?;
+        let content_xml = std::str::from_utf8(&content_bytes).map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!("ODT content.xml is not UTF-8: {error}"))
+        })?;
+        litchi_odf_common::core::validate_content_document_part(
+            content_xml,
+            "<office:text",
+            "ODT",
+        )?;
+        let content = crate::core::Content::from_vec(content_bytes)?;
+
+        let styles = if package.has_file("styles.xml") {
+            let styles_bytes = package.get_file("styles.xml")?;
+            Some(crate::core::Styles::from_vec(styles_bytes)?)
+        } else {
+            None
+        };
+
+        let meta = if package.has_file("meta.xml") {
+            let meta_bytes = package.get_file("meta.xml")?;
+            Some(crate::core::Meta::from_vec(meta_bytes)?)
+        } else {
+            None
+        };
+
+        // Initialize style registry
+        let mut style_registry = crate::elements::style::StyleRegistry::default();
+
+        // Parse styles from styles.xml if available
+        if let Some(ref styles_part) = styles {
+            style_registry = StyleElements::parse_styles(styles_part.xml_content())?;
+        }
+
+        // Also parse styles from content.xml (automatic styles)
+        // Merge content styles into main registry (content styles take precedence)
+        style_registry.try_extend(StyleElements::parse_styles(content.xml_content())?)?;
+
+        Ok(Document {
+            package: owned_package,
+            content,
+            styles,
+            meta,
+            style_registry,
+        })
+    }
+
+    fn oracle_from_bytes(bytes: Vec<u8>) -> Result<Document> {
+        from_owned_package_sequential_oracle(OwnedPackage::from_bytes(bytes)?)
+    }
+
+    /// Deterministic comparison projection: error string on failure, or the
+    /// sorted style names with their families plus the full extracted text
+    /// on success.
+    fn projection(result: Result<Document>) -> std::result::Result<String, String> {
+        result
+            .and_then(|document| {
+                let mut styles: Vec<String> = document
+                    .style_registry
+                    .styles
+                    .iter()
+                    .map(|(name, style)| format!("{name}|{:?}", style.family()))
+                    .collect();
+                styles.sort_unstable();
+                Ok(format!("{}\n{}", styles.join(","), document.text()?))
+            })
+            .map_err(|error| error.to_string())
+    }
+
+    fn assert_open_parity(label: &str, bytes: &[u8]) {
+        let expected = projection(oracle_from_bytes(bytes.to_vec()));
+        let actual = projection(Document::from_bytes(bytes.to_vec()));
+        assert_eq!(
+            expected, actual,
+            "{label}: fused owned open and sequential oracle disagree"
+        );
+    }
+
+    fn odt_package_with_mimetype(
+        mimetype: &str,
+        content: &[u8],
+        styles: Option<&[u8]>,
+        meta: Option<&[u8]>,
+    ) -> Vec<u8> {
+        // Stored members written directly: `PackageWriter` validates XML on
+        // publication, which would reject the deliberately malformed
+        // fixtures below.
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let mut built = writer.write_stored_file("mimetype", mimetype.as_bytes());
+        let mut extra_members: Vec<(&str, &[u8])> = vec![("content.xml", content)];
+        if let Some(styles) = styles {
+            extra_members.push(("styles.xml", styles));
+        }
+        if let Some(meta) = meta {
+            extra_members.push(("meta.xml", meta));
+        }
+        let mut manifest = String::from(
+            r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">"#,
+        );
+        manifest.push_str(&format!(
+            r#"<manifest:file-entry manifest:full-path="/" manifest:media-type="{mimetype}"/>"#
+        ));
+        for (path, _) in &extra_members {
+            manifest.push_str(&format!(
+                r#"<manifest:file-entry manifest:full-path="{path}" manifest:media-type="text/xml"/>"#
+            ));
+        }
+        manifest.push_str("</manifest:manifest>");
+        for (path, bytes) in extra_members {
+            built = built.and_then(|()| writer.write_stored_file(path, bytes));
+        }
+        built = built
+            .and_then(|()| writer.write_stored_file("META-INF/manifest.xml", manifest.as_bytes()));
+        match built.and_then(|()| writer.finish()) {
+            Ok(bytes) => bytes,
+            Err(error) => panic!("synthetic ODT package must build: {error}"),
+        }
+    }
+
+    fn odt_package(content: &str, styles: Option<&str>, meta: Option<&[u8]>) -> Vec<u8> {
+        odt_package_with_mimetype(
+            MIMETYPE,
+            content.as_bytes(),
+            styles.map(str::as_bytes),
+            meta,
+        )
+    }
+
+    fn content(body: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="{OFFICE}" xmlns:style="{STYLE}" xmlns:text="{TEXT}" office:version="1.4">{body}</office:document-content>"#
+        )
+    }
+
+    fn styles_document(styles: &str) -> String {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="{OFFICE}" xmlns:style="{STYLE}" office:version="1.4">{styles}</office:document-styles>"#
+        )
+    }
+
+    const VALID_BODY: &str =
+        r#"<office:body><office:text><text:p>hello</text:p></office:text></office:body>"#;
+    const STYLE_A: &str = r#"<style:style style:name="A" style:family="paragraph"></style:style>"#;
+    // A duplicate style attribute: the styles parse fails with
+    // "invalid ODT style attribute: …".
+    const DUP_ATTR_STYLE: &str = r#"<style:style style:name="a" style:name="b"></style:style>"#;
+    // A mismatched end tag: the styles parse fails with
+    // "invalid ODT style XML: …".
+    const BROKEN_STYLES_XML: &str = "<a></b>";
+
+    #[test]
+    fn fused_owned_open_matches_sequential_oracle_on_synthetic_packages() {
+        let with_styles = styles_document(STYLE_A);
+        // Each case: label, package bytes, expected outcome — `None` for a
+        // successful open, `Some(fragment)` for an error whose message must
+        // contain the fragment. The fragments make the cross-stage error
+        // precedence observable, not just parity on identical failures.
+        let cases: Vec<(&str, Vec<u8>, Option<&str>)> = vec![
+            (
+                "valid-full",
+                odt_package(
+                    &content(&format!(
+                        r#"<office:automatic-styles><style:style style:name="B" style:family="paragraph"></style:style></office:automatic-styles>{VALID_BODY}"#
+                    )),
+                    Some(&with_styles),
+                    Some(br#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:meta/></office:document-meta>"#),
+                ),
+                None,
+            ),
+            (
+                "valid-bare",
+                odt_package(&content(VALID_BODY), None, None),
+                None,
+            ),
+            // styles.xml and content.xml both define style "A": content
+            // styles take precedence (try_extend overwrites), no error.
+            (
+                "same-style-name-in-both",
+                odt_package(
+                    &content(&format!(
+                        r#"<office:automatic-styles>{STYLE_A}</office:automatic-styles>{VALID_BODY}"#
+                    )),
+                    Some(&with_styles),
+                    None,
+                ),
+                None,
+            ),
+            // A content-styles error loses to the styles.xml parse error.
+            (
+                "styles-error-beats-content-style-error",
+                odt_package(
+                    &content(&format!(
+                        r#"<office:automatic-styles>{DUP_ATTR_STYLE}</office:automatic-styles>{VALID_BODY}"#
+                    )),
+                    Some(BROKEN_STYLES_XML),
+                    None,
+                ),
+                Some("invalid ODT style XML:"),
+            ),
+            // A content-styles error alone surfaces after a clean styles.xml
+            // parse.
+            (
+                "content-style-error-alone",
+                odt_package(
+                    &content(&format!(
+                        r#"<office:automatic-styles>{DUP_ATTR_STYLE}</office:automatic-styles>{VALID_BODY}"#
+                    )),
+                    Some(&with_styles),
+                    None,
+                ),
+                Some("invalid ODT style attribute:"),
+            ),
+            // A content validation error beats any styles.xml failure: the
+            // historical validation pass early-returned before styles.xml
+            // was even fetched.
+            (
+                "validation-error-beats-styles-error",
+                odt_package(
+                    &content(r#"<office:body><office:spreadsheet/></office:body>"#),
+                    Some(BROKEN_STYLES_XML),
+                    None,
+                ),
+                Some("has the wrong office body"),
+            ),
+            // A style error recorded before a later validation failure still
+            // loses to the validation error.
+            (
+                "early-style-error-loses-to-late-validation-error",
+                odt_package(
+                    &content(&format!(
+                        r#"<office:automatic-styles>{DUP_ATTR_STYLE}</office:automatic-styles><office:body><office:spreadsheet/></office:body>"#
+                    )),
+                    None,
+                    None,
+                ),
+                Some("has the wrong office body"),
+            ),
+            // Deep validation failure (mismatched end tag) maps to the
+            // tokenizer message.
+            (
+                "mismatched-end-tag-deep",
+                odt_package(
+                    &content(
+                        r#"<office:body><office:text><text:p></text:q></office:text></office:body>"#,
+                    ),
+                    Some(&with_styles),
+                    None,
+                ),
+                Some("invalid ODT content.xml:"),
+            ),
+            (
+                "wrong-root",
+                odt_package(
+                    &content(VALID_BODY).replace("document-content", "document"),
+                    Some(&with_styles),
+                    None,
+                ),
+                Some("has the wrong root"),
+            ),
+            (
+                "missing-body",
+                odt_package(&content(""), None, None),
+                Some("has no complete expected body"),
+            ),
+            (
+                "meta-error-after-clean-styles",
+                odt_package(&content(VALID_BODY), Some(&with_styles), Some(b"\xff\xfe")),
+                Some("Invalid UTF-8 in XML content"),
+            ),
+        ];
+        for (label, bytes, expected) in &cases {
+            assert_open_parity(label, bytes);
+            let outcome = projection(Document::from_bytes(bytes.clone()));
+            match (expected, &outcome) {
+                (None, Ok(_)) => {},
+                (Some(fragment), Err(error)) => assert!(
+                    error.contains(fragment),
+                    "{label}: error {error:?} does not contain {fragment:?}"
+                ),
+                _ => panic!("{label}: outcome {outcome:?} misses expectation {expected:?}"),
+            }
+        }
+
+        // Mimetype and container-level failures agree as well.
+        let wrong_mime = odt_package_with_mimetype(
+            "application/vnd.oasis.opendocument.presentation",
+            content(VALID_BODY).as_bytes(),
+            None,
+            None,
+        );
+        assert_open_parity("wrong-mimetype", &wrong_mime);
+        let outcome = projection(Document::from_bytes(wrong_mime));
+        match outcome {
+            Err(error) => assert!(error.contains("Not an ODT file"), "unexpected: {error}"),
+            Ok(_) => panic!("wrong mimetype accepted"),
+        }
+        assert_open_parity("not-a-zip", b"this is not a package");
+        match projection(Document::from_bytes(b"this is not a package".to_vec())) {
+            Err(_) => {},
+            Ok(_) => panic!("non-ZIP bytes accepted"),
+        }
+    }
+
+    #[test]
+    fn fused_owned_open_matches_sequential_oracle_on_odt_corpus() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut files = Vec::new();
+        collect_odt(&root.join("test-data"), &mut files);
+        files.sort();
+        assert!(!files.is_empty(), "no .odt corpus fixtures discovered");
+        for path in &files {
+            let Ok(bytes) = std::fs::read(path) else {
+                continue;
+            };
+            assert_open_parity(&path.display().to_string(), &bytes);
+        }
+    }
+
+    fn collect_odt(directory: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_odt(&path, files);
+            } else if path.extension().is_some_and(|extension| extension == "odt") {
+                files.push(path);
+            }
+        }
     }
 }

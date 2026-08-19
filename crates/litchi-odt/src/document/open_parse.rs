@@ -34,9 +34,13 @@
 //! content-styles error, and finally `try_extend` runs — the historical
 //! call order.
 //!
-//! The standalone passes stay byte-identical: `validate_content_document_part`
-//! serves other callers, and the owned [`crate::document::Document`] facade
-//! keeps the sequential sequence as the equivalence oracle.
+//! Both facades run this fused parse: the source-backed
+//! [`crate::document::SourceBackedDocument`] and, since change 0222, the
+//! owned [`crate::document::Document`] open path. The standalone
+//! `validate_content_document_part` stays byte-identical in
+//! litchi-odf-common, and the historical sequential sequence survives as
+//! cfg(test) equivalence oracles (the `sequential` helper in this module's
+//! tests and the owned-path oracle in `super::package`'s tests).
 
 use litchi_core::{Error, Result};
 use quick_xml::events::{BytesRef, Event};
