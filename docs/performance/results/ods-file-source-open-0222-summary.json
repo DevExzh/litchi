@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0222-odt-owned-open-fused-parse",
+  "decision": "banked",
+  "claim_scope": "byte-identical guardrail; p50/mean accepted favorable (+0.95/+2.22, +0.62/+3.24, sub-floor - not claimed); p95/p99 disagreeing - clean; the 0220 watch-list p95 pattern absent again",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "93c2279b9b5dff79bbfd58e028c5eedede38c3a917b9f3fc8edb86a4fb0641c7",
+      "candidate_sha256": "f53a43f12c405238561bac89fddca861ce14a35bb90136b31a2bdfe528e04987",
+      "note": "control is the banked 0221 binary; candidate adds the 0222 fused-parse promotion to the owned ODT open path in litchi-odt"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD b40e839a3 (banked through 0221, both binaries); the candidate additionally carries the 0222 owned-path fused-parse change in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_source_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1348539.0,
+          "mean": 1364799.95,
+          "p95": 1466446.0,
+          "p99": 1654244.0
+        },
+        "b1": {
+          "p50": 1335776.0,
+          "mean": 1356364.902,
+          "p95": 1476230.0,
+          "p99": 1747612.0
+        },
+        "b2": {
+          "p50": 1304167.5,
+          "mean": 1311375.234,
+          "p95": 1397341.0,
+          "p99": 1452116.0
+        },
+        "a2": {
+          "p50": 1333753.0,
+          "mean": 1355289.284,
+          "p95": 1485713.0,
+          "p99": 1691346.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.946432,
+          "mean": 0.618043,
+          "p95": -0.667191,
+          "p99": -5.644149
+        },
+        "a2_to_b2": {
+          "p50": 2.218214,
+          "mean": 3.240198,
+          "p95": 5.948121,
+          "p99": 14.144356
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.096446,
+          "mean": -0.696854,
+          "p95": 1.313857,
+          "p99": 2.242837
+        },
+        "candidate": {
+          "p50": -2.366302,
+          "mean": -3.31693,
+          "p95": -5.34395,
+          "p99": -16.908559
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean"
+      ],
+      "rejected_statistics": {
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; candidate drift -16.91% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}
