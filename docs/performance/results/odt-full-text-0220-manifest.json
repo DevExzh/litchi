@@ -37,8 +37,8 @@
     {
       "path": "odt-full-text-0220-summary.json",
       "role": "derived_summary",
-      "bytes": 4005,
-      "sha256": "79fc39243ea5fced0c817fb67a2fbc1baec635b0f2aa734771595c936a9631d4"
+      "bytes": 4209,
+      "sha256": "936353f9cff6c316ae3563a5f6f88144fd36caf7340d4ff61fb8824d0c54e045"
     }
   ]
 }

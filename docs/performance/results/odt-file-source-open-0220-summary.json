@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
-  "decision": "analysis-pending",
-  "claim_scope": "pending",
+  "decision": "banked",
+  "claim_scope": "byte-identical phase (source-backed open runs no changed code); p50/mean/p95 accepted favorable (+1.03% to +5.77%) - layout-favorable readings, recorded not claimed",
   "protocol": {
     "order": [
       "a1_control",

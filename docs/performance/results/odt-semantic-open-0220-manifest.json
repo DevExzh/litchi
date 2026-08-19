@@ -37,8 +37,8 @@
     {
       "path": "odt-semantic-open-0220-summary.json",
       "role": "derived_summary",
-      "bytes": 3888,
-      "sha256": "82a4c8d7d4fda239f9fc8bf57b491eafde6af141d00a7b7bcb2538f8c3c66778"
+      "bytes": 4116,
+      "sha256": "d5945a3ff50b0db1564313a3bef7b38f92200860708dec8a1318a27c7bf23478"
     }
   ]
 }

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
-  "decision": "analysis-pending",
-  "claim_scope": "pending",
+  "decision": "banked",
+  "claim_scope": "byte-identical phase; p50 accepted favorable (layout reading, not claimed); primary p95 adverse-both (-13.30/-26.38, max 26.38% over the 0218 full-text p95 floor of 16.1%) -> single permitted rerun, cleared (see *-0220r-)",
   "protocol": {
     "order": [
       "a1_control",

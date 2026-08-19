@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
-  "decision": "analysis-pending",
-  "claim_scope": "pending",
+  "decision": "banked",
+  "claim_scope": "byte-identical phase (ODS open runs validate_content_part, not the changed validator); p50/mean adverse-both within the 0205 source-open floors (max 4.04/3.83 vs 5.5/5.5); p95 adverse-both (-2.36/-7.06, max 7.06% over the 4.5% floor) -> single permitted rerun (see *-0220r-); layout reading on a phase executing no changed code, not claimed",
   "protocol": {
     "order": [
       "a1_control",

@@ -3,6 +3,32 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0220`](changes/0220-odf-validator-borrowing-reads.md)
+(0220 rewrites the shared ODF content validator
+`validate_content_document_part` — ~69% of the timed `odt_semantic_open`
+call — with borrowing `read_event()` reads (no per-event buffer copy) and
+depth-gated namespace resolution (only Start/Empty at depth ≤ 2, the only
+arms whose resolved value is observable); the pre-change body survives as
+a cfg(test) oracle cross-checked on 41 synthetic edge cases plus the full
+ODF corpus with byte-identical error messages (248 litchi-odf-common,
+891 litchi-odt tests). Sole production caller is the ODT owned open path.
+**Banked**: `odt_semantic_open` p50 **5.99%-7.30%** lower (over the 0218
+floor 3.3%) and `odt_file_eager_open` p95 **19.12%-21.14%** lower claimed;
+the `odt_semantic_full_text` p95 primary adverse was cleared by its
+rerun; `ods_file_source_open` p95 reproduced marginally above the 0205
+floor (max 4.90% vs 4.5%) — recorded as a flagged above-floor layout
+reading on a zero-changed-code phase with bit-identical read evidence,
+floors unchanged, watch-listed for the next ODF change. Candidate
+`1971c3ad…` is the control for the next change.)
+[`change 0219`](changes/0219-odf-validator-reprofile.md)
+(0219 is an analysis, not a code change: post-0217 `perf record` profiles
+of the three ODF family open workloads attributed
+`validate_content_document_part`'s internals — per-event buffer copies
+and per-event namespace resolution whose result is consumed only at
+depth ≤ 2 — re-tested the "shared across families" premise (only the ODT
+owned open path calls it), and selected the borrowing-reads +
+depth-gated-resolution target implemented as 0220. No measurement legs;
+profiling data under `/tmp/0219-prof/`.)
 [`change 0218`](changes/0218-odt-layout-floor-calibration.md)
 (0218 is a methodology calibration, not a code change — the litchi-odt
 analog of 0205/0213: three probe binaries — banked 0215 tree plus

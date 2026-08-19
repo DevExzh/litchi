@@ -11,6 +11,47 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ODF content-validator borrowing reads — banked (change 0220)
+
+[Change 0220](changes/0220-odf-validator-borrowing-reads.md) rewrites the
+shared ODF content validator `validate_content_document_part` in
+litchi-odf-common — ~69% of the timed `odt_semantic_open` call per the
+0216/0219 profiles — with borrowing `read_event()` reads (eliminating the
+per-event buffer copy) and depth-gated namespace resolution (resolution
+runs only for Start/Empty events at depth ≤ 2, the only arms whose
+resolved value is observable; deeper bindings scope their own subtree).
+The pre-change body survives as a cfg(test) oracle cross-checked on 41
+synthetic edge cases plus the full ODF corpus with byte-identical error
+messages (248 litchi-odf-common, 891 litchi-odt tests). The sole
+production caller is the ODT owned open path, so ODS/ODP opens and the
+full-text path execute no changed code. **Banked**: `odt_semantic_open`
+p50 **5.99%-7.30%** lower (over the 0218 open p50 floor of 3.3%) and
+`odt_file_eager_open` p95 **19.12%-21.14%** lower (pre-floor claim) are
+the claimed statistics; the `odt_semantic_full_text` p95 primary adverse
+pattern was cleared by its rerun; `ods_file_source_open` p95 reproduced
+marginally above the 0205 floor (max 4.90% vs 4.5%) and is recorded as a
+flagged above-floor layout reading on a zero-changed-code phase with
+bit-identical deterministic read evidence — floors unchanged, the phase
+is watch-listed for the next ODF-family change. Raw artifacts:
+`results/*-0220-*` and `results/*-0220r-*`.
+
+## ODF shared content-validator profiling and target selection (change 0219)
+
+[Change 0219](changes/0219-odf-validator-reprofile.md) is analysis only —
+dwarf call-graph profiles of the three ODF family open workloads
+(`odt_semantic_open`, `ods_file_source_open`, `odp_semantic_open`) on the
+post-0217 banked tree, attributing the internals of
+`validate_content_document_part` (the full-document `NsReader` scan 0216
+measured at ~69% of the timed ODT open but deferred as shared across
+families). Findings: the validator's cost is the per-event buffer copy of
+`read_resolved_event_into` plus namespace resolution performed for every
+event although only depth ≤ 2 arms consume it; and the "shared" premise
+is weaker than assumed — only the ODT owned open path calls it (ODS/ODP
+opens use the trivial `validate_content_part`), so rerun exposure is
+confined to ODT. The selected target, borrowing reads + depth-gated
+resolution, was implemented as 0220. No measurement legs; profiling data
+under `/tmp/0219-prof/`.
+
 ## ODP post-0212 re-profiling and next-target selection (change 0214)
 
 [Change 0214](changes/0214-odp-post-0212-reprofile.md) is analysis only —

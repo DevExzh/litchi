@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
-  "decision": "analysis-pending",
-  "claim_scope": "pending",
+  "decision": "banked",
+  "claim_scope": "executed phase; p95 claimed (min-direction 19.12% lower; no eager-open floor calibrated - pre-floor rule, claimed direct); p50/mean rejected (candidate drift +6.48/+6.53 over the 5% ceiling); p99 rejected (control drift +35.88 over the 15% ceiling)",
   "protocol": {
     "order": [
       "a1_control",
