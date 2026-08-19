@@ -21,8 +21,9 @@ pub(super) use crate::model::{
 };
 pub(super) use litchi_core::{Error, Result, ShapeType};
 pub(super) use quick_xml::XmlVersion;
+pub(super) use quick_xml::events::attributes::{Attribute as RawAttribute, Attributes};
 pub(super) use quick_xml::events::{BytesRef, BytesStart, Event};
-pub(super) use quick_xml::name::{Namespace as XmlNamespace, ResolveResult};
+pub(super) use quick_xml::name::{LocalName, Namespace as XmlNamespace, ResolveResult};
 pub(super) use quick_xml::reader::NsReader;
 pub(super) use std::collections::{HashMap, HashSet};
 
@@ -41,6 +42,62 @@ pub(super) const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns
 pub(super) const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 pub(super) const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 pub(super) const ANIMATION_NAMESPACE_BYTES: &[u8] = ANIMATION_NAMESPACE.as_bytes();
+
+/// Copyable snapshot of an element's resolved namespace.
+///
+/// [`ResolveResult`] borrows the reader's namespace buffer, keeping the reader
+/// exclusively borrowed while the value is live. The fused content.xml pass
+/// interleaves collector feeds (which need the reader) with namespace checks,
+/// so those checks run against this token instead. The known namespace URIs
+/// are pairwise distinct, so a bound namespace maps to exactly one class;
+/// unbound and unknown prefixes map to [`NsClass::Other`], matching
+/// `is_namespace` returning false for every known URI.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum NsClass {
+    Animation,
+    Drawing,
+    Dr3d,
+    Office,
+    Presentation,
+    Script,
+    Style,
+    Table,
+    Text,
+    Other,
+}
+
+impl NsClass {
+    pub(super) fn from_resolve(namespace: &ResolveResult<'_>) -> Self {
+        match namespace {
+            ResolveResult::Bound(XmlNamespace(uri)) => Self::from_uri(uri),
+            ResolveResult::Unbound | ResolveResult::Unknown(_) => Self::Other,
+        }
+    }
+
+    pub(super) fn from_uri(uri: &[u8]) -> Self {
+        if uri == ANIMATION_NAMESPACE_BYTES {
+            Self::Animation
+        } else if uri == DRAW_NAMESPACE {
+            Self::Drawing
+        } else if uri == DR3D_NAMESPACE {
+            Self::Dr3d
+        } else if uri == OFFICE_NAMESPACE {
+            Self::Office
+        } else if uri == PRESENTATION_NAMESPACE {
+            Self::Presentation
+        } else if uri == SCRIPT_NAMESPACE {
+            Self::Script
+        } else if uri == STYLE_NAMESPACE {
+            Self::Style
+        } else if uri == TABLE_NAMESPACE {
+            Self::Table
+        } else if uri == TEXT_NAMESPACE {
+            Self::Text
+        } else {
+            Self::Other
+        }
+    }
+}
 
 /// Parser for ODP-specific structures.
 ///

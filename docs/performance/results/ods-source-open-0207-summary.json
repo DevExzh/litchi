@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0207-ods-byte-matched-attributes",
+  "decision": "neutral-below-floor",
+  "claim_scope": "allocation claim only",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "8e17ab3e9857cb5c7d6b28ea31ef85ec7512e779270f72bd11361c980e1a0eb8",
+      "candidate_sha256": "57270d24894a7047682146f4a6a68d428ecc51b3d1270e5b93d90d0fddcb284b",
+      "note": "control is the banked 0206 binary; candidate adds the 0207 byte-matched attribute decoding in litchi-ods::worksheet::codec"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, and 0206 (both binaries); the candidate additionally carries the 0207 byte-matched attribute change in litchi-ods::worksheet::codec",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_source_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1341378.0,
+          "mean": 1355017.898,
+          "p95": 1439524.0,
+          "p99": 1535106.0
+        },
+        "b1": {
+          "p50": 1257053.0,
+          "mean": 1267067.608,
+          "p95": 1356318.0,
+          "p99": 1490985.0
+        },
+        "b2": {
+          "p50": 1295430.0,
+          "mean": 1323396.758,
+          "p95": 1462565.0,
+          "p99": 1886029.0
+        },
+        "a2": {
+          "p50": 1370183.5,
+          "mean": 1380004.872,
+          "p95": 1462635.0,
+          "p99": 1552700.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 6.286446,
+          "mean": 6.490711,
+          "p95": 5.780105,
+          "p99": 2.874134
+        },
+        "a2_to_b2": {
+          "p50": 5.455729,
+          "mean": 4.102023,
+          "p95": 0.004786,
+          "p99": -21.467701
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 2.147456,
+          "mean": 1.844033,
+          "p95": 1.605461,
+          "p99": 1.14611
+        },
+        "candidate": {
+          "p50": 3.052934,
+          "mean": 4.445631,
+          "p95": 7.833487,
+          "p99": 26.495505
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "paired directions disagree; candidate drift +26.50% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "change": "0199-ods-parse-event-copy-elision",
+  "decision": "accepted",
+  "claim_scope": "ODS one-percent guardrail: lifecycle p50/mean/p95 and commit p50/mean/p95",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "4e5662b270a30fc93af0b72bbe8c80d03adc82a73612a85085e6e3ac020954e1",
+      "candidate_sha256": "6acae4dbfcac07185cba1047c5c157d52b096d0bdcc5642083cc6055e977c8ff",
+      "note": "both binaries contain changes 0193-0196 and 0198 as baseline plus the identical 341-case selector matrix; the candidate binary additionally removes per-event into_owned copies from the litchi-ods worksheet and settings parse loops; control is bit-identical to the 0198 candidate"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193-0196 and 0198 (both binaries) plus the uncommitted litchi-ods parse-loop into_owned removals (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_one_percent_edit_save",
+  "timing_scope": "open + stage + commit + sequential publication through the fixed-window hashing sink",
+  "cases": {
+    "lifecycle_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 18551238.5,
+          "mean": 18631407.642,
+          "p95": 19393015.0,
+          "p99": 20512970.0
+        },
+        "b1": {
+          "p50": 18048330.5,
+          "mean": 18206286.388,
+          "p95": 19383130.0,
+          "p99": 21525553.0
+        },
+        "b2": {
+          "p50": 18124559.0,
+          "mean": 18236854.492,
+          "p95": 19381503.0,
+          "p99": 20098631.0
+        },
+        "a2": {
+          "p50": 18578893.5,
+          "mean": 18701105.046,
+          "p95": 19573608.0,
+          "p99": 20496616.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 2.710913,
+          "mean": 2.281745,
+          "p95": 0.050972,
+          "p99": -4.936306
+        },
+        "a2_to_b2": {
+          "p50": 2.445434,
+          "mean": 2.482477,
+          "p95": 0.981449,
+          "p99": 1.941711
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.149074,
+          "mean": 0.374086,
+          "p95": 0.931227,
+          "p99": -0.079725
+        },
+        "candidate": {
+          "p50": 0.422358,
+          "mean": 0.167899,
+          "p95": -0.008394,
+          "p99": -6.628968
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3838918.0,
+          "mean": 3878452.126,
+          "p95": 4161715.0,
+          "p99": 4475862.0
+        },
+        "b1": {
+          "p50": 3550308.0,
+          "mean": 3598261.484,
+          "p95": 3945466.0,
+          "p99": 4568353.0
+        },
+        "b2": {
+          "p50": 3556323.5,
+          "mean": 3591278.672,
+          "p95": 3910582.0,
+          "p99": 4097356.0
+        },
+        "a2": {
+          "p50": 3789554.5,
+          "mean": 3827613.034,
+          "p95": 4080355.0,
+          "p99": 4302878.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 7.518004,
+          "mean": 7.22429,
+          "p95": 5.196151,
+          "p99": -2.06644
+        },
+        "a2_to_b2": {
+          "p50": 6.154576,
+          "mean": 6.174458,
+          "p95": 4.160741,
+          "p99": 4.776385
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.28587,
+          "mean": -1.310809,
+          "p95": -1.954963,
+          "p99": -3.86482
+        },
+        "candidate": {
+          "p50": 0.169436,
+          "mean": -0.194061,
+          "p95": -0.884154,
+          "p99": -10.309996
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "a2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    }
+  }
+}

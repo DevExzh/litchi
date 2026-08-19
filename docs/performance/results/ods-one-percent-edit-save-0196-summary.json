@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "change": "0196-xml-escape-byte-scan",
+  "decision": "retain_byte_scan_one_percent_lifecycle_p50_mean_and_commit_p50_mean_p99_accepted",
+  "claim_scope": "one-percent-edit source-backed ODS lifecycle: lifecycle p50/mean (0.44%-3.02% lower) and commit p50/mean/p99 (1.53%-20.15% lower) accepted; all other statistics withheld; no allocation/RSS/physical-I/O/cold-cache/producer claim",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "4df50556e468396d1f1ff6f4a89d5b17459976f349bf240a70e52be7fe428bc3",
+      "candidate_sha256": "db708afa17eddc7dab9911429c51d6d0cd676550f8c33f4458893f2ea1201cff",
+      "note": "both binaries contain changes 0193, 0194, and 0195 as baseline plus the identical 341-case selector matrix; the candidate binary additionally carries the litchi-core XML escape byte scan"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193, 0194, and 0195 (both binaries) plus the uncommitted litchi-core XML escape byte scan (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_one_percent_edit_save",
+  "timing_scope": "open + stage + commit + sequential publication through the fixed-window hashing sink",
+  "cases": {
+    "lifecycle_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 18234756.0,
+          "mean": 18320392.682,
+          "p95": 19124311.0,
+          "p99": 20082282.0
+        },
+        "b1": {
+          "p50": 18112960.5,
+          "mean": 18240585.98,
+          "p95": 19034364.0,
+          "p99": 20727615.0
+        },
+        "b2": {
+          "p50": 18268159.5,
+          "mean": 18357455.15,
+          "p95": 19114170.0,
+          "p99": 19721510.0
+        },
+        "a2": {
+          "p50": 18632019.0,
+          "mean": 18929199.162,
+          "p95": 21823359.0,
+          "p99": 24194709.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.667931,
+          "mean": 0.435617,
+          "p95": 0.470328,
+          "p99": -3.213445
+        },
+        "a2_to_b2": {
+          "p50": 1.952872,
+          "mean": 3.020434,
+          "p95": 12.414171,
+          "p99": 18.488336
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 2.178603,
+          "mean": 3.323108,
+          "p95": 14.113178,
+          "p99": 20.477887
+        },
+        "candidate": {
+          "p50": 0.856839,
+          "mean": 0.64071,
+          "p95": 0.419273,
+          "p99": -4.853935
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean"
+      ],
+      "rejected_statistics": {
+        "p95": "control drift +14.11% exceeds 10%",
+        "p99": "paired directions disagree; control drift +20.48% exceeds 15%"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3770440.5,
+          "mean": 3825467.834,
+          "p95": 4105914.0,
+          "p99": 5112204.0
+        },
+        "b1": {
+          "p50": 3712612.5,
+          "mean": 3759312.57,
+          "p95": 3986964.0,
+          "p99": 4671432.0
+        },
+        "b2": {
+          "p50": 3716163.5,
+          "mean": 3750733.898,
+          "p95": 4009515.0,
+          "p99": 4125044.0
+        },
+        "a2": {
+          "p50": 3850178.5,
+          "mean": 3942574.474,
+          "p95": 4662981.0,
+          "p99": 5166313.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.53372,
+          "mean": 1.729338,
+          "p95": 2.897041,
+          "p99": 8.621956
+        },
+        "a2_to_b2": {
+          "p50": 3.480748,
+          "mean": 4.865871,
+          "p95": 14.013911,
+          "p99": 20.154973
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 2.114819,
+          "mean": 3.061237,
+          "p95": 13.56743,
+          "p99": 1.058428
+        },
+        "candidate": {
+          "p50": 0.095647,
+          "mean": -0.228198,
+          "p95": 0.565618,
+          "p99": -11.696371
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p95": "control drift +13.57% exceeds 10%"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "a2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    }
+  }
+}

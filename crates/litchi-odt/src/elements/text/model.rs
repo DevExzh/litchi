@@ -33,6 +33,7 @@ impl Block {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn into_text(self) -> String {
         match self {
             Self::Paragraph(paragraph) => paragraph.into_text(),

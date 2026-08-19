@@ -1,0 +1,125 @@
+{
+ "schema_version": 1,
+ "change": "0192-odt-open-only-rerun-evidence",
+ "decision": "evidence_closure_accept_open_only_p50_p99",
+ "claim_scope": "fixed-corpus high-level litchi::Document ODT path-ingress warm open-only p50/p99 accepted on a clean same-binary rerun of the change 0191 withheld workload; open-only mean/p95 remain withheld; no new production mechanism",
+ "protocol": {
+  "order": [
+   "a1_eager",
+   "b1_source_backed",
+   "b2_source_backed",
+   "a2_eager"
+  ],
+  "cpu_affinity": "2",
+  "logical_cpus_visible": 1,
+  "warmups_per_case": 30,
+  "samples_per_case": 500,
+  "profile": "release",
+  "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+  "page_cache": "not controlled; no cold-cache claim",
+  "stability_threshold_percent": {
+   "p50": 5.0,
+   "mean": 5.0,
+   "p95": 10.0,
+   "p99": 15.0
+  },
+  "acceptance": "a statistic is accepted only when source-backed elapsed time is lower in both paired directions and eager/source-backed same-implementation drift stays within that statistic's threshold",
+  "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg"
+ },
+ "provenance": {
+  "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+  "source_state": "current HEAD 9b717bb08 (change 0191) with unrelated pre-existing local modifications; the release binary is bit-identical to the change 0191 binary",
+  "binary_sha256": "981ed4fbea8625b7d3feb4721262d992400bd522c51ce4be7b41071447129e59",
+  "compiler": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "allocator": "Rust system allocator",
+  "cpu": "AMD EPYC 9575F 64-Core Processor",
+  "kernel": "Linux 6.8.0-101-generic",
+  "rustflags": null,
+  "cargo_build_target": null
+ },
+ "corpus": {
+  "name": "odt-repeated-text-media",
+  "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+  "archive_bytes": 16812034,
+  "archive_member_count": 13,
+  "paragraph_count": 10000,
+  "element_count": 10000,
+  "pictures_count": 8,
+  "pictures_compressed_range_bytes": 16782376,
+  "pictures_uncompressed_payload_bytes": 16777216
+ },
+ "cases": {
+  "odt_file_open": {
+   "timing_scope": "eager fs::read plus Document::from_bytes, or source-backed Document::open(Path)",
+   "legs_ns": {
+    "a1": {
+     "p50": 3458105.5,
+     "mean": 3495076.59,
+     "p95": 3880502.0,
+     "p99": 4390806.0
+    },
+    "b1": {
+     "p50": 1671090.0,
+     "mean": 1703148.408,
+     "p95": 1978560.0,
+     "p99": 2114977.0
+    },
+    "b2": {
+     "p50": 1689639.5,
+     "mean": 1702952.814,
+     "p95": 1824572.0,
+     "p99": 1954183.0
+    },
+    "a2": {
+     "p50": 3566484.5,
+     "mean": 3673388.966,
+     "p95": 4329813.0,
+     "p99": 4831864.0
+    }
+   },
+   "source_backed_reduction_percent": {
+    "a1_to_b1": {
+     "p50": 51.676142,
+     "mean": 51.270069,
+     "p95": 49.012782,
+     "p99": 51.831691
+    },
+    "a2_to_b2": {
+     "p50": 52.62451,
+     "mean": 53.640825,
+     "p95": 57.860259,
+     "p99": 59.556333
+    }
+   },
+   "same_implementation_drift_percent": {
+    "eager": {
+     "p50": 3.134057,
+     "mean": 5.101816,
+     "p95": 11.578682,
+     "p99": 10.045035
+    },
+    "source_backed": {
+     "p50": 1.110024,
+     "mean": -0.011484,
+     "p95": -7.782832,
+     "p99": -7.602636
+    }
+   },
+   "accepted_statistics": [
+    "p50",
+    "p99"
+   ],
+   "rejected_statistics": {
+    "mean": "eager same-implementation drift 5.101816% exceeds the 5% ceiling",
+    "p95": "eager same-implementation drift 11.578682% exceeds the 10% ceiling"
+   },
+   "verification": {
+    "semantic_parity_verified": true,
+    "archive_identity_verified": true,
+    "media_identity_verified": true,
+    "source_ranges_verified": true,
+    "zero_picture_payload_overlap_verified": true
+   }
+  }
+ }
+}

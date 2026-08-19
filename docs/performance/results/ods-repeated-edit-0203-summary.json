@@ -1,0 +1,340 @@
+{
+  "schema_version": 1,
+  "change": "0203-ods-open-namespace-classify-memo",
+  "decision": "withheld",
+  "claim_scope": "ODS repeated-edit (0203 v2): total/stage/publication adverse both directions sub-4%; commit mixed; withheld overall",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "475cf2898880363517eec9e0a9ac6b582eed1f78054f161f394bdd635bb19d7d",
+      "candidate_sha256": "88d7c4c3d22c46d1c7fdb6a3cf6cbe9cd6567042aed07ef83ded19745772d24e",
+      "note": "both binaries contain changes 0192-0196 and 0198-0202 as baseline plus the identical selector matrix; the candidate binary additionally memoizes element-name namespace classifications in the fused open driver (v2 direct-mapped slot cache); control is the 0202 binary"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0192-0196 and 0198-0202 (both binaries) plus the uncommitted namespace-classification memo in the fused open driver (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_repeated_edit",
+  "timing_scope": "one source-backed owner and four fixed-window hashing sinks prepared outside the timer; the timer covers exactly four sequential edit_cells + set_cell + commit + write_to transactions with per-transaction stage/commit/publication durations summed per sample",
+  "cases": {
+    "total_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 41897547.5,
+          "mean": 42054726.07,
+          "p95": 43543036.0,
+          "p99": 44497526.0
+        },
+        "b1": {
+          "p50": 42297447.5,
+          "mean": 42356418.02,
+          "p95": 43398855.0,
+          "p99": 43790788.0
+        },
+        "b2": {
+          "p50": 42213381.5,
+          "mean": 42365773.402,
+          "p95": 43516716.0,
+          "p99": 46106105.0
+        },
+        "a2": {
+          "p50": 42169594.5,
+          "mean": 42281543.9,
+          "p95": 43478752.0,
+          "p99": 45017038.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.954471,
+          "mean": -0.717379,
+          "p95": 0.331123,
+          "p99": 1.588264
+        },
+        "a2_to_b2": {
+          "p50": -0.103835,
+          "mean": -0.199211,
+          "p95": -0.087316,
+          "p99": -2.419233
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.649315,
+          "mean": 0.53934,
+          "p95": -0.147633,
+          "p99": 1.167508
+        },
+        "candidate": {
+          "p50": -0.19875,
+          "mean": 0.022087,
+          "p95": 0.271576,
+          "p99": 5.287224
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "stage_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1889370.5,
+          "mean": 1903550.07,
+          "p95": 2051884.0,
+          "p99": 2265041.0
+        },
+        "b1": {
+          "p50": 1961064.5,
+          "mean": 1970432.77,
+          "p95": 2121742.0,
+          "p99": 2194901.0
+        },
+        "b2": {
+          "p50": 1955311.5,
+          "mean": 1977227.216,
+          "p95": 2148419.0,
+          "p99": 2440191.0
+        },
+        "a2": {
+          "p50": 1948518.5,
+          "mean": 1967019.262,
+          "p95": 2101883.0,
+          "p99": 2299906.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -3.794597,
+          "mean": -3.513577,
+          "p95": -3.404578,
+          "p99": 3.096633
+        },
+        "a2_to_b2": {
+          "p50": -0.348624,
+          "mean": -0.518955,
+          "p95": -2.214015,
+          "p99": -6.099597
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 3.130567,
+          "mean": 3.334254,
+          "p95": 2.436736,
+          "p99": 1.539266
+        },
+        "candidate": {
+          "p50": -0.293361,
+          "mean": 0.34482,
+          "p95": 1.257316,
+          "p99": 11.175447
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 6563338.5,
+          "mean": 6611951.814,
+          "p95": 6999773.0,
+          "p99": 7463913.0
+        },
+        "b1": {
+          "p50": 6662011.5,
+          "mean": 6701659.876,
+          "p95": 7051282.0,
+          "p99": 7234655.0
+        },
+        "b2": {
+          "p50": 6617335.0,
+          "mean": 6678562.332,
+          "p95": 7075565.0,
+          "p99": 7543232.0
+        },
+        "a2": {
+          "p50": 6718448.5,
+          "mean": 6774684.102,
+          "p95": 7149181.0,
+          "p99": 7634338.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.503396,
+          "mean": -1.356756,
+          "p95": -0.735867,
+          "p99": 3.071552
+        },
+        "a2_to_b2": {
+          "p50": 1.505013,
+          "mean": 1.418838,
+          "p95": 1.029712,
+          "p99": 1.193371
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 2.363279,
+          "mean": 2.461184,
+          "p95": 2.134469,
+          "p99": 2.28332
+        },
+        "candidate": {
+          "p50": -0.670616,
+          "mean": -0.344654,
+          "p95": 0.344377,
+          "p99": 4.265262
+        }
+      },
+      "accepted_statistics": [
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree"
+      }
+    },
+    "publication_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 33188283.5,
+          "mean": 33294985.97,
+          "p95": 34301577.0,
+          "p99": 34926140.0
+        },
+        "b1": {
+          "p50": 33371791.0,
+          "mean": 33395357.338,
+          "p95": 34053232.0,
+          "p99": 34297872.0
+        },
+        "b2": {
+          "p50": 33324152.0,
+          "mean": 33427432.182,
+          "p95": 34195600.0,
+          "p99": 36197253.0
+        },
+        "a2": {
+          "p50": 33235596.0,
+          "mean": 33313998.008,
+          "p95": 34081932.0,
+          "p99": 35345664.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.552929,
+          "mean": -0.301461,
+          "p95": 0.724005,
+          "p99": 1.798848
+        },
+        "a2_to_b2": {
+          "p50": -0.266449,
+          "mean": -0.3405,
+          "p95": -0.333514,
+          "p99": -2.409317
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.142558,
+          "mean": 0.057102,
+          "p95": -0.640335,
+          "p99": 1.201175
+        },
+        "candidate": {
+          "p50": -0.142752,
+          "mean": 0.096046,
+          "p95": 0.418075,
+          "p99": 5.537898
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b1": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "b2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    },
+    "a2": {
+      "output_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "source_immutability_verified": true
+    }
+  }
+}

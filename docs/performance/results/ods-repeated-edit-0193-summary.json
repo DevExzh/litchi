@@ -1,0 +1,321 @@
+{
+ "schema_version": 1,
+ "change": "0193-ods-source-edit-protection-cache",
+ "decision": "retain_cache_accept_total_and_stage_latency",
+ "claim_scope": "fixed-corpus source-backed ODS four-transaction repeated-edit warm latency: total p50/mean/p95/p99 and stage-phase p50/mean/p95/p99 accepted; commit/publication phases neutral-withheld; single-transaction lifecycles unchanged by design; no allocation/RSS/physical-I/O/cold-cache/producer claim",
+ "protocol": {
+  "order": [
+   "a1_control",
+   "b1_candidate",
+   "b2_candidate",
+   "a2_control"
+  ],
+  "cpu_affinity": "2",
+  "warmups_per_case": 30,
+  "samples_per_case": 500,
+  "profile": "release",
+  "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+  "page_cache": "not controlled; no cold-cache claim",
+  "stability_threshold_percent": {
+   "p50": 5.0,
+   "mean": 5.0,
+   "p95": 10.0,
+   "p99": 15.0
+  },
+  "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+  "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+  "binaries": {
+   "control_sha256": "07b060794de42146b45197e4c54e8bf9282d27ff1ca7abd01538d64ca27f899a",
+   "candidate_sha256": "c1ad10735d02d84528da0ca962c5019d5acf6a6276f85d577debd80a09c576ab",
+   "note": "both binaries contain the identical new harness selector; the candidate binary additionally carries the litchi-ods edit-protection cache"
+  }
+ },
+ "provenance": {
+  "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+  "source_state": "HEAD 9b717bb08 plus the new harness selector (both binaries) plus the uncommitted litchi-ods edit-protection cache (candidate binary only)",
+  "compiler": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "allocator": "Rust system allocator",
+  "cpu": "AMD EPYC 9575F 64-Core Processor",
+  "kernel": "Linux 6.8.0-101-generic",
+  "rustflags": null,
+  "cargo_build_target": null
+ },
+ "corpus": {
+  "name": "ods-media-publication",
+  "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+  "archive_bytes": 16790689,
+  "archive_member_count": 11
+ },
+ "selector": "ods_source_backed_repeated_edit",
+ "timing_scope": "one source-backed owner and four fixed-window hashing sinks prepared outside the timer; the timer covers exactly four sequential edit_cells + set_cell + commit + write_to transactions with per-transaction stage/commit/publication durations summed per sample",
+ "transaction_count": 4,
+ "cases": {
+  "total_ns": {
+   "legs_ns": {
+    "a1": {
+     "p50": 51327334.5,
+     "mean": 51661510.644,
+     "p95": 54274227.0,
+     "p99": 55717093.0
+    },
+    "b1": {
+     "p50": 46547225.5,
+     "mean": 46725956.552,
+     "p95": 48478647.0,
+     "p99": 50202439.0
+    },
+    "b2": {
+     "p50": 46425471.0,
+     "mean": 46673400.926,
+     "p95": 48519175.0,
+     "p99": 49938733.0
+    },
+    "a2": {
+     "p50": 51913812.5,
+     "mean": 52100189.872,
+     "p95": 53768625.0,
+     "p99": 55388780.0
+    }
+   },
+   "candidate_reduction_percent": {
+    "a1_to_b1": {
+     "p50": 9.312989,
+     "mean": 9.553639,
+     "p95": 10.678328,
+     "p99": 9.897598
+    },
+    "a2_to_b2": {
+     "p50": 10.572026,
+     "mean": 10.416064,
+     "p95": 9.763036,
+     "p99": 9.839623
+    }
+   },
+   "same_implementation_drift_percent": {
+    "control": {
+     "p50": 1.142623,
+     "mean": 0.849141,
+     "p95": -0.931569,
+     "p99": -0.58925
+    },
+    "candidate": {
+     "p50": -0.261572,
+     "mean": -0.112476,
+     "p95": 0.0836,
+     "p99": -0.525285
+    }
+   },
+   "accepted_statistics": [
+    "p50",
+    "mean",
+    "p95",
+    "p99"
+   ],
+   "rejected_statistics": {}
+  },
+  "stage_ns": {
+   "legs_ns": {
+    "a1": {
+     "p50": 6933983.5,
+     "mean": 6999782.122,
+     "p95": 7481710.0,
+     "p99": 7935331.0
+    },
+    "b1": {
+     "p50": 1969938.5,
+     "mean": 1987052.022,
+     "p95": 2124981.0,
+     "p99": 2461624.0
+    },
+    "b2": {
+     "p50": 1987183.0,
+     "mean": 2008432.422,
+     "p95": 2170252.0,
+     "p99": 2461596.0
+    },
+    "a2": {
+     "p50": 6894709.0,
+     "mean": 6945152.504,
+     "p95": 7321070.0,
+     "p99": 7661468.0
+    }
+   },
+   "candidate_reduction_percent": {
+    "a1_to_b1": {
+     "p50": 71.59009,
+     "mean": 71.612659,
+     "p95": 71.597656,
+     "p99": 68.978937
+    },
+    "a2_to_b2": {
+     "p50": 71.178145,
+     "mean": 71.081522,
+     "p95": 70.356082,
+     "p99": 67.870439
+    }
+   },
+   "same_implementation_drift_percent": {
+    "control": {
+     "p50": -0.566406,
+     "mean": -0.780447,
+     "p95": -2.147103,
+     "p99": -3.451186
+    },
+    "candidate": {
+     "p50": 0.875383,
+     "mean": 1.075986,
+     "p95": 2.130419,
+     "p99": -0.001137
+    }
+   },
+   "accepted_statistics": [
+    "p50",
+    "mean",
+    "p95",
+    "p99"
+   ],
+   "rejected_statistics": {}
+  },
+  "commit_ns": {
+   "legs_ns": {
+    "a1": {
+     "p50": 10599630.0,
+     "mean": 10703381.91,
+     "p95": 11421046.0,
+     "p99": 12137230.0
+    },
+    "b1": {
+     "p50": 10677819.5,
+     "mean": 10763408.028,
+     "p95": 11430149.0,
+     "p99": 12426841.0
+    },
+    "b2": {
+     "p50": 10571047.5,
+     "mean": 10658821.27,
+     "p95": 11285002.0,
+     "p99": 12063390.0
+    },
+    "a2": {
+     "p50": 11026903.0,
+     "mean": 11081780.59,
+     "p95": 11651058.0,
+     "p99": 12305515.0
+    }
+   },
+   "candidate_reduction_percent": {
+    "a1_to_b1": {
+     "p50": -0.737663,
+     "mean": -0.560815,
+     "p95": -0.079704,
+     "p99": -2.386138
+    },
+    "a2_to_b2": {
+     "p50": 4.13403,
+     "mean": 3.816709,
+     "p95": 3.141826,
+     "p99": 1.967614
+    }
+   },
+   "same_implementation_drift_percent": {
+    "control": {
+     "p50": 4.031018,
+     "mean": 3.535319,
+     "p95": 2.013931,
+     "p99": 1.386519
+    },
+    "candidate": {
+     "p50": -0.999942,
+     "mean": -0.971688,
+     "p95": -1.269861,
+     "p99": -2.924726
+    }
+   },
+   "accepted_statistics": [],
+   "rejected_statistics": {
+    "p50": "a paired direction is not lower",
+    "mean": "a paired direction is not lower",
+    "p95": "a paired direction is not lower",
+    "p99": "a paired direction is not lower"
+   }
+  },
+  "publication_ns": {
+   "legs_ns": {
+    "a1": {
+     "p50": 33544646.0,
+     "mean": 33705432.374,
+     "p95": 34857412.0,
+     "p99": 36019757.0
+    },
+    "b1": {
+     "p50": 33601674.0,
+     "mean": 33722199.676,
+     "p95": 34708615.0,
+     "p99": 35833478.0
+    },
+    "b2": {
+     "p50": 33548611.5,
+     "mean": 33713502.2,
+     "p95": 34767380.0,
+     "p99": 36534027.0
+    },
+    "a2": {
+     "p50": 33731729.5,
+     "mean": 33821268.854,
+     "p95": 34573268.0,
+     "p99": 35743355.0
+    }
+   },
+   "candidate_reduction_percent": {
+    "a1_to_b1": {
+     "p50": -0.170006,
+     "mean": -0.049747,
+     "p95": 0.426873,
+     "p99": 0.517158
+    },
+    "a2_to_b2": {
+     "p50": 0.542866,
+     "mean": 0.318636,
+     "p95": -0.561451,
+     "p99": -2.212081
+    }
+   },
+   "same_implementation_drift_percent": {
+    "control": {
+     "p50": 0.557715,
+     "mean": 0.343673,
+     "p95": -0.815161,
+     "p99": -0.767362
+    },
+    "candidate": {
+     "p50": -0.157916,
+     "mean": -0.025792,
+     "p95": 0.16931,
+     "p99": 1.955013
+    }
+   },
+   "accepted_statistics": [],
+   "rejected_statistics": {
+    "p50": "a paired direction is not lower",
+    "mean": "a paired direction is not lower",
+    "p95": "a paired direction is not lower",
+    "p99": "a paired direction is not lower"
+   }
+  }
+ },
+ "verification": {
+  "output_hash_verified": true,
+  "semantic_reopen_verified": true,
+  "media_payloads_verified": true,
+  "exact_output_verified": true,
+  "exact_sink_verified": true,
+  "source_immutability_verified": true
+ },
+ "replay_logical_counters": {
+  "preparation_read_calls": 20,
+  "preparation_read_bytes": 7785,
+  "replay_read_calls": 2388,
+  "replay_read_bytes": 67172960,
+  "note": "identical in control and candidate legs; the cache removes in-process parse work, not source reads"
+ }
+}

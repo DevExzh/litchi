@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0212-odt-fused-open-parse",
+  "decision": "withheld-pending-calibration",
+  "claim_scope": "none yet - reproduced sub-1.7% p50 adverse on byte-identical odp_semantic_open phase blocks under pre-floor rule; executed-phase accepts (full-text all-four 20.82%-29.50%) await litchi-odp floor calibration (0213) for re-verdict",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "ceba155be185f1c213c4bf90200bb5e87bb697a5023e3a703d9cd7def6042922",
+      "candidate_sha256": "246c6b1f916b2dc2fa8529edfdfed605fede29db0226f54334bd38bc5d4f8e13",
+      "note": "control is the banked 0211 binary; candidate adds the 0212 fused open parse in litchi-odt::document"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, and 0207 (both binaries); the candidate additionally carries the 0212 fused open parse change in litchi-odt::document",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odp-semantic-tiny",
+    "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+    "archive_bytes": 2229,
+    "archive_member_count": 5
+  },
+  "selector": "odp_semantic_one_slide",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 23703.0,
+          "mean": 24309.882,
+          "p95": 29080.0,
+          "p99": 36160.0
+        },
+        "b1": {
+          "p50": 18375.0,
+          "mean": 19519.9,
+          "p95": 27618.0,
+          "p99": 29841.0
+        },
+        "b2": {
+          "p50": 18361.0,
+          "mean": 18723.526,
+          "p95": 21821.0,
+          "p99": 26216.0
+        },
+        "a2": {
+          "p50": 23778.0,
+          "mean": 24879.334,
+          "p95": 31693.0,
+          "p99": 38082.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 22.478167,
+          "mean": 19.703847,
+          "p95": 5.02751,
+          "p99": 17.475111
+        },
+        "a2_to_b2": {
+          "p50": 22.781563,
+          "mean": 24.742656,
+          "p95": 31.148834,
+          "p99": 31.159078
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.316416,
+          "mean": 2.342471,
+          "p95": 8.985557,
+          "p99": 5.315265
+        },
+        "candidate": {
+          "p50": -0.07619,
+          "mean": -4.079806,
+          "p95": -20.989934,
+          "p99": -12.147716
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p95": "candidate drift -20.99% exceeds 10%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

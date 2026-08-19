@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0201-ods-fused-open-validate-fold",
+  "decision": "neutral",
+  "claim_scope": "ODS eager open: no statistic accepted; withheld as neutral",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "74951d0ccc58ce141a6e914790115cbe2b64b218d029f9aa29b8f17d8d0a844f",
+      "candidate_sha256": "606bab41e7be2de874f4fa567ce854838768a5f49fe85768c93c7d53dcea62c1",
+      "note": "both binaries contain changes 0192-0196, 0198, and 0199 as baseline plus the identical selector matrix; the candidate binary additionally folds the content.xml structural validation pass into the 0200 fused open tokenization; control is the 0200 v2 binary"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0192-0196 and 0198-0200 (both binaries) plus the uncommitted validate-pass fold into the fused open parse (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_eager_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3002298.0,
+          "mean": 3046753.186,
+          "p95": 3321420.0,
+          "p99": 3516598.0
+        },
+        "b1": {
+          "p50": 3046389.0,
+          "mean": 3085415.426,
+          "p95": 3334729.0,
+          "p99": 3622153.0
+        },
+        "b2": {
+          "p50": 3024834.5,
+          "mean": 3069690.946,
+          "p95": 3353685.0,
+          "p99": 4261751.0
+        },
+        "a2": {
+          "p50": 3007238.0,
+          "mean": 3040304.736,
+          "p95": 3298632.0,
+          "p99": 3637787.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.468575,
+          "mean": -1.268965,
+          "p95": -0.400702,
+          "p99": -3.001623
+        },
+        "a2_to_b2": {
+          "p50": -0.585138,
+          "mean": -0.966555,
+          "p95": -1.668965,
+          "p99": -17.152296
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.164541,
+          "mean": -0.21165,
+          "p95": -0.686092,
+          "p99": 3.4462
+        },
+        "candidate": {
+          "p50": -0.707543,
+          "mean": -0.509639,
+          "p95": 0.568442,
+          "p99": 17.657951
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; candidate drift +17.66% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

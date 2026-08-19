@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0205-layout-noise-floor-calibration",
+  "artifacts": [
+    {
+      "path": "ods-source-open-0205a-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 3478,
+      "compressed_sha256": "af410f872fabc48a80f1a2573ac94c8b1aa6d24ea4fc01a78d0600c930ee601f",
+      "uncompressed_bytes": 55796,
+      "uncompressed_sha256": "29d964710d3d649ddb3539d1e247fd7029ee4439d749d3309b767e8ea6beeb80"
+    },
+    {
+      "path": "ods-source-open-0205a-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 3477,
+      "compressed_sha256": "23dedacbaa123b06f70ae7a7895657c27ab5635188d0263e64091054b9d520a0",
+      "uncompressed_bytes": 55798,
+      "uncompressed_sha256": "f6f5ac01fed5306a1388722467232ce676ce343e8a787e156d23e5a2a569021e"
+    },
+    {
+      "path": "ods-source-open-0205a-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 3495,
+      "compressed_sha256": "dfb26c5ea705ea51def7a805b179791413bf9b5e70738b745ec66b7a9a4f8719",
+      "uncompressed_bytes": 55799,
+      "uncompressed_sha256": "fe66c36f1636ecf54a7e34a95587e59261a183a211749b9d0018589b200a1606"
+    },
+    {
+      "path": "ods-source-open-0205a-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 3470,
+      "compressed_sha256": "76a48863c7223480d4ec0863c1ca2c26ed552d095f1b9c234e5b301957a76863",
+      "uncompressed_bytes": 55797,
+      "uncompressed_sha256": "2934a719b612b2e9f29e972ae8f794894ecf73b5d312f27847e8cfb21c72a7c8"
+    },
+    {
+      "path": "ods-source-open-0205a-summary.json",
+      "role": "derived_summary",
+      "bytes": 4078,
+      "sha256": "4db2483f4db01f60d66f698cbf2069452f28cb916ba31fb0adb9df26e9c731a3"
+    }
+  ]
+}

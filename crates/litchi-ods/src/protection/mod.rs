@@ -5,6 +5,7 @@
 //! publication without evaluating passwords or enforcing a security policy.
 
 mod codec;
+mod fused;
 mod model;
 mod transaction;
 mod validation;

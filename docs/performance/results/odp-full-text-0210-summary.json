@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0210-odt-fused-open-parse",
+  "decision": "banked",
+  "claim_scope": "odp_semantic_list_slides p50/mean/p95/p99 16.77%-47.07% lower; odp_semantic_one_slide all-four 7.45%-19.70% lower; odp_semantic_full_text all-four 13.11%-21.71% lower; odp_semantic_open p50/mean 1.01%-3.92% lower (mechanism-absent, layout-favorable)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "41b5f923638fa6fb0065318ce09edaf27588cf7aecd83c6c923c6d050f011efd",
+      "candidate_sha256": "c4b2b56897b17d41295c7286c07f1aff4745b34e0ade4cb8c1ef55d149d29371",
+      "note": "control is the banked 0209 binary; candidate adds the 0210 fused open parse in litchi-odt::document"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, and 0207 (both binaries); the candidate additionally carries the 0210 fused open parse change in litchi-odt::document",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odp-semantic-tiny",
+    "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+    "archive_bytes": 2229,
+    "archive_member_count": 5
+  },
+  "selector": "odp_semantic_full_text",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 38042.0,
+          "mean": 38947.178,
+          "p95": 45022.0,
+          "p99": 50280.0
+        },
+        "b1": {
+          "p50": 30353.0,
+          "mean": 31009.442,
+          "p95": 35249.0,
+          "p99": 43690.0
+        },
+        "b2": {
+          "p50": 30747.5,
+          "mean": 31038.398,
+          "p95": 34517.0,
+          "p99": 40137.0
+        },
+        "a2": {
+          "p50": 37791.0,
+          "mean": 38290.104,
+          "p95": 42168.0,
+          "p99": 46704.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 20.211871,
+          "mean": 20.380773,
+          "p95": 21.707165,
+          "p99": 13.106603
+        },
+        "a2_to_b2": {
+          "p50": 18.638036,
+          "mean": 18.938852,
+          "p95": 18.14409,
+          "p99": 14.060894
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.659797,
+          "mean": -1.68709,
+          "p95": -6.339123,
+          "p99": -7.112172
+        },
+        "candidate": {
+          "p50": 1.299707,
+          "mean": 0.093378,
+          "p95": -2.076655,
+          "p99": -8.132296
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

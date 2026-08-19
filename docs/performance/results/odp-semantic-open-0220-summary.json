@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0220-odf-validator-borrowing-reads",
+  "decision": "analysis-pending",
+  "claim_scope": "pending",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "8425066ab6b43f08486c5a808d16e31bf6e758f3ff1205096c1a5e21af4a2a5d",
+      "candidate_sha256": "1971c3adf37536d1fa0963d111b79dade639ea5b624150b985faa6ab02bf8713",
+      "note": "control is the banked 0217 binary; candidate adds the 0220 borrowing-reads + depth-gated resolution validator in litchi-odf-common"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, 0207, 0209-0212, 0215, and 0217 (both binaries); the candidate additionally carries the 0220 validator borrowing-reads change in litchi-odf-common",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odp-semantic-tiny",
+    "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+    "archive_bytes": 2229,
+    "archive_member_count": 5
+  },
+  "selector": "odp_semantic_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 42488.0,
+          "mean": 43510.532,
+          "p95": 50548.0,
+          "p99": 56466.0
+        },
+        "b1": {
+          "p50": 43113.5,
+          "mean": 44955.72,
+          "p95": 54243.0,
+          "p99": 68333.0
+        },
+        "b2": {
+          "p50": 42708.5,
+          "mean": 43766.704,
+          "p95": 50249.0,
+          "p99": 56156.0
+        },
+        "a2": {
+          "p50": 42849.0,
+          "mean": 46182.992,
+          "p95": 59430.0,
+          "p99": 64669.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.47218,
+          "mean": -3.321467,
+          "p95": -7.309884,
+          "p99": -21.016187
+        },
+        "a2_to_b2": {
+          "p50": 0.327896,
+          "mean": 5.231987,
+          "p95": 15.448427,
+          "p99": 13.163958
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.849652,
+          "mean": 6.142099,
+          "p95": 17.571417,
+          "p99": 14.527326
+        },
+        "candidate": {
+          "p50": -0.939381,
+          "mean": -2.64486,
+          "p95": -7.363162,
+          "p99": -17.820087
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree; control drift +6.14% exceeds 5%",
+        "p95": "paired directions disagree; control drift +17.57% exceeds 10%",
+        "p99": "paired directions disagree; candidate drift -17.82% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

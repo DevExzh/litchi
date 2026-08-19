@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0199-ods-parse-event-copy-elision",
+  "decision": "accepted",
+  "claim_scope": "ODS eager open: elapsed p50/mean/p95/p99",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "4e5662b270a30fc93af0b72bbe8c80d03adc82a73612a85085e6e3ac020954e1",
+      "candidate_sha256": "6acae4dbfcac07185cba1047c5c157d52b096d0bdcc5642083cc6055e977c8ff",
+      "note": "both binaries contain changes 0193-0196 and 0198 as baseline plus the identical 341-case selector matrix; the candidate binary additionally removes per-event into_owned copies from the litchi-ods worksheet and settings parse loops; control is bit-identical to the 0198 candidate"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193-0196 and 0198 (both binaries) plus the uncommitted litchi-ods parse-loop into_owned removals (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_eager_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3291312.0,
+          "mean": 3351560.862,
+          "p95": 3648441.0,
+          "p99": 4082635.0
+        },
+        "b1": {
+          "p50": 2979814.0,
+          "mean": 3010785.358,
+          "p95": 3267979.0,
+          "p99": 3463235.0
+        },
+        "b2": {
+          "p50": 2973198.5,
+          "mean": 3007474.398,
+          "p95": 3218107.0,
+          "p99": 3488862.0
+        },
+        "a2": {
+          "p50": 3331669.5,
+          "mean": 3367227.846,
+          "p95": 3650476.0,
+          "p99": 3897197.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 9.46425,
+          "mean": 10.167666,
+          "p95": 10.428071,
+          "p99": 15.171574
+        },
+        "a2_to_b2": {
+          "p50": 10.759501,
+          "mean": 10.683965,
+          "p95": 11.844181,
+          "p99": 10.477659
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.226183,
+          "mean": 0.467453,
+          "p95": 0.055777,
+          "p99": -4.542116
+        },
+        "candidate": {
+          "p50": -0.222011,
+          "mean": -0.10997,
+          "p95": -1.526081,
+          "p99": 0.739973
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

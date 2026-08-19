@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "change": "0197-ods-batched-row-window-reparse",
+  "decision": "withheld-rerun",
+  "claim_scope": "none; single allowed rerun reproduced commit acceptance and the lifecycle adverse pattern; change reverted",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "db708afa17eddc7dab9911429c51d6d0cd676550f8c33f4458893f2ea1201cff",
+      "candidate_sha256": "fe3da69fae3a125183f2a9416cb49cf78314bf41c2a9a7743db7bd2af7de0ef3",
+      "note": "both binaries contain changes 0193-0196 as baseline plus the identical 341-case selector matrix; the candidate binary additionally carries the batched per-window row reparse in litchi-ods worksheet/package.rs; control is bit-identical to the 0196 candidate"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0193-0196 (both binaries) plus the uncommitted batched row-window reparse (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_one_percent_edit_save",
+  "timing_scope": "open + stage + commit + sequential publication through the fixed-window hashing sink",
+  "cases": {
+    "lifecycle_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 18278705.0,
+          "mean": 18328083.446,
+          "p95": 19038563.0,
+          "p99": 19522860.0
+        },
+        "b1": {
+          "p50": 18397444.0,
+          "mean": 18481927.722,
+          "p95": 19256994.0,
+          "p99": 19913538.0
+        },
+        "b2": {
+          "p50": 18299954.5,
+          "mean": 18372568.924,
+          "p95": 19225219.0,
+          "p99": 19547824.0
+        },
+        "a2": {
+          "p50": 18277599.0,
+          "mean": 18322211.248,
+          "p95": 18944133.0,
+          "p99": 19457750.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.649603,
+          "mean": -0.839391,
+          "p95": -1.147308,
+          "p99": -2.001131
+        },
+        "a2_to_b2": {
+          "p50": -0.122311,
+          "mean": -0.274845,
+          "p95": -1.483763,
+          "p99": -0.462921
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.006051,
+          "mean": -0.032039,
+          "p95": -0.495993,
+          "p99": -0.333506
+        },
+        "candidate": {
+          "p50": -0.529908,
+          "mean": -0.591707,
+          "p95": -0.165005,
+          "p99": -1.836509
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3727271.0,
+          "mean": 3761241.834,
+          "p95": 4020040.0,
+          "p99": 4354059.0
+        },
+        "b1": {
+          "p50": 3677177.5,
+          "mean": 3711624.162,
+          "p95": 3969729.0,
+          "p99": 4255032.0
+        },
+        "b2": {
+          "p50": 3649618.0,
+          "mean": 3684052.622,
+          "p95": 3966876.0,
+          "p99": 4203863.0
+        },
+        "a2": {
+          "p50": 3727871.5,
+          "mean": 3750503.482,
+          "p95": 3988015.0,
+          "p99": 4163486.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.343973,
+          "mean": 1.319183,
+          "p95": 1.251505,
+          "p99": 2.274361
+        },
+        "a2_to_b2": {
+          "p50": 2.099147,
+          "mean": 1.771785,
+          "p95": 0.530063,
+          "p99": -0.969788
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.016111,
+          "mean": -0.2855,
+          "p95": -0.796634,
+          "p99": -4.376904
+        },
+        "candidate": {
+          "p50": -0.749474,
+          "mean": -0.742843,
+          "p95": -0.071869,
+          "p99": -1.202553
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "a2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    }
+  }
+}

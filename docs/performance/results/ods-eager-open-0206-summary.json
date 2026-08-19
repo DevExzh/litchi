@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0206-ods-lazy-settings-qname",
+  "decision": "neutral-below-floor",
+  "claim_scope": "allocation claim only",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "5f0dab648cdf8f693ec01c171bfb81b2776e9e5abfe117b5be85c42a5bd89f66",
+      "candidate_sha256": "8e17ab3e9857cb5c7d6b28ea31ef85ec7512e779270f72bd11361c980e1a0eb8",
+      "note": "control is the banked 0204 binary (protection fused parse); candidate adds the 0206 lazy qualified-name materialization in litchi-ods::settings::codec"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, and 0204 (both binaries); the candidate additionally carries the 0206 lazy qualified-name change in litchi-ods::settings::codec",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_eager_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2890685.0,
+          "mean": 2910199.602,
+          "p95": 3024148.0,
+          "p99": 3138736.0
+        },
+        "b1": {
+          "p50": 2822846.0,
+          "mean": 2843160.216,
+          "p95": 2958067.0,
+          "p99": 3193042.0
+        },
+        "b2": {
+          "p50": 2849898.5,
+          "mean": 2880322.848,
+          "p95": 3038738.0,
+          "p99": 3443666.0
+        },
+        "a2": {
+          "p50": 2856491.5,
+          "mean": 2879223.41,
+          "p95": 2991392.0,
+          "p99": 3369685.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 2.346814,
+          "mean": 2.303601,
+          "p95": 2.185111,
+          "p99": -1.730187
+        },
+        "a2_to_b2": {
+          "p50": 0.230808,
+          "mean": -0.038185,
+          "p95": -1.582741,
+          "p99": -2.195487
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.182886,
+          "mean": -1.064401,
+          "p95": -1.083148,
+          "p99": 7.358026
+        },
+        "candidate": {
+          "p50": 0.958341,
+          "mean": 1.307089,
+          "p95": 2.727153,
+          "p99": 7.849067
+        }
+      },
+      "accepted_statistics": [
+        "p50"
+      ],
+      "rejected_statistics": {
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

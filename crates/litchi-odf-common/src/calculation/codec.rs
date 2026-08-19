@@ -79,16 +79,16 @@ pub fn write(out: &mut String, settings_option: Option<&Settings>) -> Result<()>
 
 /// Parse a bounded calculation-settings XML fragment.
 ///
+/// This standalone path keeps the historical inline event loop for latency
+/// parity on non-fused callers; family owners' fused parsers drive the
+/// equivalent [`CalculationHandler`] instead.
+///
 /// # Errors
 ///
 /// Returns an error for malformed XML, invalid settings, or exceeded resource
 /// limits.
 pub fn parse(xml: &str) -> Result<Option<Settings>> {
-    if xml.len() > super::MAX_XML_BYTES {
-        return Err(Error::InvalidFormat(
-            "calculation settings XML exceeds the size limit".to_string(),
-        ));
-    }
+    validate_size(xml)?;
     let mut reader = NsReader::from_str(xml);
     let mut buf = Vec::new();
     let mut current = None;
@@ -261,6 +261,210 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
         settings.validate()?;
     }
     Ok(result)
+}
+
+/// Enforce the pre-parse byte-size limit of the calculation-settings source.
+///
+/// Internal plumbing for family owners' fused parsers, not a supported API.
+#[doc(hidden)]
+pub fn validate_size(xml: &str) -> Result<()> {
+    if xml.len() > super::MAX_XML_BYTES {
+        return Err(Error::InvalidFormat(
+            "calculation settings XML exceeds the size limit".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Classify the resolved namespace as `(is_table, is_office)` for
+/// [`CalculationHandler::on_event`]; the resolved value borrows the reader
+/// mutably, so callers classify it immediately after the read exactly where
+/// the historical loop body classified it.
+///
+/// Internal plumbing for family owners' fused parsers, not a supported API.
+#[doc(hidden)]
+pub fn classify(namespace: &ResolveResult<'_>) -> (bool, bool) {
+    (
+        is_namespace(namespace),
+        is_namespace_uri(namespace, OFFICE_NAMESPACE),
+    )
+}
+
+/// Streaming event handler holding the [`parse`] scan state.
+///
+/// Internal plumbing for family owners' fused parsers, not a supported API:
+/// a fused open parse drives one shared tokenizer through this handler while
+/// [`parse`] keeps its historical inline loop for latency parity on
+/// non-fused callers; both apply the same checks, limits, and error messages
+/// at the same events.
+#[doc(hidden)]
+#[derive(Debug, Default)]
+pub struct CalculationHandler {
+    current: Option<Settings>,
+    result: Option<Settings>,
+    child_open: bool,
+    depth: usize,
+    events: usize,
+    document_body_depth: Option<usize>,
+}
+
+impl CalculationHandler {
+    /// Process one resolved event whose namespace was classified with
+    /// [`classify`], with the reader's resolver and decoder passed in exactly
+    /// where the historical loop body consulted them.
+    pub fn on_event(
+        &mut self,
+        is_table: bool,
+        is_office: bool,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: quick_xml::encoding::Decoder,
+    ) -> Result<()> {
+        self.events = self.events.saturating_add(1);
+        if self.events > super::MAX_EVENTS {
+            return Err(Error::InvalidFormat(
+                "calculation settings XML exceeds the event limit".to_string(),
+            ));
+        }
+        let is_start = matches!(event, Event::Start(_));
+        let is_end = matches!(event, Event::End(_));
+        if let Event::Start(element) = event
+            && is_office
+            && matches!(
+                element.local_name().as_ref(),
+                b"chart" | b"drawing" | b"presentation" | b"spreadsheet" | b"text"
+            )
+        {
+            self.document_body_depth = Some(self.depth);
+        }
+        let is_document_body_child = self
+            .document_body_depth
+            .is_some_and(|value| self.depth == value + 1);
+        match event {
+            Event::Start(element)
+                if is_table && element.local_name().as_ref() == b"calculation-settings" =>
+            {
+                if !is_document_body_child {
+                    return Err(Error::InvalidFormat(
+                        "table:calculation-settings must be a direct office document-body child"
+                            .to_string(),
+                    ));
+                }
+                if self.current.is_some() || self.result.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "duplicate table:calculation-settings".to_string(),
+                    ));
+                }
+                self.current = Some(parse_settings_attributes(resolver, decoder, element)?);
+            },
+            Event::Empty(element)
+                if is_table && element.local_name().as_ref() == b"calculation-settings" =>
+            {
+                if !is_document_body_child {
+                    return Err(Error::InvalidFormat(
+                        "table:calculation-settings must be a direct office document-body child"
+                            .to_string(),
+                    ));
+                }
+                if self.current.is_some() || self.result.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "duplicate table:calculation-settings".to_string(),
+                    ));
+                }
+                self.result = Some(parse_settings_attributes(resolver, decoder, element)?);
+            },
+            Event::Start(element) if self.current.is_some() => {
+                if self.child_open {
+                    return Err(Error::InvalidFormat(
+                        "calculation setting children must be empty".to_string(),
+                    ));
+                }
+                let settings = self.current.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("calculation settings child has no parent".to_string())
+                })?;
+                parse_settings_child(settings, resolver, decoder, is_table, element)?;
+                self.child_open = true;
+            },
+            Event::Empty(element) if self.current.is_some() => {
+                if self.child_open {
+                    return Err(Error::InvalidFormat(
+                        "calculation setting children must be empty".to_string(),
+                    ));
+                }
+                let settings = self.current.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat("calculation settings child has no parent".to_string())
+                })?;
+                parse_settings_child(settings, resolver, decoder, is_table, element)?;
+            },
+            Event::End(element) if self.current.is_some() => {
+                if self.child_open {
+                    self.child_open = false;
+                } else if is_table && element.local_name().as_ref() == b"calculation-settings" {
+                    self.result = self.current.take();
+                }
+            },
+            Event::Text(text) if self.current.is_some() => {
+                let text_content = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid calculation settings text: {error}"))
+                })?;
+                if !text_content.trim().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "table:calculation-settings cannot contain text".to_string(),
+                    ));
+                }
+            },
+            Event::CData(text) if self.current.is_some() => {
+                let cdata_content = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid calculation settings CDATA: {error}"))
+                })?;
+                if !cdata_content.trim().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "table:calculation-settings cannot contain CDATA".to_string(),
+                    ));
+                }
+            },
+            Event::GeneralRef(_) if self.current.is_some() => {
+                return Err(Error::InvalidFormat(
+                    "table:calculation-settings cannot contain entity references".to_string(),
+                ));
+            },
+            Event::Eof => {},
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+        if is_start {
+            if self.depth >= super::MAX_DEPTH {
+                return Err(Error::InvalidFormat(
+                    "calculation settings XML exceeds the nesting limit".to_string(),
+                ));
+            }
+            self.depth = self.depth.saturating_add(1);
+        } else if is_end {
+            self.depth = self.depth.saturating_sub(1);
+        }
+        Ok(())
+    }
+
+    /// Run the post-stream checks and return the parsed settings.
+    pub fn finish(self) -> Result<Option<Settings>> {
+        if self.current.is_some() {
+            return Err(Error::InvalidFormat(
+                "unterminated table:calculation-settings".to_string(),
+            ));
+        }
+        if let Some(settings) = &self.result {
+            settings.validate()?;
+        }
+        Ok(self.result)
+    }
 }
 
 fn parse_settings_attributes(

@@ -1,19 +1,20 @@
 //! XML token and event traversal for the ODP parser.
 
 use super::super::{
-    ANIMATION_NAMESPACE_BYTES, Action, AnimationKind, AnimationNode, BytesRef, BytesStart,
-    DRAW_NAMESPACE, DrawingHyperlink, DrawingShapeKind, Effect, EffectDirection, Element,
-    EnhancedGeometry, EnhancedGeometryChild, EnhancedGeometryChildKind, Error, Event,
-    EventListener, Kind, Node, NsReader, OFFICE_NAMESPACE, PRESENTATION_NAMESPACE, ParagraphText,
-    Parser, Result, SCRIPT_NAMESPACE, STYLE_NAMESPACE, ScriptEventListener, Shape, ShapeBuilder,
-    ShapeContainerScope, ShapeEventListener, ShapeType, Slide, Speed, Transition,
-    TransitionStyleDefinition, TransitionStyles, XLINK_NAMESPACE, XmlVersion,
-    validate_legacy_animation_root,
+    Action, AnimationKind, AnimationNode, BytesRef, BytesStart, DRAW_NAMESPACE, DrawingHyperlink,
+    DrawingShapeKind, Effect, EffectDirection, Element, EnhancedGeometry, EnhancedGeometryChild,
+    EnhancedGeometryChildKind, Error, Event, EventListener, Kind, Node, NsClass, NsReader,
+    PRESENTATION_NAMESPACE, ParagraphText, Parser, Result, SCRIPT_NAMESPACE, STYLE_NAMESPACE,
+    ScriptEventListener, Shape, ShapeBuilder, ShapeContainerScope, ShapeEventListener, ShapeType,
+    Slide, Speed, Transition, TransitionStyleDefinition, TransitionStyles, XLINK_NAMESPACE,
+    XmlVersion, validate_legacy_animation_root,
 };
+use super::validation::ElementAttrs;
 
 impl Parser {
     pub(super) fn parse_animation_node(
         reader: &mut NsReader<&[u8]>,
+        collector: &mut TransitionStyleCollector,
         start: &BytesStart<'_>,
         kind: Kind,
         depth: usize,
@@ -39,9 +40,11 @@ impl Parser {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(reader, ns_class, &event);
             match event {
                 Event::Start(ref child) | Event::Empty(ref child) => {
-                    if !Self::is_namespace(&namespace, ANIMATION_NAMESPACE_BYTES) {
+                    if ns_class != NsClass::Animation {
                         return Err(Error::InvalidFormat(format!(
                             "anim:{} contains a non-animation element",
                             kind.local_name()
@@ -78,6 +81,7 @@ impl Parser {
                     } else {
                         Self::parse_animation_node(
                             reader,
+                            collector,
                             child,
                             child_kind,
                             depth + 1,
@@ -87,7 +91,7 @@ impl Parser {
                     children.push(node);
                 },
                 Event::End(ref end) => {
-                    if !Self::is_namespace(&namespace, ANIMATION_NAMESPACE_BYTES)
+                    if ns_class != NsClass::Animation
                         || end.local_name().as_ref() != kind.local_name().as_bytes()
                     {
                         return Err(Error::InvalidFormat(format!(
@@ -137,6 +141,7 @@ impl Parser {
 
     pub(super) fn parse_legacy_animation_node(
         reader: &mut NsReader<&[u8]>,
+        collector: &mut TransitionStyleCollector,
         start: &BytesStart<'_>,
         kind: AnimationKind,
         depth: usize,
@@ -162,9 +167,11 @@ impl Parser {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(reader, ns_class, &event);
             match event {
                 Event::Start(ref child) | Event::Empty(ref child) => {
-                    if !Self::is_namespace(&namespace, PRESENTATION_NAMESPACE) {
+                    if ns_class != NsClass::Presentation {
                         return Err(Error::InvalidFormat(format!(
                             "presentation:{} contains a foreign element",
                             kind.local_name()
@@ -203,6 +210,7 @@ impl Parser {
                     } else {
                         Self::parse_legacy_animation_node(
                             reader,
+                            collector,
                             child,
                             child_kind,
                             depth + 1,
@@ -212,7 +220,7 @@ impl Parser {
                     children.push(node);
                 },
                 Event::End(ref end)
-                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                    if ns_class == NsClass::Presentation
                         && end.local_name().as_ref() == kind.local_name().as_bytes() =>
                 {
                     return Ok(AnimationNode::from_parsed(kind, attributes, children));
@@ -256,6 +264,7 @@ impl Parser {
 
     pub(super) fn parse_enhanced_geometry(
         reader: &mut NsReader<&[u8]>,
+        collector: &mut TransitionStyleCollector,
         element: &BytesStart<'_>,
     ) -> Result<EnhancedGeometry> {
         let attributes = Self::exact_geometry_attributes(reader, element)?;
@@ -263,15 +272,19 @@ impl Parser {
         let mut handle_seen = false;
         let mut buffer = Vec::new();
         loop {
-            let (namespace, event) =
-                reader
-                    .read_resolved_event_into(&mut buffer)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("invalid enhanced geometry XML: {error}"))
-                    })?;
+            // Tokenization failures use the same mapping as every other read
+            // site in this module: historically the transition-definitions
+            // pre-scan tokenized the whole content part before this parser
+            // could run, so this branch could only ever surface through the
+            // pre-scan's "XML parsing error" message.
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(reader, ns_class, &event);
             match event {
                 Event::Start(ref child) | Event::Empty(ref child)
-                    if Self::is_namespace(&namespace, DRAW_NAMESPACE)
+                    if ns_class == NsClass::Drawing
                         && matches!(child.local_name().as_ref(), b"equation" | b"handle") =>
                 {
                     if children.len() >= 65_536 {
@@ -297,6 +310,7 @@ impl Parser {
                     if matches!(event, Event::Start(_)) {
                         Self::consume_empty_content(
                             reader,
+                            collector,
                             DRAW_NAMESPACE,
                             child.local_name().as_ref(),
                             kind.element_name(),
@@ -304,7 +318,7 @@ impl Parser {
                     }
                 },
                 Event::End(ref end)
-                    if Self::is_namespace(&namespace, DRAW_NAMESPACE)
+                    if ns_class == NsClass::Drawing
                         && end.local_name().as_ref() == b"enhanced-geometry" =>
                 {
                     return Ok(EnhancedGeometry {
@@ -346,25 +360,16 @@ impl Parser {
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,
     ) -> Result<ScriptEventListener> {
-        let event_name = Self::required_attr(
-            reader,
-            element,
-            SCRIPT_NAMESPACE,
-            b"event-name",
-            "script:event-name",
-        )?;
-        let language = Self::required_attr(
-            reader,
-            element,
-            SCRIPT_NAMESPACE,
-            b"language",
-            "script:language",
-        )?;
-        let macro_name = Self::get_attr(reader, element, SCRIPT_NAMESPACE, b"macro-name")?;
-        let href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?;
-        let link_type = Self::get_attr(reader, element, XLINK_NAMESPACE, b"type")?;
+        let mut attributes = ElementAttrs::new(element);
+        let event_name =
+            attributes.required(reader, SCRIPT_NAMESPACE, b"event-name", "script:event-name")?;
+        let language =
+            attributes.required(reader, SCRIPT_NAMESPACE, b"language", "script:language")?;
+        let macro_name = attributes.get(reader, SCRIPT_NAMESPACE, b"macro-name")?;
+        let href = attributes.get(reader, XLINK_NAMESPACE, b"href")?;
+        let link_type = attributes.get(reader, XLINK_NAMESPACE, b"type")?;
         if href.is_some() {
-            Self::require_simple_xlink(reader, element, "script:event-listener")?;
+            attributes.require_simple_xlink(reader, "script:event-listener")?;
         } else if link_type.is_some() {
             return Err(Error::InvalidFormat(
                 "script:event-listener xlink:type requires xlink:href".to_string(),
@@ -376,7 +381,9 @@ impl Parser {
             macro_name,
             href,
             actuate_on_request: Self::parse_on_request(
-                Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?.as_deref(),
+                attributes
+                    .get(reader, XLINK_NAMESPACE, b"actuate")?
+                    .as_deref(),
                 "script:event-listener",
             )?,
         };
@@ -388,56 +395,55 @@ impl Parser {
         reader: &NsReader<&[u8]>,
         element: &BytesStart<'_>,
     ) -> Result<EventListener> {
-        let event_name = Self::required_attr(
+        let mut attributes = ElementAttrs::new(element);
+        let event_name =
+            attributes.required(reader, SCRIPT_NAMESPACE, b"event-name", "script:event-name")?;
+        let action = Action::parse(&attributes.required(
             reader,
-            element,
-            SCRIPT_NAMESPACE,
-            b"event-name",
-            "script:event-name",
-        )?;
-        let action = Action::parse(&Self::required_attr(
-            reader,
-            element,
             PRESENTATION_NAMESPACE,
             b"action",
             "presentation:action",
         )?)?;
         let mut listener = EventListener::new(event_name, action)?;
-        listener.effect = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"effect")?
+        listener.effect = attributes
+            .get(reader, PRESENTATION_NAMESPACE, b"effect")?
             .map(Effect::new)
             .transpose()?;
-        listener.direction = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"direction")?
+        listener.direction = attributes
+            .get(reader, PRESENTATION_NAMESPACE, b"direction")?
             .map(EffectDirection::new)
             .transpose()?;
-        listener.speed = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"speed")?
+        listener.speed = attributes
+            .get(reader, PRESENTATION_NAMESPACE, b"speed")?
             .map(|value| Speed::parse(&value))
             .transpose()?;
-        listener.start_scale =
-            Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"start-scale")?;
-        listener.href = Self::get_attr(reader, element, XLINK_NAMESPACE, b"href")?;
-        let link_type = Self::get_attr(reader, element, XLINK_NAMESPACE, b"type")?;
+        listener.start_scale = attributes.get(reader, PRESENTATION_NAMESPACE, b"start-scale")?;
+        listener.href = attributes.get(reader, XLINK_NAMESPACE, b"href")?;
+        let link_type = attributes.get(reader, XLINK_NAMESPACE, b"type")?;
         if listener.href.is_some() {
-            Self::require_simple_xlink(reader, element, "presentation:event-listener")?;
+            attributes.require_simple_xlink(reader, "presentation:event-listener")?;
         } else if link_type.is_some() {
             return Err(Error::InvalidFormat(
                 "presentation:event-listener xlink:type requires xlink:href".to_string(),
             ));
         }
-        listener.show_embed =
-            match Self::get_attr(reader, element, XLINK_NAMESPACE, b"show")?.as_deref() {
-                None => false,
-                Some("embed") => true,
-                Some(value) => {
-                    return Err(Error::InvalidFormat(format!(
-                        "invalid presentation:event-listener xlink:show '{value}'"
-                    )));
-                },
-            };
+        listener.show_embed = match attributes.get(reader, XLINK_NAMESPACE, b"show")?.as_deref() {
+            None => false,
+            Some("embed") => true,
+            Some(value) => {
+                return Err(Error::InvalidFormat(format!(
+                    "invalid presentation:event-listener xlink:show '{value}'"
+                )));
+            },
+        };
         listener.actuate_on_request = Self::parse_on_request(
-            Self::get_attr(reader, element, XLINK_NAMESPACE, b"actuate")?.as_deref(),
+            attributes
+                .get(reader, XLINK_NAMESPACE, b"actuate")?
+                .as_deref(),
             "presentation:event-listener",
         )?;
-        listener.verb = Self::get_attr(reader, element, PRESENTATION_NAMESPACE, b"verb")?
+        listener.verb = attributes
+            .get(reader, PRESENTATION_NAMESPACE, b"verb")?
             .map(|value| {
                 value.parse::<u64>().map_err(|_err| {
                     Error::InvalidFormat(format!("invalid presentation:verb '{value}'"))
@@ -450,18 +456,23 @@ impl Parser {
 
     pub(super) fn consume_empty_content(
         reader: &mut NsReader<&[u8]>,
+        collector: &mut TransitionStyleCollector,
         namespace_uri: &[u8],
         local_name: &[u8],
         description: &str,
     ) -> Result<()> {
         let mut buffer = Vec::new();
+        let expected_class = NsClass::from_uri(namespace_uri);
         loop {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(reader, ns_class, &event);
             match event {
                 Event::End(ref end)
-                    if Self::is_namespace(&namespace, namespace_uri)
+                    if expected_class != NsClass::Other
+                        && ns_class == expected_class
                         && end.local_name().as_ref() == local_name =>
                 {
                     return Ok(());
@@ -499,6 +510,7 @@ impl Parser {
 
     pub(super) fn parse_listener_body(
         reader: &mut NsReader<&[u8]>,
+        collector: &mut TransitionStyleCollector,
         mut listener: EventListener,
     ) -> Result<EventListener> {
         let mut buffer = Vec::new();
@@ -506,9 +518,11 @@ impl Parser {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(reader, ns_class, &event);
             match event {
                 Event::Start(ref element) | Event::Empty(ref element)
-                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                    if ns_class == NsClass::Presentation
                         && element.local_name().as_ref() == b"sound" =>
                 {
                     if listener.sound.is_some() {
@@ -521,6 +535,7 @@ impl Parser {
                     if matches!(event, Event::Start(_)) {
                         Self::consume_empty_content(
                             reader,
+                            collector,
                             PRESENTATION_NAMESPACE,
                             b"sound",
                             "presentation:sound",
@@ -528,7 +543,7 @@ impl Parser {
                     }
                 },
                 Event::End(ref end)
-                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                    if ns_class == NsClass::Presentation
                         && end.local_name().as_ref() == b"event-listener" =>
                 {
                     listener.validate()?;
@@ -568,6 +583,7 @@ impl Parser {
 
     pub(super) fn parse_event_listeners(
         reader: &mut NsReader<&[u8]>,
+        collector: &mut TransitionStyleCollector,
     ) -> Result<Vec<ShapeEventListener>> {
         let mut listeners = Vec::new();
         let mut buffer = Vec::new();
@@ -575,9 +591,11 @@ impl Parser {
             let (namespace, event) = reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(reader, ns_class, &event);
             match event {
                 Event::Start(ref element) | Event::Empty(ref element)
-                    if Self::is_namespace(&namespace, SCRIPT_NAMESPACE)
+                    if ns_class == NsClass::Script
                         && element.local_name().as_ref() == b"event-listener" =>
                 {
                     if listeners.len() >= 4096 {
@@ -589,6 +607,7 @@ impl Parser {
                     if matches!(event, Event::Start(_)) {
                         Self::consume_empty_content(
                             reader,
+                            collector,
                             SCRIPT_NAMESPACE,
                             b"event-listener",
                             "script:event-listener",
@@ -597,7 +616,7 @@ impl Parser {
                     listeners.push(ShapeEventListener::Script(listener));
                 },
                 Event::Start(ref element) | Event::Empty(ref element)
-                    if Self::is_namespace(&namespace, PRESENTATION_NAMESPACE)
+                    if ns_class == NsClass::Presentation
                         && element.local_name().as_ref() == b"event-listener" =>
                 {
                     if listeners.len() >= 4096 {
@@ -607,14 +626,14 @@ impl Parser {
                     }
                     let listener = Self::presentation_event_listener(reader, element)?;
                     let parsed_listener = if matches!(event, Event::Start(_)) {
-                        Self::parse_listener_body(reader, listener)?
+                        Self::parse_listener_body(reader, collector, listener)?
                     } else {
                         listener
                     };
                     listeners.push(ShapeEventListener::Action(Box::new(parsed_listener)));
                 },
                 Event::End(ref end)
-                    if Self::is_namespace(&namespace, OFFICE_NAMESPACE)
+                    if ns_class == NsClass::Office
                         && end.local_name().as_ref() == b"event-listeners" =>
                 {
                     return Ok(listeners);
@@ -695,11 +714,11 @@ impl Parser {
                     if Self::is_namespace(&namespace, STYLE_NAMESPACE)
                         && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
                 {
-                    let family = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"family")?;
+                    let mut attributes = ElementAttrs::new(element);
+                    let family = attributes.get(&reader, STYLE_NAMESPACE, b"family")?;
                     let is_drawing_page = family.as_deref() == Some("drawing-page");
-                    let name = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"name")?;
-                    let parent =
-                        Self::get_attr(&reader, element, STYLE_NAMESPACE, b"parent-style-name")?;
+                    let name = attributes.get(&reader, STYLE_NAMESPACE, b"name")?;
+                    let parent = attributes.get(&reader, STYLE_NAMESPACE, b"parent-style-name")?;
                     current = Some((
                         name,
                         is_drawing_page,
@@ -713,13 +732,13 @@ impl Parser {
                     if Self::is_namespace(&namespace, STYLE_NAMESPACE)
                         && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
                 {
-                    let family = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"family")?;
+                    let mut attributes = ElementAttrs::new(element);
+                    let family = attributes.get(&reader, STYLE_NAMESPACE, b"family")?;
                     if family.as_deref() == Some("drawing-page") {
-                        let name = Self::get_attr(&reader, element, STYLE_NAMESPACE, b"name")?;
+                        let name = attributes.get(&reader, STYLE_NAMESPACE, b"name")?;
                         let definition = TransitionStyleDefinition {
-                            parent: Self::get_attr(
+                            parent: attributes.get(
                                 &reader,
-                                element,
                                 STYLE_NAMESPACE,
                                 b"parent-style-name",
                             )?,
@@ -861,6 +880,18 @@ impl Parser {
         Ok(tables.into_iter().map(|table| table.shapes).collect())
     }
 
+    /// Whether a fused-pass error came from tokenizing the XML stream rather
+    /// than from semantic validation.
+    ///
+    /// Every `read_resolved_event_into` site in this module maps failures with
+    /// the `XML parsing error: ` prefix and no semantic error uses it, so the
+    /// prefix reliably identifies read errors. Tokenization errors always
+    /// surface in transition-scan position, regardless of which parser
+    /// observed them.
+    fn is_xml_read_error(error: &Error) -> bool {
+        matches!(error, Error::InvalidFormat(message) if message.starts_with("XML parsing error: "))
+    }
+
     pub(super) fn parse_pages_with_styles<const SELECT_ONE: bool>(
         xml_content: &str,
         styles_xml: Option<&str>,
@@ -869,11 +900,22 @@ impl Parser {
         container_scope: ShapeContainerScope,
     ) -> Result<Vec<Slide>> {
         let sheet_scope = container_scope == ShapeContainerScope::SpreadsheetTables;
-        let (transition_styles, default_transition) =
-            Self::resolved_transition_styles(xml_content, styles_xml)?;
+        // Historical pass order: the styles.xml transition-definitions scan
+        // completes (or fails) before anything content.xml parsing surfaces.
+        let mut definitions = TransitionStyles::default();
+        if let Some(styles_source) = styles_xml {
+            definitions = Self::parse_transition_style_definitions(styles_source)?;
+        }
+        let mut collector = TransitionStyleCollector::default();
         let mut reader = NsReader::from_str(xml_content);
         let mut buf = Vec::new();
         let mut slides = Vec::new();
+        // Deferred drawing-page transition lookups, one entry per pushed
+        // slide, resolved once the fused pass has collected every definition.
+        let mut pending_transitions: Vec<Option<String>> = Vec::new();
+        // First slide-scan error, surfaced only after transition collection
+        // and inheritance resolution, matching the historical pass order.
+        let mut main_error: Option<Error> = None;
 
         // State tracking
         let mut current_slide_text = String::new();
@@ -885,7 +927,7 @@ impl Parser {
         let mut current_notes_has_paragraph = false;
         let mut in_notes = false;
         let mut current_slide_has_segment = false;
-        let mut current_transition: Option<Transition> = None;
+        let mut current_page_style: Option<String> = None;
         let mut current_animations = Vec::new();
         let mut animation_node_count = 0;
         let mut current_legacy_animation = None;
@@ -908,16 +950,21 @@ impl Parser {
         let mut sheet_shapes_depth: Option<usize> = None;
         let mut sheet_table_has_shapes = false;
 
-        loop {
-            let (namespace, event) = reader
-                .read_resolved_event_into(&mut buf)
-                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+        // One tokenization pass drives both logical handlers: every event is
+        // fed to the transition-definition collector before the slide scan
+        // reacts to it, so collection errors keep their historical precedence
+        // over slide-scan errors at the same or later positions.
+        let mut process = |reader: &mut NsReader<&[u8]>,
+                           collector: &mut TransitionStyleCollector,
+                           ns_class: NsClass,
+                           event: &Event<'_>|
+         -> Result<()> {
             match event {
-                Event::Start(ref element) => {
+                Event::Start(element) => {
                     element_depth = element_depth.checked_add(1).ok_or_else(|| {
                         Error::InvalidFormat("XML element depth overflow".to_string())
                     })?;
-                    let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    let element_type = Self::classify(ns_class, element.local_name().as_ref());
                     Self::validate_three_dimensional_child_element(
                         shape_stack.last(),
                         element_type,
@@ -942,11 +989,12 @@ impl Parser {
                                         index: slide_index,
                                         notes: (!current_notes_text.is_empty())
                                             .then(|| std::mem::take(&mut current_notes_text)),
-                                        transition: current_transition.take(),
+                                        transition: None,
                                         animations: std::mem::take(&mut current_animations),
                                         legacy_animation: current_legacy_animation.take(),
                                         shapes: std::mem::take(&mut current_shapes),
                                     });
+                                    pending_transitions.push(current_page_style.take());
                                 } else {
                                     current_slide_text.clear();
                                     current_notes_text.clear();
@@ -959,14 +1007,8 @@ impl Parser {
                             current_slide_title = None;
                             current_slide_has_segment = false;
                             current_notes_has_paragraph = false;
-                            let style_name =
-                                Self::get_attr(&reader, element, DRAW_NAMESPACE, b"style-name")?;
-                            let transition = style_name
-                                .as_deref()
-                                .and_then(|name| transition_styles.get(name))
-                                .unwrap_or(&default_transition)
-                                .clone();
-                            current_transition = (!transition.is_empty()).then_some(transition);
+                            current_page_style =
+                                Self::get_attr(&*reader, element, DRAW_NAMESPACE, b"style-name")?;
                             in_slide = true;
                         },
                         Element::Notes if in_slide => in_notes = true,
@@ -985,7 +1027,8 @@ impl Parser {
                                     ));
                                 }
                             }
-                            let geometry = Self::parse_enhanced_geometry(&mut reader, element)?;
+                            let geometry =
+                                Self::parse_enhanced_geometry(reader, collector, element)?;
                             element_depth = Self::rewind_consumed_subtree(element_depth);
                             if let Some(builder) = shape_stack.last_mut() {
                                 builder.enhanced_geometry = Some(geometry);
@@ -1019,7 +1062,8 @@ impl Parser {
                                 ));
                             }
                             let root = Self::parse_legacy_animation_node(
-                                &mut reader,
+                                reader,
+                                collector,
                                 element,
                                 kind,
                                 1,
@@ -1044,7 +1088,7 @@ impl Parser {
                                     ));
                                 }
                                 builder.shape_type = ShapeType::GraphicFrame;
-                                builder.media = Some(Self::media_reference(&reader, element)?);
+                                builder.media = Some(Self::media_reference(&*reader, element)?);
                                 in_media_plugin = true;
                             }
                         },
@@ -1062,14 +1106,14 @@ impl Parser {
                                 .last_mut()
                                 .and_then(|builder| builder.media.as_mut())
                             {
-                                media.add_parameter(Self::media_parameter(&reader, element)?)?;
+                                media.add_parameter(Self::media_parameter(&*reader, element)?)?;
                                 in_media_parameter = true;
                             }
                         },
                         Element::DrawingHyperlink
                             if in_slide && !in_notes && current_hyperlink.is_none() =>
                         {
-                            current_hyperlink = Some(Self::drawing_hyperlink(&reader, element)?);
+                            current_hyperlink = Some(Self::drawing_hyperlink(&*reader, element)?);
                             hyperlink_parent_depth = Some(shape_stack.len());
                             hyperlink_shape_seen = false;
                         },
@@ -1095,7 +1139,8 @@ impl Parser {
                                             .to_string(),
                                     ));
                                 }
-                                builder.event_listeners = Self::parse_event_listeners(&mut reader)?;
+                                builder.event_listeners =
+                                    Self::parse_event_listeners(reader, collector)?;
                                 element_depth = Self::rewind_consumed_subtree(element_depth);
                                 builder.event_listeners_seen = true;
                             }
@@ -1135,7 +1180,7 @@ impl Parser {
                             if let Some(paragraph) = current_paragraph.as_mut() {
                                 if !SELECT_ONE || slide_index == selected_index {
                                     Self::push_text_control(
-                                        &reader,
+                                        &*reader,
                                         element,
                                         element_type,
                                         paragraph,
@@ -1143,7 +1188,7 @@ impl Parser {
                                 } else {
                                     let mut ignored = ParagraphText::default();
                                     Self::push_text_control(
-                                        &reader,
+                                        &*reader,
                                         element,
                                         element_type,
                                         &mut ignored,
@@ -1169,7 +1214,8 @@ impl Parser {
                                 ));
                             }
                             current_animations.push(Self::parse_animation_node(
-                                &mut reader,
+                                reader,
+                                collector,
                                 element,
                                 kind,
                                 1,
@@ -1242,7 +1288,7 @@ impl Parser {
                                     ));
                                 }
                                 let mut builder =
-                                    Self::shape_builder(&reader, element, shape_element)?;
+                                    Self::shape_builder(&*reader, element, shape_element)?;
                                 if hyperlink_applies && let Some(hyperlink) = &current_hyperlink {
                                     builder.hyperlink = Some(hyperlink.clone());
                                     hyperlink_shape_seen = true;
@@ -1259,7 +1305,7 @@ impl Parser {
                                     ));
                                 }
                                 let mut builder =
-                                    Self::shape_builder(&reader, element, shape_element)?;
+                                    Self::shape_builder(&*reader, element, shape_element)?;
                                 if hyperlink_applies && let Some(hyperlink) = &current_hyperlink {
                                     builder.hyperlink = Some(hyperlink.clone());
                                     hyperlink_shape_seen = true;
@@ -1271,7 +1317,7 @@ impl Parser {
                             if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::Picture;
                                 builder.image_href =
-                                    Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
+                                    Self::get_attr(&*reader, element, XLINK_NAMESPACE, b"href")?;
                             }
                         },
                         Element::Table if !shape_stack.is_empty() => {
@@ -1311,7 +1357,7 @@ impl Parser {
                         | Element::Other => {},
                     }
                 },
-                Event::Text(ref text) if current_paragraph.is_some() => {
+                Event::Text(text) if current_paragraph.is_some() => {
                     let decoded = Self::decode_text(text)?;
                     if (!SELECT_ONE || slide_index == selected_index)
                         && let Some(paragraph) = current_paragraph.as_mut()
@@ -1319,7 +1365,7 @@ impl Parser {
                         paragraph.push_text(&decoded);
                     }
                 },
-                Event::Text(ref text) if in_media_plugin => {
+                Event::Text(text) if in_media_plugin => {
                     let decoded = Self::decode_text(text)?;
                     if !decoded.trim().is_empty() {
                         return Err(Error::InvalidFormat(
@@ -1327,7 +1373,7 @@ impl Parser {
                         ));
                     }
                 },
-                Event::Text(ref text)
+                Event::Text(text)
                     if shape_stack.last().is_some_and(|builder| {
                         builder.drawing_kind.is_some_and(|kind| {
                             kind.is_three_dimensional()
@@ -1342,7 +1388,7 @@ impl Parser {
                         ));
                     }
                 },
-                Event::CData(ref text) if current_paragraph.is_some() => {
+                Event::CData(text) if current_paragraph.is_some() => {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid presentation CDATA: {error}"))
                     })?;
@@ -1352,7 +1398,7 @@ impl Parser {
                         paragraph.push_text(&decoded);
                     }
                 },
-                Event::CData(ref text) if in_media_plugin => {
+                Event::CData(text) if in_media_plugin => {
                     let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
                         Error::InvalidFormat(format!("invalid media plugin CDATA: {error}"))
                     })?;
@@ -1362,7 +1408,7 @@ impl Parser {
                         ));
                     }
                 },
-                Event::GeneralRef(ref reference) if current_paragraph.is_some() => {
+                Event::GeneralRef(reference) if current_paragraph.is_some() => {
                     let text = Self::decode_reference(reference)?;
                     if (!SELECT_ONE || slide_index == selected_index)
                         && let Some(paragraph) = current_paragraph.as_mut()
@@ -1387,7 +1433,7 @@ impl Parser {
                         "3D drawing elements cannot contain character references".to_string(),
                     ));
                 },
-                Event::CData(ref data)
+                Event::CData(data)
                     if shape_stack.last().is_some_and(|builder| {
                         builder.drawing_kind.is_some_and(|kind| {
                             kind.is_three_dimensional()
@@ -1399,8 +1445,8 @@ impl Parser {
                         "3D drawing elements cannot contain CDATA text".to_string(),
                     ));
                 },
-                Event::Empty(ref element) => {
-                    let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                Event::Empty(element) => {
+                    let element_type = Self::classify(ns_class, element.local_name().as_ref());
                     Self::validate_three_dimensional_child_element(
                         shape_stack.last(),
                         element_type,
@@ -1418,23 +1464,19 @@ impl Parser {
                     match element_type {
                         Element::Page if !sheet_scope && !in_slide => {
                             let style_name =
-                                Self::get_attr(&reader, element, DRAW_NAMESPACE, b"style-name")?;
-                            let transition = style_name
-                                .as_deref()
-                                .and_then(|name| transition_styles.get(name))
-                                .unwrap_or(&default_transition)
-                                .clone();
+                                Self::get_attr(&*reader, element, DRAW_NAMESPACE, b"style-name")?;
                             if !SELECT_ONE || slide_index == selected_index {
                                 slides.push(Slide {
                                     title: None,
                                     text: String::new(),
                                     index: slide_index,
                                     notes: None,
-                                    transition: (!transition.is_empty()).then_some(transition),
+                                    transition: None,
                                     animations: Vec::new(),
                                     legacy_animation: None,
                                     shapes: Vec::new(),
                                 });
+                                pending_transitions.push(style_name);
                             }
                             slide_index += 1;
                         },
@@ -1453,7 +1495,7 @@ impl Parser {
                                     ));
                                 }
                                 builder.enhanced_geometry = Some(EnhancedGeometry {
-                                    attributes: Self::exact_geometry_attributes(&reader, element)?,
+                                    attributes: Self::exact_geometry_attributes(&*reader, element)?,
                                     children: Vec::new(),
                                 });
                             }
@@ -1482,7 +1524,7 @@ impl Parser {
                                     ));
                                 }
                                 builder.shape_type = ShapeType::GraphicFrame;
-                                builder.media = Some(Self::media_reference(&reader, element)?);
+                                builder.media = Some(Self::media_reference(&*reader, element)?);
                             } else if in_slide {
                                 return Err(Error::InvalidFormat(
                                     "draw:plugin must be contained by a drawing shape".to_string(),
@@ -1534,7 +1576,7 @@ impl Parser {
                                 .last_mut()
                                 .and_then(|builder| builder.media.as_mut())
                             {
-                                media.add_parameter(Self::media_parameter(&reader, element)?)?;
+                                media.add_parameter(Self::media_parameter(&*reader, element)?)?;
                             }
                         },
                         _ if in_media_parameter => {
@@ -1566,7 +1608,7 @@ impl Parser {
                             if let Some(paragraph) = current_paragraph.as_mut() {
                                 if !SELECT_ONE || slide_index == selected_index {
                                     Self::push_text_control(
-                                        &reader,
+                                        &*reader,
                                         element,
                                         element_type,
                                         paragraph,
@@ -1574,7 +1616,7 @@ impl Parser {
                                 } else {
                                     let mut ignored = ParagraphText::default();
                                     Self::push_text_control(
-                                        &reader,
+                                        &*reader,
                                         element,
                                         element_type,
                                         &mut ignored,
@@ -1604,7 +1646,7 @@ impl Parser {
                                 })?;
                             let root = AnimationNode::from_parsed(
                                 kind,
-                                Self::animation_attributes(&reader, element)?,
+                                Self::animation_attributes(&*reader, element)?,
                                 Vec::new(),
                             );
                             validate_legacy_animation_root(&root)?;
@@ -1639,7 +1681,7 @@ impl Parser {
                             }
                             current_animations.push(Node::from_parsed(
                                 kind,
-                                Self::animation_attributes(&reader, element)?,
+                                Self::animation_attributes(&*reader, element)?,
                                 Vec::new(),
                             ));
                         },
@@ -1678,7 +1720,7 @@ impl Parser {
                             if let Some(builder) = shape_stack.last_mut() {
                                 builder.shape_type = ShapeType::Picture;
                                 builder.image_href =
-                                    Self::get_attr(&reader, element, XLINK_NAMESPACE, b"href")?;
+                                    Self::get_attr(&*reader, element, XLINK_NAMESPACE, b"href")?;
                             }
                         },
                         Element::Table => {
@@ -1709,7 +1751,8 @@ impl Parser {
                                     "draw:a must wrap exactly one drawing shape".to_string(),
                                 ));
                             }
-                            let mut builder = Self::shape_builder(&reader, element, shape_element)?;
+                            let mut builder =
+                                Self::shape_builder(&*reader, element, shape_element)?;
                             if hyperlink_applies && let Some(hyperlink) = &current_hyperlink {
                                 builder.hyperlink = Some(hyperlink.clone());
                                 hyperlink_shape_seen = true;
@@ -1772,9 +1815,9 @@ impl Parser {
                         | Element::Other => {},
                     }
                 },
-                Event::End(ref element) => {
+                Event::End(element) => {
                     element_depth = element_depth.saturating_sub(1);
-                    let element_type = Self::classify(&namespace, element.local_name().as_ref());
+                    let element_type = Self::classify(ns_class, element.local_name().as_ref());
                     if matches!(element_type, Element::TextParagraph)
                         && let Some(parsed_paragraph) = current_paragraph.take()
                     {
@@ -1790,27 +1833,22 @@ impl Parser {
                                 &mut current_slide_has_segment,
                             );
                         }
-                        buf.clear();
-                        continue;
+                        return Ok(());
                     }
                     if matches!(element_type, Element::Notes) {
                         in_notes = false;
-                        buf.clear();
-                        continue;
+                        return Ok(());
                     }
                     if matches!(element_type, Element::Plugin) {
                         in_media_plugin = false;
-                        buf.clear();
-                        continue;
+                        return Ok(());
                     }
                     if matches!(element_type, Element::PluginParameter) && in_media_parameter {
                         in_media_parameter = false;
-                        buf.clear();
-                        continue;
+                        return Ok(());
                     }
                     if in_notes {
-                        buf.clear();
-                        continue;
+                        return Ok(());
                     }
                     match element_type {
                         Element::DrawingHyperlink if current_hyperlink.is_some() => {
@@ -1840,16 +1878,17 @@ impl Parser {
                                         index: slide_index,
                                         notes: (!current_notes_text.is_empty())
                                             .then(|| std::mem::take(&mut current_notes_text)),
-                                        transition: current_transition.take(),
+                                        transition: None,
                                         animations: std::mem::take(&mut current_animations),
                                         legacy_animation: current_legacy_animation.take(),
                                         shapes: std::mem::take(&mut current_shapes),
                                     });
+                                    pending_transitions.push(current_page_style.take());
                                 } else {
                                     current_slide_title = None;
                                     current_slide_text.clear();
                                     current_notes_text.clear();
-                                    current_transition = None;
+                                    current_page_style = None;
                                     current_animations.clear();
                                     current_legacy_animation = None;
                                     current_shapes.clear();
@@ -1905,8 +1944,7 @@ impl Parser {
                                     if !SELECT_ONE || slide_index == selected_index {
                                         parent.children.push(builder.build());
                                     }
-                                    buf.clear();
-                                    continue;
+                                    return Ok(());
                                 }
                                 if !SELECT_ONE || slide_index == selected_index {
                                     Self::finish_shape(
@@ -1947,7 +1985,7 @@ impl Parser {
                         | Element::Other => {},
                     }
                 },
-                Event::Eof => break,
+                Event::Eof => {},
                 Event::Text(_)
                 | Event::CData(_)
                 | Event::Comment(_)
@@ -1956,9 +1994,188 @@ impl Parser {
                 | Event::DocType(_)
                 | Event::GeneralRef(_) => {},
             }
+            Ok(())
+        };
+
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buf)
+                .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+            let ns_class = NsClass::from_resolve(&namespace);
+            collector.feed(&reader, ns_class, &event);
+            if let Some(error) = collector.take_error() {
+                return Err(error);
+            }
+            if matches!(event, Event::Eof) {
+                break;
+            }
+            if main_error.is_none() {
+                let outcome = process(&mut reader, &mut collector, ns_class, &event);
+                // A collection error recorded while nested subtree parsers ran
+                // keeps transition-scan precedence over any slide-scan error
+                // the same call surfaced.
+                if let Some(error) = collector.take_error() {
+                    return Err(error);
+                }
+                if let Err(error) = outcome {
+                    if Self::is_xml_read_error(&error) {
+                        return Err(error);
+                    }
+                    main_error = Some(error);
+                }
+            }
             buf.clear();
         }
 
+        Self::merge_transition_style_definitions(&mut definitions, collector.finish());
+        let (transition_styles, default_transition) = Self::resolve_transition_styles(definitions)?;
+        if let Some(error) = main_error {
+            return Err(error);
+        }
+        for (slide, style_name) in slides.iter_mut().zip(&pending_transitions) {
+            let transition = style_name
+                .as_deref()
+                .and_then(|name| transition_styles.get(name))
+                .unwrap_or(&default_transition)
+                .clone();
+            slide.transition = (!transition.is_empty()).then_some(transition);
+        }
         Ok(slides)
+    }
+}
+
+/// Incremental mirror of [`Parser::parse_transition_style_definitions`] for the
+/// fused content.xml pass.
+///
+/// The fused pass feeds every tokenization event to this collector in stream
+/// order — including events consumed by the nested subtree parsers — so the
+/// collected definitions are exactly those the standalone pre-scan produced.
+/// The first collection error is recorded rather than returned; the fused
+/// driver surfaces it ahead of any recorded slide-scan error, matching the
+/// historical pass order in which the transition scan ran to completion (or
+/// failed) before slide parsing started.
+#[derive(Default)]
+pub(super) struct TransitionStyleCollector {
+    result: TransitionStyles,
+    current: Option<(Option<String>, bool, TransitionStyleDefinition)>,
+    in_properties: bool,
+    error: Option<Error>,
+}
+
+impl TransitionStyleCollector {
+    /// Feeds one event; a poisoned collector ignores all further events, just
+    /// like the standalone scan never reads past its first error.
+    pub(super) fn feed(&mut self, reader: &NsReader<&[u8]>, namespace: NsClass, event: &Event<'_>) {
+        if self.error.is_none()
+            && let Err(error) = self.apply(reader, namespace, event)
+        {
+            self.error = Some(error);
+        }
+    }
+
+    /// Takes the recorded collection error, if any.
+    pub(super) fn take_error(&mut self) -> Option<Error> {
+        self.error.take()
+    }
+
+    /// Consumes the collector into the collected definitions.
+    pub(super) fn finish(self) -> TransitionStyles {
+        self.result
+    }
+
+    /// The match arms of [`Parser::parse_transition_style_definitions`],
+    /// transcribed one-to-one with the same arm order and guards.
+    fn apply(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        namespace: NsClass,
+        event: &Event<'_>,
+    ) -> Result<()> {
+        match event {
+            Event::Start(element)
+                if namespace == NsClass::Style
+                    && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
+            {
+                let mut attributes = ElementAttrs::new(element);
+                let family = attributes.get(reader, STYLE_NAMESPACE, b"family")?;
+                let is_drawing_page = family.as_deref() == Some("drawing-page");
+                let name = attributes.get(reader, STYLE_NAMESPACE, b"name")?;
+                let parent = attributes.get(reader, STYLE_NAMESPACE, b"parent-style-name")?;
+                self.current = Some((
+                    name,
+                    is_drawing_page,
+                    TransitionStyleDefinition {
+                        parent,
+                        transition: Transition::new(),
+                    },
+                ));
+            },
+            Event::Empty(element)
+                if namespace == NsClass::Style
+                    && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
+            {
+                let mut attributes = ElementAttrs::new(element);
+                let family = attributes.get(reader, STYLE_NAMESPACE, b"family")?;
+                if family.as_deref() == Some("drawing-page") {
+                    let name = attributes.get(reader, STYLE_NAMESPACE, b"name")?;
+                    let definition = TransitionStyleDefinition {
+                        parent: attributes.get(reader, STYLE_NAMESPACE, b"parent-style-name")?,
+                        transition: Transition::new(),
+                    };
+                    if let Some(style_name) = name {
+                        self.result.named.insert(style_name, definition);
+                    } else {
+                        self.result.default = definition.transition;
+                    }
+                }
+            },
+            Event::Start(element) | Event::Empty(element)
+                if self.current.as_ref().is_some_and(|(_, family, _)| *family)
+                    && namespace == NsClass::Style
+                    && element.local_name().as_ref() == b"drawing-page-properties" =>
+            {
+                if let Some((_, _, definition)) = self.current.as_mut() {
+                    Parser::parse_transition_properties(
+                        reader,
+                        element,
+                        &mut definition.transition,
+                    )?;
+                }
+                self.in_properties = matches!(event, Event::Start(_));
+            },
+            Event::Start(element) | Event::Empty(element)
+                if self.in_properties
+                    && namespace == NsClass::Presentation
+                    && element.local_name().as_ref() == b"sound" =>
+            {
+                if let Some((_, _, definition)) = self.current.as_mut() {
+                    definition.transition.sound =
+                        Some(Parser::parse_transition_sound(reader, element)?);
+                }
+            },
+            Event::End(element)
+                if namespace == NsClass::Style
+                    && element.local_name().as_ref() == b"drawing-page-properties" =>
+            {
+                self.in_properties = false;
+            },
+            Event::End(element)
+                if namespace == NsClass::Style
+                    && matches!(element.local_name().as_ref(), b"style" | b"default-style") =>
+            {
+                if let Some((name, is_drawing_page, definition)) = self.current.take()
+                    && is_drawing_page
+                {
+                    if let Some(style_name) = name {
+                        self.result.named.insert(style_name, definition);
+                    } else {
+                        self.result.default = definition.transition;
+                    }
+                }
+                self.in_properties = false;
+            },
+            _ => {},
+        }
+        Ok(())
     }
 }

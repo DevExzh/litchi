@@ -327,6 +327,7 @@ impl Element {
         self.text_content = text;
     }
 
+    #[cfg(test)]
     pub(crate) fn into_text_recursive(self) -> String {
         let mut text = self.text_content;
         for child in self.children {
@@ -335,6 +336,7 @@ impl Element {
         text
     }
 
+    #[cfg(test)]
     fn append_text_recursive(self, output: &mut String) {
         output.push_str(&self.text_content);
         for child in self.children {

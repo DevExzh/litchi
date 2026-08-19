@@ -5,7 +5,7 @@
 //! codec remain in `litchi-odf-common`; this family layer owns only the
 //! `content.xml` context, immutable snapshots, and atomic edits.
 
-mod codec;
+pub(crate) mod codec;
 mod model;
 mod transaction;
 

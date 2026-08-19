@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0208-ods-borrowed-validate-decode",
+  "decision": "withheld",
+  "claim_scope": "none - adverse both-directions pattern on executed commit phases reproduced in the rule-2 reruns",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "57270d24894a7047682146f4a6a68d428ecc51b3d1270e5b93d90d0fddcb284b",
+      "candidate_sha256": "6edff9a2858b17b3904c06106edfabdfd7e81765de11be2512e1a2f783754a6b",
+      "note": "control is the banked 0207 binary; candidate adds the 0208 borrowed decode in litchi-ods::worksheet::package validate-reparse"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, and 0207 (both binaries); the candidate additionally carries the 0208 borrowed decode change in litchi-ods::worksheet::package",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_source_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 1267787.5,
+          "mean": 1284415.166,
+          "p95": 1386912.0,
+          "p99": 1584214.0
+        },
+        "b1": {
+          "p50": 1311238.0,
+          "mean": 1323449.654,
+          "p95": 1391067.0,
+          "p99": 1551368.0
+        },
+        "b2": {
+          "p50": 1345881.0,
+          "mean": 1360091.19,
+          "p95": 1442189.0,
+          "p99": 1570234.0
+        },
+        "a2": {
+          "p50": 1280976.5,
+          "mean": 1296401.142,
+          "p95": 1377498.0,
+          "p99": 1620433.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -3.42727,
+          "mean": -3.039087,
+          "p95": -0.299586,
+          "p99": 2.073331
+        },
+        "a2_to_b2": {
+          "p50": -5.066799,
+          "mean": -4.912835,
+          "p95": -4.696268,
+          "p99": 3.097876
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.040316,
+          "mean": 0.933185,
+          "p95": -0.678774,
+          "p99": 2.286244
+        },
+        "candidate": {
+          "p50": 2.642007,
+          "mean": 2.768638,
+          "p95": 3.675021,
+          "p99": 1.216088
+        }
+      },
+      "accepted_statistics": [
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

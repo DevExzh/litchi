@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0208-ods-borrowed-validate-decode",
+  "decision": "withheld",
+  "claim_scope": "none - adverse both-directions pattern on executed commit phases reproduced in the rule-2 reruns",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "57270d24894a7047682146f4a6a68d428ecc51b3d1270e5b93d90d0fddcb284b",
+      "candidate_sha256": "6edff9a2858b17b3904c06106edfabdfd7e81765de11be2512e1a2f783754a6b",
+      "note": "control is the banked 0207 binary; candidate adds the 0208 borrowed decode in litchi-ods::worksheet::package validate-reparse"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, and 0207 (both binaries); the candidate additionally carries the 0208 borrowed decode change in litchi-ods::worksheet::package",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_file_eager_open",
+  "timing_scope": "unified_root_workbook_open",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2825189.5,
+          "mean": 2851019.858,
+          "p95": 2992946.0,
+          "p99": 3157702.0
+        },
+        "b1": {
+          "p50": 2833997.0,
+          "mean": 2866356.124,
+          "p95": 3042594.0,
+          "p99": 3280301.0
+        },
+        "b2": {
+          "p50": 2838587.5,
+          "mean": 2857160.07,
+          "p95": 2993677.0,
+          "p99": 3111810.0
+        },
+        "a2": {
+          "p50": 2755038.0,
+          "mean": 2775280.482,
+          "p95": 2864838.0,
+          "p99": 3080256.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.311749,
+          "mean": -0.537922,
+          "p95": -1.658834,
+          "p99": -3.882539
+        },
+        "a2_to_b2": {
+          "p50": -3.032608,
+          "mean": -2.950318,
+          "p95": -4.497253,
+          "p99": -1.024395
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -2.483072,
+          "mean": -2.656571,
+          "p95": -4.280331,
+          "p99": -2.452606
+        },
+        "candidate": {
+          "p50": 0.16198,
+          "mean": -0.320827,
+          "p95": -1.60774,
+          "p99": -5.136449
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

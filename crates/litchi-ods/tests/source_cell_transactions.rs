@@ -282,6 +282,94 @@ fn source_cell_edit_is_failure_atomic_and_refuses_unsafe_owners() {
     assert!(edit.commit().is_err());
 }
 
+#[test]
+fn source_cell_commit_validates_multi_row_windows_in_order() {
+    // A changed window spanning several rows, including an unchanged row and
+    // an empty row between the edited ones, commits exactly.
+    let rows = concat!(
+        r#"<table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row>"#,
+        r#"<table:table-row/>"#,
+        r#"<table:table-row><table:table-cell office:value-type="string"><text:p>middle</text:p></table:table-cell></table:table-row>"#,
+        r#"<table:table-row><table:table-cell office:value-type="float" office:value="7"><text:p>7</text:p></table:table-cell></table:table-row>"#,
+    );
+    let source = package(&content("", rows), false).unwrap();
+    let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let mut edit = owner.edit_cells().unwrap();
+    assert_eq!(
+        edit.set_cell("Data", 0, 0, text("one")).unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        edit.set_cell("Data", 3, 0, text("four")).unwrap(),
+        Some(true)
+    );
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(commit.changed_cells(), 2);
+    let mut output = Vec::new();
+    commit.write_to(&mut output).unwrap();
+    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    assert_eq!(cell_text(&reopened, 0, 0), Some("one"));
+    assert_eq!(cell_text(&reopened, 2, 0), Some("middle"));
+    assert_eq!(cell_text(&reopened, 3, 0), Some("four"));
+}
+
+#[test]
+fn source_cell_commit_reports_the_first_failing_row_in_a_window() {
+    // Row 0 is clean and validates first; the refusal must still name the
+    // problem in the later row, whether it is found by the descendant scan
+    // or by the synthetic-document reparse.
+    let cases = [
+        (
+            concat!(
+                r#"<table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row>"#,
+                r#"<table:table-row><table:table-cell office:value-type="string"><text:p>first</text:p><text:p>second</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>beta</text:p></table:table-cell></table:table-row>"#,
+            ),
+            "flat ODS edit requires at most one direct text paragraph per cell",
+        ),
+        (
+            concat!(
+                r#"<table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row>"#,
+                r#"<table:table-row><table:table-cell office:value-type="string">loose<text:p>inside</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>beta</text:p></table:table-cell></table:table-row>"#,
+            ),
+            "flat ODS edit would discard text outside a cell paragraph",
+        ),
+        (
+            concat!(
+                r#"<table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row>"#,
+                r#"<table:table-row><table:table-cell office:value-type="string"><text:p><![CDATA[opaque]]></text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>beta</text:p></table:table-cell></table:table-row>"#,
+            ),
+            "flat ODS edit would discard unsupported cell text markup",
+        ),
+        (
+            concat!(
+                r#"<table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row>"#,
+                r#"<table:table-row table:unmodeled="urn:test"><table:table-cell office:value-type="string"><text:p>filler</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>beta</text:p></table:table-cell></table:table-row>"#,
+            ),
+            "flat ODS edit would discard unmodeled attribute 'unmodeled'",
+        ),
+    ];
+    for (rows, expected) in cases {
+        let source = package(&content("", rows), false).unwrap();
+        let owner =
+            SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let mut edit = owner.edit_cells().unwrap();
+        assert_eq!(
+            edit.set_cell("Data", 0, 0, text("changed")).unwrap(),
+            Some(true)
+        );
+        assert_eq!(
+            edit.set_cell("Data", 1, 1, text("changed")).unwrap(),
+            Some(true)
+        );
+        let error = edit.commit().unwrap_err();
+        assert!(
+            error.to_string().contains(expected),
+            "expected '{expected}', got '{error}'",
+        );
+    }
+}
+
 fn ordinary_rows() -> String {
     ordinary_content()
         .split_once("<table:table table:name=\"Data\">")

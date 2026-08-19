@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0218-odt-layout-floor-calibration",
+  "decision": "calibration-probe",
+  "claim_scope": "pure layout noise - never-executed padding",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "6c7fcfb9572f79bbfc2a9dd06289f733e370b34f96662980c5d59b7e972471eb",
+      "candidate_sha256": "9a2df16622296dea2fd0d5c6a3058ac42d227fa75f076bd748392d7b60280fd3",
+      "note": "control is the banked 0215 binary; probe adds never-executed parser-shaped padding in litchi-odt (layout-noise floor calibration, 0213-analog)"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, 0207, 0209-0212, and 0215 (both binaries); the probe additionally carries never-executed padding in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-semantic-tiny",
+    "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+    "archive_bytes": 2148,
+    "archive_member_count": 5
+  },
+  "selector": "odt_semantic_full_text",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 11926.0,
+          "mean": 12123.126,
+          "p95": 12168.0,
+          "p99": 18005.0
+        },
+        "b1": {
+          "p50": 12126.0,
+          "mean": 12349.596,
+          "p95": 12377.0,
+          "p99": 19688.0
+        },
+        "b2": {
+          "p50": 11957.0,
+          "mean": 12196.418,
+          "p95": 12306.0,
+          "p99": 17574.0
+        },
+        "a2": {
+          "p50": 12046.0,
+          "mean": 12314.776,
+          "p95": 15060.0,
+          "p99": 17163.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.677008,
+          "mean": -1.868083,
+          "p95": -1.71762,
+          "p99": -9.347403
+        },
+        "a2_to_b2": {
+          "p50": 0.738834,
+          "mean": 0.961106,
+          "p95": 18.286853,
+          "p99": -2.394686
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.006205,
+          "mean": 1.580863,
+          "p95": 23.767258,
+          "p99": -4.676479
+        },
+        "candidate": {
+          "p50": -1.393699,
+          "mean": -1.240348,
+          "p95": -0.573645,
+          "p99": -10.737505
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree; control drift +23.77% exceeds 10%",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

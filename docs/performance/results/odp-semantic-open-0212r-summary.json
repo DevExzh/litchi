@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0212-odt-fused-open-parse",
+  "decision": "withheld-pending-calibration",
+  "claim_scope": "none yet - reproduced sub-1.7% p50 adverse on byte-identical odp_semantic_open phase blocks under pre-floor rule; executed-phase accepts (full-text all-four 20.82%-29.50%) await litchi-odp floor calibration (0213) for re-verdict",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "ceba155be185f1c213c4bf90200bb5e87bb697a5023e3a703d9cd7def6042922",
+      "candidate_sha256": "246c6b1f916b2dc2fa8529edfdfed605fede29db0226f54334bd38bc5d4f8e13",
+      "note": "control is the banked 0211 binary; candidate adds the 0212 fused open parse in litchi-odt::document"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, and 0207 (both binaries); the candidate additionally carries the 0212 fused open parse change in litchi-odt::document",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odp-semantic-tiny",
+    "archive_sha256": "09fd8cbb0665c3c595be46b9926a2ca636af279a2c0ed1b6d842f6f059aea4ac",
+    "archive_bytes": 2229,
+    "archive_member_count": 5
+  },
+  "selector": "odp_semantic_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 42478.0,
+          "mean": 45519.208,
+          "p95": 63839.0,
+          "p99": 67402.0
+        },
+        "b1": {
+          "p50": 43119.0,
+          "mean": 44568.72,
+          "p95": 51110.0,
+          "p99": 64128.0
+        },
+        "b2": {
+          "p50": 43019.0,
+          "mean": 44005.054,
+          "p95": 50048.0,
+          "p99": 54194.0
+        },
+        "a2": {
+          "p50": 42328.0,
+          "mean": 43394.976,
+          "p95": 50310.0,
+          "p99": 53674.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -1.509016,
+          "mean": 2.088103,
+          "p95": 19.939222,
+          "p99": 4.857423
+        },
+        "a2_to_b2": {
+          "p50": -1.632489,
+          "mean": -1.405872,
+          "p95": 0.520771,
+          "p99": -0.968812
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.353124,
+          "mean": -4.666672,
+          "p95": -21.192375,
+          "p99": -20.367348
+        },
+        "candidate": {
+          "p50": -0.231916,
+          "mean": -1.264712,
+          "p95": -2.077871,
+          "p99": -15.490893
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "control drift -21.19% exceeds 10%",
+        "p99": "paired directions disagree; control drift -20.37% exceeds 15%; candidate drift -15.49% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

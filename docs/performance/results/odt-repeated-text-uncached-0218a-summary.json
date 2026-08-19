@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "change": "0218-odt-layout-floor-calibration",
+  "decision": "calibration-probe",
+  "claim_scope": "pure layout noise - never-executed padding",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "6c7fcfb9572f79bbfc2a9dd06289f733e370b34f96662980c5d59b7e972471eb",
+      "candidate_sha256": "f3da50b92927ddff840c76bfa337a75522c924edf9d80d1ddf24d191bee25a15",
+      "note": "control is the banked 0215 binary; probe adds never-executed parser-shaped padding in litchi-odt (layout-noise floor calibration, 0213-analog)"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus uncommitted changes 0192-0196, 0198-0202, 0204, 0206, 0207, 0209-0212, and 0215 (both binaries); the probe additionally carries never-executed padding in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-source-backed-repeated-text-media",
+    "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "archive_bytes": 16812034,
+    "archive_member_count": 13
+  },
+  "selector": "odt_source_backed_repeated_text_uncached",
+  "timing_scope": "source-backed owner and four output slots prepared outside timer; four public full-text projections inside timer; semantic, archive, media, source-range, freshness, and zero-post-preparation-read gates outside timer",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 14500041.0,
+          "mean": 14613941.046,
+          "p95": 15293838.0,
+          "p99": 16554863.0
+        },
+        "b1": {
+          "p50": 14952143.0,
+          "mean": 15077436.396,
+          "p95": 15663317.0,
+          "p99": 17664502.0
+        },
+        "b2": {
+          "p50": 14891330.0,
+          "mean": 15012033.766,
+          "p95": 15656248.0,
+          "p99": 16829824.0
+        },
+        "a2": {
+          "p50": 14706407.5,
+          "mean": 14823485.47,
+          "p95": 15666384.0,
+          "p99": 16566462.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -3.117936,
+          "mean": -3.171597,
+          "p95": -2.415868,
+          "p99": -6.702798
+        },
+        "a2_to_b2": {
+          "p50": -1.257428,
+          "mean": -1.271957,
+          "p95": 0.064699,
+          "p99": -1.58973
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.423213,
+          "mean": 1.433867,
+          "p95": 2.435922,
+          "p99": 0.070064
+        },
+        "candidate": {
+          "p50": -0.406718,
+          "mean": -0.433778,
+          "p95": -0.045131,
+          "p99": -4.725171
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

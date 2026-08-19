@@ -3,8 +3,9 @@
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,
+    encoding::Decoder,
     events::{BytesStart, Event},
-    name::{Namespace, ResolveResult},
+    name::{Namespace, NamespaceResolver, ResolveResult},
     reader::NsReader,
 };
 
@@ -68,6 +69,11 @@ pub struct Sheet {
     pub options: Options,
 }
 
+/// This standalone path intentionally keeps the historical inline event loop
+/// as the oracle for the fused protection parse
+/// ([`crate::protection::fused`]), which drives the equivalent
+/// [`ProtectionHandler`] over the same event stream.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<Sheet>)> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
@@ -196,40 +202,264 @@ pub(crate) fn parse_protection(xml: &str) -> Result<(Protection, Vec<Sheet>)> {
     Ok((spreadsheet, sheets))
 }
 
+/// The namespace classification the fused protection parse passes to
+/// [`ProtectionHandler::on_event`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProtectionNamespace {
+    Office,
+    Table,
+    /// The `loext` or `office-ext` protection extension namespaces.
+    Extension,
+    Other,
+}
+
+/// Classify the resolved event namespace for the semantic protection pass.
+///
+/// The resolved value borrows the reader mutably, so callers classify it
+/// immediately after the read exactly as the historical loop body did.
+pub(crate) fn classify(namespace: &ResolveResult<'_>) -> ProtectionNamespace {
+    if is_namespace(namespace, OFFICE_NAMESPACE) {
+        ProtectionNamespace::Office
+    } else if is_namespace(namespace, TABLE_NAMESPACE) {
+        ProtectionNamespace::Table
+    } else if is_namespace(namespace, LOEXT_NAMESPACE)
+        || is_namespace(namespace, OFFICE_EXT_NAMESPACE)
+    {
+        ProtectionNamespace::Extension
+    } else {
+        ProtectionNamespace::Other
+    }
+}
+
+/// Streaming event handler holding the [`parse_protection`] state.
+///
+/// The fused protection parse ([`crate::protection::fused`]) drives one
+/// shared tokenizer through this handler, while [`parse_protection`] keeps
+/// its historical inline loop as the standalone oracle; both apply the same
+/// checks and error messages at the same events.
+#[derive(Debug, Default)]
+pub(crate) struct ProtectionHandler {
+    spreadsheet: Protection,
+    spreadsheet_seen: bool,
+    sheets: Vec<Sheet>,
+    current_sheet: Option<Sheet>,
+    element_depth: usize,
+    spreadsheet_depth: Option<usize>,
+    current_sheet_depth: Option<usize>,
+}
+
+impl ProtectionHandler {
+    /// Process one resolved event.
+    ///
+    /// `namespace` is the caller-classified resolution of the event's
+    /// namespace; the resolved value borrows the reader mutably, so callers
+    /// classify it immediately after the read exactly as the historical loop
+    /// body did.
+    pub(crate) fn on_event(
+        &mut self,
+        namespace: ProtectionNamespace,
+        event: &Event<'_>,
+        resolver: &NamespaceResolver,
+        decoder: Decoder,
+    ) -> Result<()> {
+        let is_start = matches!(event, Event::Start(_));
+        let is_end = matches!(event, Event::End(_));
+        if is_start {
+            self.element_depth += 1;
+        }
+        match event {
+            Event::Start(element)
+                if namespace == ProtectionNamespace::Office
+                    && element.local_name().as_ref() == b"spreadsheet" =>
+            {
+                if self.spreadsheet_seen {
+                    return Err(Error::InvalidFormat(
+                        "duplicate office:spreadsheet element".to_string(),
+                    ));
+                }
+                self.spreadsheet =
+                    parse_spreadsheet_attributes_resolved(resolver, decoder, element)?;
+                self.spreadsheet_seen = true;
+                self.spreadsheet_depth = Some(self.element_depth);
+            },
+            Event::Empty(element)
+                if namespace == ProtectionNamespace::Office
+                    && element.local_name().as_ref() == b"spreadsheet" =>
+            {
+                if self.spreadsheet_seen {
+                    return Err(Error::InvalidFormat(
+                        "duplicate office:spreadsheet element".to_string(),
+                    ));
+                }
+                self.spreadsheet =
+                    parse_spreadsheet_attributes_resolved(resolver, decoder, element)?;
+                self.spreadsheet_seen = true;
+            },
+            Event::Start(element)
+                if namespace == ProtectionNamespace::Table
+                    && element.local_name().as_ref() == b"table"
+                    && self
+                        .spreadsheet_depth
+                        .is_some_and(|depth| self.element_depth == depth + 1) =>
+            {
+                self.current_sheet =
+                    Some(parse_sheet_attributes_resolved(resolver, decoder, element)?);
+                self.current_sheet_depth = Some(self.element_depth);
+            },
+            Event::Empty(element)
+                if namespace == ProtectionNamespace::Table
+                    && element.local_name().as_ref() == b"table"
+                    && self.spreadsheet_depth == Some(self.element_depth)
+                    && self.current_sheet.is_none() =>
+            {
+                self.sheets
+                    .push(parse_sheet_attributes_resolved(resolver, decoder, element)?);
+            },
+            Event::Start(element) | Event::Empty(element)
+                if self.current_sheet.is_some()
+                    && self.current_sheet_depth.is_some_and(|depth| {
+                        if is_start {
+                            self.element_depth == depth + 1
+                        } else {
+                            self.element_depth == depth
+                        }
+                    })
+                    && element.local_name().as_ref() == b"table-protection"
+                    && matches!(
+                        namespace,
+                        ProtectionNamespace::Table | ProtectionNamespace::Extension
+                    ) =>
+            {
+                let options = parse_sheet_options_resolved(resolver, decoder, element)?;
+                let sheet = self.current_sheet.as_mut().ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "table-protection element is outside a worksheet".to_string(),
+                    )
+                })?;
+                if !sheet.options.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "duplicate sheet table-protection element".to_string(),
+                    ));
+                }
+                sheet.options = options;
+            },
+            Event::End(element)
+                if namespace == ProtectionNamespace::Table
+                    && element.local_name().as_ref() == b"table"
+                    && self.current_sheet_depth == Some(self.element_depth) =>
+            {
+                self.sheets.push(self.current_sheet.take().ok_or_else(|| {
+                    Error::InvalidFormat("worksheet close has no open worksheet".to_string())
+                })?);
+                self.current_sheet_depth = None;
+            },
+            Event::End(element)
+                if namespace == ProtectionNamespace::Office
+                    && element.local_name().as_ref() == b"spreadsheet" =>
+            {
+                self.spreadsheet_depth = None;
+            },
+            Event::Eof => {},
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+        if is_end {
+            self.element_depth = self.element_depth.saturating_sub(1);
+        }
+        Ok(())
+    }
+
+    /// Validate the end-of-document state and build the protection metadata.
+    pub(crate) fn finish(self) -> Result<(Protection, Vec<Sheet>)> {
+        if self.current_sheet.is_some()
+            || self.current_sheet_depth.is_some()
+            || self.spreadsheet_depth.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "unterminated protected sheet".to_string(),
+            ));
+        }
+        Ok((self.spreadsheet, self.sheets))
+    }
+}
+
 fn parse_spreadsheet_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
 ) -> Result<Protection> {
+    parse_spreadsheet_attributes_resolved(reader.resolver(), reader.decoder(), element)
+}
+
+fn parse_spreadsheet_attributes_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
+    element: &BytesStart<'_>,
+) -> Result<Protection> {
     Ok(Protection {
-        structure_protected: optional_bool_attribute(
-            reader,
+        structure_protected: optional_bool_attribute_resolved(
+            resolver,
+            decoder,
             element,
             TABLE_NAMESPACE,
             b"structure-protected",
         )?,
-        key: parse_key(reader, element)?,
+        key: parse_key_resolved(resolver, decoder, element)?,
     })
 }
 
 fn parse_sheet_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Sheet> {
+    parse_sheet_attributes_resolved(reader.resolver(), reader.decoder(), element)
+}
+
+fn parse_sheet_attributes_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
+    element: &BytesStart<'_>,
+) -> Result<Sheet> {
     Ok(Sheet {
-        protected: optional_bool_attribute(reader, element, TABLE_NAMESPACE, b"protected")?,
-        key: parse_key(reader, element)?,
+        protected: optional_bool_attribute_resolved(
+            resolver,
+            decoder,
+            element,
+            TABLE_NAMESPACE,
+            b"protected",
+        )?,
+        key: parse_key_resolved(resolver, decoder, element)?,
         options: Options::default(),
     })
 }
 
-fn parse_key(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Key> {
+fn parse_key_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
+    element: &BytesStart<'_>,
+) -> Result<Key> {
     Ok(Key {
-        value: optional_attribute(reader, element, TABLE_NAMESPACE, b"protection-key")?,
-        digest_algorithm: optional_attribute(
-            reader,
+        value: optional_attribute_resolved(
+            resolver,
+            decoder,
+            element,
+            TABLE_NAMESPACE,
+            b"protection-key",
+        )?,
+        digest_algorithm: optional_attribute_resolved(
+            resolver,
+            decoder,
             element,
             TABLE_NAMESPACE,
             b"protection-key-digest-algorithm",
         )?,
-        secondary_digest_algorithm: optional_attribute(
-            reader,
+        secondary_digest_algorithm: optional_attribute_resolved(
+            resolver,
+            decoder,
             element,
             LOEXT_NAMESPACE,
             b"protection-key-digest-algorithm-2",
@@ -238,33 +468,61 @@ fn parse_key(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Key> 
 }
 
 fn parse_sheet_options(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Options> {
+    parse_sheet_options_resolved(reader.resolver(), reader.decoder(), element)
+}
+
+fn parse_sheet_options_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
+    element: &BytesStart<'_>,
+) -> Result<Options> {
     Ok(Options {
-        select_protected_cells: optional_extension_bool(
-            reader,
+        select_protected_cells: optional_extension_bool_resolved(
+            resolver,
+            decoder,
             element,
             b"select-protected-cells",
         )?,
-        select_unprotected_cells: optional_extension_bool(
-            reader,
+        select_unprotected_cells: optional_extension_bool_resolved(
+            resolver,
+            decoder,
             element,
             b"select-unprotected-cells",
         )?,
-        insert_columns: optional_extension_bool(reader, element, b"insert-columns")?,
-        insert_rows: optional_extension_bool(reader, element, b"insert-rows")?,
-        delete_columns: optional_extension_bool(reader, element, b"delete-columns")?,
-        delete_rows: optional_extension_bool(reader, element, b"delete-rows")?,
-        use_auto_filter: optional_extension_bool(reader, element, b"use-autofilter")?,
-        use_pivot: optional_extension_bool(reader, element, b"use-pivot")?,
+        insert_columns: optional_extension_bool_resolved(
+            resolver,
+            decoder,
+            element,
+            b"insert-columns",
+        )?,
+        insert_rows: optional_extension_bool_resolved(resolver, decoder, element, b"insert-rows")?,
+        delete_columns: optional_extension_bool_resolved(
+            resolver,
+            decoder,
+            element,
+            b"delete-columns",
+        )?,
+        delete_rows: optional_extension_bool_resolved(resolver, decoder, element, b"delete-rows")?,
+        use_auto_filter: optional_extension_bool_resolved(
+            resolver,
+            decoder,
+            element,
+            b"use-autofilter",
+        )?,
+        use_pivot: optional_extension_bool_resolved(resolver, decoder, element, b"use-pivot")?,
     })
 }
 
-fn optional_extension_bool(
-    reader: &NsReader<&[u8]>,
+fn optional_extension_bool_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<Option<bool>> {
     for namespace in [TABLE_NAMESPACE, LOEXT_NAMESPACE, OFFICE_EXT_NAMESPACE] {
-        if let Some(value) = optional_bool_attribute(reader, element, namespace, local_name)? {
+        if let Some(value) =
+            optional_bool_attribute_resolved(resolver, decoder, element, namespace, local_name)?
+        {
             return Ok(Some(value));
         }
     }
@@ -347,13 +605,14 @@ fn write_attribute(out: &mut String, name: &str, value: Option<&str>) {
     }
 }
 
-fn optional_bool_attribute(
-    reader: &NsReader<&[u8]>,
+fn optional_bool_attribute_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
     element: &BytesStart<'_>,
     namespace: &[u8],
     local_name: &[u8],
 ) -> Result<Option<bool>> {
-    optional_attribute(reader, element, namespace, local_name)?
+    optional_attribute_resolved(resolver, decoder, element, namespace, local_name)?
         .map(|value| match value.as_str() {
             "true" | "1" => Ok(true),
             "false" | "0" => Ok(false),
@@ -364,8 +623,9 @@ fn optional_bool_attribute(
         .transpose()
 }
 
-fn optional_attribute(
-    reader: &NsReader<&[u8]>,
+fn optional_attribute_resolved(
+    resolver: &NamespaceResolver,
+    decoder: Decoder,
     element: &BytesStart<'_>,
     namespace_uri: &[u8],
     local_name: &[u8],
@@ -373,10 +633,10 @@ fn optional_attribute(
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")))?;
-        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
         if is_namespace(&namespace, namespace_uri) && local.as_ref() == local_name {
             return attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
                 .map(|value| Some(value.into_owned()))
                 .map_err(|error| Error::InvalidFormat(format!("invalid XML attribute: {error}")));
         }

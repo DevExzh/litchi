@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0202-ods-single-tokenization-open",
+  "artifacts": [
+    {
+      "path": "ods-one-percent-edit-save-0202-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 11781,
+      "compressed_sha256": "50eaad565c07ec413b54061e07692fc93225a5d2a5ad4e389ded60ffc01d4474",
+      "uncompressed_bytes": 178308,
+      "uncompressed_sha256": "9e7424c7153de5dca1e9ba325e29f7270f2435a6384d8aff7567ce5885c5884f"
+    },
+    {
+      "path": "ods-one-percent-edit-save-0202-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 11792,
+      "compressed_sha256": "389f706028053fc8835ca38c10b1131201862184f665f2eca0b0179bd2841f86",
+      "uncompressed_bytes": 178310,
+      "uncompressed_sha256": "bebfe33d6322a1756892fe7839b3ba85d9c0508b671bba7d4ac711c9610633d4"
+    },
+    {
+      "path": "ods-one-percent-edit-save-0202-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 11765,
+      "compressed_sha256": "596ea667c8298ec3ffb79bbc2985bc8c0b86e416186f5f86c93cfe7f970d71a6",
+      "uncompressed_bytes": 178302,
+      "uncompressed_sha256": "802c54d2fe792f03d3f60ba0c2a0b333e6200ebdadd9ad70ce3c9ea1c78fe873"
+    },
+    {
+      "path": "ods-one-percent-edit-save-0202-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 11671,
+      "compressed_sha256": "8cd04fac7f31d59e504c7eb7dc53409905c32caa259493b06a07bd35588edaaa",
+      "uncompressed_bytes": 178307,
+      "uncompressed_sha256": "6aebc74df2eeb059883f1b23a21c05d057c816a38004a1f44f263c958e9873c5"
+    },
+    {
+      "path": "ods-one-percent-edit-save-0202-summary.json",
+      "role": "derived_summary",
+      "bytes": 8083,
+      "sha256": "c4d5eedc045a326cca852553b77ab4c1979804727bb46f0e878cde494678ad76"
+    }
+  ]
+}

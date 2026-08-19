@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "change": "0204-ods-protection-fused-parse",
+  "decision": "withheld",
+  "claim_scope": "ODS one-percent guardrail: lifecycle all-four accepted 1.79%-3.64% lower, commit p95 accepted; withheld overall due to cross-phase adverse pattern",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "475cf2898880363517eec9e0a9ac6b582eed1f78054f161f394bdd635bb19d7d",
+      "candidate_sha256": "5f0dab648cdf8f693ec01c171bfb81b2776e9e5abfe117b5be85c42a5bd89f66",
+      "note": "both binaries contain changes 0192-0196 and 0198-0202 as baseline plus the identical selector matrix; the candidate binary additionally fuses the protection double-parse of content.xml into one tokenization; control is the 0202 binary"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 9b717bb08 plus the uncommitted changes 0192-0196 and 0198-0202 (both binaries) plus the uncommitted protection-parse fusion (candidate binary only)",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
+  },
+  "selector": "ods_source_backed_one_percent_edit_save",
+  "timing_scope": "open + stage + commit + sequential publication through the fixed-window hashing sink",
+  "cases": {
+    "lifecycle_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 15944067.0,
+          "mean": 16015286.554,
+          "p95": 16644847.0,
+          "p99": 17525702.0
+        },
+        "b1": {
+          "p50": 15379268.5,
+          "mean": 15463607.686,
+          "p95": 16038433.0,
+          "p99": 17211750.0
+        },
+        "b2": {
+          "p50": 15471700.0,
+          "mean": 15528448.85,
+          "p95": 16056537.0,
+          "p99": 16627173.0
+        },
+        "a2": {
+          "p50": 15875562.0,
+          "mean": 15944506.482,
+          "p95": 16526935.0,
+          "p99": 17022968.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 3.542374,
+          "mean": 3.444702,
+          "p95": 3.643254,
+          "p99": 1.79138
+        },
+        "a2_to_b2": {
+          "p50": 2.543923,
+          "mean": 2.609411,
+          "p95": 2.846251,
+          "p99": 2.325065
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.429658,
+          "mean": -0.441953,
+          "p95": -0.708399,
+          "p99": -2.868553
+        },
+        "candidate": {
+          "p50": 0.601014,
+          "mean": 0.419315,
+          "p95": 0.112879,
+          "p99": -3.396383
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {}
+    },
+    "commit_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3418491.5,
+          "mean": 3447644.436,
+          "p95": 3652974.0,
+          "p99": 4005660.0
+        },
+        "b1": {
+          "p50": 3426236.5,
+          "mean": 3462802.796,
+          "p95": 3623544.0,
+          "p99": 4377422.0
+        },
+        "b2": {
+          "p50": 3448196.0,
+          "mean": 3470367.542,
+          "p95": 3643089.0,
+          "p99": 3756085.0
+        },
+        "a2": {
+          "p50": 3428209.5,
+          "mean": 3462426.944,
+          "p95": 3664601.0,
+          "p99": 3874139.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.226562,
+          "mean": -0.439673,
+          "p95": 0.805645,
+          "p99": -9.280918
+        },
+        "a2_to_b2": {
+          "p50": -0.583001,
+          "mean": -0.229336,
+          "p95": 0.587022,
+          "p99": 3.047232
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.284277,
+          "mean": 0.428771,
+          "p95": 0.318289,
+          "p99": -3.283379
+        },
+        "candidate": {
+          "p50": 0.640922,
+          "mean": 0.218457,
+          "p95": 0.539389,
+          "p99": -14.194131
+        }
+      },
+      "accepted_statistics": [
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p99": "paired directions disagree"
+      }
+    }
+  },
+  "verification_flags_per_leg": {
+    "a1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b1": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "b2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    },
+    "a2": {
+      "source_hash_verified": true,
+      "output_hash_verified": true,
+      "semantic_hash_verified": true,
+      "semantic_reopen_verified": true,
+      "media_payloads_verified": true,
+      "patch_forward_inverse_verified": true,
+      "raw_untouched_member_identity_verified": true,
+      "source_immutability_verified": true,
+      "exact_output_verified": true,
+      "exact_sink_verified": true,
+      "exact_noop_verified": true,
+      "foreign_source_refusal_verified": true,
+      "replacement_limit_verified": true,
+      "partial_sink_verified": true,
+      "source_replay_gates_verified": true
+    }
+  }
+}

@@ -267,13 +267,11 @@ impl Builder {
 ///
 /// This is intentionally a structural boundary check rather than a complete
 /// schema validator. The reader borrows `xml`, so authoring does not create a
-/// second content buffer or an intermediate DOM.
+/// second content buffer or an intermediate DOM. This standalone path keeps
+/// the historical inline event loop for latency parity on non-fused callers;
+/// the fused open parse drives the equivalent [`ValidateHandler`] instead.
 pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
-    if xml.len() > MAX_CONTENT_XML_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "ODS content.xml exceeds {MAX_CONTENT_XML_BYTES} bytes"
-        )));
-    }
+    validate_size(xml)?;
 
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
@@ -471,6 +469,206 @@ fn is_office_element(namespace: &ResolveResult<'_>, local_name: &[u8], expected:
 
 fn has_non_whitespace(value: &[u8]) -> bool {
     !value.iter().all(u8::is_ascii_whitespace)
+}
+
+/// Enforce the pre-parse byte-size limit of the package-content check.
+pub(crate) fn validate_size(xml: &str) -> Result<()> {
+    if xml.len() > MAX_CONTENT_XML_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODS content.xml exceeds {MAX_CONTENT_XML_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+/// Whether the resolved namespace is the ODF office namespace, classified by
+/// the fused open parse exactly where the historical loop body classified it.
+pub(crate) fn is_office_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE)
+}
+
+/// Streaming event handler holding the [`validate_content_xml`] scan state.
+///
+/// The fused open parse ([`crate::open_parse`]) drives one shared tokenizer
+/// through this handler, while [`validate_content_xml`] keeps its historical
+/// inline loop for latency parity on non-fused callers; both apply the same
+/// checks, limits, and error messages at the same events.
+#[derive(Debug, Default)]
+pub(crate) struct ValidateHandler {
+    depth: usize,
+    root_closed: bool,
+    body_open: bool,
+    body_seen: bool,
+    spreadsheet_seen: bool,
+}
+
+impl ValidateHandler {
+    /// Process one resolved event whose namespace was classified with
+    /// [`is_office_namespace`]; the resolved value borrows the reader
+    /// mutably, so callers classify it immediately after the read exactly as
+    /// the historical loop body did.
+    pub(crate) fn on_event(&mut self, is_office: bool, event: &Event<'_>) -> Result<()> {
+        match event {
+            Event::Start(element) => {
+                if self.depth == 0 {
+                    if self.root_closed {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one root element".to_string(),
+                        ));
+                    }
+                    if !(is_office && element.local_name().as_ref() == b"document-content") {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must be office:document-content".to_string(),
+                        ));
+                    }
+                } else if self.depth == 1 && is_office && element.local_name().as_ref() == b"body" {
+                    if self.body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    self.body_seen = true;
+                    self.body_open = true;
+                } else if is_office && element.local_name().as_ref() == b"body" {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if self.depth == 2
+                    && self.body_open
+                    && is_office
+                    && element.local_name().as_ref() == b"spreadsheet"
+                {
+                    if self.spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    self.spreadsheet_seen = true;
+                } else if is_office && element.local_name().as_ref() == b"spreadsheet" {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+
+                if self.depth == MAX_CONTENT_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS content.xml nesting exceeds {MAX_CONTENT_XML_DEPTH} elements"
+                    )));
+                }
+                self.depth += 1;
+            },
+            Event::Empty(element) => {
+                if self.depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body and office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+
+                if self.depth == 1 && is_office && element.local_name().as_ref() == b"body" {
+                    if self.body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    self.body_seen = true;
+                } else if is_office && element.local_name().as_ref() == b"body" {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if self.depth == 2
+                    && self.body_open
+                    && is_office
+                    && element.local_name().as_ref() == b"spreadsheet"
+                {
+                    if self.spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    self.spreadsheet_seen = true;
+                } else if is_office && element.local_name().as_ref() == b"spreadsheet" {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if self.depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has an unexpected closing element".to_string(),
+                    ));
+                }
+
+                if self.depth == 1 {
+                    if !(is_office && element.local_name().as_ref() == b"document-content") {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must close with office:document-content"
+                                .to_string(),
+                        ));
+                    }
+                    if self.body_open {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml closes its root before office:body".to_string(),
+                        ));
+                    }
+                    self.depth = 0;
+                    self.root_closed = true;
+                } else {
+                    if self.depth == 2
+                        && self.body_open
+                        && is_office
+                        && element.local_name().as_ref() == b"body"
+                    {
+                        self.body_open = false;
+                        if !self.spreadsheet_seen {
+                            return Err(Error::InvalidFormat(
+                                "office:body must contain office:spreadsheet".to_string(),
+                            ));
+                        }
+                    }
+                    self.depth -= 1;
+                }
+            },
+            Event::Text(text) if self.depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::CData(text) if self.depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::Eof => {
+                if !self.root_closed || self.depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml ended before its root element was closed".to_string(),
+                    ));
+                }
+                if !self.body_seen || !self.spreadsheet_seen {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body with office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+            },
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::Text(_)
+            | Event::CData(_) => {},
+        }
+        Ok(())
+    }
+
+    /// Every structural check runs mid-stream or at `Event::Eof`, so the
+    /// post-stream finish never fails.
+    pub(crate) fn finish(self) -> Result<()> {
+        Ok(())
+    }
 }
 
 fn empty_content() -> &'static str {

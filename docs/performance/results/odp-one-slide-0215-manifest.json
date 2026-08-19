@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0215-odp-shape-attr-harvest",
+  "artifacts": [
+    {
+      "path": "odp-one-slide-0215-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 3795,
+      "compressed_sha256": "69c1a2ecb418164923bce770990d1aa463d864bddd197c16238507b78481b238",
+      "uncompressed_bytes": 31806,
+      "uncompressed_sha256": "3eca24a36f7b01cef447c6270e949f9272228ce0c40b781c55e50d26935cac1e"
+    },
+    {
+      "path": "odp-one-slide-0215-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 3601,
+      "compressed_sha256": "2affa237981f3f0b3743b698543c17b63488a3eb990d106f39a47cf455cb6871",
+      "uncompressed_bytes": 31799,
+      "uncompressed_sha256": "1f76cbfb2d8e1e3e39c958c328273afeceb03805159b296439db8269f2394fc9"
+    },
+    {
+      "path": "odp-one-slide-0215-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 3747,
+      "compressed_sha256": "4ef42985fe2eb9f76806150e1cfcc66b625535e55e35bc049d59f8612e175d98",
+      "uncompressed_bytes": 31806,
+      "uncompressed_sha256": "c3b6f304760c4476fa8887d4237d757490e53175fe3239b435524579895c0c27"
+    },
+    {
+      "path": "odp-one-slide-0215-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 3828,
+      "compressed_sha256": "d514d72f3fae0ca1ae4f9eb95b1beb9ccfeb2d12c54f587a3f80fc1b507608fa",
+      "uncompressed_bytes": 31803,
+      "uncompressed_sha256": "4546c00ce2a02eefcb8bf09e3ab59d6e97899a6879a9fd4b9b49efce37a2816b"
+    },
+    {
+      "path": "odp-one-slide-0215-summary.json",
+      "role": "derived_summary",
+      "bytes": 3897,
+      "sha256": "1a7165ae777b4def4471d36631338f6fe78daf9e2a5e0e7296f4e320c8faf7ae"
+    }
+  ]
+}

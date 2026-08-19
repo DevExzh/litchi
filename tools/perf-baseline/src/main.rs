@@ -895,6 +895,7 @@ enum Case {
     OdsSourceBackedOneEditSave,
     OdsSourceEagerOnePercentEditSave,
     OdsSourceBackedOnePercentEditSave,
+    OdsSourceBackedRepeatedEdit,
     OdsMediaOneEditSave,
     OdsContentCowOwnedRebuild,
     OdsContentCowPositional,
@@ -1375,6 +1376,7 @@ impl Case {
             Self::OdsSourceBackedOneEditSave => "ods_source_backed_one_edit_save",
             Self::OdsSourceEagerOnePercentEditSave => "ods_source_eager_one_percent_edit_save",
             Self::OdsSourceBackedOnePercentEditSave => "ods_source_backed_one_percent_edit_save",
+            Self::OdsSourceBackedRepeatedEdit => "ods_source_backed_repeated_edit",
             Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
             Self::OdsContentCowOwnedRebuild => "ods_content_cow_owned_rebuild",
             Self::OdsContentCowPositional => "ods_content_cow_positional",
@@ -1786,6 +1788,10 @@ impl Case {
                 | Self::OdsSourceEagerOnePercentEditSave
                 | Self::OdsSourceBackedOnePercentEditSave
         )
+    }
+
+    const fn is_ods_source_repeated_edit(self) -> bool {
+        matches!(self, Self::OdsSourceBackedRepeatedEdit)
     }
 
     const fn uses_semantic_odp(self) -> bool {
@@ -2986,6 +2992,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_source_cell: Option<OdsSourceCellSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    ods_source_repeated_edit: Option<OdsSourceRepeatedEditSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     odf_content_cow: Option<OdfContentCowSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rtf_tail_publication: Option<RtfTailPublicationSummary>,
@@ -3600,6 +3608,48 @@ struct OdsSourceCellSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     source_replay_gates_verified: Option<bool>,
     sink_summary: Option<SinkSummary>,
+}
+
+/// Repeated source-backed ODS one-cell transaction evidence. One owner is
+/// prepared outside the timed interval; the timer covers exactly four
+/// sequential one-cell edit/commit/publish transactions against it. The eager
+/// oracle, exact-output equality, semantic reopen, media identity, and the
+/// instrumented source replay are all untimed. This is correctness and phase
+/// evidence only, and makes no latency claim by itself.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdsSourceRepeatedEditSummary {
+    implementation: &'static str,
+    phase: &'static str,
+    timing_scope: &'static str,
+    source_evidence_scope: &'static str,
+    production_contracts_outside_selector: &'static str,
+    performance_claim: &'static str,
+    transaction_count: usize,
+    update_coordinates: Vec<(usize, usize, usize)>,
+    source_bytes: u64,
+    source_archive_sha256: String,
+    output_bytes_per_variant: Vec<u64>,
+    output_sha256_per_variant: Vec<String>,
+    total_ns: Vec<u64>,
+    stage_ns: Vec<u64>,
+    commit_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
+    source_preparation_read_calls: u64,
+    source_preparation_read_bytes: u64,
+    source_replay_read_calls: u64,
+    source_replay_read_bytes: u64,
+    source_replay_range_overlap_bytes: u64,
+    source_replay_content_read_calls: u64,
+    source_replay_content_read_bytes: u64,
+    source_replay_pictures_read_calls: u64,
+    source_replay_pictures_read_bytes: u64,
+    source_replay_version_calls: u64,
+    output_hash_verified: bool,
+    semantic_reopen_verified: bool,
+    media_payloads_verified: bool,
+    exact_output_verified: bool,
+    exact_sink_verified: bool,
+    source_immutability_verified: bool,
 }
 
 /// Matched ODF content-only publication evidence. Preparation, exact no-op,
@@ -6588,6 +6638,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odf_content_cow()
                     && !case.uses_semantic_ods()
                     && !case.is_ods_source_cell_edit_save()
+                    && !case.is_ods_source_repeated_edit()
                     && !case.uses_ods_media()
                     && !case.uses_semantic_odp()
                     && !case.uses_odp_media()
@@ -7477,15 +7528,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
-        .any(|case| case.is_ods_source_cell_edit_save())
+        .any(|case| case.is_ods_source_cell_edit_save() || case.is_ods_source_repeated_edit())
     {
         let corpus = build_ods_media_corpus()?;
-        for case in options
-            .cases
-            .iter()
-            .copied()
-            .filter(|case| case.is_ods_source_cell_edit_save())
-        {
+        for case in options.cases.iter().copied().filter(|case| {
+            case.is_ods_source_cell_edit_save() || case.is_ods_source_repeated_edit()
+        }) {
             results.push(run_case_with_config(
                 case,
                 &corpus,
@@ -8607,6 +8655,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_source_backed_one_edit_save" => Some(Case::OdsSourceBackedOneEditSave),
         "ods_source_eager_one_percent_edit_save" => Some(Case::OdsSourceEagerOnePercentEditSave),
         "ods_source_backed_one_percent_edit_save" => Some(Case::OdsSourceBackedOnePercentEditSave),
+        "ods_source_backed_repeated_edit" => Some(Case::OdsSourceBackedRepeatedEdit),
         "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
         "ods_content_cow_owned_rebuild" => Some(Case::OdsContentCowOwnedRebuild),
         "ods_content_cow_positional" => Some(Case::OdsContentCowPositional),
@@ -8951,6 +9000,7 @@ fn print_usage() {
                                        ods_source_backed_one_edit_save,\n\
                                        ods_source_eager_one_percent_edit_save,\n\
                                        ods_source_backed_one_percent_edit_save,\n\
+                                       ods_source_backed_repeated_edit,\n\
                                        ods_media_one_edit_save,\n\
                                        ods_content_cow_owned_rebuild,ods_content_cow_positional,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
@@ -15428,6 +15478,9 @@ fn run_case_with_config(
         | Case::OdsSourceEagerOnePercentEditSave
         | Case::OdsSourceBackedOnePercentEditSave => {
             run_ods_source_cell_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdsSourceBackedRepeatedEdit => {
+            run_ods_source_repeated_edit(corpus, warmup_iterations, samples)
         },
         Case::OdsMediaOneEditSave => {
             run_ods_media_one_edit_save(corpus, warmup_iterations, samples)
@@ -24904,6 +24957,363 @@ fn run_ods_source_cell_edit_save(
     measured.sink = Some(sink);
     measured.output_sha256 = Some(expected_digest);
     Ok(measured)
+}
+
+/// Flat cell indices (sheet-major over the medium two-sheet 32x32 corpus) for
+/// the four sequential repeated-edit transactions.
+const ODS_REPEATED_EDIT_FLAT_INDICES: [usize; 4] = [0, 683, 1365, 2047];
+
+fn verify_ods_repeated_edit_media_identity(
+    source: &[u8],
+    output: &[u8],
+) -> Result<(), Box<dyn Error>> {
+    let source_archive = ArchiveReader::new(source)?;
+    let output_archive = ArchiveReader::new(output)?;
+    let mut picture_members = 0usize;
+    for path in source_archive.file_names() {
+        if !path.starts_with("Pictures/") {
+            continue;
+        }
+        picture_members = picture_members
+            .checked_add(1)
+            .ok_or("ODS source repeated-edit media member count overflowed")?;
+        if output_archive.read(path)? != source_archive.read(path)? {
+            return Err(
+                format!("ODS source repeated-edit media payload differs for '{path}'").into(),
+            );
+        }
+    }
+    if picture_members != ODS_MEDIA_ENTRY_COUNT {
+        return Err(
+            "ODS source repeated-edit media identity found an unexpected Pictures count".into(),
+        );
+    }
+    Ok(())
+}
+
+fn run_ods_source_repeated_edit(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != ODS_MEDIA_CORPUS_GENERATOR {
+        return Err(
+            "ODS source repeated-edit selector requires the fixed media-rich corpus".into(),
+        );
+    }
+    let shape = SemanticShape::Medium;
+    let updates = ODS_REPEATED_EDIT_FLAT_INDICES
+        .iter()
+        .map(|&flat| {
+            let sheet = flat / 1024;
+            let remainder = flat % 1024;
+            (sheet, remainder / 32, remainder % 32)
+        })
+        .collect::<Vec<_>>();
+    for &(sheet, row, column) in &updates {
+        if sheet >= shape.ods_sheet_count()
+            || row >= shape.ods_rows_per_sheet()
+            || column >= shape.ods_columns_per_sheet()
+        {
+            return Err("ODS source repeated-edit coordinate is outside the corpus".into());
+        }
+    }
+    let transaction_count = updates.len();
+    let source_archive_sha256 = corpus.manifest.archive_sha256.clone();
+    if sha256_hex(&corpus.archive) != source_archive_sha256 {
+        return Err(
+            "ODS source repeated-edit source archive hash differs from its manifest".into(),
+        );
+    }
+
+    // Untimed per-variant oracles: the eager owned path is the reference, and
+    // the source-backed path must reproduce it byte-exactly.
+    let mut expected_outputs = Vec::with_capacity(transaction_count);
+    for &update in &updates {
+        let eager = expected_ods_owned_cell_output(corpus, &[update], false)?;
+        let source_backed = expected_ods_source_cell_output(corpus, &[update], false)?;
+        if source_backed != eager {
+            return Err(
+                "ODS source repeated-edit source-backed output differs from the eager oracle"
+                    .into(),
+            );
+        }
+        expected_outputs.push(eager);
+    }
+    let expected_bytes = expected_outputs
+        .iter()
+        .map(|output| u64::try_from(output.len()))
+        .collect::<Result<Vec<u64>, _>>()?;
+    let expected_digests = expected_outputs
+        .iter()
+        .map(|output| sha256_hex(output))
+        .collect::<Vec<_>>();
+
+    // Untimed semantic reopen gate on variant 0: the edited cell carries the
+    // updated text and an untouched cell keeps its exact source text.
+    let &(edited_sheet, edited_row, edited_column) = updates
+        .first()
+        .ok_or("ODS source repeated-edit has no selected cell")?;
+    let reopened = litchi_ods::Spreadsheet::from_bytes(expected_outputs[0].clone())?;
+    let edited_name = semantic_ods_sheet_name(edited_sheet);
+    let edited = reopened
+        .cell(&edited_name, edited_row, edited_column)
+        .ok_or("ODS source repeated-edit reopened sheet is missing")?;
+    let litchi_ods::CellView::Stored(edited) = edited else {
+        return Err("ODS source repeated-edit reopened edited cell is missing".into());
+    };
+    if edited.text != semantic_ods_text(edited_sheet, edited_row, edited_column, true) {
+        return Err("ODS source repeated-edit reopened edited cell text differs".into());
+    }
+    let untouched_name = semantic_ods_sheet_name(1);
+    let untouched = reopened
+        .cell(&untouched_name, 5, 5)
+        .ok_or("ODS source repeated-edit reopened untouched sheet is missing")?;
+    let litchi_ods::CellView::Stored(untouched) = untouched else {
+        return Err("ODS source repeated-edit reopened untouched cell is missing".into());
+    };
+    if untouched.text != semantic_ods_text(1, 5, 5, false) {
+        return Err("ODS source repeated-edit reopened untouched cell text differs".into());
+    }
+
+    // Untimed media identity gate on variant 1: every `Pictures/` member is
+    // byte-identical to the source archive.
+    verify_ods_repeated_edit_media_identity(&corpus.archive, &expected_outputs[1])?;
+
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut total_ns = Vec::with_capacity(samples);
+    let mut stage_ns = Vec::with_capacity(samples);
+    let mut commit_ns = Vec::with_capacity(samples);
+    let mut publication_ns = Vec::with_capacity(samples);
+    let mut sinks = (0..transaction_count)
+        .map(|_| Vec::with_capacity(samples))
+        .collect::<Vec<Vec<SinkSummary>>>();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(source)?;
+        let mut iteration_sinks = expected_bytes
+            .iter()
+            .map(|&expected| WindowedHashingSink::new(expected, ODF_CONTENT_COW_SINK_WINDOW_BYTES))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut stage_total = Duration::ZERO;
+        let mut commit_total = Duration::ZERO;
+        let mut publication_total = Duration::ZERO;
+        let started = Instant::now();
+        for (variant, &(sheet, row, column)) in updates.iter().enumerate() {
+            let stage_started = Instant::now();
+            let mut edit = owner.edit_cells()?;
+            let sheet_name = semantic_ods_sheet_name(sheet);
+            let changed = edit
+                .set_cell(
+                    sheet_name.as_str(),
+                    row,
+                    column,
+                    ods_source_cell_value(sheet, row, column),
+                )?
+                .ok_or("ODS source repeated-edit selected worksheet is missing")?;
+            if !changed {
+                return Err("ODS source repeated-edit did not change the selected cell".into());
+            }
+            stage_total += stage_started.elapsed();
+            let commit_started = Instant::now();
+            let commit = edit.commit()?;
+            commit_total += commit_started.elapsed();
+            if commit.changed_cells() != 1 {
+                return Err(
+                    "ODS source repeated-edit commit changed an unexpected cell count".into(),
+                );
+            }
+            let publication_started = Instant::now();
+            let report = commit.write_to(&mut iteration_sinks[variant])?;
+            if report.changed_cells() != 1 || report.bytes() != expected_bytes[variant] {
+                return Err(
+                    "ODS source repeated-edit publication report differs from its oracle".into(),
+                );
+            }
+            publication_total += publication_started.elapsed();
+            std::hint::black_box(&commit);
+        }
+        let duration = started.elapsed();
+        for (variant, sink) in iteration_sinks.into_iter().enumerate() {
+            let (summary, digest) = sink.finish();
+            if digest != expected_digests[variant]
+                || summary.accepted_bytes != expected_bytes[variant]
+            {
+                return Err("ODS source repeated-edit timed publication hash differs".into());
+            }
+            if iteration >= warmup_iterations {
+                sinks[variant].push(summary);
+            }
+        }
+        owner.check_source()?;
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        if iteration >= warmup_iterations {
+            let total = elapsed_ns(duration)?;
+            let stage = elapsed_ns(stage_total)?;
+            let commit = elapsed_ns(commit_total)?;
+            let publication = elapsed_ns(publication_total)?;
+            let phase_sum = stage
+                .checked_add(commit)
+                .and_then(|sum| sum.checked_add(publication))
+                .ok_or("ODS source repeated-edit phase duration sum overflowed")?;
+            if phase_sum > total {
+                return Err("ODS source repeated-edit phases exceed their timed total".into());
+            }
+            total_ns.push(total);
+            stage_ns.push(stage);
+            commit_ns.push(commit);
+            publication_ns.push(publication);
+        }
+    }
+    if [
+        total_ns.len(),
+        stage_ns.len(),
+        commit_ns.len(),
+        publication_ns.len(),
+    ]
+    .iter()
+    .any(|length| *length != samples)
+    {
+        return Err(
+            "ODS source repeated-edit phase evidence has an incomplete sample vector".into(),
+        );
+    }
+    let window_bytes = u64::try_from(ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
+    for (variant, variant_sinks) in sinks.iter().enumerate() {
+        let sink =
+            deterministic_sink_summary(variant_sinks, "ODS source repeated-edit publication")?;
+        if sink.retained_output_bytes != Some(0)
+            || sink.retained_authoring_window_bytes != Some(window_bytes)
+            || sink.accepted_bytes != expected_bytes[variant]
+            || sink.largest_write > window_bytes
+        {
+            return Err(
+                "ODS source repeated-edit publication exceeded the retained sink bound".into(),
+            );
+        }
+    }
+
+    // One untimed instrumented replay over a fresh owner: preparation counters
+    // cover the open, then the four transactions are replayed after a counter
+    // reset. These are logical `ReadAt` counters, not physical I/O.
+    let (content_range, untouched_ranges, picture_ranges, _untouched_names) =
+        odf_content_cow_ranges(&corpus.archive)?;
+    let instrumented_source = Arc::new(InstrumentedSource::new_odf(
+        corpus.archive.clone(),
+        vec![content_range],
+        untouched_ranges,
+        picture_ranges,
+    ));
+    let read_at: Arc<dyn ReadAt> = instrumented_source.clone();
+    let owner = litchi_ods::SourceBackedSpreadsheet::from_read_at(read_at)?;
+    let preparation = instrumented_source.snapshot();
+    instrumented_source.reset();
+    for (variant, &(sheet, row, column)) in updates.iter().enumerate() {
+        let mut edit = owner.edit_cells()?;
+        let sheet_name = semantic_ods_sheet_name(sheet);
+        let changed = edit
+            .set_cell(
+                sheet_name.as_str(),
+                row,
+                column,
+                ods_source_cell_value(sheet, row, column),
+            )?
+            .ok_or("ODS source repeated-edit replay selected worksheet is missing")?;
+        if !changed {
+            return Err("ODS source repeated-edit replay did not change the selected cell".into());
+        }
+        let commit = edit.commit()?;
+        if commit.changed_cells() != 1 {
+            return Err("ODS source repeated-edit replay changed an unexpected cell count".into());
+        }
+        let mut replay_sink =
+            WindowedHashingSink::new(expected_bytes[variant], ODF_CONTENT_COW_SINK_WINDOW_BYTES)?;
+        let report = commit.write_to(&mut replay_sink)?;
+        let (replay_sink_summary, replay_digest) = replay_sink.finish();
+        let replay_gates = report.changed_cells() == 1
+            && report.bytes() == expected_bytes[variant]
+            && replay_digest == expected_digests[variant]
+            && replay_sink_summary.accepted_bytes == expected_bytes[variant]
+            && replay_sink_summary.retained_output_bytes == Some(0)
+            && replay_sink_summary.retained_authoring_window_bytes == Some(window_bytes)
+            && replay_sink_summary.largest_write <= window_bytes;
+        if !replay_gates {
+            return Err(
+                "ODS source repeated-edit replay publication differs from its oracle".into(),
+            );
+        }
+        std::hint::black_box(&commit);
+    }
+    owner.check_source()?;
+    let replay = instrumented_source.snapshot();
+    let replay_version_calls = instrumented_source.version_calls();
+    let source_unchanged =
+        sha256_hex(instrumented_source.bytes.as_slice()) == source_archive_sha256;
+    if preparation.read_calls == 0
+        || preparation.read_bytes == 0
+        || replay.read_calls == 0
+        || replay.read_bytes == 0
+        || replay.read_range_overlap_bytes > replay.read_bytes
+        || replay.odf.untouched.read_calls == 0
+        || replay.odf.untouched.read_bytes == 0
+        || replay.odf.pictures.read_calls == 0
+        || replay.odf.pictures.read_bytes == 0
+        || replay_version_calls == 0
+        || !source_unchanged
+    {
+        return Err(
+            "ODS source repeated-edit InstrumentedSource replay failed its logical-read gates"
+                .into(),
+        );
+    }
+
+    let summary = OdsSourceRepeatedEditSummary {
+        implementation: "source_backed_repeated_edit_transactions",
+        phase: "four_sequential_one_cell_edit_commit_publish_transactions",
+        timing_scope: "one source-backed owner and four fixed-window hashing sinks prepared outside the timer; the timer covers exactly four sequential edit_cells + set_cell + commit + write_to transactions with per-transaction stage/commit/publication durations summed per sample",
+        source_evidence_scope: "single untimed InstrumentedSource replay after the timed samples; preparation and replay counters are logical ReadAt observations, not physical I/O",
+        production_contracts_outside_selector: "stale/version and cancellation refusal, replacement-limit, and exact partial-sink progress contracts remain production-test evidence and are not re-proved by this selector",
+        performance_claim: "correctness and phase evidence only; no latency claim is made by this selector alone",
+        transaction_count,
+        update_coordinates: updates.clone(),
+        source_bytes: u64::try_from(corpus.archive.len())?,
+        source_archive_sha256,
+        output_bytes_per_variant: expected_bytes,
+        output_sha256_per_variant: expected_digests,
+        total_ns,
+        stage_ns,
+        commit_ns,
+        publication_ns,
+        source_preparation_read_calls: preparation.read_calls,
+        source_preparation_read_bytes: preparation.read_bytes,
+        source_replay_read_calls: replay.read_calls,
+        source_replay_read_bytes: replay.read_bytes,
+        source_replay_range_overlap_bytes: replay.read_range_overlap_bytes,
+        source_replay_content_read_calls: replay.odf.content.read_calls,
+        source_replay_content_read_bytes: replay.odf.content.read_bytes,
+        source_replay_pictures_read_calls: replay.odf.pictures.read_calls,
+        source_replay_pictures_read_bytes: replay.odf.pictures.read_bytes,
+        source_replay_version_calls: replay_version_calls,
+        output_hash_verified: true,
+        semantic_reopen_verified: true,
+        media_payloads_verified: true,
+        exact_output_verified: true,
+        exact_sink_verified: true,
+        source_immutability_verified: true,
+    };
+    let root_read_calls = vec![summary.source_replay_read_calls];
+    let root_read_bytes = vec![summary.source_replay_read_bytes];
+    Ok(result_with_source(
+        Case::OdsSourceBackedRepeatedEdit,
+        corpus,
+        elapsed,
+        SourceSummary {
+            read_calls: root_read_calls,
+            read_bytes: root_read_bytes,
+            ods_source_repeated_edit: Some(summary),
+            ..SourceSummary::default()
+        },
+    ))
 }
 
 fn run_semantic_odp(
@@ -40460,7 +40870,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 340);
+        assert_eq!(selectable_count, 341);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -43478,6 +43888,67 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn ods_source_repeated_edit_selector_parses_and_executes_on_media_rich_corpus() {
+        assert_eq!(
+            parse_case("ods_source_backed_repeated_edit"),
+            Some(Case::OdsSourceBackedRepeatedEdit)
+        );
+        assert_eq!(
+            Case::OdsSourceBackedRepeatedEdit.name(),
+            "ods_source_backed_repeated_edit"
+        );
+        let corpus = build_ods_media_corpus().unwrap();
+        let samples = 2;
+        let result = run_case(Case::OdsSourceBackedRepeatedEdit, &corpus, 0, samples).unwrap();
+        assert_eq!(result.case, "ods_source_backed_repeated_edit");
+        let source = result.source.expect("ODS source repeated-edit evidence");
+        let evidence = source
+            .ods_source_repeated_edit
+            .expect("ODS source repeated-edit summary");
+        assert_eq!(evidence.transaction_count, 4);
+        assert_eq!(evidence.update_coordinates.len(), 4);
+        assert_eq!(evidence.output_bytes_per_variant.len(), 4);
+        assert_eq!(evidence.output_sha256_per_variant.len(), 4);
+        assert_eq!(evidence.total_ns.len(), samples);
+        assert_eq!(evidence.stage_ns.len(), samples);
+        assert_eq!(evidence.commit_ns.len(), samples);
+        assert_eq!(evidence.publication_ns.len(), samples);
+        for index in 0..samples {
+            assert!(
+                evidence.stage_ns[index]
+                    + evidence.commit_ns[index]
+                    + evidence.publication_ns[index]
+                    <= evidence.total_ns[index]
+            );
+        }
+        assert!(evidence.output_hash_verified);
+        assert!(evidence.semantic_reopen_verified);
+        assert!(evidence.media_payloads_verified);
+        assert!(evidence.exact_output_verified);
+        assert!(evidence.exact_sink_verified);
+        assert!(evidence.source_immutability_verified);
+        // Per-variant outputs must equal the eager owned oracle byte-exactly.
+        for (variant, &update) in evidence.update_coordinates.iter().enumerate() {
+            let eager = super::expected_ods_owned_cell_output(&corpus, &[update], false).unwrap();
+            assert_eq!(
+                eager.len() as u64,
+                evidence.output_bytes_per_variant[variant]
+            );
+            assert_eq!(
+                super::sha256_hex(&eager),
+                evidence.output_sha256_per_variant[variant]
+            );
+        }
+        let json = serde_json::to_value(&evidence).unwrap();
+        assert!(
+            json["production_contracts_outside_selector"]
+                .as_str()
+                .unwrap()
+                .contains("stale/version")
+        );
     }
 
     #[test]

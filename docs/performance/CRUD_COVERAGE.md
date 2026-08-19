@@ -10,7 +10,7 @@ performance claim.
 
 | Required scenario | Current status | Coverage evidence |
 |---|---|---|
-| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX/ODT open; opt-in bounded RTF/XLS/DOCX/PPTX/generic-ODF reports now exercise format validation, while RTF still covers plain, raw CP-1252, LZFu and a real-producer watermark input. Change 0120 adds matched eager/source-path PPTX ordinary-root open controls using `litchi::Presentation::open(path)` and full untimed parity checks. Change 0187 routes high-level `litchi::Workbook::open(path)` for XLSX through its source-backed owner and adds open/open-plus-projection evidence; change 0188 adds matched warm DOCX/PPTX fresh-open-plus-query lifecycle evidence over fixed media-rich corpora but accepts no latency statistic because drift gates fail. Change 0191 routes high-level `litchi::Document::open(path)` for ODT through one retained source-backed owner while preserving OOXML precedence and typed source errors; broader smart-detection handoff coverage remains incomplete |
+| Open and identify format | Partial | ZIP/OPC/CFB plus owned DOC/XLS/PPT/RTF/XLSX and source-backed XLSX/ODT open; opt-in bounded RTF/XLS/DOCX/PPTX/generic-ODF reports now exercise format validation, while RTF still covers plain, raw CP-1252, LZFu and a real-producer watermark input. Change 0120 adds matched eager/source-path PPTX ordinary-root open controls using `litchi::Presentation::open(path)` and full untimed parity checks. Change 0187 routes high-level `litchi::Workbook::open(path)` for XLSX through its source-backed owner and adds open/open-plus-projection evidence; change 0188 adds matched warm DOCX/PPTX fresh-open-plus-query lifecycle evidence over fixed media-rich corpora but accepts no latency statistic because drift gates fail. Change 0191 routes high-level `litchi::Document::open(path)` for ODT through one retained source-backed owner while preserving OOXML precedence and typed source errors; change 0192 closes the withheld open-only warm p50/p99 latency evidence for that path on a bit-identical-binary rerun while mean/p95 remain withheld. Broader smart-detection handoff coverage remains incomplete |
 | List semantic children without payloads | Partial | XLS/XLSX/ODS sheets, DOC/RTF/DOCX/ODT paragraphs and PPT/PPTX/ODP slides; opt-in `docx_section_inventory` now lists the exact source-backed DOCX section descriptors, PPTX ordinary-root `slide_count` proves catalog-only source replay while `list_slides` intentionally materializes all owned slide payloads, change 0122 adds ODP source-backed open/one-middle-slide logical-read guards over a media-rich package, change 0123 adds unified-root ODP filesystem open/list parity guards, and change 0124 adds unified-root ODS filesystem worksheet-name/count/text parity plus direct typed source-read evidence; broader section/edit matrices remain missing |
 | Query one property or named object | Partial | XLS/XLSX/ODS cells, one DOC/RTF/DOCX paragraph, an indexed fully validated ODT paragraph, one PPT shape and one PPTX/ODP slide; native PPT now also has matched eager/source-backed selected-shape query-only and fresh-open-plus-query controls, change 0120 adds eager/source-root `slide_count` plus selector-first slide-100 controls with independent exact range evidence, change 0122 adds matched eager/source-backed ODP middle-slide query evidence over retained media, change 0123 adds matched unified-root ODP middle-slide filesystem queries, and change 0124 adds matched typed ODS eager/source selected-cell queries after owner preparation; the already-open RTF paragraph query reuses its parser-derived exact story length and cardinality, while explicit sparse `nth` skips discarded-view construction; change 0188 adds warm PPTX open-plus-count/selected-slide and DOCX open-plus-paragraph-count evidence but accepts no latency statistic because drift gates fail; broader properties/images remain missing |
 | Read one cell/paragraph/slide/image/Part | Partial | XLS/XLSX/ODS cells, DOC/RTF/DOCX paragraphs, indexed ODT paragraphs, PPT/PPTX/ODP text objects and generic OPC Part. Change 0120 adds a source-path PPTX slide-100 read with no unselected-slide/media payload overlap in its separate untimed replay; change 0122 adds an explicit ODP selected-media replay that proves one complete compressed `Pictures/` range and reports non-Pictures bytes separately; change 0123 adds root-path ODP archive/member/hash parity and direct typed source replay evidence; change 0124 adds typed ODS selected-cell and selected-media controls, with compressed-range and uncompressed-payload evidence kept distinct. Three opt-in OPC source-cache selectors add exact managed-Budget boundary evidence plus finite-control/managed same-Part and fixed-work disjoint-Part contention across `1/2x`, `1x`, and `2x` capacities and capped worker widths; their deterministic source delay is correctness evidence, not a latency claim. Semantic image selection remains missing |
@@ -20,7 +20,7 @@ performance claim.
 | Create a small document | Partial | Fresh DOC/XLS/PPT plus DOCX/PPTX/ODT/ODS/ODP public authoring, and narrow XLSX/RTF forward-only creation with selectable timing evidence; broader streaming authoring remains missing |
 | Create or append a very large stream | Partial | XLSX one-sheet scalar rows and plain-run RTF paragraphs have opt-in small/medium/large fixed-window creation cases through non-seek hashing sinks, deterministic untimed reopen, exact counters, and output hashes. Existing-document RTF logical tail append is now covered by both the original pair and four matched Commit-versus-PublicationPlan selectors measured at the pre-staged publication-call interval over tiny/medium/large plain corpora, with a 16 KiB non-seek sink window, exact byte counters, separate planning/publication/reopen/lifecycle scopes, and untimed patch/reopen/source-conflict/failure gates. Planning/publication vectors are per-sample; reopen/lifecycle vectors are one-element preflight-only gates run once outside the sample loop, and the retained candidate snapshot is not claimed to be window-bounded. Large fresh legacy writers still accumulate before final output |
 | Exact no-op edit and commit | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Public semantic transaction plus save/reopen; RTF also proves exact raw CP-1252, LZFu and producer-watermark publication, and the dedicated logical-tail no-op case proves shared snapshot identity plus exact sequential bytes; signed/extension corpora remain missing |
-| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; XLSX now also has six matched opt-in eager/source-backed scalar-cell publication controls over deterministic medium and dense/sparse four-sheet media-rich corpora (one cell, `ceil(1%)`, and exact 256-cell batch), one unmanaged two-worksheet control, and four managed source-backed selectors (one cell, `ceil(1%)`, exact 256-cell batch, and two worksheets). Managed evidence records separate open/plan/commit/publication/reopen vectors plus bounded PartData Budget/cache diagnostics, but has no release ABBA or performance claim. The other timed interval covers open/stage/commit/sequential publication, while lifecycle, reopen, topology, media identity, hashes and source counters are untimed; change 0096 accepts the source-backed provenance-reuse result without making an eager, physical-I/O, allocation or RSS claim. Native XLS also has matched eager/source-backed existing-comment and worksheet-visibility controls over deterministic opaque-heavy CFB corpora. Change 0174 adds matched owned/source-backed ODS existing-cell one-edit controls over the fixed media-rich corpus; change 0177 accepts the one-cell source-backed complete-lifecycle latency result while retaining the 21-cell workload as correctness/phase evidence only. Change 0171 fuses DOC paragraph, PPT shape-text, and XLS visibility owner validation into the existing final CFB fingerprint fence, removing one complete source scan per effective transaction; only the XLS bounded-batch total and scalar/batch plan-phase latency statistics pass the retained release gates. Native PPT now has a correctness-only immutable-source transaction for one existing equal-encoded-length shape-text atom through a checked CFB byte-range splice; change 0102 resolves its semantic selector through positional metadata and selected-slide reads, while complete artifact fingerprinting/publication remain, so no end-to-end latency or memory claim is made. Source-backed DOC now adds one correctness-only Word97+ main-story paragraph selector/replacement when the paragraph is one uncompressed Unicode piece and replacement width is unchanged; bounded positional chunk scanning, candidate reopen/readback, exact no-op/source/fingerprint/stale checks, inverse and typed partial output are covered, while complete CFB fingerprint/validation/publication scans remain and no DOC end-to-end latency, I/O/range, allocation/RSS, cold/high-latency, real-producer or broad CRUD claim is made (change 0105). ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, structural paragraph insertion/removal, and matched existing-image replacement while ODT, ODS and ODP verify exact retained resources and manifest media types; generic packaged ODF chart-definition replacement now uses opt-in verified raw preservation for unchanged members, with correctness-only evidence in change 0101. Source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name/sheet-protection/data-validation/auto-filter/conditional-formatting publication likewise verify eight exact 2 MiB media Parts after one semantic edit. Change 0151 freezes managed source-backed constructors and resource-accounted correctness for eleven XLSX editors—calculation properties, defined names, tab state, print options, page breaks, page margins, page setup, sheet protection, data validation, auto filter, and conditional formatting—with exact no-op/signed/MCE/stale/cancellation/unknown-owner protections, one-byte-under Budget checks, and raw preservation of unselected Parts; it adds no latency, allocation, RSS, copy, decompression, cold-I/O, total-memory, or real-producer claim. RTF now separately measures bounded existing-document logical-tail append, and change 0162 adds selectable phase/correctness evidence for same-length standalone PNG/JPEG payload replacement; their sequential sink, full reopen, durable apply/inverse and foreign-source refusal checks are untimed gates, not speedup claims. Correctness-only additions include source-backed XLSX existing scalar-cell set/clear/remove and row visibility, native XLS cross-workbook Number/Blank scalar transfer, ODS plain-scalar worksheet transfer, ODP dependency-free blank-slide transfer, package-wide DOCX story hyperlink redaction, RTF passive external-reference redaction, XLS worksheet visibility, RTF direct paragraph-layout updates, and ODT plain-paragraph moves. ODS content-validation catalog CRUD and direct PPTX transition edits retain their previously documented narrow closures. A separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
+| One semantic edit and save | Covered for generated DOC/XLS/PPT/RTF/XLSX/DOCX/PPTX/ODT/ODS/ODP | Cell/paragraph/shape edit or supported ODP slide append, then save/reopen; XLSX now also has six matched opt-in eager/source-backed scalar-cell publication controls over deterministic medium and dense/sparse four-sheet media-rich corpora (one cell, `ceil(1%)`, and exact 256-cell batch), one unmanaged two-worksheet control, and four managed source-backed selectors (one cell, `ceil(1%)`, exact 256-cell batch, and two worksheets). Managed evidence records separate open/plan/commit/publication/reopen vectors plus bounded PartData Budget/cache diagnostics, but has no release ABBA or performance claim. The other timed interval covers open/stage/commit/sequential publication, while lifecycle, reopen, topology, media identity, hashes and source counters are untimed; change 0096 accepts the source-backed provenance-reuse result without making an eager, physical-I/O, allocation or RSS claim. Native XLS also has matched eager/source-backed existing-comment and worksheet-visibility controls over deterministic opaque-heavy CFB corpora. Change 0174 adds matched owned/source-backed ODS existing-cell one-edit controls over the fixed media-rich corpus; change 0177 accepts the one-cell source-backed complete-lifecycle latency result while retaining the 21-cell workload as correctness/phase evidence only. Change 0193 caches the per-owner edit protection parse and accepts the new four-transaction repeated-edit total (9.31%-10.68% lower) and stage-phase (67.87%-71.61% lower) latency on that corpus, leaving single-transaction lifecycles unchanged by design. Change 0171 fuses DOC paragraph, PPT shape-text, and XLS visibility owner validation into the existing final CFB fingerprint fence, removing one complete source scan per effective transaction; only the XLS bounded-batch total and scalar/batch plan-phase latency statistics pass the retained release gates. Native PPT now has a correctness-only immutable-source transaction for one existing equal-encoded-length shape-text atom through a checked CFB byte-range splice; change 0102 resolves its semantic selector through positional metadata and selected-slide reads, while complete artifact fingerprinting/publication remain, so no end-to-end latency or memory claim is made. Source-backed DOC now adds one correctness-only Word97+ main-story paragraph selector/replacement when the paragraph is one uncompressed Unicode piece and replacement width is unchanged; bounded positional chunk scanning, candidate reopen/readback, exact no-op/source/fingerprint/stale checks, inverse and typed partial output are covered, while complete CFB fingerprint/validation/publication scans remain and no DOC end-to-end latency, I/O/range, allocation/RSS, cold/high-latency, real-producer or broad CRUD claim is made (change 0105). ODT separately measures paragraph replacement, inline line-break/run/hyperlink insertion, structural paragraph insertion/removal, and matched existing-image replacement while ODT, ODS and ODP verify exact retained resources and manifest media types; generic packaged ODF chart-definition replacement now uses opt-in verified raw preservation for unchanged members, with correctness-only evidence in change 0101. Source-backed DOCX/PPTX and narrow XLSX calculation-metadata/defined-name/sheet-protection/data-validation/auto-filter/conditional-formatting publication likewise verify eight exact 2 MiB media Parts after one semantic edit. Change 0151 freezes managed source-backed constructors and resource-accounted correctness for eleven XLSX editors—calculation properties, defined names, tab state, print options, page breaks, page margins, page setup, sheet protection, data validation, auto filter, and conditional formatting—with exact no-op/signed/MCE/stale/cancellation/unknown-owner protections, one-byte-under Budget checks, and raw preservation of unselected Parts; it adds no latency, allocation, RSS, copy, decompression, cold-I/O, total-memory, or real-producer claim. RTF now separately measures bounded existing-document logical-tail append, and change 0162 adds selectable phase/correctness evidence for same-length standalone PNG/JPEG payload replacement; their sequential sink, full reopen, durable apply/inverse and foreign-source refusal checks are untimed gates, not speedup claims. Correctness-only additions include source-backed XLSX existing scalar-cell set/clear/remove and row visibility, native XLS cross-workbook Number/Blank scalar transfer, ODS plain-scalar worksheet transfer, ODP dependency-free blank-slide transfer, package-wide DOCX story hyperlink redaction, RTF passive external-reference redaction, XLS worksheet visibility, RTF direct paragraph-layout updates, and ODT plain-paragraph moves. ODS content-validation catalog CRUD and direct PPTX transition edits retain their previously documented narrow closures. A separate RTF correctness gate proves real-producer root-shape edit plus checked LibreOffice resave/readback without presenting it as a paragraph benchmark |
 | About 1% semantic update and save | Covered for XLSX/DOCX/PPTX/RTF/ODT/ODS generated corpora | Deterministic evenly spaced `ceil(1%)` cell, paragraph and shape changes; the matched XLSX scalar-cell control pairs eager and source-backed selector-first multi-sheet publication over both fixed media-rich shapes, and change 0096 accepts the source-backed provenance-reuse result. DOCX and RTF use one canonical atomic paragraph batch, ODT coalesces ordinary scalar durable replacements internally, and ODS partitions flat cell positions by worksheet into bounded atomic `set_cells` calls; each commits once and reopens the package. Change 0174 adds matched owned/source-backed ODS 21-cell selectors with a common bounded sink and untimed full semantic/media/raw-member gates. Change 0177 withholds the ODS 21-cell latency result because mean and tail stability gates fail; the RTF batch case has a matched scalar-loop comparison recorded in change 0081 |
 | Bulk update matching objects | Partial | Selectable: XLSX has a matched eager/source-backed exact-256 existing scalar-cell batch over all four sheets; PPTX has a bounded atomic batch across up to 32 existing slides, with up to 256 unique nonoverlapping shape-text selectors per slide; RTF measures one bounded ordered paragraph batch plus 1/7/63 same-length standalone-picture payload replacements; native XLS measures the exact 256-existing-comment and 64-worksheet-visibility limits through matched eager/source-backed controls; XLSX also replaces a complete three-owner core conditional-formatting collection through matched eager/source-backed controls; ODP measures eight fixed-name existing text boxes across eight slides; ODT replaces 64 fixed existing image owners through matched scalar/bounded-batch controls. Change 0096 accepts only the XLSX source-backed scalar-cell provenance-reuse result; the other evidence additions still make no latency claim pending frozen ABBA. API-only correctness coverage: ODS updates up to 4,096 cells on one selected sheet; native PPT updates up to 256 persisted shape-text targets; XLSX also clears the complete conditional-formatting collection; ODT correctness extends to the exact 256-change embedded object/image bound; ODP correctness extends to the exact 256-owner batch bound. These remaining APIs are not selectable timing evidence |
 | Clear/remove/hide/detach/GC distinctions | Partial | Measured: ODT exact paragraph removal intentionally preserves orphaned resources; RTF removes one exact middle ordinary paragraph on its narrow generated plain-source closure and now removes 1/4/32 exact standalone PNG/JPEG picture groups on its separate generated ASCII-hex closure. API-only: OLE2 deletes one or a bounded stream set while retaining storages and unrelated streams; XLS shows/hides/very-hides worksheets, while XLSX additionally shows/hides/very-hides/activates tabs, hides/unhides existing rows, clears scalar cell values without deleting owners, or physically removes supported existing scalar `<c>` owners; ODS clears only unbound validation definitions; DOCX removes direct plain main-document paragraphs; PPTX and ODP remove only dependency-free supported slides; ODT removes selected resource owners while retaining payloads. DOCX reversible hyperlink-wrapper detachment remains distinct from irreversible relationship/URL redaction. Opt-in ODT GC remains exact-source and explicit-name only. General cascading delete, orphan collection and dependency-aware removal remain missing |
@@ -1530,6 +1530,273 @@ p50/mean/p95/p99 pass; RK/MulRK latency, publication, resource/I/O, cold-cache,
 atomic-save, real-producer performance and broader formula/string/structural
 XLS coverage remain open. See
 [`0181`](changes/0181-xls-source-policy-reuse.md).
+
+Change 0192 adds no selector or CRUD closure and leaves the matrix unchanged.
+It repeats only the withheld change 0191 ODT open-only workload on clean
+current HEAD with a bit-identical release binary and accepts warm open-only
+p50 (51.68%/52.62% lower than eager byte ownership) and p99 (51.83%/59.56%
+lower); mean and p95 remain withheld on eager drift. See
+[`0192`](changes/0192-odt-open-only-rerun-evidence.md).
+
+Change 0193 adds one opt-in selector (`ods_source_backed_repeated_edit`) and
+raises the matrix to 341 names while leaving the default 36 cases / 198
+records unchanged. It computes the ODS source-backed edit protection parse at
+most once per owner through a private success-only `OnceLock`, removing three
+of four identical protection-domain parses in the new four-transaction
+repeated-edit workload. Frozen cross-binary CPU-2 A/B/B/A accepts the
+four-transaction total at 9.31%-10.68% lower and the stage phase at
+67.87%-71.61% lower across p50/mean/p95/p99; commit/publication phases are
+neutral-withheld, single-transaction lifecycles are unchanged by design, and
+no allocation/RSS, physical-I/O, cold-cache, producer, or broad ODF claim is
+made. See [`0193`](changes/0193-ods-source-edit-protection-cache.md).
+
+Change 0194 adds no selector or CRUD closure and leaves the matrix unchanged.
+It rewrites the litchi-ods worksheet `validate_text` forbidden-character check
+from a per-`char` scan to a per-byte scan (exactly equivalent: every forbidden
+character is ASCII and encodes as one identical byte). Frozen cross-binary
+CPU-2 A/B/B/A over the existing three ODS source-backed edit selectors accepts
+the four-transaction repeated-edit total p50/mean (2.08%/0.63% and
+2.77%/0.19% lower) and commit-phase p50/mean/p99 (up to 13.11% lower), the
+one-cell guardrail commit p50 (0.96%/2.60% lower), and the one-percent
+guardrail lifecycle p50/mean plus commit p50/mean/p95 (up to 3.45% lower);
+all other statistics are withheld. See
+[`0194`](changes/0194-ods-validate-text-byte-scan.md).
+
+Change 0195 adds no selector or CRUD closure and leaves the matrix
+unchanged. It caches the row-local edit layout scan of `content.xml` at most
+once per source-backed ODS owner through a private success-only `OnceLock`,
+removing three of four full-document scans in the four-transaction
+repeated-edit workload. Frozen cross-binary CPU-2 A/B/B/A accepts the
+four-transaction total at 5.55%-12.49% lower and the commit phase at
+25.13%-36.98% lower across p50/mean/p95/p99, plus the one-cell guardrail
+commit p50/mean/p95/p99 and the one-percent guardrail lifecycle p99 and
+commit p50/mean/p99; all other statistics are withheld as neutral. See
+[`0195`](changes/0195-ods-source-content-layout-cache.md).
+
+Change 0196 adds no selector or CRUD closure and leaves the matrix
+unchanged. It replaces the Aho-Corasick automata behind
+`litchi_core::xml::{escape_xml, unescape_xml}` with exactly equivalent byte
+scans (fuzz-verified byte-identical over 2M randomized cases) and drops the
+dependency from litchi-core. Frozen cross-binary CPU-2 A/B/B/A accepts the
+one-percent ODS lifecycle p50/mean (0.44%-3.02% lower) and commit
+p50/mean/p99 (1.53%-20.15% lower); the repeated-edit and one-edit selectors
+are neutral-withheld throughout. See
+[`0196`](changes/0196-xml-escape-byte-scan.md).
+
+Change 0197 adds no selector or CRUD closure and leaves the matrix
+unchanged. It explored batching the ODS per-row synthetic-document reparse
+into one reparse per changed window; the one-percent commit phase accepted
+p50/mean/p95 in two independent runs, but the lifecycle scope measured a
+consistent adverse pattern in both runs and the change was withheld and
+reverted. Two multi-row window regression tests added under it remain. See
+[`0197`](changes/0197-ods-batched-row-window-reparse.md).
+
+Change 0198 adds no selector or CRUD closure and leaves the matrix
+unchanged. It extends the 0195 ODS content-layout cache with the derived
+table/row topology so cached-layout commits skip the per-commit span-vector
+re-scans. Frozen cross-binary CPU-2 A/B/B/A accepts the four-transaction
+repeated-edit total p50/mean/p95/p99 (0.19%-5.77% lower) and commit
+p50/mean/p95/p99 (2.20%-7.72% lower), plus guardrail subsets listed in the
+change doc; all other statistics are withheld as neutral. See
+[`0198`](changes/0198-ods-content-layout-topology-cache.md).
+
+Change 0199 adds no selector or CRUD closure and leaves the matrix
+unchanged. It removes the per-event `Event::into_owned()` deep copies from
+the two full-document `NsReader` parse loops in litchi-ods
+(`worksheet::codec::parse` and `settings::codec::locate`), a byte-exact
+borrow-lifetime elision. Frozen cross-binary CPU-2 A/B/B/A accepts the
+source-backed and eager opens on all four statistics (6.42%-9.70% and
+9.46%-15.17% lower), both guardrails' lifecycle and commit p50/mean/p95,
+and the repeated-edit total, commit, and publication p50/mean/p95/p99 plus
+stage p50/mean/p95; the remaining tails are withheld as neutral. See
+[`0199`](changes/0199-ods-parse-event-copy-elision.md).
+
+Change 0200 adds no selector or CRUD closure and leaves the matrix
+unchanged. It fuses the three litchi-ods-owned open passes over
+`content.xml` into one shared tokenization with pass-ordered error
+selection, while the standalone shells keep the original inline loops.
+Frozen cross-binary CPU-2 A/B/B/A accepts the source-backed open
+p50/mean/p95/p99 (19.72%-24.55% lower), the one-percent lifecycle all-four
+(3.26%-5.72% lower), the one-edit lifecycle p50/mean (2.81%-5.38% lower),
+the eager-open p99, and repeated-edit total mean/p95/p99, stage p99, and
+publication mean/p95/p99; a documented sub-1% repeated-edit
+total-p50/publication-p50 reading on source-identical phases is recorded as
+code-layout wobble. See
+[`0200`](changes/0200-ods-fused-open-parse.md).
+
+Change 0201 adds no selector or CRUD closure and leaves the matrix
+unchanged. It folds the ODS `content.xml` structural validation pass into
+the 0200 fused open tokenization (two-phase driver; standalone validator
+unchanged for its other call sites). Frozen cross-binary CPU-2 A/B/B/A
+accepts the source-backed open p50/mean/p95/p99 (9.32%-17.88% lower), the
+one-edit lifecycle all-four plus commit p50/mean, the one-percent lifecycle
+p95, and the repeated-edit total p95/p99 plus publication all-four; the
+eager-open primary adverse reading did not reproduce in the single permitted
+rerun, and a sub-1.5% repeated-edit commit p50/mean reading on
+source-identical phases is documented as code-layout wobble. See
+[`0201`](changes/0201-ods-fused-open-validate-fold.md).
+
+Change 0202 adds no selector or CRUD closure and leaves the matrix
+unchanged. It folds the pass-2a calculation-settings parse into the fused
+open tokenization (fifth handler; standalone calculation parse unchanged
+for its other call sites), so the source-backed open tokenizes
+`content.xml` exactly once. Frozen cross-binary CPU-2 A/B/B/A accepts the
+source-backed open p50/mean/p95/p99 (17.41%-23.21% lower), the one-edit
+lifecycle all-four plus commit p50/mean, the one-percent lifecycle
+p50/mean/p95 in primary and rerun (rerun commit all-four), the
+repeated-edit total p50/mean, stage p50/mean/p95, and commit all-four, and
+the eager-open mean; the one-percent lifecycle p99 primary adverse reading
+did not reproduce in the single permitted rerun, and a sub-0.5%
+repeated-edit publication p50/mean reading on source-identical phases is
+documented as code-layout wobble. See
+[`0202`](changes/0202-ods-single-tokenization-open.md).
+
+Change 0203 adds no selector or CRUD closure and leaves the matrix
+unchanged. It explored memoizing the fused open driver's namespace
+classifications (HashMap v1, then a direct-mapped slot cache v2); v1
+measured a mechanism-confirmed regression on all workloads and v2
+measured the targeted open neutral with broadly adverse guardrails, so
+both were withheld and reverted byte-exact to the 0202 state. See
+[`0203`](changes/0203-ods-open-namespace-classify-memo.md).
+
+Change 0204 adds no selector or CRUD closure and leaves the matrix
+unchanged. It fuses the ODS protection double-parse of `content.xml` into
+one tokenization; the repeated-edit stage phase accepted all-four at
+20.01%-25.86% lower. Originally withheld for a reproduced both-directions
+adverse pattern on the source-open phase (executing none of the changed
+code), it was re-verdicted **banked** after change 0205 calibrated the
+per-binary-pair layout noise floor and showed every blocking reading sits
+within it. Claim scope is the repeated-edit stage statistics only. See
+[`0204`](changes/0204-ods-protection-fused-parse.md).
+
+Change 0205 is a measurement-methodology calibration (no code change, no
+selector or CRUD closure; matrix unchanged). Probe binaries carrying
+never-executed parser-shaped padding measured the per-binary-pair layout
+noise floor per phase, and the banking rule was refined: within-floor
+adverse readings on phases executing no changed code are layout readings
+and do not block, adverse readings on executed phases still block unless
+rerun-cleared, and accepts are claimed only above the floor. See
+[`0205`](changes/0205-layout-noise-floor-calibration.md).
+
+Change 0206 adds no selector or CRUD closure and leaves the matrix
+unchanged. It removes dead per-element qualified-name materialization in
+the ODS settings location scan (shell and fused handler identically);
+banked with a deterministic allocation claim (source-open allocations
+-27.96%, allocated bytes -2.33% on the measurement corpus) and neutral
+latency under the 0205 floor rule. See
+[`0206`](changes/0206-ods-lazy-settings-qname.md).
+
+Change 0207 adds no selector or CRUD closure and leaves the matrix
+unchanged. It byte-matches resolved attribute names in the ODS worksheet
+codec and allocates owned strings only for consumed values, preserving
+the exact per-attribute error order; banked with a deterministic
+allocation claim (source-open allocations -19.22%, bytes -5.13%;
+cumulative with 0206 -41.81%) and neutral latency under the 0205 floor
+rule. See
+[`0207`](changes/0207-ods-byte-matched-attributes.md).
+
+Change 0208 adds no selector or CRUD closure and leaves the matrix
+unchanged. It tried borrowed decoding in the ODS commit validate-reparse
+with a deterministic -43.0% allocation win per commit transaction, but
+the adverse both-directions latency patterns on the executed commit
+phases reproduced in both rule-2 reruns — withheld and reverted per
+banking rule 2; the tree is bit-exact back at the 0207 state. See
+[`0208`](changes/0208-ods-borrowed-validate-decode.md).
+
+Change 0209 adds no selector or CRUD closure and leaves the matrix
+unchanged. It fuses the ODT source-backed open's two complete
+`content.xml` tokenizations (validation + content style-registry scan)
+into one pass with exact error precedence; banked with
+`odt_file_source_open` p50/mean/p95 14.63%-18.99% lower in both
+directions (pre-floor acceptance; the eager-open adverse reading did
+not reproduce in the single permitted rerun). See
+[`0209`](changes/0209-odt-fused-open-parse.md).
+
+Change 0210 adds no selector or CRUD closure and leaves the matrix
+unchanged. It replaces the ODP slide parser's per-lookup attribute
+re-scans with a lazy per-element cache (exact per-lookup error
+semantics); banked with all-four-statistic accepts on every executed
+workload (`odp_semantic_list_slides` 16.77%-47.07%, `one_slide`
+7.45%-19.70%, `full_text` 13.11%-21.71% lower, pre-floor acceptance). See
+[`0210`](changes/0210-odp-lazy-element-attrs.md).
+
+Change 0211 adds no selector or CRUD closure and leaves the matrix
+unchanged. It fuses the ODP per-query double scan of `content.xml`
+(transition-style collection + slide parse) into one tokenization with
+exact historical error precedence; banked with
+`odp_semantic_list_slides` p50/mean 15.56%-17.84%, `one_slide` p50/mean
+18.88%-19.50%, and `full_text` p50 15.85%-16.43% lower (pre-floor
+acceptance; the byte-identical open workload's adverse primary reading
+cleared in the single permitted rerun). See
+[`0211`](changes/0211-odp-fused-query-parse.md).
+
+Change 0212 adds no selector or CRUD closure and leaves the matrix
+unchanged. It caches attribute namespace resolution in the ODP slide
+parser (resolve each attribute key once at scan; lookup replay compares a
+cached snapshot with no resolver calls); originally withheld under the
+pre-floor rule for a reproduced adverse open p50 reading on a
+byte-identical phase, re-verdicted **banked** after the 0213 floor
+reclassified it as a within-floor layout reading, and re-applied
+bit-exact. Claim scope: `full_text` p50/mean/p95/p99 20.82%-29.50%,
+`list_slides` p50/mean 19.15%-25.51%, `one_slide` p50/mean/p99
+17.48%-31.16% lower. See
+[`0212`](changes/0212-odp-cached-attr-resolution.md).
+
+Change 0213 is a measurement-methodology calibration (no code change, no
+selector or CRUD closure; matrix unchanged) — the litchi-odp analog of
+0205. Probe binaries carrying never-executed parser-shaped padding
+measured the litchi-odp per-binary-pair layout noise floor per phase
+(open p50/mean 3.1%/2.5%, list-slides 2.0%/3.6%, one-slide 2.5%/3.2%,
+full-text 0.1%/0.5%), and the 0205 banking rule extends unchanged to
+litchi-odp. See
+[`0213`](changes/0213-odp-layout-floor-calibration.md).
+
+Change 0214 adds no selector or CRUD closure and leaves the matrix
+unchanged. It is a profiling/target-selection analysis (no code change):
+post-0212 `perf record` profiles of the four ODP workloads located the
+remaining hotspots and selected the single-scan shape-attribute harvest
+as the next target. See
+[`0214`](changes/0214-odp-post-0212-reprofile.md).
+
+Change 0215 adds no selector or CRUD closure and leaves the matrix
+unchanged. It folds the ODP `drawing_attributes` fresh attribute re-scan
+into the shared `ElementAttrs` incremental scan (exact document order,
+error-message identity by first reach, duplicate detection, and decode
+positions; 7 new pinning tests); banked under the 0213 floor rule with
+`odp_semantic_list_slides` p50/mean 6.53%-9.97%, `one_slide` p50/mean
+8.80%-15.10%, and `full_text` p50/mean 5.44%-11.32% lower; the
+byte-identical open workload's adverse p50 reading is a within-floor
+layout reading. See
+[`0215`](changes/0215-odp-shape-attr-harvest.md).
+
+Change 0216 adds no selector or CRUD closure and leaves the matrix
+unchanged. It is a profiling/target-selection analysis (no code change):
+post-0215 profiles of the ODT semantic workloads refuted the
+double-tokenization hypothesis and selected the discard-but-validate text
+extraction implemented as 0217. See
+[`0216`](changes/0216-odt-query-reprofile.md).
+
+Change 0217 adds no selector or CRUD closure and leaves the matrix
+unchanged. It gives the ODT `extract_text` path a discard-but-validate
+parse mode (no retained `Element` materialization; exact text, error
+precedence/messages, and limits pinned against the pre-change path as a
+live oracle). All three executed workloads accepted all four statistics
+(`full_text` 42.12%-52.07%, repeated-text cached 51.91%-57.18%, uncached
+40.31%-53.85% lower); the reproduced guardrail layout readings (open p50
+max 3.26%, list-paragraphs mean max 6.67%) were reclassified as
+within-floor layout readings by the 0218 calibration, and the change was
+re-verdicted **banked** and re-applied bit-exact. See
+[`0217`](changes/0217-odt-discard-validate-text.md).
+
+Change 0218 is a measurement-methodology calibration (no code change, no
+selector or CRUD closure; matrix unchanged) — the litchi-odt analog of
+0205/0213. Probe binaries carrying never-executed parser-shaped padding
+measured the litchi-odt per-binary-pair layout noise floor per phase
+(open p50/mean 3.3%/7.2%, list-paragraphs 5.2%/6.7%, one-paragraph
+4.8%/8.3%, full-text p50 4.1%, repeated-text-cached 7.1%/7.4%,
+repeated-text-uncached 4.8%/4.1%; tails considerably wider), and the 0205
+banking rule extends unchanged to litchi-odt. See
+[`0218`](changes/0218-odt-layout-floor-calibration.md).
 
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
