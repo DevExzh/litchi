@@ -4,7 +4,9 @@
 //! `content.xml` twice: once for the package-content structure validation
 //! ([`litchi_odf_common::core::validate_content_document_part`]) and once for
 //! the automatic-styles scan ([`StyleRegistry::from_xml`]).  This module runs
-//! both over one shared `NsReader` event stream.
+//! both over one shared quick-xml [`Reader`] event stream, with the
+//! namespace-binding maintenance `NsReader` would perform replicated by the
+//! hand-rolled [`BindingTracker`] (change 0224).
 //!
 //! Observable behavior is identical to the sequential passes:
 //!
@@ -43,9 +45,12 @@
 //! tests and the owned-path oracle in `super::package`'s tests).
 
 use litchi_core::{Error, Result};
-use quick_xml::events::{BytesRef, Event};
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
+use memchr::memmem;
+use quick_xml::events::{BytesRef, BytesStart, Event};
+use quick_xml::name::{
+    LocalName, Namespace, NamespaceError, Prefix, PrefixDeclaration, QName, ResolveResult,
+};
+use quick_xml::reader::Reader;
 
 use super::source::{CONTENT_ROOT, FAMILY_NAME};
 use crate::elements::element::Element;
@@ -55,6 +60,295 @@ use crate::elements::style::{Style, StyleRegistry};
 // litchi-odf-common (`MAX_CONTENT_BYTES` there is crate-private).
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+
+/// The reserved namespace URIs whose binding rules quick-xml's
+/// `NamespaceResolver::add` enforces. Crate-private copies of quick-xml's
+/// private `RESERVED_NAMESPACE_XML` / `RESERVED_NAMESPACE_XMLNS` constants.
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const XMLNS_NAMESPACE: &[u8] = b"http://www.w3.org/2000/xmlns/";
+
+/// Parity with quick-xml's `DEFAULT_MAX_DECLARATIONS_PER_ELEMENT`.
+const MAX_NS_DECLARATIONS_PER_ELEMENT: usize = 256;
+
+/// A single in-scope prefix→URI binding, indexing the tracker's flat byte
+/// buffer exactly like quick-xml's `NamespaceBinding`: the prefix occupies
+/// `buffer[start..start + prefix_len]` (`prefix_len == 0` for a default
+/// `xmlns="..."` declaration) and the URI follows it for `value_len` bytes.
+/// Values are copied into the one shared buffer (as quick-xml copies them);
+/// pushes only happen on elements that declare bindings, so the copies are
+/// rare and tiny.
+#[derive(Debug)]
+struct Binding {
+    /// Offset in the tracker buffer where the prefix starts.
+    start: usize,
+    /// Prefix length; zero marks a default-namespace declaration.
+    prefix_len: usize,
+    /// URI length; the URI starts at `start + prefix_len`.
+    value_len: usize,
+    /// Nesting level at which the binding was declared; the declaring element
+    /// is included, i.e. a declaration on the document root has `level = 1`.
+    level: u32,
+}
+
+impl Binding {
+    /// The bound prefix bytes, or `None` for a default-namespace declaration.
+    fn prefix<'b>(&self, buffer: &'b [u8]) -> Option<&'b [u8]> {
+        (self.prefix_len != 0).then(|| &buffer[self.start..self.start + self.prefix_len])
+    }
+
+    /// The bound namespace URI bytes.
+    fn value<'b>(&self, buffer: &'b [u8]) -> &'b [u8] {
+        &buffer[self.start + self.prefix_len..self.start + self.prefix_len + self.value_len]
+    }
+}
+
+/// Hand-rolled namespace binding tracker replacing `NsReader`'s binding
+/// maintenance over a plain [`Reader`] (change 0224).
+///
+/// Byte-exactness contract with quick-xml 0.41 `NsReader` (`ns_reader.rs`
+/// `process_event`/`read_event_impl` and `name.rs` `NamespaceResolver`):
+///
+/// - **push** runs for every `Start`/`Empty` event at any depth, before the
+///   event is handed to the handlers, so a namespace error preempts the
+///   validation error for the same element exactly as `read_event` returning
+///   `Err` did. The attribute scan uses the same
+///   `attributes().with_checks(false)` iterator and stops SILENTLY at the
+///   first malformed attribute, keeping bindings declared before it.
+/// - **declaration limit**: more than [`MAX_NS_DECLARATIONS_PER_ELEMENT`]
+///   `xmlns` attributes on one tag fail with
+///   `NamespaceError::TooManyDeclarations`, checked per declaration in
+///   attribute order.
+/// - **reserved prefixes**: `add` rejects, in attribute order and with the
+///   same precedence, binding `xml` to a foreign URI
+///   (`InvalidXmlPrefixBind`), declaring `xmlns` (`InvalidXmlnsPrefixBind`),
+///   binding another prefix to the xml URI (`InvalidPrefixForXml`), and
+///   binding any prefix to the xmlns URI (`InvalidPrefixForXmlns`). Binding
+///   `xml` to its reserved URI is a no-op. Errors are real
+///   [`NamespaceError`] values, so their `Display` (which is also
+///   `quick_xml::Error::Namespace`'s `Display`) is byte-identical by
+///   construction.
+/// - **unbinding**: `xmlns=""` / `xmlns:p=""` push a value-less binding;
+///   resolution maps an emptied default to `Unbound` and an emptied or
+///   missing prefix to `Unknown(prefix.to_vec())`, matching
+///   `resolve_prefix`.
+/// - **pending pop**: the caller applies [`BindingTracker::pop`] at the top
+///   of the next read iteration, never while delivering the `End`/`Empty`
+///   event itself, so an end tag still resolves in its own scope — the
+///   deferred `pending_pop` semantics of `NsReader::read_event_impl`.
+/// - **pre-bound entries**: `xml` and `xmlns` are bound at level 0 before any
+///   push, like `NamespaceResolver::default`.
+/// - **resolution**: `resolve_element` decomposes at the first `:` and scans
+///   bindings in reverse declaration order (last binding wins), the
+///   `resolve(name, use_default = true)` algorithm.
+///
+/// The one deliberate divergence: quick-xml counts nesting in a `u16`
+/// (wrapping in release, panicking in debug past depth 65 535); the tracker
+/// uses a `u32`. This is unobservable here — resolutions are only consumed
+/// for `Start`/`Empty` events at tracker level <= 3 — and strictly removes a
+/// panic path.
+///
+/// The `xmlns` prefilter: when a tag's raw attribute bytes contain no
+/// `xmlns` substring, no attribute key can start with `xmlns`, so the push
+/// can neither add a binding nor fail (every push error requires an
+/// `xmlns`-series key, and the malformed-attribute break is unobservable
+/// when no such key exists). The level increment is then the entire push.
+/// A raw attribute slice shorter than the needle cannot contain the
+/// substring, so it skips even the substring search.
+#[derive(Debug)]
+struct BindingTracker {
+    /// Flat byte buffer holding every in-scope prefix and URI, mirroring
+    /// `NamespaceResolver`'s single-buffer layout: one amortized allocation
+    /// for all names instead of two allocations per binding.
+    buffer: Vec<u8>,
+    /// Bindings in declaration order; levels are non-decreasing because a
+    /// push always appends at the current level and a pop truncates.
+    bindings: Vec<Binding>,
+    level: u32,
+}
+
+impl BindingTracker {
+    fn new() -> Self {
+        // `NamespaceResolver::default` pre-binds the reserved prefixes; mirror
+        // its allocation pattern (one flat buffer, one binding stack, no
+        // per-entry allocations).
+        let mut buffer = Vec::new();
+        let mut bindings = Vec::new();
+        for (prefix, uri) in [
+            (b"xml".as_slice(), XML_NAMESPACE),
+            (b"xmlns".as_slice(), XMLNS_NAMESPACE),
+        ] {
+            bindings.push(Binding {
+                start: buffer.len(),
+                prefix_len: prefix.len(),
+                value_len: uri.len(),
+                level: 0,
+            });
+            buffer.extend_from_slice(prefix);
+            buffer.extend_from_slice(uri);
+        }
+        Self {
+            buffer,
+            bindings,
+            level: 0,
+        }
+    }
+
+    /// Replicate `NamespaceResolver::push` for one `Start`/`Empty` element.
+    ///
+    /// Inline fast path: a raw attribute slice shorter than `xmlns` can
+    /// never contain the substring, so the prefilter and the scan it gates
+    /// are both skipped and the level increment is the entire push.
+    #[inline]
+    fn push(&mut self, element: &BytesStart<'_>) -> std::result::Result<(), NamespaceError> {
+        self.level += 1;
+        if element.attributes_raw().len() < b"xmlns".len() {
+            return Ok(());
+        }
+        self.push_scanned(element)
+    }
+
+    /// The prefilter-gated attribute scan of [`BindingTracker::push`], kept
+    /// out of line so the bare-tag fast path carries none of the scan
+    /// machinery (its stack frame, the `memmem` search, the attribute
+    /// iterator).
+    fn push_scanned(
+        &mut self,
+        element: &BytesStart<'_>,
+    ) -> std::result::Result<(), NamespaceError> {
+        if memmem::find(element.attributes_raw(), b"xmlns").is_none() {
+            return Ok(());
+        }
+        let mut count = 0usize;
+        for attribute in element.attributes().with_checks(false) {
+            // `with_checks(false)` plus a silent break on the first malformed
+            // attribute: the exact scan `NamespaceResolver::push` performs.
+            let Ok(attribute) = attribute else {
+                break;
+            };
+            if let Some(prefix) = attribute.key.as_namespace_binding() {
+                if count >= MAX_NS_DECLARATIONS_PER_ELEMENT {
+                    return Err(NamespaceError::TooManyDeclarations(
+                        MAX_NS_DECLARATIONS_PER_ELEMENT,
+                    ));
+                }
+                count += 1;
+                self.add(prefix, &attribute.value)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Replicate `NamespaceResolver::add` for one `xmlns` declaration.
+    fn add(
+        &mut self,
+        prefix: PrefixDeclaration<'_>,
+        uri: &[u8],
+    ) -> std::result::Result<(), NamespaceError> {
+        let level = self.level;
+        match prefix {
+            PrefixDeclaration::Default => {
+                let start = self.buffer.len();
+                self.buffer.extend_from_slice(uri);
+                self.bindings.push(Binding {
+                    start,
+                    prefix_len: 0,
+                    value_len: uri.len(),
+                    level,
+                });
+            },
+            PrefixDeclaration::Named(b"xml") => {
+                if uri != XML_NAMESPACE {
+                    return Err(NamespaceError::InvalidXmlPrefixBind(uri.to_vec()));
+                }
+                // Binding `xml` to its reserved URI adds no entry.
+            },
+            PrefixDeclaration::Named(b"xmlns") => {
+                return Err(NamespaceError::InvalidXmlnsPrefixBind(uri.to_vec()));
+            },
+            PrefixDeclaration::Named(prefix) => {
+                if uri == XML_NAMESPACE {
+                    return Err(NamespaceError::InvalidPrefixForXml(prefix.to_vec()));
+                }
+                if uri == XMLNS_NAMESPACE {
+                    return Err(NamespaceError::InvalidPrefixForXmlns(prefix.to_vec()));
+                }
+                let start = self.buffer.len();
+                self.buffer.extend_from_slice(prefix);
+                self.buffer.extend_from_slice(uri);
+                self.bindings.push(Binding {
+                    start,
+                    prefix_len: prefix.len(),
+                    value_len: uri.len(),
+                    level,
+                });
+            },
+        }
+        Ok(())
+    }
+
+    /// Replicate `NamespaceResolver::pop` (`set_level(level - 1)`): drop every
+    /// binding declared deeper than the new level, truncating the flat buffer
+    /// at the first dropped binding's start exactly as `set_level` does.
+    fn pop(&mut self) {
+        self.level = self.level.saturating_sub(1);
+        // From the back (most deeply nested scope), look for the first scope
+        // that is still valid — the `set_level` scan.
+        match self
+            .bindings
+            .iter()
+            .rposition(|binding| binding.level <= self.level)
+        {
+            // None of the bindings are valid: remove all of them.
+            None => {
+                self.buffer.clear();
+                self.bindings.clear();
+            },
+            // Drop all bindings past the last valid one, only when there is
+            // something to drop (`set_level`'s `get(last + 1)` guard).
+            Some(last_kept) => {
+                if let Some(len) = self
+                    .bindings
+                    .get(last_kept + 1)
+                    .map(|binding| binding.start)
+                {
+                    self.buffer.truncate(len);
+                    self.bindings.truncate(last_kept + 1);
+                }
+            },
+        }
+    }
+
+    /// Replicate `NamespaceResolver::resolve(name, use_default = true)`.
+    fn resolve_element<'n>(&self, name: QName<'n>) -> (ResolveResult<'_>, LocalName<'n>) {
+        let (local_name, prefix) = name.decompose();
+        (self.resolve_prefix(prefix), local_name)
+    }
+
+    /// Replicate `NamespaceResolver::resolve_prefix`: scan bindings in reverse
+    /// declaration order so the last binding wins; an emptied or missing
+    /// prefixed binding resolves to `Unknown`, an emptied default to
+    /// `Unbound`, without scanning further back.
+    fn resolve_prefix(&self, prefix: Option<Prefix<'_>>) -> ResolveResult<'_> {
+        let mut bindings = self.bindings.iter().rev();
+        match prefix {
+            None => match bindings.find(|binding| binding.prefix_len == 0) {
+                Some(binding) if binding.value_len != 0 => {
+                    ResolveResult::Bound(Namespace(binding.value(&self.buffer)))
+                },
+                _ => ResolveResult::Unbound,
+            },
+            Some(prefix) => {
+                let prefix = prefix.into_inner();
+                match bindings.find(|binding| binding.prefix(&self.buffer) == Some(prefix)) {
+                    Some(binding) if binding.value_len != 0 => {
+                        ResolveResult::Bound(Namespace(binding.value(&self.buffer)))
+                    },
+                    _ => ResolveResult::Unknown(prefix.to_vec()),
+                }
+            },
+        }
+    }
+}
 
 /// The two-handler fused open parse over `content.xml`.
 pub(crate) struct OpenParse {
@@ -81,16 +375,29 @@ impl OpenParse {
         let mut styles = StyleHandler::default();
         let mut style_error = None;
 
-        let mut reader = NsReader::from_str(content_xml);
+        let mut reader = Reader::from_str(content_xml);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
+        let mut tracker = BindingTracker::new();
+        let mut pending_pop = false;
         loop {
             // Borrowing read: events borrow `content_xml` directly, avoiding
-            // the per-event buffer copy of the `_into` API. Binding push/pop
-            // still runs inside `read_event` for every event, so
-            // prefix-rebinding semantics are unchanged, and the tokenization
+            // the per-event buffer copy of the `_into` API. The tokenization
             // error stream is identical to the historical validation-first
-            // read (which tokenized the same bytes and read to EOF).
+            // read (which tokenized the same bytes and read to EOF): the
+            // plain `Reader` here is the same tokenizer `NsReader` wraps,
+            // with the same configuration.
+            //
+            // Binding maintenance replicates `NsReader::read_event_impl`'s
+            // ordering: a deferred pop of the previous `End`/`Empty` scope
+            // runs before the read, and the push for a `Start`/`Empty` runs
+            // before the event is classified, so a namespace error preempts
+            // the validation error for the same element, exactly where
+            // `read_event` returned `Err` historically.
+            if pending_pop {
+                tracker.pop();
+                pending_pop = false;
+            }
             let event = match reader.read_event() {
                 Ok(event) => event,
                 Err(error) => {
@@ -99,6 +406,24 @@ impl OpenParse {
                     )));
                 },
             };
+            match &event {
+                Event::Start(element) => {
+                    // `NamespaceError`'s `Display` is what
+                    // `quick_xml::Error::Namespace` forwards to, so this
+                    // message is byte-identical to the `NsReader` failure.
+                    tracker.push(element).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                    })?;
+                },
+                Event::Empty(element) => {
+                    tracker.push(element).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                    })?;
+                    pending_pop = true;
+                },
+                Event::End(_) => pending_pop = true,
+                _ => {},
+            }
             // The ValidateHandler consumes the resolved namespace only in its
             // Start/Empty arms at depth <= 2 (root, `office:body`,
             // `office:forms`/family element — the same arms as the standalone
@@ -106,10 +431,12 @@ impl OpenParse {
             // never resolves. Bindings declared at depth >= 3 scope just their
             // own subtree, so no consumed resolution can change. Resolve only
             // where the result is observable, exactly where the historical
-            // validation loop classified it.
+            // validation loop classified it. The tracker still maintains
+            // bindings (and its byte-exact error stream) for every event at
+            // any depth, as `NsReader` did.
             let office = match &event {
                 Event::Start(element) | Event::Empty(element) if validate.depth <= 2 => {
-                    let (namespace, _) = reader.resolver().resolve_element(element.name());
+                    let (namespace, _) = tracker.resolve_element(element.name());
                     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                 },
                 _ => false,
@@ -468,6 +795,11 @@ mod tests {
     /// Pre-0221 oracle: the buffered, fully-resolved fused open-parse loop,
     /// retained verbatim to cross-check the borrowing, depth-gated
     /// [`OpenParse::run`] on the synthetic edge cases and the fixture corpus.
+    /// Since change 0224 it doubles as the `NsReader` differential oracle for
+    /// the plain-`Reader` + [`BindingTracker`] driving loop: it still performs
+    /// quick-xml's own binding maintenance (and resolves every event), so any
+    /// divergence in the tracker's push/pop/error-stream replication shows up
+    /// here.
     fn run_buffered_oracle(content_xml: &str) -> Result<OpenParse> {
         use litchi_core::Error;
         use quick_xml::events::Event;
@@ -868,6 +1200,407 @@ mod tests {
         for (label, xml) in &cases {
             assert_gated_equivalent(label, xml);
         }
+    }
+
+    /// Change 0224 differential battery: every byte-exactness obligation of
+    /// the [`BindingTracker`] contract (push scan, silent break, declaration
+    /// limit, reserved-prefix errors in attribute order, unbinding, deferred
+    /// pop) is exercised against the `NsReader` oracle, including errors
+    /// raised by binding maintenance at depth >= 3.
+    #[test]
+    fn tracker_matches_nsreader_on_namespace_edge_cases() {
+        const XML_URI: &str = "http://www.w3.org/XML/1998/namespace";
+        const XMLNS_URI: &str = "http://www.w3.org/2000/xmlns/";
+        let minimal = document(r#"<office:body><office:text/></office:body>"#);
+        let declarations = |count: usize| {
+            (0..count)
+                .map(|index| format!(r#"xmlns:d{index}="urn:d""#))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+
+        let cases: Vec<(String, String)> = vec![
+            // The malformed-attribute scan break keeps bindings declared
+            // before the break (root stays bound) and never reaches bindings
+            // declared after it.
+            (
+                "malformed-attribute-after-xmlns-on-root".to_string(),
+                minimal.replace(r#" office:version="1.4""#, " bad="),
+            ),
+            (
+                "malformed-attribute-before-xmlns-on-root".to_string(),
+                format!(
+                    r#"<office:document-content broken= xmlns:office="{OFFICE}"><office:body><office:text/></office:body></office:document-content>"#
+                ),
+            ),
+            (
+                "empty-attribute-key-breaks-scan".to_string(),
+                minimal.replace(&format!(r#"xmlns:text="{TEXT}""#), r#"="x""#),
+            ),
+            // The 256-declaration limit fires identically at any depth.
+            (
+                "declarations-at-limit-accepted".to_string(),
+                document(&format!(
+                    r#"<office:body><office:text><text:p {}>x</text:p></office:text></office:body>"#,
+                    declarations(256)
+                )),
+            ),
+            (
+                "declarations-over-limit-deep".to_string(),
+                document(&format!(
+                    r#"<office:body><office:text><text:p {}>x</text:p></office:text></office:body>"#,
+                    declarations(257)
+                )),
+            ),
+            (
+                "declarations-over-limit-on-root".to_string(),
+                minimal.replace(
+                    r#"<office:document-content"#,
+                    &format!("<office:document-content {}", declarations(257)),
+                ),
+            ),
+            // Reserved-prefix rules, each firing on the root and deep inside
+            // the body (depth >= 3 maintenance must not be gated).
+            (
+                "xml-prefix-foreign-uri-on-root".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:text="{TEXT}""#),
+                    r#"xmlns:xml="urn:wrong""#,
+                ),
+            ),
+            (
+                "xml-prefix-foreign-uri-deep".to_string(),
+                document(
+                    r#"<office:body><office:text><text:p xmlns:xml="urn:wrong">x</text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "xml-prefix-reserved-uri-accepted".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:text="{TEXT}""#),
+                    &format!(r#"xmlns:xml="{XML_URI}""#),
+                ),
+            ),
+            (
+                "xmlns-prefix-declared-on-root".to_string(),
+                minimal.replace(&format!(r#"xmlns:text="{TEXT}""#), r#"xmlns:xmlns="urn:x""#),
+            ),
+            (
+                "prefix-bound-to-xml-uri".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:text="{TEXT}""#),
+                    &format!(r#"xmlns:foo="{XML_URI}""#),
+                ),
+            ),
+            (
+                "prefix-bound-to-xmlns-uri-deep".to_string(),
+                document(&format!(
+                    r#"<office:body><office:text><text:p xmlns:foo="{XMLNS_URI}">x</text:p></office:text></office:body>"#
+                )),
+            ),
+            // The first failing declaration wins, in attribute order.
+            (
+                "reserved-error-ordering-xmlns-uri-first".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:text="{TEXT}""#),
+                    &format!(r#"xmlns:foo="{XMLNS_URI}" xmlns:xml="urn:wrong""#),
+                ),
+            ),
+            (
+                "reserved-error-ordering-xml-first".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:text="{TEXT}""#),
+                    &format!(r#"xmlns:xml="urn:wrong" xmlns:foo="{XMLNS_URI}""#),
+                ),
+            ),
+            // Unbinding: an emptied prefix resolves `Unknown` (rejects at the
+            // consumed depth), an emptied default resolves `Unbound`.
+            (
+                "prefix-unbound-on-body-rejected".to_string(),
+                minimal.replace("<office:body>", r#"<office:body xmlns:office="">"#),
+            ),
+            (
+                "prefix-unbound-deep-accepted".to_string(),
+                document(
+                    r#"<office:body><office:text><text:p xmlns:text=""><text:span/></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "default-namespace-unbound-at-body".to_string(),
+                format!(
+                    r#"<document-content xmlns="{OFFICE}"><body xmlns=""><text/></body></document-content>"#
+                ),
+            ),
+            (
+                "default-namespace-rebound-after-unbinding".to_string(),
+                format!(
+                    r#"<document-content xmlns="{OFFICE}"><body xmlns=""><x xmlns="{OFFICE}"></x><text/></body></document-content>"#
+                ),
+            ),
+            // Duplicate declarations: no duplicate check (`with_checks(false)`),
+            // the last binding wins on resolution.
+            (
+                "duplicate-xmlns-last-wins-accepted".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:office="{OFFICE}""#),
+                    &format!(r#"xmlns:office="urn:wrong" xmlns:office="{OFFICE}""#),
+                ),
+            ),
+            (
+                "duplicate-xmlns-last-wins-rejected".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:office="{OFFICE}""#),
+                    &format!(r#"xmlns:office="{OFFICE}" xmlns:office="urn:wrong""#),
+                ),
+            ),
+            // Declaration values stay raw and undecoded: an entity reference
+            // in the URI is never expanded, so the binding cannot match.
+            (
+                "entity-in-xmlns-value-stays-raw".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:office="{OFFICE}""#),
+                    &format!(r#"xmlns:office="{OFFICE}&amp;""#),
+                ),
+            ),
+            // Single quotes and whitespace variants around declarations.
+            (
+                "single-quoted-xmlns-value".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:office="{OFFICE}""#),
+                    &format!("xmlns:office='{OFFICE}'"),
+                ),
+            ),
+            (
+                "spaced-xmlns-declaration".to_string(),
+                minimal.replace(
+                    &format!(r#"xmlns:office="{OFFICE}""#),
+                    &format!(r#"xmlns:office = "{OFFICE}""#),
+                ),
+            ),
+            // Element names in the `xmlns` series are not declarations; the
+            // prefilter must fall through to the full scan harmlessly.
+            (
+                "xmlns-named-element-deep".to_string(),
+                document(
+                    r#"<office:body><office:text><text:p><xmlnsfoo xmlns2="v"/></text:p></office:text></office:body>"#,
+                ),
+            ),
+        ];
+        // Asserting only cross-implementation agreement would let a toothless
+        // case pass (e.g. if an "error" input were silently accepted by both
+        // sides); pin the expected outcome of every case as well.
+        let expected_outcomes: &[(&str, bool)] = &[
+            ("malformed-attribute-after-xmlns-on-root", true),
+            ("malformed-attribute-before-xmlns-on-root", false),
+            ("empty-attribute-key-breaks-scan", true),
+            ("declarations-at-limit-accepted", true),
+            ("declarations-over-limit-deep", false),
+            ("declarations-over-limit-on-root", false),
+            ("xml-prefix-foreign-uri-on-root", false),
+            ("xml-prefix-foreign-uri-deep", false),
+            ("xml-prefix-reserved-uri-accepted", true),
+            ("xmlns-prefix-declared-on-root", false),
+            ("prefix-bound-to-xml-uri", false),
+            ("prefix-bound-to-xmlns-uri-deep", false),
+            ("reserved-error-ordering-xmlns-uri-first", false),
+            ("reserved-error-ordering-xml-first", false),
+            ("prefix-unbound-on-body-rejected", false),
+            ("prefix-unbound-deep-accepted", true),
+            ("default-namespace-unbound-at-body", false),
+            ("default-namespace-rebound-after-unbinding", false),
+            ("duplicate-xmlns-last-wins-accepted", true),
+            ("duplicate-xmlns-last-wins-rejected", false),
+            ("entity-in-xmlns-value-stays-raw", false),
+            ("single-quoted-xmlns-value", true),
+            ("spaced-xmlns-declaration", true),
+            ("xmlns-named-element-deep", true),
+        ];
+        assert_eq!(
+            cases.len(),
+            expected_outcomes.len(),
+            "every battery case needs a pinned outcome"
+        );
+        for ((label, xml), (_, expect_ok)) in cases.iter().zip(expected_outcomes) {
+            assert_gated_equivalent(label, xml);
+            assert_eq!(
+                fused(xml).is_ok(),
+                *expect_ok,
+                "{label}: unexpected accept/reject outcome"
+            );
+        }
+    }
+
+    /// Per-event element-name resolutions from the new `Reader` + tracker
+    /// driving loop, recorded for every `Start`/`Empty`/`End` event at every
+    /// depth (not only the consumed depth <= 2 ones).
+    fn tracker_resolutions(xml: &str) -> std::result::Result<Vec<String>, String> {
+        use quick_xml::reader::Reader;
+
+        let mut reader = Reader::from_str(xml);
+        reader.config_mut().check_end_names = true;
+        reader.config_mut().check_comments = true;
+        let mut tracker = super::BindingTracker::new();
+        let mut pending_pop = false;
+        let mut resolutions = Vec::new();
+        loop {
+            if pending_pop {
+                tracker.pop();
+                pending_pop = false;
+            }
+            let event = reader
+                .read_event()
+                .map_err(|error| format!("invalid ODT content.xml: {error}"))?;
+            match &event {
+                quick_xml::events::Event::Start(element) => {
+                    if let Err(error) = tracker.push(element) {
+                        return Err(format!("invalid ODT content.xml: {error}"));
+                    }
+                    resolutions.push(format!(
+                        "start:{:?}",
+                        tracker.resolve_element(element.name()).0
+                    ));
+                },
+                quick_xml::events::Event::Empty(element) => {
+                    if let Err(error) = tracker.push(element) {
+                        return Err(format!("invalid ODT content.xml: {error}"));
+                    }
+                    resolutions.push(format!(
+                        "empty:{:?}",
+                        tracker.resolve_element(element.name()).0
+                    ));
+                    pending_pop = true;
+                },
+                quick_xml::events::Event::End(element) => {
+                    // The scope pop is deferred to the next read, so the end
+                    // tag still resolves in its own scope.
+                    resolutions.push(format!(
+                        "end:{:?}",
+                        tracker.resolve_element(element.name()).0
+                    ));
+                    pending_pop = true;
+                },
+                quick_xml::events::Event::Eof => break,
+                _ => {},
+            }
+        }
+        Ok(resolutions)
+    }
+
+    /// The same resolutions from `NsReader`'s fully-resolved event stream
+    /// (`read_resolved_event_into` resolves every `Start`/`Empty`/`End` name).
+    fn nsreader_resolutions(xml: &str) -> std::result::Result<Vec<String>, String> {
+        use quick_xml::reader::NsReader;
+
+        let mut reader = NsReader::from_str(xml);
+        reader.config_mut().check_end_names = true;
+        reader.config_mut().check_comments = true;
+        let mut buffer = Vec::new();
+        let mut resolutions = Vec::new();
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| format!("invalid ODT content.xml: {error}"))?;
+            match &event {
+                quick_xml::events::Event::Start(_) => {
+                    resolutions.push(format!("start:{namespace:?}"));
+                },
+                quick_xml::events::Event::Empty(_) => {
+                    resolutions.push(format!("empty:{namespace:?}"));
+                },
+                quick_xml::events::Event::End(_) => {
+                    resolutions.push(format!("end:{namespace:?}"));
+                },
+                quick_xml::events::Event::Eof => break,
+                _ => {},
+            }
+            buffer.clear();
+        }
+        Ok(resolutions)
+    }
+
+    fn assert_resolutions_equivalent(label: &str, xml: &str) {
+        assert_eq!(
+            tracker_resolutions(xml),
+            nsreader_resolutions(xml),
+            "{label}: tracker and NsReader per-event resolutions disagree"
+        );
+    }
+
+    /// Resolution fidelity at every depth: rebinding, unbinding, reserved
+    /// prefixes, default namespaces, and error preemption, plus the whole
+    /// `BindingTracker`-relevant synthetic battery.
+    #[test]
+    fn tracker_matches_nsreader_resolutions_on_synthetic_cases() {
+        let cases: Vec<(&str, String)> = vec![
+            (
+                "minimal",
+                document(r#"<office:body><office:text/></office:body>"#),
+            ),
+            (
+                "rebinding-nested",
+                document(
+                    r#"<office:body><office:text><text:p xmlns:office="urn:evil"><office:annotation/></text:p><text:p><office:annotation/></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "rebinding-on-empty",
+                document(r#"<office:body xmlns:office="urn:evil"/><office:text/>"#),
+            ),
+            (
+                "unbinding-and-restore",
+                document(
+                    r#"<office:body><office:text><text:p xmlns:text=""><text:span/><x xmlns:text="urn:other"><text:span/></x></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "default-namespace-mixed-with-prefixed",
+                format!(
+                    r#"<document-content xmlns="{OFFICE}" xmlns:office="urn:other"><body><text/><office:note/></body></document-content>"#
+                ),
+            ),
+            (
+                "reserved-xml-prefix-element-names",
+                document(
+                    r#"<office:body><office:text><text:p xml:space="preserve"><xml:thing/><xmlns:other/></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "unknown-prefixes-at-all-depths",
+                document(
+                    r#"<office:body><office:text><text:p><a:b><c:d/></a:b></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "duplicate-declarations-last-wins",
+                document(
+                    r#"<office:body><office:text><text:p xmlns:text="urn:first" xmlns:text="urn:second"><text:span/></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "error-stops-stream",
+                document(
+                    r#"<office:body><office:text><text:p xmlns:xml="urn:wrong">x</text:p><text:p/></office:text></office:body>"#,
+                ),
+            ),
+        ];
+        for (label, xml) in &cases {
+            assert_resolutions_equivalent(label, xml);
+        }
+    }
+
+    #[test]
+    fn tracker_matches_nsreader_resolutions_on_odt_corpus() {
+        let files = corpus_files();
+        assert!(!files.is_empty(), "no .odt corpus fixtures discovered");
+        let mut compared = 0usize;
+        for path in &files {
+            let Some(xml) = content_xml(path) else {
+                continue;
+            };
+            assert_resolutions_equivalent(&path.display().to_string(), &xml);
+            compared += 1;
+        }
+        assert!(compared > 0, "no .odt corpus fixtures yielded content.xml");
     }
 
     #[test]

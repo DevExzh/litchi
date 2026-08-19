@@ -3,6 +3,26 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0224`](changes/0224-odt-openparse-binding-tracker.md)
+(0224 replaces `NsReader` in `OpenParse::run` with a plain `Reader` plus a
+hand-rolled `BindingTracker` — the binding push/error stream replicated
+byte-exactly (real `NamespaceError` values, so messages are identical by
+construction; silent-break push scan, 256-declaration limit, unbinding
+asymmetry, deferred pop, error preemption) plus an `xmlns` memmem
+prefilter with a length-gated inline fast path and a flat-buffer binding
+layout mirroring quick-xml's allocator pattern. Differential oracles pin
+per-event resolutions at every depth across 24 adversarial cases and the
+full corpus (898 litchi-odt tests). v1 showed a reproduced tiny-shape
+(24-paragraph) p50 regression — diagnosed as a real fixed ~1.5 µs/open
+overhead vs ~17 ns/paragraph saving (crossover ~70 paragraphs) and fixed
+in v2; the harness's reported `results[0]` is the tiny shape, so the
+medium/large wins (−11.6%/−24.1% p50) are documented as analysis
+evidence. **Banked**: `odt_file_eager_open` p50/mean/p99
+**9.41%-13.07% / 9.86%-14.48% / 14.01%-25.39%** (0223 floors),
+`odt_file_source_open` p50 **21.85%-23.05%** (pre-floor),
+`odt_file_source_open_full_text_lifecycle` mean **9.39%-11.77%** (0223
+floor); `odt_semantic_open` no claim (drift/floor) but no adverse.
+Candidate `48bd4072…` is the control for the next change.)
 [`change 0223`](changes/0223-odt-source-path-floor-calibration.md)
 (0223 is a methodology calibration, not a code change — the 0218 analog
 extended to the ODT source-path and eager-open phases 0218 did not cover.
