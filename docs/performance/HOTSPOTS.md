@@ -3,6 +3,30 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0227`](changes/0227-odt-text-binding-tracker.md)
+(0227 removes `NsReader`'s per-event `process_event` binding maintenance
+(profiled at 9.1%-18.1% of timed on the text-path phases) from the 0217
+discard-but-validate text path: the 0224 `BindingTracker` is lifted to a
+shared `pub(crate)` module `litchi-odt::binding_tracker` (plus a new
+`resolve_attribute`), and `parse_text_block_texts` drives a plain
+borrowing `Reader` with hand-maintained push/pop — byte-identical
+tokenization, namespace errors, and resolutions by construction, the
+0225 memo intact. Attribute validation is generalized over a private
+`TextAttributeResolver` trait so the retained/selected paths keep their
+`NsReader` untouched. Differential oracles: the lockstep
+tracker-vs-`NsReader` per-event replay across the corpus, an
+adversarial reserved-prefix/declaration-limit battery with
+byte-identical error strings (901 litchi-odt tests). **Banked**:
+`odt_semantic_full_text` p50 **9.44%-13.32%**, `odt_repeated_text_cached`
+p50/mean/p95 **17.57%-18.52% / 17.66%-18.11% / 13.60%-17.56%**,
+`odt_repeated_text_uncached` ALL FOUR (rerun 0227r, superseding the
+primary's anomalous b1 leg) **18.79%-20.32% / 18.45%-20.37% /
+17.43%-21.68% / 8.65%-18.10%**,
+`odt_file_source_open_full_text_lifecycle` p50/mean
+**10.37%-13.34% / 9.10%-13.15%**; guardrails clean, within-floor, or
+cleared-by-rerun. The ODT open/text paths are now floor-fighting; next
+is the calibration-first DOCX pivot (0228 floor calibration staged).
+Candidate `1d503363…` is the control for the next change.)
 [`change 0226`](changes/0226-odt-source-open-floor-calibration.md)
 (0226 is a methodology calibration, not a code change — the 0223 analog
 completing the `odt_file_source_open` floor set after 0225's verdict was

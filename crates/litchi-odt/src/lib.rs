@@ -296,6 +296,7 @@ pub(crate) use elements::field::{
 )]
 pub(crate) use elements::text::{Hyperlink, TextHyperlinkActuate, TextHyperlinkShow};
 
+mod binding_tracker;
 mod builder;
 mod document;
 mod dynamic_text;

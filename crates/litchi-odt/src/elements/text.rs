@@ -8,12 +8,14 @@ mod model;
 mod validation;
 
 use super::element::{Element, ElementBase, try_owned_string, try_prefixed_name};
+use crate::binding_tracker::BindingTracker;
 use litchi_core::{Error, Result};
 use memchr::memmem;
 use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesRef, BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
+use quick_xml::name::{LocalName, Namespace, QName, ResolveResult};
+use quick_xml::reader::{NsReader, Reader};
 
 pub use codec::Elements;
 pub use model::{Block, Kind, LinkActuate, LinkShow};
@@ -1247,6 +1249,59 @@ fn may_declare_namespace(element: &BytesStart<'_>) -> bool {
     raw.len() >= b"xmlns".len() && memmem::find(raw, b"xmlns").is_some()
 }
 
+/// Attribute-name resolution and value decoding for the text-attribute
+/// helpers, abstracting over the two namespace machineries driving the text
+/// loops: `NsReader` (retained and selected paths) and the change-0227
+/// plain-[`Reader`] + [`BindingTracker`] pair (discard path). Both sides
+/// replicate `NamespaceResolver::resolve_attribute` (`use_default = false`)
+/// and expose the driving reader's decoder, so
+/// [`validate_text_block_attributes`] and [`text_space_count`] behave
+/// byte-identically under either.
+trait TextAttributeResolver {
+    /// Resolve an attribute qualified name exactly like
+    /// `NamespaceResolver::resolve_attribute`.
+    fn resolve_attribute<'n>(&self, name: QName<'n>) -> (ResolveResult<'_>, LocalName<'n>);
+    /// The driving reader's decoder, for attribute value normalization.
+    fn decoder(&self) -> Decoder;
+}
+
+impl TextAttributeResolver for NsReader<&[u8]> {
+    fn resolve_attribute<'n>(&self, name: QName<'n>) -> (ResolveResult<'_>, LocalName<'n>) {
+        self.resolver().resolve_attribute(name)
+    }
+
+    fn decoder(&self) -> Decoder {
+        // `NsReader` has no inherent `decoder`; it derefs to the inner
+        // `Reader`, whose decoder this exposes.
+        (**self).decoder()
+    }
+}
+
+/// The [`BindingTracker`] + decoder pair of the discard path (change 0227).
+/// The decoder is the plain reader's, the same UTF-8 pass-through
+/// `NsReader::from_str` carries.
+struct TrackedAttributes<'a> {
+    tracker: &'a BindingTracker,
+    decoder: Decoder,
+}
+
+impl TextAttributeResolver for TrackedAttributes<'_> {
+    fn resolve_attribute<'n>(&self, name: QName<'n>) -> (ResolveResult<'_>, LocalName<'n>) {
+        self.tracker.resolve_attribute(name)
+    }
+
+    fn decoder(&self) -> Decoder {
+        self.decoder
+    }
+}
+
+/// Build the discard path's attribute resolver for one call site (the
+/// tracker is mutably borrowed between resolutions, so the adapter cannot
+/// outlive a single call).
+fn tracked_attributes(tracker: &BindingTracker, decoder: Decoder) -> TrackedAttributes<'_> {
+    TrackedAttributes { tracker, decoder }
+}
+
 /// Last-resolution memo for the text-namespace classification of
 /// [`parse_text_block_texts`].
 ///
@@ -1294,7 +1349,7 @@ impl TextNamespaceMemo {
     /// the last verdict when the binding content and prefix are unchanged.
     fn is_text_namespace(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        tracker: &BindingTracker,
         content_version: u64,
         element: &BytesStart<'_>,
     ) -> Result<bool> {
@@ -1306,9 +1361,9 @@ impl TextNamespaceMemo {
             return Ok(self.is_text);
         }
         // Miss: resolve directly, exactly as `resolve_event` does for element
-        // events (`use_default = true`).
+        // events (`use_default = true`, baked into `resolve_prefix`).
         let is_text = matches!(
-            reader.resolver().resolve_prefix(element.name().prefix(), true),
+            tracker.resolve_prefix(element.name().prefix()),
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE
         );
         self.has_prefix = prefix.is_some();
@@ -1347,8 +1402,14 @@ impl TextNamespaceMemo {
 /// unreachable, since the tag derives from the same `b"p" | b"h"` match that
 /// started the block.
 pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
-    let mut reader = NsReader::from_str(xml_content);
-    let mut buffer = Vec::new();
+    // Plain reader + hand-rolled binding maintenance (change 0227): the
+    // tracker replicates the push/pop `NsReader` performs inside its read
+    // (the `BindingTracker` byte-exactness contract), and the borrowing read
+    // drops the per-event buffer copy of `read_event_into`.
+    let mut reader = Reader::from_str(xml_content);
+    let decoder = reader.decoder();
+    let mut tracker = BindingTracker::new();
+    let mut pending_pop = false;
     let mut blocks: Vec<Option<String>> = Vec::new();
     let mut active: Vec<ActiveTextBlockText> = Vec::new();
     let mut document_depth = 0usize;
@@ -1359,25 +1420,40 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
     // Last-resolution memo state (see `TextNamespaceMemo`): a monotone
     // content version of the binding stack, one flag per open `Start` scope
     // recording whether that scope could declare namespaces, and a marker
-    // that the previous event's deferred pop (executed inside the next read)
-    // removed bindings.
+    // that the previous event's deferred pop removed bindings.
     let mut memo = TextNamespaceMemo::new();
     let mut content_version = 0u64;
     let mut declared_stack: Vec<bool> = Vec::new();
     let mut pop_removed_bindings = false;
 
     loop {
+        // The deferred pop of the previous `End`/`Empty` scope runs before
+        // the read, exactly where `NsReader::read_event_impl` applies it.
+        if pending_pop {
+            tracker.pop();
+            pending_pop = false;
+        }
+        // Borrowing read: events borrow `xml_content` directly. The plain
+        // `Reader` is the same tokenizer `NsReader` wraps, with the same
+        // default configuration, so the tokenization error stream is
+        // unchanged.
         let event = reader
-            .read_event_into(&mut buffer)
+            .read_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))?;
-        // The deferred pop of the previous `End`/`Empty` scope ran inside
-        // that read; invalidate the memo before any resolution below.
+        // The deferred pop above removed bindings when this flag is set;
+        // invalidate the memo before any resolution below.
         if pop_removed_bindings {
             content_version += 1;
             pop_removed_bindings = false;
         }
         // This bookkeeping precedes every `continue` below because the
-        // reader maintains bindings inside skipped subtrees too.
+        // tracker maintains bindings inside skipped subtrees too.
+        //
+        // The push for a `Start`/`Empty` runs before the classification, so
+        // a namespace error preempts the event exactly where `NsReader`'s
+        // read returned `Err`. A push error is a real `NamespaceError`,
+        // whose `Display` is what `quick_xml::Error::Namespace` forwards to,
+        // so the message is byte-identical to the historical failure.
         //
         // `resolve_event` maps `Start`/`Empty` to
         // `resolve_prefix(name().prefix(), use_default = true)` and every
@@ -1385,6 +1461,9 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
         // consumed here), so only `Start`/`Empty` go through the memo.
         let text_namespace = match event {
             Event::Start(ref element) => {
+                tracker.push(element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
+                })?;
                 let declares = may_declare_namespace(element);
                 try_push(
                     &mut declared_stack,
@@ -1392,20 +1471,26 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                     "ODT namespace-declaration stack",
                 )?;
                 // The element's own declarations are in scope for its
-                // resolution (the push ran inside the read).
+                // resolution (the push ran above).
                 if declares {
                     content_version += 1;
                 }
-                memo.is_text_namespace(&reader, content_version, element)?
+                memo.is_text_namespace(&tracker, content_version, element)?
             },
             Event::Empty(ref element) => {
+                tracker.push(element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
+                })?;
+                // The scope an `Empty` element opens closes immediately:
+                // defer its pop to the top of the next iteration.
+                pending_pop = true;
                 if may_declare_namespace(element) {
                     // Push for this event, then a deferred pop before the
                     // next one: both change the binding content.
                     content_version += 1;
                     pop_removed_bindings = true;
                 }
-                memo.is_text_namespace(&reader, content_version, element)?
+                memo.is_text_namespace(&tracker, content_version, element)?
             },
             _ => false,
         };
@@ -1422,12 +1507,10 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
 
                 if tracked_changes_depth > 0 {
                     tracked_changes_depth += 1;
-                    buffer.clear();
                     continue;
                 }
                 if is_text_element(text_namespace, element, b"tracked-changes") {
                     tracked_changes_depth = 1;
-                    buffer.clear();
                     continue;
                 }
 
@@ -1449,7 +1532,10 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                     // Attribute validation precedes slot reservation, matching
                     // the retained path's `make_text_block_element`-before-
                     // `reserve_text_block` evaluation order.
-                    validate_text_block_attributes(&reader, element)?;
+                    validate_text_block_attributes(
+                        &tracked_attributes(&tracker, decoder),
+                        element,
+                    )?;
                     let slot = reserve_text_block_text(&mut blocks)?;
                     active.push(ActiveTextBlockText {
                         depth: 1,
@@ -1464,7 +1550,12 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                     {
                         skipped_depth = 1;
                     } else {
-                        append_text_control(&reader, text_namespace, element, &mut current.text)?;
+                        append_text_control(
+                            &tracked_attributes(&tracker, decoder),
+                            text_namespace,
+                            element,
+                            &mut current.text,
+                        )?;
                     }
                 }
             },
@@ -1478,10 +1569,18 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                     // (`reserve_text_block` before `make_text_block_element`);
                     // keep that order.
                     let slot = reserve_text_block_text(&mut blocks)?;
-                    validate_text_block_attributes(&reader, element)?;
+                    validate_text_block_attributes(
+                        &tracked_attributes(&tracker, decoder),
+                        element,
+                    )?;
                     store_text_block_text(String::new(), slot, &mut blocks, &mut total_text_bytes)?;
                 } else if let Some(current) = active.last_mut() {
-                    append_text_control(&reader, text_namespace, element, &mut current.text)?;
+                    append_text_control(
+                        &tracked_attributes(&tracker, decoder),
+                        text_namespace,
+                        element,
+                        &mut current.text,
+                    )?;
                 }
             },
             Event::Text(ref value) if tracked_changes_depth == 0 && skipped_depth == 0 => {
@@ -1513,10 +1612,11 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                 }
             },
             Event::End(_) => {
-                // The deferred pop of this scope executes inside the next
-                // read; record now whether it will remove bindings. An
-                // unbalanced stack is malformed input the reader rejects
+                // The deferred pop of this scope executes at the top of the
+                // next iteration; record now whether it will remove bindings.
+                // An unbalanced stack is malformed input the reader rejects
                 // anyway, so conservatively treat it as declaring.
+                pending_pop = true;
                 if declared_stack.pop().unwrap_or(true) {
                     pop_removed_bindings = true;
                 }
@@ -1525,7 +1625,6 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                 })?;
                 if tracked_changes_depth > 0 {
                     tracked_changes_depth -= 1;
-                    buffer.clear();
                     continue;
                 }
                 skipped_depth = skipped_depth.saturating_sub(1);
@@ -1549,7 +1648,6 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
     }
 
     if !active.is_empty() || tracked_changes_depth != 0 || skipped_depth != 0 || document_depth != 0
@@ -1883,7 +1981,10 @@ fn parse_selected_text_block_element(
 /// discard branch of [`parse_selected_text_block_element`] lifted into a
 /// shared shape; both copies must stay in lockstep with
 /// [`make_text_block_element`].
-fn validate_text_block_attributes(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) -> Result<()> {
+fn validate_text_block_attributes<R: TextAttributeResolver + ?Sized>(
+    resolver: &R,
+    source: &BytesStart<'_>,
+) -> Result<()> {
     let mut discarded_names = Vec::new();
     for attribute in source.attributes() {
         let attribute = attribute.map_err(|error| {
@@ -1892,7 +1993,7 @@ fn validate_text_block_attributes(reader: &NsReader<&[u8]>, source: &BytesStart<
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
-        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
         let local_name = std::str::from_utf8(local_name.as_ref()).map_err(|_error| {
             Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
         })?;
@@ -1921,7 +2022,7 @@ fn validate_text_block_attributes(reader: &NsReader<&[u8]>, source: &BytesStart<
             },
         };
         let _value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, resolver.decoder())
             .map_err(|error| {
                 Error::InvalidFormat(format!("invalid ODF text attribute value: {error}"))
             })?;
@@ -1965,8 +2066,8 @@ fn append_selected_text_control(
     Ok(())
 }
 
-fn append_text_control(
-    reader: &NsReader<&[u8]>,
+fn append_text_control<R: TextAttributeResolver + ?Sized>(
+    resolver: &R,
     text_namespace: bool,
     element: &BytesStart<'_>,
     output: &mut String,
@@ -1976,7 +2077,7 @@ fn append_text_control(
     }
     match element.local_name().as_ref() {
         b"s" => {
-            let count = text_space_count(reader, element)?.unwrap_or(1);
+            let count = text_space_count(resolver, element)?.unwrap_or(1);
             if count > MAX_SPACE_COUNT {
                 return Err(Error::InvalidFormat(format!(
                     "text:s count exceeds {MAX_SPACE_COUNT}"
@@ -2006,12 +2107,15 @@ fn append_text_control(
     Ok(())
 }
 
-fn text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<usize>> {
+fn text_space_count<R: TextAttributeResolver + ?Sized>(
+    resolver: &R,
+    element: &BytesStart<'_>,
+) -> Result<Option<usize>> {
     let mut count = None;
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid text:s attribute: {error}")))?;
-        let (namespace, local_name) = reader.resolver().resolve_attribute(attribute.key);
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
         if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE)
             && local_name.as_ref() == b"c"
         {
@@ -2021,7 +2125,7 @@ fn text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resul
                 ));
             }
             let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, resolver.decoder())
                 .map_err(|error| {
                     Error::InvalidFormat(format!("invalid text:c attribute: {error}"))
                 })?;
@@ -2819,15 +2923,25 @@ mod tests {
 
     /// Replay the bookkeeping of `parse_text_block_texts` event by event,
     /// asserting every memo verdict equals a fresh direct resolution against
-    /// the live resolver. Panic-free here is not a concern: test-only.
+    /// the live resolver. The tracker is maintained in parallel with the
+    /// `NsReader` oracle — deferred pop at the top of the iteration, push
+    /// before the classification — replicating the production loop, so a
+    /// verdict match also pins tracker-vs-`NsReader` resolution parity.
+    /// Panic-free here is not a concern: test-only.
     fn assert_memo_classification_matches(xml: &str) {
         let mut reader = NsReader::from_str(xml);
         let mut buffer = Vec::new();
+        let mut tracker = BindingTracker::new();
+        let mut pending_pop = false;
         let mut memo = TextNamespaceMemo::new();
         let mut content_version = 0u64;
         let mut declared_stack: Vec<bool> = Vec::new();
         let mut pop_removed_bindings = false;
         loop {
+            if pending_pop {
+                tracker.pop();
+                pending_pop = false;
+            }
             let event = reader
                 .read_event_into(&mut buffer)
                 .expect("test XML must parse");
@@ -2837,21 +2951,29 @@ mod tests {
             }
             match event {
                 Event::Start(ref element) => {
+                    tracker
+                        .push(element)
+                        .expect("test XML namespaces must be valid");
                     let declares = may_declare_namespace(element);
                     declared_stack.push(declares);
                     if declares {
                         content_version += 1;
                     }
-                    assert_memo_hit_matches(&reader, &mut memo, content_version, element);
+                    assert_memo_hit_matches(&reader, &tracker, &mut memo, content_version, element);
                 },
                 Event::Empty(ref element) => {
+                    tracker
+                        .push(element)
+                        .expect("test XML namespaces must be valid");
+                    pending_pop = true;
                     if may_declare_namespace(element) {
                         content_version += 1;
                         pop_removed_bindings = true;
                     }
-                    assert_memo_hit_matches(&reader, &mut memo, content_version, element);
+                    assert_memo_hit_matches(&reader, &tracker, &mut memo, content_version, element);
                 },
                 Event::End(_) => {
+                    pending_pop = true;
                     if declared_stack.pop().unwrap_or(true) {
                         pop_removed_bindings = true;
                     }
@@ -2865,6 +2987,7 @@ mod tests {
 
     fn assert_memo_hit_matches(
         reader: &NsReader<&[u8]>,
+        tracker: &BindingTracker,
         memo: &mut TextNamespaceMemo,
         content_version: u64,
         element: &BytesStart<'_>,
@@ -2874,7 +2997,7 @@ mod tests {
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE
         );
         let memoized = memo
-            .is_text_namespace(reader, content_version, element)
+            .is_text_namespace(tracker, content_version, element)
             .expect("test XML fits the memo prefix buffer");
         assert_eq!(
             memoized,
@@ -2951,6 +3074,107 @@ mod tests {
                     "unexpected extracted text for fixture {index}"
                 );
             }
+        }
+    }
+
+    // ========== 0227 binding-tracker differential pins ==========
+
+    /// Namespace-error and attribute-resolution parity between the
+    /// tracker-driven discard path (change 0227) and the `NsReader`-driven
+    /// retained oracle: identical outcomes and byte-identical error strings.
+    #[test]
+    fn tracker_driven_path_matches_ns_reader_oracle_on_adversarial_namespaces() {
+        let text_ns = std::str::from_utf8(TEXT_NAMESPACE).unwrap();
+        let xml_ns = "http://www.w3.org/XML/1998/namespace";
+        let xmlns_ns = "http://www.w3.org/2000/xmlns/";
+
+        // --- Reserved-prefix and reserved-URI errors (push failures) ---
+        let error_fixtures: Vec<String> = vec![
+            // Declaring the `xmlns` prefix itself.
+            format!(r#"<t:p xmlns:t="{text_ns}" xmlns:xmlns="urn:example:x">x</t:p>"#),
+            // Binding `xml` to a foreign URI.
+            format!(r#"<t:p xmlns:t="{text_ns}" xmlns:xml="urn:example:x">x</t:p>"#),
+            // Binding another prefix to the reserved xml URI.
+            format!(r#"<t:p xmlns:t="{text_ns}" xmlns:q="{xml_ns}">x</t:p>"#),
+            // Binding a prefix to the reserved xmlns URI.
+            format!(r#"<t:p xmlns:t="{text_ns}" xmlns:q="{xmlns_ns}">x</t:p>"#),
+            // The same failures on a nested element mid-stream, after a
+            // successful block: the push error preempts the event exactly
+            // where `NsReader`'s read error did.
+            format!(
+                r#"<t:p xmlns:t="{text_ns}">A</t:p><t:p xmlns:t="{text_ns}"><t:span xmlns:xmlns="urn:example:x">B</t:span></t:p>"#
+            ),
+            // A namespace error on an `Empty` element.
+            format!(r#"<t:p xmlns:t="{text_ns}">A</t:p><t:s xmlns:xml="urn:example:x"/>"#),
+            // Malformed declaration mid-scan (`xmlns:t` with no value): the
+            // tokenizer and both readers reject it identically.
+            format!(r#"<t:p xmlns:t="{text_ns}"><t:s xmlns:t=">#</t:p>"#),
+        ];
+        for xml in &error_fixtures {
+            assert_memo_matches_direct_resolution(xml);
+            let message = extract_text_error(xml);
+            assert!(
+                message.starts_with("Invalid format: invalid ODF text XML:"),
+                "unexpected error for {xml}: {message}"
+            );
+        }
+
+        // --- Declaration-limit parity: 256 declarations pass, 257 fail ---
+        // (`xmlns:t` below accounts for one declaration on the tag).
+        let declarations = |count: usize| {
+            (0..count)
+                .map(|index| format!(r#"xmlns:d{index}="urn:example:{index}""#))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let within_limit = format!(r#"<t:p xmlns:t="{text_ns}" {}>x</t:p>"#, declarations(255));
+        assert_memo_matches_direct_resolution(&within_limit);
+        assert_eq!(parse_text_block_texts(&within_limit).unwrap(), ["x"]);
+        let over_limit = format!(r#"<t:p xmlns:t="{text_ns}" {}>x</t:p>"#, declarations(256));
+        assert_memo_matches_direct_resolution(&over_limit);
+        assert!(
+            extract_text_error(&over_limit).starts_with("Invalid format: invalid ODF text XML:")
+        );
+
+        // --- Benign reserved bindings and attribute resolution ---
+        let ok_fixtures: Vec<(String, Vec<&str>)> = vec![
+            // Rebinding `xml` to its reserved URI is a no-op.
+            (
+                format!(r#"<t:p xmlns:t="{text_ns}" xmlns:xml="{xml_ns}">x</t:p>"#),
+                vec!["x"],
+            ),
+            // `text:c` on `text:s` resolves through the tracker's
+            // `resolve_attribute` under a second prefix bound to the text
+            // namespace.
+            (
+                format!(r#"<t:p xmlns:t="{text_ns}" xmlns:a="{text_ns}">A<t:s a:c="3"/>B</t:p>"#),
+                vec!["A   B"],
+            ),
+            // An unprefixed `c` attribute does NOT fall back to the default
+            // namespace (`use_default = false` for attributes): `text:s`
+            // contributes the default single space.
+            (
+                format!(r#"<t:p xmlns:t="{text_ns}" xmlns="{text_ns}">A<t:s c="5"/>B</t:p>"#),
+                vec!["A B"],
+            ),
+            // An emptied binding (`xmlns:t=""`) shadows the outer prefix
+            // inside the scope: the inner `t:s` element name itself resolves
+            // to `Unknown`, so the whole control is skipped rather than
+            // counted.
+            (
+                format!(
+                    r#"<t:p xmlns:t="{text_ns}">A<t:s><t:inner xmlns:t=""><t:s t:c="9"/></t:inner></t:s>B</t:p>"#
+                ),
+                vec!["A B"],
+            ),
+        ];
+        for (xml, expected) in &ok_fixtures {
+            assert_memo_matches_direct_resolution(xml);
+            assert_eq!(
+                parse_text_block_texts(xml).unwrap(),
+                *expected,
+                "unexpected extracted text for {xml}"
+            );
         }
     }
 
