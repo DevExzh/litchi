@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0220-odf-validator-borrowing-reads",
+  "artifacts": [
+    {
+      "path": "ods-file-source-open-0220r-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 3435,
+      "compressed_sha256": "a96a21973008101795767d82a761c2a2a0ee1ea0744adb284f3564d6e7f88b33",
+      "uncompressed_bytes": 55798,
+      "uncompressed_sha256": "2b75fbc34571ab1fa51e5e44ed55e86528c0c1a3d62131b0702a3f75b0d9e25a"
+    },
+    {
+      "path": "ods-file-source-open-0220r-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 3449,
+      "compressed_sha256": "83e712f864b66caff7ed09ac49de10b7a97acf63948eb71a448e6f8cebc731a6",
+      "uncompressed_bytes": 55798,
+      "uncompressed_sha256": "a3728766690089413e4db8ef424a3f1fe3c09385657f2ef4c69f99f1121732c1"
+    },
+    {
+      "path": "ods-file-source-open-0220r-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 3444,
+      "compressed_sha256": "c1b03cf8c26a357f439077e7a689df2bc65eba551edce8e633fc284ccebe8e6b",
+      "uncompressed_bytes": 55799,
+      "uncompressed_sha256": "f010ca110cb73d0d8028dd246504654ee7e60fc09f4d525e90edf6e1550b17dd"
+    },
+    {
+      "path": "ods-file-source-open-0220r-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 3450,
+      "compressed_sha256": "2c388f8f67c4b3654ab782da74beb49ec3002c21f7c7c779294dbbcbb2cba77a",
+      "uncompressed_bytes": 55791,
+      "uncompressed_sha256": "a6c5ef23d0096cbdebdd50719a4b749d61f0eb929ef41eb686b978fcf049ffd5"
+    },
+    {
+      "path": "ods-file-source-open-0220r-summary.json",
+      "role": "derived_summary",
+      "bytes": 4445,
+      "sha256": "3658a7fce15a1e47f0b6e70878c77316ebfee809f70dc96c04fe9e8346a729e1"
+    }
+  ]
+}

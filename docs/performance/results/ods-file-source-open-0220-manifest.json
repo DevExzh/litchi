@@ -37,8 +37,8 @@
     {
       "path": "ods-file-source-open-0220-summary.json",
       "role": "derived_summary",
-      "bytes": 4030,
-      "sha256": "7814a6f00583f05257c27e12a6dc4c52e80310cc481215556b5cca744fa71585"
+      "bytes": 4353,
+      "sha256": "eb30b11e19de52a8954f96c4a0b5639361e41afa28b4eb4e849ecd6488bf855e"
     }
   ]
 }

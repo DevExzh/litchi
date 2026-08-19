@@ -37,8 +37,8 @@
     {
       "path": "odp-semantic-open-0220-summary.json",
       "role": "derived_summary",
-      "bytes": 3997,
-      "sha256": "0d446bd52a0fe8ab5db9d40cbbdf6c78eb38371a80bb7a9944e0d8079ef3f2fc"
+      "bytes": 4094,
+      "sha256": "fefa2bcdfdb1bcfe82afd46612928ded27df6f9c717f8a76bbe77a851d7c517d"
     }
   ]
 }

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
   "decision": "banked",
-  "claim_scope": "byte-identical phase; p50 accepted favorable (layout reading, not claimed); primary p95 adverse-both (-13.30/-26.38, max 26.38% over the 0218 full-text p95 floor of 16.1%) -> single permitted rerun, cleared (see *-0220r-)",
+  "claim_scope": "rerun: the primary p95 adverse pattern did NOT reproduce (+15.72/+21.76, favorable both dirs) - cleared; p50/mean accepted favorable, sub-floor layout readings; no adverse-both statistic",
   "protocol": {
     "order": [
       "a1_control",
@@ -52,65 +52,65 @@
     "elapsed_ns": {
       "legs_ns": {
         "a1": {
-          "p50": 6780.0,
-          "mean": 7126.568,
-          "p95": 8511.0,
-          "p99": 15191.0
+          "p50": 6359.0,
+          "mean": 6718.006,
+          "p95": 9243.0,
+          "p99": 10414.0
         },
         "b1": {
-          "p50": 6409.0,
-          "mean": 6874.126,
-          "p95": 9643.0,
-          "p99": 14449.0
+          "p50": 6329.0,
+          "mean": 6534.146,
+          "p95": 7790.0,
+          "p99": 10425.0
         },
         "b2": {
-          "p50": 6449.0,
-          "mean": 6716.024,
-          "p95": 8782.0,
-          "p99": 10294.0
+          "p50": 6368.0,
+          "mean": 6548.224,
+          "p95": 6769.0,
+          "p99": 10504.0
         },
         "a2": {
-          "p50": 6469.0,
-          "mean": 6693.294,
-          "p95": 6949.0,
-          "p99": 10154.0
+          "p50": 6429.0,
+          "mean": 6670.596,
+          "p95": 8652.0,
+          "p99": 10404.0
         }
       },
       "candidate_reduction_percent": {
         "a1_to_b1": {
-          "p50": 5.471976,
-          "mean": 3.542266,
-          "p95": -13.300435,
-          "p99": 4.884471
+          "p50": 0.471772,
+          "mean": 2.736824,
+          "p95": 15.720004,
+          "p99": -0.105627
         },
         "a2_to_b2": {
-          "p50": 0.309167,
-          "mean": -0.339594,
-          "p95": -26.377896,
-          "p99": -1.378767
+          "p50": 0.948826,
+          "mean": 1.834499,
+          "p95": 21.763754,
+          "p99": -0.961169
         }
       },
       "same_implementation_drift_percent": {
         "control": {
-          "p50": -4.587021,
-          "mean": -6.079701,
-          "p95": -18.35272,
-          "p99": -33.157791
+          "p50": 1.100802,
+          "mean": -0.705715,
+          "p95": -6.394028,
+          "p99": -0.096025
         },
         "candidate": {
-          "p50": 0.624122,
-          "mean": -2.299958,
-          "p95": -8.928757,
-          "p99": -28.756315
+          "p50": 0.616211,
+          "mean": 0.215453,
+          "p95": -13.106547,
+          "p99": 0.757794
         }
       },
       "accepted_statistics": [
-        "p50"
+        "p50",
+        "mean"
       ],
       "rejected_statistics": {
-        "mean": "paired directions disagree; control drift -6.08% exceeds 5%",
-        "p95": "paired directions disagree; control drift -18.35% exceeds 10%",
-        "p99": "paired directions disagree; control drift -33.16% exceeds 15%; candidate drift -28.76% exceeds 15%"
+        "p95": "candidate drift -13.11% exceeds 10%",
+        "p99": "paired directions disagree"
       }
     }
   },

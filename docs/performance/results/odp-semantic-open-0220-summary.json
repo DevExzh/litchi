@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
-  "decision": "analysis-pending",
-  "claim_scope": "pending",
+  "decision": "banked",
+  "claim_scope": "byte-identical phase; paired directions disagree on all four statistics - clean guardrail, no adverse-both pattern",
   "protocol": {
     "order": [
       "a1_control",

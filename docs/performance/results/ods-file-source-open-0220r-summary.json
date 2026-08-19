@@ -2,7 +2,7 @@
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
   "decision": "banked",
-  "claim_scope": "byte-identical phase; p50 accepted favorable (layout reading, not claimed); primary p95 adverse-both (-13.30/-26.38, max 26.38% over the 0218 full-text p95 floor of 16.1%) -> single permitted rerun, cleared (see *-0220r-)",
+  "claim_scope": "rerun: p50/mean adverse-both reproduced within floor (max 2.97/3.34 vs 5.5/5.5); p95 adverse-both reproduced at -4.90/-3.67 (max 4.90%, marginally over the 4.5% floor) - above-floor layout reading, FLAGGED for monitoring in the next ODF guardrail set; non-attributable: zero changed code reachable on the phase (sole caller is the ODT owned open path) and per-sample read evidence is bit-identical across all 8 primary+rerun legs; floor unchanged (no post-hoc stretch)",
   "protocol": {
     "order": [
       "a1_control",
@@ -41,76 +41,75 @@
     "cargo_build_target": null
   },
   "corpus": {
-    "name": "odt-semantic-tiny",
-    "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
-    "archive_bytes": 2148,
-    "archive_member_count": 5
+    "name": "ods-media-publication",
+    "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+    "archive_bytes": 16790689,
+    "archive_member_count": 11
   },
-  "selector": "odt_semantic_full_text",
-  "timing_scope": null,
+  "selector": "ods_file_source_open",
+  "timing_scope": "unified_root_workbook_open",
   "cases": {
     "elapsed_ns": {
       "legs_ns": {
         "a1": {
-          "p50": 6780.0,
-          "mean": 7126.568,
-          "p95": 8511.0,
-          "p99": 15191.0
+          "p50": 1314784.5,
+          "mean": 1328057.202,
+          "p95": 1412895.0,
+          "p99": 1518639.0
         },
         "b1": {
-          "p50": 6409.0,
-          "mean": 6874.126,
-          "p95": 9643.0,
-          "p99": 14449.0
+          "p50": 1353102.5,
+          "mean": 1372479.764,
+          "p95": 1482149.0,
+          "p99": 1942490.0
         },
         "b2": {
-          "p50": 6449.0,
-          "mean": 6716.024,
-          "p95": 8782.0,
-          "p99": 10294.0
+          "p50": 1369200.5,
+          "mean": 1381078.54,
+          "p95": 1477464.0,
+          "p99": 1579273.0
         },
         "a2": {
-          "p50": 6469.0,
-          "mean": 6693.294,
-          "p95": 6949.0,
-          "p99": 10154.0
+          "p50": 1329726.0,
+          "mean": 1340606.47,
+          "p95": 1425222.0,
+          "p99": 1520313.0
         }
       },
       "candidate_reduction_percent": {
         "a1_to_b1": {
-          "p50": 5.471976,
-          "mean": 3.542266,
-          "p95": -13.300435,
-          "p99": 4.884471
+          "p50": -2.914394,
+          "mean": -3.344928,
+          "p95": -4.901567,
+          "p99": -27.909925
         },
         "a2_to_b2": {
-          "p50": 0.309167,
-          "mean": -0.339594,
-          "p95": -26.377896,
-          "p99": -1.378767
+          "p50": -2.968619,
+          "mean": -3.018937,
+          "p95": -3.665534,
+          "p99": -3.878149
         }
       },
       "same_implementation_drift_percent": {
         "control": {
-          "p50": -4.587021,
-          "mean": -6.079701,
-          "p95": -18.35272,
-          "p99": -33.157791
+          "p50": 1.136422,
+          "mean": 0.944934,
+          "p95": 0.872464,
+          "p99": 0.11023
         },
         "candidate": {
-          "p50": 0.624122,
-          "mean": -2.299958,
-          "p95": -8.928757,
-          "p99": -28.756315
+          "p50": 1.18971,
+          "mean": 0.626514,
+          "p95": -0.316095,
+          "p99": -18.698526
         }
       },
-      "accepted_statistics": [
-        "p50"
-      ],
+      "accepted_statistics": [],
       "rejected_statistics": {
-        "mean": "paired directions disagree; control drift -6.08% exceeds 5%",
-        "p95": "paired directions disagree; control drift -18.35% exceeds 10%",
-        "p99": "paired directions disagree; control drift -33.16% exceeds 15%; candidate drift -28.76% exceeds 15%"
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree",
+        "p99": "paired directions disagree; candidate drift -18.70% exceeds 15%"
       }
     }
   },

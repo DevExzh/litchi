@@ -290,7 +290,6 @@ pub fn validate_content_document_part(
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
-    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut root_closed = false;
     let mut body_seen = false;
@@ -300,13 +299,25 @@ pub fn validate_content_document_part(
     let mut first_event = true;
 
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
-            })?;
-        let office =
-            matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE);
+        // Borrowing read: events borrow `xml` directly, avoiding the
+        // per-event buffer copy of the `_into` API. Binding push/pop still
+        // runs inside `read_event` for every event, so prefix-rebinding
+        // semantics and the tokenization error stream are unchanged.
+        let event = reader.read_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
+        })?;
+        // The resolved namespace is consumed only by the Start/Empty arms at
+        // depth <= 2 below (root, `office:body`, `office:forms`/family
+        // element); deeper arms use `local_name()` only, and bindings declared
+        // at depth >= 3 scope just their own subtree, so no consumed
+        // resolution can change. Resolve only where the result is observable.
+        let office = match &event {
+            Event::Start(element) | Event::Empty(element) if depth <= 2 => {
+                let (namespace, _) = reader.resolver().resolve_element(element.name());
+                matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+            },
+            _ => false,
+        };
         match event {
             Event::Start(element) => {
                 if root_closed {
@@ -441,7 +452,6 @@ pub fn validate_content_document_part(
             Event::Comment(_) | Event::PI(_) | Event::CData(_) | Event::GeneralRef(_) => {},
         }
         first_event = false;
-        buffer.clear();
     }
 
     if !root_closed || depth != 0 || !body_seen || !expected_seen {
@@ -454,7 +464,7 @@ pub fn validate_content_document_part(
 
 #[cfg(test)]
 mod tests {
-    use super::{OwnedPackage, Package, validate_content_part};
+    use super::{OwnedPackage, Package, validate_content_document_part, validate_content_part};
     use std::io::{Cursor, Write};
 
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.presentation";
@@ -523,5 +533,707 @@ mod tests {
         };
         assert!(error.contains("ODG content.xml has no expected body"));
         Ok(())
+    }
+
+    /// Pre-0220 oracle: the historical buffered, fully-resolved
+    /// implementation of [`validate_content_document_part`], retained
+    /// byte-identically to cross-check the borrowing, depth-gated
+    /// implementation on both the synthetic edge cases and the fixture
+    /// corpus.
+    fn validate_content_document_part_oracle(
+        xml: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> litchi_core::Result<()> {
+        use litchi_core::Error;
+        use quick_xml::events::Event;
+        use quick_xml::name::{Namespace, ResolveResult};
+        use quick_xml::reader::NsReader;
+
+        if xml.len() > super::MAX_CONTENT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "{family_name} content.xml exceeds the family limit"
+            )));
+        }
+        let expected_local = body_marker
+            .strip_prefix("<office:")
+            .and_then(|marker| {
+                marker
+                    .split(|character: char| !character.is_ascii_alphanumeric() && character != '-')
+                    .next()
+            })
+            .filter(|local| !local.is_empty())
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!("{family_name} content.xml has no expected body"))
+            })?;
+        const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+        let mut reader = NsReader::from_str(xml);
+        reader.config_mut().check_end_names = true;
+        reader.config_mut().check_comments = true;
+        let mut buffer = Vec::new();
+        let mut depth = 0usize;
+        let mut root_closed = false;
+        let mut body_seen = false;
+        let mut expected_seen = false;
+        let mut in_body = false;
+        let mut declaration_seen = false;
+        let mut first_event = true;
+
+        loop {
+            let (namespace, event) =
+                reader
+                    .read_resolved_event_into(&mut buffer)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
+                    })?;
+            let office = matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE);
+            match event {
+                Event::Start(element) => {
+                    if root_closed {
+                        return Err(Error::InvalidFormat(format!(
+                            "{family_name} content.xml has content after its root"
+                        )));
+                    }
+                    let local = element.local_name();
+                    match depth {
+                        0 if office && local.as_ref() == b"document-content" => depth = 1,
+                        0 => {
+                            return Err(Error::InvalidFormat(format!(
+                                "{family_name} content.xml has the wrong root"
+                            )));
+                        },
+                        1 if office && local.as_ref() == b"body" && !body_seen => {
+                            body_seen = true;
+                            in_body = true;
+                            depth = 2;
+                        },
+                        1 if office && local.as_ref() == b"body" => {
+                            return Err(Error::InvalidFormat(format!(
+                                "{family_name} content.xml has duplicate office:body"
+                            )));
+                        },
+                        1 => {
+                            depth = depth.checked_add(1).ok_or_else(|| {
+                                Error::InvalidFormat(format!(
+                                    "{family_name} content.xml nesting overflows"
+                                ))
+                            })?
+                        },
+                        2 if in_body && office && local.as_ref() == b"forms" && !expected_seen => {
+                            depth = 3;
+                        },
+                        2 if in_body
+                            && office
+                            && local.as_ref() == expected_local.as_bytes()
+                            && !expected_seen =>
+                        {
+                            expected_seen = true;
+                            depth = 3;
+                        },
+                        2 if in_body => {
+                            return Err(Error::InvalidFormat(format!(
+                                "{family_name} content.xml has the wrong office body"
+                            )));
+                        },
+                        _ => {
+                            depth = depth.checked_add(1).ok_or_else(|| {
+                                Error::InvalidFormat(format!(
+                                    "{family_name} content.xml nesting overflows"
+                                ))
+                            })?
+                        },
+                    }
+                },
+                Event::Empty(element) => {
+                    if root_closed || depth == 0 {
+                        return Err(Error::InvalidFormat(format!(
+                            "{family_name} content.xml has an invalid empty root"
+                        )));
+                    }
+                    let local = element.local_name();
+                    if depth == 1 {
+                        if office && local.as_ref() == b"body" && !body_seen {
+                            body_seen = true;
+                        } else if office && local.as_ref() == b"body" {
+                            return Err(Error::InvalidFormat(format!(
+                                "{family_name} content.xml has duplicate office:body"
+                            )));
+                        }
+                    } else if in_body
+                        && depth == 2
+                        && office
+                        && local.as_ref() == b"forms"
+                        && !expected_seen
+                    {
+                        // `office:forms` may precede the family body.
+                    } else if in_body
+                        && depth == 2
+                        && office
+                        && local.as_ref() == expected_local.as_bytes()
+                        && !expected_seen
+                    {
+                        expected_seen = true;
+                    } else if in_body && depth == 2 {
+                        return Err(Error::InvalidFormat(format!(
+                            "{family_name} content.xml has the wrong office body"
+                        )));
+                    }
+                },
+                Event::End(_) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "{family_name} content.xml has an unexpected end"
+                        ))
+                    })?;
+                    if depth == 0 {
+                        root_closed = true;
+                    } else if in_body && depth == 1 {
+                        in_body = false;
+                    }
+                },
+                Event::Text(text) => {
+                    if (depth == 0 || root_closed) && !text.iter().all(u8::is_ascii_whitespace) {
+                        return Err(Error::InvalidFormat(format!(
+                            "{family_name} content.xml has unexpected text outside its root"
+                        )));
+                    }
+                },
+                Event::CData(_) | Event::GeneralRef(_) if depth == 0 || root_closed => {
+                    return Err(Error::InvalidFormat(format!(
+                        "{family_name} content.xml has content outside its root"
+                    )));
+                },
+                Event::DocType(_) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "{family_name} content.xml must not contain a doctype"
+                    )));
+                },
+                Event::GeneralRef(reference)
+                    if !crate::validation::valid_xml_reference(&reference) =>
+                {
+                    return Err(Error::InvalidFormat(format!(
+                        "{family_name} content.xml has an invalid character or entity reference"
+                    )));
+                },
+                Event::Decl(_) if declaration_seen || !first_event || depth != 0 || root_closed => {
+                    return Err(Error::InvalidFormat(format!(
+                        "{family_name} content.xml has an XML declaration outside its prologue"
+                    )));
+                },
+                Event::Decl(_) => declaration_seen = true,
+                Event::Eof => break,
+                Event::Comment(_) | Event::PI(_) | Event::CData(_) | Event::GeneralRef(_) => {},
+            }
+            first_event = false;
+            buffer.clear();
+        }
+
+        if !root_closed || depth != 0 || !body_seen || !expected_seen {
+            return Err(Error::InvalidFormat(format!(
+                "{family_name} content.xml has no complete expected body"
+            )));
+        }
+        Ok(())
+    }
+
+    const TEXT_MARKER: &str = "<office:text";
+    const OFFICE_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+
+    fn document(inner: &str) -> String {
+        format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NS}">{inner}</office:document-content>"#
+        )
+    }
+
+    fn assert_validator_parity(label: &str, xml: &str, body_marker: &str, family_name: &str) {
+        let expected = validate_content_document_part_oracle(xml, body_marker, family_name)
+            .map_err(|error| error.to_string());
+        let actual = validate_content_document_part(xml, body_marker, family_name)
+            .map_err(|error| error.to_string());
+        assert_eq!(
+            expected, actual,
+            "{label}: borrowing validator and buffered oracle disagree"
+        );
+    }
+
+    #[test]
+    fn borrowing_validator_matches_oracle_on_synthetic_edge_cases() {
+        let text_body = r#"<office:body><office:text/></office:body>"#;
+        let cases: Vec<(&str, String, &str, &str)> = vec![
+            (
+                "minimal-empty-family",
+                document(text_body),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "family-start-end",
+                document(r#"<office:body><office:text></office:text></office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "xml-decl-prologue",
+                format!(
+                    r#"<?xml version="1.0" encoding="UTF-8"?>{}"#,
+                    document(text_body)
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "comment-and-pi-prologue",
+                format!(r#"<!--c--><?p i?>{}"#, document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "forms-before-family",
+                document(r#"<office:body><office:forms/><office:text/></office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "forms-start-end-before-family",
+                document(
+                    r#"<office:body><office:forms></office:forms><office:text/></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "non-office-element-at-depth-one",
+                document(r#"<office:meta/><office:body><office:text/></office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "deep-prefix-rebinding-accepted",
+                document(
+                    r#"<office:body><office:text><text:p xmlns:office="urn:evil"><office:annotation/></text:p></office:text></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "unknown-prefix-deep-accepted",
+                document(
+                    r#"<office:body><office:text><text:p><weird:thing/></text:p></office:text></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "default-namespace-binding-accepted",
+                format!(
+                    r#"<document-content xmlns="{OFFICE_NS}"><body><text/></body></document-content>"#
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "aliased-prefix-binding-accepted",
+                format!(
+                    r#"<x:document-content xmlns:x="{OFFICE_NS}"><x:body><x:text/></x:body></x:document-content>"#
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "rebinding-on-body-hides-it",
+                document(text_body)
+                    .replace("<office:body>", r#"<office:body xmlns:office="urn:evil">"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "rebinding-on-empty-body-hides-it",
+                document(r#"<office:body xmlns:office="urn:evil"/><office:text/>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "rebinding-on-family-element-rejected",
+                document(text_body).replace(
+                    "<office:text/>",
+                    r#"<office:text xmlns:office="urn:evil"/>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "cdata-and-reference-inside-body",
+                document(
+                    r#"<office:body><office:text><text:p><![CDATA[x]]>&amp;&#x9;</text:p></office:text></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "whitespace-outside-root-accepted",
+                format!("  \n{} \t ", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            ("empty-input", String::new(), TEXT_MARKER, "ODT"),
+            (
+                "wrong-root",
+                document(text_body).replace("document-content", "document"),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "unknown-prefix-at-root",
+                document(text_body).replace(
+                    r#" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0""#,
+                    "",
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "duplicate-body",
+                document(r#"<office:body/><office:body><office:text/></office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "duplicate-empty-body",
+                document(r#"<office:body><office:text/></office:body><office:body/>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "wrong-office-body",
+                document(r#"<office:body><office:presentation/></office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "family-then-forms",
+                document(r#"<office:body><office:text/><office:forms/></office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "duplicate-family-element",
+                document(r#"<office:body><office:text/><office:text/></office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            ("missing-body", document(""), TEXT_MARKER, "ODT"),
+            (
+                "body-without-family",
+                document(r#"<office:body/>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "self-closing-root",
+                format!(r#"<office:document-content xmlns:office="{OFFICE_NS}"/>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "text-before-root",
+                format!("hello{}", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "text-after-root",
+                format!("{}tail", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "cdata-outside-root",
+                format!("<![CDATA[x]]>{}", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "reference-outside-root",
+                format!("&amp;{}", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "doctype-rejected",
+                format!("<!DOCTYPE office:document-content>{}", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "invalid-general-reference",
+                document(
+                    r#"<office:body><office:text><text:p>&nosuch;</text:p></office:text></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "invalid-character-reference",
+                document(
+                    r#"<office:body><office:text><text:p>&#xD800;</text:p></office:text></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "content-after-root",
+                format!("{}<extra></extra>", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "unclosed-elements-at-eof",
+                format!(r#"<office:document-content xmlns:office="{OFFICE_NS}"><office:body>"#),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "mismatched-end-tag-deep",
+                document(
+                    r#"<office:body><office:text><text:p></text:q></office:text></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "mismatched-end-tag-shallow",
+                format!(
+                    r#"<office:document-content xmlns:office="{OFFICE_NS}"><office:body></office:document-content>"#
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "truncated-tag-at-eof",
+                format!("{}<text:p", document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "double-hyphen-comment",
+                document(
+                    r#"<office:body><office:text><!-- a -- b --></office:text></office:body>"#,
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "decl-after-whitespace",
+                format!(r#" <?xml version="1.0"?>{}"#, document(text_body)),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "duplicate-decl",
+                format!(
+                    r#"<?xml version="1.0"?><?xml version="1.0"?>{}"#,
+                    document(text_body)
+                ),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "stray-end-tag",
+                "</office:document-content>".to_string(),
+                TEXT_MARKER,
+                "ODT",
+            ),
+            (
+                "other-family-marker",
+                document(r#"<office:body><office:table/></office:body>"#),
+                "<office:table",
+                "ODS",
+            ),
+            (
+                "other-family-mismatch",
+                document(r#"<office:body><office:text/></office:body>"#),
+                "<office:drawing",
+                "ODG",
+            ),
+        ];
+        for (label, xml, body_marker, family_name) in &cases {
+            assert_validator_parity(label, xml, body_marker, family_name);
+        }
+    }
+
+    #[test]
+    fn validator_error_messages_stay_pinned() {
+        let text_body = r#"<office:body><office:text/></office:body>"#;
+        let prefix = "Invalid format: ";
+        let cases: Vec<(&str, String, &str)> = vec![
+            (
+                "wrong-root",
+                document(text_body).replace("document-content", "document"),
+                "ODT content.xml has the wrong root",
+            ),
+            (
+                "duplicate-body",
+                document(r#"<office:body/><office:body><office:text/></office:body>"#),
+                "ODT content.xml has duplicate office:body",
+            ),
+            (
+                "wrong-office-body",
+                document(r#"<office:body><office:presentation/></office:body>"#),
+                "ODT content.xml has the wrong office body",
+            ),
+            (
+                "self-closing-root",
+                format!(r#"<office:document-content xmlns:office="{OFFICE_NS}"/>"#),
+                "ODT content.xml has an invalid empty root",
+            ),
+            (
+                "text-before-root",
+                format!("hello{}", document(text_body)),
+                "ODT content.xml has unexpected text outside its root",
+            ),
+            (
+                "cdata-outside-root",
+                format!("<![CDATA[x]]>{}", document(text_body)),
+                "ODT content.xml has content outside its root",
+            ),
+            (
+                "doctype",
+                format!("<!DOCTYPE office:document-content>{}", document(text_body)),
+                "ODT content.xml must not contain a doctype",
+            ),
+            (
+                "invalid-reference",
+                document(
+                    r#"<office:body><office:text><text:p>&nosuch;</text:p></office:text></office:body>"#,
+                ),
+                "ODT content.xml has an invalid character or entity reference",
+            ),
+            (
+                "decl-outside-prologue",
+                format!(r#" <?xml version="1.0"?>{}"#, document(text_body)),
+                "ODT content.xml has an XML declaration outside its prologue",
+            ),
+            (
+                "missing-body",
+                document(""),
+                "ODT content.xml has no complete expected body",
+            ),
+            (
+                "content-after-root",
+                format!("{}<extra></extra>", document(text_body)),
+                "ODT content.xml has content after its root",
+            ),
+            (
+                "stray-end-tag",
+                "</office:document-content>".to_string(),
+                "invalid ODT content.xml: ill-formed document: close tag \
+                 `</office:document-content>` does not match any open tag",
+            ),
+        ];
+        for (label, xml, expected) in &cases {
+            let actual = match validate_content_document_part(xml, TEXT_MARKER, "ODT") {
+                Err(error) => error.to_string(),
+                Ok(()) => panic!("{label}: expected validation failure"),
+            };
+            let expected = format!("{prefix}{expected}");
+            assert_eq!(&actual, &expected, "{label}: error message drifted");
+        }
+        // Tokenizer failures keep the quick_xml mapping prefix.
+        let malformed =
+            document(r#"<office:body><office:text><text:p></text:q></office:text></office:body>"#);
+        match validate_content_document_part(&malformed, TEXT_MARKER, "ODT") {
+            Err(error) => assert!(
+                error
+                    .to_string()
+                    .starts_with("Invalid format: invalid ODT content.xml: "),
+                "tokenizer error lost its mapping: {error}"
+            ),
+            Ok(()) => panic!("mismatched end tag accepted"),
+        }
+    }
+
+    fn odf_corpus_files() -> Vec<std::path::PathBuf> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("test-data");
+        let mut files = Vec::new();
+        collect_odf(&root, &mut files);
+        files.sort();
+        files
+    }
+
+    fn collect_odf(directory: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_odf(&path, files);
+            } else if path
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|extension| {
+                    matches!(
+                        extension,
+                        "odt"
+                            | "ods"
+                            | "odp"
+                            | "odg"
+                            | "ott"
+                            | "ots"
+                            | "otp"
+                            | "otg"
+                            | "fodt"
+                            | "fods"
+                            | "fodp"
+                            | "fodg"
+                    )
+                })
+            {
+                files.push(path);
+            }
+        }
+    }
+
+    fn corpus_content_xml(path: &std::path::Path) -> Option<(String, &'static str, &'static str)> {
+        let extension = path.extension()?.to_str()?;
+        let (flat, body_marker, family_name) = match extension {
+            "odt" | "ott" => (false, "<office:text", "ODT"),
+            "fodt" => (true, "<office:text", "ODT"),
+            "ods" | "ots" => (false, "<office:table", "ODS"),
+            "fods" => (true, "<office:table", "ODS"),
+            "odp" | "otp" => (false, "<office:presentation", "ODP"),
+            "fodp" => (true, "<office:presentation", "ODP"),
+            "odg" | "otg" => (false, "<office:drawing", "ODG"),
+            "fodg" => (true, "<office:drawing", "ODG"),
+            _ => return None,
+        };
+        let bytes = std::fs::read(path).ok()?;
+        if flat {
+            return String::from_utf8(bytes)
+                .ok()
+                .map(|xml| (xml, body_marker, family_name));
+        }
+        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+        let entry = reader.read("content.xml").ok()?;
+        String::from_utf8(entry)
+            .ok()
+            .map(|xml| (xml, body_marker, family_name))
+    }
+
+    #[test]
+    fn borrowing_validator_matches_oracle_on_odf_corpus() {
+        let files = odf_corpus_files();
+        assert!(!files.is_empty(), "no ODF corpus fixtures discovered");
+        let mut compared = 0usize;
+        for path in &files {
+            let Some((xml, body_marker, family_name)) = corpus_content_xml(path) else {
+                continue;
+            };
+            assert_validator_parity(&path.display().to_string(), &xml, body_marker, family_name);
+            compared += 1;
+        }
+        assert!(compared > 0, "no ODF corpus fixtures yielded content.xml");
     }
 }

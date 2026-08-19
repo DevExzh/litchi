@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "change": "0220-odf-validator-borrowing-reads",
-  "decision": "analysis-pending",
-  "claim_scope": "pending",
+  "decision": "banked",
+  "claim_scope": "executed phase; p50 claimed (min-direction 5.99% lower, over the 0218 open p50 floor of 3.3%); mean favorable both dirs but min-direction 5.69% within the 7.2% floor - neutral under rule 3; p95/p99 withheld (candidate/control drift over ceiling)",
   "protocol": {
     "order": [
       "a1_control",

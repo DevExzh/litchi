@@ -1798,6 +1798,29 @@ repeated-text-uncached 4.8%/4.1%; tails considerably wider), and the 0205
 banking rule extends unchanged to litchi-odt. See
 [`0218`](changes/0218-odt-layout-floor-calibration.md).
 
+Change 0219 is profiling and target-selection analysis only (no code
+change, no selector or CRUD closure; matrix unchanged): dwarf call-graph
+profiles of the three ODF family open workloads attributed the shared
+content validator `validate_content_document_part` (~69% of the timed
+`odt_semantic_open` call) to per-event buffer copies and per-event
+namespace resolution consumed only at depth ≤ 2, and selected the
+borrowing-reads + depth-gated-resolution target implemented as 0220. See
+[`0219`](changes/0219-odf-validator-reprofile.md).
+
+Change 0220 adds no selector or CRUD closure and leaves the matrix
+unchanged. It rewrites the shared ODF content validator with borrowing
+`read_event()` reads and depth-gated namespace resolution, with the
+pre-change body retained as a cfg(test) oracle (accept/reject parity and
+byte-identical error messages across synthetic edge cases and the full
+ODF corpus). The sole production caller is the ODT owned open path.
+**Banked**: `odt_semantic_open` p50 5.99%-7.30% lower (over the 0218
+floor) and `odt_file_eager_open` p95 19.12%-21.14% lower claimed; the
+`odt_semantic_full_text` p95 primary adverse was cleared by its rerun,
+and `ods_file_source_open` p95 is recorded as a flagged above-floor
+layout reading (max 4.90% vs the 4.5% floor) on a zero-changed-code
+phase, watch-listed for the next ODF change. See
+[`0220`](changes/0220-odf-validator-borrowing-reads.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
