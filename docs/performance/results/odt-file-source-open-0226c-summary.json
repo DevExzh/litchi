@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "change": "0226-odt-file-source-open-layout-floor-calibration",
+  "decision": "calibration-complete",
+  "claim_scope": "layout-noise calibration probe for change 0226 (never-executed padding, +7,744 B .text): adverse-both mean max 6.09%, p95 max 45.02%, p99 max 38.69% - pure layout noise. Contributes to the odt-file-source-open effective floor table p50 6.7 / mean 6.1 / p95 45.0 / p99 38.7 (0223 rule: worst observed magnitude, no margin)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "48bd4072fdc10f6be60c01fd3cc908c79f3cde07fa7768187ea3166ebd329ca2",
+      "candidate_sha256": "29277aa49e5bfb46cc53faf4efd5e6d05148dc084f7ba146daa759fbfddcc745",
+      "note": "control is the banked 0224 binary; probe c adds never-executed parser-shaped padding in litchi-odt (+7,744 B .text; layout-noise floor calibration, 0223-analog bracketing the 0225 candidate's -6,064 B shift in magnitude)"
+    }
+  },
+  "provenance": {
+    "source_revision": "c6b94046e5ebaee92f662f37029c91b8fd3039fd",
+    "source_state": "HEAD c6b94046e banked through 0224 (both binaries); the probe additionally carries never-executed padding in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-source-backed-repeated-text-media",
+    "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "archive_bytes": 16812034,
+    "archive_member_count": 13
+  },
+  "selector": "odt_file_source_open",
+  "timing_scope": "filesystem_read_or_path_open_and_unified_document_ownership_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 630276.0,
+          "mean": 636669.786,
+          "p95": 671227.0,
+          "p99": 803340.0
+        },
+        "b1": {
+          "p50": 634996.5,
+          "mean": 660468.544,
+          "p95": 866047.0,
+          "p99": 931886.0
+        },
+        "b2": {
+          "p50": 616701.5,
+          "mean": 667559.842,
+          "p95": 1014421.0,
+          "p99": 1044984.0
+        },
+        "a2": {
+          "p50": 620172.0,
+          "mean": 629261.65,
+          "p95": 699506.0,
+          "p99": 753469.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.748958,
+          "mean": -3.738007,
+          "p95": -29.024458,
+          "p99": -16.001444
+        },
+        "a2_to_b2": {
+          "p50": 0.559603,
+          "mean": -6.086211,
+          "p95": -45.019628,
+          "p99": -38.689714
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.603107,
+          "mean": -1.163576,
+          "p95": 4.213031,
+          "p99": -6.207957
+        },
+        "candidate": {
+          "p50": -2.881118,
+          "mean": 1.073677,
+          "p95": 17.132327,
+          "p99": 12.136463
+        }
+      },
+      "accepted_statistics": [],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree; candidate drift +17.13% exceeds 10%",
+        "p99": "paired directions disagree"
+      },
+      "adverse_both_statistics": [
+        "mean",
+        "p95",
+        "p99"
+      ]
+    }
+  },
+  "control_reference": {
+    "source": "odt-file-source-open-0225-{a1,a2} raw legs (control harness-0224-banked, 0225 run)",
+    "legs_ns": {
+      "a1": {
+        "p50": 591601.0,
+        "mean": 595253.24,
+        "p95": 624371.0,
+        "p99": 652009.0
+      },
+      "a2": {
+        "p50": 623299.5,
+        "mean": 632843.332,
+        "p95": 680048.0,
+        "p99": 818578.0
+      }
+    },
+    "drift_percent_0226_vs_0225_control": {
+      "p50": {
+        "a1_0226_vs_0225": 6.537345,
+        "a2_0226_vs_0225": -0.501765
+      },
+      "mean": {
+        "a1_0226_vs_0225": 6.957803,
+        "a2_0226_vs_0225": -0.565967
+      },
+      "p95": {
+        "a1_0226_vs_0225": 7.504513,
+        "a2_0226_vs_0225": 2.861269
+      },
+      "p99": {
+        "a1_0226_vs_0225": 23.209956,
+        "a2_0226_vs_0225": -7.953915
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}
