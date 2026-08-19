@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0221-odt-openparse-borrowing-reads",
+  "decision": "banked",
+  "claim_scope": "executed phase (source open + full-text lifecycle); p50/mean/p95 claimed (min-direction 20.55/20.74/22.24 lower, both directions, clean drifts; pre-floor rule); p99 rejected (candidate drift +17.90 over the 15% ceiling)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "1971c3adf37536d1fa0963d111b79dade639ea5b624150b985faa6ab02bf8713",
+      "candidate_sha256": "93c2279b9b5dff79bbfd58e028c5eedede38c3a917b9f3fc8edb86a4fb0641c7",
+      "note": "control is the banked 0220 binary; candidate adds the 0221 borrowing-reads + depth-gated resolution OpenParse::run change in litchi-odt"
+    }
+  },
+  "provenance": {
+    "source_revision": "9b717bb080d30c01ef2bf5d02d477b4589879ed9",
+    "source_state": "HEAD 4e94ee7d8 (banked through 0220, both binaries); the candidate additionally carries the 0221 OpenParse::run borrowing-reads change in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-source-backed-repeated-text-media",
+    "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "archive_bytes": 16812034,
+    "archive_member_count": 13
+  },
+  "selector": "odt_file_source_open_full_text_lifecycle",
+  "timing_scope": "filesystem_read_or_path_open_and_unified_document_full_text_query_inside_timer; corpus, temporary-file setup, semantic parity, archive identity, and source replay outside timer",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 3340558.0,
+          "mean": 3357172.018,
+          "p95": 3473496.0,
+          "p99": 3676167.0
+        },
+        "b1": {
+          "p50": 2567956.5,
+          "mean": 2577747.668,
+          "p95": 2681993.0,
+          "p99": 2769313.0
+        },
+        "b2": {
+          "p50": 2574310.5,
+          "mean": 2594741.422,
+          "p95": 2697244.0,
+          "p99": 3264928.0
+        },
+        "a2": {
+          "p50": 3240094.0,
+          "mean": 3273672.874,
+          "p95": 3468741.0,
+          "p99": 3621621.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 23.127918,
+          "mean": 23.216694,
+          "p95": 22.786927,
+          "p99": 24.668466
+        },
+        "a2_to_b2": {
+          "p50": 20.548277,
+          "mean": 20.739135,
+          "p95": 22.241413,
+          "p99": 9.848988
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -3.007402,
+          "mean": -2.487187,
+          "p95": -0.136894,
+          "p99": -1.483774
+        },
+        "candidate": {
+          "p50": 0.247434,
+          "mean": 0.659248,
+          "p95": 0.568644,
+          "p99": 17.896677
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "candidate drift +17.90% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

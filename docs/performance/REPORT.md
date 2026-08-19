@@ -11,6 +11,28 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ODT fused open-parse borrowing reads — banked (change 0221)
+
+[Change 0221](changes/0221-odt-openparse-borrowing-reads.md) replays the
+banked 0220 transformation on the fused source-backed ODT open
+(`OpenParse::run` in litchi-odt): borrowing `read_event()` reads plus
+depth-gated namespace resolution (Start/Empty at depth ≤ 2, the only arms
+consuming `office`; `StyleHandler` never resolves). The pre-change loop
+survives as a cfg(test) oracle with accept/reject and byte-identical
+error parity across 26 synthetic edge cases and all 69 ODT corpus
+fixtures (893 litchi-odt tests). **Banked** with the largest
+executed-phase wins of the series alongside 0217:
+`odt_file_source_open` p50/mean/p95 **43.28%-46.30%** lower and
+`odt_file_source_open_full_text_lifecycle` p50/mean/p95
+**20.55%-23.22%** lower, both directions, clean drifts. All five
+byte-identical guardrails are clean or within-floor: the
+`odt_semantic_open` p99 primary above-floor pattern (max 32.81% vs the
+28.2% floor) did not reproduce at magnitude in its rerun (max 11.68%),
+and the 0220 watch-listed `ods_file_source_open` p95 reads within floor
+under this layout (max 2.30%) — the 0220 flag is cleared, consistent with
+the layout-displacement attribution. Raw artifacts:
+`results/*-0221-*` and `results/*-0221r-*`.
+
 ## ODF content-validator borrowing reads — banked (change 0220)
 
 [Change 0220](changes/0220-odf-validator-borrowing-reads.md) rewrites the

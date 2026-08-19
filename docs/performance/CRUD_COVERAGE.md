@@ -1821,6 +1821,18 @@ layout reading (max 4.90% vs the 4.5% floor) on a zero-changed-code
 phase, watch-listed for the next ODF change. See
 [`0220`](changes/0220-odf-validator-borrowing-reads.md).
 
+Change 0221 adds no selector or CRUD closure and leaves the matrix
+unchanged. It replays the 0220 borrowing-reads + depth-gated-resolution
+transformation on the fused source-backed ODT open (`OpenParse::run`),
+with the pre-change loop retained as a cfg(test) oracle (parity across 26
+synthetic edge cases and 69 ODT fixtures, byte-identical errors).
+**Banked**: `odt_file_source_open` p50/mean/p95 43.28%-46.30% lower and
+`odt_file_source_open_full_text_lifecycle` p50/mean/p95 20.55%-23.22%
+lower; all guardrails clean or within-floor, and the 0220 watch-listed
+`ods_file_source_open` p95 read within floor under this layout — flag
+cleared. See
+[`0221`](changes/0221-odt-openparse-borrowing-reads.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

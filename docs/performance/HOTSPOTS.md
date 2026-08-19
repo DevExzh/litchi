@@ -3,6 +3,24 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0221`](changes/0221-odt-openparse-borrowing-reads.md)
+(0221 replays the banked 0220 transformation on the fused source-backed
+ODT open (`OpenParse::run`, litchi-odt): borrowing `read_event()` +
+depth-gated `resolve_element()` (Start/Empty, depth ≤ 2 — verified
+arm-by-arm; `StyleHandler` never resolves). Pre-change loop retained as a
+cfg(test) oracle; 2 new parity tests (26 synthetic edge cases + 69 ODT
+fixtures, byte-identical errors; 893 litchi-odt tests). **Banked**:
+`odt_file_source_open` p50/mean/p95 **43.28%-46.30%** lower and
+`odt_file_source_open_full_text_lifecycle` p50/mean/p95
+**20.55%-23.22%** lower, both directions, clean drifts — the largest
+executed-phase wins of the series alongside 0217. All guardrails clean or
+within-floor: the `odt_semantic_open` p99 primary above-floor pattern did
+not reproduce at magnitude in its rerun, and the 0220 watch-listed
+`ods_file_source_open` p95 reads within floor under this layout — flag
+CLEARED. Candidate `93c2279b…` is the control for the next change.
+Selected next: 0222 — promote the fused parse to the owned open path
+(0219 candidate B, re-quantified post-0220 at ~27% of timed
+`odt_semantic_open`).)
 [`change 0220`](changes/0220-odf-validator-borrowing-reads.md)
 (0220 rewrites the shared ODF content validator
 `validate_content_document_part` — ~69% of the timed `odt_semantic_open`
