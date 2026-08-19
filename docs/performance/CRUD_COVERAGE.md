@@ -1895,6 +1895,24 @@ supersede 0223's 2.5%/28.0%; lifecycle/eager floors unchanged). The 0205
 banking rule applies unchanged. See
 [`0226`](changes/0226-odt-source-open-floor-calibration.md).
 
+Change 0227 adds no selector or CRUD closure and leaves the matrix
+unchanged. It lifts the 0224 `BindingTracker` into the shared
+crate-private `litchi-odt::binding_tracker` module and rewires the
+discard-but-validate ODT text path (`parse_text_block_texts`) from
+`NsReader` to a plain borrowing `Reader` with hand-maintained binding
+push/pop, removing the per-event `process_event` cost while keeping the
+tokenization, namespace error stream, and the 0225 resolution memo
+byte-exact (lockstep tracker-vs-`NsReader` differential replay and an
+adversarial reserved-prefix/declaration-limit battery; 901 litchi-odt
+tests). **Banked**: `odt_semantic_full_text` p50 9.44%-13.32% lower,
+`odt_repeated_text_cached` p50/mean/p95 17.57%-18.52% / 17.66%-18.11% /
+13.60%-17.56% lower, `odt_repeated_text_uncached` p50/mean/p95/p99
+18.79%-20.32% / 18.45%-20.37% / 17.43%-21.68% / 8.65%-18.10% lower
+(rerun 0227r), `odt_file_source_open_full_text_lifecycle` p50/mean
+10.37%-13.34% / 9.10%-13.15% lower; guardrails clean, within-floor, or
+cleared by rerun. See
+[`0227`](changes/0227-odt-text-binding-tracker.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

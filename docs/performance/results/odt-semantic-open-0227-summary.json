@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0227-odt-text-binding-tracker",
+  "decision": "banked",
+  "claim_scope": "guardrail clean: no adverse-both statistic; accepted mean (+6.49/+3.11) below the 0218 open mean floor 7.2% - no claim",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "ec3dc81d69238edc4b8fe86e59529f5397d725628b56d24ff002285fb3a7d30a",
+      "candidate_sha256": "1d503363657f7badb0d2c321ca208dbe9e9cbf22765745fc8ccd1a1a7ab1e1cd",
+      "note": "control is the banked 0225 binary; candidate adds the 0227 text-path binding tracker in litchi-odt (plain Reader + BindingTracker replacing NsReader in parse_text_block_texts)"
+    }
+  },
+  "provenance": {
+    "source_revision": "4b3ffb2de903f96e78bde4506107194888dd7b5e",
+    "source_state": "HEAD 4b3ffb2de banked through 0225 (control); the candidate additionally carries the uncommitted 0227 text-path binding tracker in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-semantic-tiny",
+    "archive_sha256": "5653028560318043435e45fea3e41a3f4c09689cf966dfc0986e92340a5be83c",
+    "archive_bytes": 2148,
+    "archive_member_count": 5
+  },
+  "selector": "odt_semantic_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 17945.0,
+          "mean": 19837.324,
+          "p95": 27198.0,
+          "p99": 34168.0
+        },
+        "b1": {
+          "p50": 17845.5,
+          "mean": 18550.872,
+          "p95": 24103.0,
+          "p99": 27378.0
+        },
+        "b2": {
+          "p50": 18014.5,
+          "mean": 18388.248,
+          "p95": 20948.0,
+          "p99": 25515.0
+        },
+        "a2": {
+          "p50": 17815.5,
+          "mean": 18978.294,
+          "p95": 24415.0,
+          "p99": 26837.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.554472,
+          "mean": 6.485008,
+          "p95": 11.379513,
+          "p99": 19.872395
+        },
+        "a2_to_b2": {
+          "p50": -1.117005,
+          "mean": 3.109057,
+          "p95": 14.200287,
+          "p99": 4.926035
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.721649,
+          "mean": -4.330372,
+          "p95": -10.23237,
+          "p99": -21.455748
+        },
+        "candidate": {
+          "p50": 0.947017,
+          "mean": -0.876638,
+          "p95": -13.089657,
+          "p99": -6.804734
+        }
+      },
+      "accepted_statistics": [
+        "mean"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "p95": "control drift -10.23% exceeds 10%; candidate drift -13.09% exceeds 10%",
+        "p99": "control drift -21.46% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit); corpus/source/sink blocks verified bit-identical across all four legs by the summary builder"
+}

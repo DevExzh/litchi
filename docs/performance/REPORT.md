@@ -11,6 +11,40 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ODT text-path hand-rolled binding tracker — banked (change 0227)
+
+[Change 0227](changes/0227-odt-text-binding-tracker.md) removes
+`NsReader`'s per-event `process_event` binding maintenance (profiled at
+9.1%-18.1% of timed on the text-path phases after 0224) from the 0217
+discard-but-validate text path behind `extract_text` and the full-text
+phases: the 0224 `BindingTracker` is lifted into a shared crate-private
+`litchi-odt::binding_tracker` module (extended with
+`resolve_attribute`), and `parse_text_block_texts` drives a plain
+borrowing `quick_xml::Reader` with hand-maintained push/pop — the same
+tokenizer and byte-identical namespace error stream by construction,
+with the borrowing read also dropping the per-event buffer copy. The
+0225 resolution memo composes unchanged; the retained/selected paths
+keep their `NsReader`. Exactness is pinned by the lockstep
+tracker-vs-`NsReader` per-event replay across the ODT/FODT corpus and
+an adversarial battery (reserved-prefix/URI errors, 256/257-declaration
+limit parity, emptied bindings) asserting byte-identical outcomes and
+error strings (901 litchi-odt tests). **Banked**: `odt_semantic_full_text`
+p50 **9.44%-13.32%** lower (0218 floor 4.1), `odt_repeated_text_cached`
+p50/mean/p95 **17.57%-18.52% / 17.66%-18.11% / 13.60%-17.56%** lower,
+`odt_repeated_text_uncached` all four **18.79%-20.32% / 18.45%-20.37% /
+17.43%-21.68% / 8.65%-18.10%** lower (rerun 0227r, superseding the
+primary's anomalous b1 leg), `odt_file_source_open_full_text_lifecycle`
+p50/mean **10.37%-13.34% / 9.10%-13.15%** lower; guardrails clean,
+within-floor, or cleared by rerun (the eager-open primary adverse
+direction did not reproduce in rerun). The measured claim minimums
+(8.65%-18.79%) land inside or above the predicted 7%-15% band for the
+process_event removal. With the ODT open/text paths now floor-fighting,
+the program pivots calibration-first to DOCX: change 0228 (DOCX-family
+layout-noise floor calibration, including the `xlsx_file_open` /
+`pptx_file_source_open` cross-guardrails) is staged to run before the
+first DOCX optimization. Raw artifacts: `results/*-0227-*` and
+`results/*-0227r-*`.
+
 ## ODT file-source-open layout noise floor calibration (change 0226)
 
 [Change 0226](changes/0226-odt-source-open-floor-calibration.md) is a

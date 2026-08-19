@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0227-odt-text-binding-tracker",
+  "decision": "banked",
+  "claim_scope": "executed phase (text path): p50/mean/p95 claimed (min-direction 17.57%/17.66%/13.60% lower, above the 0218 cached floors 7.1/7.4/7.5); p99 favorable both dirs (+18.24/+26.40) but rejected on control drift +20.61% over the 15% ceiling",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "ec3dc81d69238edc4b8fe86e59529f5397d725628b56d24ff002285fb3a7d30a",
+      "candidate_sha256": "1d503363657f7badb0d2c321ca208dbe9e9cbf22765745fc8ccd1a1a7ab1e1cd",
+      "note": "control is the banked 0225 binary; candidate adds the 0227 text-path binding tracker in litchi-odt (plain Reader + BindingTracker replacing NsReader in parse_text_block_texts)"
+    }
+  },
+  "provenance": {
+    "source_revision": "4b3ffb2de903f96e78bde4506107194888dd7b5e",
+    "source_state": "HEAD 4b3ffb2de banked through 0225 (control); the candidate additionally carries the uncommitted 0227 text-path binding tracker in litchi-odt",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "odt-source-backed-repeated-text-media",
+    "archive_sha256": "29d8c1dcd21e739b07d95e463a875126af73d040188433e77817b47717e42bae",
+    "archive_bytes": 16812034,
+    "archive_member_count": 13
+  },
+  "selector": "odt_source_backed_repeated_text_cached",
+  "timing_scope": "source-backed owner and four output slots prepared outside timer; four public full-text projections inside timer; semantic, archive, media, source-range, freshness, and zero-post-preparation-read gates outside timer",
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2783075.0,
+          "mean": 2820850.116,
+          "p95": 3076489.0,
+          "p99": 3409028.0
+        },
+        "b1": {
+          "p50": 2294219.0,
+          "mean": 2322733.948,
+          "p95": 2536204.0,
+          "p99": 2787060.0
+        },
+        "b2": {
+          "p50": 2258259.0,
+          "mean": 2310391.174,
+          "p95": 2629523.0,
+          "p99": 3026209.0
+        },
+        "a2": {
+          "p50": 2771528.5,
+          "mean": 2821358.024,
+          "p95": 3043474.0,
+          "p99": 4111770.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 17.565319,
+          "mean": 17.658371,
+          "p95": 17.56174,
+          "p99": 18.244731
+        },
+        "a2_to_b2": {
+          "p50": 18.519366,
+          "mean": 18.11067,
+          "p95": 13.601266,
+          "p99": 26.401306
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.414883,
+          "mean": 0.018005,
+          "p95": -1.073139,
+          "p99": 20.614146
+        },
+        "candidate": {
+          "p50": -1.567418,
+          "mean": -0.53139,
+          "p95": 3.679475,
+          "p99": 8.580691
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "control drift +20.61% exceeds 15%"
+      }
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit); corpus/source/sink blocks verified bit-identical across all four legs by the summary builder"
+}
