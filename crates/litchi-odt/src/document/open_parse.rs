@@ -80,23 +80,36 @@ impl OpenParse {
         let mut reader = NsReader::from_str(content_xml);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
-        let mut buffer = Vec::new();
         loop {
-            let (namespace, event) = match reader.read_resolved_event_into(&mut buffer) {
-                Ok(resolved) => resolved,
+            // Borrowing read: events borrow `content_xml` directly, avoiding
+            // the per-event buffer copy of the `_into` API. Binding push/pop
+            // still runs inside `read_event` for every event, so
+            // prefix-rebinding semantics are unchanged, and the tokenization
+            // error stream is identical to the historical validation-first
+            // read (which tokenized the same bytes and read to EOF).
+            let event = match reader.read_event() {
+                Ok(event) => event,
                 Err(error) => {
-                    // Validation historically tokenized the same bytes first
-                    // and read to EOF, so every read failure surfaced with
-                    // its mapping before the style scan ever started.
                     return Err(Error::InvalidFormat(format!(
                         "invalid {FAMILY_NAME} content.xml: {error}"
                     )));
                 },
             };
-            // The resolved namespace borrows the reader mutably, so classify
-            // it before the handlers touch the reader again, exactly where
-            // the historical validation loop classified it.
-            let office = matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE);
+            // The ValidateHandler consumes the resolved namespace only in its
+            // Start/Empty arms at depth <= 2 (root, `office:body`,
+            // `office:forms`/family element — the same arms as the standalone
+            // validator); the StyleHandler matches raw qualified names and
+            // never resolves. Bindings declared at depth >= 3 scope just their
+            // own subtree, so no consumed resolution can change. Resolve only
+            // where the result is observable, exactly where the historical
+            // validation loop classified it.
+            let office = match &event {
+                Event::Start(element) | Event::Empty(element) if validate.depth <= 2 => {
+                    let (namespace, _) = reader.resolver().resolve_element(element.name());
+                    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                },
+                _ => false,
+            };
             let is_eof = matches!(event, Event::Eof);
             // Validation errors early-returned historically, discarding any
             // style state; abort the scan at the same event.
@@ -106,7 +119,6 @@ impl OpenParse {
             {
                 style_error = Some(error);
             }
-            buffer.clear();
             if is_eof {
                 break;
             }
@@ -449,6 +461,73 @@ mod tests {
         Ok(project(&registry))
     }
 
+    /// Pre-0221 oracle: the buffered, fully-resolved fused open-parse loop,
+    /// retained verbatim to cross-check the borrowing, depth-gated
+    /// [`OpenParse::run`] on the synthetic edge cases and the fixture corpus.
+    fn run_buffered_oracle(content_xml: &str) -> Result<OpenParse> {
+        use litchi_core::Error;
+        use quick_xml::events::Event;
+        use quick_xml::name::{Namespace, ResolveResult};
+        use quick_xml::reader::NsReader;
+
+        if content_xml.len() > super::MAX_CONTENT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "{FAMILY_NAME} content.xml exceeds the family limit"
+            )));
+        }
+        let mut validate = super::ValidateHandler::new()?;
+        let mut styles = super::StyleHandler::default();
+        let mut style_error = None;
+
+        let mut reader = NsReader::from_str(content_xml);
+        reader.config_mut().check_end_names = true;
+        reader.config_mut().check_comments = true;
+        let mut buffer = Vec::new();
+        loop {
+            let (namespace, event) = match reader.read_resolved_event_into(&mut buffer) {
+                Ok(resolved) => resolved,
+                Err(error) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "invalid {FAMILY_NAME} content.xml: {error}"
+                    )));
+                },
+            };
+            let office = matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == super::OFFICE_NAMESPACE);
+            let is_eof = matches!(event, Event::Eof);
+            validate.on_event(office, &event)?;
+            if style_error.is_none()
+                && let Err(error) = styles.on_event(&event)
+            {
+                style_error = Some(error);
+            }
+            buffer.clear();
+            if is_eof {
+                break;
+            }
+        }
+        validate.finish()?;
+
+        Ok(OpenParse {
+            registry: styles.registry,
+            style_error,
+        })
+    }
+
+    /// The pre-0221 fused loop with the same comparison projection.
+    fn fused_oracle(xml: &str) -> Result<String> {
+        let registry = run_buffered_oracle(xml)?.finish()?;
+        Ok(project(&registry))
+    }
+
+    fn assert_gated_equivalent(label: &str, xml: &str) {
+        let expected = fused_oracle(xml).map_err(|error| error.to_string());
+        let actual = fused(xml).map_err(|error| error.to_string());
+        assert_eq!(
+            expected, actual,
+            "{label}: gated and buffered-resolved fused runs disagree"
+        );
+    }
+
     fn assert_equivalent(label: &str, xml: &str) {
         let expected = sequential(xml).map_err(|error| error.to_string());
         let actual = fused(xml).map_err(|error| error.to_string());
@@ -638,5 +717,167 @@ mod tests {
             registry.get_style("Kept").is_some(),
             "literal byte matching must collect the canonical prefix"
         );
+    }
+
+    #[test]
+    fn gated_run_matches_buffered_oracle_on_synthetic_edge_cases() {
+        let minimal = document(r#"<office:body><office:text/></office:body>"#);
+        let cases: Vec<(&str, String)> = vec![
+            ("minimal", minimal.clone()),
+            (
+                "rebinding-on-body-hides-it",
+                minimal.replace("<office:body>", r#"<office:body xmlns:office="urn:evil">"#),
+            ),
+            (
+                "rebinding-on-empty-body-hides-it",
+                document(r#"<office:body xmlns:office="urn:evil"/><office:text/>"#),
+            ),
+            (
+                "rebinding-on-family-element-rejected",
+                minimal.replace(
+                    "<office:text/>",
+                    r#"<office:text xmlns:office="urn:evil"/>"#,
+                ),
+            ),
+            (
+                "deep-rebinding-accepted",
+                document(
+                    r#"<office:body><office:text><text:p xmlns:office="urn:evil"><office:annotation/></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "rebind-and-restore-nested",
+                document(
+                    r#"<office:body><office:text><text:p xmlns:office="urn:evil"><office:annotation/></text:p><text:p><office:annotation/></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "aliased-prefix-everywhere",
+                format!(
+                    r#"<x:document-content xmlns:x="{OFFICE}"><x:body><x:text/></x:body></x:document-content>"#
+                ),
+            ),
+            (
+                "default-namespace-accepted",
+                format!(
+                    r#"<document-content xmlns="{OFFICE}"><body><text/></body></document-content>"#
+                ),
+            ),
+            (
+                "unknown-prefix-at-root",
+                minimal.replace(
+                    &format!(
+                        r#" xmlns:office="{OFFICE}" xmlns:style="{STYLE}" xmlns:text="{TEXT}""#
+                    ),
+                    "",
+                ),
+            ),
+            (
+                "unknown-prefix-deep-accepted",
+                document(
+                    r#"<office:body><office:text><text:p><weird:thing/></text:p></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "second-prefix-bound-to-office",
+                format!(
+                    r#"<office:document-content xmlns:office="{OFFICE}" xmlns:o2="{OFFICE}"><o2:body><o2:text/></o2:body></office:document-content>"#
+                ),
+            ),
+            (
+                "forms-empty-before-family",
+                document(r#"<office:body><office:forms/><office:text/></office:body>"#),
+            ),
+            (
+                "forms-start-end-before-family",
+                document(
+                    r#"<office:body><office:forms></office:forms><office:text/></office:body>"#,
+                ),
+            ),
+            (
+                "mismatched-end-tag-deep",
+                document(
+                    r#"<office:body><office:text><text:p></text:q></office:text></office:body>"#,
+                ),
+            ),
+            (
+                "mismatched-end-tag-at-body",
+                format!(
+                    r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:text></office:body></office:document-content>"#
+                ),
+            ),
+            (
+                "comment-pi-cdata-interleaved",
+                format!(
+                    r#"<?xml version="1.0"?><!--prologue--><?pi data?>{}"#,
+                    document(
+                        r#"<office:body><office:text><text:p><![CDATA[x]]><!--in--><?p i?>&amp;</text:p></office:text></office:body>"#,
+                    )
+                ),
+            ),
+            (
+                "comment-and-pi-after-root-accepted",
+                format!("{}<!--tail--><?pi data?>", minimal),
+            ),
+            (
+                "double-hyphen-comment",
+                document(
+                    r#"<office:body><office:text><!-- a -- b --></office:text></office:body>"#,
+                ),
+            ),
+            ("cdata-outside-root", format!("<![CDATA[x]]>{minimal}")),
+            ("truncated-at-open-tag", format!("{}<text:p", minimal)),
+            (
+                "unclosed-body-at-eof",
+                format!(r#"<office:document-content xmlns:office="{OFFICE}"><office:body>"#),
+            ),
+            (
+                "truncated-inside-automatic-styles",
+                format!(
+                    r#"<office:document-content xmlns:office="{OFFICE}" xmlns:style="{STYLE}"><office:automatic-styles><style:style style:name="a""#
+                ),
+            ),
+            ("missing-body", document("")),
+            ("body-without-family", document(r#"<office:body/>"#)),
+            (
+                "wrong-root",
+                minimal.replace("document-content", "document"),
+            ),
+            (
+                "empty-root",
+                format!(r#"<office:document-content xmlns:office="{OFFICE}"/>"#),
+            ),
+            (
+                "style-collected-under-deep-rebinding",
+                document(concat!(
+                    r#"<office:automatic-styles><x xmlns:style="urn:evil"><style:style style:name="Deep" style:family="paragraph"/></x></office:automatic-styles>"#,
+                    r#"<office:body><office:text/></office:body>"#,
+                )),
+            ),
+            (
+                "style-error-before-mismatched-end",
+                format!(
+                    r#"<office:document-content xmlns:office="{OFFICE}" xmlns:style="{STYLE}"><office:automatic-styles><style:style style:name="a" style:name="b"></style:style></office:automatic-styles><office:body><office:text><text:p></text:q></office:text></office:body></office:document-content>"#
+                ),
+            ),
+        ];
+        for (label, xml) in &cases {
+            assert_gated_equivalent(label, xml);
+        }
+    }
+
+    #[test]
+    fn gated_run_matches_buffered_oracle_on_odt_corpus() {
+        let files = corpus_files();
+        assert!(!files.is_empty(), "no .odt corpus fixtures discovered");
+        let mut compared = 0usize;
+        for path in &files {
+            let Some(xml) = content_xml(path) else {
+                continue;
+            };
+            assert_gated_equivalent(&path.display().to_string(), &xml);
+            compared += 1;
+        }
+        assert!(compared > 0, "no .odt corpus fixtures yielded content.xml");
     }
 }
