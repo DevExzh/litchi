@@ -1868,6 +1868,33 @@ p50 21.85%-23.05% lower, `odt_file_source_open_full_text_lifecycle` mean
 9.39%-11.77% lower; all guardrails clean or within-floor. See
 [`0224`](changes/0224-odt-openparse-binding-tracker.md).
 
+Change 0225 adds no selector or CRUD closure and leaves the matrix
+unchanged. It adds a last-prefix namespace resolution memo
+(`TextNamespaceMemo`) to the discard-but-validate ODT text path
+(`parse_text_block_texts`), replacing per-event `resolve_event` reverse
+scans with a content-versioned memo whose invalidation is provably exact
+(differential rebinding battery, per-event classification replay,
+corpus-wide parity; 900 litchi-odt tests). Provisionally withheld
+pending the 0226 floor calibration, then **banked**:
+`odt_semantic_full_text` p50/mean 15.79%-17.44% / 19.03%-20.70% lower,
+`odt_repeated_text_cached` p50/mean/p95 20.10%-20.24% / 19.85%-20.68% /
+19.02%-21.93% lower, `odt_repeated_text_uncached` p50/mean/p95/p99
+21.79%-23.51% / 22.56%-23.42% / 23.58%-24.96% / 26.73%-26.96% lower,
+`odt_file_source_open_full_text_lifecycle` p50 15.96%-16.50% lower;
+guardrails clean, within-floor, or cleared by rerun. See
+[`0225`](changes/0225-odt-text-resolution-memo.md).
+
+Change 0226 is a measurement-methodology calibration (no code change, no
+selector or CRUD closure; matrix unchanged) — the 0223 analog completing
+the `odt_file_source_open` floor set after 0225's residual guardrail
+reading. Probe binaries carrying never-executed parser-shaped padding
+(.text +3,872/+5,984/+7,744 B) measured pure layout noise; folding in
+the 0225 byte-identical-phase history, the file-source-open effective
+floor is now p50 6.7% / mean 6.1% / p95 45.0% / p99 38.7% (p95/p99
+supersede 0223's 2.5%/28.0%; lifecycle/eager floors unchanged). The 0205
+banking rule applies unchanged. See
+[`0226`](changes/0226-odt-source-open-floor-calibration.md).
+
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.

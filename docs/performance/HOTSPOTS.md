@@ -3,6 +3,43 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0226`](changes/0226-odt-source-open-floor-calibration.md)
+(0226 is a methodology calibration, not a code change — the 0223 analog
+completing the `odt_file_source_open` floor set after 0225's verdict was
+blocked by an adverse-both p50 reading (max 6.65%) on that byte-identical
+guardrail's uncalibrated statistic. Three probe binaries (banked 0224 tree
+plus never-executed parser-shaped padding of +3,872/+5,984/+7,744 B text
+in litchi-odt, seeds 2261-2263, bracketing 0225's −6,064 B shift in
+magnitude) measured pure layout noise under the full A1/B1/B2/A2 protocol
+(12 legs): probe a adverse-both p50 3.50%/mean 5.75%, probe b none,
+probe c mean 6.09%/p95 45.02%/p99 38.69%. Folding in the 0225
+byte-identical-phase history per the 0223 rule (worst observed
+adverse-both magnitude, no margin), the `odt_file_source_open` floor is
+now p50 6.7% / mean 6.1% / p95 45.0% / p99 38.7% — p95/p99 supersede
+0223's 2.5%/28.0% (this session's machine was far noisier in the
+500-sample tails); the 0223 lifecycle/eager floors are unchanged. All
+0225 source-open adverse readings fall within floor — layout readings —
+and 0225 was re-verdicted **banked** — see below.)
+[`change 0225`](changes/0225-odt-text-resolution-memo.md)
+(0225 adds a last-prefix namespace resolution memo (`TextNamespaceMemo`)
+to the 0217 discard-but-validate text path `parse_text_block_texts`
+(litchi-odt): `read_event_into` plus a content-versioned memo replaces
+per-event `resolve_event` reverse scans over ~37 live bindings, with
+provably exact invalidation (`xmlns` memmem prefilter for pushes,
+scope-tracking for the deferred pops) — infallible lookups only, error
+stream unchanged, panic-free. Differential oracles: 8 synthetic
+rebinding fixtures with pinned text, a per-event classification replay,
+and corpus-wide parity (900 litchi-odt tests). **Banked** — after the
+0226 calibration cleared the residual source-open guardrail reading:
+`odt_semantic_full_text` p50/mean **15.79%-17.44% / 19.03%-20.70%**,
+`odt_repeated_text_cached` p50/mean/p95
+**20.10%-20.24% / 19.85%-20.68% / 19.02%-21.93%**,
+`odt_repeated_text_uncached` ALL FOUR
+**21.79%-23.51% / 22.56%-23.42% / 23.58%-24.96% / 26.73%-26.96%**,
+`odt_file_source_open_full_text_lifecycle` p50 **15.96%-16.50%**
+(lifecycle mean/p95/p99 favorable but control-drift-rejected);
+guardrails clean, within-floor, or cleared-by-rerun. Candidate
+`ec3dc81d…` is the control for the next change.)
 [`change 0224`](changes/0224-odt-openparse-binding-tracker.md)
 (0224 replaces `NsReader` in `OpenParse::run` with a plain `Reader` plus a
 hand-rolled `BindingTracker` — the binding push/error stream replicated
