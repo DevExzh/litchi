@@ -92,3 +92,23 @@ represent fallible deferred loading or pin evictable cache data. The staged
 follow-up requires a fallible owning `PartData`/metadata-only `PartView`, one
 immutable positional ZIP index, source-version checks, a byte-weighted
 single-flight cache, and raw-entry provenance.
+
+## 2026-08-20 safety amendment
+
+The exact-source fast path remains the sole byte-identical no-op path. After
+any mutation revokes that authorization, an owned source uses targeted
+preservation and now returns the typed `OpcError::PreservationUnavailable`
+before sequential sink output when prefixes, trailing/junk members, ZIP64 or
+other framing, opaque members, or changed topology cannot be proven safe. The
+ordinary full writer remains available for new packages and borrowed unsigned
+sources; it is not a fallback for a mutated owned source.
+
+Signature tracking now treats origin/signature/certificate relationships,
+signature targets and paths, signature content types, orphan infrastructure,
+and mutable package/Part relationship seams conservatively. Changed signed
+sources return `OpcError::SignedSourceRequiresExplicitPolicy` unless the
+explicit sign, resign, or unsign operation authorizes the resulting graph.
+Untouched borrowed signed sources have no exact bytes to copy and therefore
+return the same typed policy refusal instead of normalizing signed content.
+These capability errors map to `litchi_core::Error::Unsupported` through the
+OPC core conversion and the XLSX facade adapter, rather than `Other`.

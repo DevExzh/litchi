@@ -2325,7 +2325,9 @@ impl SourceBackedPackage {
     /// This conversion refuses managed packages before any ordinary payload
     /// read. An owning package would detach copied payloads from the cache
     /// handles that retain the execution context's hierarchical reservations;
-    /// use the source-backed view while that context is active.
+    /// use the source-backed view while that context is active. A materialized
+    /// signed graph retains borrowed-ingress policy and must be explicitly
+    /// stripped or resigned before ordinary publication.
     pub fn into_opc_package(self) -> Result<OpcPackage> {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -2353,6 +2355,7 @@ impl SourceBackedPackage {
     /// package, or the same source, limit, relationship, ZIP, and allocation
     /// errors as [`Self::into_opc_package`]. A source mutation or cancellation
     /// observed before, during, or after materialization rejects the result.
+    /// A signed borrowed graph remains policy-gated after materialization.
     pub fn to_opc_package(&self) -> Result<OpcPackage> {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -2401,6 +2404,10 @@ impl SourceBackedPackage {
             self.finish_stage(result)?;
         }
         package.set_non_part_members(non_part_members);
+        package.source_ingress = true;
+        package.signature_graph_tracked = package.is_signed();
+        package.signature_policy_authorized = false;
+        package.signature_api_authored = false;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         Ok(package)
@@ -4083,14 +4090,14 @@ impl SourceBackedPackage {
     fn has_signature_infrastructure(&self) -> bool {
         self.package_relationships
             .iter()
-            .any(|relationship| is_signature_relationship(relationship.reltype()))
+            .any(is_signature_relationship_or_target)
             || self.parts.iter().any(|part| {
                 is_signature_path(part.partname.as_str())
                     || is_signature_content_type(&part.content_type)
                     || part
                         .relationships
                         .iter()
-                        .any(|relationship| is_signature_relationship(relationship.reltype()))
+                        .any(is_signature_relationship_or_target)
             })
     }
 
@@ -5296,6 +5303,30 @@ fn is_signature_relationship(kind: &str) -> bool {
     ]
     .iter()
     .any(|candidate| kind.eq_ignore_ascii_case(candidate))
+}
+
+fn is_signature_relationship_or_target(relationship: &crate::Relationship) -> bool {
+    if is_signature_relationship(relationship.reltype()) {
+        return true;
+    }
+    if relationship.is_external() {
+        return false;
+    }
+    let target_path = relationship.target_path();
+    if is_signature_path(target_path) {
+        return true;
+    }
+    if !target_may_be_signature_path(target_path) {
+        return false;
+    }
+    relationship
+        .target_partname()
+        .map_or(true, |target| is_signature_path(target.as_str()))
+}
+
+fn target_may_be_signature_path(path: &str) -> bool {
+    path.split('/')
+        .any(|segment| segment.eq_ignore_ascii_case("_xmlsignatures"))
 }
 
 fn is_signature_path(path: &str) -> bool {
@@ -7844,6 +7875,22 @@ mod tests {
                 .unwrap(),
             eager_reader.read_member("word/document.xml").unwrap()
         );
+    }
+
+    #[test]
+    fn borrowed_signed_materialization_retains_publication_policy() {
+        let source = signed_archive(b"<signed/>");
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let materialized = package.to_opc_package().unwrap();
+        assert!(materialized.is_signed());
+
+        let mut output = Vec::new();
+        assert!(matches!(
+            materialized.to_stream(&mut output),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        assert!(output.is_empty());
     }
 
     #[test]

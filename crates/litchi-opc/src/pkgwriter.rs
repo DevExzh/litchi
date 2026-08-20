@@ -1397,6 +1397,27 @@ mod tests {
     }
 
     #[test]
+    fn untouched_borrowed_signed_source_refuses_without_exact_bytes() {
+        let (source, _first) = signed_source();
+        let package = OpcPackage::from_bytes(&source).expect("open borrowed signed source");
+        assert!(package.is_signed());
+        assert!(package.exact_source().is_none());
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("borrowed signed source must not normalize signatures");
+        assert!(matches!(
+            error,
+            crate::OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
     fn open_and_reader_retain_owned_source_but_borrowed_bytes_do_not() {
         let source = exact_empty_archive(b"owned source");
 

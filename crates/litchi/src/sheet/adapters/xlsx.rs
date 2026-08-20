@@ -25,6 +25,11 @@ fn boxed_xlsx_error(error: xlsx::Error) -> BoxError {
                 observed: actual,
             })
         },
+        xlsx::Error::Package(
+            error @ (litchi_opc::OpcError::SourceBackedOverlayUnavailable { .. }
+            | litchi_opc::OpcError::PreservationUnavailable { .. }
+            | litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy),
+        ) => Box::new(litchi_core::Error::Unsupported(error.to_string())),
         error => Box::new(error),
     }
 }
@@ -577,6 +582,25 @@ mod tests {
     use std::io::{Cursor, Write};
 
     use crate::sheet::{CellValue, WorkbookTrait};
+
+    #[test]
+    fn package_publication_capabilities_reach_the_core_error_class() {
+        for error in [
+            litchi_opc::OpcError::PreservationUnavailable {
+                reason: "opaque ZIP framing".to_owned(),
+            },
+            litchi_opc::OpcError::SourceBackedOverlayUnavailable {
+                reason: "opaque member cannot be patched".to_owned(),
+            },
+            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
+        ] {
+            let boxed = boxed_xlsx_error(xlsx::Error::Package(error));
+            assert!(matches!(
+                boxed.downcast_ref::<litchi_core::Error>(),
+                Some(litchi_core::Error::Unsupported(_))
+            ));
+        }
+    }
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const RELATIONSHIPS: &str =
