@@ -2149,7 +2149,10 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
 
 ## Cases
 
-- `zip_index`: parse the ZIP central directory and build Soapberry's index.
+- `zip_index`: parse the ZIP central directory and build Soapberry's index;
+  each iteration verifies the member count against the deterministic corpus
+  manifest and retains measured `source.zip_index.observed_member_counts`
+  (warm-ups excluded) beside its `expected_member_count`.
 - `zip_read_one`: read and verify one target member from an already indexed ZIP.
 - `opc_open`: parse a generated OPC ZIP into `litchi_opc::OpcPackage`.
 - `opc_open_owned`: move an already-prepared archive allocation into
