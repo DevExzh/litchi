@@ -42,16 +42,24 @@ use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
     Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
+use litchi_ooxml_common::xml::{OMML_NAMESPACE_URI, scan_omml_formula_ranges};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, PartData, ReadLimits,
     Relationships, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
+};
+use litchi_pptx::shape::text::{
+    extract as extract_drawingml_text, scan_ranges as scan_drawingml_ranges,
 };
 use litchi_xlsx::{
     Cell as XlsxCell, MergeChoice, MergeLimits, Rect, RowIndex, SourceBackedWorkbook,
     StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
     Value as XlsxValue, Workbook,
 };
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesRef, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::ArchiveReader;
@@ -125,6 +133,18 @@ const ODP_TEXT_BOX_BATCH_CORPUS_GENERATOR: &str = "litchi-odp-cross-slide-textbo
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1";
 const RTF_PICTURE_CRUD_CORPUS_GENERATOR: &str = "litchi-rtf-picture-crud-v1";
+const OOXML_TRACKER_CORPUS_GENERATOR: &str = "litchi-ooxml-namespace-tracker-v1";
+const OOXML_TRACKER_OMML_NAMESPACE: &[u8] = OMML_NAMESPACE_URI.as_bytes();
+const OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/math";
+const OOXML_TRACKER_STRICT_OMML_NAMESPACE: &[u8] =
+    OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI.as_bytes();
+const OOXML_TRACKER_DRAWINGML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const OOXML_TRACKER_STRICT_DRAWINGML_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/drawingml/main";
+const OOXML_TRACKER_OMML_FORMULA_COUNT: usize = 256;
+const OOXML_TRACKER_DRAWINGML_PARAGRAPH_COUNT: usize = 256;
 const XLSX_STREAMING_CORPUS_GENERATOR: &str = "litchi-xlsx-streaming-create-v1";
 const RTF_STREAMING_CORPUS_GENERATOR: &str = "litchi-rtf-streaming-create-v1";
 const RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES: usize = 16 * 1024;
@@ -642,6 +662,9 @@ enum Case {
     OdtFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
+    OmmlFormulaRangeScan,
+    PptxDrawingmlExtract,
+    PptxDrawingmlRangeScan,
     PptxEagerBatchEditSave,
     PptxSourceBackedBatchEditSave,
     PptxEagerMultiSlideBatchEditSave,
@@ -1046,6 +1069,9 @@ impl Case {
             Self::OdtFileSourceOpenFullTextLifecycle => "odt_file_source_open_full_text_lifecycle",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
+            Self::OmmlFormulaRangeScan => "omml_formula_range_scan",
+            Self::PptxDrawingmlExtract => "pptx_drawingml_extract",
+            Self::PptxDrawingmlRangeScan => "pptx_drawingml_range_scan",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
             Self::PptxSourceBackedBatchEditSave => "pptx_source_backed_batch_edit_save",
             Self::PptxEagerMultiSlideBatchEditSave => "pptx_eager_multi_slide_batch_edit_save",
@@ -2155,6 +2181,13 @@ impl Case {
         matches!(self, Self::DocxSourceBackedOneEditSave)
     }
 
+    const fn is_ooxml_tracker_scan(self) -> bool {
+        matches!(
+            self,
+            Self::OmmlFormulaRangeScan | Self::PptxDrawingmlExtract | Self::PptxDrawingmlRangeScan
+        )
+    }
+
     const fn is_pptx_source_edit_save(self) -> bool {
         matches!(
             self,
@@ -2404,6 +2437,20 @@ struct Corpus {
     target_name: String,
     target_payload: Vec<u8>,
     xlsx: Option<XlsxCorpus>,
+}
+
+/// Fixed XML fragments for the hidden OOXML namespace-tracker selectors.
+///
+/// The expected projections are produced by the independent `NsReader` oracle
+/// before any timed iteration.  The timed functions only scan the already
+/// materialized bytes and compare their result after the clock stops.
+struct OoxmlTrackerCorpus {
+    manifest: CorpusManifest,
+    omml: Vec<u8>,
+    drawingml: Vec<u8>,
+    expected_omml_ranges: Vec<(u32, u32)>,
+    expected_drawingml_text: String,
+    expected_drawingml_ranges: Vec<(u32, u32)>,
 }
 
 #[derive(Debug)]
@@ -6615,6 +6662,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_ooxml_tracker_scan())
+    {
+        let corpus = build_ooxml_tracker_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_ooxml_tracker_scan())
+        {
+            results.push(run_ooxml_tracker_case(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.is_opc_source_cache_evidence())
     {
         let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible)?;
@@ -6706,6 +6774,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_opc_source_cache_evidence()
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
+                    && !case.is_ooxml_tracker_scan()
                     && !case.is_doc_owner_public_phases()
                     && !case.is_pptx_source_edit_save()
                     && !case.is_pptx_cross_copy()
@@ -8438,6 +8507,9 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
+        "omml_formula_range_scan" => Some(Case::OmmlFormulaRangeScan),
+        "pptx_drawingml_extract" => Some(Case::PptxDrawingmlExtract),
+        "pptx_drawingml_range_scan" => Some(Case::PptxDrawingmlRangeScan),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
         "pptx_source_backed_batch_edit_save" => Some(Case::PptxSourceBackedBatchEditSave),
         "pptx_eager_multi_slide_batch_edit_save" => Some(Case::PptxEagerMultiSlideBatchEditSave),
@@ -8893,6 +8965,8 @@ fn print_usage() {
                                        odt_file_source_open_full_text_lifecycle,\n\
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
+                                       omml_formula_range_scan,\n\
+                                       pptx_drawingml_extract,pptx_drawingml_range_scan,\n\
                                        pptx_eager_batch_edit_save,\n\
                                        pptx_source_backed_batch_edit_save,\n\
                                        pptx_eager_multi_slide_batch_edit_save,\n\
@@ -15124,6 +15198,565 @@ fn payload_bytes(kind: PayloadKind, index: usize, length: usize) -> Vec<u8> {
     bytes
 }
 
+fn oracle_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    if name.local_name().as_ref() != b"oMath" {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == OOXML_TRACKER_OMML_NAMESPACE || *value == OOXML_TRACKER_STRICT_OMML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => prefix.as_slice() == b"m",
+        ResolveResult::Unbound => false,
+    }
+}
+
+fn oracle_drawingml_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> bool {
+    if name.local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == OOXML_TRACKER_DRAWINGML_NAMESPACE
+                || *value == OOXML_TRACKER_STRICT_DRAWINGML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => {
+            prefix.as_slice() == b"a"
+                || fragment_prefix
+                    .as_ref()
+                    .and_then(|prefix| prefix.as_deref())
+                    == Some(prefix.as_slice())
+        },
+        ResolveResult::Unbound => fragment_prefix == &Some(None),
+    }
+}
+
+fn oracle_range(start: usize, end: usize, label: &str) -> Result<(u32, u32), Box<dyn Error>> {
+    let length = end
+        .checked_sub(start)
+        .ok_or_else(|| io::Error::other(format!("{label} range underflows")))?;
+    Ok((
+        u32::try_from(start)
+            .map_err(|error| io::Error::other(format!("{label} offset exceeds u32: {error}")))?,
+        u32::try_from(length)
+            .map_err(|error| io::Error::other(format!("{label} length exceeds u32: {error}")))?,
+    ))
+}
+
+fn oracle_omml_ranges(xml: &[u8]) -> Result<Vec<(u32, u32)>, Box<dyn Error>> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut capture: Option<(usize, usize)> = None;
+    let mut ranges = Vec::new();
+    let mut depth = 0usize;
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element) if oracle_omml_name(&namespace, element.name()) => {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none() && oracle_omml_name(&namespace, element.name()) =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position())?;
+        match event {
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(io::Error::other("OMML oracle lost its captured formula").into());
+                };
+                *captured_depth = captured_depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("OMML oracle depth overflows"))?;
+            },
+            ScanEvent::Empty => ranges.push(oracle_range(event_start, event_end, "OMML")?),
+            ScanEvent::End => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(io::Error::other("OMML oracle ended without a formula").into());
+                };
+                *captured_depth = captured_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("OMML oracle depth underflows"))?;
+                if *captured_depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        return Err(io::Error::other("OMML oracle lost its formula range").into());
+                    };
+                    ranges.push(oracle_range(start, event_end, "OMML")?);
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(io::Error::other("OMML oracle saw an unterminated formula").into());
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(ranges)
+}
+
+fn oracle_decode_reference(reference: &BytesRef<'_>) -> Result<String, Box<dyn Error>> {
+    if let Some(character) = reference
+        .resolve_char_ref()
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+    {
+        return Ok(character.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_owned()),
+        "lt" => Ok("<".to_owned()),
+        "gt" => Ok(">".to_owned()),
+        "quot" => Ok("\"".to_owned()),
+        "apos" => Ok("'".to_owned()),
+        _ => Err(io::Error::other(format!("unsupported XML entity '&{name};'")).into()),
+    }
+}
+
+fn oracle_drawingml_text(
+    xml: &[u8],
+    paragraph_separator: Option<char>,
+) -> Result<String, Box<dyn Error>> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut result = String::with_capacity(xml.len() / 8);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut text_depth = None;
+    let mut seen_paragraph = false;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+        if fragment_prefix.is_none()
+            && let Event::Start(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            fragment_prefix = Some(
+                element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().to_vec()),
+            );
+        }
+        match event {
+            Event::Start(element) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth overflows"))?;
+                if oracle_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if text_depth.is_none()
+                    && oracle_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = Some(depth);
+                } else if oracle_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
+                {
+                    result.push('\n');
+                } else if oracle_drawingml_name(
+                    &namespace,
+                    element.name(),
+                    b"tab",
+                    &fragment_prefix,
+                ) {
+                    result.push('\t');
+                }
+            },
+            Event::Empty(element) => {
+                if oracle_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if oracle_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
+                {
+                    result.push('\n');
+                } else if oracle_drawingml_name(
+                    &namespace,
+                    element.name(),
+                    b"tab",
+                    &fragment_prefix,
+                ) {
+                    result.push('\t');
+                }
+            },
+            Event::Text(text) if text_depth.is_some() => {
+                let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?;
+                result.push_str(&quick_xml::escape::unescape(&decoded).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?);
+            },
+            Event::CData(text) if text_depth.is_some() => {
+                result.push_str(&text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?);
+            },
+            Event::GeneralRef(reference) if text_depth.is_some() => {
+                result.push_str(&oracle_decode_reference(&reference)?);
+            },
+            Event::End(element) => {
+                if text_depth == Some(depth)
+                    && oracle_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth underflows"))?;
+            },
+            Event::Eof if depth != 0 || text_depth.is_some() => {
+                return Err(io::Error::other("DrawingML oracle saw unterminated XML").into());
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(result)
+}
+
+fn oracle_drawingml_ranges(xml: &[u8], target: &[u8]) -> Result<Vec<(u32, u32)>, Box<dyn Error>> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut capture: Option<(usize, usize)> = None;
+    let mut ranges = Vec::new();
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            if fragment_prefix.is_none()
+                && let Event::Start(element) = &event
+                && !matches!(namespace, ResolveResult::Bound(_))
+            {
+                fragment_prefix = Some(
+                    element
+                        .name()
+                        .prefix()
+                        .map(|prefix| prefix.into_inner().to_vec()),
+                );
+            }
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element)
+                    if oracle_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        target,
+                        &fragment_prefix,
+                    ) =>
+                {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none()
+                        && oracle_drawingml_name(
+                            &namespace,
+                            element.name(),
+                            target,
+                            &fragment_prefix,
+                        ) =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position())?;
+        match event {
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(
+                        io::Error::other("DrawingML oracle lost its captured element").into(),
+                    );
+                };
+                *captured_depth = captured_depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth overflows"))?;
+            },
+            ScanEvent::Empty => ranges.push(oracle_range(event_start, event_end, "DrawingML")?),
+            ScanEvent::End => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(
+                        io::Error::other("DrawingML oracle ended without an element").into(),
+                    );
+                };
+                *captured_depth = captured_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth underflows"))?;
+                if *captured_depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        return Err(
+                            io::Error::other("DrawingML oracle lost its element range").into()
+                        );
+                    };
+                    ranges.push(oracle_range(start, event_end, "DrawingML")?);
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(
+                    io::Error::other("DrawingML oracle saw an unterminated element").into(),
+                );
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(ranges)
+}
+
+fn build_ooxml_tracker_corpus() -> Result<OoxmlTrackerCorpus, Box<dyn Error>> {
+    let mut omml = format!(
+        r#"<root xmlns:m="{}" xmlns:s="{}" xmlns:q="urn:outer"><!-- fixed tracker corpus -->"#,
+        OMML_NAMESPACE_URI, OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI,
+    );
+    for index in 0..OOXML_TRACKER_OMML_FORMULA_COUNT {
+        if index % 32 == 0 {
+            omml.push_str(r#"<q:holder xmlns:q="urn:inner"><m:oMath/></q:holder>"#);
+        }
+        if index % 64 == 0 {
+            omml.push_str(r#"<scope xmlns:m="urn:foreign"><m:oMath/></scope>"#);
+        }
+        omml.push_str(&format!(
+            r#"<m:oMath><m:r><m:t>x{index}</m:t></m:r></m:oMath><s:oMath><s:r/></s:oMath>"#
+        ));
+    }
+    omml.push_str("</root>");
+
+    let mut drawingml = format!(
+        r#"<root xmlns:a="{}" xmlns:q="urn:outer"><!-- fixed tracker corpus -->"#,
+        std::str::from_utf8(OOXML_TRACKER_DRAWINGML_NAMESPACE)?
+    );
+    for index in 0..OOXML_TRACKER_DRAWINGML_PARAGRAPH_COUNT {
+        if index % 32 == 0 {
+            drawingml.push_str(
+                r#"<q:holder xmlns:q="urn:inner"><a:p><a:t>ignored</a:t></a:p></q:holder>"#,
+            );
+        }
+        drawingml.push_str(&format!(
+            r#"<a:p><a:r><a:t>text-{index} &amp; value</a:t><a:tab/><a:br/></a:r></a:p>"#
+        ));
+    }
+    drawingml.push_str("</root>");
+
+    let omml = omml.into_bytes();
+    let drawingml = drawingml.into_bytes();
+    let expected_omml_ranges = oracle_omml_ranges(&omml)?;
+    let expected_drawingml_text = oracle_drawingml_text(&drawingml, Some('\n'))?;
+    let expected_drawingml_ranges = oracle_drawingml_ranges(&drawingml, b"p")?;
+
+    let mut actual_omml_ranges = Vec::new();
+    scan_omml_formula_ranges::<litchi_ooxml_common::XmlError>(&omml, |start, length| {
+        actual_omml_ranges.push((start, length));
+        Ok(())
+    })?;
+    if actual_omml_ranges != expected_omml_ranges {
+        return Err(io::Error::other("OMML tracker setup disagrees with NsReader oracle").into());
+    }
+    let actual_drawingml_text = extract_drawingml_text(&drawingml, Some('\n'))?;
+    if actual_drawingml_text != expected_drawingml_text {
+        return Err(
+            io::Error::other("DrawingML extractor setup disagrees with NsReader oracle").into(),
+        );
+    }
+    let mut actual_drawingml_ranges = Vec::new();
+    scan_drawingml_ranges(&drawingml, b"p", |start, length| {
+        actual_drawingml_ranges.push((start, length));
+        Ok(())
+    })?;
+    if actual_drawingml_ranges != expected_drawingml_ranges {
+        return Err(
+            io::Error::other("DrawingML range setup disagrees with NsReader oracle").into(),
+        );
+    }
+
+    let mut identity = Vec::with_capacity(
+        16usize
+            .checked_add(omml.len())
+            .and_then(|value| value.checked_add(drawingml.len()))
+            .ok_or_else(|| io::Error::other("OOXML tracker corpus size overflows"))?,
+    );
+    identity.extend_from_slice(&u64::try_from(omml.len())?.to_le_bytes());
+    identity.extend_from_slice(&omml);
+    identity.extend_from_slice(&u64::try_from(drawingml.len())?.to_le_bytes());
+    identity.extend_from_slice(&drawingml);
+    let entry_bytes = omml
+        .len()
+        .checked_add(drawingml.len())
+        .ok_or_else(|| io::Error::other("OOXML tracker entry size overflows"))?;
+    let manifest = CorpusManifest {
+        name: "ooxml-namespace-tracker-fixed".to_owned(),
+        generator: OOXML_TRACKER_CORPUS_GENERATOR,
+        package_format: "OOXML XML fragments",
+        shape: "fixed",
+        payload_kind: "namespace-tracker-adversarial",
+        compression: "none",
+        entry_count: 2,
+        archive_member_count: 2,
+        entry_bytes,
+        uncompressed_payload_bytes: entry_bytes,
+        archive_bytes: identity.len(),
+        archive_sha256: sha256_hex(&identity),
+        target_entry: "omml.xml+presentation.xml".to_owned(),
+        target_payload_bytes: identity.len(),
+        target_payload_sha256: sha256_hex(&identity),
+        rtf_variant: None,
+        xlsx: None,
+    };
+    Ok(OoxmlTrackerCorpus {
+        manifest,
+        omml,
+        drawingml,
+        expected_omml_ranges,
+        expected_drawingml_text,
+        expected_drawingml_ranges,
+    })
+}
+
+enum OoxmlTrackerProjection {
+    Text(String),
+    Ranges(Vec<(u32, u32)>),
+}
+
+fn ooxml_tracker_range_digest(ranges: &[(u32, u32)]) -> String {
+    let mut bytes = Vec::with_capacity(ranges.len().saturating_mul(8));
+    for &(start, length) in ranges {
+        bytes.extend_from_slice(&start.to_le_bytes());
+        bytes.extend_from_slice(&length.to_le_bytes());
+    }
+    sha256_hex(&bytes)
+}
+
+fn run_ooxml_tracker_case(
+    case: Case,
+    corpus: &OoxmlTrackerCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let expected_digest = match case {
+        Case::OmmlFormulaRangeScan => ooxml_tracker_range_digest(&corpus.expected_omml_ranges),
+        Case::PptxDrawingmlExtract => sha256_hex(corpus.expected_drawingml_text.as_bytes()),
+        Case::PptxDrawingmlRangeScan => {
+            ooxml_tracker_range_digest(&corpus.expected_drawingml_ranges)
+        },
+        _ => return Err("non-OOXML tracker case passed to its dedicated runner".into()),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let started = Instant::now();
+        let projection = match case {
+            Case::OmmlFormulaRangeScan => {
+                let mut ranges = Vec::with_capacity(corpus.expected_omml_ranges.len());
+                scan_omml_formula_ranges::<litchi_ooxml_common::XmlError>(
+                    &corpus.omml,
+                    |start, length| {
+                        ranges.push((start, length));
+                        Ok(())
+                    },
+                )?;
+                OoxmlTrackerProjection::Ranges(ranges)
+            },
+            Case::PptxDrawingmlExtract => {
+                OoxmlTrackerProjection::Text(extract_drawingml_text(&corpus.drawingml, Some('\n'))?)
+            },
+            Case::PptxDrawingmlRangeScan => {
+                let mut ranges = Vec::with_capacity(corpus.expected_drawingml_ranges.len());
+                scan_drawingml_ranges(&corpus.drawingml, b"p", |start, length| {
+                    ranges.push((start, length));
+                    Ok(())
+                })?;
+                OoxmlTrackerProjection::Ranges(ranges)
+            },
+            _ => return Err("non-OOXML tracker case passed to its timed loop".into()),
+        };
+        std::hint::black_box(&projection);
+        let duration = started.elapsed();
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+
+        let matches_oracle = match (&projection, case) {
+            (OoxmlTrackerProjection::Ranges(actual), Case::OmmlFormulaRangeScan) => {
+                actual == &corpus.expected_omml_ranges
+            },
+            (OoxmlTrackerProjection::Text(actual), Case::PptxDrawingmlExtract) => {
+                actual == &corpus.expected_drawingml_text
+            },
+            (OoxmlTrackerProjection::Ranges(actual), Case::PptxDrawingmlRangeScan) => {
+                actual == &corpus.expected_drawingml_ranges
+            },
+            _ => false,
+        };
+        if !matches_oracle {
+            return Err(io::Error::other(format!(
+                "{} disagrees with its NsReader oracle",
+                case.name()
+            ))
+            .into());
+        }
+    }
+
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: None,
+        source: None,
+        execution: None,
+        output_sha256: Some(expected_digest),
+        operation_metrics: None,
+    })
+}
+
 #[cfg(test)]
 fn run_case(
     case: Case,
@@ -15215,6 +15848,9 @@ fn run_case_with_config(
         },
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::OmmlFormulaRangeScan | Case::PptxDrawingmlExtract | Case::PptxDrawingmlRangeScan => {
+            Err("OOXML namespace-tracker cases use their dedicated fixed corpus runner".into())
         },
         Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave => {
             run_pptx_batch_edit_save(case, corpus, warmup_iterations, samples)
@@ -41129,7 +41765,28 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 344);
+        assert_eq!(selectable_count, 347);
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn ooxml_tracker_selectors_are_opt_in_and_nsreader_verified() {
+        let cases = [
+            Case::OmmlFormulaRangeScan,
+            Case::PptxDrawingmlExtract,
+            Case::PptxDrawingmlRangeScan,
+        ];
+        let corpus = build_ooxml_tracker_corpus().unwrap();
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.is_ooxml_tracker_scan());
+            assert!(!Case::DEFAULT.contains(&case));
+            let result = run_ooxml_tracker_case(case, &corpus, 0, 1).unwrap();
+            assert_eq!(result.case, case.name());
+            assert_eq!(result.elapsed_ns.samples.len(), 1);
+            assert_eq!(result.corpus.generator, OOXML_TRACKER_CORPUS_GENERATOR);
+            assert!(result.output_sha256.is_some());
+        }
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
