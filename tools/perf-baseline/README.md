@@ -194,6 +194,12 @@ text), archive SHA-256, and independently opened eager OPC/property metadata
 digest guard each case. These selectors bring the
 selectable matrix to 344 names while leaving the default 36 cases / 198
 records unchanged.
+One additional opt-in native DOC semantic selector
+(`doc_semantic_paragraph_count`) times `Document::paragraph_count()` over the
+same deterministic writer corpora as `doc_semantic_list_paragraphs`. An
+independent untimed paragraph-list oracle checks the exact cardinality, and
+the selector leaves the default 36 cases / 198 records unchanged. This brings
+the selectable matrix to 345 names.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -2325,9 +2331,12 @@ native-Office claim is made.
   public `write_to`.
 - `doc_semantic_open`: open the generated DOC container and its document model
   through `litchi_doc::Package`.
-- `doc_semantic_list_paragraphs` / `doc_semantic_one_paragraph` /
+- `doc_semantic_list_paragraphs` / `doc_semantic_paragraph_count` /
+  `doc_semantic_one_paragraph` /
   `doc_semantic_full_text`: time ordinary document paragraph enumeration,
-  middle-paragraph selection, or complete text extraction. The public
+  exact public paragraph cardinality query, middle-paragraph selection, or
+  complete text extraction. The count selector uses an independent untimed
+  paragraph-list oracle. The public
   one-paragraph path necessarily materializes the paragraph collection.
 - `doc_semantic_noop_edit_save` / `doc_semantic_one_edit_save`: start from an
   already-open exact-source `body_text::Snapshot`, publish zero or one middle
