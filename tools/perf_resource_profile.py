@@ -11,7 +11,10 @@ The ordinary current-HEAD mode uses temporary external traces and retains
 their SHA and size, command, and parsed counters, but not the potentially
 large raw trace.  Its XLSX managed-batch ABBA mode instead retains per-leg
 harness, ``/usr/bin/time``, and optional heaptrack artifacts under an explicit
-artifact directory.  Source/sink counters are logical harness counters.
+artifact directory.  The DOCX semantic/full-text ABBA mode uses explicit
+control/candidate binaries, requires matching deterministic corpus manifests,
+and labels all harness elapsed values as instrumented resource observations.
+Source/sink counters are logical harness counters.
 ``strace`` values are whole-process syscall observations and must not be read
 as decompressed or recompressed byte counts.
 """
@@ -52,6 +55,13 @@ DEFAULT_ABBA_OUTPUT = (
     / "performance"
     / "results"
     / "xlsx-managed-batch-resource-abba-current.json"
+)
+DEFAULT_DOCX_ABBA_OUTPUT = (
+    REPO_ROOT
+    / "docs"
+    / "performance"
+    / "results"
+    / "docx-semantic-resource-abba-current.json"
 )
 MAX_UNTRACKED_FILES = 4096
 MAX_UNTRACKED_FILE_BYTES = 16 * 1024 * 1024
@@ -158,6 +168,22 @@ XLSX_MANAGED_BATCH_ARGS: tuple[str, ...] = (
     "--xlsx-cell-crud-shape",
     XLSX_MANAGED_BATCH_SHAPE,
 )
+DOCX_SEMANTIC_ID = "docx-semantic"
+DOCX_SEMANTIC_ID_ALIASES: tuple[str, ...] = (
+    DOCX_SEMANTIC_ID,
+    "docx-semantic-full-text",
+)
+DOCX_SEMANTIC_CASES: tuple[str, ...] = (
+    "docx_semantic_open",
+    "docx_semantic_full_text",
+)
+DOCX_SEMANTIC_SHAPE = "large"
+DOCX_SEMANTIC_ARGS: tuple[str, ...] = (
+    "--case",
+    ",".join(DOCX_SEMANTIC_CASES),
+    "--semantic-shape",
+    DOCX_SEMANTIC_SHAPE,
+)
 ABBA_LEG_ORDER: tuple[str, ...] = ("A1", "B1", "B2", "A2")
 ABBA_LEG_VARIANTS: dict[str, str] = {
     "A1": "control",
@@ -166,13 +192,25 @@ ABBA_LEG_VARIANTS: dict[str, str] = {
     "A2": "control",
 }
 RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = (
-    ("harness.elapsed_ns.p50", "harness operation-summary elapsed time (ns)"),
-    ("harness.elapsed_ns.p95", "harness operation-summary elapsed time (ns)"),
-    ("harness.elapsed_ns.p99", "harness operation-summary elapsed time (ns)"),
-    ("harness.elapsed_ns.mean", "harness operation-summary elapsed time (ns)"),
+    (
+        "harness.elapsed_ns.p50",
+        "instrumented harness operation-summary elapsed time (ns); not latency evidence",
+    ),
+    (
+        "harness.elapsed_ns.p95",
+        "instrumented harness operation-summary elapsed time (ns); not latency evidence",
+    ),
+    (
+        "harness.elapsed_ns.p99",
+        "instrumented harness operation-summary elapsed time (ns); not latency evidence",
+    ),
+    (
+        "harness.elapsed_ns.mean",
+        "instrumented harness operation-summary elapsed time (ns); not latency evidence",
+    ),
     (
         "harness.elapsed_ns.standard_deviation",
-        "harness operation-summary elapsed time (ns)",
+        "instrumented harness operation-summary elapsed time (ns); not latency evidence",
     ),
     ("time.max_rss_kib", "whole-process maximum resident set size (KiB)"),
     ("time.user_seconds", "whole-process user CPU time (s)"),
@@ -196,6 +234,22 @@ RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = (
     ("heaptrack.peak_heap_bytes", "whole-process heaptrack peak heap bytes"),
     ("heaptrack.peak_rss_bytes", "whole-process heaptrack peak RSS bytes"),
 )
+DOCX_RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = tuple(
+    [
+        (
+            f"harness.{case}.elapsed_ns.{statistic}",
+            f"instrumented {case} operation-summary elapsed time ({statistic}); "
+            "not latency evidence",
+        )
+        for case in DOCX_SEMANTIC_CASES
+        for statistic in ("p50", "p95", "p99", "mean", "standard_deviation")
+    ]
+    + [
+        spec
+        for spec in RESOURCE_METRIC_SPECS
+        if not spec[0].startswith("harness.elapsed_ns.")
+    ]
+)
 NOT_MEASURED_RESOURCE_DIMENSIONS: dict[str, str] = {
     "memory_copy_bytes": (
         "not measured: /usr/bin/time and heaptrack report process totals, not bytes copied"
@@ -205,6 +259,16 @@ NOT_MEASURED_RESOURCE_DIMENSIONS: dict[str, str] = {
     ),
     "physical_cold_io": (
         "not measured: this mode does not flush or otherwise establish cold physical I/O"
+    ),
+}
+LATENCY_SEPARATION = {
+    "status": "not_measured",
+    "reason": (
+        "resource legs are instrumented by /usr/bin/time and optionally heaptrack; "
+        "their harness elapsed_ns values are not latency evidence"
+    ),
+    "required_source": (
+        "run a separate uninstrumented latency harness with the same binary and corpus identity"
     ),
 }
 
@@ -638,6 +702,21 @@ def environment() -> dict[str, Any]:
         page_size = os.sysconf("SC_PAGE_SIZE")
     except (AttributeError, OSError, ValueError):
         page_size = None
+    # Keep this allow-list deliberately small.  It records knobs that can
+    # alter scheduling/allocation without serializing ambient credentials,
+    # paths, or arbitrary user configuration into a retained report.
+    environment_keys = (
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "RUSTFLAGS",
+        "CARGO_BUILD_JOBS",
+        "RAYON_NUM_THREADS",
+        "MALLOC_CONF",
+    )
+    selected_environment = {
+        key: os.environ[key] for key in environment_keys if key in os.environ
+    }
     return {
         "os": platform.system(),
         "kernel": platform.release(),
@@ -653,6 +732,7 @@ def environment() -> dict[str, Any]:
         ),
         "rustc_version": tool_version("rustc", ("--version",)),
         "cargo_version": tool_version("cargo", ("--version",)),
+        "selected_environment": selected_environment,
     }
 
 
@@ -972,6 +1052,33 @@ def logical_measurements(report: dict[str, Any]) -> list[dict[str, Any]]:
     return measurements
 
 
+def instrumented_harness_metrics(
+    report: dict[str, Any], cases: Sequence[str]
+) -> dict[str, Any]:
+    """Extract per-case elapsed summaries with an explicit instrumented label.
+
+    These values are retained only to align resource legs.  They are collected
+    inside the same process invocation as ``/usr/bin/time``/heaptrack and must
+    not be consumed as uninstrumented latency evidence.
+    """
+    results = report.get("results") if isinstance(report, dict) else None
+    if not isinstance(results, list):
+        return {}
+    wanted = set(cases)
+    metrics: dict[str, Any] = {}
+    for result in results:
+        if not isinstance(result, dict) or result.get("case") not in wanted:
+            continue
+        elapsed = result.get("elapsed_ns")
+        if not isinstance(elapsed, dict):
+            continue
+        case = str(result["case"])
+        for statistic in ("p50", "p95", "p99", "mean", "standard_deviation"):
+            if statistic in elapsed:
+                metrics[f"harness.{case}.elapsed_ns.{statistic}"] = elapsed[statistic]
+    return metrics
+
+
 def _canonical_json(value: Any, location: str) -> str:
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
@@ -1164,6 +1271,118 @@ def _harness_result(report: Any, location: str) -> tuple[dict[str, Any], dict[st
     return configuration, result
 
 
+def _docx_harness_results(
+    report: Any, location: str
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Validate the two fixed DOCX semantic/full-text rows before comparison.
+
+    The resource runner deliberately does not infer a corpus from a command
+    line.  Every leg must carry both semantic rows and a complete deterministic
+    corpus manifest, including archive and target hashes.  This keeps an
+    accidentally changed generator, shape, or fixture from becoming a
+    seemingly comparable resource result.
+    """
+    if not isinstance(report, dict):
+        raise ResourceProfileInputError(f"{location} must be an object")
+    if report.get("schema_version") != SCHEMA_VERSION:
+        raise ResourceProfileInputError(
+            f"{location}.schema_version must be {SCHEMA_VERSION!r}"
+        )
+    configuration = report.get("configuration")
+    if not isinstance(configuration, dict):
+        raise ResourceProfileInputError(f"{location}.configuration must be an object")
+    results = report.get("results")
+    if not isinstance(results, list) or len(results) != len(DOCX_SEMANTIC_CASES):
+        raise ResourceProfileInputError(
+            f"{location}.results must contain exactly the DOCX semantic/full-text rows"
+        )
+    observed_cases = [
+        result.get("case") if isinstance(result, dict) else None for result in results
+    ]
+    if tuple(observed_cases) != DOCX_SEMANTIC_CASES:
+        raise ResourceProfileInputError(
+            f"{location}.results cases must be {list(DOCX_SEMANTIC_CASES)!r}; "
+            f"got {observed_cases!r}"
+        )
+    validated: list[dict[str, Any]] = []
+    required_manifest_keys = (
+        "name",
+        "generator",
+        "package_format",
+        "shape",
+        "payload_kind",
+        "compression",
+        "entry_count",
+        "archive_member_count",
+        "entry_bytes",
+        "uncompressed_payload_bytes",
+        "archive_bytes",
+        "archive_sha256",
+        "target_entry",
+        "target_payload_bytes",
+        "target_payload_sha256",
+    )
+    for index, result in enumerate(results):
+        result_location = f"{location}.results[{index}]"
+        if not isinstance(result, dict):
+            raise ResourceProfileInputError(f"{result_location} must be an object")
+        corpus = result.get("corpus")
+        if not isinstance(corpus, dict) or not corpus:
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus must be a non-empty object"
+            )
+        for key in required_manifest_keys:
+            if key not in corpus:
+                raise ResourceProfileInputError(
+                    f"{result_location}.corpus.{key} is required for DOCX identity"
+                )
+        if corpus.get("shape") != DOCX_SEMANTIC_SHAPE:
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.shape must be {DOCX_SEMANTIC_SHAPE!r}"
+            )
+        if corpus.get("generator") != "litchi-docx-semantic-v1":
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.generator is not the fixed DOCX generator"
+            )
+        if corpus.get("package_format") != "DOCX/OPC/ZIP":
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.package_format is not DOCX/OPC/ZIP"
+            )
+        for key in (
+            "entry_count",
+            "archive_member_count",
+            "entry_bytes",
+            "uncompressed_payload_bytes",
+            "archive_bytes",
+            "target_payload_bytes",
+        ):
+            value = corpus.get(key)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ResourceProfileInputError(
+                    f"{result_location}.corpus.{key} must be a non-negative integer"
+                )
+        _validate_sha256(
+            corpus.get("archive_sha256"), f"{result_location}.corpus.archive_sha256"
+        )
+        _validate_sha256(
+            corpus.get("target_payload_sha256"),
+            f"{result_location}.corpus.target_payload_sha256",
+        )
+        validated.append(result)
+    within_report_identity = _canonical_json(
+        validated[0]["corpus"], f"{location}.results[0].corpus"
+    )
+    if any(
+        _canonical_json(result["corpus"], f"{location}.corpus")
+        != within_report_identity
+        for result in validated[1:]
+    ):
+        raise ResourceProfileInputError(
+            f"{location}.results DOCX corpus identities do not match"
+        )
+    return configuration, validated
+
+
 def _require_revision(report: dict[str, Any], location: str) -> str:
     environment = report.get("environment")
     if not isinstance(environment, dict):
@@ -1184,6 +1403,7 @@ def validate_abba_inputs(
     legs: Sequence[dict[str, Any]],
     *,
     expected_configuration: dict[str, Any] | None = None,
+    workload: str = "xlsx",
 ) -> dict[str, Any]:
     """Validate clean binary/revision/corpus/config identity for four ABBA legs.
 
@@ -1192,6 +1412,8 @@ def validate_abba_inputs(
     statistics are interpreted, and a missing identity is an error rather than
     an implicit match.
     """
+    if workload not in {"xlsx", DOCX_SEMANTIC_ID}:
+        raise ResourceProfileInputError(f"unsupported ABBA workload: {workload!r}")
     if len(legs) != len(ABBA_LEG_ORDER):
         raise ResourceProfileInputError(
             f"ABBA requires exactly {len(ABBA_LEG_ORDER)} legs; got {len(legs)}"
@@ -1205,7 +1427,7 @@ def validate_abba_inputs(
     binary_paths: dict[str, str] = {}
     binary_modes: dict[str, int] = {}
     configurations: list[dict[str, Any]] = []
-    corpora: list[dict[str, Any]] = []
+    corpora: list[Any] = []
     tools: list[Any] = []
     for index, leg in enumerate(legs):
         location = f"legs[{index}]"
@@ -1230,10 +1452,21 @@ def validate_abba_inputs(
         report = leg.get("harness_report")
         if report is None:
             report = leg.get("report")
-        configuration, result = _harness_result(report, f"{location}.harness_report")
+        if workload == DOCX_SEMANTIC_ID:
+            configuration, results = _docx_harness_results(
+                report, f"{location}.harness_report"
+            )
+            corpus_value: Any = [
+                {"case": result["case"], "corpus": result["corpus"]}
+                for result in results
+            ]
+        else:
+            configuration, result = _harness_result(
+                report, f"{location}.harness_report"
+            )
+            corpus_value = result["corpus"]
         configurations.append(configuration)
-        corpus = result["corpus"]
-        corpora.append(corpus)
+        corpora.append(corpus_value)
         revisions[label] = _require_revision(report, f"{location}.harness_report")
         tool = report.get("tool")
         if not isinstance(tool, dict):
@@ -1247,9 +1480,13 @@ def validate_abba_inputs(
     configuration_identity = _canonical_json(configurations[0], "ABBA configuration")
     if any(_canonical_json(item, "ABBA configuration") != configuration_identity for item in configurations[1:]):
         raise ResourceProfileInputError("ABBA harness configurations do not match")
-    corpus_identity = _canonical_json(corpora[0], "ABBA corpus")
-    if any(_canonical_json(item, "ABBA corpus") != corpus_identity for item in corpora[1:]):
-        raise ResourceProfileInputError("ABBA XLSX corpora do not match")
+    corpus_identity_json = _canonical_json(corpora[0], "ABBA corpus")
+    if any(
+        _canonical_json(item, "ABBA corpus") != corpus_identity_json
+        for item in corpora[1:]
+    ):
+        label = "DOCX semantic corpora" if workload == DOCX_SEMANTIC_ID else "XLSX corpora"
+        raise ResourceProfileInputError(f"ABBA {label} do not match")
     tool_identity = _canonical_json(tools[0], "ABBA tool identity")
     if any(_canonical_json(item, "ABBA tool identity") != tool_identity for item in tools[1:]):
         raise ResourceProfileInputError("ABBA harness tool identities do not match")
@@ -1280,8 +1517,24 @@ def validate_abba_inputs(
                     f"ABBA configuration.{key} does not match fixed configuration: "
                     f"{configurations[0].get(key)!r} != {expected!r}"
                 )
+    docx_corpus_identities = (
+        [
+            {
+                "case": item["case"],
+                "corpus": item["corpus"],
+                "identity": corpus_identity(item["corpus"]),
+                "identity_sha256": sha256_bytes(
+                    _canonical_json(item["corpus"], "DOCX corpus").encode("utf-8")
+                ),
+            }
+            for item in corpora[0]
+        ]
+        if workload == DOCX_SEMANTIC_ID
+        else None
+    )
     return {
         "status": "validated",
+        "workload": workload,
         "leg_order": list(ABBA_LEG_ORDER),
         "control_revision": revisions["A1"],
         "candidate_revision": revisions["B1"],
@@ -1289,9 +1542,25 @@ def validate_abba_inputs(
         "candidate_binary_sha256": binary_hashes["B1"],
         "configuration": configurations[0],
         "corpus": corpora[0],
+        "corpus_identities": docx_corpus_identities
+        if workload == DOCX_SEMANTIC_ID
+        else corpus_identity(corpora[0]),
         "tool": tools[0],
         "claim": "identity validation only; no performance or speedup claim",
     }
+
+
+def validate_docx_abba_inputs(
+    legs: Sequence[dict[str, Any]],
+    *,
+    expected_configuration: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """DOCX-named wrapper for callers that do not need workload dispatch."""
+    return validate_abba_inputs(
+        legs,
+        expected_configuration=expected_configuration,
+        workload=DOCX_SEMANTIC_ID,
+    )
 
 
 def _finite_resource_value(value: Any) -> float | int | None:
@@ -1423,14 +1692,18 @@ def _paired_resource_statistic(
     return result
 
 
-def abba_statistics(legs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def abba_statistics(
+    legs: Sequence[dict[str, Any]],
+    *,
+    metric_specs: Sequence[tuple[str, str]] = RESOURCE_METRIC_SPECS,
+) -> dict[str, Any]:
     """Emit descriptive paired resource statistics without accepting a speedup."""
     if any(not isinstance(leg, dict) for leg in legs):
         raise ResourceProfileInputError("ABBA legs must be objects")
     labels = [leg.get("leg") for leg in legs]
     validate_abba_order(labels)
     metrics: dict[str, Any] = {}
-    for metric, description in RESOURCE_METRIC_SPECS:
+    for metric, description in metric_specs:
         values = {label: _leg_resource_metric(leg, metric) for label, leg in zip(labels, legs)}
         controls = [values["A1"], values["A2"]]
         candidates = [values["B1"], values["B2"]]
@@ -1881,6 +2154,108 @@ def profile_xlsx_abba_leg(
     }
 
 
+def profile_docx_semantic_abba_leg(
+    *,
+    leg: str,
+    variant: str,
+    binary: Path,
+    binary_descriptor: dict[str, Any],
+    artifact_root: Path,
+    warmup: int,
+    samples: int,
+    tools: dict[str, dict[str, Any]],
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """Run one fixed DOCX semantic/full-text resource leg.
+
+    The two DOCX cases share one fresh process so their corpus and tool
+    identities are aligned.  The process is run once under GNU time and once
+    under heaptrack when those optional tools are available; neither run is a
+    latency sample.
+    """
+    if leg not in ABBA_LEG_VARIANTS or ABBA_LEG_VARIANTS[leg] != variant:
+        raise ResourceProfileInputError(f"invalid ABBA leg/variant pair: {leg!r}/{variant!r}")
+    leg_dir = artifact_root / leg.lower()
+    leg_dir.mkdir(parents=True, exist_ok=True)
+    harness_json = leg_dir / "harness.json"
+    stdout = leg_dir / "harness-stdout.txt"
+    stderr = leg_dir / "harness-stderr.txt"
+    command = _profile_command(
+        binary,
+        DOCX_SEMANTIC_ARGS,
+        warmup=warmup,
+        samples=samples,
+        output=harness_json,
+    )
+    time_tool = tools.get("time", {})
+    time_report = leg_dir / "time-v.txt"
+    timed_command = (
+        [str(time_tool["path"]), "-v", "-o", str(time_report), "--", *command]
+        if time_tool.get("available")
+        else command
+    )
+    run = run_command(
+        timed_command,
+        stdout_path=stdout,
+        stderr_path=stderr,
+        timeout_seconds=timeout_seconds,
+    )
+    run = _retain_run_artifacts(run, stdout, stderr)
+    if run["returncode"] != 0 or not harness_json.is_file():
+        raise RuntimeError(
+            f"harness failed for {leg}: returncode={run['returncode']} stderr={run['stderr_excerpt']}"
+        )
+    report = load_json(harness_json)
+    if time_tool.get("available"):
+        parsed_time = parse_time_report(time_report, retained=True)
+        time_result: dict[str, Any] = {
+            "status": parsed_time.get("status", "unparsed"),
+            "command": command_record(timed_command),
+            "run": run,
+            "parsed": parsed_time,
+            "scope": "whole process; instrumented resource observation, not latency evidence",
+        }
+    else:
+        time_result = {
+            "status": "unsupported",
+            "reason": "GNU /usr/bin/time unavailable",
+            "scope": "whole process when available; not latency evidence",
+        }
+    return {
+        "leg": leg,
+        "variant": variant,
+        "binary_identity": dict(binary_descriptor),
+        "harness": {
+            "command": command_record(command),
+            "run": run,
+            "report": artifact(harness_json, retained=True),
+            "logical_measurements": logical_measurements(report),
+            "instrumented_resource_metrics": instrumented_harness_metrics(
+                report, DOCX_SEMANTIC_CASES
+            ),
+        },
+        # This private field is removed before JSON publication.  It remains
+        # available through validation so a compact summary cannot hide a
+        # changed case order, corpus, configuration, or revision.
+        "harness_report": report,
+        "resource_metrics": instrumented_harness_metrics(
+            report, DOCX_SEMANTIC_CASES
+        ),
+        "latency_evidence": dict(LATENCY_SEPARATION),
+        "time": time_result,
+        "heaptrack": _profile_abba_heaptrack(
+            binary,
+            DOCX_SEMANTIC_ARGS,
+            leg_dir,
+            tools,
+            warmup=warmup,
+            samples=samples,
+            timeout_seconds=timeout_seconds,
+        ),
+        "artifact_directory": str(leg_dir),
+    }
+
+
 def _fixed_xlsx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
     return {
         "warmup_iterations": warmup,
@@ -1894,6 +2269,24 @@ def _fixed_xlsx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
             "xlsx_cell_crud_shapes": [XLSX_MANAGED_BATCH_SHAPE],
         },
         "leg_order": list(ABBA_LEG_ORDER),
+    }
+
+
+def _fixed_docx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
+    return {
+        "warmup_iterations": warmup,
+        "samples": samples,
+        "cases": list(DOCX_SEMANTIC_CASES),
+        "semantic_shape": DOCX_SEMANTIC_SHAPE,
+        "harness_expected": {
+            "samples_per_case": samples,
+            "warmup_iterations_per_case": warmup,
+            "cases": list(DOCX_SEMANTIC_CASES),
+            "semantic_shapes": [DOCX_SEMANTIC_SHAPE],
+        },
+        "leg_order": list(ABBA_LEG_ORDER),
+        "latency_evidence": dict(LATENCY_SEPARATION),
+        "resource_tools": ["/usr/bin/time", "heaptrack", "heaptrack_print"],
     }
 
 
@@ -1990,6 +2383,129 @@ def run_xlsx_managed_batch_abba(arguments: argparse.Namespace) -> int:
             "Missing optional tools remain unsupported/null; no zero is substituted.",
             "Allocation and RSS values are whole-process observations, including profiler overhead where applicable.",
             "Copy bytes, decompressed bytes, and physical-cold I/O are not measured.",
+        ],
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("x", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2, sort_keys=True, allow_nan=False)
+        handle.write("\n")
+    return 0
+
+
+def run_docx_semantic_abba(arguments: argparse.Namespace) -> int:
+    """Run reproducible DOCX semantic/full-text resource evidence.
+
+    Control and candidate are intentionally explicit executable paths.  This
+    mode never builds either binary and never substitutes a current working
+    tree or an implicit Cargo target for a missing path.
+    """
+    control = binary_identity(Path(arguments.control_binary), label="control")
+    candidate = binary_identity(Path(arguments.candidate_binary), label="candidate")
+    if control["binary_sha256"] == candidate["binary_sha256"]:
+        raise ResourceProfileInputError("control and candidate binary hashes are identical")
+    output_path = Path(arguments.output).expanduser().resolve()
+    artifact_root = (
+        Path(arguments.artifact_dir).expanduser().resolve()
+        if arguments.artifact_dir
+        else output_path.with_name(output_path.stem + "-artifacts")
+    )
+    output_path, artifact_root = reserve_abba_paths(output_path, artifact_root)
+    tools = {
+        "time": probe_tool("/usr/bin/time", ("--version",)),
+        "heaptrack": probe_tool("heaptrack", ("--version",)),
+        "heaptrack_print": probe_tool("heaptrack_print", ("--version",)),
+    }
+    legs: list[dict[str, Any]] = []
+    for leg in ABBA_LEG_ORDER:
+        variant = ABBA_LEG_VARIANTS[leg]
+        descriptor = control if variant == "control" else candidate
+        legs.append(
+            profile_docx_semantic_abba_leg(
+                leg=leg,
+                variant=variant,
+                binary=Path(descriptor["path"]),
+                binary_descriptor=descriptor,
+                artifact_root=artifact_root,
+                warmup=arguments.warmup,
+                samples=arguments.samples,
+                tools=tools,
+                timeout_seconds=arguments.timeout,
+            )
+        )
+    control_after = binary_identity(Path(arguments.control_binary), label="control")
+    candidate_after = binary_identity(Path(arguments.candidate_binary), label="candidate")
+    if control_after["binary_sha256"] != control["binary_sha256"]:
+        raise ResourceProfileInputError("control binary changed during DOCX ABBA execution")
+    if control_after["mode_bits"] != control["mode_bits"]:
+        raise ResourceProfileInputError("control binary mode changed during DOCX ABBA execution")
+    if candidate_after["binary_sha256"] != candidate["binary_sha256"]:
+        raise ResourceProfileInputError("candidate binary changed during DOCX ABBA execution")
+    if candidate_after["mode_bits"] != candidate["mode_bits"]:
+        raise ResourceProfileInputError("candidate binary mode changed during DOCX ABBA execution")
+    fixed_configuration = _fixed_docx_abba_configuration(arguments.warmup, arguments.samples)
+    validation = validate_abba_inputs(
+        legs,
+        expected_configuration=fixed_configuration["harness_expected"],
+        workload=DOCX_SEMANTIC_ID,
+    )
+    statistics_report = abba_statistics(legs, metric_specs=DOCX_RESOURCE_METRIC_SPECS)
+    published_legs = [
+        {key: value for key, value in leg.items() if key != "harness_report"}
+        for leg in legs
+    ]
+    report = {
+        "schema_version": SCHEMA_VERSION,
+        "abba_schema_version": ABBA_SCHEMA_VERSION,
+        "tool": {
+            "name": TOOL_NAME,
+            "version": TOOL_VERSION,
+            "mode": "docx-semantic-abba-resource-profile",
+            "python_standard_library_only": True,
+        },
+        "scope": {
+            "claim": (
+                "four fresh process legs in fixed A1/B1/B2/A2 order over the same "
+                "deterministic DOCX semantic/full-text corpus; descriptive resource "
+                "comparison only and no automatic latency or speedup claim"
+            ),
+            "workload": DOCX_SEMANTIC_ID,
+            "cases": list(DOCX_SEMANTIC_CASES),
+            "semantic_shape": DOCX_SEMANTIC_SHAPE,
+            "resource_scope": (
+                "process-total /usr/bin/time and optional heaptrack observations, plus "
+                "per-case harness summaries collected inside those instrumented runs"
+            ),
+            "physical_io": (
+                "no physical I/O claim; no cache flush, source-byte, decompressed-byte, "
+                "recompressed-byte, or memory-copy counter is collected"
+            ),
+        },
+        "latency_evidence": dict(LATENCY_SEPARATION),
+        "host_environment": environment(),
+        "binary_identity": {"control": control, "candidate": candidate},
+        "configuration": fixed_configuration,
+        "corpus_identities": validation["corpus_identities"],
+        "tools": tools,
+        "validation": validation,
+        "legs": published_legs,
+        "statistics": statistics_report,
+        "perf_counters": {
+            "status": "not_measured",
+            "reason": "perf counters are not collected or synthesized by this mode",
+            "counters": {event: {"value": None, "available": False} for event in EVENTS},
+        },
+        "not_measured": dict(NOT_MEASURED_RESOURCE_DIMENSIONS),
+        "physical_io_claim_scope": (
+            "whole-process profiler observations do not identify physical source reads, "
+            "decompression, recompression, or memory copies"
+        ),
+        "artifact_directory": str(artifact_root),
+        "limitations": [
+            "Control and candidate revisions must come from clean release harness worktrees.",
+            "Missing optional tools remain unsupported/null; no zero is substituted.",
+            "Instrumented harness elapsed values are retained for workload alignment only, not latency evidence.",
+            "Allocation and RSS values are whole-process observations, including profiler overhead where applicable.",
+            "Physical I/O, copy bytes, decompressed bytes, and recompressed bytes are not measured.",
         ],
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2160,6 +2676,12 @@ def build_identity(
 def run_profile(arguments: argparse.Namespace) -> int:
     abba_control = getattr(arguments, "control_binary", None)
     abba_candidate = getattr(arguments, "candidate_binary", None)
+    if getattr(arguments, "workload", None) is not None and (
+        abba_control is None and abba_candidate is None
+    ):
+        raise ResourceProfileInputError(
+            "--workload is only valid with explicit --control-binary and --candidate-binary"
+        )
     if abba_control is not None or abba_candidate is not None:
         if abba_control is None or abba_candidate is None:
             raise ResourceProfileInputError(
@@ -2169,9 +2691,29 @@ def run_profile(arguments: argparse.Namespace) -> int:
             raise ResourceProfileInputError(
                 "ABBA mode accepts already-built release binaries; omit --build"
             )
-        if arguments.only and arguments.only != XLSX_MANAGED_BATCH_ID:
+        requested_workload = getattr(arguments, "workload", None)
+        if arguments.only and arguments.only not in {
+            XLSX_MANAGED_BATCH_ID,
+            *DOCX_SEMANTIC_ID_ALIASES,
+        }:
             raise ResourceProfileInputError(
-                "ABBA mode only supports --only xlsx-managed-batch"
+                "ABBA mode only supports --only xlsx-managed-batch or --only docx-semantic"
+            )
+        if requested_workload in DOCX_SEMANTIC_ID_ALIASES:
+            requested_workload = DOCX_SEMANTIC_ID
+        if requested_workload is None:
+            requested_workload = (
+                DOCX_SEMANTIC_ID
+                if arguments.only in DOCX_SEMANTIC_ID_ALIASES
+                else XLSX_MANAGED_BATCH_ID
+            )
+        if arguments.only in DOCX_SEMANTIC_ID_ALIASES:
+            only_workload = DOCX_SEMANTIC_ID
+        else:
+            only_workload = arguments.only
+        if only_workload and only_workload != requested_workload:
+            raise ResourceProfileInputError(
+                "--only and --workload must select the same ABBA workload"
             )
         abba_arguments = argparse.Namespace(
             control_binary=abba_control,
@@ -2186,6 +2728,12 @@ def run_profile(arguments: argparse.Namespace) -> int:
             samples=arguments.samples,
             timeout=arguments.timeout,
         )
+        if requested_workload == DOCX_SEMANTIC_ID:
+            if arguments.output == DEFAULT_OUTPUT:
+                abba_arguments.output = DEFAULT_DOCX_ABBA_OUTPUT
+            return run_docx_semantic_abba(abba_arguments)
+        if arguments.output == DEFAULT_OUTPUT:
+            abba_arguments.output = DEFAULT_ABBA_OUTPUT
         return run_xlsx_managed_batch_abba(abba_arguments)
     binary = Path(arguments.binary).resolve() if arguments.binary else DEFAULT_BINARY
     build_command: list[str] = [
@@ -2339,12 +2887,17 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--build", action="store_true", help="build the isolated release harness first")
     run.add_argument("--only", help="comma-separated workload IDs")
     run.add_argument(
+        "--workload",
+        choices=(XLSX_MANAGED_BATCH_ID, *DOCX_SEMANTIC_ID_ALIASES),
+        help="resource ABBA workload when explicit control/candidate binaries are supplied",
+    )
+    run.add_argument(
         "--control-binary",
         "--control",
         "--before-binary",
         dest="control_binary",
         type=Path,
-        help="switch to the retained XLSX managed-batch ABBA mode",
+        help="switch to the retained resource ABBA mode selected by --workload/--only",
     )
     run.add_argument(
         "--candidate-binary",
@@ -2352,7 +2905,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--after-binary",
         dest="candidate_binary",
         type=Path,
-        help="switch to the retained XLSX managed-batch ABBA mode",
+        help="switch to the retained resource ABBA mode selected by --workload/--only",
     )
     run.add_argument("--artifact-dir", type=Path)
     run.add_argument("--warmup", type=int, default=1)
@@ -2390,6 +2943,41 @@ def build_parser() -> argparse.ArgumentParser:
     abba.add_argument("--samples", type=int, default=30)
     abba.add_argument("--timeout", type=float, default=600.0)
     abba.set_defaults(function=run_xlsx_managed_batch_abba)
+
+    docx = subparsers.add_parser(
+        "compare-docx-semantic",
+        aliases=("abba-docx-semantic", "compare-docx", "abba-docx"),
+        help=(
+            "run a retained A1/B1/B2/A2 resource comparison for DOCX semantic "
+            "open/full-text workloads"
+        ),
+    )
+    docx.add_argument(
+        "--control-binary",
+        "--control",
+        "--before-binary",
+        dest="control_binary",
+        type=Path,
+        required=True,
+    )
+    docx.add_argument(
+        "--candidate-binary",
+        "--candidate",
+        "--after-binary",
+        dest="candidate_binary",
+        type=Path,
+        required=True,
+    )
+    docx.add_argument("--output", type=Path, default=DEFAULT_DOCX_ABBA_OUTPUT)
+    docx.add_argument(
+        "--artifact-dir",
+        type=Path,
+        help="directory for retained per-leg harness/time/heaptrack artifacts",
+    )
+    docx.add_argument("--warmup", type=int, default=3)
+    docx.add_argument("--samples", type=int, default=30)
+    docx.add_argument("--timeout", type=float, default=600.0)
+    docx.set_defaults(function=run_docx_semantic_abba)
     return parser
 
 
@@ -2403,6 +2991,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "abba-xlsx-managed-batch",
         "abba",
         "compare",
+        "compare-docx-semantic",
+        "abba-docx-semantic",
+        "compare-docx",
+        "abba-docx",
     }:
         if arguments.warmup < 0 or arguments.samples < 1 or arguments.timeout <= 0:
             raise SystemExit("--warmup must be non-negative, --samples and --timeout must be positive")

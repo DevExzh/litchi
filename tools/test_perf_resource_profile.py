@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import tempfile
 import unittest
@@ -666,6 +667,337 @@ peak RSS (including heaptrack overhead): 4.00M
         self.assertNotIn("allocation_calls", result)
         self.assertNotIn("peak_heap_bytes", result)
         self.assertNotIn("allocated_bytes", result)
+
+    @staticmethod
+    def _docx_report(revision="control-revision", *, samples=3, shape="large"):
+        configuration = {
+            "samples_per_case": samples,
+            "warmup_iterations_per_case": 1,
+            "cases": list(perf_resource_profile.DOCX_SEMANTIC_CASES),
+            "semantic_shapes": [shape],
+        }
+        corpus = {
+            "name": f"docx-semantic-{shape}",
+            "generator": "litchi-docx-semantic-v1",
+            "package_format": "DOCX/OPC/ZIP",
+            "shape": shape,
+            "payload_kind": "deterministic-semantic-text",
+            "compression": "deflate",
+            "entry_count": 10_000,
+            "archive_member_count": 8,
+            "entry_bytes": 49,
+            "uncompressed_payload_bytes": 490_000,
+            "archive_bytes": 50_000,
+            "archive_sha256": "a" * 64,
+            "target_entry": "paragraph:0",
+            "target_payload_bytes": 49,
+            "target_payload_sha256": "b" * 64,
+            "rtf_variant": None,
+            "xlsx": None,
+        }
+        results = []
+        for offset, case in enumerate(perf_resource_profile.DOCX_SEMANTIC_CASES):
+            results.append(
+                {
+                    "case": case,
+                    "corpus": dict(corpus),
+                    "elapsed_ns": {
+                        "unit": "ns",
+                        "p50": 100 + offset * 10,
+                        "p95": 110 + offset * 10,
+                        "p99": 120 + offset * 10,
+                        "mean": 105 + offset * 10,
+                        "standard_deviation": 5,
+                    },
+                }
+            )
+        return {
+            "schema_version": perf_resource_profile.SCHEMA_VERSION,
+            "tool": {
+                "name": "litchi-perf-baseline",
+                "version": "0.1.0",
+                "profile": "release",
+            },
+            "environment": {
+                "git_revision": revision,
+                "git_worktree_dirty": False,
+            },
+            "configuration": configuration,
+            "results": results,
+        }
+
+    @classmethod
+    def _docx_legs(cls, root):
+        binaries = {}
+        for variant, content in (
+            ("control", b"docx-control-binary"),
+            ("candidate", b"docx-candidate-binary"),
+        ):
+            path = Path(root) / f"{variant}-docx-binary"
+            path.write_bytes(content)
+            path.chmod(0o755)
+            binaries[variant] = perf_resource_profile.binary_identity(path, label=variant)
+        legs = []
+        for leg in perf_resource_profile.ABBA_LEG_ORDER:
+            variant = perf_resource_profile.ABBA_LEG_VARIANTS[leg]
+            revision = f"{variant}-revision"
+            legs.append(
+                {
+                    "leg": leg,
+                    "variant": variant,
+                    "binary_identity": dict(binaries[variant]),
+                    "harness_report": cls._docx_report(revision),
+                }
+            )
+        return legs
+
+    def test_docx_parser_exposes_explicit_comparison_cli(self):
+        parsed = perf_resource_profile.build_parser().parse_args(
+            [
+                "compare-docx-semantic",
+                "--control-binary",
+                "/tmp/control",
+                "--candidate-binary",
+                "/tmp/candidate",
+            ]
+        )
+        self.assertEqual(parsed.command, "compare-docx-semantic")
+        self.assertIs(parsed.function, perf_resource_profile.run_docx_semantic_abba)
+        run = perf_resource_profile.build_parser().parse_args(
+            [
+                "run",
+                "--workload",
+                perf_resource_profile.DOCX_SEMANTIC_ID,
+                "--only",
+                perf_resource_profile.DOCX_SEMANTIC_ID,
+                "--control-binary",
+                "/tmp/control",
+                "--candidate-binary",
+                "/tmp/candidate",
+            ]
+        )
+        self.assertEqual(run.workload, perf_resource_profile.DOCX_SEMANTIC_ID)
+        alias = perf_resource_profile.build_parser().parse_args(
+            [
+                "run",
+                "--workload",
+                "docx-semantic-full-text",
+                "--control-binary",
+                "/tmp/control",
+                "--candidate-binary",
+                "/tmp/candidate",
+            ]
+        )
+        self.assertEqual(alias.workload, "docx-semantic-full-text")
+
+    def test_docx_validation_requires_matching_rows_and_full_corpus_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legs = self._docx_legs(directory)
+            expected = {
+                "samples_per_case": 3,
+                "warmup_iterations_per_case": 1,
+                "cases": list(perf_resource_profile.DOCX_SEMANTIC_CASES),
+                "semantic_shapes": ["large"],
+            }
+            validated = perf_resource_profile.validate_docx_abba_inputs(
+                legs, expected_configuration=expected
+            )
+            self.assertEqual(validated["workload"], perf_resource_profile.DOCX_SEMANTIC_ID)
+            self.assertEqual(
+                [item["case"] for item in validated["corpus_identities"]],
+                list(perf_resource_profile.DOCX_SEMANTIC_CASES),
+            )
+            self.assertEqual(validated["corpus_identities"][0]["corpus"]["shape"], "large")
+            self.assertEqual(
+                len(validated["corpus_identities"][0]["identity_sha256"]), 64
+            )
+
+            reordered = self._docx_legs(directory)
+            reordered[0]["harness_report"]["results"].reverse()
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "cases must be"
+            ):
+                perf_resource_profile.validate_docx_abba_inputs(reordered)
+
+            within_report_mismatch = self._docx_legs(directory)
+            within_report_mismatch[0]["harness_report"]["results"][1]["corpus"][
+                "archive_sha256"
+            ] = "d" * 64
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "corpus identities do not match",
+            ):
+                perf_resource_profile.validate_docx_abba_inputs(within_report_mismatch)
+
+            missing_hash = self._docx_legs(directory)
+            del missing_hash[1]["harness_report"]["results"][0]["corpus"][
+                "target_payload_sha256"
+            ]
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "target_payload_sha256"
+            ):
+                perf_resource_profile.validate_docx_abba_inputs(missing_hash)
+
+            mismatched = self._docx_legs(directory)
+            for result in mismatched[2]["harness_report"]["results"]:
+                result["corpus"]["archive_sha256"] = "c" * 64
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "DOCX semantic corpora do not match"
+            ):
+                perf_resource_profile.validate_docx_abba_inputs(mismatched)
+
+    def test_docx_resource_metrics_are_case_specific_and_not_latency_evidence(self):
+        report = self._docx_report()
+        metrics = perf_resource_profile.instrumented_harness_metrics(
+            report, perf_resource_profile.DOCX_SEMANTIC_CASES
+        )
+        self.assertEqual(metrics["harness.docx_semantic_open.elapsed_ns.p50"], 100)
+        self.assertEqual(metrics["harness.docx_semantic_full_text.elapsed_ns.p50"], 110)
+        self.assertEqual(
+            perf_resource_profile.LATENCY_SEPARATION["status"], "not_measured"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            legs = self._docx_legs(directory)
+            for leg in legs:
+                leg["resource_metrics"] = {
+                    "harness.docx_semantic_open.elapsed_ns.p50": 100,
+                    "harness.docx_semantic_full_text.elapsed_ns.p50": 200,
+                }
+            statistics = perf_resource_profile.abba_statistics(
+                legs, metric_specs=perf_resource_profile.DOCX_RESOURCE_METRIC_SPECS
+            )
+        self.assertIn(
+            "harness.docx_semantic_full_text.elapsed_ns.p50",
+            statistics["metrics"],
+        )
+        self.assertIn("not latency evidence", statistics["metrics"][
+            "harness.docx_semantic_open.elapsed_ns.p50"
+        ]["description"])
+        json.dumps(statistics, allow_nan=False)
+
+    def test_docx_leg_uses_time_and_heaptrack_without_collapsing_latency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "control-docx-binary"
+            binary.write_bytes(b"control-docx")
+            binary.chmod(0o755)
+            artifact_root = root / "artifacts"
+            descriptor = perf_resource_profile.binary_identity(binary, label="control")
+
+            def fake_run(command, *, stdout_path, stderr_path, timeout_seconds):
+                del timeout_seconds
+                command = list(command)
+                if "--json" in command:
+                    report_path = Path(command[command.index("--json") + 1])
+                    report_path.write_text(
+                        json.dumps(self._docx_report()), encoding="utf-8"
+                    )
+                if "-o" in command and "--record-only" not in command:
+                    time_path = Path(command[command.index("-o") + 1])
+                    time_path.write_text(
+                        "Maximum resident set size (kbytes): 123\n",
+                        encoding="utf-8",
+                    )
+                if "--record-only" in command:
+                    (root / "artifacts" / "a1").mkdir(parents=True, exist_ok=True)
+                    (root / "artifacts" / "a1" / "heaptrack-profile.zst").write_bytes(
+                        b"capture"
+                    )
+                if "-H" in command:
+                    histogram = Path(command[command.index("-H") + 1])
+                    histogram.write_text("4\t3\n", encoding="utf-8")
+                    stdout_path.write_text(
+                        "calls to allocation functions: 1\n"
+                        "peak heap memory consumption: 1K\n",
+                        encoding="utf-8",
+                    )
+                return {
+                    "command": command,
+                    "returncode": 0,
+                    "timed_out": False,
+                    "wall_ns": 1,
+                    "stdout": {},
+                    "stderr": {},
+                    "stderr_excerpt": None,
+                }
+
+            with mock.patch.object(
+                perf_resource_profile, "run_command", side_effect=fake_run
+            ):
+                leg = perf_resource_profile.profile_docx_semantic_abba_leg(
+                    leg="A1",
+                    variant="control",
+                    binary=binary,
+                    binary_descriptor=descriptor,
+                    artifact_root=artifact_root,
+                    warmup=1,
+                    samples=3,
+                    tools={
+                        "time": {"available": True, "path": "/usr/bin/time"},
+                        "heaptrack": {"available": True, "path": "heaptrack"},
+                        "heaptrack_print": {
+                            "available": True,
+                            "path": "heaptrack_print",
+                        },
+                    },
+                    timeout_seconds=1,
+                )
+        self.assertEqual(leg["latency_evidence"]["status"], "not_measured")
+        self.assertIn("harness.docx_semantic_open.elapsed_ns.p50", leg["resource_metrics"])
+        self.assertIn("/usr/bin/time", leg["time"]["command"])
+        self.assertEqual(leg["heaptrack"]["status"], "ok")
+
+    def test_docx_abba_orchestration_publishes_identity_before_resource_statistics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legs = self._docx_legs(root)
+            output = root / "docx-resource.json"
+            artifacts = root / "docx-artifacts"
+
+            def fake_leg(**kwargs):
+                leg = next(item for item in legs if item["leg"] == kwargs["leg"])
+                return {
+                    **leg,
+                    "harness": {"logical_measurements": []},
+                    "time": {"status": "unsupported"},
+                    "heaptrack": {"status": "unsupported"},
+                    "latency_evidence": dict(perf_resource_profile.LATENCY_SEPARATION),
+                    "resource_metrics": {},
+                    "artifact_directory": str(artifacts / kwargs["leg"].lower()),
+                }
+
+            unavailable = {
+                "available": False,
+                "path": None,
+                "version": None,
+                "binary_sha256": None,
+                "returncode": None,
+            }
+            arguments = argparse.Namespace(
+                control_binary=root / "control-docx-binary",
+                candidate_binary=root / "candidate-docx-binary",
+                output=output,
+                artifact_dir=artifacts,
+                warmup=1,
+                samples=3,
+                timeout=1,
+            )
+            with mock.patch.object(
+                perf_resource_profile, "profile_docx_semantic_abba_leg", side_effect=fake_leg
+            ), mock.patch.object(
+                perf_resource_profile, "probe_tool", return_value=unavailable
+            ):
+                self.assertEqual(
+                    perf_resource_profile.run_docx_semantic_abba(arguments), 0
+                )
+            published = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(published["scope"]["workload"], perf_resource_profile.DOCX_SEMANTIC_ID)
+        self.assertEqual(
+            published["corpus_identities"][0]["corpus"]["archive_sha256"], "a" * 64
+        )
+        self.assertEqual(published["latency_evidence"]["status"], "not_measured")
+        self.assertEqual(published["tools"]["heaptrack"]["available"], False)
+        self.assertEqual(published["statistics"]["not_measured"]["physical_cold_io"].split(":", 1)[0], "not measured")
 
 
 if __name__ == "__main__":
