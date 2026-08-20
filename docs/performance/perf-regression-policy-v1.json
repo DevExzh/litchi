@@ -49,7 +49,8 @@
     "version": "0.1.0",
     "profile": "release",
     "target_os": "linux",
-    "target_arch": "x86_64"
+    "target_arch": "x86_64",
+    "instrumentation": "none"
   },
   "build_identity_fields": [
     "rustc_version",
@@ -124,8 +125,18 @@
       "max_regression_percent": 5.0,
       "path_globs": [
         "**/*allocation_calls",
+        "**/*allocation_calls/values",
+        "**/*deallocation_calls",
+        "**/*deallocation_calls/values",
+        "**/*reallocation_calls",
+        "**/*reallocation_calls/values",
+        "**/*failed_allocation_calls",
+        "**/*failed_allocation_calls/values",
         "**/*allocations",
         "**/*allocated_bytes",
+        "**/*allocated_bytes/values",
+        "**/*deallocated_bytes",
+        "**/*deallocated_bytes/values",
         "*allocation_calls",
         "*allocations",
         "*allocated_bytes"
