@@ -456,19 +456,51 @@ class PerfCompareTests(unittest.TestCase):
         current = report(revision="current")
         baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
         current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        for item in (baseline, current):
+            source = item["results"][0]["operation_metrics"]["source"]
+            source["status"] = "not_applicable"
+            source["counter_scope"] = "not_applicable_in_process_sink"
+            for field, vector in source.items():
+                if field in {"status", "counter_scope"}:
+                    continue
+                vector["status"] = "not_applicable"
+                vector.pop("values", None)
         current["results"][0]["operation_metrics"][
             "latency_claim"
         ] = perf_compare.COMPARABLE_LATENCY_CLAIM
-        current_source = current["results"][0]["operation_metrics"]["source"]
-        current_source["status"] = "not_applicable"
-        current_source["counter_scope"] = "not_applicable_in_process_sink"
-        for field, vector in current_source.items():
-            if field in {"status", "counter_scope"}:
-                continue
-            vector["status"] = "not_applicable"
-            vector.pop("values", None)
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError, "latency claim mismatch"
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+    def test_source_counter_scope_mismatch_fails_closed(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["source"][
+            "counter_scope"
+        ] = "untimed_source_replay_only"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "source counter scope mismatch"
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+    def test_invalid_source_counter_scope_fails_closed(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["source"][
+            "counter_scope"
+        ] = "future_scope"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "operation_metrics.source.counter_scope must be one of",
         ):
             perf_compare.compare_reports(
                 baseline, current, self.operation_metrics_policy()
