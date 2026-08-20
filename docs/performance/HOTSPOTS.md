@@ -3,6 +3,12 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0252 — XLSX page-break projection ABBA evidence](changes/0252-xlsx-pagebreak-projection-abba.md)
+(the fixed media-rich eager page-break selector accepts p50/mean/p95/p99 at
+approximately 1.2%-2.0% lower candidate latency; the source-backed selector
+accepts p50/mean/p95, while p99 is excluded for a `-0.300698%` A2→B2
+direction. Identity and drift gates pass. Production landing remains pending
+an independent code/oracle audit; this is not a broad XLSX claim.)
 [change 0251 — XLSX borrowed XML worksheet parsing ABBA evidence](changes/0251-xlsx-xml-borrowed-abba.md)
 (three selectors accept all four statistics; `xlsx_first_cell` accepts p50,
 mean, and p99, while p95 is drift-rejected at +10.941931% candidate drift.
