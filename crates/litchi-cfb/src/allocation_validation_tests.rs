@@ -44,6 +44,43 @@ fn write_u32(bytes: &mut [u8], offset: usize, value: u32) {
     bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
 }
 
+fn data_entry_offset(bytes: &[u8]) -> usize {
+    (read_u32(bytes, 0x30) as usize + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE
+}
+
+fn data_start_sector(bytes: &[u8]) -> u32 {
+    read_u32(bytes, data_entry_offset(bytes) + 116)
+}
+
+fn fat_entry_offset(bytes: &[u8], sector: u32) -> usize {
+    (read_u32(bytes, 0x4c) as usize + 1) * SECTOR_SIZE_V3 + sector as usize * 4
+}
+
+fn minifat_entry_offset(bytes: &[u8], sector: u32) -> usize {
+    (read_u32(bytes, 0x3c) as usize + 1) * SECTOR_SIZE_V3 + sector as usize * 4
+}
+
+fn regular_data_terminal_sector(bytes: &[u8]) -> u32 {
+    let mut sector = data_start_sector(bytes);
+    for _ in 1..8 {
+        sector = read_u32(bytes, fat_entry_offset(bytes, sector));
+    }
+    sector
+}
+
+fn mini_data_terminal_sector(bytes: &[u8]) -> u32 {
+    let mut sector = data_start_sector(bytes);
+    sector = read_u32(bytes, minifat_entry_offset(bytes, sector));
+    sector
+}
+
+fn assert_open_corrupted(bytes: Vec<u8>, expected: &str) {
+    assert!(matches!(
+        OleFile::open(Cursor::new(bytes)),
+        Err(crate::OleError::CorruptedFile(message)) if message.contains(expected)
+    ));
+}
+
 #[test]
 fn rejects_version_3_directory_sector_count() {
     let mut bytes = sample_file();
@@ -89,18 +126,15 @@ fn rejects_incorrect_minifat_sector_count() {
 #[test]
 fn open_rejects_minifat_cycles_and_invalid_markers() {
     fn corrupt_first_data_mini_sector(bytes: &mut [u8], next: u32) {
-        let directory_sector = read_u32(bytes, 0x30) as usize;
-        let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
-        let mini_start = read_u32(bytes, data_entry + 116) as usize;
-        let minifat_sector = read_u32(bytes, 0x3c) as usize;
-        let entry = (minifat_sector + 1) * SECTOR_SIZE_V3 + mini_start * 4;
-        write_u32(bytes, entry, next);
+        write_u32(
+            bytes,
+            minifat_entry_offset(bytes, data_start_sector(bytes)),
+            next,
+        );
     }
 
     let mut cycle = mini_stream_file();
-    let directory_sector = read_u32(&cycle, 0x30) as usize;
-    let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
-    let mini_start = read_u32(&cycle, data_entry + 116);
+    let mini_start = data_start_sector(&cycle);
     corrupt_first_data_mini_sector(&mut cycle, mini_start);
     assert!(matches!(
         OleFile::open(Cursor::new(cycle)),
@@ -118,18 +152,15 @@ fn open_rejects_minifat_cycles_and_invalid_markers() {
 #[test]
 fn open_rejects_fat_stream_cycles_and_invalid_markers() {
     fn corrupt_first_data_sector(bytes: &mut [u8], next: u32) {
-        let directory_sector = read_u32(bytes, 0x30) as usize;
-        let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
-        let data_start = read_u32(bytes, data_entry + 116) as usize;
-        let fat_sector = read_u32(bytes, 0x4c) as usize;
-        let entry = (fat_sector + 1) * SECTOR_SIZE_V3 + data_start * 4;
-        write_u32(bytes, entry, next);
+        write_u32(
+            bytes,
+            fat_entry_offset(bytes, data_start_sector(bytes)),
+            next,
+        );
     }
 
     let mut cycle = regular_stream_file();
-    let directory_sector = read_u32(&cycle, 0x30) as usize;
-    let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
-    let data_start = read_u32(&cycle, data_entry + 116);
+    let data_start = data_start_sector(&cycle);
     corrupt_first_data_sector(&mut cycle, data_start);
     assert!(matches!(
         OleFile::open(Cursor::new(cycle)),
@@ -142,6 +173,71 @@ fn open_rejects_fat_stream_cycles_and_invalid_markers() {
         OleFile::open(Cursor::new(invalid_marker)),
         Err(crate::OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
     ));
+}
+
+#[test]
+fn open_rejects_fat_stream_short_excess_and_terminal_markers() {
+    let mut short = regular_stream_file();
+    let start = data_start_sector(&short);
+    write_u32(&mut short, fat_entry_offset(&short, start), ENDOFCHAIN);
+    assert_open_corrupted(
+        short,
+        "regular stream chain ends before its declared length",
+    );
+
+    let mut excess = regular_stream_file();
+    let terminal = regular_data_terminal_sector(&excess);
+    write_u32(
+        &mut excess,
+        fat_entry_offset(&excess, terminal),
+        terminal + 1,
+    );
+    assert_open_corrupted(excess, "regular stream chain exceeds its declared length");
+
+    let mut free = regular_stream_file();
+    let terminal = regular_data_terminal_sector(&free);
+    write_u32(&mut free, fat_entry_offset(&free, terminal), FREESECT);
+    assert_open_corrupted(free, "regular stream chain exceeds its declared length");
+
+    let mut explicit_terminal = regular_stream_file();
+    let terminal = regular_data_terminal_sector(&explicit_terminal);
+    write_u32(
+        &mut explicit_terminal,
+        fat_entry_offset(&explicit_terminal, terminal),
+        ENDOFCHAIN,
+    );
+    assert!(OleFile::open(Cursor::new(explicit_terminal)).is_ok());
+}
+
+#[test]
+fn open_rejects_minifat_stream_short_excess_and_terminal_markers() {
+    let mut short = mini_stream_file();
+    let start = data_start_sector(&short);
+    write_u32(&mut short, minifat_entry_offset(&short, start), ENDOFCHAIN);
+    assert_open_corrupted(short, "mini stream chain ends before its declared length");
+
+    let mut excess = mini_stream_file();
+    let terminal = mini_data_terminal_sector(&excess);
+    write_u32(
+        &mut excess,
+        minifat_entry_offset(&excess, terminal),
+        terminal + 1,
+    );
+    assert_open_corrupted(excess, "mini stream chain exceeds its declared length");
+
+    let mut free = mini_stream_file();
+    let terminal = mini_data_terminal_sector(&free);
+    write_u32(&mut free, minifat_entry_offset(&free, terminal), FREESECT);
+    assert_open_corrupted(free, "mini stream chain exceeds its declared length");
+
+    let mut explicit_terminal = mini_stream_file();
+    let terminal = mini_data_terminal_sector(&explicit_terminal);
+    write_u32(
+        &mut explicit_terminal,
+        minifat_entry_offset(&explicit_terminal, terminal),
+        ENDOFCHAIN,
+    );
+    assert!(OleFile::open(Cursor::new(explicit_terminal)).is_ok());
 }
 
 #[test]
