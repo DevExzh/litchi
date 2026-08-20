@@ -74,6 +74,29 @@ optimizations that intentionally change I/O, source reads, or sink writes;
 use a matching evidence protocol for those changes. It never infers a speedup
 claim from an accepted statistic.
 
+The four raw reports and their strict summary can be packaged for archival
+with the standard-library-only `tools/perf_abba_package.py` helper. It invokes
+the external `zstd` executable in a deterministic single-threaded mode,
+retains raw JSON bytes, and refuses malformed summary bindings, duplicate
+ABBA roles, output overwrites, and output paths that escape the selected
+directory:
+
+```sh
+python3 tools/perf_abba_package.py \
+  --change 0238-perf-package \
+  --output-dir docs/performance/results/0238-perf-package \
+  --summary target/perf/summary.json \
+  --artifact a1=target/perf/control-a.json \
+  --artifact b1=target/perf/candidate-a.json \
+  --artifact b2=target/perf/candidate-b.json \
+  --artifact a2=target/perf/control-b.json
+```
+
+The deterministic manifest records each artifact's role, compressed and
+uncompressed byte counts and SHA-256 digests, plus the summary's raw and
+canonical identity and report bindings. Existing files are never replaced;
+use a fresh output directory for a rerun.
+
 The native OLE2, DOCX/PPTX, RTF, and ODF semantic matrices are deliberately
 opt-in. They measure only current public APIs and therefore do not change the
 default 36 cases / 198 records.
