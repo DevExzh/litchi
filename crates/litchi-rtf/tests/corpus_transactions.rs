@@ -96,23 +96,18 @@ fn hostile_operation_fanout_stops_at_the_caller_bound() {
 }
 
 #[test]
-fn changed_microsoft_and_libreoffice_corpus_output_reopens() {
+fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
     let microsoft_bytes = std::fs::read(corpus("test-data/rtf/testNegativeUnicode.rtf")).unwrap();
     let microsoft = Document::from_bytes(&microsoft_bytes).unwrap();
     let microsoft_target = Document::parse(r"{\rtf1\ansi Microsoft interop target}").unwrap();
-    let changed = TransferPlan::field(&microsoft, 0, &microsoft_target)
-        .unwrap()
-        .commit()
-        .unwrap()
-        .into_snapshot();
-    assert_ne!(
-        changed.to_bytes().unwrap(),
-        microsoft_target.to_bytes().unwrap()
-    );
-    let reopened = Document::from_bytes(&changed.to_bytes().unwrap()).unwrap();
-    assert_eq!(reopened.fields().len(), 1);
+    assert!(matches!(
+        TransferPlan::field(&microsoft, 0, &microsoft_target),
+        Err(Error::UnsupportedSource(_))
+    ));
+    let microsoft_reopened = Document::from_bytes(&microsoft.to_bytes().unwrap()).unwrap();
+    assert_eq!(microsoft_reopened.fields().len(), 1);
     assert_eq!(
-        reopened.fields()[0].instruction,
+        microsoft_reopened.fields()[0].instruction,
         microsoft.fields()[0].instruction
     );
 
