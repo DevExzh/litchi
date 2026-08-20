@@ -340,6 +340,14 @@ def allocator_operation_metrics(value=100, sample_count=5):
     return operation_metrics
 
 
+def allocator_raw_metrics(value=100):
+    return {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        **{field: value for field in ALLOCATOR_VECTOR_FIELDS},
+    }
+
+
 def allocator_report(value=100, revision="baseline"):
     result = report(value=value, revision=revision)
     result["tool"]["binary"] = "litchi-perf-baseline-alloc"
@@ -356,10 +364,7 @@ def allocator_report(value=100, revision="baseline"):
                 {
                     "sample_index": sample_index,
                     "cache_state": cache_state,
-                    "allocation_metrics": {
-                        "status": "measured",
-                        "scope": "operation_global_system_allocator",
-                    },
+                    "allocation_metrics": allocator_raw_metrics(value),
                 }
                 for cache_state in ("warm", "cold-requested")
                 for sample_index in range(5)
@@ -1260,6 +1265,8 @@ class PerfCompareTests(unittest.TestCase):
             item["operation_metrics"]["allocation"]["allocation_calls"][
                 "values"
             ] = [110] * 5
+        for sample in current["filesystem_evidence"][0]["samples"]:
+            sample["allocation_metrics"]["allocation_calls"] = 110
         result = perf_compare.compare_reports(baseline, current, comparison_policy)
         self.assertEqual(result["status"], "regression")
         self.assertEqual(result["summary"]["latency_claims"], "withheld_instrumentation")
@@ -1288,6 +1295,26 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["summary"]["latency_claims"], "withheld_instrumentation")
         self.assertEqual(result["summary"]["compared_metrics"], 20)
+
+        missing_raw = allocator_report(revision="current")
+        del missing_raw["filesystem_evidence"][0]["samples"][0][
+            "allocation_metrics"
+        ]["allocated_bytes"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "raw allocation_metrics.*every numeric allocator field",
+        ):
+            perf_compare.compare_reports(baseline, missing_raw, comparison_policy)
+
+        mismatched_raw = allocator_report(revision="current")
+        mismatched_raw["filesystem_evidence"][0]["samples"][0][
+            "allocation_metrics"
+        ]["allocation_calls"] += 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "raw allocator allocation_calls.*does not match",
+        ):
+            perf_compare.compare_reports(baseline, mismatched_raw, comparison_policy)
 
         missing = allocator_report(revision="current")
         del missing["results"][0]["operation_metrics"]["allocation"][

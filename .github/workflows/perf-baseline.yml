@@ -159,6 +159,54 @@ jobs:
             --features allocator-metrics \
             --bin litchi-perf-baseline-alloc
 
+      - name: Run bounded allocator evidence and policy smoke
+        run: |
+          mkdir -p target/perf/allocator-smoke
+          cargo run --release --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc -- \
+            --warmup 3 \
+            --samples 15 \
+            --case opc_file_eager_open \
+            --filesystem-cache warm,cold-requested \
+            --json target/perf/allocator-smoke/current.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          current_path = Path("target/perf/allocator-smoke/current.json")
+          baseline_path = Path("target/perf/allocator-smoke/baseline.json")
+          current = json.loads(current_path.read_text())
+          revision = current["environment"].get("git_revision")
+          assert isinstance(revision, str) and revision
+          baseline = json.loads(json.dumps(current))
+          baseline["environment"]["git_revision"] = (
+              f"allocator-smoke-reference:{revision}"
+          )
+          baseline_path.write_text(json.dumps(baseline, indent=2, sort_keys=True) + "\n")
+          PY
+          python3 tools/perf_compare.py \
+            --policy docs/performance/perf-regression-policy-allocator-v1.json \
+            --baseline target/perf/allocator-smoke/baseline.json \
+            --current target/perf/allocator-smoke/current.json \
+            --json-out target/perf/allocator-smoke/comparison.json \
+            --summary-out target/perf/allocator-smoke/comparison.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          comparison = json.loads(
+              Path("target/perf/allocator-smoke/comparison.json").read_text()
+          )
+          assert comparison["status"] == "pass"
+          assert comparison["summary"]["matched_results"] == 2
+          assert comparison["summary"]["regressions"] == 0
+          assert comparison["summary"]["latency_claims"] == "withheld_instrumentation"
+          assert comparison["summary"]["latency_compared_results"] == 0
+          assert comparison["summary"]["latency_excluded_results"] == 2
+          assert comparison["summary"]["compared_metrics"] == 20
+          PY
+
       - name: Test fail-closed performance Python tooling
         run: |
           python3 -m unittest \
