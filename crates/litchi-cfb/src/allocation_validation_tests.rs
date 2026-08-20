@@ -28,6 +28,14 @@ fn mini_stream_file() -> Vec<u8> {
     output.into_inner()
 }
 
+fn regular_stream_file() -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Data"], &[0u8; 4096]).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn read_u32(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
 }
@@ -101,6 +109,35 @@ fn open_rejects_minifat_cycles_and_invalid_markers() {
 
     let mut invalid_marker = mini_stream_file();
     corrupt_first_data_mini_sector(&mut invalid_marker, MAXREGSECT);
+    assert!(matches!(
+        OleFile::open(Cursor::new(invalid_marker)),
+        Err(crate::OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
+    ));
+}
+
+#[test]
+fn open_rejects_fat_stream_cycles_and_invalid_markers() {
+    fn corrupt_first_data_sector(bytes: &mut [u8], next: u32) {
+        let directory_sector = read_u32(bytes, 0x30) as usize;
+        let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
+        let data_start = read_u32(bytes, data_entry + 116) as usize;
+        let fat_sector = read_u32(bytes, 0x4c) as usize;
+        let entry = (fat_sector + 1) * SECTOR_SIZE_V3 + data_start * 4;
+        write_u32(bytes, entry, next);
+    }
+
+    let mut cycle = regular_stream_file();
+    let directory_sector = read_u32(&cycle, 0x30) as usize;
+    let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
+    let data_start = read_u32(&cycle, data_entry + 116);
+    corrupt_first_data_sector(&mut cycle, data_start);
+    assert!(matches!(
+        OleFile::open(Cursor::new(cycle)),
+        Err(crate::OleError::CorruptedFile(message)) if message.contains("Cycle detected")
+    ));
+
+    let mut invalid_marker = regular_stream_file();
+    corrupt_first_data_sector(&mut invalid_marker, MAXREGSECT);
     assert!(matches!(
         OleFile::open(Cursor::new(invalid_marker)),
         Err(crate::OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
