@@ -3132,7 +3132,7 @@ identifier surface. The `litchi-iwa -> litchi-numbers` edge and ordered debt
 The focused all-feature Numbers suite currently passes 298 tests with four
 ignored, including nine focused rich-text projection tests; document-reader
 integration passes 16/16, and the boundary suite passes 267/267 while the live
-graph remains 64 packages and 239 internal
+graph remains 64 packages and 240 internal
 declarations. Existing native Numbers basic and formula/rich-text fixtures
 continue to provide application semantic acceptance; this read-only
 implementation change introduces no native save/reopen or performance claim.
@@ -3205,3 +3205,47 @@ earlier exact-writer statement is narrowed to the low-level live
 earlier instrumentation counts are read-count evidence only; no latency or
 memory improvement is claimed until the pending performance entries are
 measured.
+
+## 2026-08-20 amendment: Numbers type-6002 Tile production-decode exit
+
+The focused Numbers type-6002 Tile owner now uses the no-`Vec` transactional
+`numbers_table_cell_storage_codec::decode_tile_with_visitor` route. Its strict
+handwritten canonical router validates root/row framing, required and duplicate
+fields, canonical scalar and Boolean encodings, unknown/group forms, and
+aggregate limits. Private Buffa lazy views are used only as a parity check after
+strict traversal. Production publishes no generated `tst::Tile`; the permanent
+boundary check permits Prost only in test fixtures and differential oracles and
+rejects both generated `Tile::decode` and `TileRowInfo::decode` (including
+`tst::Tile::decode` and `tst::TileRowInfo::decode`) in production. Row callbacks
+borrow storage and offset slices from the source component.
+
+The visitor guards the prefix materialized-cell total before parsing a row. A
+semantic cell error is retained while later rows still receive strict wire
+validation, producing the complete decode report without growing the semantic
+table. The package merges that full report, then charges the aggregate
+materialized-cell count, then returns the retained semantic error. A later
+malformed wire error therefore wins over an earlier semantic cell error; an
+aggregate cell limit wins over a retained semantic error. Candidate tables and
+retained budgets are local and publish only after success, while bounded decode
+work remains charged after rejection.
+
+This turn also hardens legacy type-6000 admission: strict shape classification
+still ignores TableInfo false positives, while schema-shaped legacy models hit
+the table budget before Prost decode/materialization and cannot commit rejected
+candidate budgets.
+
+The production cut removes the duplicate Tile parse and row-buffer copies, but
+source borrowing at this codec boundary is not an end-to-end zero-copy claim.
+The 2026-08-20 gates record 221 `litchi-iwa-protos` tests, 311 passed and four
+ignored Numbers unit tests, and all 14 integration binaries passed (120 tests
+total), including `document_reader` 16/16 and `tile_reader_integration` 2/2.
+Boundary is 271; the live graph is 64 packages, 240 internal declarations, and
+14 unchanged ordered debts. The final temp-corpus nightly ASan smoke ran 100
+runs with eight seeds; the read-only native Numbers ZIP/directory hash and UI
+gate passed its known hashes.
+
+This is a focused production-decode exit, not completion of the extractor,
+Numbers package, or monolith. No measured performance, latency, RSS, native
+save, or native mutation claim follows. Eight production generated decodes
+remain in the extractor, old `litchi-iwa` Tile paths remain, and debt 015 plus
+all 14 ordered migration debts are unchanged.

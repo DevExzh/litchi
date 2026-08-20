@@ -2920,6 +2920,9 @@ fn set_once<T>(slot: &mut Option<T>, value: T) -> Result<(), DecodeError> {
 )]
 mod tests {
     use super::*;
+    use prost::Message as _;
+
+    use crate::tst;
 
     fn varint(output: &mut Vec<u8>, mut value: u64) {
         loop {
@@ -2946,6 +2949,11 @@ mod tests {
         varint(output, u64::try_from(value.len()).unwrap());
         output.extend_from_slice(value);
     }
+    fn unknown_group(output: &mut Vec<u8>, number: u32, nested_number: u32, value: u64) {
+        key(output, number, 3);
+        v(output, nested_number, value);
+        key(output, number, 4);
+    }
     fn f32_bits(output: &mut Vec<u8>, number: u32, value: u32) {
         key(output, number, 5);
         output.extend_from_slice(&value.to_le_bytes());
@@ -2966,6 +2974,97 @@ mod tests {
         v(&mut out, 2, 0);
         b(&mut out, 3, &[]);
         b(&mut out, 4, &[]);
+        out
+    }
+    fn populated_row(index: u32, storage: &[u8], offsets: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        v(&mut out, 1, u64::from(index));
+        v(&mut out, 2, 3);
+        b(&mut out, 3, storage);
+        b(&mut out, 4, offsets);
+        v(&mut out, 5, 9);
+        b(&mut out, 6, b"current-storage");
+        b(&mut out, 7, b"current-offsets");
+        v(&mut out, 8, 1);
+        out
+    }
+    fn tile_from_rows(rows: &[Vec<u8>]) -> Vec<u8> {
+        let mut out = Vec::new();
+        v(&mut out, 1, 0);
+        v(&mut out, 2, 0);
+        v(&mut out, 3, u64::try_from(rows.len()).unwrap());
+        v(&mut out, 4, u64::try_from(rows.len()).unwrap());
+        for payload in rows {
+            b(&mut out, 5, payload);
+        }
+        out
+    }
+    fn unknown_row(index: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        v(&mut out, 90, 0x9000);
+        v(&mut out, 1, u64::from(index));
+        b(&mut out, 91, b"unknown-before-cell-count");
+        v(&mut out, 2, 4);
+        b(&mut out, 3, b"pre-storage");
+        v(&mut out, 92, 0x9200);
+        b(&mut out, 4, b"pre-offsets");
+        v(&mut out, 5, 8);
+        b(&mut out, 93, b"unknown-before-current-storage");
+        b(&mut out, 6, b"current-storage");
+        v(&mut out, 94, 0);
+        b(&mut out, 7, b"current-offsets");
+        v(&mut out, 8, 0);
+        b(&mut out, 95, b"unknown-after-row");
+        out
+    }
+    fn unknown_row_with_groups(index: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        unknown_group(&mut out, 90, 91, 0x9000);
+        v(&mut out, 1, u64::from(index));
+        b(&mut out, 3, b"pre-storage");
+        unknown_group(&mut out, 92, 93, 0x9200);
+        v(&mut out, 2, 4);
+        b(&mut out, 4, b"pre-offsets");
+        v(&mut out, 5, 8);
+        b(&mut out, 6, b"current-storage");
+        b(&mut out, 7, b"current-offsets");
+        v(&mut out, 8, 0);
+        unknown_group(&mut out, 94, 95, 0x9400);
+        out
+    }
+    fn tile_with_unknowns(row: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        v(&mut out, 90, 0x9000);
+        v(&mut out, 1, 12);
+        b(&mut out, 91, b"unknown-between-scalars");
+        v(&mut out, 2, 34);
+        v(&mut out, 92, 56);
+        v(&mut out, 3, 78);
+        b(&mut out, 93, b"unknown-before-numrows");
+        v(&mut out, 4, 90);
+        b(&mut out, 94, b"unknown-before-row");
+        b(&mut out, 5, row);
+        v(&mut out, 95, 0x9500);
+        v(&mut out, 6, 7);
+        b(&mut out, 96, b"unknown-before-bools");
+        v(&mut out, 7, 0);
+        v(&mut out, 8, 0);
+        b(&mut out, 97, b"unknown-after-tile");
+        out
+    }
+    fn tile_with_unknown_groups(row: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        unknown_group(&mut out, 90, 91, 0x9000);
+        v(&mut out, 1, 12);
+        v(&mut out, 2, 34);
+        unknown_group(&mut out, 92, 93, 0x9200);
+        v(&mut out, 3, 78);
+        v(&mut out, 4, 90);
+        b(&mut out, 5, row);
+        v(&mut out, 6, 7);
+        v(&mut out, 7, 0);
+        unknown_group(&mut out, 94, 95, 0x9400);
+        v(&mut out, 8, 0);
         out
     }
     fn tile(rows: usize) -> Vec<u8> {
@@ -3118,6 +3217,92 @@ mod tests {
         ) -> Result<(), DecodeError> {
             self.segments += 1;
             assert_ne!(reference.reference().identifier(), 0);
+            Ok(())
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct RowFact {
+        tile_row_index: u32,
+        cell_count: u32,
+        storage_version: Option<u32>,
+        has_wide_offsets: Option<bool>,
+        cell_storage_buffer_pre_bnc: Vec<u8>,
+        cell_offsets_pre_bnc: Vec<u8>,
+        cell_storage_buffer: Option<Vec<u8>>,
+        cell_offsets: Option<Vec<u8>>,
+    }
+
+    fn row_fact(row: TileRowInfoSnapshot<'_>) -> RowFact {
+        RowFact {
+            tile_row_index: row.tile_row_index(),
+            cell_count: row.cell_count(),
+            storage_version: row.storage_version(),
+            has_wide_offsets: row.has_wide_offsets(),
+            cell_storage_buffer_pre_bnc: row.cell_storage_buffer_pre_bnc().to_vec(),
+            cell_offsets_pre_bnc: row.cell_offsets_pre_bnc().to_vec(),
+            cell_storage_buffer: row.cell_storage_buffer().map(<[u8]>::to_vec),
+            cell_offsets: row.cell_offsets().map(<[u8]>::to_vec),
+        }
+    }
+
+    fn prost_row_fact(row: &tst::TileRowInfo) -> RowFact {
+        RowFact {
+            tile_row_index: row.tile_row_index,
+            cell_count: row.cell_count,
+            storage_version: row.storage_version,
+            has_wide_offsets: row.has_wide_offsets,
+            cell_storage_buffer_pre_bnc: row.cell_storage_buffer_pre_bnc.clone(),
+            cell_offsets_pre_bnc: row.cell_offsets_pre_bnc.clone(),
+            cell_storage_buffer: row.cell_storage_buffer.clone(),
+            cell_offsets: row.cell_offsets.clone(),
+        }
+    }
+
+    #[derive(Default)]
+    struct RowCollector {
+        rows: Vec<RowFact>,
+        source_range: Option<(usize, usize)>,
+        borrowed_payloads: Vec<(usize, usize)>,
+    }
+
+    impl RowCollector {
+        fn for_source(source: &[u8]) -> Self {
+            let start = source.as_ptr() as usize;
+            let end = start.saturating_add(source.len());
+            Self {
+                rows: Vec::new(),
+                source_range: Some((start, end)),
+                borrowed_payloads: Vec::new(),
+            }
+        }
+
+        fn assert_borrowed(&mut self, payload: &[u8]) {
+            let Some((source_start, source_end)) = self.source_range else {
+                return;
+            };
+            if payload.is_empty() {
+                return;
+            }
+            let payload_start = payload.as_ptr() as usize;
+            let payload_end = payload_start.saturating_add(payload.len());
+            assert!(payload_start >= source_start);
+            assert!(payload_end <= source_end);
+            self.borrowed_payloads.push((payload_start, payload.len()));
+        }
+    }
+
+    impl StorageVisitor for RowCollector {
+        fn visit_tile_row(&mut self, row: TileRowInfoSnapshot<'_>) -> Result<(), DecodeError> {
+            self.assert_borrowed(row.cell_storage_buffer_pre_bnc());
+            self.assert_borrowed(row.cell_offsets_pre_bnc());
+            if let Some(payload) = row.cell_storage_buffer() {
+                self.assert_borrowed(payload);
+            }
+            if let Some(payload) = row.cell_offsets() {
+                self.assert_borrowed(payload);
+            }
+            self.rows.push(row_fact(row));
             Ok(())
         }
     }
@@ -3379,6 +3564,496 @@ mod tests {
         b(&mut segment, 3, &entry);
         let s = decode_table_data_list_segment(&segment, options(&segment)).unwrap();
         assert_eq!((s.key_range_location(), s.key_range_length()), (4, 8));
+    }
+
+    #[test]
+    fn tile_visitor_matches_prost_for_unsorted_duplicate_indices_and_presence() {
+        let expected = tst::Tile {
+            max_column: 12,
+            max_row: 34,
+            num_cells: 56,
+            numrows: 78,
+            row_infos: vec![
+                tst::TileRowInfo {
+                    tile_row_index: 11,
+                    cell_count: 2,
+                    cell_storage_buffer_pre_bnc: vec![1, 2],
+                    cell_offsets_pre_bnc: vec![3],
+                    storage_version: Some(7),
+                    cell_storage_buffer: Some(vec![4, 5]),
+                    cell_offsets: Some(vec![6]),
+                    has_wide_offsets: Some(false),
+                },
+                tst::TileRowInfo {
+                    tile_row_index: 3,
+                    cell_count: 0,
+                    cell_storage_buffer_pre_bnc: Vec::new(),
+                    cell_offsets_pre_bnc: Vec::new(),
+                    storage_version: None,
+                    cell_storage_buffer: None,
+                    cell_offsets: Some(vec![8]),
+                    has_wide_offsets: Some(true),
+                },
+                tst::TileRowInfo {
+                    tile_row_index: 11,
+                    cell_count: 9,
+                    cell_storage_buffer_pre_bnc: vec![9],
+                    cell_offsets_pre_bnc: vec![10],
+                    storage_version: Some(12),
+                    cell_storage_buffer: Some(vec![11]),
+                    cell_offsets: None,
+                    has_wide_offsets: None,
+                },
+            ],
+            storage_version: Some(90),
+            last_saved_in_bnc: Some(false),
+            should_use_wide_rows: Some(false),
+        };
+        let source = expected.encode_to_vec();
+        let before = source.clone();
+        let prost = tst::Tile::decode(source.as_slice()).unwrap();
+        let mut visitor = RowCollector::for_source(&source);
+        let (snapshot, report) =
+            decode_tile_with_visitor(&source, options(&source), &mut visitor).unwrap();
+
+        assert_eq!(source, before);
+        assert_eq!(snapshot.max_column(), prost.max_column);
+        assert_eq!(snapshot.max_row(), prost.max_row);
+        assert_eq!(snapshot.num_cells(), prost.num_cells);
+        assert_eq!(snapshot.num_rows(), prost.numrows);
+        assert_eq!(snapshot.storage_version(), prost.storage_version);
+        assert_eq!(snapshot.last_saved_in_bnc(), prost.last_saved_in_bnc);
+        assert_eq!(snapshot.should_use_wide_rows(), prost.should_use_wide_rows);
+        assert_eq!(visitor.rows.len(), prost.row_infos.len());
+        assert_eq!(
+            visitor.rows,
+            prost
+                .row_infos
+                .iter()
+                .map(prost_row_fact)
+                .collect::<Vec<_>>()
+        );
+        assert_ne!(
+            usize::try_from(snapshot.num_rows()).unwrap(),
+            visitor.rows.len()
+        );
+        assert_ne!(
+            usize::try_from(snapshot.num_cells()).unwrap(),
+            visitor
+                .rows
+                .iter()
+                .map(|row| usize::try_from(row.cell_count).unwrap())
+                .sum::<usize>()
+        );
+        assert!(report.fields() > 0);
+    }
+
+    #[test]
+    fn tile_visitor_accepts_unknowns_and_keeps_source_unchanged() {
+        let source = tile_with_unknowns(&unknown_row(5));
+        let before = source.clone();
+        let mut visitor = RowCollector::for_source(&source);
+        let snapshot = decode_tile_with_visitor(&source, options(&source), &mut visitor)
+            .unwrap()
+            .0;
+
+        assert_eq!(source, before);
+        assert_eq!(snapshot.max_column(), 12);
+        assert_eq!(snapshot.max_row(), 34);
+        assert_eq!(snapshot.num_cells(), 78);
+        assert_eq!(snapshot.num_rows(), 90);
+        assert_eq!(snapshot.storage_version(), Some(7));
+        assert_eq!(snapshot.last_saved_in_bnc(), Some(false));
+        assert_eq!(snapshot.should_use_wide_rows(), Some(false));
+        assert_eq!(visitor.rows.len(), 1);
+        let decoded_row = &visitor.rows[0];
+        assert_eq!(decoded_row.tile_row_index, 5);
+        assert_eq!(decoded_row.cell_count, 4);
+        assert_eq!(decoded_row.cell_storage_buffer_pre_bnc, b"pre-storage");
+        assert_eq!(decoded_row.cell_offsets_pre_bnc, b"pre-offsets");
+        assert_eq!(decoded_row.storage_version, Some(8));
+        assert_eq!(
+            decoded_row.cell_storage_buffer,
+            Some(b"current-storage".to_vec())
+        );
+        assert_eq!(decoded_row.cell_offsets, Some(b"current-offsets".to_vec()));
+        assert_eq!(decoded_row.has_wide_offsets, Some(false));
+    }
+
+    #[test]
+    fn tile_visitor_accepts_matched_unknown_groups_at_root_and_row_scopes() {
+        let row_source = unknown_row_with_groups(5);
+        let row_before = row_source.clone();
+        let row_snapshot = decode_tile_row_info(&row_source, options(&row_source)).unwrap();
+        assert_eq!(row_source, row_before);
+        assert_eq!(row_snapshot.tile_row_index(), 5);
+        assert_eq!(row_snapshot.cell_count(), 4);
+        assert_eq!(row_snapshot.cell_storage_buffer_pre_bnc(), b"pre-storage");
+        assert_eq!(row_snapshot.cell_offsets_pre_bnc(), b"pre-offsets");
+        assert_eq!(row_snapshot.storage_version(), Some(8));
+        assert_eq!(
+            row_snapshot.cell_storage_buffer(),
+            Some(&b"current-storage"[..])
+        );
+        assert_eq!(row_snapshot.cell_offsets(), Some(&b"current-offsets"[..]));
+        assert_eq!(row_snapshot.has_wide_offsets(), Some(false));
+
+        let source = tile_with_unknown_groups(&row_source);
+        let before = source.clone();
+        let mut visitor = RowCollector::for_source(&source);
+        let (snapshot, visitor_report) =
+            decode_tile_with_visitor(&source, options(&source), &mut visitor).unwrap();
+        let (scalar, scalar_report) = decode_tile_with_report(&source, options(&source)).unwrap();
+
+        assert_eq!(source, before);
+        assert_eq!(snapshot, scalar);
+        assert_eq!(visitor_report, scalar_report);
+        assert_eq!(
+            (
+                snapshot.max_column(),
+                snapshot.max_row(),
+                snapshot.num_cells(),
+                snapshot.num_rows(),
+                snapshot.storage_version(),
+                snapshot.last_saved_in_bnc(),
+                snapshot.should_use_wide_rows(),
+            ),
+            (12, 34, 78, 90, Some(7), Some(false), Some(false))
+        );
+        assert_eq!(visitor.rows.len(), 1);
+        assert_eq!(visitor.rows[0].tile_row_index, 5);
+        assert_eq!(visitor.rows[0].cell_count, 4);
+        assert_eq!(visitor.rows[0].cell_storage_buffer_pre_bnc, b"pre-storage");
+        assert_eq!(visitor.rows[0].cell_offsets_pre_bnc, b"pre-offsets");
+        assert_eq!(visitor.rows[0].storage_version, Some(8));
+        assert_eq!(
+            visitor.rows[0].cell_storage_buffer,
+            Some(b"current-storage".to_vec())
+        );
+        assert_eq!(
+            visitor.rows[0].cell_offsets,
+            Some(b"current-offsets".to_vec())
+        );
+        assert_eq!(visitor.rows[0].has_wide_offsets, Some(false));
+    }
+
+    #[test]
+    fn tile_visitor_and_scalar_paths_have_report_and_row_parity() {
+        let first = populated_row(7, b"pre-storage", b"pre-offsets");
+        let second = unknown_row(2);
+        let source = tile_from_rows(&[first, second]);
+        let mut visitor = RowCollector::for_source(&source);
+        let (visited, visitor_report) =
+            decode_tile_with_visitor(&source, options(&source), &mut visitor).unwrap();
+        let (scalar, scalar_report) = decode_tile_with_report(&source, options(&source)).unwrap();
+
+        assert_eq!(visited, scalar);
+        assert_eq!(visitor_report, scalar_report);
+        assert_eq!(visitor.rows.len(), 2);
+    }
+
+    #[test]
+    fn tile_visitor_exact_nesting_limit_is_inclusive() {
+        let source = tile(1);
+        let (_, report) = decode_tile_with_report(&source, options(&source)).unwrap();
+        assert_eq!(report.max_depth(), 2);
+        let exact = DecodeOptions::new(
+            source.len(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.references(),
+            report.text_bytes(),
+        );
+        let mut visitor = RowCollector::for_source(&source);
+        let (_, exact_report) = decode_tile_with_visitor(&source, exact, &mut visitor).unwrap();
+        assert_eq!(exact_report, report);
+
+        let one_less = DecodeOptions::new(
+            source.len(),
+            usize::MAX,
+            usize::MAX,
+            report.max_depth() - 1,
+            usize::MAX,
+            usize::MAX,
+        );
+        let error = decode_tile_with_visitor(&source, one_less, &mut ()).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Nesting {
+                observed: 2,
+                maximum: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn tile_visitor_rejects_malformed_required_wire_and_group_forms() {
+        let valid = tile(1);
+
+        let mut missing_tile_required = valid.clone();
+        assert_eq!(&missing_tile_required[..2], [0x08, 0x00]);
+        missing_tile_required.drain(..2);
+
+        let mut duplicate_tile_required = valid.clone();
+        v(&mut duplicate_tile_required, 1, 0);
+
+        let mut wrong_tile_wire = Vec::new();
+        b(&mut wrong_tile_wire, 1, &[]);
+        wrong_tile_wire.extend_from_slice(&valid[2..]);
+
+        let mut noncanonical_tile_varint = Vec::new();
+        key(&mut noncanonical_tile_varint, 1, 0);
+        noncanonical_tile_varint.extend_from_slice(&[0x80, 0x00]);
+        noncanonical_tile_varint.extend_from_slice(&valid[2..]);
+
+        let mut overflowing_tile_u32 = Vec::new();
+        v(
+            &mut overflowing_tile_u32,
+            1,
+            u64::from(u32::MAX).saturating_add(1),
+        );
+        overflowing_tile_u32.extend_from_slice(&valid[2..]);
+
+        let mut invalid_tile_bool = valid.clone();
+        v(&mut invalid_tile_bool, 7, 2);
+
+        let mut truncated_tile = valid.clone();
+        truncated_tile.pop();
+
+        let mut missing_row_required = row(1);
+        missing_row_required.drain(..2);
+        let missing_row_required = tile_from_rows(&[missing_row_required]);
+
+        let mut duplicate_row_required = row(1);
+        v(&mut duplicate_row_required, 1, 2);
+        let duplicate_row_required = tile_from_rows(&[duplicate_row_required]);
+
+        let canonical_row = row(1);
+        let mut wrong_row_wire = Vec::new();
+        b(&mut wrong_row_wire, 1, &[]);
+        wrong_row_wire.extend_from_slice(&canonical_row[2..]);
+        let wrong_row_wire = tile_from_rows(&[wrong_row_wire]);
+
+        let mut noncanonical_row_varint = Vec::new();
+        key(&mut noncanonical_row_varint, 1, 0);
+        noncanonical_row_varint.extend_from_slice(&[0x80, 0x00]);
+        noncanonical_row_varint.extend_from_slice(&canonical_row[2..]);
+        let noncanonical_row_varint = tile_from_rows(&[noncanonical_row_varint]);
+
+        let mut overflowing_row_u32 = Vec::new();
+        v(
+            &mut overflowing_row_u32,
+            1,
+            u64::from(u32::MAX).saturating_add(1),
+        );
+        overflowing_row_u32.extend_from_slice(&canonical_row[2..]);
+        let overflowing_row_u32 = tile_from_rows(&[overflowing_row_u32]);
+
+        let mut invalid_row_bool = canonical_row.clone();
+        v(&mut invalid_row_bool, 8, 2);
+        let invalid_row_bool = tile_from_rows(&[invalid_row_bool]);
+
+        let mut truncated_row = tile_from_rows(&[canonical_row]);
+        truncated_row.pop();
+
+        let mut unclosed_group = valid.clone();
+        key(&mut unclosed_group, 90, 3);
+
+        let mut mismatched_group = valid.clone();
+        key(&mut mismatched_group, 90, 3);
+        v(&mut mismatched_group, 91, 1);
+        key(&mut mismatched_group, 91, 4);
+
+        let mut stray_end_group = valid;
+        key(&mut stray_end_group, 90, 4);
+
+        let cases = [
+            ("missing tile required", missing_tile_required),
+            ("duplicate tile required", duplicate_tile_required),
+            ("wrong tile wire", wrong_tile_wire),
+            ("noncanonical tile varint", noncanonical_tile_varint),
+            ("overflowing tile uint32", overflowing_tile_u32),
+            ("invalid tile bool", invalid_tile_bool),
+            ("truncated tile", truncated_tile),
+            ("missing row required", missing_row_required),
+            ("duplicate row required", duplicate_row_required),
+            ("wrong row wire", wrong_row_wire),
+            ("noncanonical row varint", noncanonical_row_varint),
+            ("overflowing row uint32", overflowing_row_u32),
+            ("invalid row bool", invalid_row_bool),
+            ("truncated row", truncated_row),
+            ("unclosed group", unclosed_group),
+            ("mismatched group", mismatched_group),
+            ("stray end group", stray_end_group),
+        ];
+        for (label, source) in cases {
+            let mut visitor = RowCollector::default();
+            assert!(
+                decode_tile_with_visitor(&source, options(&source), &mut visitor).is_err(),
+                "{label} unexpectedly decoded"
+            );
+        }
+    }
+
+    #[test]
+    fn tile_visitor_callbacks_can_observe_rows_before_later_malformed_row() {
+        let first = row(4);
+        let mut malformed_later = row(9);
+        v(&mut malformed_later, 1, 10);
+        let source = tile_from_rows(&[first.clone(), malformed_later]);
+        let before = source.clone();
+
+        // Visitor callbacks are streaming by contract. A later row failure
+        // cannot roll back a callback that already observed the first row.
+        let mut visitor = RowCollector::for_source(&source);
+        assert!(decode_tile_with_visitor(&source, options(&source), &mut visitor).is_err());
+        assert_eq!(visitor.rows.len(), 1);
+        assert_eq!(
+            visitor.rows[0],
+            row_fact(decode_tile_row_info(&first, options(&first)).unwrap())
+        );
+
+        assert_eq!(source, before);
+    }
+
+    #[test]
+    fn tile_visitor_returns_source_borrowed_rows_and_exact_report() {
+        let storage = [0x11, 0x22, 0x33];
+        let offsets = [0x44, 0x55];
+        let first = populated_row(4, &storage, &offsets);
+        let second = populated_row(7, b"second-storage", b"second-offsets");
+        let mut source = Vec::new();
+        v(&mut source, 1, 12);
+        v(&mut source, 2, 8);
+        v(&mut source, 3, 3);
+        v(&mut source, 4, 9);
+        b(&mut source, 5, &first);
+        b(&mut source, 5, &second);
+        v(&mut source, 6, 10);
+        v(&mut source, 7, 1);
+        v(&mut source, 8, 0);
+
+        let mut visitor = RowCollector::for_source(&source);
+        let (snapshot, rows_report) =
+            decode_tile_with_visitor(&source, options(&source), &mut visitor).unwrap();
+        let (_, scalar_report) = decode_tile_with_report(&source, options(&source)).unwrap();
+        assert_eq!(rows_report, scalar_report);
+        assert_eq!(snapshot.max_column(), 12);
+        assert_eq!(snapshot.max_row(), 8);
+        assert_eq!(snapshot.num_cells(), 3);
+        assert_eq!(snapshot.num_rows(), 9);
+        assert_eq!(snapshot.storage_version(), Some(10));
+        assert_eq!(snapshot.last_saved_in_bnc(), Some(true));
+        assert_eq!(snapshot.should_use_wide_rows(), Some(false));
+        assert_eq!(visitor.rows.len(), 2);
+        let first_row = &visitor.rows[0];
+        assert_eq!(first_row.tile_row_index, 4);
+        assert_eq!(first_row.cell_count, 3);
+        assert_eq!(first_row.storage_version, Some(9));
+        assert_eq!(
+            first_row.cell_storage_buffer,
+            Some(b"current-storage".to_vec())
+        );
+        assert_eq!(first_row.cell_offsets, Some(b"current-offsets".to_vec()));
+        assert_eq!(first_row.has_wide_offsets, Some(true));
+        let storage_offset = source
+            .windows(storage.len())
+            .position(|window| window == storage)
+            .unwrap();
+        let offsets_offset = source
+            .windows(offsets.len())
+            .position(|window| window == offsets)
+            .unwrap();
+        assert!(
+            visitor
+                .borrowed_payloads
+                .contains(&(source[storage_offset..].as_ptr() as usize, storage.len()))
+        );
+        assert!(
+            visitor
+                .borrowed_payloads
+                .contains(&(source[offsets_offset..].as_ptr() as usize, offsets.len()))
+        );
+        assert_eq!(visitor.rows[1].tile_row_index, 7);
+    }
+
+    #[test]
+    fn tile_visitor_preserves_failure_atomicity_and_all_decode_limits() {
+        let source = tile(3);
+        let (_, report) = decode_tile_with_report(&source, options(&source)).unwrap();
+        let exact = DecodeOptions::new(
+            source.len(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.references(),
+            report.text_bytes(),
+        );
+        let mut exact_visitor = RowCollector::for_source(&source);
+        let (_, exact_report) =
+            decode_tile_with_visitor(&source, exact, &mut exact_visitor).unwrap();
+        assert_eq!(exact_report, report);
+
+        let fields = decode_tile_with_visitor(
+            &source,
+            DecodeOptions::new(
+                source.len(),
+                report.fields() - 1,
+                usize::MAX,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+            &mut (),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            fields.resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+
+        let work = decode_tile_with_visitor(
+            &source,
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                report.work_bytes() - 1,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+            &mut (),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            work.resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+
+        let bytes = decode_tile_with_visitor(
+            &source,
+            DecodeOptions::new(
+                source.len() - 1,
+                usize::MAX,
+                usize::MAX,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+            &mut (),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            bytes.resource_limit(),
+            Some(DecodeLimit::Bytes { .. })
+        ));
+
+        let mut malformed_row = row(2);
+        v(&mut malformed_row, 1, 3);
+        let mut malformed = tile(2);
+        b(&mut malformed, 5, &malformed_row);
+        assert!(decode_tile_with_visitor(&malformed, options(&malformed), &mut ()).is_err());
     }
 
     #[test]
