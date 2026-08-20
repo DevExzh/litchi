@@ -2846,7 +2846,8 @@ mod tests {
     }
 
     #[test]
-    fn keynote_properties_profile_ignores_other_metadata_authorities() -> std::io::Result<()> {
+    fn keynote_properties_profile_ignores_other_metadata_authorities()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
         let temp = Temp::new()?;
         let properties = b"canonical properties";
 
