@@ -44,7 +44,8 @@ use litchi_ole_common::object::{
 };
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, PartData, ReadLimits,
-    Relationships, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits, TargetMode,
+    Relationships, SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics,
+    SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_xlsx::{
@@ -32716,57 +32717,15 @@ impl OpcCacheCapacity {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct OpcCacheCounterDelta {
-    hits: u64,
-    cold_loads: u64,
-    waiter_joins: u64,
-    successful_loads: u64,
-    failed_loads: u64,
-    evictions: u64,
-    bypasses: u64,
-    oversized_bypasses: u64,
-    allocation_bypasses: u64,
-    budget_reservation_failures: u64,
-}
+type OpcCacheCounterDelta = SourceCacheCounterDelta;
 
 fn opc_cache_counter_delta(
     before: SourceCacheDiagnostics,
     after: SourceCacheDiagnostics,
 ) -> Result<OpcCacheCounterDelta, Box<dyn Error>> {
-    let subtract = |name: &str, after: u64, before: u64| -> Result<u64, Box<dyn Error>> {
-        after
-            .checked_sub(before)
-            .ok_or_else(|| format!("OPC cache counter {name} moved backwards").into())
-    };
-    Ok(OpcCacheCounterDelta {
-        hits: subtract("hits", after.hits, before.hits)?,
-        cold_loads: subtract("cold_loads", after.cold_loads, before.cold_loads)?,
-        waiter_joins: subtract("waiter_joins", after.waiter_joins, before.waiter_joins)?,
-        successful_loads: subtract(
-            "successful_loads",
-            after.successful_loads,
-            before.successful_loads,
-        )?,
-        failed_loads: subtract("failed_loads", after.failed_loads, before.failed_loads)?,
-        evictions: subtract("evictions", after.evictions, before.evictions)?,
-        bypasses: subtract("bypasses", after.bypasses, before.bypasses)?,
-        oversized_bypasses: subtract(
-            "oversized_bypasses",
-            after.oversized_bypasses,
-            before.oversized_bypasses,
-        )?,
-        allocation_bypasses: subtract(
-            "allocation_bypasses",
-            after.allocation_bypasses,
-            before.allocation_bypasses,
-        )?,
-        budget_reservation_failures: subtract(
-            "budget_reservation_failures",
-            after.budget_reservation_failures,
-            before.budget_reservation_failures,
-        )?,
-    })
+    Ok(SourceCacheDiagnostics::checked_counter_delta(
+        before, after,
+    )?)
 }
 
 impl OpcCacheDiagnosticsSummary {
@@ -33267,7 +33226,7 @@ fn opc_cache_wait_for_cohort(
 ) -> Result<SourceCacheDiagnostics, Box<dyn Error>> {
     let deadline = Instant::now() + timeout;
     loop {
-        let diagnostics = package.cache_diagnostics();
+        let diagnostics = package.try_cache_diagnostics()?;
         if diagnostics.in_flight_loads == expected_flights
             && diagnostics.waiter_joins >= expected_waiters
         {
@@ -33352,13 +33311,13 @@ fn run_opc_source_cache_budget_boundary(
                 1,
             )?;
             source.reset();
-            let before = package.cache_diagnostics();
+            let before = package.try_cache_diagnostics()?;
             opc_cache_assert_diagnostics_mode(OpcCacheMode::Managed, before, memory_limit)?;
 
             let started = Instant::now();
             let loaded = package.part(target_part)?.data();
             let duration = started.elapsed();
-            let after = package.cache_diagnostics();
+            let after = package.try_cache_diagnostics()?;
             opc_cache_assert_diagnostics_mode(OpcCacheMode::Managed, after, memory_limit)?;
             let delta = opc_cache_counter_delta(before, after)?;
             let source_snapshot = source.snapshot();
@@ -33684,7 +33643,7 @@ fn run_opc_source_cache_contention_cell(
         }
         backing.reset();
         source.arm(expected_initial)?;
-        let before = package.cache_diagnostics();
+        let before = package.try_cache_diagnostics()?;
         opc_cache_assert_diagnostics_mode(mode, before, memory_limit)?;
         let assignments =
             opc_cache_assignments(scenario, worker_count, working_set_parts, timed_parts)?;
@@ -33722,7 +33681,7 @@ fn run_opc_source_cache_contention_cell(
             &mut outputs,
             expected_outputs,
         )?;
-        let after = package.cache_diagnostics();
+        let after = package.try_cache_diagnostics()?;
         opc_cache_assert_diagnostics_mode(mode, after, memory_limit)?;
         let delta = opc_cache_counter_delta(before, after)?;
         let source_snapshot = backing.snapshot();
@@ -33751,7 +33710,7 @@ fn run_opc_source_cache_contention_cell(
         }
 
         drop(outputs);
-        let after_handle_diagnostics = package.cache_diagnostics();
+        let after_handle_diagnostics = package.try_cache_diagnostics()?;
         let used_after_handle = opc_cache_budget_used(budget.as_ref());
         if used_after_handle != expected_cache_budget
             || after_handle_diagnostics.budget_memory_used != expected_cache_budget
