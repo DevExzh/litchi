@@ -94,8 +94,14 @@ python3 tools/perf_abba_package.py \
 
 The deterministic manifest records each artifact's role, compressed and
 uncompressed byte counts and SHA-256 digests, plus the summary's raw and
-canonical identity and report bindings. Existing files are never replaced;
-use a fresh output directory for a rerun.
+canonical identity and report bindings. It also records the canonical `zstd`
+executable path, version string, file size, and executable SHA-256 used for
+compression. All files are first written under a private staging directory
+inside the output directory and then published with exclusive hard links; a
+write, directory, or publication failure removes the staging directory and
+every file published by that invocation. Existing files are never replaced;
+use a fresh output directory for a rerun. For safety, the selected output
+directory itself may not be a symlink, and output names must remain below it.
 
 The native OLE2, DOCX/PPTX, RTF, and ODF semantic matrices are deliberately
 opt-in. They measure only current public APIs and therefore do not change the
