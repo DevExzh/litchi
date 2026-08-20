@@ -486,6 +486,8 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
     let mut catalog_error = None;
     let mut depth = 0usize;
     let mut spreadsheet_depth = None;
+    let mut dde_link_depth = None;
+    let mut dde_cache_depth = None;
     let mut entries = Vec::new();
     let mut names = HashSet::<String>::new();
 
@@ -504,8 +506,24 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                 {
                     spreadsheet_depth = Some(depth);
                 }
+                if dde_cache_depth.is_none()
+                    && namespace == NamespaceKind::Table
+                    && local.as_ref() == b"dde-link"
+                {
+                    dde_link_depth = Some(depth);
+                }
                 if namespace == NamespaceKind::Table && local.as_ref() == b"table" {
-                    if spreadsheet_depth != depth.checked_sub(1) {
+                    let is_dde_cache =
+                        dde_cache_depth.is_some() || dde_link_depth == depth.checked_sub(1);
+                    if is_dde_cache {
+                        if dde_cache_depth.is_none() {
+                            dde_cache_depth = Some(depth.checked_add(1).ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODS DDE cache depth overflows usize".to_string(),
+                                )
+                            })?);
+                        }
+                    } else if spreadsheet_depth != depth.checked_sub(1) {
                         catalog_error.get_or_insert_with(|| {
                             Error::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
@@ -533,7 +551,13 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                     spreadsheet_depth = Some(depth);
                 }
                 if namespace == NamespaceKind::Table && local.as_ref() == b"table" {
-                    if spreadsheet_depth != depth.checked_sub(1) {
+                    let is_dde_cache =
+                        dde_cache_depth.is_some() || dde_link_depth == depth.checked_sub(1);
+                    if is_dde_cache {
+                        // Cached DDE tables are inert source data, not
+                        // worksheets.  The worksheet codec deliberately
+                        // excludes both their root and every descendant.
+                    } else if spreadsheet_depth != depth.checked_sub(1) {
                         catalog_error.get_or_insert_with(|| {
                             Error::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
@@ -549,7 +573,16 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                     }
                 }
             },
-            Event::End(_) => {
+            Event::End(element) => {
+                if dde_cache_depth == Some(depth) {
+                    dde_cache_depth = None;
+                }
+                if namespace == NamespaceKind::Table
+                    && element.local_name().as_ref() == b"dde-link"
+                    && dde_link_depth == depth.checked_sub(1)
+                {
+                    dde_link_depth = None;
+                }
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     Error::InvalidFormat("ODS XML element stack underflow".to_string())
                 })?;

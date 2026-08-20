@@ -11,6 +11,7 @@ const MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const DDE_CONTENT: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="Base"><office:dde-source office:dde-application="soffice" office:dde-topic="file:///never-contacted.ods" office:dde-item="Sheet1.A1:B2" office:name="Reference" office:conversion-mode="keep-text" office:automatic-update="true"/><table:table-row><table:table-cell office:value-type="string"><text:p>Pre <text:span text:style-name="Bold">styled <text:a xlink:href="https://never-fetched.invalid/" xlink:type="simple">link</text:a></text:span> tail</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Scenario"><table:scenario table:scenario-ranges="$Scenario.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4" table:is-active="true" table:display-border="false" table:border-color="#12AbEF" table:copy-back="true" table:copy-styles="false" table:copy-formulas="true" table:comment="Best &amp; worst" table:protected="false"/><table:table-row/></table:table><table:dde-links><table:dde-link><office:dde-source office:dde-application="calc" office:dde-topic="file:///never-opened.ods" office:dde-item="Prices.A1"/><table:table><table:table-row><table:table-cell office:value-type="float" office:value="42"/></table:table-row></table:table></table:dde-link></table:dde-links></office:spreadsheet></office:body></office:document-content>"##;
 const RSA_KEY: &[u8] =
     include_bytes!("../../litchi-odf-common/tests/fixtures/signatures/rsa-key.pk8");
 const RSA_CERT: &[u8] =
@@ -218,6 +219,37 @@ fn catalog_handles_namespace_aliases_and_empty_selected_worksheets() {
         .expect("empty worksheet exists");
     assert_eq!(selected.name, "Empty");
     assert!(selected.rows.is_empty());
+}
+
+#[test]
+fn catalog_excludes_inert_dde_cached_tables_and_matches_eager_sheets() {
+    let bytes = package_with_content(DDE_CONTENT);
+    let eager = Spreadsheet::from_bytes(bytes.clone()).expect("eager DDE owner");
+    let eager_sheets = eager.sheets();
+    let catalog = SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("DDE catalog open");
+
+    assert_eq!(
+        catalog.sheet_names().expect("DDE sheet names"),
+        ["Base", "Scenario"]
+    );
+    assert_eq!(
+        catalog.sheet_count().expect("DDE sheet count"),
+        eager_sheets.len()
+    );
+    for (index, expected) in eager_sheets.iter().enumerate() {
+        let selected = catalog
+            .sheet_at(index)
+            .expect("DDE selected sheet")
+            .expect("DDE selected sheet exists");
+        assert_eq!(selected, expected.clone());
+    }
+    assert!(
+        catalog
+            .sheet_at(eager_sheets.len())
+            .expect("DDE cache is not a sheet")
+            .is_none()
+    );
 }
 
 #[test]
