@@ -1500,6 +1500,14 @@ ODS_SOURCE_CELL_MEASUREMENTS = (
     "untouched_source_read_calls",
 )
 
+XLSX_CELL_VALUES_SOURCE_MEASUREMENTS = (
+    "commit_ns",
+    "open_ns",
+    "plan_ns",
+    "publication_ns",
+    "reopen_ns",
+)
+
 
 def _source_identity_projection(value: Any) -> Any:
     """Remove named measurements while retaining every source identity field."""
@@ -1522,6 +1530,12 @@ def _source_identity_projection(value: Any) -> Any:
         # root.  They remain measurements for these exact ODS rows.
         projected.pop("read_calls", None)
         projected.pop("read_bytes", None)
+    xlsx_cell_values = projected.get("xlsx_cell_values")
+    if isinstance(xlsx_cell_values, dict):
+        projected_xlsx = dict(xlsx_cell_values)
+        for field in XLSX_CELL_VALUES_SOURCE_MEASUREMENTS:
+            projected_xlsx.pop(field, None)
+        projected["xlsx_cell_values"] = projected_xlsx
     return projected
 
 

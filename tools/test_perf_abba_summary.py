@@ -1048,6 +1048,39 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         ):
             perf_abba_summary.summarize_reports(legs)
 
+    def test_xlsx_cell_value_timings_are_measurements_not_source_identity(self):
+        legs = four_legs()
+        for leg_index, leg in enumerate(legs):
+            for result in leg["results"]:
+                result["source"] = {
+                    "read_calls": [10],
+                    "read_bytes": [100],
+                    "xlsx_cell_values": {
+                        "source_archive_sha256": "a" * 64,
+                        "output_sha256": ["b" * 64],
+                        "semantic_sha256": ["c" * 64],
+                        "open_ns": [100 + leg_index],
+                        "plan_ns": [200 + leg_index],
+                        "commit_ns": [300 + leg_index],
+                        "publication_ns": [400 + leg_index],
+                        "reopen_ns": [500 + leg_index],
+                    },
+                }
+        summary = perf_abba_summary.summarize_reports(legs)
+        source = summary["results"][0]["source"]
+        self.assertEqual(source["read_calls"], [10])
+        xlsx = source["xlsx_cell_values"]
+        self.assertEqual(xlsx["source_archive_sha256"], "a" * 64)
+        self.assertEqual(xlsx["output_sha256"], ["b" * 64])
+        for field in perf_abba_summary.XLSX_CELL_VALUES_SOURCE_MEASUREMENTS:
+            self.assertNotIn(field, xlsx)
+
+        legs[2]["results"][0]["source"]["read_calls"] = [11]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "source identity"
+        ):
+            perf_abba_summary.summarize_reports(legs)
+
     def test_tool_configuration_and_result_identity_mismatches_fail_closed(self):
         for mutation, message in (
             (lambda legs: legs[1]["tool"].update(version="other"), "tool identity"),
