@@ -5,16 +5,13 @@
 //! external `fincore` observation immediately before the operation and a
 //! positive process `read_bytes` delta during the operation.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "linux")]
-use std::{
-    env,
-    fs::{self, OpenOptions},
-    io::Read,
-    path::PathBuf,
-    process::Command,
-};
+use std::{env, fs, process::Command};
+
+#[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+use std::{fs::OpenOptions, io::Read};
 
 use serde::{Deserialize, Deserializer, Serialize, de};
 
@@ -27,6 +24,7 @@ use crate::process_metrics;
 pub(crate) enum Status {
     Eligible,
     IneligibleNonLinux,
+    IneligibleLinuxNon64Bit,
     IneligibleFilesystemUnknown,
     IneligibleFilesystemUnsupported,
     IneligibleFincoreUnavailable,
@@ -62,10 +60,11 @@ impl Status {
     }
 }
 
-/// One verifier result.  No source path is retained as a dedicated report
-/// field; raw external-tool stderr is retained byte-for-byte and may itself
-/// contain a tool-emitted path.  Optional values are omitted when a
-/// precondition failed before the corresponding observation could be made.
+/// One verifier result.  Source paths, absolute tool paths, and external-tool
+/// stderr bytes are not retained in reports.  The tool basename, executable
+/// digest/version, and stderr digest/length preserve non-sensitive provenance.
+/// Optional values are omitted when a precondition failed before the
+/// corresponding observation could be made.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Sample {
     pub status: Status,
@@ -94,15 +93,19 @@ pub(crate) struct Sample {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub writeback_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fincore_path: Option<String>,
+    pub fincore_tool: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fincore_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fincore_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fincore_stderr: Option<Vec<u8>>,
+    pub fincore_stderr_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fincore_version_stderr: Option<Vec<u8>>,
+    pub fincore_stderr_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_version_stderr_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_version_stderr_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fincore_method: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -131,11 +134,13 @@ impl Sample {
             resident_bytes: None,
             dirty_bytes: None,
             writeback_bytes: None,
-            fincore_path: None,
+            fincore_tool: None,
             fincore_sha256: None,
             fincore_version: None,
-            fincore_stderr: None,
-            fincore_version_stderr: None,
+            fincore_stderr_sha256: None,
+            fincore_stderr_bytes: None,
+            fincore_version_stderr_sha256: None,
+            fincore_version_stderr_bytes: None,
             fincore_method: None,
             fincore_fallback: None,
             read_bytes_before: None,
@@ -164,11 +169,13 @@ impl Sample {
             resident_bytes: None,
             dirty_bytes: None,
             writeback_bytes: None,
-            fincore_path: None,
+            fincore_tool: None,
             fincore_sha256: None,
             fincore_version: None,
-            fincore_stderr: None,
-            fincore_version_stderr: None,
+            fincore_stderr_sha256: None,
+            fincore_stderr_bytes: None,
+            fincore_version_stderr_sha256: None,
+            fincore_version_stderr_bytes: None,
             fincore_method: None,
             fincore_fallback: None,
             read_bytes_before: None,
@@ -196,7 +203,14 @@ pub(crate) fn page_size_for_harness() -> Result<u64, Status> {
     }
     #[cfg(target_os = "linux")]
     {
-        page_size_bytes().ok_or(Status::IneligibleSourcePageSizeUnavailable)
+        #[cfg(not(target_pointer_width = "64"))]
+        {
+            return Err(Status::IneligibleLinuxNon64Bit);
+        }
+        #[cfg(target_pointer_width = "64")]
+        {
+            page_size_bytes().ok_or(Status::IneligibleSourcePageSizeUnavailable)
+        }
     }
 }
 
@@ -385,11 +399,14 @@ fn observation_status(observation: FincoreObservation, source_bytes: u64) -> Sta
 
 struct FincoreProbe {
     observation: Result<FincoreObservation, Status>,
-    path: Option<String>,
+    executable: Option<PathBuf>,
+    tool: Option<String>,
     sha256: Option<String>,
     version: Option<String>,
-    stderr: Option<Vec<u8>>,
-    version_stderr: Option<Vec<u8>>,
+    stderr_sha256: Option<String>,
+    stderr_bytes: Option<u64>,
+    version_stderr_sha256: Option<String>,
+    version_stderr_bytes: Option<u64>,
     method: Option<&'static str>,
     fallback: Option<&'static str>,
 }
@@ -398,11 +415,14 @@ impl FincoreProbe {
     fn unavailable(status: Status) -> Self {
         Self {
             observation: Err(status),
-            path: None,
+            executable: None,
+            tool: None,
             sha256: None,
             version: None,
-            stderr: None,
-            version_stderr: None,
+            stderr_sha256: None,
+            stderr_bytes: None,
+            version_stderr_sha256: None,
+            version_stderr_bytes: None,
             method: None,
             fallback: None,
         }
@@ -411,11 +431,13 @@ impl FincoreProbe {
 
 impl Sample {
     fn attach_fincore_probe(&mut self, probe: &FincoreProbe) {
-        self.fincore_path = probe.path.clone();
+        self.fincore_tool = probe.tool.clone();
         self.fincore_sha256 = probe.sha256.clone();
         self.fincore_version = probe.version.clone();
-        self.fincore_stderr = probe.stderr.clone();
-        self.fincore_version_stderr = probe.version_stderr.clone();
+        self.fincore_stderr_sha256 = probe.stderr_sha256.clone();
+        self.fincore_stderr_bytes = probe.stderr_bytes;
+        self.fincore_version_stderr_sha256 = probe.version_stderr_sha256.clone();
+        self.fincore_version_stderr_bytes = probe.version_stderr_bytes;
         self.fincore_method = probe.method.map(str::to_owned);
         self.fincore_fallback = probe.fallback.map(str::to_owned);
     }
@@ -433,96 +455,105 @@ pub(crate) fn prepare(path: &Path) -> Sample {
 
     #[cfg(target_os = "linux")]
     {
-        let symlink_metadata = match fs::symlink_metadata(path) {
-            Ok(metadata) => metadata,
-            Err(_) => return Sample::ineligible(Status::IneligibleSourceNotRegular),
-        };
-        if !symlink_metadata.file_type().is_file() {
-            return Sample::ineligible(Status::IneligibleSourceNotRegular);
-        }
-        // Open read-write before fstatfs.  This is required for the
-        // fincore/mincore fallback contract and also binds the filesystem
-        // identity to the exact descriptor used for fsync and advice.
-        let mut file = match OpenOptions::new().read(true).write(true).open(path) {
-            Ok(file) => file,
-            Err(_) => return Sample::ineligible(Status::IneligibleSourceReadWriteUnavailable),
-        };
-        let source_metadata = match file.metadata() {
-            Ok(metadata) if metadata.is_file() => metadata,
-            _ => return Sample::ineligible(Status::IneligibleSourceNotRegular),
-        };
-        let source_bytes = source_metadata.len();
-        if source_bytes == 0 {
-            return Sample::ineligible(Status::IneligibleSourceEmpty);
-        }
-        let filesystem_magic = match rustix::fs::fstatfs(&file)
-            .ok()
-            .and_then(|statfs| u64::try_from(statfs.f_type).ok())
+        #[cfg(not(target_pointer_width = "64"))]
         {
-            Some(magic) => magic,
-            None => return Sample::ineligible(Status::IneligibleFilesystemUnknown),
-        };
-        if !supported_block_filesystem(filesystem_magic) {
-            let mut sample = Sample::ineligible(Status::IneligibleFilesystemUnsupported);
-            sample.filesystem_magic = Some(filesystem_magic);
-            sample.source_bytes = Some(source_bytes);
-            sample.aligned_source_bytes = Some(source_bytes);
-            return sample;
+            let _ = path;
+            return Sample::ineligible(Status::IneligibleLinuxNon64Bit);
         }
-        let page_size_bytes = match page_size_bytes() {
-            Some(page_size_bytes) if page_size_bytes > 0 => page_size_bytes,
-            _ => return Sample::ineligible(Status::IneligibleSourcePageSizeUnavailable),
-        };
-        if source_bytes % page_size_bytes != 0 {
+
+        #[cfg(target_pointer_width = "64")]
+        {
+            let symlink_metadata = match fs::symlink_metadata(path) {
+                Ok(metadata) => metadata,
+                Err(_) => return Sample::ineligible(Status::IneligibleSourceNotRegular),
+            };
+            if !symlink_metadata.file_type().is_file() {
+                return Sample::ineligible(Status::IneligibleSourceNotRegular);
+            }
+            // Open read-write before fstatfs.  This is required for the
+            // fincore/mincore fallback contract and also binds the filesystem
+            // identity to the exact descriptor used for fsync and advice.
+            let mut file = match OpenOptions::new().read(true).write(true).open(path) {
+                Ok(file) => file,
+                Err(_) => return Sample::ineligible(Status::IneligibleSourceReadWriteUnavailable),
+            };
+            let source_metadata = match file.metadata() {
+                Ok(metadata) if metadata.is_file() => metadata,
+                _ => return Sample::ineligible(Status::IneligibleSourceNotRegular),
+            };
+            let source_bytes = source_metadata.len();
+            if source_bytes == 0 {
+                return Sample::ineligible(Status::IneligibleSourceEmpty);
+            }
+            let filesystem_magic = match rustix::fs::fstatfs(&file)
+                .ok()
+                .and_then(|statfs| u64::try_from(statfs.f_type).ok())
+            {
+                Some(magic) => magic,
+                None => return Sample::ineligible(Status::IneligibleFilesystemUnknown),
+            };
+            if !supported_block_filesystem(filesystem_magic) {
+                let mut sample = Sample::ineligible(Status::IneligibleFilesystemUnsupported);
+                sample.filesystem_magic = Some(filesystem_magic);
+                sample.source_bytes = Some(source_bytes);
+                sample.aligned_source_bytes = Some(source_bytes);
+                return sample;
+            }
+            let page_size_bytes = match page_size_bytes() {
+                Some(page_size_bytes) if page_size_bytes > 0 => page_size_bytes,
+                _ => return Sample::ineligible(Status::IneligibleSourcePageSizeUnavailable),
+            };
+            if source_bytes % page_size_bytes != 0 {
+                let mut sample = Sample::with_source(
+                    Status::IneligibleSourceNotPageAligned,
+                    filesystem_magic,
+                    page_size_bytes,
+                    source_bytes,
+                );
+                sample.fsync_completed = Some(false);
+                return sample;
+            }
             let mut sample = Sample::with_source(
-                Status::IneligibleSourceNotPageAligned,
+                Status::Eligible,
                 filesystem_magic,
                 page_size_bytes,
                 source_bytes,
             );
-            sample.fsync_completed = Some(false);
-            return sample;
-        }
-        let mut sample = Sample::with_source(
-            Status::Eligible,
-            filesystem_magic,
-            page_size_bytes,
-            source_bytes,
-        );
-        let mut source_contents = Vec::new();
-        if file.read_to_end(&mut source_contents).is_err()
-            || u64::try_from(source_contents.len()).ok() != Some(source_bytes)
-        {
-            sample.status = Status::IneligibleSourceHashFailed;
-            return sample;
-        }
-        let source_hash = super::sha256_hex(&source_contents);
-        sample.aligned_source_sha256 = Some(source_hash);
-        if file.sync_all().is_err() {
-            sample.status = Status::IneligibleSourceFsyncFailed;
-            return sample;
-        }
-        sample.fsync_completed = Some(true);
-        if rustix::fs::fadvise(&file, 0, None, rustix::fs::Advice::DontNeed).is_err() {
-            sample.status = Status::IneligibleSourceAdviceFailed;
-            return sample;
-        }
-        sample.advice = Some(ADVICE.to_owned());
-        let probe = run_fincore(path);
-        sample.attach_fincore_probe(&probe);
-        let observation = match probe.observation {
-            Ok(observation) => observation,
-            Err(status) => {
-                sample.status = status;
+            let mut source_contents = Vec::new();
+            if file.read_to_end(&mut source_contents).is_err()
+                || u64::try_from(source_contents.len()).ok() != Some(source_bytes)
+            {
+                sample.status = Status::IneligibleSourceHashFailed;
                 return sample;
-            },
-        };
-        sample.fincore_size_bytes = Some(observation.size_bytes);
-        sample.resident_bytes = Some(observation.resident_bytes);
-        sample.dirty_bytes = Some(observation.dirty_bytes);
-        sample.writeback_bytes = Some(observation.writeback_bytes);
-        sample.status = observation_status(observation, source_bytes);
-        sample
+            }
+            let source_hash = super::sha256_hex(&source_contents);
+            sample.aligned_source_sha256 = Some(source_hash);
+            if file.sync_all().is_err() {
+                sample.status = Status::IneligibleSourceFsyncFailed;
+                return sample;
+            }
+            sample.fsync_completed = Some(true);
+            if rustix::fs::fadvise(&file, 0, None, rustix::fs::Advice::DontNeed).is_err() {
+                sample.status = Status::IneligibleSourceAdviceFailed;
+                return sample;
+            }
+            sample.advice = Some(ADVICE.to_owned());
+            let probe = run_fincore(path);
+            sample.attach_fincore_probe(&probe);
+            let observation = match probe.observation {
+                Ok(observation) => observation,
+                Err(status) => {
+                    sample.status = status;
+                    return sample;
+                },
+            };
+            sample.fincore_size_bytes = Some(observation.size_bytes);
+            sample.resident_bytes = Some(observation.resident_bytes);
+            sample.dirty_bytes = Some(observation.dirty_bytes);
+            sample.writeback_bytes = Some(observation.writeback_bytes);
+            sample.status = observation_status(observation, source_bytes);
+            sample
+        }
     }
 }
 
@@ -677,15 +708,18 @@ fn run_fincore(path: &Path) -> FincoreProbe {
     };
     let mut probe = FincoreProbe {
         observation: Err(Status::IneligibleFincoreFailed),
-        path: Some(metadata.path),
+        executable: Some(metadata.executable),
+        tool: Some(metadata.tool),
         sha256: Some(metadata.sha256),
         version: Some(metadata.version),
-        stderr: None,
-        version_stderr: metadata.version_stderr,
+        stderr_sha256: None,
+        stderr_bytes: None,
+        version_stderr_sha256: Some(metadata.version_stderr_sha256),
+        version_stderr_bytes: metadata.version_stderr_bytes,
         method: Some(FINCORE_METHOD),
         fallback: Some(FINCORE_FALLBACK),
     };
-    let executable = match probe.path.as_deref() {
+    let executable = match probe.executable.as_deref() {
         Some(path) => path,
         None => {
             probe.observation = Err(Status::IneligibleFincoreMetadataUnavailable);
@@ -709,7 +743,8 @@ fn run_fincore(path: &Path) -> FincoreProbe {
             return probe;
         },
     };
-    probe.stderr = Some(output.stderr.clone());
+    probe.stderr_sha256 = Some(super::sha256_hex(&output.stderr));
+    probe.stderr_bytes = u64::try_from(output.stderr.len()).ok();
     if !output.status.success() {
         probe.observation = Err(Status::IneligibleFincoreFailed);
         return probe;
@@ -772,20 +807,30 @@ fn run_fincore(_path: &Path) -> FincoreProbe {
 
 #[cfg(target_os = "linux")]
 struct FincoreMetadata {
-    path: String,
+    executable: PathBuf,
+    tool: String,
     sha256: String,
     version: String,
-    version_stderr: Option<Vec<u8>>,
+    version_stderr_sha256: String,
+    version_stderr_bytes: Option<u64>,
 }
 
 #[cfg(target_os = "linux")]
 fn fincore_metadata() -> Result<FincoreMetadata, Status> {
     let path = locate_fincore().ok_or(Status::IneligibleFincoreUnavailable)?;
     let canonical = fs::canonicalize(path).map_err(|_| Status::IneligibleFincoreUnavailable)?;
-    let canonical_string = canonical
-        .to_str()
+    let tool = canonical
+        .file_name()
+        .and_then(|name| name.to_str())
         .ok_or(Status::IneligibleFincoreMetadataUnavailable)?
         .to_owned();
+    if tool.is_empty()
+        || tool.contains('/')
+        || tool.contains('\\')
+        || tool.chars().any(char::is_control)
+    {
+        return Err(Status::IneligibleFincoreMetadataUnavailable);
+    }
     let binary = fs::read(&canonical).map_err(|_| Status::IneligibleFincoreMetadataUnavailable)?;
     let sha256 = super::sha256_hex(&binary);
     let version = Command::new(&canonical)
@@ -795,19 +840,26 @@ fn fincore_metadata() -> Result<FincoreMetadata, Status> {
     if !version.status.success() || version.stdout.is_empty() {
         return Err(Status::IneligibleFincoreMetadataUnavailable);
     }
-    let version_stderr = Some(version.stderr);
+    let version_stderr_sha256 = super::sha256_hex(&version.stderr);
+    let version_stderr_bytes = u64::try_from(version.stderr.len()).ok();
     let version = String::from_utf8(version.stdout)
         .map_err(|_| Status::IneligibleFincoreMetadataUnavailable)?
         .trim()
         .to_owned();
-    if version.is_empty() {
+    if version.is_empty()
+        || version.contains('/')
+        || version.contains('\\')
+        || version.chars().any(char::is_control)
+    {
         return Err(Status::IneligibleFincoreMetadataUnavailable);
     }
     Ok(FincoreMetadata {
-        path: canonical_string,
+        executable: canonical,
+        tool,
         sha256,
         version,
-        version_stderr,
+        version_stderr_sha256,
+        version_stderr_bytes,
     })
 }
 
@@ -1005,6 +1057,21 @@ mod tests {
     fn fincore_method_has_no_implicit_fallback() {
         assert_eq!(FINCORE_METHOD, "external_fincore_json_columns");
         assert_eq!(FINCORE_FALLBACK, "none");
+    }
+
+    #[test]
+    fn fincore_report_provenance_omits_paths_and_stderr_contents() {
+        let mut sample = Sample::ineligible(Status::IneligibleFincoreFailed);
+        sample.fincore_tool = Some("fincore".to_owned());
+        sample.fincore_sha256 = Some("a".repeat(64));
+        sample.fincore_version = Some("fincore from util-linux 2.41.3".to_owned());
+        sample.fincore_stderr_sha256 = Some("b".repeat(64));
+        sample.fincore_stderr_bytes = Some(0);
+        let value = serde_json::to_value(sample).unwrap();
+        assert!(value.get("fincore_tool").is_some());
+        assert!(value.get("fincore_path").is_none());
+        assert!(value.get("fincore_stderr").is_none());
+        assert!(value.get("fincore_stderr_sha256").is_some());
     }
 
     #[test]

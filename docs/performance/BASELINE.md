@@ -1365,14 +1365,20 @@ Change 0236 adds an opt-in `cold-verified` state without changing the
 page-aligned, read-write-open sources on an allowlisted block-backed
 filesystem identified from the opened FD's numeric `statfs` magic (`0xef53`
 ext2/3/4, `0x58465342` XFS, `0x9123683e` Btrfs, `0xf2f52010` F2FS, or
-`0x2fc12fc1` ZFS). It records canonical fincore path/SHA-256/version, raw
-stderr, method/fallback evidence, and a strict external `fincore` JSON proof
-of zero resident, dirty, and writeback bytes. The timed operation must
-produce a positive process `/proc/self/io` `read_bytes` delta. Prepared query
-controls are excluded. Ineligible host/proof conditions are explicit statuses
-and emit no timed result. This proves page-cache and process-I/O conditions
-only; it makes no physical-media or device-cache claim and has no captured
-performance result. See
+`0x2fc12fc1` ZFS). It records the canonical fincore basename, executable
+SHA-256/version, stderr digests/lengths, method/fallback evidence, and a
+strict external `fincore` JSON proof of zero resident, dirty, and writeback
+bytes. The timed operation must produce a positive process `/proc/self/io`
+`read_bytes` delta. Prepared query controls are excluded. Ineligible
+host/proof conditions are explicit statuses and emit no timed result. This
+proves page-cache and process-I/O conditions only; it makes no physical-media
+or device-cache claim and has no captured performance result. On 32-bit Linux
+the state is conservatively rejected as `ineligible_linux_non64_bit`. The
+`filesystem_evidence` state records `cold_verified_status` and optional
+`cold_verified_samples` alongside the existing `warm` and `cold-requested`
+states; sample provenance contains aligned source SHA-256/size and fincore
+method/fallback fields, while stderr contents and absolute paths are omitted.
+See
 [`0236`](changes/0236-cold-verified-filesystem-evidence.md).
 
 Source-backed OPC payload retention is now optionally charged to a caller's

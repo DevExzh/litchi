@@ -731,9 +731,10 @@ that a root was selected, not the path itself.
 `cold-requested` remains the existing advisory state.  It records an accepted
 Linux `posix_fadvise(DONTNEED)` request and does not imply that the source was
 evicted.  The opt-in `--filesystem-cache cold-verified` state is stricter and
-Linux-only.  It runs only source-touching open/lifecycle/save controls (the
-prepared PPTX/DOCX query controls are explicitly ineligible), and leaves the
-default cache selection unchanged.
+is admitted only on 64-bit Linux; 32-bit Linux is explicitly reported as
+`ineligible_linux_non64_bit`.  It runs only source-touching
+open/lifecycle/save controls (the prepared PPTX/DOCX query controls are
+explicitly ineligible), and leaves the default cache selection unchanged.
 
 Cold-verified samples are admitted only when all of the following hold:
 
@@ -744,8 +745,9 @@ Cold-verified samples are admitted only when all of the following hold:
 - the source has been `fsync`ed and accepted `posix_fadvise(DONTNEED)` advice;
 - the canonical, hashed, versioned external `fincore` binary emits one strict
   JSON record immediately before the timed operation with zero resident,
-  dirty, and writeback bytes; raw stderr and method/fallback evidence are
-  retained, and any unrecognized fallback is ineligible; and
+  dirty, and writeback bytes; only its basename, executable hash/version, and
+  stderr digest/length plus method/fallback evidence are retained, and any
+  unrecognized fallback is ineligible; and
 - the child’s `/proc/self/io` `read_bytes` delta is positive during the
   source-touching interval.
 
@@ -760,10 +762,10 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 
 The verifier creates a private page-aligned source copy (ZIP alignment uses
 the EOCD comment field and does not change logical package members).  It does
-not add source paths or device identifiers to the report; raw fincore stderr is
-retained byte-for-byte and may contain a tool-emitted path.  Each eligible
-proof records the aligned source SHA-256 and size, numeric filesystem magic,
-and canonical fincore path/SHA-256/version.  `filesystem_evidence` records an explicit
+not add source paths, absolute tool paths, stderr contents, or device
+identifiers to the report.  Each eligible proof records the aligned source
+SHA-256 and size, numeric filesystem magic, and canonical fincore basename,
+SHA-256, and version.  `filesystem_evidence` records an explicit
 `cold_verified_status` for every requested case and keeps ineligible cases out
 of timed results; a status such as `ineligible_filesystem_unsupported`,
 `ineligible_fincore_invalid_json`, or `ineligible_read_bytes_zero` is a
@@ -2636,12 +2638,13 @@ the recorded configuration; no ambient network or clock-derived input is used.
 
 Filesystem records are additive under `filesystem_evidence`. Each evidence
 sample is keyed by case, corpus manifest, sample index, and `cache_state`
-(`warm` or `cold-requested`), and pairs child elapsed time with parent-observed
-wall time. It includes logical `ReadAt` requested/returned bytes, fixed request
-size buckets, largest requested/returned range sizes, a range-order pattern,
-maximum concurrent reads, procfs I/O/fault/RSS deltas (with post-sample
-`VmHWM`), output SHA-256 and byte length for saves, and public API publication
-counters where available. `opc_materialized_parts` is explicit
+(`warm`, `cold-requested`, or `cold-verified`), and pairs child elapsed time
+with parent-observed wall time. It includes logical `ReadAt`
+requested/returned bytes, fixed request size buckets, largest
+requested/returned range sizes, a range-order pattern, maximum concurrent
+reads, procfs I/O/fault/RSS deltas (with post-sample `VmHWM`), output SHA-256 and
+byte length for saves, and public API publication counters where available.
+`opc_materialized_parts` is explicit
 zero for the raw-copy source overlay path; CFB records changed spans and
 published bytes. The configuration records selected cache states, process
 isolation, fresh-child sampling, and whether a caller-selected filesystem root
@@ -2732,6 +2735,21 @@ the write vectors
 independently of the existing `sink.status` for `output_bytes`. Filesystem
 selectors do not expose a logical sink summary, so their sink-write vectors
 remain explicitly `not_applicable`.
+
+When `cold-verified` is selected, the evidence object additionally records
+`cold_verified_status`, optional `cold_verified_samples`,
+`cold_verified_claim_scope`, and `cold_verified_fincore_command`. Each
+`cold_verified_samples` entry records the explicit status, numeric
+`filesystem_magic`, page/source and aligned-source byte counts, aligned-source
+SHA-256, fsync/advice state, fincore size/resident/dirty/writeback counts,
+`read_bytes_before`/`after`/`delta`, and method/fallback evidence. Fincore
+provenance is privacy-preserving: `fincore_tool` is only the canonical
+basename, `fincore_sha256` and `fincore_version` identify the executable, and
+`fincore_stderr_sha256`/`fincore_stderr_bytes` plus their version-stderr
+counterparts record digests and lengths without serializing stderr contents.
+Ineligible entries remain in `cold_verified_samples`/status evidence but do
+not produce a timed `CaseResult`; prepared query controls use
+`ineligible_prepared_query_control`.
 
 ODP media-rich selectors additionally record `source.odp_media`: the exact
 phase/timing scope, selected middle slide and media member, canonical full
