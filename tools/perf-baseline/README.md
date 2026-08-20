@@ -53,8 +53,26 @@ closed when harness configuration, stable environment facts, corpus identity,
 source metrics, sink metrics, or result coverage differ between legs. Its
 default same-implementation drift ceilings are 5% for p50 and mean, 10% for
 p95, and 15% for p99; use `--drift-ceilings` only when a recorded calibration
-justifies different values. It never infers a speedup claim from an accepted
-statistic.
+justifies different values. Reports must be complete schema-v1 JSON from the
+`litchi-perf-baseline` harness, with typed tool/configuration/environment
+fields, a clean worktree, positive warm-up count, and at least 15 retained
+samples per row. A1/A2 must carry one non-empty control revision, B1/B2 one
+different non-empty candidate revision; each leg's environment and canonical
+report hash is retained in the summary. Configured shape arrays are checked
+against result rows; filesystem evidence is the schema-specific exception for
+format-specific filesystem shapes such as `media-rich`.
+
+The helper verifies every integer statistic, Welford sample standard deviation,
+and the two-sided Student's-t 95% confidence interval using the harness
+formula. p50 is the Rust u64 floor midpoint and p95/p99 use integer
+nearest-rank. A source or sink that is present must be byte-for-byte/canonical
+JSON equal on all four legs; an absent or null value is reported only as
+`consistently_absent`, never as `verified_equal`. When present,
+`output_sha256` must be a lowercase SHA-256 identity equal on all legs. This
+strict source/sink identity policy means the ABBA summary is not suitable for
+optimizations that intentionally change I/O, source reads, or sink writes;
+use a matching evidence protocol for those changes. It never infers a speedup
+claim from an accepted statistic.
 
 The native OLE2, DOCX/PPTX, RTF, and ODF semantic matrices are deliberately
 opt-in. They measure only current public APIs and therefore do not change the
