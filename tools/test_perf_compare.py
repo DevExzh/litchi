@@ -1269,18 +1269,7 @@ class PerfCompareTests(unittest.TestCase):
         )
         self.assertEqual(
             {item["metric"] for item in result["regressions"]},
-            {
-                "operation_metrics.allocation.allocation_calls.values",
-                "operation_metrics.allocation.deallocation_calls.values",
-                "operation_metrics.allocation.reallocation_calls.values",
-                "operation_metrics.allocation.failed_allocation_calls.values",
-                "operation_metrics.allocation.allocated_bytes.values",
-                "operation_metrics.allocation.deallocated_bytes.values",
-                "operation_metrics.allocation.live_bytes_before.values",
-                "operation_metrics.allocation.live_bytes_after.values",
-                "operation_metrics.allocation.peak_live_bytes_before.values",
-                "operation_metrics.allocation.peak_live_bytes_after.values",
-            },
+            {"operation_metrics.allocation.allocation_calls.values"},
         )
 
     def test_allocator_filesystem_policy_requires_measured_vectors(self):

@@ -559,7 +559,9 @@ fn allocation_metrics(
         }));
     }
 
-    let measured = |name: &str, value: fn(&crate::allocation_metrics::Sample) -> Option<u64>| {
+    let measured = |name: &str,
+                    value: fn(&crate::allocation_metrics::Sample) -> Option<u64>|
+     -> Result<MetricVector, Box<dyn Error>> {
         let values = observations
             .iter()
             .map(|sample| value(sample))
@@ -661,6 +663,7 @@ pub(crate) fn from_sink_observation(
             opc_parts: MetricVector::absent(MetricStatus::NotApplicable, MATERIALIZATION_SCOPE),
         },
         cfb_phases: absent_cfb_phase_metrics(),
+        allocation: None,
     })
 }
 
