@@ -40,16 +40,20 @@ impl Document {
         self.fib.get_all_subdoc_ranges().into_iter().try_fold(
             0usize,
             |count, (_, start_cp, end_cp)| {
-                count
-                    .checked_add(ParagraphExtractor::count_paragraphs_in_range(
-                        text,
-                        (start_cp, end_cp),
-                    ))
-                    .ok_or_else(|| {
-                        PackageError::Corrupted(
-                            "DOC paragraph count exceeds the addressable range".to_owned(),
-                        )
-                    })
+                if start_cp >= end_cp {
+                    Ok(count)
+                } else {
+                    count
+                        .checked_add(ParagraphExtractor::count_paragraphs_in_range(
+                            text,
+                            (start_cp, end_cp),
+                        ))
+                        .ok_or_else(|| {
+                            PackageError::Corrupted(
+                                "DOC paragraph count exceeds the addressable range".to_owned(),
+                            )
+                        })
+                }
             },
         )
     }
