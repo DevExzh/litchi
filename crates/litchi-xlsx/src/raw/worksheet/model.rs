@@ -19,6 +19,7 @@ pub(super) const MAX_CELL_STYLE: u32 = 65_490;
 pub(super) const MAX_COLUMN_STYLE: u32 = 65_429;
 pub(super) const MAX_METADATA_INDEX: u32 = 2_147_483_647;
 pub(super) const MAX_XML_DEPTH: usize = 256;
+pub(super) const MAX_XML_EVENTS: usize = 1_000_000;
 
 pub(crate) fn merge_successor(local: &[u8]) -> bool {
     matches!(

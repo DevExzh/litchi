@@ -18,7 +18,7 @@ use super::model::{
 use crate::error::{Result, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::worksheet::edit::model::SelectionRange;
-use crate::raw::worksheet::model::MAX_XML_DEPTH;
+use crate::raw::worksheet::model::{MAX_XML_DEPTH, MAX_XML_EVENTS};
 use crate::raw::worksheet::{
     merge_successor, optional_bool, optional_u32, parse_a1, parse_one_based_row, x14ac,
 };
@@ -184,11 +184,28 @@ struct Scanner {
 }
 
 pub(crate) fn scan(content: &[u8]) -> Result<Layout> {
+    scan_with_limit(content, MAX_XML_EVENTS)
+}
+
+#[cfg(test)]
+pub(crate) fn scan_with_event_limit(content: &[u8], max_events: usize) -> Result<Layout> {
+    scan_with_limit(content, max_events)
+}
+
+fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
     let mut reader = NsReader::from_reader(content);
+    reader.config_mut().check_end_names = true;
     let mut scanner = Scanner::default();
     let mut stack = Vec::<Frame>::new();
+    let mut events = 0usize;
 
     loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+        if events > max_events {
+            return Err(invalid("worksheet XML exceeds event limit"));
+        }
         let event_start = position(&reader)?;
         let (namespace, event) = reader
             .read_resolved_event()
