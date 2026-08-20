@@ -122,6 +122,16 @@ FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, str]] = {
         "generator": "litchi-ods-media-publication-v1",
         "shape": "media-rich",
     },
+    "xlsx_eager_page_break_edit_save": {
+        "name": "xlsx-page-break-media",
+        "generator": "litchi-xlsx-page-break-source-edit-media-v1",
+        "shape": "media-rich",
+    },
+    "xlsx_source_backed_page_break_edit_save": {
+        "name": "xlsx-page-break-media",
+        "generator": "litchi-xlsx-page-break-source-edit-media-v1",
+        "shape": "media-rich",
+    },
 }
 
 _MISSING = object()
