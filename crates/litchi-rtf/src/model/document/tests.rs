@@ -231,7 +231,21 @@ fn rejects_excessively_nested_shape_groups() {
         panic!("excessive shape-group nesting should fail")
     };
     assert!(
-        matches!(error, RtfError::MalformedDocument(message) if message.contains("shape group nesting"))
+        matches!(error, RtfError::MalformedDocument(message) if message.contains("group nesting"))
+    );
+}
+
+#[test]
+fn accepts_only_inert_transport_padding_after_the_root_group() {
+    let document = RtfDocument::parse("{\\rtf1 padded} \r\n\0\0")
+        .expect("whitespace and NUL transport padding");
+    assert_eq!(document.text(), "padded");
+
+    let Err(error) = RtfDocument::parse("{\\rtf1 padded} trailing") else {
+        panic!("visible trailing text must remain invalid")
+    };
+    assert!(
+        matches!(error, RtfError::MalformedDocument(message) if message.contains("trailing non-whitespace"))
     );
 }
 
