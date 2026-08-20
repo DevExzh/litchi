@@ -1086,11 +1086,12 @@ mod tests {
         ];
         let aligned_zip = page_aligned_archive(&zip, 4096, true).unwrap();
         assert_eq!(aligned_zip.len() % 4096, 0);
-        assert_eq!(&aligned_zip[..22], &zip);
+        assert_eq!(&aligned_zip[..20], &zip[..20]);
         assert_eq!(
             u16::from_le_bytes([aligned_zip[20], aligned_zip[21]]) as usize,
             aligned_zip.len() - 22
         );
+        assert!(aligned_zip[22..].iter().all(|byte| *byte == 0));
 
         let cfb = vec![0x11_u8; 4095];
         let aligned_cfb = page_aligned_archive(&cfb, 4096, false).unwrap();
