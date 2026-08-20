@@ -1869,9 +1869,14 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     let before = verified_before.or_else(|| process_metrics::Snapshot::read().ok());
     let started = Instant::now();
     let mut details = OperationDetails::default();
+    let mut deferred_source_open_package = None;
     let counter = match operation {
         Operation::OpcEagerOpen => run_opc_eager_open(&source, &mut details)?,
-        Operation::OpcSourceOpen => run_opc_source_open(&source, &mut details)?,
+        Operation::OpcSourceOpen => {
+            let (counter, package) = run_opc_source_open(&source)?;
+            deferred_source_open_package = Some(package);
+            counter
+        },
         Operation::OpcEagerSave => run_opc_eager_save(
             &source,
             &destination,
@@ -1924,6 +1929,10 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         },
     };
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
+    if let Some(package) = deferred_source_open_package {
+        details.opc_materialized_parts = Some(package.try_cache_diagnostics()?.successful_loads);
+        std::hint::black_box(package);
+    }
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
     let cold_verified = cold_verified_preparation
@@ -3196,13 +3205,11 @@ fn run_opc_eager_open(
 
 fn run_opc_source_open(
     source: &Path,
-    details: &mut OperationDetails,
-) -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
+) -> Result<(Option<Arc<CountingReadAt>>, SourceBackedPackage), Box<dyn Error>> {
     let counter = Arc::new(CountingReadAt::new(Arc::new(FileSource::open(source)?)));
     let package = SourceBackedPackage::from_read_at(counter.clone())?;
-    details.opc_materialized_parts = Some(package.cache_diagnostics().successful_loads);
     std::hint::black_box(&package);
-    Ok(Some(counter))
+    Ok((Some(counter), package))
 }
 
 fn run_pptx_operation(

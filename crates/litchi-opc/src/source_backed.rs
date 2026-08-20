@@ -340,11 +340,12 @@ impl Default for SourceCacheLimits {
 /// Content-free point-in-time diagnostics for a source-backed payload cache.
 ///
 /// Counters are monotonically increasing for the package lifetime and use
-/// checked relaxed atomic updates, so a snapshot is observational rather than
-/// a globally linearized transaction. `retained_entries`, `retained_bytes`,
-/// and `in_flight_loads` are captured together while the cache takes its
-/// existing short lock. No member names, part URIs, or ZIP entry IDs are
-/// exposed.
+/// checked relaxed atomic CAS updates, so a snapshot is observational rather
+/// than a globally linearized transaction. The checked CAS is intentional
+/// instrumentation overhead: event recording must never wrap silently.
+/// `retained_entries`, `retained_bytes`, and `in_flight_loads` are captured
+/// together while the cache takes its existing short lock. No member names,
+/// part URIs, or ZIP entry IDs are exposed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SourceCacheDiagnostics {
     /// Requests satisfied directly from a retained payload entry.
@@ -499,6 +500,7 @@ impl SourceCacheDiagnostics {
     /// or wrapped interval and returns an error. Callers collecting metrics
     /// should obtain both snapshots through
     /// [`SourceBackedPackage::try_cache_diagnostics`].
+    #[must_use]
     pub fn checked_counter_delta(
         before: Self,
         after: Self,
@@ -1571,16 +1573,18 @@ impl PartCache {
         // cache entry, completion payload, and returned handles. Count only
         // unique reservation identities so a diagnostic snapshot cannot
         // report more retained cache bytes than the hierarchical budget.
-        let mut budget_cache_reserved_bytes = state
-            .entries
-            .values()
-            .map(|entry| entry.payload.reserved_bytes())
-            .sum::<u64>();
-        let mut budget_cache_reserved_objects = state
-            .entries
-            .values()
-            .map(|entry| entry.payload.reserved_objects())
-            .sum::<u64>();
+        let mut budget_cache_reserved_bytes = 0_u64;
+        let mut budget_cache_reserved_objects = 0_u64;
+        for entry in state.entries.values() {
+            self.add_diagnostic_gauge(
+                &mut budget_cache_reserved_bytes,
+                entry.payload.reserved_bytes(),
+            );
+            self.add_diagnostic_gauge(
+                &mut budget_cache_reserved_objects,
+                entry.payload.reserved_objects(),
+            );
+        }
         for flight in state.flights.values() {
             if let Some(reservation) = flight.reservation.as_ref() {
                 let already_counted = state.entries.values().any(|entry| {
@@ -1591,8 +1595,10 @@ impl PartCache {
                         .is_some_and(|existing| Arc::ptr_eq(existing, reservation))
                 });
                 if !already_counted {
-                    budget_cache_reserved_bytes =
-                        budget_cache_reserved_bytes.saturating_add(reservation.amount());
+                    self.add_diagnostic_gauge(
+                        &mut budget_cache_reserved_bytes,
+                        reservation.amount(),
+                    );
                 }
             }
             if let Some(object_reservation) = flight.payload_object_reservation.as_ref() {
@@ -1604,13 +1610,17 @@ impl PartCache {
                         .is_some_and(|existing| Arc::ptr_eq(existing, object_reservation))
                 });
                 if !already_counted {
-                    budget_cache_reserved_objects =
-                        budget_cache_reserved_objects.saturating_add(object_reservation.amount());
+                    self.add_diagnostic_gauge(
+                        &mut budget_cache_reserved_objects,
+                        object_reservation.amount(),
+                    );
                 }
             }
             if let Some(object_reservation) = flight.flight_object_reservation.as_ref() {
-                budget_cache_reserved_objects =
-                    budget_cache_reserved_objects.saturating_add(object_reservation.amount());
+                self.add_diagnostic_gauge(
+                    &mut budget_cache_reserved_objects,
+                    object_reservation.amount(),
+                );
             }
         }
         let (budget_input_bytes_used, budget_input_bytes_limit) =
@@ -1695,6 +1705,15 @@ impl PartCache {
             budget_objects_limit,
             budget_catalog_reserved_objects: 0,
             budget_cache_reserved_objects,
+        }
+    }
+
+    fn add_diagnostic_gauge(&self, total: &mut u64, amount: u64) {
+        if let Some(next) = total.checked_add(amount) {
+            *total = next;
+        } else {
+            *total = u64::MAX;
+            self.diagnostics.overflowed.store(true, Ordering::Release);
         }
     }
 }
@@ -2228,6 +2247,7 @@ impl SourceBackedPackage {
     /// overflow as an error. Ordinary compatibility callers can continue to
     /// use the infallible method; benchmark and telemetry code should use this
     /// method so an invalid snapshot cannot be mistaken for a valid interval.
+    #[must_use]
     pub fn try_cache_diagnostics(
         &self,
     ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
@@ -7340,6 +7360,186 @@ mod tests {
     }
 
     #[test]
+    fn try_cache_diagnostics_matches_compatibility_snapshot_when_healthy() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"healthy diagnostics", false),
+        )))
+        .unwrap();
+
+        assert_eq!(
+            package
+                .try_cache_diagnostics()
+                .expect("healthy diagnostic snapshot"),
+            package.cache_diagnostics()
+        );
+    }
+
+    #[test]
+    fn managed_input_reservation_counter_overflow_fails_closed_through_wrapper() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"managed input diagnostics",
+            false,
+        )));
+        let (_budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let counter = package
+            .cache
+            .input_reservation_failures
+            .as_ref()
+            .expect("managed input reservation counter");
+        counter.value.store(u64::MAX, Ordering::Relaxed);
+        counter.increment();
+
+        assert_eq!(
+            package.try_cache_diagnostics(),
+            Err(SourceCacheDiagnosticsError::CounterOverflow)
+        );
+    }
+
+    #[test]
+    fn managed_output_reservation_counter_overflow_fails_closed_through_wrapper() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"managed output diagnostics",
+            false,
+        )));
+        let (_budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let counter = package
+            .cache
+            .output_reservation_failures
+            .as_ref()
+            .expect("managed output reservation counter");
+        counter.value.store(u64::MAX, Ordering::Relaxed);
+        counter.increment();
+
+        assert_eq!(
+            package.try_cache_diagnostics(),
+            Err(SourceCacheDiagnosticsError::CounterOverflow)
+        );
+    }
+
+    #[test]
+    fn aggregate_reservation_counter_overflow_fails_closed_through_wrapper() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"managed aggregate diagnostics",
+            false,
+        )));
+        let (_budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        package
+            .cache
+            .counters
+            .budget_reservation_failures
+            .value
+            .store(u64::MAX, Ordering::Relaxed);
+        package
+            .cache
+            .input_reservation_failures
+            .as_ref()
+            .expect("managed input reservation counter")
+            .value
+            .store(1, Ordering::Relaxed);
+
+        assert_eq!(
+            package.try_cache_diagnostics(),
+            Err(SourceCacheDiagnosticsError::CounterOverflow)
+        );
+    }
+
+    #[test]
+    fn retained_gauge_aggregation_overflow_fails_closed_through_wrapper() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_with_part_names(
+                "word/document.xml",
+                &["word/document.xml", "custom/other.xml"],
+            ),
+        )))
+        .unwrap();
+        assert_eq!(package.parts.len(), 2);
+
+        let bytes_budget_a = Budget::root(
+            "diagnostic-gauge-bytes-a",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let bytes_budget_b = Budget::root(
+            "diagnostic-gauge-bytes-b",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let objects_budget_a = Budget::root(
+            "diagnostic-gauge-objects-a",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let objects_budget_b = Budget::root(
+            "diagnostic-gauge-objects-b",
+            Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let bytes_a = Arc::new(
+            bytes_budget_a
+                .reserve(Resource::Memory, u64::MAX)
+                .expect("maximum diagnostic byte reservation"),
+        );
+        let bytes_b = Arc::new(
+            bytes_budget_b
+                .reserve(Resource::Memory, u64::MAX)
+                .expect("maximum diagnostic byte reservation"),
+        );
+        let objects_a = Arc::new(
+            objects_budget_a
+                .reserve(Resource::Objects, u64::MAX)
+                .expect("maximum diagnostic object reservation"),
+        );
+        let objects_b = Arc::new(
+            objects_budget_b
+                .reserve(Resource::Objects, u64::MAX)
+                .expect("maximum diagnostic object reservation"),
+        );
+        let mut state = package.cache.state.lock().expect("unpoisoned cache state");
+        for (index, (entry_id, bytes, objects)) in [
+            (package.parts[0].entry_id, bytes_a, objects_a),
+            (package.parts[1].entry_id, bytes_b, objects_b),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            state.entries.insert(
+                entry_id,
+                CacheEntry {
+                    payload: CachedPayload {
+                        bytes: Arc::new(Vec::new()),
+                        reservation: Some(bytes),
+                        object_reservation: Some(objects),
+                    },
+                    last_used: u64::try_from(index).expect("bounded test index"),
+                },
+            );
+        }
+        drop(state);
+
+        assert_eq!(
+            package.try_cache_diagnostics(),
+            Err(SourceCacheDiagnosticsError::CounterOverflow)
+        );
+    }
+
+    #[test]
     fn poisoned_cache_state_fails_closed_snapshot() {
         let cache = Arc::new(PartCache::new(SourceCacheLimits::new(3, 3).unwrap()));
         let poisoner = Arc::clone(&cache);
@@ -7351,6 +7551,24 @@ mod tests {
 
         assert_eq!(
             cache.try_diagnostics(),
+            Err(SourceCacheDiagnosticsError::StatePoisoned)
+        );
+    }
+
+    #[test]
+    fn poisoned_cache_state_fails_closed_through_wrapper() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"poisoned diagnostics", false),
+        )))
+        .unwrap();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _state = package.cache.state.lock().expect("unpoisoned cache state");
+            panic!("test cache-state poison through package wrapper");
+        }));
+        assert!(result.is_err());
+
+        assert_eq!(
+            package.try_cache_diagnostics(),
             Err(SourceCacheDiagnosticsError::StatePoisoned)
         );
     }
