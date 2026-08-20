@@ -974,7 +974,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **341 selectable cases**; 200 was the count before the
+harness contains **346 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -997,6 +997,12 @@ capability-bounded variants (39 tiny / 70 tiny-plus-large rows), 24
 shape-selected ODT/ODS/ODP semantic cases, twelve fixed media-rich ODF cases,
 and 22 opt-in native DOC/XLS/PPT semantic/phase-attribution cases. It
 is still not broad program or CRUD coverage.
+
+The four new opt-in XLSB lifecycle selectors use deterministic tiny, medium,
+large, and sparse BIFF12 corpora. Their full scan prepares the archive,
+workbook, and worksheets outside timing, measures only boxed
+`worksheet.cells()` consumption, and verifies exact counts and canonical cell
+hashes afterward; the default 36-case/198-record tranche is unchanged.
 
 Change 0189 adds four opt-in XLSX join/three-way composition selectors. Their
 two-shape smoke verifies lineage, conflicts, explicit resolution, durable
@@ -2436,7 +2442,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 341 selectable cases. Change
+The current standalone harness provides 346 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
