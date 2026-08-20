@@ -829,9 +829,11 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**341 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
-repair-plan selector and later opt-in selectors were added. The
-historical 36-default-case/198-default-record tranche remains measured as
+**356 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+repair-plan selector and later opt-in selectors were added. The twelve ODF
+catalog-detection selectors are opt-in correctness/oracle cases only and do
+not change the historical 36-default-case/198-default-record tranche, which
+remains measured as
 documented below; newer selectable cases do not inherit those measurements.
 
 Change 0188 adds eight opt-in DOCX/PPTX fresh-open-plus-query lifecycle

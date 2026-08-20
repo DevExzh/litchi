@@ -176,6 +176,12 @@ and times only `Paragraph::text()` for the tiny, medium, and large shapes; exact
 text and error guards remain outside the timed interval. This brings the
 selectable matrix to 342 names while leaving the default 36 cases / 198 records
 unchanged.
+Twelve additional ODF catalog-detection selectors
+(`detect_{odt,ods,odp}_{bytes,reader,polyglot,catalog_alias}`) are opt-in.
+They cover canonical byte/reader detection plus OOXML/ODF polyglots and
+uncertain catalog aliases, while keeping the default 36 cases / 198 records
+unchanged and making no benchmark claim. These additions bring the selectable
+matrix to 356 names.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
 and a temporary source file. The first times exactly
