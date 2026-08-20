@@ -9,7 +9,7 @@ use super::edit::{Commit, Edit, Patch};
 use super::worksheet;
 use super::{codec, package};
 use litchi_core::Selector as CoreSelector;
-use litchi_opc::{OpcPackage, PackURI, ReadLimits};
+use litchi_opc::{OpcPackage, PackURI, Part, ReadLimits};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
@@ -110,6 +110,11 @@ pub(super) struct SheetData {
     pub(super) part_uri: PackURI,
     pub(super) cells: OnceLock<Store>,
     pub(super) web_bindings: OnceCell<crate::web::Bindings>,
+    /// Successful page-break projections are retained only for the exact
+    /// worksheet payload allocation that produced them. A changed worksheet
+    /// gets a fresh cache; snapshots that share unchanged source bytes may
+    /// safely share the parsed projection too.
+    pub(super) page_breaks: Arc<OnceCell<crate::page_breaks::PageBreaks>>,
     #[allow(
         dead_code,
         reason = "the cached column index supports internal workbook edit planning"
@@ -123,6 +128,41 @@ pub(super) struct ValidatedWorksheetStore {
     pub(super) uri: PackURI,
     pub(super) content: Arc<Vec<u8>>,
     pub(super) store: Store,
+}
+
+/// Reuse a successful worksheet projection only when the target snapshot
+/// retains the exact source payload allocation. A publication that replaces
+/// the worksheet bytes receives a fresh cache, so no edit can observe a
+/// projection from an earlier generation.
+fn page_break_cache(
+    source: Option<&Workbook>,
+    package: &OpcPackage,
+    part_uri: &PackURI,
+) -> Arc<OnceCell<crate::page_breaks::PageBreaks>> {
+    let Some(source) = source else {
+        return Arc::new(OnceCell::new());
+    };
+    let Some(source_sheet) = source
+        .inner
+        .sheets
+        .iter()
+        .find(|sheet| &sheet.part_uri == part_uri)
+    else {
+        return Arc::new(OnceCell::new());
+    };
+    let Ok(source_part) = source.inner.package.get_part(part_uri) else {
+        return Arc::new(OnceCell::new());
+    };
+    let Ok(target_part) = package.get_part(part_uri) else {
+        return Arc::new(OnceCell::new());
+    };
+    let source_blob = source_part.blob_arc();
+    let target_blob = target_part.blob_arc();
+    if Arc::ptr_eq(&source_blob, &target_blob) {
+        Arc::clone(&source_sheet.page_breaks)
+    } else {
+        Arc::new(OnceCell::new())
+    }
 }
 
 #[derive(Debug)]
@@ -393,15 +433,18 @@ impl Workbook {
             .enumerate()
             .map(|(position, (sheet, part))| {
                 let name_key = crate::sheet::key(&sheet.name);
+                let part_uri = part.uri;
+                let page_breaks = page_break_cache(source, &package, &part_uri);
                 Arc::new(SheetData {
                     position,
                     name: sheet.name,
                     name_key,
                     kind: part.kind,
                     visibility: codec::visibility(sheet.visibility),
-                    part_uri: part.uri,
+                    part_uri,
                     cells: OnceLock::new(),
                     web_bindings: OnceCell::new(),
+                    page_breaks,
                     native_id: sheet.sheet_id,
                     relationship_id: sheet.relationship_id,
                 })
