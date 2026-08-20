@@ -223,7 +223,8 @@ impl Workbook {
     ///
     /// # Performance Notes
     ///
-    /// - OLE2 and OOXML detection return parsed owners that their loaders reuse
+    /// - XLSX detection retains a bounded source-backed catalog and defers worksheet payloads
+    /// - Other OLE2 and OOXML detection results return parsed owners that their loaders reuse
     /// - Other detection results retain the moved buffer for loaders that may parse it afterward
     /// - No temporary files created
     /// - Ideal for network data, streams, or in-memory content
@@ -240,6 +241,28 @@ impl Workbook {
                 });
             },
             Err(bytes) => bytes,
+        };
+
+        #[cfg(feature = "xlsx")]
+        let bytes = match crate::detection_smart::detected::detect_workbook_source_bytes(bytes) {
+            crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsx(package) => {
+                let metadata = crate::ooxml_common::properties::read_source_backed(&package)
+                    .map_err(crate::map_ooxml_error)?
+                    .map(litchi_core::Metadata::from)
+                    .unwrap_or_default();
+                let workbook =
+                    crate::xlsx::SourceBackedWorkbook::from_source_backed_package(package)
+                        .map_err(crate::map_ooxml_error)?;
+                return Ok(Self {
+                    inner: WorkbookImpl::Xlsx(super::adapters::Workbook::from_source_backed(
+                        workbook,
+                    )),
+                    cached_metadata: metadata,
+                });
+            },
+            crate::detection_smart::detected::WorkbookSourceBytesDetection::Fallback(bytes) => {
+                bytes
+            },
         };
 
         // Detection consumes the input and returns either a parsed owner or the
@@ -693,35 +716,40 @@ mod source_xlsx_path_tests {
     }
 
     #[test]
-    fn filesystem_xlsx_uses_source_owner_and_matches_eager_projection() {
+    fn filesystem_and_bytes_xlsx_use_source_owner_and_match_projection() {
         let bytes = valid_package("source title");
         let path = tempfile::Builder::new().suffix(".ods").tempfile().unwrap();
         std::fs::write(path.path(), &bytes).unwrap();
 
         let source = Workbook::open(path.path()).expect("source XLSX");
-        let eager = Workbook::from_bytes(bytes).expect("eager XLSX");
+        let bytes_workbook = Workbook::from_bytes(bytes.clone()).expect("bytes XLSX");
+        let eager = crate::xlsx::Workbook::from_bytes(bytes).expect("typed eager XLSX");
         let WorkbookImpl::Xlsx(source_adapter) = &source.inner else {
             panic!("filesystem XLSX did not select the XLSX owner");
         };
-        let WorkbookImpl::Xlsx(eager_adapter) = &eager.inner else {
+        let WorkbookImpl::Xlsx(bytes_adapter) = &bytes_workbook.inner else {
             panic!("byte XLSX did not select the XLSX owner");
         };
         assert!(source_adapter.is_source_backed());
-        assert!(!eager_adapter.is_source_backed());
+        assert!(bytes_adapter.is_source_backed());
         assert_eq!(source.worksheet_names().unwrap(), ["First", "Second"]);
         assert_eq!(
             source.worksheet_names().unwrap(),
-            eager.worksheet_names().unwrap()
+            bytes_workbook.worksheet_names().unwrap()
         );
         assert_eq!(
             source.worksheet_count().unwrap(),
-            eager.worksheet_count().unwrap()
+            bytes_workbook.worksheet_count().unwrap()
         );
-        assert_eq!(source.text().unwrap(), eager.text().unwrap());
+        assert_eq!(
+            eager.sheets().map(|sheet| sheet.name()).collect::<Vec<_>>(),
+            ["First", "Second"]
+        );
+        assert_eq!(source.text().unwrap(), bytes_workbook.text().unwrap());
         assert_eq!(source.text().unwrap(), "1\n2\n");
         assert_eq!(
             source.metadata().unwrap().title,
-            eager.metadata().unwrap().title
+            bytes_workbook.metadata().unwrap().title
         );
         assert_eq!(
             source.metadata().unwrap().title.as_deref(),
@@ -750,6 +778,31 @@ mod source_xlsx_path_tests {
         let WorkbookImpl::Xlsx(adapter) = &workbook.inner else {
             panic!("filesystem XLSX did not select the XLSX owner");
         };
+        assert_eq!(
+            adapter
+                .worksheet_by_index(0)
+                .unwrap()
+                .cell_by_coordinate("A1")
+                .unwrap()
+                .value(),
+            &CellValue::Int(1)
+        );
+        assert!(workbook.text().is_err());
+    }
+
+    #[test]
+    fn bytes_xlsx_defers_unselected_worksheet_payload() {
+        let bytes = package(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row>"#,
+            "deferred bytes",
+        );
+
+        let workbook = Workbook::from_bytes(bytes).expect("catalog-only bytes open");
+        assert_eq!(workbook.worksheet_names().unwrap(), ["First", "Second"]);
+        let WorkbookImpl::Xlsx(adapter) = &workbook.inner else {
+            panic!("bytes XLSX did not select the XLSX owner");
+        };
+        assert!(adapter.is_source_backed());
         assert_eq!(
             adapter
                 .worksheet_by_index(0)

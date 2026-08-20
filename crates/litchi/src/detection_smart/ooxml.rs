@@ -160,13 +160,10 @@ fn detect_ooxml_format_from_content_types(
 
 /// Detect an OOXML family from a source-backed OPC catalog without loading
 /// any part payload. Path facades use this metadata-only probe to hand a
-/// validated source-backed DOCX/PPTX owner to the unified APIs while
-/// retaining the existing eager [`detect_ooxml_format_from_package`] path for
-/// byte-backed callers and non-source fallbacks.
-#[cfg(all(
-    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-    any(unix, windows)
-))]
+/// validated source-backed OOXML owner to the unified APIs while retaining the
+/// existing eager [`detect_ooxml_format_from_package`] path for public smart
+/// detection and non-source fallbacks.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub(crate) fn detect_ooxml_format_from_source_backed_package(
     package: &litchi_opc::SourceBackedPackage,
 ) -> Option<FileFormat> {
