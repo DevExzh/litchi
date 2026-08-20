@@ -144,6 +144,14 @@ and times only `Paragraph::text()` for the tiny, medium, and large shapes; exact
 text and error guards remain outside the timed interval. This brings the
 selectable matrix to 342 names while leaving the default 36 cases / 198 records
 unchanged.
+Four additional opt-in XLSB lifecycle selectors (`xlsb_semantic_open`,
+`xlsb_semantic_list_worksheets`, `xlsb_semantic_one_cell`, and
+`xlsb_semantic_full_cell_scan`) use deterministic tiny, medium, large, and
+sparse BIFF12 corpora. Archive cloning, workbook/worksheet preparation, and
+verification stay outside the timer; the full scan times only boxed
+`worksheet.cells()` consumption and verifies an exact canonical cell digest.
+These selectors bring the matrix to 346 names while leaving the default 36
+cases / 198 records unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
 and a temporary source file. The first times exactly
