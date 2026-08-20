@@ -11,8 +11,9 @@ The ordinary current-HEAD mode uses temporary external traces and retains
 their SHA and size, command, and parsed counters, but not the potentially
 large raw trace.  Its XLSX managed-batch ABBA mode instead retains per-leg
 harness, ``/usr/bin/time``, and optional heaptrack artifacts under an explicit
-artifact directory.  The DOCX semantic/full-text ABBA mode uses explicit
-control/candidate binaries, requires matching deterministic corpus manifests,
+artifact directory.  The DOCX semantic/full-text ABBA mode (optionally
+including the one-paragraph text case) uses explicit control/candidate
+binaries, requires matching deterministic corpus manifests,
 and labels all harness elapsed values as instrumented resource observations.
 Source/sink counters are logical harness counters.
 ``strace`` values are whole-process syscall observations and must not be read
@@ -177,6 +178,11 @@ DOCX_SEMANTIC_CASES: tuple[str, ...] = (
     "docx_semantic_open",
     "docx_semantic_full_text",
 )
+DOCX_SEMANTIC_ONE_PARAGRAPH_TEXT_CASE = "docx_semantic_one_paragraph_text"
+DOCX_SEMANTIC_CASES_WITH_ONE_PARAGRAPH_TEXT: tuple[str, ...] = (
+    *DOCX_SEMANTIC_CASES,
+    DOCX_SEMANTIC_ONE_PARAGRAPH_TEXT_CASE,
+)
 DOCX_SEMANTIC_SHAPE = "large"
 DOCX_SEMANTIC_ARGS: tuple[str, ...] = (
     "--case",
@@ -234,22 +240,71 @@ RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = (
     ("heaptrack.peak_heap_bytes", "whole-process heaptrack peak heap bytes"),
     ("heaptrack.peak_rss_bytes", "whole-process heaptrack peak RSS bytes"),
 )
-DOCX_RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = tuple(
-    [
-        (
-            f"harness.{case}.elapsed_ns.{statistic}",
-            f"instrumented {case} operation-summary elapsed time ({statistic}); "
-            "not latency evidence",
-        )
-        for case in DOCX_SEMANTIC_CASES
-        for statistic in ("p50", "p95", "p99", "mean", "standard_deviation")
-    ]
-    + [
-        spec
-        for spec in RESOURCE_METRIC_SPECS
-        if not spec[0].startswith("harness.elapsed_ns.")
-    ]
+def _docx_resource_metric_specs(
+    cases: Sequence[str],
+) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        [
+            (
+                f"harness.{case}.elapsed_ns.{statistic}",
+                f"instrumented {case} operation-summary elapsed time ({statistic}); "
+                "not latency evidence",
+            )
+            for case in cases
+            for statistic in ("p50", "p95", "p99", "mean", "standard_deviation")
+        ]
+        + [
+            spec
+            for spec in RESOURCE_METRIC_SPECS
+            if not spec[0].startswith("harness.elapsed_ns.")
+        ]
+    )
+
+
+DOCX_RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = _docx_resource_metric_specs(
+    DOCX_SEMANTIC_CASES
 )
+
+
+def _normalize_docx_cases(cases: Sequence[str] | None) -> tuple[str, ...]:
+    selected = DOCX_SEMANTIC_CASES if cases is None else tuple(cases)
+    allowed = (
+        DOCX_SEMANTIC_CASES,
+        DOCX_SEMANTIC_CASES_WITH_ONE_PARAGRAPH_TEXT,
+    )
+    if selected not in allowed:
+        raise ResourceProfileInputError(
+            "DOCX resource cases must be the default open/full-text pair or "
+            "that pair plus docx_semantic_one_paragraph_text"
+        )
+    return selected
+
+
+def docx_semantic_cases(*, include_one_paragraph_text: bool = False) -> tuple[str, ...]:
+    """Return the fixed DOCX resource case tuple selected by the CLI flag."""
+    return (
+        DOCX_SEMANTIC_CASES_WITH_ONE_PARAGRAPH_TEXT
+        if include_one_paragraph_text
+        else DOCX_SEMANTIC_CASES
+    )
+
+
+def docx_semantic_args(cases: Sequence[str] = DOCX_SEMANTIC_CASES) -> tuple[str, ...]:
+    """Build the harness arguments for one of the fixed DOCX case tuples."""
+    selected = _normalize_docx_cases(cases)
+    return (
+        "--case",
+        ",".join(selected),
+        "--semantic-shape",
+        DOCX_SEMANTIC_SHAPE,
+    )
+
+
+def docx_resource_metric_specs(
+    cases: Sequence[str] = DOCX_SEMANTIC_CASES,
+) -> tuple[tuple[str, str], ...]:
+    """Return resource metric definitions for the selected fixed DOCX cases."""
+    return _docx_resource_metric_specs(_normalize_docx_cases(cases))
 NOT_MEASURED_RESOURCE_DIMENSIONS: dict[str, str] = {
     "memory_copy_bytes": (
         "not measured: /usr/bin/time and heaptrack report process totals, not bytes copied"
@@ -1452,16 +1507,20 @@ def _harness_result(report: Any, location: str) -> tuple[dict[str, Any], dict[st
 
 
 def _docx_harness_results(
-    report: Any, location: str
+    report: Any,
+    location: str,
+    *,
+    cases: Sequence[str] = DOCX_SEMANTIC_CASES,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Validate the two fixed DOCX semantic/full-text rows before comparison.
+    """Validate the selected fixed DOCX semantic rows before comparison.
 
     The resource runner deliberately does not infer a corpus from a command
-    line.  Every leg must carry both semantic rows and a complete deterministic
-    corpus manifest, including archive and target hashes.  This keeps an
-    accidentally changed generator, shape, or fixture from becoming a
+    line.  Every leg must carry the selected semantic rows and a complete
+    deterministic corpus manifest, including archive and target hashes.  This
+    keeps an accidentally changed generator, shape, or fixture from becoming a
     seemingly comparable resource result.
     """
+    selected_cases = _normalize_docx_cases(cases)
     if not isinstance(report, dict):
         raise ResourceProfileInputError(f"{location} must be an object")
     if report.get("schema_version") != SCHEMA_VERSION:
@@ -1473,16 +1532,16 @@ def _docx_harness_results(
         raise ResourceProfileInputError(f"{location}.configuration must be an object")
     sample_count = _requested_sample_count(configuration, f"{location}.configuration")
     results = report.get("results")
-    if not isinstance(results, list) or len(results) != len(DOCX_SEMANTIC_CASES):
+    if not isinstance(results, list) or len(results) != len(selected_cases):
         raise ResourceProfileInputError(
-            f"{location}.results must contain exactly the DOCX semantic/full-text rows"
+            f"{location}.results must contain exactly the selected DOCX semantic rows"
         )
     observed_cases = [
         result.get("case") if isinstance(result, dict) else None for result in results
     ]
-    if tuple(observed_cases) != DOCX_SEMANTIC_CASES:
+    if tuple(observed_cases) != selected_cases:
         raise ResourceProfileInputError(
-            f"{location}.results cases must be {list(DOCX_SEMANTIC_CASES)!r}; "
+            f"{location}.results cases must be {list(selected_cases)!r}; "
             f"got {observed_cases!r}"
         )
     validated: list[dict[str, Any]] = []
@@ -1590,6 +1649,7 @@ def validate_abba_inputs(
     *,
     expected_configuration: dict[str, Any] | None = None,
     workload: str = "xlsx",
+    docx_cases: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Validate clean binary/revision/corpus/config identity for four ABBA legs.
 
@@ -1600,6 +1660,11 @@ def validate_abba_inputs(
     """
     if workload not in {"xlsx", DOCX_SEMANTIC_ID}:
         raise ResourceProfileInputError(f"unsupported ABBA workload: {workload!r}")
+    selected_docx_cases = (
+        _normalize_docx_cases(docx_cases)
+        if workload == DOCX_SEMANTIC_ID
+        else DOCX_SEMANTIC_CASES
+    )
     if len(legs) != len(ABBA_LEG_ORDER):
         raise ResourceProfileInputError(
             f"ABBA requires exactly {len(ABBA_LEG_ORDER)} legs; got {len(legs)}"
@@ -1642,7 +1707,9 @@ def validate_abba_inputs(
             report = leg.get("report")
         if workload == DOCX_SEMANTIC_ID:
             configuration, results = _docx_harness_results(
-                report, f"{location}.harness_report"
+                report,
+                f"{location}.harness_report",
+                cases=selected_docx_cases,
             )
             corpus_value: Any = [
                 {"case": result["case"], "corpus": result["corpus"]}
@@ -1762,12 +1829,14 @@ def validate_docx_abba_inputs(
     legs: Sequence[dict[str, Any]],
     *,
     expected_configuration: dict[str, Any] | None = None,
+    cases: Sequence[str] = DOCX_SEMANTIC_CASES,
 ) -> dict[str, Any]:
     """DOCX-named wrapper for callers that do not need workload dispatch."""
     return validate_abba_inputs(
         legs,
         expected_configuration=expected_configuration,
         workload=DOCX_SEMANTIC_ID,
+        docx_cases=cases,
     )
 
 
@@ -2373,14 +2442,16 @@ def profile_docx_semantic_abba_leg(
     samples: int,
     tools: dict[str, dict[str, Any]],
     timeout_seconds: float,
+    cases: Sequence[str] = DOCX_SEMANTIC_CASES,
 ) -> dict[str, Any]:
-    """Run one fixed DOCX semantic/full-text resource leg.
+    """Run one fixed DOCX semantic resource leg.
 
-    The two DOCX cases share one fresh process so their corpus and tool
+    The selected DOCX cases share one fresh process so their corpus and tool
     identities are aligned.  The process is run once under GNU time and once
     under heaptrack when those optional tools are available; neither run is a
     latency sample.
     """
+    selected_cases = _normalize_docx_cases(cases)
     if leg not in ABBA_LEG_VARIANTS or ABBA_LEG_VARIANTS[leg] != variant:
         raise ResourceProfileInputError(f"invalid ABBA leg/variant pair: {leg!r}/{variant!r}")
     leg_dir = artifact_root / leg.lower()
@@ -2390,7 +2461,7 @@ def profile_docx_semantic_abba_leg(
     stderr = leg_dir / "harness-stderr.txt"
     command = _profile_command(
         binary,
-        DOCX_SEMANTIC_ARGS,
+        docx_semantic_args(selected_cases),
         warmup=warmup,
         samples=samples,
         output=harness_json,
@@ -2439,7 +2510,7 @@ def profile_docx_semantic_abba_leg(
             "report": artifact(harness_json, retained=True),
             "logical_measurements": logical_measurements(report),
             "instrumented_resource_metrics": instrumented_harness_metrics(
-                report, DOCX_SEMANTIC_CASES
+                report, selected_cases
             ),
         },
         # This private field is removed before JSON publication.  It remains
@@ -2447,13 +2518,13 @@ def profile_docx_semantic_abba_leg(
         # changed case order, corpus, configuration, or revision.
         "harness_report": report,
         "resource_metrics": instrumented_harness_metrics(
-            report, DOCX_SEMANTIC_CASES
+            report, selected_cases
         ),
         "latency_evidence": dict(LATENCY_SEPARATION),
         "time": time_result,
         "heaptrack": _profile_abba_heaptrack(
             binary,
-            DOCX_SEMANTIC_ARGS,
+            docx_semantic_args(selected_cases),
             leg_dir,
             tools,
             warmup=warmup,
@@ -2480,16 +2551,24 @@ def _fixed_xlsx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
     }
 
 
-def _fixed_docx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
+def _fixed_docx_abba_configuration(
+    warmup: int,
+    samples: int,
+    cases: Sequence[str] = DOCX_SEMANTIC_CASES,
+) -> dict[str, Any]:
+    selected_cases = _normalize_docx_cases(cases)
     return {
         "warmup_iterations": warmup,
         "samples": samples,
-        "cases": list(DOCX_SEMANTIC_CASES),
+        "cases": list(selected_cases),
+        "include_one_paragraph_text": (
+            DOCX_SEMANTIC_ONE_PARAGRAPH_TEXT_CASE in selected_cases
+        ),
         "semantic_shape": DOCX_SEMANTIC_SHAPE,
         "harness_expected": {
             "samples_per_case": samples,
             "warmup_iterations_per_case": warmup,
-            "cases": list(DOCX_SEMANTIC_CASES),
+            "cases": list(selected_cases),
             "semantic_shapes": [DOCX_SEMANTIC_SHAPE],
         },
         "leg_order": list(ABBA_LEG_ORDER),
@@ -2616,12 +2695,15 @@ def run_xlsx_managed_batch_abba(arguments: argparse.Namespace) -> int:
 
 
 def run_docx_semantic_abba(arguments: argparse.Namespace) -> int:
-    """Run reproducible DOCX semantic/full-text resource evidence.
+    """Run reproducible DOCX semantic resource evidence.
 
     Control and candidate are intentionally explicit executable paths.  This
     mode never builds either binary and never substitutes a current working
     tree or an implicit Cargo target for a missing path.
     """
+    selected_cases = docx_semantic_cases(
+        include_one_paragraph_text=getattr(arguments, "include_one_paragraph_text", False)
+    )
     control = binary_identity(Path(arguments.control_binary), label="control")
     candidate = binary_identity(Path(arguments.candidate_binary), label="candidate")
     if control["binary_sha256"] == candidate["binary_sha256"]:
@@ -2653,6 +2735,7 @@ def run_docx_semantic_abba(arguments: argparse.Namespace) -> int:
                 samples=arguments.samples,
                 tools=tools,
                 timeout_seconds=arguments.timeout,
+                cases=selected_cases,
             )
         )
     control_after = binary_identity(Path(arguments.control_binary), label="control")
@@ -2665,13 +2748,21 @@ def run_docx_semantic_abba(arguments: argparse.Namespace) -> int:
         raise ResourceProfileInputError("candidate binary changed during DOCX ABBA execution")
     if candidate_after["mode_bits"] != candidate["mode_bits"]:
         raise ResourceProfileInputError("candidate binary mode changed during DOCX ABBA execution")
-    fixed_configuration = _fixed_docx_abba_configuration(arguments.warmup, arguments.samples)
+    fixed_configuration = _fixed_docx_abba_configuration(
+        arguments.warmup,
+        arguments.samples,
+        selected_cases,
+    )
     validation = validate_abba_inputs(
         legs,
         expected_configuration=fixed_configuration["harness_expected"],
         workload=DOCX_SEMANTIC_ID,
+        docx_cases=selected_cases,
     )
-    statistics_report = abba_statistics(legs, metric_specs=DOCX_RESOURCE_METRIC_SPECS)
+    statistics_report = abba_statistics(
+        legs,
+        metric_specs=docx_resource_metric_specs(selected_cases),
+    )
     published_legs = []
     for leg, harness_identity in zip(legs, validation["harness_identities"]):
         published = {
@@ -2704,11 +2795,11 @@ def run_docx_semantic_abba(arguments: argparse.Namespace) -> int:
         "scope": {
             "claim": (
                 "four fresh process legs in fixed A1/B1/B2/A2 order over the same "
-                "deterministic DOCX semantic/full-text corpus; descriptive resource "
+                "deterministic DOCX semantic corpus; descriptive resource "
                 "comparison only and no automatic latency or speedup claim"
             ),
             "workload": DOCX_SEMANTIC_ID,
-            "cases": list(DOCX_SEMANTIC_CASES),
+            "cases": list(selected_cases),
             "semantic_shape": DOCX_SEMANTIC_SHAPE,
             "resource_scope": (
                 "process-total /usr/bin/time and optional heaptrack observations, plus "
@@ -2947,6 +3038,12 @@ def run_profile(arguments: argparse.Namespace) -> int:
                 if arguments.only in DOCX_SEMANTIC_ID_ALIASES
                 else XLSX_MANAGED_BATCH_ID
             )
+        if getattr(arguments, "include_one_paragraph_text", False) and (
+            requested_workload != DOCX_SEMANTIC_ID
+        ):
+            raise ResourceProfileInputError(
+                "--include-one-paragraph-text requires the DOCX semantic ABBA workload"
+            )
         if arguments.only in DOCX_SEMANTIC_ID_ALIASES:
             only_workload = DOCX_SEMANTIC_ID
         else:
@@ -2967,6 +3064,9 @@ def run_profile(arguments: argparse.Namespace) -> int:
             warmup=arguments.warmup,
             samples=arguments.samples,
             timeout=arguments.timeout,
+            include_one_paragraph_text=getattr(
+                arguments, "include_one_paragraph_text", False
+            ),
         )
         if requested_workload == DOCX_SEMANTIC_ID:
             if arguments.output == DEFAULT_OUTPUT:
@@ -3148,6 +3248,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="switch to the retained resource ABBA mode selected by --workload/--only",
     )
     run.add_argument("--artifact-dir", type=Path)
+    run.add_argument(
+        "--include-one-paragraph-text",
+        "--include-docx-one-paragraph-text",
+        dest="include_one_paragraph_text",
+        action="store_true",
+        help=(
+            "include docx_semantic_one_paragraph_text in the DOCX resource ABBA "
+            "case tuple"
+        ),
+    )
     run.add_argument("--warmup", type=int, default=1)
     run.add_argument("--samples", type=int, default=3)
     run.add_argument("--timeout", type=float, default=600.0)
@@ -3189,7 +3299,7 @@ def build_parser() -> argparse.ArgumentParser:
         aliases=("abba-docx-semantic", "compare-docx", "abba-docx"),
         help=(
             "run a retained A1/B1/B2/A2 resource comparison for DOCX semantic "
-            "open/full-text workloads"
+            "open/full-text workloads (optionally one-paragraph text)"
         ),
     )
     docx.add_argument(
@@ -3213,6 +3323,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--artifact-dir",
         type=Path,
         help="directory for retained per-leg harness/time/heaptrack artifacts",
+    )
+    docx.add_argument(
+        "--include-one-paragraph-text",
+        "--include-docx-one-paragraph-text",
+        dest="include_one_paragraph_text",
+        action="store_true",
+        help="include docx_semantic_one_paragraph_text in the resource case tuple",
     )
     docx.add_argument("--warmup", type=int, default=3)
     docx.add_argument("--samples", type=int, default=30)
