@@ -11,6 +11,17 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## XLSX page-break projection ABBA evidence (change 0252)
+
+[Change 0252](changes/0252-xlsx-pagebreak-projection-abba.md) records the
+strict current-schema package for the fixed media-rich XLSX page-break edit
+selectors. The eager selector accepts p50/mean/p95/p99 with reductions of
+approximately 1.2%-2.0% in both paired directions. The source-backed selector
+accepts p50/mean/p95; p99 is excluded because its A2→B2 direction is a
+`-0.300698%` regression. All identity and drift gates pass, but production
+landing remains pending an independent code/oracle audit. This is narrow
+fixed-corpus evidence with no broad XLSX claim.
+
 ## PPTX named-slide selector ABBA evidence (change 0253)
 
 [Change 0253](changes/0253-pptx-named-slide-abba.md) records the corrected
