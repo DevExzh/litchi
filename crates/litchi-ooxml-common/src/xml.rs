@@ -41,6 +41,8 @@ pub const STRICT_DRAWINGML_CHART_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml
 pub const OMML_NAMESPACE_URI: &str = "http://schemas.openxmlformats.org/officeDocument/2006/math";
 const OMML_NAMESPACE: &[u8] = OMML_NAMESPACE_URI.as_bytes();
 const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
+const MAX_OMML_SCAN_DEPTH: usize = 128;
+const MAX_OMML_SCAN_NODES: usize = 1_000_000;
 
 /// Decode a numeric or predefined XML entity reference.
 /// # Errors
@@ -183,6 +185,8 @@ where
 
     let mut reader = NsReader::from_reader(xml_bytes);
     let mut capture: Option<(usize, usize)> = None;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
 
     loop {
         let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
@@ -192,6 +196,45 @@ where
             let (namespace, event) = reader
                 .read_resolved_event()
                 .map_err(|error| XmlError::Malformed(error.to_string()))?;
+            match &event {
+                Event::Start(_) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        XmlError::Invalid("OMML element counter overflow".to_string())
+                    })?;
+                    if nodes > MAX_OMML_SCAN_NODES {
+                        return Err(XmlError::Invalid(format!(
+                            "OMML XML exceeds {MAX_OMML_SCAN_NODES} elements"
+                        ))
+                        .into());
+                    }
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| XmlError::Invalid("OMML nesting is too deep".to_string()))?;
+                    if depth > MAX_OMML_SCAN_DEPTH {
+                        return Err(XmlError::Invalid(format!(
+                            "OMML nesting exceeds the {MAX_OMML_SCAN_DEPTH} depth limit"
+                        ))
+                        .into());
+                    }
+                },
+                Event::Empty(_) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        XmlError::Invalid("OMML element counter overflow".to_string())
+                    })?;
+                    if nodes > MAX_OMML_SCAN_NODES {
+                        return Err(XmlError::Invalid(format!(
+                            "OMML XML exceeds {MAX_OMML_SCAN_NODES} elements"
+                        ))
+                        .into());
+                    }
+                },
+                Event::End(_) => {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| XmlError::Invalid("invalid OMML nesting".to_string()))?;
+                },
+                _ => {},
+            }
             match event {
                 Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
                 Event::Start(element) if is_omml_name(&namespace, element.name(), b"oMath") => {
@@ -251,7 +294,7 @@ where
                     emit_omml_range(start, event_end, &mut emit)?;
                 }
             },
-            ScanEvent::Eof if capture.is_some() => {
+            ScanEvent::Eof if capture.is_some() || depth != 0 => {
                 return Err(XmlError::Invalid("unterminated OMML formula".to_string()).into());
             },
             ScanEvent::Eof => break,
@@ -390,5 +433,17 @@ mod tests {
             XmlError::Malformed(_) | XmlError::Invalid(_)
         ));
         assert_eq!(emitted, 0);
+    }
+
+    #[test]
+    fn rejects_omml_structural_depth_over_bound() {
+        let mut xml = String::from("<root>");
+        xml.push_str(&"<node>".repeat(MAX_OMML_SCAN_DEPTH));
+        xml.push_str(&"</node>".repeat(MAX_OMML_SCAN_DEPTH));
+        xml.push_str("</root>");
+        assert!(matches!(
+            scan_omml_formula_ranges::<XmlError>(xml.as_bytes(), |_, _| Ok(())),
+            Err(XmlError::Invalid(message)) if message.contains("depth limit")
+        ));
     }
 }
