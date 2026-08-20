@@ -960,6 +960,36 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             ):
                 perf_abba_summary.summarize_reports(legs)
 
+    def test_cfb_phase_timings_are_measurements_not_source_identity(self):
+        legs = four_legs()
+        for leg_index, leg in enumerate(legs):
+            for result in leg["results"]:
+                result["source"] = {
+                    "cfb_open_stream": {
+                        "expected_payload_sha256": "a" * 64,
+                        "source_version_check": "stable version fence",
+                        "logical_read_calls": [2, 2, 2, 2, 2],
+                        "open_ns": [100 + leg_index],
+                        "operation_ns": [200 + leg_index],
+                        "per_operation_ns": [[200 + leg_index]],
+                        "total_ns": [300 + leg_index],
+                    }
+                }
+        summary = perf_abba_summary.summarize_reports(legs)
+        source = summary["results"][0]["source"]["cfb_open_stream"]
+        self.assertEqual(source["expected_payload_sha256"], "a" * 64)
+        self.assertEqual(source["source_version_check"], "stable version fence")
+        for field in perf_abba_summary.CFB_OPEN_STREAM_SOURCE_MEASUREMENTS:
+            self.assertNotIn(field, source)
+
+        legs[2]["results"][0]["source"]["cfb_open_stream"][
+            "source_version_check"
+        ] = "changed version fence"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "source identity"
+        ):
+            perf_abba_summary.summarize_reports(legs)
+
     def test_tool_configuration_and_result_identity_mismatches_fail_closed(self):
         for mutation, message in (
             (lambda legs: legs[1]["tool"].update(version="other"), "tool identity"),

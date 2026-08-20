@@ -1431,7 +1431,45 @@ def _identity_value(row: dict[str, Any], field: str, location: str) -> tuple[boo
     # no identity, so it is absence rather than a verified-equal payload.
     present = field in row and row[field] is not None
     value = row[field] if present else None
+    if field == "source":
+        value = _source_identity_projection(value)
     return present, _canonical_json(value, f"{location}.{field}")
+
+
+CFB_OPEN_STREAM_SOURCE_MEASUREMENTS = (
+    "expected_direct_physical_range",
+    "logical_read_bytes",
+    "logical_read_calls",
+    "logical_read_range_sizes",
+    "logical_read_ranges",
+    "open_ns",
+    "open_read_bytes",
+    "open_read_calls",
+    "open_read_range_sizes",
+    "open_read_ranges",
+    "operation_ns",
+    "per_operation_ns",
+    "per_operation_read_bytes",
+    "per_operation_read_calls",
+    "per_operation_read_range_sizes",
+    "per_operation_read_ranges",
+    "root_cache_read_bytes",
+    "total_ns",
+)
+
+
+def _source_identity_projection(value: Any) -> Any:
+    """Remove named measurements while retaining every source identity field."""
+    if not isinstance(value, dict):
+        return value
+    projected = dict(value)
+    cfb_open_stream = projected.get("cfb_open_stream")
+    if isinstance(cfb_open_stream, dict):
+        projected_cfb = dict(cfb_open_stream)
+        for field in CFB_OPEN_STREAM_SOURCE_MEASUREMENTS:
+            projected_cfb.pop(field, None)
+        projected["cfb_open_stream"] = projected_cfb
+    return projected
 
 
 def _compare_row_identity(
@@ -1456,6 +1494,8 @@ def _compare_row_identity(
             f"{location} {field} identity differs between ABBA legs"
         )
     value = rows["a1"][field]
+    if field == "source":
+        value = _source_identity_projection(value)
     return "verified_equal", True, expected_identity, value
 
 
