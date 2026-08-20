@@ -38,7 +38,7 @@ struct Header {
 
 struct StreamReader<'a> {
     shared: &'a SharedOleFile,
-    path: &'a [String],
+    refs: Vec<&'a str>,
     length: u64,
 }
 
@@ -46,13 +46,9 @@ impl<'a> StreamReader<'a> {
     fn new(shared: &'a SharedOleFile, path: &'a [String], length: u64) -> Self {
         Self {
             shared,
-            path,
+            refs: path.iter().map(String::as_str).collect(),
             length,
         }
-    }
-
-    fn refs(&self) -> Vec<&str> {
-        self.path.iter().map(String::as_str).collect()
     }
 
     fn read_into(&self, offset: u64, output: &mut [u8], label: &str) -> Result<()> {
@@ -69,7 +65,7 @@ impl<'a> StreamReader<'a> {
             .into());
         }
         self.shared
-            .read_stream_range(&self.refs(), offset, output)
+            .read_stream_range(&self.refs, offset, output)
             .map_err(map_ole_error)
     }
 
@@ -84,10 +80,8 @@ impl<'a> StreamReader<'a> {
     }
 
     fn header(&self, offset: u64, label: &str) -> Result<Header> {
-        let bytes = self.read_vec(offset, HEADER_LEN, &format!("{label} header"))?;
-        let bytes: [u8; HEADER_LEN] = bytes.try_into().map_err(|_error| {
-            PackageError::Corrupted(format!("{label} header has an invalid width"))
-        })?;
+        let mut bytes = [0_u8; HEADER_LEN];
+        self.read_into(offset, &mut bytes, &format!("{label} header"))?;
         let version_instance = u16::from_le_bytes([bytes[0], bytes[1]]);
         let data_len =
             usize::try_from(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]])).map_err(
@@ -285,13 +279,14 @@ fn read_current_user(reader: &StreamReader<'_>, limits: RecordLimits) -> Result<
     if reader.length < 28 {
         return Err(PackageError::Corrupted("CurrentUser stream too short".into()).into());
     }
-    let header = reader.read_vec(0, 28, "CurrentUser")?;
+    let mut header = [0_u8; 28];
+    reader.read_into(0, &mut header, "CurrentUser")?;
     let stream_len = usize::try_from(reader.length).map_err(|_error| {
         PackageError::ResourceLimit("CurrentUser length does not fit usize".into())
     })?;
     let prefix_len = CurrentUser::source_prefix_len(&header, stream_len)?;
     let prefix = if prefix_len == header.len() {
-        header
+        return CurrentUser::parse_with_limits(&header, limits).map_err(Into::into);
     } else {
         reader.read_vec(0, prefix_len, "CurrentUser prefix")?
     };
