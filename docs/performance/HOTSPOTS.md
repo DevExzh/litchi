@@ -3,6 +3,16 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0229 — DOCX text-path hand-rolled binding tracker](changes/0229-docx-text-binding-tracker.md)
+(full-text latency readings are recorded for the semantic and ordinary-root
+selectors, but the overall verdict is provisionally withheld under the 0228
+pre-floor rule: `docx_file_source_open` and the `xlsx_file_open`
+cross-guardrail retain adverse-both uncalibrated readings. Guardrails are
+explicitly mixed/failed. The corrected resource report was reprocessed by
+`litchi-resource-profile` 0.1.1 with raw print/histogram hashes verified;
+temporary allocations are effectively neutral (paired deltas −2/−6), and
+RSS is mixed within <2.4% heaptrack and <0.4% time RSS, with no broad DOCX
+claim.)
 [`change 0228`](changes/0228-docx-floor-calibration.md)
 (0228 is a methodology calibration, not a code change — the DOCX-family
 analog of 0223/0226, calibrating the likely guardrail phases BEFORE the
