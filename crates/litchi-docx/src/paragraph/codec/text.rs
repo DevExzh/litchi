@@ -12,8 +12,8 @@
 )]
 //! Streaming text extraction for paragraph and run content.
 
-use crate::binding_tracker::BindingTracker;
 use crate::error::{Error, Result};
+use litchi_ooxml_common::private::BindingTracker;
 use litchi_ooxml_common::xml::decode_xml_reference;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;

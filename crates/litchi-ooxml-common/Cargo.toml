@@ -20,6 +20,7 @@ litchi-core = { workspace = true }
 litchi-crypto = { workspace = true, optional = true }
 litchi-opc = { workspace = true }
 litchi-vba = { workspace = true, optional = true }
+memchr = { workspace = true }
 quick-xml = { workspace = true }
 ryu = { workspace = true }
 thiserror = { workspace = true }
