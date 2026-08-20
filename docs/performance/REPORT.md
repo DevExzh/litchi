@@ -11,6 +11,24 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## DOCX text-path hand-rolled binding tracker (change 0229)
+
+[Change 0229](changes/0229-docx-text-binding-tracker.md) records a narrow
+`extract_word_text` full-text result for the DOCX-local hand-rolled namespace
+tracker. The accepted readings are limited to the named semantic and
+ordinary-root full-text selectors; semantic shapes retain p50/mean (and the
+shape-specific accepted tail cells), while both ordinary-root full-text
+selectors accept all four statistics. The source open-plus-full-text
+lifecycle accepts p50/mean only. The overall verdict remains provisionally
+withheld: `docx_file_source_open` and the `xlsx_file_open` cross-guardrail
+retain adverse-both readings on 0228-uncalibrated statistics, and the other
+guardrails are mixed or drift/direction-rejected. The corrected resource
+report was reprocessed by `litchi-resource-profile` 0.1.1 with raw
+heaptrack print/histogram hashes verified; temporary allocations are
+111,637,365 / 111,637,363 / 111,637,355 / 111,637,361 (paired deltas −2/−6),
+effectively neutral. RSS remains mixed within <2.4% heaptrack and <0.4%
+`/usr/bin/time`; no broad DOCX claim is made.
+
 ## DOCX-family layout noise floor calibration (change 0228)
 
 [Change 0228](changes/0228-docx-floor-calibration.md) is a
