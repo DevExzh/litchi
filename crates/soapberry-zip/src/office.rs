@@ -34,6 +34,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+use crate::crc::crc32_chunk;
 use crate::path::{RawPath, ZipFilePath};
 use crate::{
     CompressionMethod, Error, ErrorKind, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt,
@@ -865,6 +866,38 @@ impl<'data> ArchiveReader<'data> {
         }
     }
 
+    /// Decompress and verify one member directly into a caller-owned sink.
+    ///
+    /// The sink receives at most the declared uncompressed member size. A
+    /// successful return means the declared size and CRC have both been
+    /// checked. The operation uses a fixed-size scratch buffer and does not
+    /// retain a complete decompressed member.
+    ///
+    /// This method is not atomic: a sink may contain a valid prefix when the
+    /// operation returns an I/O, checksum, or size error. The returned count
+    /// is the number of bytes accepted by the sink on success. Archive entry
+    /// limits are checked while constructing this reader.
+    pub fn read_to<W: Write>(&self, name: &str, sink: &mut W) -> Result<u64, Error> {
+        let lookup = lookup_member_name(name);
+        let info = self
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+
+        let entry = self.archive.get_entry(info.wayfinder)?;
+        let verifier = entry.claim_verifier();
+        match info.compression_method {
+            CompressionMethod::Store => stream_verified(entry.data(), verifier, sink),
+            CompressionMethod::Deflate => {
+                stream_verified(DeflateDecoder::new(entry.data()), verifier, sink)
+            },
+            other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                other.as_id().as_u16(),
+            ))),
+        }
+    }
+
     /// Read a file as a UTF-8 string.
     ///
     /// Convenience method that reads and decodes the file as UTF-8.
@@ -1367,6 +1400,40 @@ where
         Ok(output)
     }
 
+    /// Decompress and verify one indexed member directly into a caller-owned
+    /// sink without retaining the complete decompressed member.
+    ///
+    /// The sink may contain a valid prefix when an I/O, checksum, or size
+    /// error is returned. A successful return reports the number of bytes
+    /// accepted by the sink. Entry limits were checked while constructing the
+    /// index.
+    pub fn read_entry_to<W: Write>(&self, entry_id: EntryId, sink: &mut W) -> Result<u64, Error> {
+        let indexed = self.indexed_entry(entry_id)?;
+        let entry = self.archive.get_entry(indexed.info.wayfinder)?;
+        let verifier = entry.reader().claim_verifier()?;
+        match indexed.info.compression_method {
+            CompressionMethod::Store => stream_verified(entry.reader(), verifier, sink),
+            CompressionMethod::Deflate => {
+                stream_verified(DeflateDecoder::new(entry.reader()), verifier, sink)
+            },
+            other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                other.as_id().as_u16(),
+            ))),
+        }
+    }
+
+    /// Decompress and verify one member by normalized name directly into a
+    /// caller-owned sink.
+    ///
+    /// This is the positional-source counterpart to [`Self::read_to`]. The
+    /// sink may contain a valid prefix when an error is returned.
+    pub fn read_to<W: Write>(&self, name: &str, sink: &mut W) -> Result<u64, Error> {
+        let entry_id = self
+            .entry_id(name)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
+        self.read_entry_to(entry_id, sink)
+    }
+
     /// Reads multiple members through an explicit local [`ParallelReadSession`].
     ///
     /// This method is available only for positional sources that are safe to
@@ -1583,6 +1650,66 @@ fn limit_error(resource: LimitResource, actual: u64, maximum: u64) -> Error {
 #[inline]
 fn cancelled_error() -> Error {
     ErrorKind::Cancelled.into()
+}
+
+/// Copy a verified decompressed member to a sink using bounded scratch space.
+///
+/// The one-byte probe after the declared size detects an overlong logical
+/// stream without publishing bytes beyond the central-directory claim. CRC
+/// verification is performed only after the complete declared payload has
+/// been accepted by the sink.
+fn stream_verified<D, W>(
+    mut reader: D,
+    verifier: ZipVerification,
+    sink: &mut W,
+) -> Result<u64, Error>
+where
+    D: Read,
+    W: Write,
+{
+    let expected_size = verifier.size();
+    let mut copied = 0_u64;
+    let mut crc = 0_u32;
+    let mut buffer = [0_u8; STREAM_COPY_BUFFER_SIZE];
+
+    while copied < expected_size {
+        let remaining = expected_size - copied;
+        let request = usize::try_from(remaining)
+            .unwrap_or(STREAM_COPY_BUFFER_SIZE)
+            .min(buffer.len());
+        let read = reader.read(&mut buffer[..request]).map_err(Error::from)?;
+        if read == 0 {
+            return Err(ErrorKind::InvalidSize {
+                expected: expected_size,
+                actual: copied,
+            }
+            .into());
+        }
+        sink.write_all(&buffer[..read]).map_err(Error::from)?;
+        crc = crc32_chunk(&buffer[..read], crc);
+        copied = copied.checked_add(read as u64).ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "decompressed ZIP byte count overflows u64".to_string(),
+            })
+        })?;
+    }
+
+    let mut probe = [0_u8; 1];
+    let extra = reader.read(&mut probe).map_err(Error::from)?;
+    if extra != 0 {
+        let actual = copied.checked_add(extra as u64).unwrap_or(u64::MAX);
+        return Err(ErrorKind::InvalidSize {
+            expected: expected_size,
+            actual,
+        }
+        .into());
+    }
+
+    verifier.valid(ZipVerification {
+        crc,
+        uncompressed_size: copied,
+    })?;
+    Ok(copied)
 }
 
 impl std::fmt::Debug for ArchiveReader<'_> {
@@ -3091,6 +3218,17 @@ impl<'data> LazyArchiveReader<'data> {
         Ok(arc)
     }
 
+    /// Decompress and verify one member directly into a caller-owned sink.
+    ///
+    /// This operation intentionally bypasses the lazy decompression cache, so
+    /// consumers can process a large member incrementally without retaining a
+    /// second complete payload. The sink may contain a valid prefix when an
+    /// I/O, checksum, or size error is returned.
+    #[inline]
+    pub fn read_to<W: Write>(&self, name: &str, sink: &mut W) -> Result<u64, Error> {
+        self.inner.read_to(name, sink)
+    }
+
     /// Reads multiple members through an explicit session without populating the cache.
     ///
     /// Results retain caller input order. Cancellation returns an outer error
@@ -3431,6 +3569,81 @@ mod tests {
         let reader = ArchiveReader::new(&bytes).unwrap();
         assert!(reader.contains("content.xml"));
         assert_eq!(reader.read("content.xml").unwrap(), b"<root>Hello</root>");
+    }
+
+    #[test]
+    fn read_to_streams_stored_and_deflated_members_with_short_writes() {
+        let payload = (0..(STREAM_COPY_BUFFER_SIZE * 2 + 37))
+            .map(|index| (index as u8).wrapping_mul(31))
+            .collect::<Vec<_>>();
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", &payload).unwrap();
+        writer.write_deflated("deflated.bin", &payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let mut stored = ShortWriter::new(7);
+        assert_eq!(
+            reader.read_to("stored.bin", &mut stored).unwrap(),
+            payload.len() as u64
+        );
+        assert_eq!(stored.bytes, payload);
+
+        let mut deflated = ShortWriter::new(11);
+        assert_eq!(
+            reader.read_to("deflated.bin", &mut deflated).unwrap(),
+            payload.len() as u64
+        );
+        assert_eq!(deflated.bytes, payload);
+    }
+
+    #[test]
+    fn indexed_and_lazy_read_to_stream_without_cache_population() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_deflated("content.xml", b"<content>Hello</content>")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let indexed = indexed_archive(bytes.clone());
+        let id = indexed.entry_id("content.xml").unwrap();
+        let mut indexed_output = Vec::new();
+        assert_eq!(
+            indexed.read_entry_to(id, &mut indexed_output).unwrap(),
+            b"<content>Hello</content>".len() as u64
+        );
+        assert_eq!(indexed_output, b"<content>Hello</content>");
+
+        let lazy = LazyArchiveReader::new(&bytes).unwrap();
+        let mut lazy_output = Vec::new();
+        assert_eq!(
+            lazy.read_to("content.xml", &mut lazy_output).unwrap(),
+            b"<content>Hello</content>".len() as u64
+        );
+        assert_eq!(lazy_output, b"<content>Hello</content>");
+        assert_eq!(lazy.cache_size(), 0);
+    }
+
+    #[test]
+    fn read_to_retains_typed_integrity_errors_and_sink_failures() {
+        let mut bytes = bulk_fixture();
+        corrupt_payload(&mut bytes, b"bad");
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let mut output = Vec::new();
+        let error = reader.read_to("bad", &mut output).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+        assert_eq!(output, b"bad");
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_deflated("payload.bin", &[b'x'; STREAM_COPY_BUFFER_SIZE + 1])
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let mut failing = FailingWriter::new(5);
+        let error = reader.read_to("payload.bin", &mut failing).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert_eq!(failing.bytes.len(), 5);
     }
 
     #[test]
