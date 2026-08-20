@@ -40948,7 +40948,10 @@ mod tests {
     fn zip_index_rejects_manifest_count_drift() {
         let mut corpus = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
         corpus.manifest.archive_member_count += 1;
-        let error = run_case(Case::ZipIndex, &corpus, 0, 1).unwrap_err();
+        let error = match run_case(Case::ZipIndex, &corpus, 0, 1) {
+            Ok(_) => panic!("ZIP index accepted a manifest count mismatch"),
+            Err(error) => error,
+        };
 
         assert!(
             error
