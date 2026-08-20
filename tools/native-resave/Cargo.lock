@@ -44,15 +44,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aho-corasick"
-version = "1.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -923,6 +914,7 @@ version = "0.0.1"
 dependencies = [
  "fixedbitset",
  "litchi-core",
+ "rayon",
  "sha2 0.11.0",
  "smallvec",
  "zerocopy",
@@ -940,7 +932,6 @@ dependencies = [
 name = "litchi-core"
 version = "0.0.1"
 dependencies = [
- "aho-corasick",
  "base64",
  "chrono",
  "fast-float2",
@@ -951,6 +942,7 @@ dependencies = [
  "sha2 0.11.0",
  "smallvec",
  "thiserror",
+ "windows-sys",
  "zerocopy",
 ]
 
@@ -1009,8 +1001,10 @@ dependencies = [
  "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
+ "memchr",
  "quick-xml",
  "serde_json",
+ "sha2 0.11.0",
  "smallvec",
  "thiserror",
  "unicode-normalization",
@@ -1076,6 +1070,7 @@ dependencies = [
  "quick-xml",
  "rand 0.10.2",
  "rsa",
+ "serde_json",
  "sha1 0.11.0",
  "sha2 0.11.0",
  "signature",
@@ -1116,6 +1111,7 @@ dependencies = [
  "quick-xml",
  "soapberry-zip",
  "xml-minifier",
+ "zeroize",
 ]
 
 [[package]]
@@ -1138,6 +1134,7 @@ dependencies = [
  "quick-xml",
  "serde_json",
  "smallvec",
+ "zeroize",
 ]
 
 [[package]]
@@ -1222,6 +1219,7 @@ dependencies = [
  "litchi-core",
  "memchr",
  "quick-xml",
+ "sha2 0.11.0",
  "smallvec",
  "soapberry-zip",
  "tempfile",
@@ -1260,6 +1258,7 @@ dependencies = [
  "bitflags",
  "caseless",
  "chrono",
+ "litchi-core",
  "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
@@ -1280,6 +1279,7 @@ dependencies = [
  "litchi-codepage",
  "litchi-core",
  "serde_json",
+ "sha2 0.11.0",
  "smallvec",
  "zerocopy",
  "zerocopy-derive",
