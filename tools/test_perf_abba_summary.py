@@ -265,6 +265,83 @@ def with_parallel_metrics(reports):
     return reports
 
 
+def with_operation_metrics(reports):
+    """Attach the current strict operation-metrics schema to every result."""
+
+    from tools.test_perf_compare import operation_metrics_report_fields
+
+    def resize_vectors(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key == "values" and isinstance(item, list):
+                    value[key] = (item * 4)[:15]
+                else:
+                    resize_vectors(item)
+
+    reports = copy.deepcopy(reports)
+    for leg in reports:
+        for result in leg["results"]:
+            metrics = operation_metrics_report_fields()
+            metrics["sample_count"] = 15
+            metrics["sample_indices"] = list(range(15))
+            resize_vectors(metrics)
+            result["operation_metrics"] = metrics
+    return reports
+
+
+def with_filesystem_evidence(reports):
+    reports = copy.deepcopy(reports)
+    for leg in reports:
+        leg["configuration"]["filesystem_cache_states"] = ["warm"]
+        leg["configuration"]["filesystem_fresh_child_per_sample"] = True
+        result = leg["results"][0]
+        leg["filesystem_evidence"] = [
+            {
+                "case": result["case"],
+                "corpus": copy.deepcopy(result["corpus"]),
+                "warmup_iterations": 1,
+                "sample_count": 15,
+                "cache_states": ["warm"],
+                "fresh_child_per_sample": True,
+                "samples": [
+                    {
+                        "sample_index": index,
+                        "cache_state": "warm",
+                        "parent_wall_ns": 200 + index,
+                        "cold_advice": "not_requested",
+                        "logical_read_counter_scope": "test_scope",
+                        "logical_read_calls": 0,
+                        "logical_read_requested_bytes": 0,
+                        "logical_read_bytes": 0,
+                        "logical_read_largest_requested_bytes": 0,
+                        "logical_read_largest_returned_bytes": 0,
+                        "max_concurrent_reads": 0,
+                        "logical_read_request_sizes": [],
+                        "logical_read_request_size_buckets": {
+                            "bytes_0": 0,
+                            "bytes_1_to_512": 0,
+                            "bytes_513_to_4096": 0,
+                            "bytes_4097_to_16384": 0,
+                            "bytes_16385_to_65536": 0,
+                            "bytes_over_65536": 0,
+                        },
+                        "process_metrics": None,
+                        "output_sha256": None,
+                        "output_bytes": None,
+                        "opc_materialized_parts": None,
+                        "cfb_changed_spans": None,
+                        "cfb_published_bytes": None,
+                        "elapsed_ns": 100 + index,
+                    }
+                    for index in range(15)
+                ],
+                "tool": copy.deepcopy(leg["tool"]),
+                "configuration": copy.deepcopy(leg["configuration"]),
+            }
+        ]
+    return reports
+
+
 class PerfAbbaSummaryTests(unittest.TestCase):
     def test_recomputes_statistics_and_emits_every_multi_shape_row(self):
         summary = perf_abba_summary.summarize_reports(four_legs())
@@ -289,6 +366,13 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         summary = perf_abba_summary.summarize_reports(reports)
         self.assertEqual(summary["verification"]["result_count"], 2)
 
+        combined = with_operation_metrics(with_parallel_metrics(four_legs()))
+        combined_summary = perf_abba_summary.summarize_reports(combined)
+        self.assertEqual(
+            combined_summary["results"][0]["identity"]["operation_metrics_status"],
+            "verified_equal",
+        )
+
         malformed = copy.deepcopy(reports)
         malformed[0]["parallel_metrics"]["cases"][0]["deterministic_task_count"][
             "value"
@@ -298,6 +382,94 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             "deterministic_task_count.value must be a non-negative",
         ):
             perf_abba_summary.summarize_reports(malformed)
+
+    def test_operation_metrics_validate_nested_identity_but_not_metric_values(self):
+        summary = perf_abba_summary.summarize_reports(with_operation_metrics(four_legs()))
+        self.assertEqual(
+            summary["results"][0]["identity"]["operation_metrics_status"],
+            "verified_equal",
+        )
+
+        mutations = (
+            (
+                lambda legs: legs[1]["results"][0]["operation_metrics"].update(
+                    sample_count=14
+                ),
+                "operation_metrics.*sample_count",
+            ),
+            (
+                lambda legs: legs[1]["results"][0]["operation_metrics"].update(
+                    schema=2
+                ),
+                "operation_metrics keys mismatch",
+            ),
+            (
+                lambda legs: legs[1]["results"][0]["operation_metrics"]["source"].update(
+                    counter_scope="untimed_source_replay_only"
+                ),
+                "operation_metrics identity",
+            ),
+        )
+        for mutation, message in mutations:
+            legs = with_operation_metrics(four_legs())
+            mutation(legs)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(legs)
+
+        numeric_change = with_operation_metrics(four_legs())
+        numeric_change[1]["results"][0]["operation_metrics"]["process"]["read_bytes"][
+            "values"
+        ] = [999] * 15
+        self.assertEqual(
+            perf_abba_summary.summarize_reports(numeric_change)["results"][0][
+                "identity"
+            ]["operation_metrics_status"],
+            "verified_equal",
+        )
+
+    def test_filesystem_evidence_binds_complete_corpus_tool_and_configuration_identity(self):
+        summary = perf_abba_summary.summarize_reports(with_filesystem_evidence(four_legs()))
+        self.assertTrue(summary["verification"]["filesystem_evidence_identity_verified"])
+
+        mutations = (
+            (
+                lambda legs: legs[1]["filesystem_evidence"][0]["corpus"].update(
+                    name="changed-corpus"
+                ),
+                "case/corpus identity",
+            ),
+            (
+                lambda legs: legs[1]["filesystem_evidence"][0]["tool"].update(
+                    version="changed-tool"
+                ),
+                "tool identity",
+            ),
+            (
+                lambda legs: legs[1]["filesystem_evidence"][0]["configuration"].update(
+                    warmup_iterations_per_case=2
+                ),
+                "configuration identity",
+            ),
+        )
+        for mutation, message in mutations:
+            legs = with_filesystem_evidence(four_legs())
+            mutation(legs)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(legs)
+
+        numeric_change = with_filesystem_evidence(four_legs())
+        sample = numeric_change[1]["filesystem_evidence"][0]["samples"][0]
+        sample["logical_read_calls"] = 999
+        sample["logical_read_request_sizes"] = [1, 2, 3]
+        self.assertTrue(
+            perf_abba_summary.summarize_reports(numeric_change)["verification"][
+                "filesystem_evidence_identity_verified"
+            ]
+        )
 
     def test_default_drift_ceilings_and_custom_ceilings_are_applied_per_statistic(self):
         legs = reports_for_values(
@@ -533,15 +705,53 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         filesystem = four_legs()
         for leg in filesystem:
             leg["configuration"]["cases"] = ["docx_file_source_full_text"]
-            leg["filesystem_evidence"] = [
-                {
-                    "case": "docx_file_source_full_text",
-                    "corpus": {"shape": "media-rich"},
-                }
-            ]
+            leg["configuration"]["filesystem_cache_states"] = ["warm"]
+            leg["configuration"]["filesystem_fresh_child_per_sample"] = True
             for result in leg["results"]:
                 result["case"] = "docx_file_source_full_text"
                 result["corpus"]["shape"] = "media-rich"
+            leg["filesystem_evidence"] = [
+                {
+                    "case": "docx_file_source_full_text",
+                    "corpus": copy.deepcopy(leg["results"][0]["corpus"]),
+                    "warmup_iterations": 1,
+                    "sample_count": 15,
+                    "cache_states": ["warm"],
+                    "fresh_child_per_sample": True,
+                    "samples": [
+                        {
+                            "sample_index": index,
+                            "cache_state": "warm",
+                            "elapsed_ns": 100 + index,
+                            "parent_wall_ns": 200 + index,
+                            "cold_advice": "not_requested",
+                            "logical_read_counter_scope": "test_scope",
+                            "logical_read_calls": 0,
+                            "logical_read_requested_bytes": 0,
+                            "logical_read_bytes": 0,
+                            "logical_read_largest_requested_bytes": 0,
+                            "logical_read_largest_returned_bytes": 0,
+                            "max_concurrent_reads": 0,
+                            "logical_read_request_sizes": [],
+                            "logical_read_request_size_buckets": {
+                                "bytes_0": 0,
+                                "bytes_1_to_512": 0,
+                                "bytes_513_to_4096": 0,
+                                "bytes_4097_to_16384": 0,
+                                "bytes_16385_to_65536": 0,
+                                "bytes_over_65536": 0,
+                            },
+                            "process_metrics": None,
+                            "output_sha256": None,
+                            "output_bytes": None,
+                            "opc_materialized_parts": None,
+                            "cfb_changed_spans": None,
+                            "cfb_published_bytes": None,
+                        }
+                        for index in range(15)
+                    ],
+                }
+            ]
         summary = perf_abba_summary.summarize_reports(filesystem)
         self.assertEqual({result["shape"] for result in summary["results"]}, {"media-rich"})
 
