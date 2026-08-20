@@ -480,6 +480,28 @@ peak RSS (including heaptrack overhead): 4.00M
             ):
                 perf_resource_profile.validate_abba_inputs(mode_mismatch)
 
+    def test_abba_validation_binds_tool_and_stable_environment_identity(self):
+        mutations = (
+            (
+                "tool target",
+                lambda report: report["tool"].update(target_arch="aarch64"),
+                "tool identities do not match",
+            ),
+            (
+                "environment CPU",
+                lambda report: report["environment"].update(cpu_model="other-cpu"),
+                "stable environment identities do not match",
+            ),
+        )
+        for name, mutate, expected in mutations:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                legs = self._abba_legs(directory)
+                mutate(legs[1]["harness_report"])
+                with self.assertRaisesRegex(
+                    perf_resource_profile.ResourceProfileInputError, expected
+                ):
+                    perf_resource_profile.validate_abba_inputs(legs)
+
     def test_abba_statistics_are_descriptive_and_preserve_not_measured_dimensions(self):
         with tempfile.TemporaryDirectory() as directory:
             legs = self._abba_legs(directory)

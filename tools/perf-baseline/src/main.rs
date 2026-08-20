@@ -41137,6 +41137,57 @@ mod tests {
     }
 
     #[test]
+    fn selectable_case_registry_has_complete_name_and_parse_mappings() {
+        let source = include_str!("main.rs");
+        let case_body = source
+            .split_once("enum Case {")
+            .and_then(|(_, rest)| rest.split_once("\n}\n\nimpl Case"))
+            .map(|(body, _)| body)
+            .expect("Case enum body is present");
+        let variants = case_body
+            .lines()
+            .map(str::trim)
+            .filter_map(|line| line.strip_suffix(','))
+            .filter(|line| {
+                line.chars()
+                    .next()
+                    .is_some_and(|character| character.is_ascii_uppercase())
+            })
+            .collect::<Vec<_>>();
+
+        let case_impl = source
+            .split_once("impl Case {")
+            .and_then(|(_, rest)| rest.split_once("\nfn parse_case"))
+            .map(|(body, _)| body)
+            .expect("Case implementation body is present");
+        let name_body = case_impl
+            .split_once("const fn name(self)")
+            .and_then(|(_, rest)| rest.split_once("const fn uses_synthetic_cfb"))
+            .map(|(body, _)| body)
+            .expect("Case::name implementation is present");
+        let parse_body = source
+            .split_once("fn parse_case(value: &str)")
+            .and_then(|(_, rest)| rest.split_once("\nfn parse_shape"))
+            .map(|(body, _)| body)
+            .expect("parse_case implementation is present");
+
+        assert_eq!(name_body.matches("Self::").count(), variants.len());
+        assert_eq!(parse_body.matches("Some(Case::").count(), variants.len());
+        for variant in variants {
+            let name_needle = format!("Self::{variant}");
+            let parse_needle = format!("Some(Case::{variant})");
+            assert!(
+                name_body.contains(name_needle.as_str()),
+                "Case::{variant} is missing from Case::name"
+            );
+            assert!(
+                parse_body.contains(parse_needle.as_str()),
+                "Case::{variant} is missing from parse_case"
+            );
+        }
+    }
+
+    #[test]
     fn docx_semantic_paragraph_selectors_have_distinct_opt_in_mappings() {
         let scanner = Case::DocxSemanticOneParagraph;
         let text = Case::DocxSemanticOneParagraphText;
