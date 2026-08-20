@@ -31,6 +31,44 @@ EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_filesystem_selector"
 COMPARABLE_LATENCY_CLAIM = "comparable_timed_operation"
 OPERATION_ALIGNMENT = "elapsed_ns.samples_by_elapsed_then_sample_index"
 
+_DEFAULT_RESULT_KEY_FIELDS = ("case", "corpus")
+_CACHE_RESULT_KEY_FIELDS = ("case", "corpus", "cache_state")
+_METADATA_FIELD_NAMES = frozenset(
+    {
+        "status",
+        "scope",
+        "alignment",
+        "sample_count",
+        "counter_scope",
+        "unit",
+    }
+)
+_ALLOCATOR_INSTRUMENTATION = "system_allocator_operation_scoped"
+_ALLOCATOR_BINARY = "litchi-perf-baseline-alloc"
+_ALLOCATOR_SCOPE = "operation_global_system_allocator"
+_ALLOCATOR_VECTOR_FIELDS = (
+    "allocation_calls",
+    "deallocation_calls",
+    "reallocation_calls",
+    "failed_allocation_calls",
+    "allocated_bytes",
+    "deallocated_bytes",
+    "live_bytes_before",
+    "live_bytes_after",
+    "peak_live_bytes_before",
+    "peak_live_bytes_after",
+)
+_FILESYSTEM_CASE_PREFIXES = (
+    "opc_file_",
+    "cfb_file_",
+    "pptx_file_",
+    "docx_file_",
+    "odt_file_",
+    "ods_file_",
+    "odp_file_",
+)
+_OPTIONAL_POLICY_KEYS = {"result_key_fields", "expected_build_identity"}
+
 
 class ComparisonInputError(ValueError):
     """Raised when inputs cannot be compared safely."""
@@ -120,7 +158,7 @@ def validate_policy(raw: Any) -> dict[str, Any]:
         "metric_classes",
     }
     missing = sorted(required - policy.keys())
-    unknown = sorted(policy.keys() - required)
+    unknown = sorted(policy.keys() - required - _OPTIONAL_POLICY_KEYS)
     if missing or unknown:
         raise ComparisonInputError(
             f"policy keys mismatch: missing={missing}, unknown={unknown}"
@@ -164,11 +202,42 @@ def validate_policy(raw: Any) -> dict[str, Any]:
     if not isinstance(policy["require_distinct_revisions"], bool):
         raise ComparisonInputError("policy.require_distinct_revisions must be boolean")
     tool = _require_object(policy["tool_identity"], "policy.tool_identity")
-    for field in ("name", "version", "profile", "target_os", "target_arch"):
+    for field in (
+        "name",
+        "version",
+        "binary",
+        "profile",
+        "target_os",
+        "target_arch",
+        "instrumentation",
+    ):
         if not isinstance(tool.get(field), str) or not tool[field]:
             raise ComparisonInputError(
                 f"policy.tool_identity.{field} must be a non-empty string"
             )
+    result_key_fields = policy.get("result_key_fields", list(_DEFAULT_RESULT_KEY_FIELDS))
+    if result_key_fields not in (
+        list(_DEFAULT_RESULT_KEY_FIELDS),
+        list(_CACHE_RESULT_KEY_FIELDS),
+    ):
+        raise ComparisonInputError(
+            "policy.result_key_fields must be ['case', 'corpus'] or "
+            "['case', 'corpus', 'cache_state']"
+        )
+    if tool["instrumentation"] == _ALLOCATOR_INSTRUMENTATION:
+        if result_key_fields != list(_CACHE_RESULT_KEY_FIELDS):
+            raise ComparisonInputError(
+                "allocator policy must include cache_state in result_key_fields"
+            )
+        if tool["binary"] != _ALLOCATOR_BINARY:
+            raise ComparisonInputError(
+                "allocator policy must pin tool_identity.binary to "
+                f"{_ALLOCATOR_BINARY!r}"
+            )
+    elif result_key_fields != list(_DEFAULT_RESULT_KEY_FIELDS):
+        raise ComparisonInputError(
+            "cache_state result keys are reserved for allocator policy"
+        )
     identity_fields = policy["build_identity_fields"]
     if (
         not isinstance(identity_fields, list)
@@ -193,6 +262,34 @@ def validate_policy(raw: Any) -> dict[str, Any]:
             "policy.nullable_build_identity_fields must be a unique subset of "
             "build_identity_fields"
         )
+    expected_build_identity = policy.get("expected_build_identity")
+    if expected_build_identity is not None:
+        expected_identity = _require_object(
+            expected_build_identity, "policy.expected_build_identity"
+        )
+        if not expected_identity:
+            raise ComparisonInputError(
+                "policy.expected_build_identity must not be empty"
+            )
+        unknown_identity = sorted(set(expected_identity) - set(identity_fields))
+        if unknown_identity:
+            raise ComparisonInputError(
+                "policy.expected_build_identity contains fields outside "
+                f"build_identity_fields: {unknown_identity}"
+            )
+        for field, value in expected_identity.items():
+            if value is None or isinstance(value, bool) or not isinstance(value, (int, str)):
+                raise ComparisonInputError(
+                    f"policy.expected_build_identity.{field} must be a non-null scalar"
+                )
+            if isinstance(value, str) and not value:
+                raise ComparisonInputError(
+                    f"policy.expected_build_identity.{field} must be non-empty"
+                )
+            if isinstance(value, int) and value <= 0:
+                raise ComparisonInputError(
+                    f"policy.expected_build_identity.{field} must be positive"
+                )
     expected_configuration = _require_object(
         policy["expected_configuration"], "policy.expected_configuration"
     )
@@ -259,7 +356,9 @@ def validate_policy(raw: Any) -> dict[str, Any]:
     return policy
 
 
-def _result_key(result: dict[str, Any], location: str) -> tuple[str, str, str]:
+def _result_key(
+    result: dict[str, Any], location: str, *, include_cache_state: bool = False
+) -> tuple[str, str, str]:
     case = result.get("case")
     corpus = result.get("corpus")
     if not isinstance(case, str) or not case:
@@ -282,11 +381,19 @@ def _result_key(result: dict[str, Any], location: str) -> tuple[str, str, str]:
         raise ComparisonInputError(
             f"{location}.cache_state must be 'warm' or 'cold-requested'"
         )
+    if include_cache_state and not cache_state:
+        raise ComparisonInputError(
+            f"{location}.cache_state must be a non-empty string for allocator evidence"
+        )
     return case, corpus_identity, cache_state
 
 
 def _index_results(
-    report: dict[str, Any], label: str, expected_count: int
+    report: dict[str, Any],
+    label: str,
+    expected_count: int,
+    *,
+    include_cache_state: bool = False,
 ) -> dict[tuple[str, str, str], dict[str, Any]]:
     results = report.get("results")
     if not isinstance(results, list):
@@ -300,7 +407,11 @@ def _index_results(
         result = _require_object(raw_result, f"{label}.results[{index}]")
         if "elapsed_ns" not in result:
             raise ComparisonInputError(f"{label}.results[{index}] lacks elapsed_ns")
-        key = _result_key(result, f"{label}.results[{index}]")
+        key = _result_key(
+            result,
+            f"{label}.results[{index}]",
+            include_cache_state=include_cache_state,
+        )
         if key in indexed:
             raise ComparisonInputError(
                 f"{label} contains duplicate case/corpus key for {key[0]!r}"
@@ -314,11 +425,15 @@ def result_key_manifest_sha256(
 ) -> str:
     digest = hashlib.sha256()
     for key in sorted(keys):
+        if len(key) not in {2, 3}:
+            raise ValueError("result keys must contain case/corpus and optional cache_state")
         if len(key) == 2:
             case, corpus_identity = key
             cache_state = ""
-        else:
+        elif len(key) == 3:
             case, corpus_identity, cache_state = key
+        else:
+            raise ValueError("result keys must contain case/corpus and optional cache_state")
         digest.update(case.encode("utf-8"))
         digest.update(b"\0")
         digest.update(corpus_identity.encode("utf-8"))
@@ -329,9 +444,25 @@ def result_key_manifest_sha256(
     return digest.hexdigest()
 
 
-def report_result_key_manifest_sha256(report: Any, expected_count: int) -> str:
+def report_result_key_manifest_sha256(
+    report: Any,
+    expected_count: int,
+    *,
+    result_key_fields: Iterable[str] = _DEFAULT_RESULT_KEY_FIELDS,
+) -> str:
     report_object = _require_object(report, "report")
-    indexed = _index_results(report_object, "report", expected_count)
+    fields = tuple(result_key_fields)
+    if fields not in (_DEFAULT_RESULT_KEY_FIELDS, _CACHE_RESULT_KEY_FIELDS):
+        raise ComparisonInputError(
+            "result_key_fields must be ('case', 'corpus') or "
+            "('case', 'corpus', 'cache_state')"
+        )
+    indexed = _index_results(
+        report_object,
+        "report",
+        expected_count,
+        include_cache_state=fields == _CACHE_RESULT_KEY_FIELDS,
+    )
     return result_key_manifest_sha256(indexed)
 
 
@@ -1092,6 +1223,14 @@ def _validate_report_identity(
             raise ComparisonInputError(
                 f"build identity mismatch for {field!r}: {before!r} != {after!r}"
             )
+    for field, expected in policy.get("expected_build_identity", {}).items():
+        for label, report in (("baseline", baseline), ("current", current)):
+            actual = report["environment"].get(field)
+            if actual != expected:
+                raise ComparisonInputError(
+                    f"{label} build identity {field!r} does not match the expected "
+                    f"allocator identity: {actual!r} != {expected!r}"
+                )
     logical_cpus = baseline["environment"]["logical_cpus_available"]
     expected_workers = sorted(
         {min(requested, logical_cpus) for requested in (1, 2, 4, 8, logical_cpus)}
@@ -1452,7 +1591,9 @@ def _validate_operation_metrics(
             f"{path} strict validation requires supported report schema "
             f"{SUPPORTED_REPORT_SCHEMA}, got {report_schema}"
         )
-    operation_keys = _OPERATION_METRICS_KEYS | ({"allocation"} if "allocation" in value else set())
+    operation_keys = _OPERATION_METRICS_KEYS | (
+        {"allocation"} if isinstance(value, dict) and "allocation" in value else set()
+    )
     obj = _require_exact_keys(value, path, operation_keys)
     sample_count = len(elapsed_samples)
     declared_sample_count = obj["sample_count"]
@@ -1749,29 +1890,36 @@ def _walk_metrics(
     vector_metadata: dict[str, tuple[str, str]],
     metric_vector_context: bool,
 ) -> None:
+    if path.rsplit(".", 1)[-1] in _METADATA_FIELD_NAMES:
+        return
     vector = (
         _unwrap_metric_vector(value, path)
         if metric_vector_context
         else _METRIC_VECTOR_MISSING
     )
+    metric_path = path
     if vector is not _METRIC_VECTOR_MISSING:
         vector_values, status, scope = vector
         vector_metadata[path] = (status, scope)
         if vector_values is None:
             return
         value = vector_values
-    metric_class = _metric_class_for_path(path, policy)
+        values_path = f"{path}.values"
+        values_metric_class = _metric_class_for_path(values_path, policy)
+        if values_metric_class is not None:
+            metric_path = values_path
+    metric_class = _metric_class_for_path(metric_path, policy)
     if metric_class is not None:
         presence = metric_class["presence"]
         metric_label = f"{presence} metric"
         if isinstance(value, list):
             if len(value) < policy["minimum_samples"]:
                 raise ComparisonInputError(
-                    f"{metric_label} {path} has {len(value)} samples; "
+                    f"{metric_label} {metric_path} has {len(value)} samples; "
                     f"minimum is {policy['minimum_samples']}"
                 )
             samples = [
-                _finite_number(item, f"{path}[{index}]")
+                _finite_number(item, f"{metric_path}[{index}]")
                 for index, item in enumerate(value)
             ]
             metric_value = _percentile(samples, 50)
@@ -1779,9 +1927,9 @@ def _walk_metrics(
             metric_value = _finite_number(value, path)
         else:
             raise ComparisonInputError(
-                f"{metric_label} {path} must be a numeric scalar or sample vector"
+                f"{metric_label} {metric_path} must be a numeric scalar or sample vector"
             )
-        selected[path] = (
+        selected[metric_path] = (
             metric_class["name"],
             metric_value,
             float(metric_class["max_regression_percent"]),
@@ -1845,6 +1993,233 @@ def _collect_metrics(
             metric_vector_context,
         )
     return selected, vector_metadata
+
+
+def _allocator_policy(policy: dict[str, Any]) -> bool:
+    return policy["tool_identity"]["instrumentation"] == _ALLOCATOR_INSTRUMENTATION
+
+
+def _validate_allocator_evidence(
+    result: dict[str, Any], location: str, minimum_samples: int
+) -> None:
+    case = result.get("case")
+    if not isinstance(case, str) or not case.startswith(_FILESYSTEM_CASE_PREFIXES):
+        raise ComparisonInputError(
+            f"{location}.case must select a filesystem allocator case"
+        )
+    operation_metrics = _require_object(
+        result.get("operation_metrics"), f"{location}.operation_metrics"
+    )
+    sample_count = operation_metrics.get("sample_count")
+    if (
+        isinstance(sample_count, bool)
+        or not isinstance(sample_count, int)
+        or sample_count < minimum_samples
+    ):
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.sample_count must be at least "
+            f"{minimum_samples}"
+        )
+    elapsed = _require_object(result.get("elapsed_ns"), f"{location}.elapsed_ns")
+    elapsed_samples = elapsed.get("samples")
+    if not isinstance(elapsed_samples, list) or len(elapsed_samples) != sample_count:
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.sample_count must match elapsed samples"
+        )
+    if operation_metrics.get("alignment") != OPERATION_ALIGNMENT:
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.alignment must be {OPERATION_ALIGNMENT!r}"
+        )
+    allocation = _require_object(
+        operation_metrics.get("allocation"), f"{location}.operation_metrics.allocation"
+    )
+    expected_keys = {"status", "scope", *_ALLOCATOR_VECTOR_FIELDS}
+    if set(allocation) != expected_keys:
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.allocation has an invalid schema"
+        )
+    if allocation.get("status") != "measured":
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.allocation.status must be 'measured'"
+        )
+    if allocation.get("scope") != _ALLOCATOR_SCOPE:
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.allocation.scope must be "
+            f"'{_ALLOCATOR_SCOPE}'"
+        )
+    vector_lengths: set[int] = set()
+    for field in _ALLOCATOR_VECTOR_FIELDS:
+        vector = _require_object(
+            allocation.get(field), f"{location}.operation_metrics.allocation.{field}"
+        )
+        if set(vector) != {"values", "status", "scope"}:
+            raise ComparisonInputError(
+                f"{location}.operation_metrics.allocation.{field} has an invalid schema"
+            )
+        if vector.get("status") != "measured" or vector.get("scope") != _ALLOCATOR_SCOPE:
+            raise ComparisonInputError(
+                f"{location}.operation_metrics.allocation.{field} status/scope mismatch"
+            )
+        values = vector.get("values")
+        if not isinstance(values, list) or not values:
+            raise ComparisonInputError(
+                f"{location}.operation_metrics.allocation.{field}.values must be non-empty"
+            )
+        if len(values) != sample_count or len(values) < minimum_samples:
+            raise ComparisonInputError(
+                f"{location}.operation_metrics.allocation.{field}.values cardinality "
+                f"{len(values)} does not match sample_count {sample_count}"
+            )
+        for index, item in enumerate(values):
+            _finite_number(
+                item,
+                f"{location}.operation_metrics.allocation.{field}.values[{index}]",
+            )
+        vector_lengths.add(len(values))
+    if vector_lengths != {sample_count}:
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.allocation vectors have mismatched cardinality"
+        )
+
+
+def _validate_allocator_filesystem_evidence(
+    report: dict[str, Any], policy: dict[str, Any], label: str
+) -> None:
+    evidence = report.get("filesystem_evidence")
+    if not isinstance(evidence, list) or not evidence:
+        raise ComparisonInputError(
+            f"{label}.filesystem_evidence is required for allocator policy"
+        )
+    expected_cases = set(policy["required_cases"])
+    expected_configuration = policy["expected_configuration"]
+    expected_sample_count = expected_configuration.get("samples_per_case")
+    expected_cache_states = expected_configuration.get("filesystem_cache_states")
+    if (
+        isinstance(expected_sample_count, bool)
+        or not isinstance(expected_sample_count, int)
+        or expected_sample_count < policy["minimum_samples"]
+    ):
+        raise ComparisonInputError(
+            "allocator policy.samples_per_case must meet minimum_samples"
+        )
+    if (
+        not isinstance(expected_cache_states, list)
+        or not expected_cache_states
+        or any(not isinstance(state, str) or not state for state in expected_cache_states)
+        or len(set(expected_cache_states)) != len(expected_cache_states)
+    ):
+        raise ComparisonInputError(
+            "allocator policy.filesystem_cache_states must be unique non-empty strings"
+        )
+    expected_sample_total = expected_sample_count * len(expected_cache_states)
+    observed_cases: set[str] = set()
+    for index, raw_item in enumerate(evidence):
+        item = _require_object(raw_item, f"{label}.filesystem_evidence[{index}]")
+        case = item.get("case")
+        if not isinstance(case, str) or not case or not case.startswith(
+            _FILESYSTEM_CASE_PREFIXES
+        ):
+            raise ComparisonInputError(
+                f"{label}.filesystem_evidence[{index}].case must select a filesystem case"
+            )
+        if case in observed_cases:
+            raise ComparisonInputError(
+                f"{label}.filesystem_evidence contains duplicate case {case!r}"
+            )
+        observed_cases.add(case)
+        item_sample_count = item.get("sample_count")
+        if (
+            isinstance(item_sample_count, bool)
+            or not isinstance(item_sample_count, int)
+            or item_sample_count != expected_sample_count
+        ):
+            raise ComparisonInputError(
+                f"{label}.filesystem_evidence[{index}].sample_count does not match "
+                f"policy: {item_sample_count!r} != {expected_sample_count!r}"
+            )
+        item_cache_states = item.get("cache_states")
+        if item_cache_states != expected_cache_states:
+            raise ComparisonInputError(
+                f"{label}.filesystem_evidence[{index}].cache_states does not match policy"
+            )
+        samples = item.get("samples")
+        if not isinstance(samples, list) or len(samples) != expected_sample_total:
+            raise ComparisonInputError(
+                f"{label}.filesystem_evidence[{index}].samples cardinality does not "
+                f"match sample_count/cache_states ({expected_sample_total})"
+            )
+        sample_indices = {state: [] for state in expected_cache_states}
+        for sample_index, raw_sample in enumerate(samples):
+            sample = _require_object(
+                raw_sample,
+                f"{label}.filesystem_evidence[{index}].samples[{sample_index}]",
+            )
+            allocation = _require_object(
+                sample.get("allocation_metrics"),
+                f"{label}.filesystem_evidence[{index}].samples[{sample_index}]"
+                ".allocation_metrics",
+            )
+            if allocation.get("status") != "measured" or allocation.get("scope") != _ALLOCATOR_SCOPE:
+                raise ComparisonInputError(
+                    f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                    "allocation status/scope must be measured/system allocator"
+                )
+            cache_state = sample.get("cache_state")
+            if cache_state not in sample_indices:
+                raise ComparisonInputError(
+                    f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                    "has an unexpected cache_state"
+                )
+            sample_number = sample.get("sample_index")
+            if (
+                isinstance(sample_number, bool)
+                or not isinstance(sample_number, int)
+                or sample_number < 0
+            ):
+                raise ComparisonInputError(
+                    f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                    "sample_index must be a non-negative integer"
+                )
+            sample_indices[cache_state].append(sample_number)
+        expected_indices = set(range(expected_sample_count))
+        for cache_state, indices in sample_indices.items():
+            if len(indices) != expected_sample_count or set(indices) != expected_indices:
+                raise ComparisonInputError(
+                    f"{label}.filesystem_evidence[{index}] {cache_state!r} "
+                    "sample_index cardinality does not match sample_count"
+                )
+    if observed_cases != expected_cases:
+        raise ComparisonInputError(
+            f"{label}.filesystem_evidence cases do not match policy"
+        )
+
+
+def _validate_allocator_result_key_cardinality(
+    keys: set[tuple[str, str, str]], policy: dict[str, Any], label: str
+) -> None:
+    expected_states = policy["expected_configuration"].get("filesystem_cache_states")
+    if not isinstance(expected_states, list) or not expected_states:
+        raise ComparisonInputError(
+            "allocator policy.filesystem_cache_states must be non-empty"
+        )
+    expected_count = policy["expected_result_count"]
+    if expected_count % len(expected_states) != 0:
+        raise ComparisonInputError(
+            "allocator policy.expected_result_count must divide cache-state count"
+        )
+    state_counts = {state: 0 for state in expected_states}
+    for key in keys:
+        if len(key) != 3 or key[2] not in state_counts:
+            raise ComparisonInputError(
+                f"{label} allocator result keys must use the configured cache states"
+            )
+        state_counts[key[2]] += 1
+    expected_per_state = expected_count // len(expected_states)
+    if any(count != expected_per_state for count in state_counts.values()):
+        raise ComparisonInputError(
+            f"{label} allocator result cache-state cardinality does not match policy: "
+            f"{state_counts!r}"
+        )
 
 
 def _latency_claim(result: dict[str, Any]) -> str:
@@ -1997,11 +2372,28 @@ def compare_reports(
     baseline = _require_object(baseline_raw, "baseline")
     current = _require_object(current_raw, "current")
     _validate_report_identity(baseline, current, policy)
+    allocator_mode = _allocator_policy(policy)
+    if allocator_mode:
+        _validate_allocator_filesystem_evidence(baseline, policy, "baseline")
+        _validate_allocator_filesystem_evidence(current, policy, "current")
     expected_count = policy["expected_result_count"]
-    baseline_results = _index_results(baseline, "baseline", expected_count)
-    current_results = _index_results(current, "current", expected_count)
+    baseline_results = _index_results(
+        baseline,
+        "baseline",
+        expected_count,
+        include_cache_state=allocator_mode,
+    )
+    current_results = _index_results(
+        current,
+        "current",
+        expected_count,
+        include_cache_state=allocator_mode,
+    )
     baseline_keys = set(baseline_results)
     current_keys = set(current_results)
+    if allocator_mode:
+        _validate_allocator_result_key_cardinality(baseline_keys, policy, "baseline")
+        _validate_allocator_result_key_cardinality(current_keys, policy, "current")
     if baseline_keys != current_keys:
         missing = sorted(key[0] for key in baseline_keys - current_keys)
         extra = sorted(key[0] for key in current_keys - baseline_keys)
@@ -2035,8 +2427,16 @@ def compare_reports(
     latency_excluded_results = 0
     for key in sorted(baseline_keys):
         case = key[0]
+        cache_state = key[2]
         before_result = baseline_results[key]
         after_result = current_results[key]
+        if allocator_mode:
+            _validate_allocator_evidence(
+                before_result, f"baseline.{case}[{cache_state}]", minimum_samples
+            )
+            _validate_allocator_evidence(
+                after_result, f"current.{case}[{cache_state}]", minimum_samples
+            )
         before_latency = _latencies(before_result, f"baseline.{case}", minimum_samples)
         after_latency = _latencies(after_result, f"current.{case}", minimum_samples)
         before_selected, before_vector_metadata = _collect_metrics(
@@ -2076,7 +2476,7 @@ def compare_reports(
                         baseline=before_latency[percentile],
                         current=after_latency[percentile],
                         threshold=float(latency_thresholds[percentile]),
-                        cache_state=key[2],
+                        cache_state=cache_state,
                     )
                 )
         _compare_metric_vector_metadata(
@@ -2122,7 +2522,7 @@ def compare_reports(
                     baseline=before_value,
                     current=after_value,
                     threshold=before_threshold,
-                    cache_state=key[2],
+                    cache_state=cache_state,
                 )
             )
         for path in sorted(before_optional):
@@ -2147,7 +2547,7 @@ def compare_reports(
                     baseline=before_value,
                     current=after_value,
                     threshold=before_threshold,
-                    cache_state=key[2],
+                    cache_state=cache_state,
                 )
             )
 
@@ -2165,6 +2565,9 @@ def compare_reports(
             "matched_results": len(baseline_keys),
             "compared_metrics": len(comparisons),
             "regressions": len(regressions),
+            "latency_claims": (
+                "withheld_instrumentation" if allocator_mode else "compared"
+            ),
             "latency_compared_results": latency_compared_results,
             "latency_excluded_results": latency_excluded_results,
         },

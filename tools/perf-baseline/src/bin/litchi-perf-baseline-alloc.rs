@@ -102,6 +102,33 @@ mod allocator {
         }
 
         #[test]
+        fn global_allocator_records_zeroed_alloc_and_zeroes_memory() {
+            let _lock = TEST_LOCK.lock().unwrap();
+            allocation_metrics::enable();
+            let before = allocation_metrics::snapshot();
+            let layout = Layout::from_size_align(64, 8).unwrap();
+            // SAFETY: `layout` is valid and this direct call uses the same
+            // allocator whose returned pointer is deallocated below.
+            let pointer = unsafe { GLOBAL_ALLOCATOR.alloc_zeroed(layout) };
+            assert!(!pointer.is_null());
+            // SAFETY: `pointer` is a valid allocation of `layout.size()` bytes
+            // returned by `GLOBAL_ALLOCATOR.alloc_zeroed` and remains owned by
+            // this test until the deallocation below.
+            let bytes = unsafe { std::slice::from_raw_parts(pointer, layout.size()) };
+            assert!(bytes.iter().all(|byte| *byte == 0));
+            let during = allocation_metrics::snapshot();
+            assert_eq!(
+                during.allocation_calls,
+                before.allocation_calls + 1,
+                "successful alloc_zeroed must increment allocation calls"
+            );
+            assert!(during.allocated_bytes >= before.allocated_bytes + layout.size() as u64);
+            // SAFETY: `pointer` came from `GLOBAL_ALLOCATOR.alloc_zeroed(layout)`
+            // and has not been freed or otherwise used since that call.
+            unsafe { GLOBAL_ALLOCATOR.dealloc(pointer, layout) };
+        }
+
+        #[test]
         fn global_allocator_records_realloc_grow_and_shrink() {
             let _lock = TEST_LOCK.lock().unwrap();
             allocation_metrics::enable();
@@ -151,6 +178,38 @@ mod allocator {
                 before.failed_allocation_calls + 1
             );
             assert_eq!(after.live_bytes, before.live_bytes);
+        }
+
+        #[test]
+        fn global_allocator_records_a_failed_realloc_without_losing_old_allocation() {
+            let _lock = TEST_LOCK.lock().unwrap();
+            allocation_metrics::enable();
+            let before = allocation_metrics::snapshot();
+            let layout = Layout::from_size_align(32, 8).unwrap();
+            // SAFETY: `layout` is valid and this direct call uses the same
+            // allocator whose returned pointer is deallocated below.
+            let pointer = unsafe { GLOBAL_ALLOCATOR.alloc(layout) };
+            assert!(!pointer.is_null());
+            let after_alloc = allocation_metrics::snapshot();
+            // SAFETY: `pointer` was returned for `layout` by the same
+            // allocator. `isize::MAX` is deliberately unallocatable; a null
+            // result leaves the original allocation owned by this test.
+            let failed = unsafe { GLOBAL_ALLOCATOR.realloc(pointer, layout, isize::MAX as usize) };
+            assert!(failed.is_null(), "the maximal realloc should be rejected");
+            let after_failed = allocation_metrics::snapshot();
+            assert_eq!(
+                after_failed.failed_allocation_calls,
+                after_alloc.failed_allocation_calls + 1
+            );
+            assert_eq!(
+                after_failed.reallocation_calls,
+                after_alloc.reallocation_calls
+            );
+            assert_eq!(after_failed.live_bytes, after_alloc.live_bytes);
+            // SAFETY: the failed realloc preserves the original allocation
+            // returned for `layout`, which is still valid here.
+            unsafe { GLOBAL_ALLOCATOR.dealloc(pointer, layout) };
+            assert_eq!(allocation_metrics::snapshot().live_bytes, before.live_bytes);
         }
     }
 }

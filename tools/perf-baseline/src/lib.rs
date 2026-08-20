@@ -2520,6 +2520,7 @@ struct Report {
 struct Tool {
     name: &'static str,
     version: &'static str,
+    binary: &'static str,
     profile: &'static str,
     target_os: &'static str,
     target_arch: &'static str,
@@ -8122,6 +8123,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         tool: Tool {
             name: env!("CARGO_PKG_NAME"),
             version: env!("CARGO_PKG_VERSION"),
+            binary: allocation_metrics::binary_identity(),
             profile: if cfg!(debug_assertions) {
                 "debug"
             } else {
