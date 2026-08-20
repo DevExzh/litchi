@@ -289,6 +289,52 @@ def with_operation_metrics(reports):
     return reports
 
 
+def with_legacy_operation_metrics(reports):
+    """Attach the pre-additive schema-1 operation-metrics envelope."""
+
+    reports = with_operation_metrics(reports)
+    for leg in reports:
+        for result in leg["results"]:
+            current = result["operation_metrics"]
+            result["operation_metrics"] = {
+                "sample_count": current["sample_count"],
+                "alignment": "elapsed_ns.samples",
+                "source": {
+                    key: current["source"][key]
+                    for key in (
+                        "status",
+                        "counter_scope",
+                        "logical_read_calls",
+                        "logical_read_requested_bytes",
+                        "logical_read_returned_bytes",
+                        "max_concurrent_reads",
+                    )
+                },
+                "process": {
+                    key: current["process"][key]
+                    for key in (
+                        "status",
+                        "user_cpu_ticks",
+                        "system_cpu_ticks",
+                        "clock_ticks_per_second",
+                        "minor_faults",
+                        "major_faults",
+                        "voluntary_context_switches",
+                        "nonvoluntary_context_switches",
+                        "rss_delta_bytes",
+                        "peak_rss_bytes",
+                    )
+                },
+                "sink": {
+                    key: current["sink"][key] for key in ("status", "output_bytes")
+                },
+                "publication": current["publication"],
+                "materialization": current["materialization"],
+                "cfb_phases": current["cfb_phases"],
+            }
+    return reports
+
+
 def with_filesystem_evidence(reports):
     reports = copy.deepcopy(reports)
     for leg in reports:
@@ -429,6 +475,35 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             "verified_equal",
         )
 
+    def test_legacy_operation_metrics_use_exact_historical_schema(self):
+        reports = with_legacy_operation_metrics(four_legs())
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(
+            summary["results"][0]["identity"]["operation_metrics_status"],
+            "verified_equal",
+        )
+
+        malformed = copy.deepcopy(reports)
+        malformed[0]["results"][0]["operation_metrics"]["source"][
+            "logical_read_calls"
+        ]["values"] = [1]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "logical_read_calls.values has 1 samples",
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        current = with_operation_metrics(four_legs())
+        mixed = with_legacy_operation_metrics(four_legs())
+        mixed[1]["results"][0]["operation_metrics"] = current[1]["results"][0][
+            "operation_metrics"
+        ]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "operation_metrics identity",
+        ):
+            perf_abba_summary.summarize_reports(mixed)
+
     def test_filesystem_evidence_binds_complete_corpus_tool_and_configuration_identity(self):
         summary = perf_abba_summary.summarize_reports(with_filesystem_evidence(four_legs()))
         self.assertTrue(summary["verification"]["filesystem_evidence_identity_verified"])
@@ -470,6 +545,47 @@ class PerfAbbaSummaryTests(unittest.TestCase):
                 "filesystem_evidence_identity_verified"
             ]
         )
+
+    def test_filesystem_range_size_pair_accepts_schema_one_legacy_reports(self):
+        reports = with_filesystem_evidence(four_legs())
+        for leg in reports:
+            for sample in leg["filesystem_evidence"][0]["samples"]:
+                sample.pop("logical_read_largest_requested_bytes")
+                sample.pop("logical_read_largest_returned_bytes")
+
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertTrue(summary["verification"]["filesystem_evidence_identity_verified"])
+
+    def test_filesystem_range_size_pair_rejects_partial_or_mixed_legacy_shapes(self):
+        partial = with_filesystem_evidence(four_legs())
+        partial[0]["filesystem_evidence"][0]["samples"][0].pop(
+            "logical_read_largest_returned_bytes"
+        )
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "both logical read range-size counters or neither",
+        ):
+            perf_abba_summary.summarize_reports(partial)
+
+        mixed = with_filesystem_evidence(four_legs())
+        for sample in mixed[0]["filesystem_evidence"][0]["samples"]:
+            sample.pop("logical_read_largest_requested_bytes")
+            sample.pop("logical_read_largest_returned_bytes")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "filesystem_evidence identity differs",
+        ):
+            perf_abba_summary.summarize_reports(mixed)
+
+        within_evidence = with_filesystem_evidence(four_legs())
+        for sample in within_evidence[0]["filesystem_evidence"][0]["samples"][1:]:
+            sample.pop("logical_read_largest_requested_bytes")
+            sample.pop("logical_read_largest_returned_bytes")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "one logical read range-size counter schema consistently",
+        ):
+            perf_abba_summary.summarize_reports(within_evidence)
 
     def test_default_drift_ceilings_and_custom_ceilings_are_applied_per_statistic(self):
         legs = reports_for_values(
