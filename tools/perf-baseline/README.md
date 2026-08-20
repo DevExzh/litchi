@@ -194,13 +194,15 @@ text), archive SHA-256, and independently opened eager OPC/property metadata
 digest guard each case. These selectors bring the
 selectable matrix to 344 names while leaving the default 36 cases / 198
 records unchanged.
-Three additional opt-in OOXML wire selectors (`omml_formula_range_scan`,
-`pptx_drawingml_extract`, and `pptx_drawingml_range_scan`) use one fixed,
-namespace-adversarial XML corpus. Their independent `quick_xml::NsReader`
-projections are prepared and checked before timing; each timed iteration only
-executes the selected production scanner and verifies its exact ranges or text
-after the clock stops. These selectors bring the
-selectable matrix to 347 names while leaving the default 36 cases / 198 records
+Four additional opt-in OOXML wire selectors (`omml_formula_range_scan`,
+`omml_formula_extract`, `pptx_drawingml_extract`, and
+`pptx_drawingml_range_scan`) use one fixed, namespace-adversarial XML corpus.
+Their independent `quick_xml::NsReader` projections are prepared and checked
+before timing; each timed iteration only executes the selected production
+scanner or public extractor and verifies its exact ranges, formula strings, or
+text after the clock stops. The formula-string digest is length-delimited and
+computed before timing. These selectors bring the
+selectable matrix to 348 names while leaving the default 36 cases / 198 records
 unchanged.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
@@ -2488,6 +2490,10 @@ native-Office claim is made.
 - `omml_formula_range_scan`: scan the fixed OMML fragment corpus through
   `litchi_ooxml_common::xml::scan_omml_formula_ranges`; exact byte ranges are
   checked against an untimed `NsReader` oracle.
+- `omml_formula_extract`: extract the same corpus through the public
+  `litchi_ooxml_common::xml::extract_omml_formulas`; exact formula XML strings
+  are independently reconstructed from the oracle's byte ranges and hashed
+  outside the timed interval.
 - `pptx_drawingml_extract`: extract text from the fixed DrawingML fragment
   corpus; exact text is checked against an untimed `NsReader` oracle.
 - `pptx_drawingml_range_scan`: scan `p` element ranges from the same fixed
