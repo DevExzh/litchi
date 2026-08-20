@@ -326,24 +326,24 @@ fn typed_constructors_validate_new_property_scopes() {
 }
 
 #[test]
-fn rejects_excessive_math_nesting_depth() {
+fn nested_math_obeys_the_global_group_safety_limit() {
     let mut rtf = String::from(r"{\rtf1{\mmath");
-    for _ in 0..65 {
+    for _ in 0..15 {
         rtf.push_str(r"{\mbox{\me");
     }
     rtf.push_str(r"{\mr 1}");
-    for _ in 0..65 {
+    for _ in 0..15 {
         rtf.push_str("}}");
     }
     rtf.push_str("}}");
     assert!(RtfDocument::parse(&rtf).is_err());
 
     let mut valid = String::from(r"{\rtf1{\mmath");
-    for _ in 0..62 {
+    for _ in 0..14 {
         valid.push_str(r"{\mbox{\me");
     }
     valid.push_str(r"{\mr 1}");
-    for _ in 0..62 {
+    for _ in 0..14 {
         valid.push_str("}}");
     }
     valid.push_str("}}");

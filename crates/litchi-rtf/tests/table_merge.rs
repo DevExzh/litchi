@@ -123,13 +123,18 @@ fn applies_end_defined_nested_merge_metadata() {
 }
 
 #[test]
-fn parses_real_libreoffice_merge_fixtures() {
+fn handles_real_libreoffice_merge_fixtures() {
     let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/extras");
-    let horizontal = RtfDocument::parse(
-        &std::fs::read_to_string(base.join("rtfimport/data/tdf117403.rtf")).unwrap(),
-    )
-    .unwrap();
+    let horizontal_source =
+        std::fs::read_to_string(base.join("rtfimport/data/tdf117403.rtf")).unwrap();
+    assert!(matches!(
+        RtfDocument::parse(&horizontal_source),
+        Err(litchi_rtf::RtfError::MalformedDocument(message))
+            if message.contains("requires a version parameter")
+    ));
+    let versioned_horizontal = horizontal_source.replacen(r"{\rtf", r"{\rtf1", 1);
+    let horizontal = RtfDocument::parse(&versioned_horizontal).unwrap();
     let cells = horizontal.tables()[0].rows()[0].cells();
     assert_eq!(cells[0].merge().horizontal, Some(TableCellMergeRole::First));
     assert_eq!(

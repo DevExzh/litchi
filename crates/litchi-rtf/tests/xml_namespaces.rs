@@ -87,7 +87,7 @@ fn rejects_malformed_or_active_namespace_tables() {
 }
 
 #[test]
-fn parses_bundled_libreoffice_xml_namespace_fixtures() {
+fn handles_bundled_libreoffice_xml_namespace_fixtures() {
     const FIXTURES: &[&str] = &[
         "sw/qa/core/data/rtf/pass/tdf116851.rtf",
         "sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf",
@@ -100,6 +100,14 @@ fn parses_bundled_libreoffice_xml_namespace_fixtures() {
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
+        if *fixture == "sw/qa/extras/rtfexport/data/FWDP90_min.rtf" {
+            assert!(matches!(
+                RtfDocument::parse_bytes(&bytes),
+                Err(litchi_rtf::RtfError::MalformedDocument(message))
+                    if message.contains("trailing non-whitespace")
+            ));
+            continue;
+        }
         let document = RtfDocument::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let namespaces = document

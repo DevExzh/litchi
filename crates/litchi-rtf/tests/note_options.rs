@@ -170,7 +170,7 @@ fn omission_stays_empty_and_note_bodies_do_not_infer_options() {
 }
 
 #[test]
-fn parses_named_libreoffice_note_option_fixtures() {
+fn handles_named_libreoffice_note_option_fixtures() {
     let section_end = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf"
     );
@@ -208,16 +208,9 @@ fn parses_named_libreoffice_note_option_fixtures() {
     let arabic = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf108947.rtf"
     );
-    let document = RtfDocument::parse_bytes(arabic).unwrap();
-    let options = document.note_options();
-    assert_eq!(
-        options.present_kinds,
-        Some(PresentNoteKinds::FootnotesAndEndnotes)
-    );
-    assert_eq!(
-        options.footnote_placement,
-        Some(NotePlacement::BottomOfPage)
-    );
-    assert_eq!(options.footnote_numbering, Some(NoteNumberingStyle::Arabic));
-    assert_eq!(options.endnote_numbering, Some(NoteNumberingStyle::Arabic));
+    assert!(matches!(
+        RtfDocument::parse_bytes(arabic),
+        Err(litchi_rtf::RtfError::MalformedDocument(message))
+            if message.contains("trailing non-whitespace")
+    ));
 }

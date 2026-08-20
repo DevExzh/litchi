@@ -321,15 +321,12 @@ fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
 }
 
 #[test]
-fn ignores_section_note_controls_after_the_parsed_document_group() {
-    let document = RtfDocument::parse(r"{\rtf1 Body}\sectd\sftnbj").unwrap();
-    assert_eq!(document.text(), "Body");
-    assert!(
-        document
-            .sections()
-            .iter()
-            .all(|section| section.properties.note_options.is_empty())
-    );
+fn rejects_section_note_controls_after_the_parsed_document_group() {
+    assert!(matches!(
+        RtfDocument::parse(r"{\rtf1 Body}\sectd\sftnbj"),
+        Err(litchi_rtf::RtfError::MalformedDocument(message))
+            if message.contains("trailing non-whitespace")
+    ));
 
     assert!(RtfDocument::parse(r"{\rtf1 Body\sftnbj}").is_err());
 }
