@@ -15,6 +15,8 @@ artifact directory.  The DOCX semantic/full-text ABBA mode (optionally
 including the one-paragraph text case) uses explicit control/candidate
 binaries, requires matching deterministic corpus manifests,
 and labels all harness elapsed values as instrumented resource observations.
+The XLSX borrowed-parser ABBA mode applies the same retained-artifact contract
+to its fixed tiny-read and medium edit/save selector tuple.
 Source/sink counters are logical harness counters.
 ``strace`` values are whole-process syscall observations and must not be read
 as decompressed or recompressed byte counts.
@@ -42,7 +44,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 SCHEMA_VERSION = 1
 TOOL_NAME = "litchi-resource-profile"
-TOOL_VERSION = "0.1.1"
+TOOL_VERSION = "0.1.2"
 ABBA_SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_MANIFEST = REPO_ROOT / "tools" / "perf-baseline" / "Cargo.toml"
