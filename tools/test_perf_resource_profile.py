@@ -23,6 +23,8 @@ User time (seconds): 1.25
 System time (seconds): 0.50
 \tElapsed (wall clock) time (h:mm:ss or m:ss): 0:02.75
 Voluntary context switches: 12
+Involuntary context switches: 3
+Major (requiring I/O) page faults: 1
 Minor (reclaiming a frame) page faults: 34
 """,
                 encoding="utf-8",
@@ -33,6 +35,19 @@ Minor (reclaiming a frame) page faults: 34
         self.assertEqual(parsed["user_seconds"], 1.25)
         self.assertEqual(parsed["elapsed_wall_seconds"], 2.75)
         self.assertEqual(parsed["voluntary_context_switches"], 12)
+
+    def test_time_parser_rejects_partial_report_as_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "partial-time.txt"
+            path.write_text(
+                "Maximum resident set size (kbytes): 12345\n"
+                "Elapsed (wall clock) time (h:mm:ss or m:ss): 0:02.75\n",
+                encoding="utf-8",
+            )
+            parsed = perf_resource_profile.parse_time_report(path)
+        self.assertEqual(parsed["status"], "unavailable")
+        self.assertIn("user_seconds", parsed["missing_fields"])
+        self.assertNotEqual(parsed["status"], "ok")
 
     def test_time_parser_marks_malformed_numeric_fields_unparsed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -299,17 +314,34 @@ peak RSS (including heaptrack overhead): 4.00M
         self.assertEqual(sample["logical_read_request_size_buckets"]["1-511"], 4)
 
     @staticmethod
-    def _abba_report(revision="control-revision", *, corpus_shape="medium", samples=3):
+    def _abba_report(revision="1" * 40, *, corpus_shape="medium", samples=3):
         return {
             "schema_version": perf_resource_profile.SCHEMA_VERSION,
             "tool": {
                 "name": "litchi-perf-baseline",
                 "version": "0.1.0",
                 "profile": "release",
+                "target_os": "linux",
+                "target_arch": "x86_64",
             },
             "environment": {
                 "git_revision": revision,
                 "git_worktree_dirty": False,
+                "rustc_version": "rustc 1.95.0 (test)",
+                "logical_cpus_available": 8,
+                "allocator": "Rust system allocator",
+                "rustflags": None,
+                "cargo_build_target": None,
+                "perf_event_paranoid": "4",
+                "os": "linux",
+                "kernel": "test-kernel",
+                "cpu_model": "test-cpu",
+                "total_memory_bytes": 1_000_000,
+                "page_size_bytes": 4096,
+                "filesystem_type": None,
+                "source_destination_same_device": None,
+                "cpu_affinity": None,
+                "storage_identifier": None,
             },
             "configuration": {
                 "samples_per_case": samples,
@@ -327,11 +359,19 @@ peak RSS (including heaptrack overhead): 4.00M
                     },
                     "elapsed_ns": {
                         "unit": "ns",
+                        "samples": [100, 105, 110],
+                        "min": 100,
                         "p50": 100,
                         "p95": 110,
                         "p99": 120,
+                        "max": 120,
                         "mean": 105,
                         "standard_deviation": 5,
+                        "confidence_interval_95": {
+                            "method": "two-sided Student's t interval for the mean",
+                            "lower": 90.0,
+                            "upper": 120.0,
+                        },
                     },
                 }
             ],
@@ -351,7 +391,7 @@ peak RSS (including heaptrack overhead): 4.00M
         legs = []
         for leg in perf_resource_profile.ABBA_LEG_ORDER:
             variant = perf_resource_profile.ABBA_LEG_VARIANTS[leg]
-            revision = "control-revision" if variant == "control" else "candidate-revision"
+            revision = "1" * 40 if variant == "control" else "2" * 40
             legs.append(
                 {
                     "leg": leg,
@@ -669,7 +709,7 @@ peak RSS (including heaptrack overhead): 4.00M
         self.assertNotIn("allocated_bytes", result)
 
     @staticmethod
-    def _docx_report(revision="control-revision", *, samples=3, shape="large"):
+    def _docx_report(revision="1" * 40, *, samples=3, shape="large"):
         configuration = {
             "samples_per_case": samples,
             "warmup_iterations_per_case": 1,
@@ -703,11 +743,19 @@ peak RSS (including heaptrack overhead): 4.00M
                     "corpus": dict(corpus),
                     "elapsed_ns": {
                         "unit": "ns",
+                        "samples": [100 + offset * 10] * samples,
+                        "min": 100 + offset * 10,
                         "p50": 100 + offset * 10,
                         "p95": 110 + offset * 10,
                         "p99": 120 + offset * 10,
+                        "max": 120 + offset * 10,
                         "mean": 105 + offset * 10,
                         "standard_deviation": 5,
+                        "confidence_interval_95": {
+                            "method": "two-sided Student's t interval for the mean",
+                            "lower": 90 + offset * 10,
+                            "upper": 120 + offset * 10,
+                        },
                     },
                 }
             )
@@ -717,10 +765,27 @@ peak RSS (including heaptrack overhead): 4.00M
                 "name": "litchi-perf-baseline",
                 "version": "0.1.0",
                 "profile": "release",
+                "target_os": "linux",
+                "target_arch": "x86_64",
             },
             "environment": {
                 "git_revision": revision,
                 "git_worktree_dirty": False,
+                "rustc_version": "rustc 1.95.0 (test)",
+                "logical_cpus_available": 8,
+                "allocator": "Rust system allocator",
+                "rustflags": None,
+                "cargo_build_target": None,
+                "perf_event_paranoid": "4",
+                "os": "linux",
+                "kernel": "test-kernel",
+                "cpu_model": "test-cpu",
+                "total_memory_bytes": 1_000_000,
+                "page_size_bytes": 4096,
+                "filesystem_type": None,
+                "source_destination_same_device": None,
+                "cpu_affinity": None,
+                "storage_identifier": None,
             },
             "configuration": configuration,
             "results": results,
@@ -740,7 +805,7 @@ peak RSS (including heaptrack overhead): 4.00M
         legs = []
         for leg in perf_resource_profile.ABBA_LEG_ORDER:
             variant = perf_resource_profile.ABBA_LEG_VARIANTS[leg]
-            revision = f"{variant}-revision"
+            revision = "1" * 40 if variant == "control" else "2" * 40
             legs.append(
                 {
                     "leg": leg,
@@ -845,6 +910,50 @@ peak RSS (including heaptrack overhead): 4.00M
                 perf_resource_profile.ResourceProfileInputError, "DOCX semantic corpora do not match"
             ):
                 perf_resource_profile.validate_docx_abba_inputs(mismatched)
+
+    def test_docx_validation_fails_closed_on_harness_and_environment_identity(self):
+        cases = (
+            ("tool name", lambda report: report["tool"].update(name="other-harness"), "tool.name"),
+            ("tool version", lambda report: report["tool"].update(version="9.9.9"), "tool.version"),
+            ("schema", lambda report: report.update(schema_version=999), "schema_version"),
+            ("short revision", lambda report: report["environment"].update(git_revision="a" * 39), "git_revision"),
+            ("uppercase revision", lambda report: report["environment"].update(git_revision="A" * 40), "git_revision"),
+            ("missing compiler", lambda report: report["environment"].pop("rustc_version"), "rustc_version"),
+            ("changed CPU", lambda report: report["environment"].update(cpu_model="other-cpu"), "stable environment"),
+        )
+        for name, mutate, expected in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                legs = self._docx_legs(directory)
+                mutate(legs[1]["harness_report"])
+                with self.assertRaisesRegex(
+                    perf_resource_profile.ResourceProfileInputError, expected
+                ):
+                    perf_resource_profile.validate_docx_abba_inputs(legs)
+
+    def test_docx_validation_requires_complete_requested_finite_elapsed_statistics(self):
+        cases = (
+            ("missing elapsed", lambda elapsed: None, "elapsed_ns is required"),
+            ("wrong unit", lambda elapsed: elapsed.update(unit="ms"), "unit must be 'ns'"),
+            ("short samples", lambda elapsed: elapsed.update(samples=[1]), "sample_count"),
+            ("nonfinite mean", lambda elapsed: elapsed.update(mean=float("inf")), "mean"),
+            (
+                "nonfinite confidence",
+                lambda elapsed: elapsed["confidence_interval_95"].update(upper=float("nan")),
+                "confidence_interval_95.upper",
+            ),
+        )
+        for name, mutate, expected in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                legs = self._docx_legs(directory)
+                elapsed = legs[0]["harness_report"]["results"][0]["elapsed_ns"]
+                if name == "missing elapsed":
+                    legs[0]["harness_report"]["results"][0].pop("elapsed_ns")
+                else:
+                    mutate(elapsed)
+                with self.assertRaisesRegex(
+                    perf_resource_profile.ResourceProfileInputError, expected
+                ):
+                    perf_resource_profile.validate_docx_abba_inputs(legs)
 
     def test_docx_resource_metrics_are_case_specific_and_not_latency_evidence(self):
         report = self._docx_report()
@@ -998,6 +1107,22 @@ peak RSS (including heaptrack overhead): 4.00M
         self.assertEqual(published["latency_evidence"]["status"], "not_measured")
         self.assertEqual(published["tools"]["heaptrack"]["available"], False)
         self.assertEqual(published["statistics"]["not_measured"]["physical_cold_io"].split(":", 1)[0], "not measured")
+        self.assertEqual(
+            published["canonical_harness_identity"]["tool"]["name"],
+            perf_resource_profile.HARNESS_TOOL_NAME,
+        )
+        self.assertEqual(
+            published["canonical_harness_identity"]["environment"]["cpu_model"],
+            "test-cpu",
+        )
+        self.assertEqual(
+            published["canonical_harness_identity"]["leg_revisions"]["A1"],
+            "1" * 40,
+        )
+        for leg in published["legs"]:
+            self.assertNotIn("harness_report", leg)
+            self.assertIn("harness_identity", leg)
+            self.assertEqual(leg["harness_identity"]["environment"]["allocator"], "Rust system allocator")
 
 
 if __name__ == "__main__":

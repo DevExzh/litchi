@@ -278,6 +278,41 @@ class ResourceProfileInputError(ValueError):
 
 
 SHA256_HEX_RE = re.compile(r"[0-9a-fA-F]{64}\Z")
+HARNESS_TOOL_NAME = "litchi-perf-baseline"
+HARNESS_TOOL_VERSION = "0.1.0"
+HARNESS_TOOL_PROFILE = "release"
+HARNESS_REVISION_RE = re.compile(r"[0-9a-f]{40}\Z")
+# These are the fields emitted by tools/perf-baseline/src/main.rs.  They are
+# deliberately required rather than inferred from the Python runner's host:
+# the binary that produced a leg is the authority for compiler, target, host,
+# allocator, and build-environment identity.
+HARNESS_ENVIRONMENT_FIELDS: tuple[str, ...] = (
+    "rustc_version",
+    "logical_cpus_available",
+    "allocator",
+    "rustflags",
+    "cargo_build_target",
+    "perf_event_paranoid",
+    "os",
+    "kernel",
+    "cpu_model",
+    "total_memory_bytes",
+    "page_size_bytes",
+    "filesystem_type",
+    "source_destination_same_device",
+    "cpu_affinity",
+    "storage_identifier",
+)
+HARNESS_ENVIRONMENT_EXCLUDED_FIELDS = {"git_revision", "git_worktree_dirty"}
+ELAPSED_STATISTIC_FIELDS: tuple[str, ...] = (
+    "min",
+    "p50",
+    "p95",
+    "p99",
+    "max",
+    "mean",
+    "standard_deviation",
+)
 EVENTS = ("cycles", "instructions", "branches", "branch-misses", "cache-misses", "page-faults")
 TIME_FIELDS = {
     "Maximum resident set size (kbytes)": "max_rss_kib",
@@ -288,6 +323,9 @@ TIME_FIELDS = {
     "Major (requiring I/O) page faults": "major_page_faults",
     "Minor (reclaiming a frame) page faults": "minor_page_faults",
 }
+TIME_EXPECTED_FIELDS: tuple[str, ...] = tuple(TIME_FIELDS.values()) + (
+    "elapsed_wall_seconds",
+)
 CORPUS_IDENTITY_KEYS = (
     "name",
     "generator",
@@ -783,7 +821,21 @@ def parse_time_report(path: Path, *, retained: bool = False) -> dict[str, Any]:
             except (OverflowError, ValueError):
                 parsed[key] = None
                 malformed = True
-    parsed["status"] = "ok" if "max_rss_kib" in parsed and not malformed else "unparsed"
+    missing = [key for key in TIME_EXPECTED_FIELDS if key not in parsed]
+    parsed["expected_fields"] = list(TIME_EXPECTED_FIELDS)
+    if malformed:
+        parsed["status"] = "unparsed"
+    elif not any(key in parsed for key in TIME_EXPECTED_FIELDS):
+        parsed["status"] = "unparsed"
+    elif missing:
+        parsed["status"] = "unavailable"
+        parsed["reason"] = (
+            "incomplete GNU time -v report; missing expected fields: "
+            + ", ".join(missing)
+        )
+        parsed["missing_fields"] = missing
+    else:
+        parsed["status"] = "ok"
     parsed["artifact"] = artifact(path, retained=retained)
     return parsed
 
@@ -1239,6 +1291,128 @@ def reserve_abba_paths(output_path: Path, artifact_root: Path) -> tuple[Path, Pa
     return output, root
 
 
+def _harness_tool_identity(report: Any, location: str) -> dict[str, Any]:
+    tool = report.get("tool") if isinstance(report, dict) else None
+    if not isinstance(tool, dict):
+        raise ResourceProfileInputError(f"{location}.tool must be an object")
+    if tool.get("name") != HARNESS_TOOL_NAME:
+        raise ResourceProfileInputError(
+            f"{location}.tool.name must be {HARNESS_TOOL_NAME!r}"
+        )
+    if tool.get("version") != HARNESS_TOOL_VERSION:
+        raise ResourceProfileInputError(
+            f"{location}.tool.version must be {HARNESS_TOOL_VERSION!r}"
+        )
+    if tool.get("profile") != HARNESS_TOOL_PROFILE:
+        raise ResourceProfileInputError(
+            f"{location}.tool.profile must be {HARNESS_TOOL_PROFILE!r}"
+        )
+    for key in ("target_os", "target_arch"):
+        value = tool.get(key)
+        if not isinstance(value, str) or not value:
+            raise ResourceProfileInputError(
+                f"{location}.tool.{key} must be a non-empty string"
+            )
+    _canonical_json(tool, f"{location}.tool")
+    return dict(tool)
+
+
+def _harness_environment_identity(report: Any, location: str) -> dict[str, Any]:
+    environment = report.get("environment") if isinstance(report, dict) else None
+    if not isinstance(environment, dict):
+        raise ResourceProfileInputError(f"{location}.environment must be an object")
+    for key in HARNESS_ENVIRONMENT_FIELDS:
+        if key not in environment:
+            raise ResourceProfileInputError(
+                f"{location}.environment.{key} is required for stable harness identity"
+            )
+    identity = {
+        key: value
+        for key, value in environment.items()
+        if key not in HARNESS_ENVIRONMENT_EXCLUDED_FIELDS
+    }
+    _canonical_json(identity, f"{location}.environment")
+    return identity
+
+
+def _requested_sample_count(configuration: dict[str, Any], location: str) -> int:
+    samples = configuration.get("samples_per_case")
+    if isinstance(samples, bool) or not isinstance(samples, int) or samples <= 0:
+        raise ResourceProfileInputError(
+            f"{location}.samples_per_case must be a positive integer"
+        )
+    warmup = configuration.get("warmup_iterations_per_case")
+    if isinstance(warmup, bool) or not isinstance(warmup, int) or warmup < 0:
+        raise ResourceProfileInputError(
+            f"{location}.warmup_iterations_per_case must be a non-negative integer"
+        )
+    return samples
+
+
+def _finite_nonnegative(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return False
+    return math.isfinite(number) and number >= 0
+
+
+def _validate_elapsed_statistics(
+    elapsed: Any, *, sample_count: int, location: str
+) -> None:
+    if not isinstance(elapsed, dict):
+        raise ResourceProfileInputError(f"{location} is required")
+    if elapsed.get("unit") != "ns":
+        raise ResourceProfileInputError(f"{location}.unit must be 'ns'")
+    samples = elapsed.get("samples")
+    if not isinstance(samples, list) or len(samples) != sample_count:
+        observed = len(samples) if isinstance(samples, list) else None
+        raise ResourceProfileInputError(
+            f"{location}.sample_count must equal requested {sample_count}; got {observed!r}"
+        )
+    for index, value in enumerate(samples):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+            or not _finite_nonnegative(value)
+        ):
+            raise ResourceProfileInputError(
+                f"{location}.samples[{index}] must be a finite non-negative integer"
+            )
+    for key in ELAPSED_STATISTIC_FIELDS:
+        value = elapsed.get(key)
+        if not _finite_nonnegative(value):
+            raise ResourceProfileInputError(
+                f"{location}.{key} must be a finite non-negative number"
+            )
+    confidence = elapsed.get("confidence_interval_95")
+    if not isinstance(confidence, dict):
+        raise ResourceProfileInputError(
+            f"{location}.confidence_interval_95 is required"
+        )
+    if not isinstance(confidence.get("method"), str) or not confidence["method"]:
+        raise ResourceProfileInputError(
+            f"{location}.confidence_interval_95.method must be a non-empty string"
+        )
+    for key in ("lower", "upper"):
+        if not _finite_nonnegative(confidence.get(key)):
+            raise ResourceProfileInputError(
+                f"{location}.confidence_interval_95.{key} must be finite"
+            )
+    reported_count = elapsed.get("sample_count")
+    if reported_count is not None and (
+        isinstance(reported_count, bool)
+        or not isinstance(reported_count, int)
+        or reported_count != sample_count
+    ):
+        raise ResourceProfileInputError(
+            f"{location}.sample_count must equal requested {sample_count}"
+        )
+
+
 def _harness_result(report: Any, location: str) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(report, dict):
         raise ResourceProfileInputError(f"{location} must be an object")
@@ -1249,6 +1423,7 @@ def _harness_result(report: Any, location: str) -> tuple[dict[str, Any], dict[st
     configuration = report.get("configuration")
     if not isinstance(configuration, dict):
         raise ResourceProfileInputError(f"{location}.configuration must be an object")
+    sample_count = _requested_sample_count(configuration, f"{location}.configuration")
     results = report.get("results")
     if not isinstance(results, list) or len(results) != 1:
         raise ResourceProfileInputError(
@@ -1268,6 +1443,11 @@ def _harness_result(report: Any, location: str) -> tuple[dict[str, Any], dict[st
         raise ResourceProfileInputError(
             f"{location}.results[0].corpus.shape must be {XLSX_MANAGED_BATCH_SHAPE!r}"
         )
+    _validate_elapsed_statistics(
+        result.get("elapsed_ns"),
+        sample_count=sample_count,
+        location=f"{location}.results[0].elapsed_ns",
+    )
     return configuration, result
 
 
@@ -1291,6 +1471,7 @@ def _docx_harness_results(
     configuration = report.get("configuration")
     if not isinstance(configuration, dict):
         raise ResourceProfileInputError(f"{location}.configuration must be an object")
+    sample_count = _requested_sample_count(configuration, f"{location}.configuration")
     results = report.get("results")
     if not isinstance(results, list) or len(results) != len(DOCX_SEMANTIC_CASES):
         raise ResourceProfileInputError(
@@ -1326,6 +1507,11 @@ def _docx_harness_results(
         result_location = f"{location}.results[{index}]"
         if not isinstance(result, dict):
             raise ResourceProfileInputError(f"{result_location} must be an object")
+        _validate_elapsed_statistics(
+            result.get("elapsed_ns"),
+            sample_count=sample_count,
+            location=f"{result_location}.elapsed_ns",
+        )
         corpus = result.get("corpus")
         if not isinstance(corpus, dict) or not corpus:
             raise ResourceProfileInputError(
@@ -1392,9 +1578,9 @@ def _require_revision(report: dict[str, Any], location: str) -> str:
             f"{location}.environment.git_worktree_dirty must be false"
         )
     revision = environment.get("git_revision")
-    if not isinstance(revision, str) or not revision:
+    if not isinstance(revision, str) or HARNESS_REVISION_RE.fullmatch(revision) is None:
         raise ResourceProfileInputError(
-            f"{location}.environment.git_revision must be a non-empty string"
+            f"{location}.environment.git_revision must be exactly 40 lowercase hexadecimal characters"
         )
     return revision
 
@@ -1429,6 +1615,8 @@ def validate_abba_inputs(
     configurations: list[dict[str, Any]] = []
     corpora: list[Any] = []
     tools: list[Any] = []
+    environments: list[dict[str, Any]] = []
+    harness_identities: list[dict[str, Any]] = []
     for index, leg in enumerate(legs):
         location = f"legs[{index}]"
         if not isinstance(leg, dict):
@@ -1467,15 +1655,25 @@ def validate_abba_inputs(
             corpus_value = result["corpus"]
         configurations.append(configuration)
         corpora.append(corpus_value)
-        revisions[label] = _require_revision(report, f"{location}.harness_report")
-        tool = report.get("tool")
-        if not isinstance(tool, dict):
-            raise ResourceProfileInputError(f"{location}.harness_report.tool must be an object")
-        if tool.get("profile") != "release":
-            raise ResourceProfileInputError(
-                f"{location}.harness_report.tool.profile must be 'release'"
-            )
+        report_location = f"{location}.harness_report"
+        revision = _require_revision(report, report_location)
+        revisions[label] = revision
+        environment_identity = _harness_environment_identity(report, report_location)
+        environments.append(environment_identity)
+        tool = _harness_tool_identity(report, report_location)
         tools.append(tool)
+        harness_identities.append(
+            {
+                "leg": label,
+                "variant": expected_variant,
+                "schema_version": report["schema_version"],
+                "tool": tool,
+                "environment": environment_identity,
+                "git_revision": revision,
+                "git_worktree_dirty": False,
+                "configuration": configuration,
+            }
+        )
 
     configuration_identity = _canonical_json(configurations[0], "ABBA configuration")
     if any(_canonical_json(item, "ABBA configuration") != configuration_identity for item in configurations[1:]):
@@ -1490,6 +1688,14 @@ def validate_abba_inputs(
     tool_identity = _canonical_json(tools[0], "ABBA tool identity")
     if any(_canonical_json(item, "ABBA tool identity") != tool_identity for item in tools[1:]):
         raise ResourceProfileInputError("ABBA harness tool identities do not match")
+    environment_identity = _canonical_json(environments[0], "ABBA environment identity")
+    if any(
+        _canonical_json(item, "ABBA environment identity") != environment_identity
+        for item in environments[1:]
+    ):
+        raise ResourceProfileInputError(
+            "ABBA harness stable environment identities do not match"
+        )
     if binary_hashes["A1"] != binary_hashes["A2"]:
         raise ResourceProfileInputError("control binary changed between A1 and A2")
     if binary_hashes["B1"] != binary_hashes["B2"]:
@@ -1546,6 +1752,8 @@ def validate_abba_inputs(
         if workload == DOCX_SEMANTIC_ID
         else corpus_identity(corpora[0]),
         "tool": tools[0],
+        "environment": environments[0],
+        "harness_identities": harness_identities,
         "claim": "identity validation only; no performance or speedup claim",
     }
 
@@ -2340,10 +2548,24 @@ def run_xlsx_managed_batch_abba(arguments: argparse.Namespace) -> int:
         expected_configuration=fixed_configuration["harness_expected"],
     )
     statistics_report = abba_statistics(legs)
-    published_legs = [
-        {key: value for key, value in leg.items() if key != "harness_report"}
-        for leg in legs
-    ]
+    published_legs = []
+    for leg, harness_identity in zip(legs, validation["harness_identities"]):
+        published = {
+            key: value for key, value in leg.items() if key != "harness_report"
+        }
+        published["harness_identity"] = harness_identity
+        published_legs.append(published)
+    canonical_harness_identity = {
+        "schema_version": SCHEMA_VERSION,
+        "tool": validation["tool"],
+        "environment": validation["environment"],
+        "configuration": validation["configuration"],
+        "leg_revisions": {
+            identity["leg"]: identity["git_revision"]
+            for identity in validation["harness_identities"]
+        },
+        "clean_worktrees": True,
+    }
     report = {
         "schema_version": SCHEMA_VERSION,
         "abba_schema_version": ABBA_SCHEMA_VERSION,
@@ -2367,6 +2589,7 @@ def run_xlsx_managed_batch_abba(arguments: argparse.Namespace) -> int:
         "host_environment": environment(),
         "binary_identity": {"control": control, "candidate": candidate},
         "configuration": fixed_configuration,
+        "canonical_harness_identity": canonical_harness_identity,
         "tools": tools,
         "validation": validation,
         "legs": published_legs,
@@ -2449,10 +2672,26 @@ def run_docx_semantic_abba(arguments: argparse.Namespace) -> int:
         workload=DOCX_SEMANTIC_ID,
     )
     statistics_report = abba_statistics(legs, metric_specs=DOCX_RESOURCE_METRIC_SPECS)
-    published_legs = [
-        {key: value for key, value in leg.items() if key != "harness_report"}
-        for leg in legs
-    ]
+    published_legs = []
+    for leg, harness_identity in zip(legs, validation["harness_identities"]):
+        published = {
+            key: value for key, value in leg.items() if key != "harness_report"
+        }
+        # Keep the canonical identity needed to audit a published result even
+        # though the raw harness JSON is intentionally not copied into it.
+        published["harness_identity"] = harness_identity
+        published_legs.append(published)
+    canonical_harness_identity = {
+        "schema_version": SCHEMA_VERSION,
+        "tool": validation["tool"],
+        "environment": validation["environment"],
+        "configuration": validation["configuration"],
+        "leg_revisions": {
+            identity["leg"]: identity["git_revision"]
+            for identity in validation["harness_identities"]
+        },
+        "clean_worktrees": True,
+    }
     report = {
         "schema_version": SCHEMA_VERSION,
         "abba_schema_version": ABBA_SCHEMA_VERSION,
@@ -2485,6 +2724,7 @@ def run_docx_semantic_abba(arguments: argparse.Namespace) -> int:
         "binary_identity": {"control": control, "candidate": candidate},
         "configuration": fixed_configuration,
         "corpus_identities": validation["corpus_identities"],
+        "canonical_harness_identity": canonical_harness_identity,
         "tools": tools,
         "validation": validation,
         "legs": published_legs,
