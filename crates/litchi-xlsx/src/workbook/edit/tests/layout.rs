@@ -7,6 +7,95 @@ use super::support::{
 
 use crate::column::Outline;
 use crate::{StyleState, Value};
+use litchi_opc::Part;
+
+fn page_break_workbook() -> Workbook {
+    let source = two_sheet_workbook(WorksheetKind::Worksheet);
+    let mut package = source.inner.package.clone();
+    package
+        .get_part_mut(&source.inner.sheets[0].part_uri)
+        .expect("first worksheet")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/><rowBreaks count="1" manualBreakCount="1"><brk id="4" max="16383" man="1"/></rowBreaks></worksheet>"#.to_vec(),
+        );
+    Workbook::from_package(package).expect("page-break workbook")
+}
+
+#[test]
+fn worksheet_page_break_projection_reuses_successful_snapshot_parse() {
+    let workbook = page_break_workbook();
+    let sheet = workbook
+        .sheet(0usize)
+        .expect("sheet lookup")
+        .expect("first worksheet");
+    assert!(sheet.data.page_breaks.get().is_none());
+
+    let first = sheet.page_breaks().expect("first page-break read");
+    let cached = sheet.data.page_breaks.get().expect("cached projection");
+    let cached_address = cached as *const _;
+    assert_eq!(&first, cached);
+
+    let second = sheet.page_breaks().expect("second page-break read");
+    let cached_again = sheet.data.page_breaks.get().expect("cached projection");
+    assert_eq!(first, second);
+    assert_eq!(cached_address, cached_again as *const _);
+}
+
+#[test]
+fn worksheet_page_break_projection_is_invalidated_by_publication() {
+    let source = page_break_workbook();
+    let source_sheet = source
+        .sheet(0usize)
+        .expect("source lookup")
+        .expect("source worksheet");
+    let original = source_sheet.page_breaks().expect("source page breaks");
+    let original_cache = std::sync::Arc::clone(&source_sheet.data.page_breaks);
+
+    let mut edit = source.edit().expect("edit");
+    edit.move_page_breaks(0usize, 1usize)
+        .expect("move page breaks")
+        .expect("source and target sheets");
+    let committed = edit.commit().expect("commit");
+    let moved_source = committed
+        .workbook()
+        .sheet(0usize)
+        .expect("source lookup")
+        .expect("source worksheet");
+    let moved_target = committed
+        .workbook()
+        .sheet(1usize)
+        .expect("target lookup")
+        .expect("target worksheet");
+
+    assert!(!std::sync::Arc::ptr_eq(
+        &original_cache,
+        &moved_source.data.page_breaks
+    ));
+    assert!(!std::sync::Arc::ptr_eq(
+        &original_cache,
+        &moved_target.data.page_breaks
+    ));
+    assert!(moved_source.data.page_breaks.get().is_none());
+    assert!(moved_target.data.page_breaks.get().is_none());
+    let updated_source = moved_source
+        .page_breaks()
+        .expect("updated source page breaks");
+    assert!(updated_source.horizontal().is_none());
+    assert!(updated_source.vertical().is_none());
+    assert_eq!(
+        moved_target
+            .page_breaks()
+            .expect("updated target page breaks"),
+        original
+    );
+
+    // The source snapshot remains immutable even after its descendant was
+    // published and retains the original successful projection.
+    assert_eq!(
+        source_sheet.page_breaks().expect("source snapshot"),
+        original
+    );
+}
 
 #[test]
 fn row_visibility_is_checked_reversible_and_patch_visible() {
