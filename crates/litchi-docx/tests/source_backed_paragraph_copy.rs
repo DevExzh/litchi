@@ -697,7 +697,7 @@ fn partial_sinks_complete_and_write_zero_fails_without_false_progress() {
     assert!(
         matches!(
             error,
-            Error::Document(litchi_docx::Error::Opc(litchi_opc::OpcError::ZipError(_)))
+            Error::Document(litchi_docx::Error::Opc(litchi_opc::OpcError::IoError(_)))
         ),
         "unexpected write-zero error: {error:?}"
     );
