@@ -3007,6 +3007,13 @@ def build_identity(
 def run_profile(arguments: argparse.Namespace) -> int:
     abba_control = getattr(arguments, "control_binary", None)
     abba_candidate = getattr(arguments, "candidate_binary", None)
+    if getattr(arguments, "include_one_paragraph_text", False) and (
+        abba_control is None or abba_candidate is None
+    ):
+        raise ResourceProfileInputError(
+            "--include-one-paragraph-text requires explicit control and candidate "
+            "binaries for the DOCX semantic ABBA workload"
+        )
     if getattr(arguments, "workload", None) is not None and (
         abba_control is None and abba_candidate is None
     ):
