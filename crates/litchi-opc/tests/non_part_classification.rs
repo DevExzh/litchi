@@ -157,6 +157,27 @@ fn accepts_the_content_types_stream_under_a_case_variant_name() {
     let reader = read(&bytes).expect("case-variant manifest must resolve");
     assert_eq!(blob(&reader, "/xl/workbook.xml"), b"<workbook/>");
     assert!(reader.non_part_members().is_empty());
+    assert_eq!(
+        PhysPkgReader::new(&bytes)
+            .unwrap()
+            .content_types_xml()
+            .unwrap(),
+        XML_ONLY_MANIFEST
+    );
+}
+
+#[test]
+fn rejects_multiple_case_equivalent_content_types_members() {
+    let bytes = archive(&[
+        ("[Content_Types].xml", XML_ONLY_MANIFEST),
+        ("[content_types].xml", XML_ONLY_MANIFEST),
+        ("xl/workbook.xml", b"<workbook/>"),
+    ]);
+
+    assert!(matches!(
+        read(&bytes),
+        Err(OpcError::DuplicateContentTypesMember { .. })
+    ));
 }
 
 #[test]

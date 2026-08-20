@@ -280,6 +280,7 @@ fn structural_issue(
         | OpcError::InvalidContentType { .. }
         | OpcError::DuplicateContentTypeDefault(_)
         | OpcError::DuplicateContentTypeOverride { .. }
+        | OpcError::DuplicateContentTypesMember { .. }
         | OpcError::InvalidContentTypeExtension(_) => (
             "opc.content_types.invalid",
             "The OPC content-type catalog is structurally invalid.",
@@ -442,6 +443,7 @@ fn is_structural_rejection(error: &OpcError) -> bool {
             | OpcError::InvalidContentTypesManifest(_)
             | OpcError::DuplicateContentTypeDefault(_)
             | OpcError::DuplicateContentTypeOverride { .. }
+            | OpcError::DuplicateContentTypesMember { .. }
             | OpcError::InvalidContentTypeExtension(_)
             | OpcError::InvalidRelationship(_)
             | OpcError::InvalidRelationshipsManifest(_)

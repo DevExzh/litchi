@@ -373,8 +373,10 @@ impl<'data> PhysPkgReader<'data> {
     pub fn content_types_xml(&self) -> Result<Vec<u8>> {
         let content_types_uri =
             PackURI::new(crate::packuri::CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
+        let member_name =
+            crate::pkgreader::PackageReader::locate_content_types_member(&self.archive)?;
         self.read_bounded_member(
-            content_types_uri.membername(),
+            member_name,
             content_types_uri.as_ref(),
             ReadResource::ContentTypesBytes,
             self.limits.max_content_types_bytes() as u64,

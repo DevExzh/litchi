@@ -680,44 +680,55 @@ impl<'data> ArchiveReader<'data> {
                 }
             }
 
-            let name = match path.try_normalize() {
-                Ok(normalized) => normalized.as_ref().to_string(),
-                Err(_) => {
-                    // Fallback to raw path as lossy UTF-8
-                    String::from_utf8_lossy(path.as_ref()).to_string()
-                },
-            };
+            let (name, lossy_name) = normalized_member_name(path);
+            let name = canonical_member_name(name);
 
             // Directories are never exposed or decompressed by this API. They
             // consume name and metadata budgets above, but not file or payload
             // budgets. Retaining their compact declarations makes structural
             // inspection possible without changing file lookup behavior.
             if directory {
-                directories.entry(name).or_insert(Metadata {
-                    compressed_size,
-                    uncompressed_size,
-                    directory: true,
-                });
+                if directories.contains_key(&name) {
+                    return Err(duplicate_member_error(
+                        &name,
+                        lossy_name,
+                        "duplicate normalized directory names",
+                    ));
+                }
+                if index.contains_key(&name) {
+                    return Err(file_directory_collision_error(&name, lossy_name));
+                }
+                directories.insert(
+                    name,
+                    Metadata {
+                        compressed_size,
+                        uncompressed_size,
+                        directory: true,
+                    },
+                );
                 continue;
             }
 
-            let local_header_offset = entry.local_header_offset();
-            if index
-                .insert(
-                    name.clone(),
-                    EntryInfo {
-                        wayfinder: entry.wayfinder(),
-                        compression_method: entry.compression_method(),
-                        uncompressed_size,
-                    },
-                )
-                .is_some()
-            {
-                return Err(ErrorKind::InvalidInput {
-                    msg: "archive contains duplicate normalized file names".to_string(),
-                }
-                .into());
+            if directories.contains_key(&name) {
+                return Err(file_directory_collision_error(&name, lossy_name));
             }
+
+            let local_header_offset = entry.local_header_offset();
+            if index.contains_key(&name) {
+                return Err(duplicate_member_error(
+                    &name,
+                    lossy_name,
+                    "duplicate normalized file names",
+                ));
+            }
+            index.insert(
+                name.clone(),
+                EntryInfo {
+                    wayfinder: entry.wayfinder(),
+                    compression_method: entry.compression_method(),
+                    uncompressed_size,
+                },
+            );
             ordered_names.push((local_header_offset, name));
         }
 
@@ -747,13 +758,8 @@ impl<'data> ArchiveReader<'data> {
     /// Check if a file exists in the archive.
     #[inline]
     pub fn contains(&self, name: &str) -> bool {
-        // Try exact match first
-        if self.index.contains_key(name) {
-            return true;
-        }
-        // Try without leading slash
-        let normalized = name.strip_prefix('/').unwrap_or(name);
-        self.index.contains_key(normalized)
+        let lookup = lookup_member_name(name);
+        !lookup.explicit_directory && self.index.contains_key(&lookup.name)
     }
 
     /// Return declared metadata for a normalized member name.
@@ -761,18 +767,20 @@ impl<'data> ArchiveReader<'data> {
     /// This performs only hash-map lookup over the central-directory index. It
     /// never reads, decompresses, verifies, or allocates member payload data.
     pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
-        let normalized = name.strip_prefix('/').unwrap_or(name);
-        if let Some(info) = self.index.get(normalized) {
-            return Ok(Metadata {
-                compressed_size: info.wayfinder.compressed_size_hint(),
-                uncompressed_size: info.uncompressed_size,
-                directory: false,
-            });
+        let lookup = lookup_member_name(name);
+        if !lookup.explicit_directory {
+            if let Some(info) = self.index.get(&lookup.name) {
+                return Ok(Metadata {
+                    compressed_size: info.wayfinder.compressed_size_hint(),
+                    uncompressed_size: info.uncompressed_size,
+                    directory: false,
+                });
+            }
         }
         self.directories
-            .get(normalized)
+            .get(&lookup.name)
             .copied()
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(normalized.to_string())))
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))
     }
 
     /// Get an iterator over all file names in the archive.
@@ -787,11 +795,12 @@ impl<'data> ArchiveReader<'data> {
     /// ODF encryption is applied to an already-deflated byte stream, so the
     /// enclosing ZIP entry must not perform another compression transform.
     pub fn is_stored(&self, name: &str) -> Result<bool, Error> {
-        let normalized = name.strip_prefix('/').unwrap_or(name);
+        let lookup = lookup_member_name(name);
         let info = self
             .index
-            .get(normalized)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(normalized.to_string())))?;
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
         Ok(info.compression_method == CompressionMethod::Store)
     }
 
@@ -800,13 +809,13 @@ impl<'data> ArchiveReader<'data> {
     /// Returns the decompressed contents of the file. Supports both stored
     /// (uncompressed) and deflated entries.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
-        // Normalize name - remove leading slash if present
-        let normalized = name.strip_prefix('/').unwrap_or(name);
+        let lookup = lookup_member_name(name);
 
         let info = self
             .index
-            .get(normalized)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(normalized.to_string())))?;
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
 
         let entry = self.archive.get_entry(info.wayfinder)?;
         let data = entry.data();
@@ -1083,18 +1092,36 @@ where
 
                 let compressed_size = entry.compressed_size_hint();
                 let uncompressed_size = entry.uncompressed_size_hint();
-                let name = match policy {
+                let (name, lossy_name) = match policy {
                     ArchiveValidationPolicy::Normalized => normalized_member_name(path),
-                    ArchiveValidationPolicy::StrictPackage => strict_member_name(path)?,
+                    ArchiveValidationPolicy::StrictPackage => (strict_member_name(path)?, false),
                 };
+                let name = canonical_member_name(name);
 
                 if entry.is_dir() {
-                    directories.entry(name).or_insert(Metadata {
-                        compressed_size,
-                        uncompressed_size,
-                        directory: true,
-                    });
+                    if directories.contains_key(&name) {
+                        return Err(duplicate_member_error(
+                            &name,
+                            lossy_name,
+                            "duplicate normalized directory names",
+                        ));
+                    }
+                    if index.contains_key(&name) {
+                        return Err(file_directory_collision_error(&name, lossy_name));
+                    }
+                    directories.insert(
+                        name,
+                        Metadata {
+                            compressed_size,
+                            uncompressed_size,
+                            directory: true,
+                        },
+                    );
                     continue;
+                }
+
+                if directories.contains_key(&name) {
+                    return Err(file_directory_collision_error(&name, lossy_name));
                 }
 
                 if matches!(policy, ArchiveValidationPolicy::StrictPackage)
@@ -1152,12 +1179,14 @@ where
                 }
 
                 let entry_id = EntryId(entries.len());
-                if index.insert(name.clone(), entry_id).is_some() {
-                    return Err(ErrorKind::InvalidInput {
-                        msg: "archive contains duplicate normalized file names".to_string(),
-                    }
-                    .into());
+                if index.contains_key(&name) {
+                    return Err(duplicate_member_error(
+                        &name,
+                        lossy_name,
+                        "duplicate normalized file names",
+                    ));
                 }
+                index.insert(name.clone(), entry_id);
                 ordered_entries.push((entry.local_header_offset(), entry_id));
                 entries.push(IndexedEntry {
                     name,
@@ -1230,21 +1259,23 @@ where
     /// Resolve a member name to its stable opaque entry ID.
     #[inline]
     pub fn entry_id(&self, name: &str) -> Option<EntryId> {
-        let normalized = name.strip_prefix('/').unwrap_or(name);
-        self.index.get(normalized).copied()
+        let lookup = lookup_member_name(name);
+        if lookup.explicit_directory {
+            return None;
+        }
+        self.index.get(&lookup.name).copied()
     }
 
     /// Return declared metadata for a member without payload access.
     pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
+        let lookup = lookup_member_name(name);
         match self.entry_id(name) {
             Some(id) => self.metadata_for(id),
-            None => {
-                let normalized = name.strip_prefix('/').unwrap_or(name);
-                self.directories
-                    .get(normalized)
-                    .copied()
-                    .ok_or_else(|| Error::from(ErrorKind::FileNotFound(normalized.to_string())))
-            },
+            None => self
+                .directories
+                .get(&lookup.name)
+                .copied()
+                .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name))),
         }
     }
 
@@ -1268,19 +1299,17 @@ where
 
     /// Whether an indexed file uses ZIP Store compression.
     pub fn is_stored(&self, name: &str) -> Result<bool, Error> {
-        let entry_id = self.entry_id(name).ok_or_else(|| {
-            let normalized = name.strip_prefix('/').unwrap_or(name);
-            Error::from(ErrorKind::FileNotFound(normalized.to_string()))
-        })?;
+        let entry_id = self
+            .entry_id(name)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
         Ok(self.indexed_entry(entry_id)?.info.compression_method == CompressionMethod::Store)
     }
 
     /// Read and verify one member by name.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
-        let entry_id = self.entry_id(name).ok_or_else(|| {
-            let normalized = name.strip_prefix('/').unwrap_or(name);
-            Error::from(ErrorKind::FileNotFound(normalized.to_string()))
-        })?;
+        let entry_id = self
+            .entry_id(name)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
         self.read_entry(entry_id)
     }
 
@@ -1407,11 +1436,66 @@ impl<R> std::fmt::Debug for IndexedArchive<R> {
     }
 }
 
-fn normalized_member_name(path: ZipFilePath<RawPath<'_>>) -> String {
+#[derive(Debug)]
+struct LookupMemberName {
+    name: String,
+    explicit_directory: bool,
+}
+
+fn normalized_member_name(path: ZipFilePath<RawPath<'_>>) -> (String, bool) {
     match path.try_normalize() {
-        Ok(normalized) => normalized.as_ref().to_string(),
-        Err(_) => String::from_utf8_lossy(path.as_ref()).to_string(),
+        Ok(normalized) => (normalized.as_ref().to_string(), false),
+        Err(_) => {
+            // Keep the existing lossy-UTF-8 compatibility behavior, but apply
+            // the same path normalization as valid UTF-8 names so a name
+            // returned by `file_names()` is always a usable lookup key.
+            let lossy = String::from_utf8_lossy(path.as_ref());
+            let normalized = ZipFilePath::from_str(&lossy);
+            (normalized.as_str().to_string(), true)
+        },
     }
+}
+
+fn canonical_member_name(name: String) -> String {
+    name.trim_end_matches('/').to_string()
+}
+
+fn lookup_member_name(name: &str) -> LookupMemberName {
+    let explicit_directory = name
+        .as_bytes()
+        .last()
+        .is_some_and(|byte| matches!(byte, b'/' | b'\\'));
+    let normalized = ZipFilePath::from_str(name);
+    LookupMemberName {
+        name: canonical_member_name(normalized.as_str().to_string()),
+        explicit_directory,
+    }
+}
+
+fn duplicate_member_error(name: &str, lossy_name: bool, kind: &str) -> Error {
+    let suffix = if lossy_name {
+        " (lossy UTF-8 name collision)"
+    } else {
+        ""
+    };
+    ErrorKind::InvalidInput {
+        msg: format!("archive contains {kind}: {name}{suffix}"),
+    }
+    .into()
+}
+
+fn file_directory_collision_error(name: &str, lossy_name: bool) -> Error {
+    let suffix = if lossy_name {
+        " (lossy UTF-8 name collision)"
+    } else {
+        ""
+    };
+    ErrorKind::InvalidInput {
+        msg: format!(
+            "archive contains file/directory name collision after normalization: {name}{suffix}"
+        ),
+    }
+    .into()
 }
 
 fn strict_member_name(path: ZipFilePath<RawPath<'_>>) -> Result<String, Error> {
@@ -2411,7 +2495,7 @@ impl<W: Write> StreamingArchiveWriter<W> {
             ));
         }
         let path = ZipFilePath::from_str(raw_name);
-        let normalized_name: String = path.into();
+        let normalized_name = canonical_member_name(path.as_str().to_string());
         let name_bytes = u64::try_from(normalized_name.len()).unwrap_or(u64::MAX);
         if name_bytes > ZIP32_MAX_MEMBER_NAME_BYTES
             || name_bytes > self.limits.max_member_name_bytes
@@ -2977,27 +3061,31 @@ impl<'data> LazyArchiveReader<'data> {
     /// This is more efficient than `read()` when the same file is accessed
     /// multiple times, as it avoids cloning the decompressed data.
     pub fn read_shared(&self, name: &str) -> Result<std::sync::Arc<Vec<u8>>, Error> {
-        let normalized = name.strip_prefix('/').unwrap_or(name);
+        let lookup = lookup_member_name(name);
+        if lookup.explicit_directory {
+            return Err(ErrorKind::FileNotFound(lookup.name).into());
+        }
+        let normalized = lookup.name;
 
         // Fast path: check if already cached (read lock)
         {
             let cache = self.cache.read().unwrap();
-            if let Some(data) = cache.get(normalized) {
+            if let Some(data) = cache.get(&normalized) {
                 return Ok(std::sync::Arc::clone(data));
             }
         }
 
         // Slow path: decompress and cache (write lock)
-        let data = self.inner.read(normalized)?;
+        let data = self.inner.read(name)?;
         let arc = std::sync::Arc::new(data);
 
         {
             let mut cache = self.cache.write().unwrap();
             // Double-check in case another thread cached it while we were decompressing
-            if let Some(existing) = cache.get(normalized) {
+            if let Some(existing) = cache.get(&normalized) {
                 return Ok(std::sync::Arc::clone(existing));
             }
-            cache.insert(normalized.to_string(), std::sync::Arc::clone(&arc));
+            cache.insert(normalized, std::sync::Arc::clone(&arc));
         }
 
         Ok(arc)
@@ -4075,6 +4163,80 @@ mod tests {
             2,
             1,
         );
+    }
+
+    #[test]
+    fn archive_readers_reject_duplicate_directories_and_file_directory_collisions() {
+        for entries in [
+            vec![
+                FixtureEntry::stored(b"folder/", b""),
+                FixtureEntry::stored(b"./folder/", b""),
+            ],
+            vec![
+                FixtureEntry::stored(b"folder", b"file"),
+                FixtureEntry::stored(b"folder/", b""),
+            ],
+        ] {
+            let bytes = fixture(&entries);
+            assert!(matches!(
+                ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED),
+                Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("directory") || msg.contains("file/directory"))
+            ));
+            assert!(matches!(
+                indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED),
+                Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("directory") || msg.contains("file/directory"))
+            ));
+        }
+    }
+
+    #[test]
+    fn archive_readers_reject_lossy_utf8_name_collisions() {
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"collision\xff.bin", b"one"),
+            FixtureEntry::stored(b"collision\xfe.bin", b"two"),
+        ]);
+
+        for result in [
+            ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).map(|_| ()),
+            indexed_archive_result(bytes.clone(), ArchiveLimits::UNBOUNDED).map(|_| ()),
+        ] {
+            assert!(matches!(
+                result,
+                Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { msg } if msg.contains("duplicate normalized file names"))
+            ));
+        }
+    }
+
+    #[test]
+    fn archive_lookups_apply_the_same_normalization_as_ingress() {
+        let bytes = fixture(&[FixtureEntry::stored(b"dir/../body.xml", b"body")]);
+        let reader = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        assert!(reader.contains("/./dir/../body.xml"));
+        assert_eq!(reader.read("/./dir/../body.xml").unwrap(), b"body");
+
+        let indexed = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        assert!(indexed.contains("/./dir/../body.xml"));
+        assert_eq!(indexed.read("/./dir/../body.xml").unwrap(), b"body");
+    }
+
+    #[test]
+    fn archive_readers_normalize_lossy_utf8_names_for_lookup() {
+        let bytes = fixture(&[FixtureEntry::stored(b"dir/../lossy\xff.bin", b"body")]);
+        let query = "/./dir/../lossy\u{FFFD}.bin";
+
+        let reader = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        assert_eq!(reader.file_names().collect::<Vec<_>>(), ["lossy�.bin"]);
+        assert!(reader.contains(query));
+        assert_eq!(reader.read(query).unwrap(), b"body");
+
+        let indexed = indexed_archive_result(bytes.clone(), ArchiveLimits::UNBOUNDED).unwrap();
+        assert_eq!(indexed.file_names().collect::<Vec<_>>(), ["lossy�.bin"]);
+        assert!(indexed.contains(query));
+        assert_eq!(indexed.read(query).unwrap(), b"body");
+
+        let lazy = LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        assert!(lazy.contains(query));
+        assert_eq!(lazy.read_shared(query).unwrap().as_slice(), b"body");
     }
 
     #[test]

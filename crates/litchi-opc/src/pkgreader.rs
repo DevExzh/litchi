@@ -27,7 +27,6 @@ use std::sync::Arc;
 /// the source-backed ingress share exactly the same conformance checks.
 pub(crate) trait ArchiveAccess {
     fn len(&self) -> usize;
-    fn contains(&self, name: &str) -> bool;
     fn file_names(&self) -> Box<dyn Iterator<Item = &str> + '_>;
     fn metadata(
         &self,
@@ -39,10 +38,6 @@ pub(crate) trait ArchiveAccess {
 impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
     fn len(&self) -> usize {
         Self::len(self)
-    }
-
-    fn contains(&self, name: &str) -> bool {
-        Self::contains(self, name)
     }
 
     fn file_names(&self) -> Box<dyn Iterator<Item = &str> + '_> {
@@ -64,10 +59,6 @@ impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
 impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::IndexedArchive<R> {
     fn len(&self) -> usize {
         Self::len(self)
-    }
-
-    fn contains(&self, name: &str) -> bool {
-        Self::contains(self, name)
     }
 
     fn file_names(&self) -> Box<dyn Iterator<Item = &str> + '_> {
@@ -465,15 +456,25 @@ impl PackageReader {
     /// The reserved name is `[Content_Types].xml`. ECMA-376 Part 2 §9.1.1.2 makes
     /// item-name comparison ASCII case-insensitive, so a package that stores the
     /// stream as `[content_types].xml` is still unambiguous; Apache POI resolves
-    /// it the same way. The exact spelling wins when both are present.
-    fn locate_content_types_member<A: ArchiveAccess + ?Sized>(archive: &A) -> Result<&str> {
-        if archive.contains(CONTENT_TYPES_MEMBER) {
-            return Ok(CONTENT_TYPES_MEMBER);
+    /// it the same way. Multiple ASCII-case-equivalent spellings are rejected
+    /// because choosing one would make the package's manifest ambiguous.
+    pub(crate) fn locate_content_types_member<A: ArchiveAccess + ?Sized>(
+        archive: &A,
+    ) -> Result<&str> {
+        let mut found: Option<&str> = None;
+        for name in archive.file_names() {
+            if !name.eq_ignore_ascii_case(CONTENT_TYPES_MEMBER) {
+                continue;
+            }
+            if let Some(existing) = found {
+                return Err(OpcError::DuplicateContentTypesMember {
+                    existing: existing.to_string(),
+                    candidate: name.to_string(),
+                });
+            }
+            found = Some(name);
         }
-        archive
-            .file_names()
-            .find(|name| name.eq_ignore_ascii_case(CONTENT_TYPES_MEMBER))
-            .ok_or_else(|| OpcError::PartNotFound(CONTENT_TYPES_MEMBER.to_string()))
+        found.ok_or_else(|| OpcError::PartNotFound(CONTENT_TYPES_MEMBER.to_string()))
     }
 
     /// Parse relationships XML into `SerializedRelationship` structs.
