@@ -16475,7 +16475,7 @@ fn build_pptx_selector_oracle(
     shape: SemanticShape,
     edits: &[PptxSelectorEdit],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_vec(corpus.archive.clone())?;
     for operation in edits {
         let part_name = PackURI::new(format!(
             "/ppt/slides/slide{}.xml",
@@ -41123,10 +41123,10 @@ mod tests {
         build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
         cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
         ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
-        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
-        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
-        run_docx_source_backed_one_edit_save, run_odf_content_cow,
-        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        pptx_named_slide_name, resolve_execution_workers, run_case, run_case_with_config,
+        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
+        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
+        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,

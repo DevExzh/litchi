@@ -165,7 +165,7 @@ pub(crate) struct SlideNameIndex {
 
 impl SlideNameIndex {
     pub(crate) fn build(slides: &[Slide]) -> Result<Self> {
-        let mut by_name = HashMap::new();
+        let mut by_name: HashMap<String, SlideNameMatch> = HashMap::new();
         by_name
             .try_reserve(slides.len())
             .map_err(|source| Error::Allocation {
