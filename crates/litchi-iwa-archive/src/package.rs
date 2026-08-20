@@ -3590,6 +3590,20 @@ mod tests {
         ));
         assert_eq!(crate::zip::test_entry_read_count(), 0);
 
+        let central_near_name = raw_named_zip(authority, local_near_name, 0, 0, b"properties");
+        crate::zip::reset_test_entry_read_count();
+        let catalog = Catalog::__from_bytes_with_logical_entry_limits(
+            &central_near_name,
+            Limits::default(),
+            LogicalEntryLimits::PAGES_METADATA,
+        )?;
+        assert!(catalog.is_empty());
+        assert_eq!(
+            crate::zip::test_entry_read_count(),
+            0,
+            "a non-alias central near-name remains outside the selected authority"
+        );
+
         let central_alias_name = b"Metadata\\Properties.plist";
         let central_alias = raw_named_zip(authority, central_alias_name, 0, 0, b"properties");
         crate::zip::reset_test_entry_read_count();
