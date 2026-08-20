@@ -602,7 +602,7 @@ impl<'data> ArchiveReader<'data> {
         let mut total_metadata_bytes = 0u64;
         let mut total_uncompressed_size = 0u64;
         let mut ordered_names = Vec::new();
-        let mut local_offsets_non_decreasing = true;
+        let mut local_offsets_strictly_increasing = true;
         let mut previous_local_header_offset = None;
         for entry_result in archive.entries() {
             let entry = entry_result?;
@@ -712,8 +712,9 @@ impl<'data> ArchiveReader<'data> {
             }
 
             let local_header_offset = entry.local_header_offset();
-            if previous_local_header_offset.is_some_and(|previous| local_header_offset < previous) {
-                local_offsets_non_decreasing = false;
+            if previous_local_header_offset.is_some_and(|previous| local_header_offset <= previous)
+            {
+                local_offsets_strictly_increasing = false;
             }
             previous_local_header_offset = Some(local_header_offset);
             if directories.contains_key(&name) {
@@ -738,7 +739,7 @@ impl<'data> ArchiveReader<'data> {
             ordered_names.push((local_header_offset, name));
         }
 
-        if !local_offsets_non_decreasing {
+        if !local_offsets_strictly_increasing {
             ordered_names.sort_by_key(|(offset, _)| *offset);
         }
         let order = ordered_names.into_iter().map(|(_, name)| name).collect();
@@ -1066,7 +1067,7 @@ where
         let mut strict_mimetype = None;
         let mut has_encrypted_entries = false;
         let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
-        let mut local_offsets_non_decreasing = true;
+        let mut local_offsets_strictly_increasing = true;
         let mut previous_local_header_offset = None;
 
         {
@@ -1191,9 +1192,9 @@ where
                 let entry_id = EntryId(entries.len());
                 let local_header_offset = entry.local_header_offset();
                 if previous_local_header_offset
-                    .is_some_and(|previous| local_header_offset < previous)
+                    .is_some_and(|previous| local_header_offset <= previous)
                 {
-                    local_offsets_non_decreasing = false;
+                    local_offsets_strictly_increasing = false;
                 }
                 previous_local_header_offset = Some(local_header_offset);
                 if index.contains_key(&name) {
@@ -1220,7 +1221,7 @@ where
             validate_strict_mimetype(&archive, strict_mimetype)?;
         }
 
-        if !local_offsets_non_decreasing {
+        if !local_offsets_strictly_increasing {
             ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
         }
         let order = ordered_entries.into_iter().map(|(_, id)| id).collect();
@@ -4836,6 +4837,30 @@ mod tests {
                 b"folder/".to_vec(),
                 b"first.bin".to_vec(),
             ]
+        );
+    }
+
+    #[test]
+    fn equal_local_header_offsets_keep_existing_reader_ordering() {
+        let mut bytes = fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"second.bin", b"second"),
+        ]);
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let central = archive.directory_offset() as usize;
+        let first_len = central_record_len(&bytes, central);
+        let second = central + first_len;
+        bytes[second + 42..second + 46].copy_from_slice(&0u32.to_le_bytes());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
+        let indexed = indexed_archive(bytes);
+        assert_eq!(
+            indexed.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
         );
     }
 
