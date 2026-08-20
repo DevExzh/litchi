@@ -145,6 +145,13 @@ pub(crate) struct Inner {
     pub(super) date_system: DateSystem,
     pub(super) active_sheet: Option<usize>,
     pub(super) sheets: Box<[Arc<SheetData>]>,
+    /// Sheet positions sorted by their canonical, case-insensitive names.
+    ///
+    /// `raw::parse_catalog` rejects duplicate canonical names before this
+    /// snapshot is built, so the order is a total lookup index rather than a
+    /// lossy collision map. Keeping positions (instead of cloning keys into
+    /// another map) preserves the existing name-key allocations.
+    pub(super) sheet_name_order: Box<[usize]>,
     pub(super) defined_names: Box<[raw::DefinedName]>,
     pub(super) pivot_caches: Box<[raw::PivotCache]>,
     pub(super) external_reference_ids: Box<[String]>,
@@ -408,6 +415,15 @@ impl Workbook {
             })
             .collect::<Vec<_>>()
             .into_boxed_slice();
+        let mut sheet_name_order = (0..sheets.len()).collect::<Vec<_>>();
+        sheet_name_order.sort_unstable_by(|left, right| {
+            sheets[*left]
+                .name_key
+                .as_ref()
+                .cmp(sheets[*right].name_key.as_ref())
+                .then_with(|| left.cmp(right))
+        });
+        let sheet_name_order = sheet_name_order.into_boxed_slice();
 
         Ok(Self {
             inner: Arc::new(Inner {
@@ -429,6 +445,7 @@ impl Workbook {
                 },
                 active_sheet,
                 sheets,
+                sheet_name_order,
                 defined_names: catalog.defined_names.into_boxed_slice(),
                 pivot_caches: catalog.pivot_caches.into_boxed_slice(),
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
@@ -525,9 +542,15 @@ impl Workbook {
             CoreSelector::Name(name) => {
                 let key = crate::sheet::key(&name);
                 self.inner
-                    .sheets
-                    .iter()
-                    .find(|sheet| sheet.name_key == key)
+                    .sheet_name_order
+                    .binary_search_by(|&position| {
+                        self.inner.sheets[position]
+                            .name_key
+                            .as_ref()
+                            .cmp(key.as_ref())
+                    })
+                    .ok()
+                    .and_then(|order| self.inner.sheets.get(self.inner.sheet_name_order[order]))
                     .cloned()
             },
             CoreSelector::Id(never) => match never {},
