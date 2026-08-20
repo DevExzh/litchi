@@ -17,7 +17,9 @@ use crate::pkgreader::{
     ValidationCatalogPhase, is_xml_id,
 };
 use crate::rel::{Relationships, TargetMode};
-use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion};
+use litchi_core::{
+    ExecutionContext, ExecutionError, OwnedSource, ReadAt, Reservation, Resource, SourceVersion,
+};
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
@@ -1882,6 +1884,26 @@ impl SourceBackedPackage {
             cache: PartCache::new_with_diagnostics(SourceCacheLimits::default(), diagnostics),
             catalog_object_reservation: None,
         })
+    }
+
+    /// Open a source-backed package with the standard bounded read policy.
+    ///
+    /// The input vector is moved into the source owner. Ordinary part payloads
+    /// remain deferred until a [`PartView::data`] request, just as with
+    /// [`Self::from_read_at`].
+    pub fn from_vec(data: Vec<u8>) -> Result<Self> {
+        Self::from_read_at(Arc::new(OwnedSource::new(data)))
+    }
+
+    /// Open an owned source-backed package with an explicit bounded read
+    /// policy.
+    ///
+    /// The input vector is moved into the source owner. Opening validates the
+    /// ZIP catalog, content types, and relationships without materializing
+    /// ordinary part payloads; a payload is decompressed only when its
+    /// [`PartView::data`] is requested.
+    pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
+        Self::from_read_at_with_limits(Arc::new(OwnedSource::new(data)), limits)
     }
 
     /// Open a source-backed package with the standard bounded read policy.
@@ -5796,6 +5818,29 @@ mod tests {
             writer.write_stored("scratch.bin", b"not a part").unwrap();
         }
         writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn owned_bytes_open_keeps_ordinary_payloads_deferred() {
+        let package = SourceBackedPackage::from_vec(archive_bytes(
+            root_relationships(),
+            b"<document/>",
+            true,
+        ))
+        .unwrap();
+
+        let opened = package.cache_diagnostics();
+        assert_eq!(opened.cold_loads, 0);
+        assert_eq!(opened.retained_entries, 0);
+
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let data = package.part(&document).unwrap().data().unwrap();
+        assert_eq!(data.as_bytes(), b"<document/>");
+
+        let loaded = package.cache_diagnostics();
+        assert_eq!(loaded.cold_loads, 1);
+        assert_eq!(loaded.successful_loads, 1);
+        assert_eq!(loaded.retained_entries, 1);
     }
 
     #[test]
