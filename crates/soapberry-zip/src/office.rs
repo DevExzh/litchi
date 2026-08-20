@@ -3504,6 +3504,26 @@ mod tests {
     }
 
     #[derive(Debug)]
+    struct FailOnRangeReaderAt {
+        bytes: Vec<u8>,
+        fail_start: u64,
+        fail_end: u64,
+    }
+
+    impl ReaderAt for FailOnRangeReaderAt {
+        fn read_at(&self, buffer: &mut [u8], offset: u64) -> io::Result<usize> {
+            let request_end = offset.saturating_add(buffer.len() as u64);
+            if offset < self.fail_end && request_end > self.fail_start {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "injected indexed source read failure",
+                ));
+            }
+            self.bytes.as_slice().read_at(buffer, offset)
+        }
+    }
+
+    #[derive(Debug)]
     enum ReadStep {
         Interrupted,
         Bytes(Vec<u8>),
@@ -4339,6 +4359,99 @@ mod tests {
         assert_eq!(metadata.uncompressed_size(), 24);
         assert_eq!(archive.read_entry(id).unwrap(), b"<content>Hello</content>");
         assert_eq!(archive.read("mimetype").unwrap(), b"application/test");
+    }
+
+    #[test]
+    fn indexed_read_to_reports_typed_crc_failure_for_data_descriptor() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored_stream("bad.bin", Cursor::new(b"bad".to_vec()))
+            .unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        assert!(local_member_has_data_descriptor(&bytes, b"bad.bin"));
+        corrupt_payload(&mut bytes, b"bad");
+
+        let archive = indexed_archive(bytes);
+        let entry_id = archive.entry_id("bad.bin").unwrap();
+        let mut output = Vec::new();
+        let error = archive.read_entry_to(entry_id, &mut output).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+        assert_eq!(output, b"bad");
+    }
+
+    #[test]
+    fn read_to_rejects_truncated_and_overlong_store_and_deflate_members() {
+        for deflated in [false, true] {
+            for (payload, declared_size) in
+                [(b"abc".as_slice(), 4_u32), (b"abcde".as_slice(), 4_u32)]
+            {
+                let mut writer = StreamingArchiveWriter::new();
+                if deflated {
+                    writer.write_deflated("member.bin", payload).unwrap();
+                } else {
+                    writer.write_stored("member.bin", payload).unwrap();
+                }
+                let mut bytes = writer.finish_to_bytes().unwrap();
+                rewrite_uncompressed_size(&mut bytes, b"member.bin", declared_size);
+
+                let reader = ArchiveReader::new(&bytes).unwrap();
+                let mut output = Vec::new();
+                let error = reader.read_to("member.bin", &mut output).unwrap_err();
+                assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+
+                let archive = indexed_archive(bytes);
+                let mut output = Vec::new();
+                let error = archive.read_to("member.bin", &mut output).unwrap_err();
+                assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+            }
+        }
+    }
+
+    #[test]
+    fn indexed_read_to_supports_zip64_member_metadata_and_short_writes() {
+        let bytes = include_bytes!("../assets/zip64.zip").to_vec();
+        let archive = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let mut output = ShortWriter::new(3);
+        let count = archive.read_to("README", &mut output).unwrap();
+        assert_eq!(count, 36);
+        assert_eq!(output.bytes, b"This small file is in ZIP64 format.\n");
+    }
+
+    #[test]
+    fn indexed_read_to_reports_source_and_zero_progress_sink_errors() {
+        let payload = vec![b'x'; STREAM_COPY_BUFFER_SIZE + 1];
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("payload.bin", &payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+
+        let zip = ZipArchive::from_slice(&bytes).unwrap();
+        let wayfinder = zip.entries().next().unwrap().unwrap().wayfinder();
+        let entry = zip.get_entry(wayfinder).unwrap();
+        let (fail_start, fail_end) = entry.compressed_data_range();
+        let archive = IndexedArchive::from_reader_with_limits(
+            FailOnRangeReaderAt {
+                bytes: bytes.clone(),
+                fail_start,
+                fail_end,
+            },
+            bytes.len() as u64,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        let error = archive.read_to("payload.bin", &mut output).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_) | ErrorKind::Io(_)));
+        assert!(output.is_empty());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let mut zero = ZeroWriter;
+        let error = reader.read_to("payload.bin", &mut zero).unwrap_err();
+        match error.kind() {
+            ErrorKind::IO(error) | ErrorKind::Io(error) => {
+                assert_eq!(error.kind(), io::ErrorKind::WriteZero);
+            },
+            other => panic!("expected zero-progress sink failure, got {other:?}"),
+        }
     }
 
     #[test]
@@ -5233,6 +5346,43 @@ mod tests {
         let extra_len = u16::from_le_bytes([bytes[offset + 30], bytes[offset + 31]]) as usize;
         let comment_len = u16::from_le_bytes([bytes[offset + 32], bytes[offset + 33]]) as usize;
         FIXED_SIZE + name_len + extra_len + comment_len
+    }
+
+    fn rewrite_uncompressed_size(archive: &mut [u8], wanted_name: &[u8], size: u32) {
+        const CENTRAL_HEADER: [u8; 4] = 0x0201_4b50_u32.to_le_bytes();
+        const LOCAL_HEADER: [u8; 4] = 0x0403_4b50_u32.to_le_bytes();
+
+        let local_offset = archive
+            .windows(4)
+            .enumerate()
+            .find_map(|(offset, signature)| {
+                if signature != LOCAL_HEADER || offset.saturating_add(30) > archive.len() {
+                    return None;
+                }
+                let name_len =
+                    u16::from_le_bytes([archive[offset + 26], archive[offset + 27]]) as usize;
+                let name_end = offset.saturating_add(30).saturating_add(name_len);
+                (name_end <= archive.len() && &archive[offset + 30..name_end] == wanted_name)
+                    .then_some(offset)
+            })
+            .expect("local member header");
+        archive[local_offset + 22..local_offset + 26].copy_from_slice(&size.to_le_bytes());
+
+        let central_offset = archive
+            .windows(4)
+            .enumerate()
+            .find_map(|(offset, signature)| {
+                if signature != CENTRAL_HEADER || offset.saturating_add(46) > archive.len() {
+                    return None;
+                }
+                let name_len =
+                    u16::from_le_bytes([archive[offset + 28], archive[offset + 29]]) as usize;
+                let name_end = offset.saturating_add(46).saturating_add(name_len);
+                (name_end <= archive.len() && &archive[offset + 46..name_end] == wanted_name)
+                    .then_some(offset)
+            })
+            .expect("central member header");
+        archive[central_offset + 24..central_offset + 28].copy_from_slice(&size.to_le_bytes());
     }
 
     fn bulk_fixture() -> Vec<u8> {
