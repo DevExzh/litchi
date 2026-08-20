@@ -13996,7 +13996,11 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     let committed = edit.commit()?.workbook().clone();
     let bytes = committed.to_bytes()?;
     let owned = Workbook::from_bytes(bytes.clone())?;
-    let source = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes)))?;
+    let source = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))?;
+    // On native targets, the umbrella byte facade retains this same source-backed
+    // catalog. Check its lightweight projection so the index stays compatible
+    // with that newly landed ingress path without adding another timed selector.
+    let facade = litchi::Workbook::from_bytes(bytes)?;
     let expected = [
         "Résumé".to_owned(),
         "Στοιχεία".to_owned(),
@@ -14011,7 +14015,17 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
-    if owned_names != expected || source_names != expected {
+    let facade_names = facade
+        .worksheet_names()
+        .map_err(|error| error.to_string())?;
+    let facade_count = facade
+        .worksheet_count()
+        .map_err(|error| error.to_string())?;
+    if owned_names != expected
+        || source_names != expected
+        || facade_names != expected
+        || facade_count != expected.len()
+    {
         return Err("XLSX selector oracle changed Unicode sheet spelling or order".into());
     }
 
@@ -14059,6 +14073,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         .set_blob(duplicate_xml.into_bytes());
     let duplicate_archive = PackageWriter::to_bytes(&duplicate_package)?;
     if Workbook::from_bytes(duplicate_archive.clone()).is_ok()
+        || litchi::Workbook::from_bytes(duplicate_archive.clone()).is_ok()
         || SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(duplicate_archive))).is_ok()
     {
         return Err("XLSX selector oracle accepted duplicate parsed catalog names".into());
@@ -29454,6 +29469,16 @@ fn run_xlsx_named_sheet_lookup(
         return Err("XLSX named selector catalog differs from case selection".into());
     }
     let target_name = xlsx_sheet_name(spec.sheet_count - 1);
+    let target_address = xlsx_address(0, 0)?;
+    let target_payload = xlsx_value(XlsxCoordinate {
+        sheet: spec.sheet_count - 1,
+        row: 0,
+        column: 0,
+    })
+    .to_string();
+    if corpus.target_payload.as_slice() != target_payload.as_bytes() {
+        return Err("XLSX named selector target witness differs from its corpus".into());
+    }
     let target_query = target_name.to_ascii_lowercase();
     let iteration_count = iteration_count(warmup_iterations, samples)?;
 
@@ -29465,6 +29490,18 @@ fn run_xlsx_named_sheet_lookup(
         let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
         if workbook.len() != spec.sheet_count {
             return Err("source-backed named selector catalog has the wrong sheet count".into());
+        }
+        let target = workbook
+            .sheet(target_name.as_str())?
+            .ok_or("source-backed named selector target sheet is missing")?;
+        if target.name() != target_name
+            || !matches!(
+                target.cell(target_address.as_str())?.stored(),
+                Some(XlsxCell::Value(XlsxValue::Number(value)))
+                    if value.as_str() == target_payload.as_str()
+            )
+        {
+            return Err("source-backed named selector target witness differs".into());
         }
         source.reset();
         let mut elapsed = Vec::with_capacity(samples);
@@ -29496,6 +29533,18 @@ fn run_xlsx_named_sheet_lookup(
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         if workbook.len() != spec.sheet_count {
             return Err("owned named selector catalog has the wrong sheet count".into());
+        }
+        let target = workbook
+            .sheet(target_name.as_str())?
+            .ok_or("owned named selector target sheet is missing")?;
+        if target.name() != target_name
+            || !matches!(
+                target.cell(target_address.as_str())?.stored(),
+                Some(XlsxCell::Value(XlsxValue::Number(value)))
+                    if value.as_str() == target_payload.as_str()
+            )
+        {
+            return Err("owned named selector target witness differs".into());
         }
         let mut elapsed = Vec::with_capacity(samples);
         for iteration in 0..iteration_count {
