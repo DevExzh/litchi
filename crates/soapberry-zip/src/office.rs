@@ -3652,7 +3652,7 @@ mod tests {
         let mut output = Vec::new();
         let error = reader.read_to("bad", &mut output).unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
-        assert_eq!(output, b"bad");
+        assert_eq!(output, vec![b'b' ^ 0x80, b'a', b'd']);
 
         let mut writer = StreamingArchiveWriter::new();
         writer
@@ -4376,7 +4376,7 @@ mod tests {
         let mut output = Vec::new();
         let error = archive.read_entry_to(entry_id, &mut output).unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
-        assert_eq!(output, b"bad");
+        assert_eq!(output, vec![b'b' ^ 0x80, b'a', b'd']);
     }
 
     #[test]
