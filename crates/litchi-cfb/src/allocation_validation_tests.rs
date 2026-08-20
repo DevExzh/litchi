@@ -179,7 +179,8 @@ fn open_rejects_fat_stream_cycles_and_invalid_markers() {
 fn open_rejects_fat_stream_short_excess_and_terminal_markers() {
     let mut short = regular_stream_file();
     let start = data_start_sector(&short);
-    write_u32(&mut short, fat_entry_offset(&short, start), ENDOFCHAIN);
+    let offset = fat_entry_offset(&short, start);
+    write_u32(&mut short, offset, ENDOFCHAIN);
     assert_open_corrupted(
         short,
         "regular stream chain ends before its declared length",
@@ -187,25 +188,20 @@ fn open_rejects_fat_stream_short_excess_and_terminal_markers() {
 
     let mut excess = regular_stream_file();
     let terminal = regular_data_terminal_sector(&excess);
-    write_u32(
-        &mut excess,
-        fat_entry_offset(&excess, terminal),
-        terminal + 1,
-    );
+    let offset = fat_entry_offset(&excess, terminal);
+    write_u32(&mut excess, offset, terminal + 1);
     assert_open_corrupted(excess, "regular stream chain exceeds its declared length");
 
     let mut free = regular_stream_file();
     let terminal = regular_data_terminal_sector(&free);
-    write_u32(&mut free, fat_entry_offset(&free, terminal), FREESECT);
+    let offset = fat_entry_offset(&free, terminal);
+    write_u32(&mut free, offset, FREESECT);
     assert_open_corrupted(free, "regular stream chain exceeds its declared length");
 
     let mut explicit_terminal = regular_stream_file();
     let terminal = regular_data_terminal_sector(&explicit_terminal);
-    write_u32(
-        &mut explicit_terminal,
-        fat_entry_offset(&explicit_terminal, terminal),
-        ENDOFCHAIN,
-    );
+    let offset = fat_entry_offset(&explicit_terminal, terminal);
+    write_u32(&mut explicit_terminal, offset, ENDOFCHAIN);
     assert!(OleFile::open(Cursor::new(explicit_terminal)).is_ok());
 }
 
@@ -213,30 +209,26 @@ fn open_rejects_fat_stream_short_excess_and_terminal_markers() {
 fn open_rejects_minifat_stream_short_excess_and_terminal_markers() {
     let mut short = mini_stream_file();
     let start = data_start_sector(&short);
-    write_u32(&mut short, minifat_entry_offset(&short, start), ENDOFCHAIN);
+    let offset = minifat_entry_offset(&short, start);
+    write_u32(&mut short, offset, ENDOFCHAIN);
     assert_open_corrupted(short, "mini stream chain ends before its declared length");
 
     let mut excess = mini_stream_file();
     let terminal = mini_data_terminal_sector(&excess);
-    write_u32(
-        &mut excess,
-        minifat_entry_offset(&excess, terminal),
-        terminal + 1,
-    );
+    let offset = minifat_entry_offset(&excess, terminal);
+    write_u32(&mut excess, offset, terminal + 1);
     assert_open_corrupted(excess, "mini stream chain exceeds its declared length");
 
     let mut free = mini_stream_file();
     let terminal = mini_data_terminal_sector(&free);
-    write_u32(&mut free, minifat_entry_offset(&free, terminal), FREESECT);
+    let offset = minifat_entry_offset(&free, terminal);
+    write_u32(&mut free, offset, FREESECT);
     assert_open_corrupted(free, "mini stream chain exceeds its declared length");
 
     let mut explicit_terminal = mini_stream_file();
     let terminal = mini_data_terminal_sector(&explicit_terminal);
-    write_u32(
-        &mut explicit_terminal,
-        minifat_entry_offset(&explicit_terminal, terminal),
-        ENDOFCHAIN,
-    );
+    let offset = minifat_entry_offset(&explicit_terminal, terminal);
+    write_u32(&mut explicit_terminal, offset, ENDOFCHAIN);
     assert!(OleFile::open(Cursor::new(explicit_terminal)).is_ok());
 }
 
