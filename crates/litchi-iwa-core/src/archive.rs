@@ -1506,6 +1506,10 @@ impl Archive {
         // byte would turn a large object into a second, avoidable allocation
         // spike. Grow the object list only as validated objects are found.
         let mut objects = Vec::new();
+        // A selected parse does not retain discarded objects, but it must
+        // retain their identities long enough to preserve the archive-wide
+        // uniqueness invariant enforced by a full parse.
+        let mut discarded_identifiers = selected_identifier.map(|_| HashSet::new());
         let mut cursor = 0usize;
         let mut object_count = 0usize;
         let mut total_messages = 0usize;
@@ -1533,6 +1537,20 @@ impl Archive {
                 Error::invalid_archive(object_start, "truncated ArchiveInfo header")
             })?;
             let archive_info = ArchiveInfo::decode_with_limits(header, limits)?;
+            if let Some(identifiers) = discarded_identifiers.as_mut() {
+                let identifier = archive_info.identifier.ok_or_else(|| {
+                    Error::invalid_archive(object_start, "object is missing its archive identifier")
+                })?;
+                identifiers
+                    .try_reserve(1)
+                    .map_err(|_| Error::allocation("IWA archive identifiers", 1))?;
+                if !identifiers.insert(identifier) {
+                    return Err(Error::invalid_archive(
+                        object_start,
+                        "duplicate object identifier",
+                    ));
+                }
+            }
             let selected = selected_identifier
                 .is_none_or(|identifier| archive_info.identifier == Some(identifier));
             let (original_header, original_canonical_header) = if selected {
