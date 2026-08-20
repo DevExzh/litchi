@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
 import json
 import tempfile
 import unittest
@@ -10,6 +12,82 @@ from unittest import mock
 from pathlib import Path
 
 from tools import perf_resource_profile
+
+
+# Independent retained-0251 corpus fixtures.  These deliberately do not read
+# implementation constants: changing the validator's pin must break these
+# tests until the retained evidence is consciously re-reviewed.
+XLSX_TINY_CORPUS_FIXTURE = {
+    "name": "xlsx-tiny",
+    "generator": "litchi-xlsx-synthetic-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "tiny",
+    "payload_kind": "deterministic-integer-grid",
+    "compression": "deflate",
+    "entry_count": 192,
+    "archive_member_count": 8,
+    "entry_bytes": 4,
+    "uncompressed_payload_bytes": 768,
+    "archive_bytes": 3561,
+    "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "xlsx": {
+        "sheet_count": 3,
+        "rows_per_sheet": 8,
+        "columns_per_sheet": 8,
+        "one_percent_update_count": 2,
+        "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+            ],
+            "shared_strings": None,
+            "styles": "xl/styles.xml",
+        },
+    },
+}
+XLSX_MEDIUM_CORPUS_FIXTURE = {
+    "name": "xlsx-cell-values-medium",
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "medium",
+    "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+    "compression": "deflate",
+    "entry_count": 9216,
+    "archive_member_count": 17,
+    "entry_bytes": 4,
+    "uncompressed_payload_bytes": 4231168,
+    "archive_bytes": 4226429,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "xlsx": {
+        "sheet_count": 4,
+        "rows_per_sheet": 48,
+        "columns_per_sheet": 48,
+        "one_percent_update_count": 93,
+        "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml",
+            ],
+            "shared_strings": None,
+            "styles": "xl/styles.xml",
+        },
+    },
+}
+XLSX_CORPUS_CANONICAL_DIGESTS = {
+    "tiny": "0f521b922f4c4a408a5cdaf87dd2dc84eefb28589fd38955c54ae99000351aed",
+    "medium": "4cdb4fc4199a0604ea1431c044f3fe86c04e9822d1121044110ba44356f43efc",
+}
 
 
 class ResourceProfileParserTests(unittest.TestCase):
@@ -325,6 +403,46 @@ peak RSS (including heaptrack overhead): 4.00M
             parsed = perf_resource_profile.parse_heaptrack_print(summary)
         self.assertEqual(parsed["status"], "unparsed")
         self.assertIsNone(parsed["temporary_allocations"])
+
+    def test_heaptrack_histogram_rejects_partial_rows_and_strict_evidence_rejects_null_total(self):
+        malformed_rows = (
+            "4\t3\nmalformed\n",
+            "4 3\n",
+            "-1\t3\n",
+            "4\t-3\n",
+            "4\tnot-a-number\n",
+            "4\t3.5\n",
+            "4\t3\textra\n",
+            "\n\t \n",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, contents in enumerate(malformed_rows):
+                path = Path(directory) / f"malformed-{index}.tsv"
+                path.write_text(contents, encoding="utf-8")
+                self.assertIsNone(perf_resource_profile.parse_heaptrack_histogram(path))
+
+            legs = self._xlsx_xml_borrowed_legs(directory)
+            for leg in legs:
+                leg.update(self._strict_xlsx_resource_fields())
+            parsed = Path(directory) / "partial.tsv"
+            parsed.write_text("4\t3\nmalformed\n", encoding="utf-8")
+            self.assertIsNone(perf_resource_profile.parse_heaptrack_histogram(parsed))
+            legs[0]["heaptrack"]["print"]["parsed"]["histogram_artifact"] = (
+                perf_resource_profile.artifact(parsed, retained=True)
+            )
+            legs[0]["heaptrack"]["print"]["parsed"]["allocated_bytes"] = None
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "allocated_bytes is missing or non-finite",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_resource_legs(legs)
+
+    def test_heaptrack_bytes_token_fails_closed_on_huge_or_nonfinite_units(self):
+        self.assertEqual(perf_resource_profile._bytes_token("2.50M"), 2_621_440)
+        self.assertIsNone(perf_resource_profile._bytes_token("9" * 500 + "T"))
+        self.assertIsNone(perf_resource_profile._bytes_token("1e999T"))
+        self.assertIsNone(perf_resource_profile._bytes_token("nanM"))
+        self.assertIsNone(perf_resource_profile._bytes_token("infG"))
 
     def test_retained_docx_heaptrack_report_is_reprocessed_from_verified_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -964,12 +1082,8 @@ peak RSS (including heaptrack overhead): 4.00M
             "xlsx_shapes": ["tiny"],
             "xlsx_cell_crud_shapes": ["medium"],
         }
-        tiny_corpus = json.loads(
-            json.dumps(perf_resource_profile.XLSX_XML_BORROWED_TINY_CORPUS_MANIFEST)
-        )
-        medium_corpus = json.loads(
-            json.dumps(perf_resource_profile.XLSX_XML_BORROWED_MEDIUM_CORPUS_MANIFEST)
-        )
+        tiny_corpus = copy.deepcopy(XLSX_TINY_CORPUS_FIXTURE)
+        medium_corpus = copy.deepcopy(XLSX_MEDIUM_CORPUS_FIXTURE)
         results = []
         for offset, case in enumerate(cases):
             result = {
@@ -1053,13 +1167,20 @@ peak RSS (including heaptrack overhead): 4.00M
         return legs
 
     @staticmethod
-    def _strict_xlsx_resource_fields(value=100):
-        retained = {
-            "present": True,
-            "retained": True,
-            "sha256": "a" * 64,
-            "bytes": 1,
-        }
+    def _strict_xlsx_resource_fields(value=100, *, artifact_root=None):
+        if artifact_root is None:
+            retained = {
+                "present": True,
+                "retained": True,
+                "sha256": "a" * 64,
+                "bytes": 1,
+            }
+        else:
+            artifact_root = Path(artifact_root)
+            artifact_root.mkdir(parents=True, exist_ok=True)
+            evidence_path = artifact_root / "strict-evidence.bin"
+            evidence_path.write_bytes(b"strict-xlsx-evidence")
+            retained = perf_resource_profile.artifact(evidence_path, retained=True)
         parsed_time = {
             "status": "ok",
             "max_rss_kib": value,
@@ -1106,11 +1227,16 @@ peak RSS (including heaptrack overhead): 4.00M
                     "parsed": parsed_heaptrack,
                 },
             },
-            "resource_metrics": {
-                metric: value
-                for metric in perf_resource_profile.XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS
-            },
         }
+
+    @staticmethod
+    def _set_strict_xlsx_metric(leg, metric, value):
+        if metric.startswith("time."):
+            leg["time"]["parsed"][metric.split(".", 1)[1]] = value
+        elif metric.startswith("heaptrack."):
+            leg["heaptrack"]["print"]["parsed"][metric.split(".", 1)[1]] = value
+        else:
+            raise AssertionError(f"unexpected strict XLSX metric: {metric}")
 
     def test_docx_parser_exposes_explicit_comparison_cli(self):
         parsed = perf_resource_profile.build_parser().parse_args(
@@ -1217,6 +1343,14 @@ peak RSS (including heaptrack overhead): 4.00M
 
     def test_xlsx_xml_borrowed_validation_binds_four_rows_and_identity_channels(self):
         with tempfile.TemporaryDirectory() as directory:
+            for shape, corpus in (
+                ("tiny", XLSX_TINY_CORPUS_FIXTURE),
+                ("medium", XLSX_MEDIUM_CORPUS_FIXTURE),
+            ):
+                digest = hashlib.sha256(
+                    json.dumps(corpus, sort_keys=True, separators=(",", ":")).encode()
+                ).hexdigest()
+                self.assertEqual(digest, XLSX_CORPUS_CANONICAL_DIGESTS[shape])
             expected = {
                 "samples_per_case": 3,
                 "warmup_iterations_per_case": 1,
@@ -1232,6 +1366,15 @@ peak RSS (including heaptrack overhead): 4.00M
             self.assertEqual(
                 [item["case"] for item in validated["corpus_identities"]],
                 list(perf_resource_profile.XLSX_XML_BORROWED_CASES),
+            )
+            self.assertEqual(
+                [item["identity_sha256"] for item in validated["corpus_identities"]],
+                [
+                    XLSX_CORPUS_CANONICAL_DIGESTS["tiny"],
+                    XLSX_CORPUS_CANONICAL_DIGESTS["tiny"],
+                    XLSX_CORPUS_CANONICAL_DIGESTS["medium"],
+                    XLSX_CORPUS_CANONICAL_DIGESTS["medium"],
+                ],
             )
             self.assertEqual(
                 [item["case"] for item in validated["result_identities"]],
@@ -1465,10 +1608,10 @@ peak RSS (including heaptrack overhead): 4.00M
                 leg.update(self._strict_xlsx_resource_fields(100))
             for index in (1, 2):
                 for metric in required:
-                    at_boundary[index]["resource_metrics"][metric] = 105
-            at_boundary[0]["resource_metrics"][
-                "harness.xlsx_first_cell.elapsed_ns.p50"
-            ] = 10**12
+                    self._set_strict_xlsx_metric(at_boundary[index], metric, 105)
+            at_boundary[0]["resource_metrics"] = {
+                "harness.xlsx_first_cell.elapsed_ns.p50": 10**12
+            }
             accepted = perf_resource_profile.validate_xlsx_xml_borrowed_acceptance(
                 at_boundary
             )
@@ -1482,7 +1625,7 @@ peak RSS (including heaptrack overhead): 4.00M
             over_boundary = self._xlsx_xml_borrowed_legs(directory)
             for leg in over_boundary:
                 leg.update(self._strict_xlsx_resource_fields(100))
-            over_boundary[1]["resource_metrics"][required[0]] = 105.1
+            self._set_strict_xlsx_metric(over_boundary[1], required[0], 105.1)
             with self.assertRaisesRegex(
                 perf_resource_profile.ResourceProfileInputError,
                 "exceeds 5.000000%",
@@ -1492,8 +1635,7 @@ peak RSS (including heaptrack overhead): 4.00M
             missing = self._xlsx_xml_borrowed_legs(directory)
             for leg in missing:
                 leg.update(self._strict_xlsx_resource_fields(100))
-            missing[0]["resource_metrics"].pop(required[0])
-            missing[0]["heaptrack"]["print"]["parsed"]["allocation_calls"] = None
+            self._set_strict_xlsx_metric(missing[0], required[0], None)
             with self.assertRaisesRegex(
                 perf_resource_profile.ResourceProfileInputError,
                 "missing or non-finite",
@@ -1503,15 +1645,22 @@ peak RSS (including heaptrack overhead): 4.00M
             nonfinite = self._xlsx_xml_borrowed_legs(directory)
             for leg in nonfinite:
                 leg.update(self._strict_xlsx_resource_fields(100))
-            nonfinite[2]["resource_metrics"][required[1]] = float("nan")
-            nonfinite[2]["heaptrack"]["print"]["parsed"]["allocated_bytes"] = float(
-                "nan"
-            )
+            self._set_strict_xlsx_metric(nonfinite[2], required[1], float("nan"))
             with self.assertRaisesRegex(
                 perf_resource_profile.ResourceProfileInputError,
                 "missing or non-finite",
             ):
                 perf_resource_profile.validate_xlsx_xml_borrowed_acceptance(nonfinite)
+
+            mismatch = self._xlsx_xml_borrowed_legs(directory)
+            for leg in mismatch:
+                leg.update(self._strict_xlsx_resource_fields(100))
+            mismatch[0]["resource_metrics"] = {required[0]: 101}
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "does not match parsed evidence",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_acceptance(mismatch)
 
     def test_xlsx_xml_borrowed_leg_retains_time_heaptrack_and_harness_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1709,7 +1858,9 @@ Minor (reclaiming a frame) page faults: 34
                 leg = next(item for item in legs if item["leg"] == kwargs["leg"])
                 return {
                     **leg,
-                    **self._strict_xlsx_resource_fields(100),
+                    **self._strict_xlsx_resource_fields(
+                        100, artifact_root=artifacts / kwargs["leg"].lower()
+                    ),
                     "harness": {"logical_measurements": []},
                     "latency_evidence": dict(perf_resource_profile.LATENCY_SEPARATION),
                     "artifact_directory": str(artifacts / kwargs["leg"].lower()),
@@ -1742,6 +1893,12 @@ Minor (reclaiming a frame) page faults: 34
                     perf_resource_profile.run_xlsx_xml_borrowed_abba(arguments), 0
                 )
             published = json.loads(output.read_text(encoding="utf-8"))
+            artifact_files_exist = [
+                (
+                    Path(leg["artifact_directory"]) / "strict-evidence.bin"
+                ).is_file()
+                for leg in published["legs"]
+            ]
         self.assertEqual(
             published["scope"]["workload"], perf_resource_profile.XLSX_XML_BORROWED_ID
         )
@@ -1751,17 +1908,29 @@ Minor (reclaiming a frame) page faults: 34
         )
         self.assertEqual(published["scope"]["xlsx_shape"], "tiny")
         self.assertEqual(published["scope"]["xlsx_cell_crud_shape"], "medium")
-        self.assertEqual(published["tool"]["version"], "0.1.3")
+        self.assertEqual(published["tool"]["version"], "0.1.4")
         self.assertEqual(published["latency_evidence"]["status"], "not_measured")
         self.assertEqual(len(published["corpus_identities"]), 4)
         self.assertEqual(len(published["result_identities"]), 4)
         self.assertEqual(published["tools"]["heaptrack"]["available"], True)
         self.assertEqual(published["resource_evidence"]["status"], "validated")
         self.assertEqual(published["predeclared_acceptance"]["status"], "accepted")
+        expected_artifact_sha256 = perf_resource_profile.sha256_bytes(
+            b"strict-xlsx-evidence"
+        )
         for leg in published["legs"]:
             self.assertNotIn("harness_report", leg)
             self.assertIn("harness_identity", leg)
             self.assertIn("result_identities", leg["harness_identity"])
+            self.assertEqual(
+                leg["time"]["parsed"]["artifact"]["sha256"],
+                expected_artifact_sha256,
+            )
+            self.assertEqual(
+                leg["heaptrack"]["print"]["parsed"]["histogram_artifact"]["sha256"],
+                expected_artifact_sha256,
+            )
+            self.assertTrue(all(artifact_files_exist))
 
     def test_xlsx_xml_borrowed_requires_each_external_resource_tool(self):
         with tempfile.TemporaryDirectory() as directory:
