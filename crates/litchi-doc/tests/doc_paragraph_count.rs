@@ -1,4 +1,4 @@
-//! Regression coverage for the allocation-free native-DOC paragraph count.
+//! Regression coverage for the structural-only native-DOC paragraph count.
 
 use litchi_doc::Package;
 use litchi_doc::writer::Writer;
