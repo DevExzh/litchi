@@ -29,6 +29,7 @@ const ZIP_SIGNATURE: &[u8] = b"PK\x03\x04";
 const LOCAL_HEADER_BYTES: usize = 30;
 const MIMETYPE_PATH: &str = "mimetype";
 const MIMETYPE_NAME: &[u8] = MIMETYPE_PATH.as_bytes();
+const OOXML_CATALOG_NAME: &str = "[Content_Types].xml";
 const MAX_MIMETYPE_BYTES: usize = 256;
 
 /// Classify the raw contents of an ODF `mimetype` member.
@@ -139,6 +140,137 @@ pub fn bytes(value: &[u8]) -> Option<Format> {
 #[must_use]
 pub fn packaged_mime(value: &[u8]) -> Option<Format> {
     mime(packaged_mime_bytes(value)?)
+}
+
+/// Check whether a ZIP candidate has the reserved OPC content-types member.
+///
+/// This inspects only the central-directory catalog. It does not read or
+/// decompress a member and does not build an owned archive index, so a normal
+/// ODF package can avoid an unrelated full OPC probe. `Some(false)` means the
+/// ZIP catalog was valid and had no exact content-types member; `None` means
+/// the candidate was not a valid ZIP catalog. Member-name matching follows
+/// OPC's ASCII-case-insensitive, normalized-name lookup semantics.
+#[must_use]
+pub fn packaged_has_ooxml_catalog(value: &[u8]) -> Option<bool> {
+    if !value.starts_with(ZIP_SIGNATURE) {
+        return None;
+    }
+
+    let archive = soapberry_zip::ZipArchive::from_slice(value).ok()?;
+    let mut entries = archive.entries();
+    while let Some(entry) = entries.next_entry().ok()? {
+        if entry.is_dir() {
+            continue;
+        }
+        let normalized = entry.file_path().try_normalize().ok()?;
+        if normalized.as_str().eq_ignore_ascii_case(OOXML_CATALOG_NAME) {
+            return Some(true);
+        }
+    }
+    Some(false)
+}
+
+/// Check the reserved OPC content-types member from a positional ZIP source.
+///
+/// This is the source-backed counterpart to [`packaged_has_ooxml_catalog`]. It
+/// reads only ZIP metadata through [`ReadAt`], retaining the caller's source
+/// identity check and never materializing or decompressing a member. ZIP
+/// layout errors are reported as `Ok(None)` so an owning facade can retain its
+/// existing fallback/error policy for malformed candidates.
+///
+/// # Errors
+///
+/// Returns source I/O, source-change, or bounded scratch-buffer allocation
+/// errors.
+pub fn packaged_has_ooxml_catalog_read_at(
+    source: &dyn ReadAt,
+) -> litchi_core::Result<Option<bool>> {
+    let expected = source.version()?;
+    let detected = (|| {
+        let length = source.len()?;
+        if length < u64::try_from(ZIP_SIGNATURE.len()).expect("ZIP signature fits in u64") {
+            return Ok(None);
+        }
+
+        let mut signature = [0_u8; ZIP_SIGNATURE.len()];
+        source.read_exact_at(0, &mut signature)?;
+        if signature.as_slice() != ZIP_SIGNATURE {
+            return Ok(None);
+        }
+
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+            .map_err(|source| Error::Allocation {
+                resource: "ODF ZIP catalog probe",
+                source,
+            })?;
+        buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let archive = match soapberry_zip::ZipLocator::new().locate_in_reader(
+            ReadAtZipSource { source },
+            &mut buffer,
+            length,
+        ) {
+            Ok(archive) => archive,
+            Err((_reader, _error)) => return Ok(None),
+        };
+        let mut entries = archive.entries(&mut buffer);
+        while let Some(entry) = match entries.next_entry() {
+            Ok(entry) => entry,
+            Err(_error) => return Ok(None),
+        } {
+            if entry.is_dir() {
+                continue;
+            }
+            let normalized = match entry.file_path().try_normalize() {
+                Ok(normalized) => normalized,
+                Err(_error) => return Ok(None),
+            };
+            if normalized.as_str().eq_ignore_ascii_case(OOXML_CATALOG_NAME) {
+                return Ok(Some(true));
+            }
+        }
+        Ok(Some(false))
+    })();
+    let observed = source.version()?;
+    ensure_source_current(expected, observed)?;
+    detected
+}
+
+/// Check the reserved OPC content-types member from a seekable reader.
+///
+/// The reader's original position is restored before returning. As with the
+/// other catalog probes, this reads ZIP central-directory metadata only and
+/// returns `None` for non-ZIP or malformed candidates.
+pub fn packaged_has_ooxml_catalog_from_reader<R: Read + Seek>(reader: &mut R) -> Option<bool> {
+    let original = reader.stream_position().ok()?;
+    let detected = (|| {
+        reader.seek(SeekFrom::Start(0)).ok()?;
+        let mut signature = [0_u8; ZIP_SIGNATURE.len()];
+        reader.read_exact(&mut signature).ok()?;
+        if signature.as_slice() != ZIP_SIGNATURE {
+            return None;
+        }
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+            .ok()?;
+        buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let archive = soapberry_zip::ZipArchive::from_seekable(&mut *reader, &mut buffer).ok()?;
+        let mut entries = archive.entries(&mut buffer);
+        while let Some(entry) = entries.next_entry().ok()? {
+            if entry.is_dir() {
+                continue;
+            }
+            let normalized = entry.file_path().try_normalize().ok()?;
+            if normalized.as_str().eq_ignore_ascii_case(OOXML_CATALOG_NAME) {
+                return Some(true);
+            }
+        }
+        Some(false)
+    })();
+    reader.seek(SeekFrom::Start(original)).ok()?;
+    detected
 }
 
 /// Detect a packaged ODF MIME type from a positional source.
@@ -318,6 +450,16 @@ fn trim_ascii(mut value: &[u8]) -> &[u8] {
         value = &value[..value.len() - 1];
     }
     value
+}
+
+struct ReadAtZipSource<'a> {
+    source: &'a dyn ReadAt,
+}
+
+impl soapberry_zip::ReaderAt for ReadAtZipSource<'_> {
+    fn read_at(&self, buffer: &mut [u8], offset: u64) -> std::io::Result<usize> {
+        self.source.read_at(offset, buffer)
+    }
 }
 
 #[cfg(test)]
@@ -536,6 +678,38 @@ mod tests {
     }
 
     #[test]
+    fn central_catalog_probe_is_exact_and_conservative() {
+        let ordinary = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"[Content_Types].xml"),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&ordinary), Some(false));
+
+        let case_insensitive = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("[content_types].xml", b"<broken>"),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&case_insensitive), Some(true));
+
+        let normalized = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("/[Content_Types].xml", b"<broken>"),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&normalized), Some(true));
+
+        let directory = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("[Content_Types].xml/", b""),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&directory), Some(false));
+
+        let mut malformed = ordinary;
+        malformed.truncate(malformed.len() - 1);
+        assert_eq!(packaged_has_ooxml_catalog(&malformed), None);
+        assert_eq!(packaged_has_ooxml_catalog(b"not a ZIP"), None);
+    }
+
+    #[test]
     fn positional_packaged_probe_reuses_strict_local_mimetype_grammar() {
         let mut writer = crate::core::PackageWriter::new();
         writer
@@ -550,6 +724,24 @@ mod tests {
         assert_eq!(
             packaged_mime_read_at(&source).expect("positional probe"),
             packaged_mime(&package)
+        );
+        assert_eq!(
+            packaged_has_ooxml_catalog_read_at(&source).expect("positional catalog probe"),
+            packaged_has_ooxml_catalog(&package)
+        );
+        let mut seekable = Cursor::new(package.clone());
+        seekable.set_position(5);
+        assert_eq!(
+            packaged_has_ooxml_catalog_from_reader(&mut seekable),
+            Some(false)
+        );
+        assert_eq!(seekable.position(), 5);
+        let mut malformed = package.clone();
+        malformed.truncate(malformed.len() - 1);
+        assert_eq!(
+            packaged_has_ooxml_catalog_read_at(&litchi_core::OwnedSource::new(malformed))
+                .expect("malformed positional catalog probe"),
+            None
         );
         assert_eq!(
             packaged_mime_read_at(&litchi_core::OwnedSource::new(

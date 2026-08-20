@@ -144,9 +144,11 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
 /// `OwnedPackage` index is transferred to the typed ODS owner without a
 /// second ODF semantic index scan. Other formats return their original bytes
 /// for the ordinary detector. In builds with any OOXML probe feature enabled,
-/// it first performs the same bounded OOXML probe as smart detection,
-/// preserving OOXML-first precedence for valid OOXML/ODF polyglots; that probe
-/// is an independent OPC scan and is not counted as an ODF index.
+/// a cheap central-directory catalog check gates the same bounded OOXML probe
+/// as smart detection. This preserves OOXML-first precedence for valid
+/// OOXML/ODF polyglots while avoiding an unrelated OPC scan for ordinary ODF
+/// packages; the probe is an independent OPC scan and is not counted as an
+/// ODF index.
 #[cfg(feature = "ods")]
 pub(crate) fn detect_prepared_ods(
     bytes: Vec<u8>,
@@ -157,7 +159,9 @@ pub(crate) fn detect_prepared_ods(
         return Err(bytes);
     }
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    if ooxml_probe_wins(&bytes) {
+    if litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(true)
+        && ooxml_probe_wins(&bytes)
+    {
         return Err(bytes);
     }
     let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
@@ -288,6 +292,21 @@ pub(crate) fn detect_workbook_source_path(
     #[cfg(not(feature = "ods"))]
     let is_ods = false;
 
+    #[cfg(all(
+        feature = "ods",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    let ordinary_ods = is_ods
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref())
+            .ok()
+            .flatten()
+            == Some(false);
+    #[cfg(all(
+        not(feature = "ods"),
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    let ordinary_ods = false;
+
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
         let mut signature = [0_u8; 4];
@@ -297,7 +316,7 @@ pub(crate) fn detect_workbook_source_path(
                 &signature,
                 litchi_core::detection::utils::ZIP_SIGNATURE,
             );
-        let source_package = if zip_magic {
+        let source_package = if zip_magic && !ordinary_ods {
             match crate::opc::SourceBackedPackage::from_read_at_with_limits(
                 Arc::clone(&source),
                 crate::opc::ReadLimits::default(),
@@ -470,12 +489,12 @@ fn read_path_source_bytes(
 }
 
 /// Prepare an ODP package for the unified presentation facade while keeping
-/// the public smart-detection enum source-compatible. As with ODS, it first
-/// performs the bounded OOXML probe when any OOXML probe feature is enabled so
-/// OOXML-first polyglot precedence remains unchanged, including for a
-/// recognized OOXML leaf whose own facade feature is disabled. When ODF wins,
-/// the prepared ODF index transfers to the typed ODP owner without a second
-/// ODF semantic index scan.
+/// the public smart-detection enum source-compatible. As with ODS, a cheap
+/// central-directory catalog check gates the bounded OOXML probe when any
+/// OOXML probe feature is enabled, so OOXML-first polyglot precedence remains
+/// unchanged, including for a recognized OOXML leaf whose own facade feature
+/// is disabled. When ODF wins, the prepared ODF index transfers to the typed
+/// ODP owner without a second ODF semantic index scan.
 #[cfg(feature = "odp")]
 pub(crate) fn detect_prepared_odp(
     bytes: Vec<u8>,
@@ -486,7 +505,9 @@ pub(crate) fn detect_prepared_odp(
         return Err(bytes);
     }
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    if ooxml_probe_wins(&bytes) {
+    if litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(true)
+        && ooxml_probe_wins(&bytes)
+    {
         return Err(bytes);
     }
     let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
@@ -663,27 +684,36 @@ pub fn detect_format_smart_with_limits(
 
     // Check ZIP candidates in the same order as the ordinary detector.
     if mask.is_zip() {
+        #[cfg(all(
+            any(feature = "odt", feature = "ods", feature = "odp"),
+            any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+        ))]
+        let normal_odf = litchi_odf_common::detect::packaged_mime(&bytes).is_some()
+            && litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(false);
+        #[cfg(all(
+            not(any(feature = "odt", feature = "ods", feature = "odp")),
+            any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+        ))]
+        let normal_odf = false;
+
         // A successful OOXML probe returns the parsed OPC owner directly.
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        if !normal_odf
+            && let Ok(package) = crate::opc::OpcPackage::from_bytes_with_limits(&bytes, limits)
+            && let Some(format) =
+                crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)
         {
-            if let Ok(package) = crate::opc::OpcPackage::from_bytes_with_limits(&bytes, limits) {
-                // Use existing OOXML detection logic
-                if let Some(format) =
-                    crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)
-                {
-                    return match format {
-                        #[cfg(feature = "docx")]
-                        FileFormat::Docx => Some(DetectedFormat::Docx(package)),
-                        #[cfg(feature = "pptx")]
-                        FileFormat::Pptx => Some(DetectedFormat::Pptx(package)),
-                        #[cfg(feature = "xlsx")]
-                        FileFormat::Xlsx => Some(DetectedFormat::Xlsx(package)),
-                        #[cfg(feature = "xlsb")]
-                        FileFormat::Xlsb => Some(DetectedFormat::Xlsb(package)),
-                        _ => None,
-                    };
-                }
-            }
+            return match format {
+                #[cfg(feature = "docx")]
+                FileFormat::Docx => Some(DetectedFormat::Docx(package)),
+                #[cfg(feature = "pptx")]
+                FileFormat::Pptx => Some(DetectedFormat::Pptx(package)),
+                #[cfg(feature = "xlsx")]
+                FileFormat::Xlsx => Some(DetectedFormat::Xlsx(package)),
+                #[cfg(feature = "xlsb")]
+                FileFormat::Xlsb => Some(DetectedFormat::Xlsb(package)),
+                _ => None,
+            };
         }
 
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
@@ -1287,6 +1317,22 @@ pub(crate) fn detect_pptx_source_path_with_limits(
         }));
     }
 
+    #[cfg(feature = "odp")]
+    let ordinary_odp = !ooxml_extension
+        && litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())
+            .ok()
+            .flatten()
+            == Some(litchi_core::FileFormat::Odp)
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref())
+            .ok()
+            .flatten()
+            == Some(false);
+    #[cfg(not(feature = "odp"))]
+    let ordinary_odp = false;
+    if ordinary_odp {
+        return Ok(None);
+    }
+
     if !zip_magic {
         return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ZipError(
             "OOXML-suffixed input does not have ZIP magic".to_owned(),
@@ -1434,6 +1480,50 @@ mod short_signature_tests {
 
         assert_eq!(spreadsheet.prepared_index_identity(), index_identity);
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
+    }
+
+    #[cfg(all(
+        feature = "ods",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[test]
+    fn ods_handoff_handles_ordinary_and_malformed_ooxml_catalogs() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_SPREADSHEET)
+            .unwrap();
+        writer
+            .add_file(
+                litchi_odf_common::constants::ODF_CONTENT,
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:spreadsheet/></office:body></office:document-content>"#,
+            )
+            .unwrap();
+        let ordinary = writer.finish_to_bytes().unwrap();
+        assert!(matches!(
+            detect_format_smart(ordinary.clone()),
+            Some(super::DetectedFormat::Ods(_))
+        ));
+        assert!(super::detect_prepared_ods(ordinary).is_ok());
+
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_SPREADSHEET)
+            .unwrap();
+        writer
+            .add_file(
+                litchi_odf_common::constants::ODF_CONTENT,
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:spreadsheet/></office:body></office:document-content>"#,
+            )
+            .unwrap();
+        writer
+            .add_file("[Content_Types].xml", b"<not-an-opc-types-root/>")
+            .unwrap();
+        let malformed_catalog = writer.finish_to_bytes().unwrap();
+        assert!(matches!(
+            detect_format_smart(malformed_catalog.clone()),
+            Some(super::DetectedFormat::Ods(_))
+        ));
+        assert!(super::detect_prepared_ods(malformed_catalog).is_ok());
     }
 
     #[cfg(all(
