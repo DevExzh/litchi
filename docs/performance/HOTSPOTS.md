@@ -3,6 +3,13 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0251 — XLSX borrowed XML worksheet parsing ABBA evidence](changes/0251-xlsx-xml-borrowed-abba.md)
+(three selectors accept all four statistics; `xlsx_first_cell` accepts p50,
+mean, and p99, while p95 is drift-rejected at +10.941931% candidate drift.
+No adverse-both cell is present. Latency supports the listed cells, but
+production is HELD pending allocator/resource evidence; the candidate is not
+landed. The durable baseline failure reproduces on the unmodified base and is
+unrelated; targeted suites passed. No broad XLSX claim.)
 [change 0250 — ZIP ordering/index ABBA evidence](changes/0250-zip-ordering-abba.md)
 (the eight-row `zip_index` package accepts no statistic; adverse-both counts
 are p50=5, mean=3, p95=3, and p99=3. The compressible tiny, many-small, and
