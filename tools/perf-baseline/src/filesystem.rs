@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use soapberry_zip::ZipArchive;
 
-use crate::process_metrics;
+use crate::{cold_verified, process_metrics};
 
 const OPC_FILE_SHAPE: super::CorpusShape = super::CorpusShape::FewLarge;
 const OPC_FILE_PAYLOAD: super::PayloadKind = super::PayloadKind::Incompressible;
@@ -295,6 +295,9 @@ impl ChildResult {
             logical_read_calls: 0,
             logical_read_requested_bytes: 0,
             logical_read_bytes: 0,
+            logical_read_largest_requested_bytes: 0,
+            logical_read_largest_returned_bytes: 0,
+            logical_read_pattern: None,
             max_concurrent_reads: 0,
             logical_read_request_sizes: Vec::new(),
             logical_read_request_size_buckets: ReadSizeBuckets::default(),

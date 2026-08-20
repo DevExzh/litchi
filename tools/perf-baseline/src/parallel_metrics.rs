@@ -265,8 +265,8 @@ fn source_chunk_evidence(source: Option<&SourceSummary>) -> Result<ChunkEvidence
                                 .checked_add(phase.physical_request_count)
                                 .ok_or_else(|| {
                                     InputError(format!(
-                                        "source.cfb_open_stream.simulation.samples[{sample_index}] "
-                                            "per-operation request count overflows u64"
+                                        "source.cfb_open_stream.simulation.samples[{sample_index}] \
+                                         per-operation request count overflows u64"
                                     ))
                                 })
                         })
@@ -476,8 +476,8 @@ fn reorder_to_elapsed_samples(
     for (sorted_index, &original_index) in sample_order.iter().enumerate() {
         if original_index >= values.len() {
             return Err(InputError(format!(
-                "{location} sample_order[{sorted_index}]={original_index} is outside "
-                    "the retained sample vector"
+                "{location} sample_order[{sorted_index}]={original_index} is outside \
+                 the retained sample vector"
             )));
         }
         if seen[original_index] {
