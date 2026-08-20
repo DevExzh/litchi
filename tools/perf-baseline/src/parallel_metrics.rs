@@ -708,10 +708,10 @@ mod tests {
         input.logical_tasks = Some(1);
         assert!(case_metrics(input, 0, &[1, 2, 4]).is_err());
 
-        let mut input = input();
-        input.opc_cache_worker_count = Some(8);
-        input.persistent_worker_teams_created = Some(1);
-        assert!(case_metrics(input, 0, &[1, 2, 4]).is_err());
+        let mut cache_input = input();
+        cache_input.opc_cache_worker_count = Some(8);
+        cache_input.persistent_worker_teams_created = Some(1);
+        assert!(case_metrics(cache_input, 0, &[1, 2, 4]).is_err());
     }
 
     #[test]

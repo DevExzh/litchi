@@ -920,11 +920,16 @@ mod tests {
     #[test]
     fn strict_fincore_json_rejects_unknown_and_duplicate_fields() {
         for json in [
-            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0,"writeback":0,"extra":1}]}"#,
-            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0,"writeback":0,"res":0}]}"#,
-            br#"{"fincore":[{"file":"/tmp/source","size":"8192","res":0,"dirty":0,"writeback":0}]}"#,
-            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0}]}"#,
-            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0,"writeback":0}],"extra":[]}"#,
+            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0,"writeback":0,"extra":1}]}"#
+                .as_slice(),
+            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0,"writeback":0,"res":0}]}"#
+                .as_slice(),
+            br#"{"fincore":[{"file":"/tmp/source","size":"8192","res":0,"dirty":0,"writeback":0}]}"#
+                .as_slice(),
+            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0}]}"#
+                .as_slice(),
+            br#"{"fincore":[{"file":"/tmp/source","size":8192,"res":0,"dirty":0,"writeback":0}],"extra":[]}"#
+                .as_slice(),
         ] {
             assert_eq!(parse_fincore_json(json), Err(Status::IneligibleFincoreInvalidJson));
         }

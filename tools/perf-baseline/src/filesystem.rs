@@ -4324,7 +4324,7 @@ mod tests {
 
     #[test]
     fn padded_docx_archive_keeps_semantic_corpus_identity() {
-        let corpus = super::build_docx_source_edit_corpus().unwrap();
+        let corpus = crate::build_docx_source_edit_corpus().unwrap();
         let aligned =
             super::cold_verified::page_aligned_archive(&corpus.archive, 4096, true).unwrap();
         assert_eq!(aligned.len() % 4096, 0);
