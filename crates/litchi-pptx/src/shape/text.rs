@@ -13,10 +13,10 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
-/// Maximum nesting depth accepted when extracting `DrawingML` text, matching
-/// the hardened slide element scanner.
+/// Maximum nesting depth accepted by the `DrawingML` text and range scanners,
+/// matching the hardened slide element scanner.
 const MAX_TEXT_SCAN_DEPTH: usize = 128;
-/// Maximum number of elements scanned while extracting `DrawingML` text.
+/// Maximum number of elements visited by either `DrawingML` scanner.
 const MAX_TEXT_SCAN_NODES: usize = 1_000_000;
 
 fn is_drawingml_name(
@@ -196,6 +196,8 @@ pub fn scan_ranges(
     let mut reader = NsReader::from_reader(xml_bytes);
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut capture: Option<(usize, usize)> = None;
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
     loop {
         let event_start = usize::try_from(reader.buffer_position())
             .map_err(|_err| Error::Invalid("DrawingML offset does not fit usize".to_string()))?;
@@ -213,6 +215,42 @@ pub fn scan_ranges(
                         .prefix()
                         .map(|prefix| prefix.into_inner().to_vec()),
                 );
+            }
+            match &event {
+                Event::Start(_) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("DrawingML element counter overflow".to_string())
+                    })?;
+                    if nodes > MAX_TEXT_SCAN_NODES {
+                        return Err(Error::Invalid(format!(
+                            "DrawingML XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                        )));
+                    }
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("DrawingML nesting is too deep".to_string())
+                    })?;
+                    if depth > MAX_TEXT_SCAN_DEPTH {
+                        return Err(Error::Invalid(format!(
+                            "DrawingML nesting exceeds the {MAX_TEXT_SCAN_DEPTH} depth limit"
+                        )));
+                    }
+                },
+                Event::Empty(_) => {
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("DrawingML element counter overflow".to_string())
+                    })?;
+                    if nodes > MAX_TEXT_SCAN_NODES {
+                        return Err(Error::Invalid(format!(
+                            "DrawingML XML exceeds {MAX_TEXT_SCAN_NODES} elements"
+                        )));
+                    }
+                },
+                Event::End(_) => {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| Error::Invalid("invalid DrawingML nesting".to_string()))?;
+                },
+                _ => {},
             }
             match event {
                 Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
@@ -271,7 +309,7 @@ pub fn scan_ranges(
                     emit_drawingml_range(start, event_end, &mut emit)?;
                 }
             },
-            ScanEvent::Eof if capture.is_some() => {
+            ScanEvent::Eof if capture.is_some() || depth != 0 => {
                 return Err(Error::Invalid("unterminated DrawingML element".to_string()));
             },
             ScanEvent::Eof => break,
@@ -342,6 +380,15 @@ mod tests {
 
         let truncated = br#"<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:r><a:t>bad</a:t>"#;
         assert!(extract(truncated, None).is_err());
+    }
+
+    #[test]
+    fn drawingml_range_scan_rejects_structural_depth_over_bound() {
+        let mut xml = String::from("<root>");
+        xml.push_str(&"<node>".repeat(MAX_TEXT_SCAN_DEPTH));
+        xml.push_str(&"</node>".repeat(MAX_TEXT_SCAN_DEPTH));
+        xml.push_str("</root>");
+        assert!(scan_ranges(xml.as_bytes(), b"p", |_, _| Ok(())).is_err());
     }
 
     #[test]
