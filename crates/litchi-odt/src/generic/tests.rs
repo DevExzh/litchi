@@ -3,7 +3,9 @@
 use super::{Family, FlatDocument, Package};
 use crate::constants;
 use crate::core::PackageWriter;
+use litchi_core::Error;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+use std::io::Cursor;
 
 fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
     let archive = ArchiveReader::new(package).unwrap();
@@ -131,6 +133,39 @@ fn opens_standard_and_odfdo_compatible_flat_documents_losslessly() {
         assert_eq!(document.to_bytes(), xml.as_bytes());
         assert_eq!(document.into_bytes(), xml.into_bytes());
     }
+}
+
+#[test]
+fn flat_document_owned_and_reader_limits_share_exact_boundaries() {
+    let xml = format!(
+        r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="{}"><o:body><o:text/></o:body></o:document>"#,
+        constants::ODF_TEXT,
+    );
+    let exact = u64::try_from(xml.len()).unwrap();
+    assert!(FlatDocument::from_bytes_with_limit(xml.as_bytes().to_vec(), exact).is_ok());
+    assert!(FlatDocument::from_reader_with_limit(Cursor::new(xml.as_bytes()), exact).is_ok());
+
+    let mut oversized = xml.as_bytes().to_vec();
+    oversized.push(b'x');
+    assert!(matches!(
+        FlatDocument::from_bytes_with_limit(oversized.clone(), exact),
+        Err(Error::ResourceLimit(_))
+    ));
+    assert!(matches!(
+        FlatDocument::from_reader_with_limit(Cursor::new(oversized), exact),
+        Err(Error::ResourceLimit(_))
+    ));
+    assert!(matches!(
+        FlatDocument::from_bytes_with_limit(xml.into_bytes(), 0),
+        Err(Error::InvalidFormat(_))
+    ));
+    assert!(matches!(
+        FlatDocument::from_bytes_with_limit(
+            b"<o:document/>".to_vec(),
+            super::flat::HARD_MAX_FLAT_DOCUMENT_BYTES + 1,
+        ),
+        Err(Error::InvalidFormat(_))
+    ));
 }
 
 #[test]

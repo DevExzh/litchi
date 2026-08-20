@@ -189,11 +189,11 @@ pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>>
         let Some(format) = packaged_mime_with_limits(value, limits)? else {
             return Ok(None);
         };
-        let archive = soapberry_zip::office::ArchiveReader::new(value)
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let archive =
+            soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
         if !archive
             .is_stored(MIMETYPE_PATH)
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?
+            .map_err(map_detector_zip_error)?
         {
             return Ok(None);
         }
@@ -378,6 +378,13 @@ fn check_input_len(length: usize, limits: Limits, scope: &'static str) -> Result
         }));
     }
     Ok(())
+}
+
+fn map_detector_zip_error(error: soapberry_zip::Error) -> Error {
+    match crate::core::package::map_zip_error(error) {
+        limit @ Error::ResourceLimit(_) => limit,
+        error => Error::InvalidFormat(error.to_string()),
+    }
 }
 
 fn packaged_mime_bytes(value: &[u8]) -> Option<&[u8]> {
@@ -657,6 +664,34 @@ mod tests {
             reader_with_limits(&mut reader, Limits::new(0)),
             Err(Error::InvalidFormat(_))
         ));
+    }
+
+    #[test]
+    fn detector_preserves_zip_file_count_and_metadata_limits() {
+        for (resource, expected_resource) in [
+            (soapberry_zip::LimitResource::FileCount, Resource::Objects),
+            (
+                soapberry_zip::LimitResource::MetadataBytes,
+                Resource::InputBytes,
+            ),
+        ] {
+            let error = map_detector_zip_error(soapberry_zip::Error::from(
+                soapberry_zip::ErrorKind::LimitExceeded {
+                    resource,
+                    actual: 2,
+                    maximum: 1,
+                },
+            ));
+            assert!(matches!(
+                error,
+                Error::ResourceLimit(ResourceLimit {
+                    resource,
+                    observed: 2,
+                    limit: 1,
+                    ..
+                }) if resource == expected_resource
+            ));
+        }
     }
 
     #[test]

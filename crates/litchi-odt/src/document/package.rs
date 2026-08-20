@@ -5,6 +5,7 @@ use crate::core::{Content, Meta, OwnedPackage, PreparedPackage, SourcePackageLim
 use crate::elements::style::{StyleElements, StyleRegistry};
 use litchi_core::{Error, Result};
 use std::path::Path;
+use zeroize::Zeroizing;
 
 impl Document {
     pub(crate) fn into_package(self) -> OwnedPackage {
@@ -92,8 +93,12 @@ impl Document {
         path: P,
         password: impl Into<String>,
     ) -> Result<Self> {
+        let mut password = Zeroizing::new(password.into());
         let file = std::fs::File::open(path)?;
-        Self::from_owned_package(OwnedPackage::from_reader_with_password(file, password)?)
+        Self::from_owned_package(OwnedPackage::from_reader_with_password(
+            file,
+            std::mem::take(&mut *password),
+        )?)
     }
 
     /// Open a password-encrypted ODT document from a path with explicit finite
@@ -103,9 +108,12 @@ impl Document {
         limits: SourcePackageLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
+        let mut password = Zeroizing::new(password.into());
         let file = std::fs::File::open(path)?;
         Self::from_owned_package(OwnedPackage::from_reader_with_limits_and_password(
-            file, limits, password,
+            file,
+            limits,
+            std::mem::take(&mut *password),
         )?)
     }
 
@@ -140,7 +148,11 @@ impl Document {
 
     /// Create a document from password-encrypted ODT bytes.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Self::from_owned_package(OwnedPackage::from_bytes_with_password(bytes, password)?)
+        let mut password = Zeroizing::new(password.into());
+        Self::from_owned_package(OwnedPackage::from_bytes_with_password(
+            bytes,
+            std::mem::take(&mut *password),
+        )?)
     }
 
     /// Open a prepared packaged ODF result produced by smart detection.

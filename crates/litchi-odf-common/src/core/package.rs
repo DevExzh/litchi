@@ -23,6 +23,10 @@ use std::path::Path;
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
+pub(crate) fn zeroizing_password(password: impl Into<String>) -> Zeroizing<String> {
+    Zeroizing::new(password.into())
+}
+
 /// An ODF package (ZIP file containing XML documents).
 ///
 /// Uses soapberry-zip for efficient lazy decompression.
@@ -463,7 +467,7 @@ impl SourceBackedPackage {
         source: Arc<dyn ReadAt>,
         password: impl Into<String>,
     ) -> Result<Self> {
-        let password = Zeroizing::new(password.into());
+        let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(
             source,
             SourcePackageLimits::default(),
@@ -478,7 +482,7 @@ impl SourceBackedPackage {
         limits: SourcePackageLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
-        let password = Zeroizing::new(password.into());
+        let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(source, limits, Some(password))
     }
 
@@ -632,7 +636,7 @@ impl SourceBackedPackage {
         path: impl AsRef<Path>,
         password: impl Into<String>,
     ) -> Result<Self> {
-        let password = Zeroizing::new(password.into());
+        let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(
             Arc::new(FileSource::open(path)?),
             SourcePackageLimits::default(),
@@ -647,7 +651,7 @@ impl SourceBackedPackage {
         limits: SourcePackageLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
-        let password = Zeroizing::new(password.into());
+        let password = zeroizing_password(password);
         Self::from_read_at_with_limits_and_password_inner(
             Arc::new(FileSource::open(path)?),
             limits,
@@ -821,7 +825,10 @@ impl SourceBackedPackage {
         let package = prefer_current(
             self.source.as_ref(),
             self.source_version,
-            OwnedPackage::from_shared_bytes_with_strict_policy(Arc::new(bytes)),
+            OwnedPackage::from_shared_bytes_with_strict_policy_and_limits(
+                Arc::new(bytes),
+                self.limits,
+            ),
         )?;
         let mut package = package;
         package.password = self.password.clone();
@@ -1172,7 +1179,7 @@ fn read_indexed_string_with_limit<R: ZipReaderAt>(
     prefer_current(source, expected, text)
 }
 
-fn map_zip_error(error: soapberry_zip::Error) -> Error {
+pub(crate) fn map_zip_error(error: soapberry_zip::Error) -> Error {
     match error.into_kind() {
         ZipErrorKind::Allocation { resource, source } => Error::Allocation { resource, source },
         ZipErrorKind::LimitExceeded {
@@ -1254,7 +1261,8 @@ impl OwnedPackage {
         reader: R,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_reader_with_limits_and_password(reader, SourcePackageLimits::default(), password)
+        let password = zeroizing_password(password);
+        Self::from_reader_with_zeroizing_password(reader, SourcePackageLimits::default(), password)
     }
 
     /// Open an ODF package from a reader with explicit finite limits and a
@@ -1264,9 +1272,18 @@ impl OwnedPackage {
         limits: SourcePackageLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
+        let password = zeroizing_password(password);
+        Self::from_reader_with_zeroizing_password(reader, limits, password)
+    }
+
+    pub(crate) fn from_reader_with_zeroizing_password<R: Read>(
+        reader: R,
+        limits: SourcePackageLimits,
+        password: Zeroizing<String>,
+    ) -> Result<Self> {
         validate_source_limits(limits)?;
         let data = read_owned_input(reader, limits.max_source_bytes, "ODF owned package input")?;
-        Self::from_bytes_with_limits_and_password(data, limits, password)
+        Self::from_bytes_with_zeroizing_password(data, limits, password)
     }
 
     /// Create an ODF package from bytes.
@@ -1371,9 +1388,16 @@ impl OwnedPackage {
     /// strict package policy and structured resource-limit errors are retained
     /// at the transition to the owning representation.
     pub(crate) fn from_shared_bytes_with_strict_policy(data: Arc<Vec<u8>>) -> Result<Self> {
+        Self::from_shared_bytes_with_strict_policy_and_limits(data, SourcePackageLimits::default())
+    }
+
+    pub(crate) fn from_shared_bytes_with_strict_policy_and_limits(
+        data: Arc<Vec<u8>>,
+        limits: SourcePackageLimits,
+    ) -> Result<Self> {
         Self::from_shared_bytes_with_policy_and_limits(
             data,
-            SourcePackageLimits::default(),
+            limits,
             soapberry_zip::office::ArchiveValidationPolicy::StrictPackage,
         )
     }
@@ -1384,7 +1408,8 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Self::from_bytes_with_limits_and_password(data, SourcePackageLimits::default(), password)
+        let password = zeroizing_password(password);
+        Self::from_bytes_with_zeroizing_password(data, SourcePackageLimits::default(), password)
     }
 
     /// Open ODF bytes with explicit finite limits and retain a password for
@@ -1394,7 +1419,15 @@ impl OwnedPackage {
         limits: SourcePackageLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
-        let password = Zeroizing::new(password.into());
+        let password = zeroizing_password(password);
+        Self::from_bytes_with_zeroizing_password(data, limits, password)
+    }
+
+    pub(crate) fn from_bytes_with_zeroizing_password(
+        data: Vec<u8>,
+        limits: SourcePackageLimits,
+        password: Zeroizing<String>,
+    ) -> Result<Self> {
         validate_source_limits(limits)?;
         Self::from_shared_bytes_with_policy_and_limits(
             Arc::new(data),
@@ -1455,6 +1488,12 @@ impl OwnedPackage {
     #[must_use]
     pub fn shared_bytes(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.data)
+    }
+
+    /// Return the finite limits retained by this package owner.
+    #[must_use]
+    pub const fn limits(&self) -> SourcePackageLimits {
+        self.limits
     }
 
     /// Clone the immutable archive/index handles without retaining a
@@ -1771,7 +1810,7 @@ impl package::PackageLookup for SourceBackedPackage {
 mod tests {
     use super::*;
     use crate::core::{PackageWriter, Profile};
-    use std::io::Cursor;
+    use std::io::{Cursor, Read};
     use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
     // Helper function to create a minimal ODF package (ZIP with mimetype and manifest)
@@ -2061,15 +2100,60 @@ mod tests {
         );
         assert!(SourceBackedPackage::from_read_at_with_limits(source, limits).is_err());
 
+        let limits = SourcePackageLimits::new(
+            u64::try_from(data.len()).unwrap(),
+            SourceArchiveLimits::default(),
+        );
         let source = CountingSource::new(data.clone());
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at_with_limits(source, limits).unwrap();
         let materialized = package.materialize().unwrap();
         assert_eq!(materialized.as_bytes(), data.as_slice());
+        assert_eq!(materialized.limits(), limits);
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn source_backed_path_accepts_exact_limit_and_rejects_max_plus_one() {
+        static NEXT_PATH_ID: AtomicU64 = AtomicU64::new(0);
+
+        let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
+        let path = std::env::temp_dir().join(format!(
+            "litchi-odf-owned-limits-{}-{}.odt",
+            std::process::id(),
+            NEXT_PATH_ID.fetch_add(1, Ordering::Relaxed),
+        ));
+        std::fs::write(&path, &data).unwrap();
+        let exact = SourcePackageLimits::new(
+            u64::try_from(data.len()).unwrap(),
+            SourceArchiveLimits::default(),
+        );
+        assert!(SourceBackedPackage::from_path_with_limits(&path, exact).is_ok());
+        assert!(
+            SourceBackedPackage::from_path_with_limits_and_password(&path, exact, "password")
+                .is_ok()
+        );
+
+        let too_small = exact.with_max_source_bytes(exact.max_source_bytes() - 1);
+        assert!(matches!(
+            SourceBackedPackage::from_path_with_limits(&path, too_small),
+            Err(Error::ResourceLimit(_))
+        ));
+        assert!(matches!(
+            SourceBackedPackage::from_path_with_limits_and_password(&path, too_small, "password"),
+            Err(Error::ResourceLimit(_))
+        ));
+        let missing = path.with_extension("missing");
+        assert!(SourceBackedPackage::from_path_with_password(missing, "password").is_err());
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
     fn owned_reader_limits_apply_before_zip_indexing_and_match_password_path() {
         let limits = SourcePackageLimits::new(8, SourceArchiveLimits::default());
+        assert!(matches!(
+            OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 8]), limits),
+            Err(Error::InvalidFormat(_))
+        ));
         assert!(matches!(
             OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 9]), limits),
             Err(Error::ResourceLimit(_))
@@ -2077,11 +2161,59 @@ mod tests {
 
         assert!(matches!(
             OwnedPackage::from_reader_with_limits_and_password(
+                Cursor::new(vec![0_u8; 8]),
+                limits,
+                "password",
+            ),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            OwnedPackage::from_reader_with_limits_and_password(
                 Cursor::new(vec![0_u8; 9]),
                 limits,
                 "password",
             ),
             Err(Error::ResourceLimit(_))
+        ));
+    }
+
+    struct FailingReader;
+
+    impl Read for FailingReader {
+        fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::other("test reader failure"))
+        }
+    }
+
+    #[test]
+    fn owned_password_ingress_handles_validation_read_and_archive_errors() {
+        let invalid_limits = SourcePackageLimits::new(0, SourceArchiveLimits::default());
+        let mut reader = Cursor::new(vec![0_u8; 1]);
+        assert!(matches!(
+            OwnedPackage::from_reader_with_limits_and_password(
+                &mut reader,
+                invalid_limits,
+                "password",
+            ),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert_eq!(reader.position(), 0);
+
+        assert!(matches!(
+            OwnedPackage::from_reader_with_password(FailingReader, "password"),
+            Err(Error::Io(_))
+        ));
+        assert!(matches!(
+            OwnedPackage::from_bytes_with_password(b"not a ZIP".to_vec(), "password"),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            OwnedPackage::from_bytes_with_limits_and_password(
+                Vec::new(),
+                invalid_limits,
+                "password",
+            ),
+            Err(Error::InvalidFormat(_))
         ));
     }
 
