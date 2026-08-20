@@ -807,6 +807,8 @@ enum Case {
     XlsxSourceNarrowColumnRangeScan,
     XlsxFileOpen,
     XlsxFileOpenLifecycle,
+    XlsxBytesOpen,
+    XlsxBytesOpenLifecycle,
     XlsxStreamingCreate,
     OpcRangeSourceOpen,
     OpcRangeSourceOpenMainRead,
@@ -1285,6 +1287,8 @@ impl Case {
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
             Self::XlsxFileOpen => "xlsx_file_open",
             Self::XlsxFileOpenLifecycle => "xlsx_file_open_lifecycle",
+            Self::XlsxBytesOpen => "xlsx_bytes_open",
+            Self::XlsxBytesOpenLifecycle => "xlsx_bytes_open_lifecycle",
             Self::XlsxStreamingCreate => "xlsx_streaming_create",
             Self::OpcRangeSourceOpen => "opc_range_source_open",
             Self::OpcRangeSourceOpenMainRead => "opc_range_source_open_main_read",
@@ -2141,6 +2145,10 @@ impl Case {
 
     const fn is_xlsx_root_file(self) -> bool {
         matches!(self, Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle)
+    }
+
+    const fn is_xlsx_bytes_root_file(self) -> bool {
+        matches!(self, Self::XlsxBytesOpen | Self::XlsxBytesOpenLifecycle)
     }
 
     const fn is_docx_source_edit_save(self) -> bool {
@@ -6692,6 +6700,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_odp_repeated_text()
                     && !case.is_ods_root_file()
                     && !case.is_xlsx_root_file()
+                    && !case.is_xlsx_bytes_root_file()
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
@@ -7844,6 +7853,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_xlsx_bytes_root_file())
+    {
+        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium)?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_xlsx_bytes_root_file())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.uses_odp_text_box_batch())
     {
         let corpus = build_odp_text_box_batch_corpus()?;
@@ -8604,6 +8635,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
         "xlsx_file_open" => Some(Case::XlsxFileOpen),
         "xlsx_file_open_lifecycle" => Some(Case::XlsxFileOpenLifecycle),
+        "xlsx_bytes_open" => Some(Case::XlsxBytesOpen),
+        "xlsx_bytes_open_lifecycle" => Some(Case::XlsxBytesOpenLifecycle),
         "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
         "opc_range_source_open" => Some(Case::OpcRangeSourceOpen),
         "opc_range_source_open_main_read" => Some(Case::OpcRangeSourceOpenMainRead),
@@ -8999,6 +9032,7 @@ fn print_usage() {
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
                                        xlsx_file_open,xlsx_file_open_lifecycle,\n\
+                                       xlsx_bytes_open,xlsx_bytes_open_lifecycle,\n\
                                        xlsx_streaming_create,\n\
                                        opc_range_source_open,opc_range_source_open_main_read,\n\
                                        xlsx_range_source_open,xlsx_range_source_list_sheets,\n\
@@ -15385,6 +15419,9 @@ fn run_case_with_config(
         },
         Case::XlsxFileOpen | Case::XlsxFileOpenLifecycle => {
             run_xlsx_root_file_access(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
+            run_xlsx_bytes_root_access(case, corpus, warmup_iterations, samples)
         },
         Case::XlsxStreamingCreate | Case::RtfStreamingCreate => {
             Err("streaming creation cases use their bounded corpus runner".into())
@@ -29576,6 +29613,104 @@ fn run_xlsx_root_file_access(
     }
 }
 
+fn xlsx_bytes_root_case_parameters(case: Case) -> Result<bool, Box<dyn Error>> {
+    match case {
+        Case::XlsxBytesOpen => Ok(false),
+        Case::XlsxBytesOpenLifecycle => Ok(true),
+        _ => Err("non-bytes XLSX root case passed to XLSX bytes root case parameters".into()),
+    }
+}
+
+fn run_xlsx_bytes_root_access(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR {
+        return Err(
+            "XLSX bytes root cases require the deterministic cell-CRUD XLSX corpus".into(),
+        );
+    }
+    let lifecycle = xlsx_bytes_root_case_parameters(case)?;
+
+    // Keep the eager owner as an independent semantic oracle. These checks are
+    // deliberately outside the timed facade lifecycle, as is the archive hash.
+    let eager = Workbook::from_bytes(corpus.archive.clone())?;
+    verify_xlsx_cells(&eager, spec, &[])?;
+    let expected_names = eager
+        .sheets()
+        .map(|sheet| sheet.name().to_owned())
+        .collect::<Vec<_>>();
+    let expected_count = eager.len();
+    if expected_names.len() != spec.sheet_count || expected_count != spec.sheet_count {
+        return Err("typed eager XLSX bytes oracle worksheet shape differs from corpus".into());
+    }
+    if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
+        || corpus.archive.len() != corpus.manifest.archive_bytes
+    {
+        return Err("XLSX bytes root archive differs from its deterministic manifest".into());
+    }
+
+    // The umbrella projection is also prepared before timing, so the measured
+    // lifecycle only accounts for the selected facade operation.
+    let oracle =
+        litchi::Workbook::from_bytes(corpus.archive.clone()).map_err(|error| error.to_string())?;
+    let expected_text = oracle.text().map_err(|error| error.to_string())?;
+    let expected_metadata_sha256 =
+        xlsx_root_metadata_digest(&oracle.metadata().map_err(|error| error.to_string())?)?;
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Keep Vec ownership preparation outside the measurement interval.
+        let owned = corpus.archive.clone();
+        let started = Instant::now();
+        let workbook =
+            litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
+        let measured_projection = if lifecycle {
+            Some((
+                workbook
+                    .worksheet_names()
+                    .map_err(|error| error.to_string())?,
+                workbook
+                    .worksheet_count()
+                    .map_err(|error| error.to_string())?,
+                workbook.text().map_err(|error| error.to_string())?,
+            ))
+        } else {
+            None
+        };
+        let duration = started.elapsed();
+
+        let (names, count, text) = match measured_projection {
+            Some(projection) => projection,
+            None => (
+                workbook
+                    .worksheet_names()
+                    .map_err(|error| error.to_string())?,
+                workbook
+                    .worksheet_count()
+                    .map_err(|error| error.to_string())?,
+                workbook.text().map_err(|error| error.to_string())?,
+            ),
+        };
+        let metadata_sha256 =
+            xlsx_root_metadata_digest(&workbook.metadata().map_err(|error| error.to_string())?)?;
+        if names != expected_names
+            || count != expected_count
+            || text != expected_text
+            || metadata_sha256 != expected_metadata_sha256
+        {
+            return Err("XLSX bytes root projection differs from typed/eager oracle".into());
+        }
+        std::hint::black_box(&workbook);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    Ok(result(case, corpus, elapsed, None))
+}
+
 fn verify_unselected_xlsx_ranges_untouched(
     snapshot: SourceSnapshot,
     context: &str,
@@ -40954,7 +41089,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 342);
+        assert_eq!(selectable_count, 343);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -45047,6 +45182,39 @@ mod tests {
         let open = run_case(Case::XlsxFileOpen, &corpus, 0, 2).unwrap();
         let lifecycle = run_case(Case::XlsxFileOpenLifecycle, &corpus, 0, 2).unwrap();
         for result in [open, lifecycle] {
+            assert_eq!(result.elapsed_ns.samples.len(), 2);
+            assert!(
+                result.source.is_none(),
+                "the selector keeps the existing schema"
+            );
+            assert_eq!(
+                result.corpus.generator,
+                XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+            );
+            assert_eq!(result.corpus.archive_sha256, corpus.manifest.archive_sha256);
+        }
+    }
+
+    #[test]
+    fn xlsx_unified_bytes_selectors_use_facade_bytes_lifecycle() {
+        for (name, case) in [
+            ("xlsx_bytes_open", Case::XlsxBytesOpen),
+            ("xlsx_bytes_open_lifecycle", Case::XlsxBytesOpenLifecycle),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(case.is_xlsx_bytes_root_file());
+            assert!(!case.is_xlsx_root_file());
+            assert!(!case.uses_xlsx());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        let eager = Workbook::from_bytes(corpus.archive.clone()).unwrap();
+        verify_xlsx_cells(&eager, xlsx_spec(&corpus).unwrap(), &[]).unwrap();
+        for case in [Case::XlsxBytesOpen, Case::XlsxBytesOpenLifecycle] {
+            let result = run_case(case, &corpus, 0, 2).unwrap();
             assert_eq!(result.elapsed_ns.samples.len(), 2);
             assert!(
                 result.source.is_none(),
