@@ -14,6 +14,13 @@ The complete raw samples and corpus manifests are in
 The full-process resource result is in
 [`results/baseline-opc-2665d572b-2026-08-10.time.txt`](results/baseline-opc-2665d572b-2026-08-10.time.txt).
 
+The additive schema-2 catalog and migration rules are documented in
+[`CORPUS_MANIFEST_V2.md`](CORPUS_MANIFEST_V2.md).  The checked default catalog
+is [`results/perf-corpus-manifest-v2.json`](results/perf-corpus-manifest-v2.json).
+The schema-1 corpus objects and the comparator's case/corpus identity digest are
+unchanged; V2 fields that are not represented by the historical report remain
+explicitly unknown rather than being inferred.
+
 ## Latest retained high-level ODT source-ingress result (change 0191)
 
 `litchi::Document::open(Path)` now retains validated ODT files through one

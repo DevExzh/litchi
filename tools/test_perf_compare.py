@@ -419,6 +419,27 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(digest, manifest["result_keys_sha256"])
         self.assertEqual(digest, checked_policy["expected_result_keys_sha256"])
 
+    def test_additive_corpus_catalog_reference_preserves_v1_comparison(self):
+        baseline = report()
+        current = report(revision="current")
+        reference = {
+            "manifest_version": 2,
+            "catalog_id": "litchi-perf-corpus-v2",
+            "catalog_sha256": "0" * 64,
+            "content_set_sha256": "1" * 64,
+        }
+        baseline["corpus_catalog"] = copy.deepcopy(reference)
+        current["corpus_catalog"] = copy.deepcopy(reference)
+        comparison = perf_compare.compare_reports(baseline, current, policy())
+        self.assertEqual(comparison["status"], "pass")
+        self.assertEqual(comparison["summary"]["matched_results"], 1)
+
+    def test_schema_one_report_without_corpus_catalog_remains_supported(self):
+        baseline = report()
+        current = report(revision="current")
+        comparison = perf_compare.compare_reports(baseline, current, policy())
+        self.assertEqual(comparison["status"], "pass")
+
     def test_pass_compares_latency_and_available_resource_counters(self):
         baseline = report()
         current = report(104, "current")
