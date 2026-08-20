@@ -119,7 +119,62 @@ def report(value=100, revision="baseline", corpus_sha="abc"):
     }
 
 
+def metric_vector(values, *, status="measured", scope="test_scope"):
+    wrapper = {"status": status, "scope": scope}
+    if values is not None:
+        wrapper["values"] = values
+    return wrapper
+
+
+def operation_metrics_report_fields():
+    return {
+        "sample_count": 5,
+        "alignment": "elapsed_ns.samples",
+        "process": {
+            "status": "measured",
+            "major_faults": metric_vector(
+                [2] * 5,
+                scope="child_process_interval_delta_including_procfs_probe_overhead",
+            ),
+            "rchar": metric_vector(
+                [3] * 5,
+                scope="child_process_interval_delta_including_procfs_probe_overhead",
+            ),
+            "read_bytes": metric_vector(
+                [4] * 5,
+                scope="child_process_interval_delta_including_procfs_probe_overhead",
+            ),
+            "syscr": metric_vector(
+                [1] * 5,
+                scope="child_process_interval_delta_including_procfs_probe_overhead",
+            ),
+        },
+        "sink": {
+            "status": "not_applicable",
+            "output_bytes": metric_vector(
+                None,
+                status="not_applicable",
+                scope="post_operation_output_length_not_sink_write_volume",
+            ),
+            "write_status": "measured",
+            "accepted_bytes": metric_vector([100] * 5),
+            "write_calls": metric_vector([2] * 5),
+            "write_size_buckets": {
+                "status": "measured",
+                "bytes_1_to_512": metric_vector([2] * 5),
+            },
+        },
+    }
+
+
 class PerfCompareTests(unittest.TestCase):
+    def operation_metrics_policy(self):
+        comparison_policy = policy()
+        comparison_policy["metric_classes"][-1]["path_globs"].extend(
+            ["**/*faults", "**/*read_bytes", "**/*write_calls"]
+        )
+        return comparison_policy
+
     def test_checked_policy_pins_identity_only_default_manifest(self):
         repository = Path(__file__).resolve().parents[1]
         checked_policy = json.loads(
@@ -219,6 +274,53 @@ class PerfCompareTests(unittest.TestCase):
         result = perf_compare.compare_reports(report(), current, policy())
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["summary"]["compared_metrics"], 7)
+
+    def test_operation_metric_vectors_unwrap_and_regressions_fail(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = (
+            operation_metrics_report_fields()
+        )
+        current["results"][0]["operation_metrics"] = (
+            operation_metrics_report_fields()
+        )
+
+        result = perf_compare.compare_reports(
+            baseline, current, self.operation_metrics_policy()
+        )
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["compared_metrics"], 10)
+
+        current["results"][0]["operation_metrics"]["sink"]["write_calls"][
+            "values"
+        ] = [3] * 5
+        current["results"][0]["operation_metrics"]["process"]["read_bytes"][
+            "values"
+        ] = [5] * 5
+        result = perf_compare.compare_reports(
+            baseline, current, self.operation_metrics_policy()
+        )
+        self.assertEqual(result["status"], "regression")
+        self.assertTrue(
+            {
+                "operation_metrics.process.read_bytes",
+                "operation_metrics.sink.write_calls",
+            }
+            <= {item["metric"] for item in result["regressions"]}
+        )
+
+    def test_malformed_metric_vector_wrapper_fails_closed(self):
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["operation_metrics"] = operation_metrics_report_fields()
+            del item["operation_metrics"]["sink"]["write_calls"]["values"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "values is required"
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
 
     def test_p50_and_p95_regressions_are_reported(self):
         result = perf_compare.compare_reports(report(), report(120, "current"), policy())

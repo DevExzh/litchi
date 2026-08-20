@@ -6,7 +6,9 @@
 //! not infer allocations, copies, decompression, recompression, or a peak from
 //! a process-wide measurement that cannot provide one.  In-process sink
 //! summaries are promoted separately when the harness has already proved that
-//! the summary is deterministic across the retained samples.
+//! the summary is deterministic across the retained samples.  `/proc/self/io`
+//! vectors are explicitly scoped to the child interval including procfs probe
+//! overhead; an after-snapshot read can add `rchar` and `syscr`.
 
 use std::error::Error;
 
@@ -191,6 +193,7 @@ pub(crate) struct OperationMetrics {
 const ALIGNMENT: &str = "elapsed_ns.samples";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
 const PROCESS_SCOPE: &str = "procfs_operation_delta";
+const PROC_IO_SCOPE: &str = "child_process_interval_delta_including_procfs_probe_overhead";
 const CLOCK_SCOPE: &str = "procfs_after_sample_unit_factor";
 const RSS_SCOPE: &str = "procfs_operation_delta_not_peak";
 const HWM_SCOPE: &str = "process_lifetime_high_water_after_not_operation_peak";
@@ -509,15 +512,16 @@ impl WriteSizeBucketMetrics {
 
 fn absent_process_metrics(status: MetricStatus) -> ProcessMetrics {
     let process = || MetricVector::absent(status, PROCESS_SCOPE);
+    let proc_io = || MetricVector::absent(status, PROC_IO_SCOPE);
     ProcessMetrics {
         status,
-        rchar: process(),
-        wchar: process(),
-        read_bytes: process(),
-        write_bytes: process(),
-        cancelled_write_bytes: process(),
-        syscr: process(),
-        syscw: process(),
+        rchar: proc_io(),
+        wchar: proc_io(),
+        read_bytes: proc_io(),
+        write_bytes: proc_io(),
+        cancelled_write_bytes: proc_io(),
+        syscr: proc_io(),
+        syscw: proc_io(),
         user_cpu_ticks: process(),
         system_cpu_ticks: process(),
         clock_ticks_per_second: process(),
@@ -622,15 +626,16 @@ fn process_metrics(samples: &[&SampleEvidence]) -> Result<ProcessMetrics, Box<dy
     }
     if all_absent {
         let unavailable = || MetricVector::absent(MetricStatus::Unavailable, PROCESS_SCOPE);
+        let unavailable_proc_io = || MetricVector::absent(MetricStatus::Unavailable, PROC_IO_SCOPE);
         return Ok(ProcessMetrics {
             status: MetricStatus::Unavailable,
-            rchar: unavailable(),
-            wchar: unavailable(),
-            read_bytes: unavailable(),
-            write_bytes: unavailable(),
-            cancelled_write_bytes: unavailable(),
-            syscr: unavailable(),
-            syscw: unavailable(),
+            rchar: unavailable_proc_io(),
+            wchar: unavailable_proc_io(),
+            read_bytes: unavailable_proc_io(),
+            write_bytes: unavailable_proc_io(),
+            cancelled_write_bytes: unavailable_proc_io(),
+            syscr: unavailable_proc_io(),
+            syscw: unavailable_proc_io(),
             user_cpu_ticks: unavailable(),
             system_cpu_ticks: unavailable(),
             clock_ticks_per_second: unavailable(),
@@ -658,15 +663,21 @@ fn process_metrics(samples: &[&SampleEvidence]) -> Result<ProcessMetrics, Box<dy
             PROCESS_SCOPE,
         )
     };
+    let measured_proc_io = |value: fn(&crate::process_metrics::Delta) -> u64| {
+        MetricVector::measured(
+            values.iter().map(|metrics| value(metrics)).collect(),
+            PROC_IO_SCOPE,
+        )
+    };
     Ok(ProcessMetrics {
         status: MetricStatus::Measured,
-        rchar: measured(|metrics| metrics.rchar),
-        wchar: measured(|metrics| metrics.wchar),
-        read_bytes: measured(|metrics| metrics.read_bytes),
-        write_bytes: measured(|metrics| metrics.write_bytes),
-        cancelled_write_bytes: measured(|metrics| metrics.cancelled_write_bytes),
-        syscr: measured(|metrics| metrics.syscr),
-        syscw: measured(|metrics| metrics.syscw),
+        rchar: measured_proc_io(|metrics| metrics.rchar),
+        wchar: measured_proc_io(|metrics| metrics.wchar),
+        read_bytes: measured_proc_io(|metrics| metrics.read_bytes),
+        write_bytes: measured_proc_io(|metrics| metrics.write_bytes),
+        cancelled_write_bytes: measured_proc_io(|metrics| metrics.cancelled_write_bytes),
+        syscr: measured_proc_io(|metrics| metrics.syscr),
+        syscw: measured_proc_io(|metrics| metrics.syscw),
         user_cpu_ticks: measured(|metrics| metrics.user_cpu_ticks),
         system_cpu_ticks: measured(|metrics| metrics.system_cpu_ticks),
         clock_ticks_per_second: MetricVector::measured(
@@ -858,6 +869,10 @@ mod tests {
         assert_eq!(envelope.source.logical_read_calls.values, Some(vec![0]));
         assert_eq!(envelope.process.status, MetricStatus::Measured);
         assert_eq!(envelope.process.rchar.values, Some(vec![11]));
+        assert_eq!(
+            envelope.process.rchar.scope,
+            "child_process_interval_delta_including_procfs_probe_overhead"
+        );
         assert_eq!(envelope.process.wchar.values, Some(vec![12]));
         assert_eq!(envelope.process.read_bytes.values, Some(vec![13]));
         assert_eq!(envelope.process.write_bytes.values, Some(vec![14]));

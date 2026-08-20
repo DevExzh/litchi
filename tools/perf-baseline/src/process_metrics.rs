@@ -5,6 +5,11 @@
 //! files reports `None` in the child result, and the benchmark remains useful
 //! for elapsed time and positional-read accounting.
 //!
+//! The `/proc/self/io` deltas cover the child interval bracketed by the
+//! before/after snapshots, including procfs probe overhead.  In particular,
+//! the after-snapshot read can add `rchar` and `syscr`; these values are not
+//! operation-only or physical-storage attribution.
+//!
 //! The CPU counters are process CPU-time ticks, not whole-machine utilization.
 //! A caller that needs process CPU utilization derives it from
 //! `(user_cpu_ticks + system_cpu_ticks) / clock_ticks_per_second / elapsed`.

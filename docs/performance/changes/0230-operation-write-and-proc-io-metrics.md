@@ -17,8 +17,11 @@ version remains `1`.
 The filesystem operation envelope now exposes all existing `/proc/self/io`
 operation deltas alongside its CPU, fault, context-switch, and RSS vectors:
 `rchar`, `wchar`, `read_bytes`, `write_bytes`, `cancelled_write_bytes`, `syscr`,
-and `syscw`. Procfs collection remains best-effort; unavailable values retain
-their explicit status and omit numeric vectors.
+and `syscw`. Their vector scope is
+`child_process_interval_delta_including_procfs_probe_overhead`: the after-
+snapshot procfs read can itself add `rchar` and `syscr`. Procfs collection
+remains best-effort; unavailable values retain their explicit status and omit
+numeric vectors.
 
 ## Interpretation boundary
 
@@ -36,7 +39,7 @@ over the aligned elapsed samples because the measured sink summaries were
 already checked equal across those samples; this is not a new per-sample
 measurement. Filesystem selectors have no logical sink summary and retain
 `not_applicable` sink-write vectors. No allocation, decompressed-byte,
-recompressed-byte, or physical-I/O claim is introduced.
+recompressed-byte, operation-only procfs, or physical-I/O claim is introduced.
 
 ## Verification
 
