@@ -1,5 +1,6 @@
 //! Semantic workbook snapshot and worksheet models.
 
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -130,36 +131,52 @@ pub(super) struct ValidatedWorksheetStore {
     pub(super) store: Store,
 }
 
+struct PageBreakCacheEntry {
+    blob: Arc<Vec<u8>>,
+    cache: Arc<OnceCell<crate::page_breaks::PageBreaks>>,
+}
+
+/// Build the source cache index once per descendant snapshot. Keeping the
+/// lookup keyed by part URI avoids scanning every source sheet for each
+/// target sheet during publication.
+fn page_break_caches(source: Option<&Workbook>) -> HashMap<PackURI, PageBreakCacheEntry> {
+    let Some(source) = source else {
+        return HashMap::new();
+    };
+    let mut caches = HashMap::with_capacity(source.inner.sheets.len());
+    for sheet in source.inner.sheets.iter() {
+        let Ok(part) = source.inner.package.get_part(&sheet.part_uri) else {
+            continue;
+        };
+        caches.insert(
+            sheet.part_uri.clone(),
+            PageBreakCacheEntry {
+                blob: part.blob_arc(),
+                cache: Arc::clone(&sheet.page_breaks),
+            },
+        );
+    }
+    caches
+}
+
 /// Reuse a successful worksheet projection only when the target snapshot
 /// retains the exact source payload allocation. A publication that replaces
 /// the worksheet bytes receives a fresh cache, so no edit can observe a
 /// projection from an earlier generation.
 fn page_break_cache(
-    source: Option<&Workbook>,
+    source_caches: &HashMap<PackURI, PageBreakCacheEntry>,
     package: &OpcPackage,
     part_uri: &PackURI,
 ) -> Arc<OnceCell<crate::page_breaks::PageBreaks>> {
-    let Some(source) = source else {
-        return Arc::new(OnceCell::new());
-    };
-    let Some(source_sheet) = source
-        .inner
-        .sheets
-        .iter()
-        .find(|sheet| &sheet.part_uri == part_uri)
-    else {
-        return Arc::new(OnceCell::new());
-    };
-    let Ok(source_part) = source.inner.package.get_part(part_uri) else {
+    let Some(source) = source_caches.get(part_uri) else {
         return Arc::new(OnceCell::new());
     };
     let Ok(target_part) = package.get_part(part_uri) else {
         return Arc::new(OnceCell::new());
     };
-    let source_blob = source_part.blob_arc();
     let target_blob = target_part.blob_arc();
-    if Arc::ptr_eq(&source_blob, &target_blob) {
-        Arc::clone(&source_sheet.page_breaks)
+    if Arc::ptr_eq(&source.blob, &target_blob) {
+        Arc::clone(&source.cache)
     } else {
         Arc::new(OnceCell::new())
     }
@@ -426,6 +443,7 @@ impl Workbook {
             },
             Some(_) | None => Arc::new(SharedStringLineage),
         };
+        let source_page_break_caches = page_break_caches(source);
         let sheets = catalog
             .sheets
             .into_iter()
@@ -434,7 +452,7 @@ impl Workbook {
             .map(|(position, (sheet, part))| {
                 let name_key = crate::sheet::key(&sheet.name);
                 let part_uri = part.uri;
-                let page_breaks = page_break_cache(source, &package, &part_uri);
+                let page_breaks = page_break_cache(&source_page_break_caches, &package, &part_uri);
                 Arc::new(SheetData {
                     position,
                     name: sheet.name,
