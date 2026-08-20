@@ -42,7 +42,9 @@ use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
     Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
-use litchi_ooxml_common::xml::{OMML_NAMESPACE_URI, scan_omml_formula_ranges};
+use litchi_ooxml_common::xml::{
+    OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
+};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, PartData, ReadLimits,
     Relationships, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits, TargetMode,
@@ -663,6 +665,7 @@ enum Case {
     DocxSourceBackedOneEditSave,
     PptxSourceBackedOneEditSave,
     OmmlFormulaRangeScan,
+    OmmlFormulaExtract,
     PptxDrawingmlExtract,
     PptxDrawingmlRangeScan,
     PptxEagerBatchEditSave,
@@ -1070,6 +1073,7 @@ impl Case {
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::OmmlFormulaRangeScan => "omml_formula_range_scan",
+            Self::OmmlFormulaExtract => "omml_formula_extract",
             Self::PptxDrawingmlExtract => "pptx_drawingml_extract",
             Self::PptxDrawingmlRangeScan => "pptx_drawingml_range_scan",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
@@ -2184,7 +2188,10 @@ impl Case {
     const fn is_ooxml_tracker_scan(self) -> bool {
         matches!(
             self,
-            Self::OmmlFormulaRangeScan | Self::PptxDrawingmlExtract | Self::PptxDrawingmlRangeScan
+            Self::OmmlFormulaRangeScan
+                | Self::OmmlFormulaExtract
+                | Self::PptxDrawingmlExtract
+                | Self::PptxDrawingmlRangeScan
         )
     }
 
@@ -2449,6 +2456,7 @@ struct OoxmlTrackerCorpus {
     omml: Vec<u8>,
     drawingml: Vec<u8>,
     expected_omml_ranges: Vec<(u32, u32)>,
+    expected_omml_formulas: Vec<String>,
     expected_drawingml_text: String,
     expected_drawingml_ranges: Vec<(u32, u32)>,
 }
@@ -8508,6 +8516,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
         "omml_formula_range_scan" => Some(Case::OmmlFormulaRangeScan),
+        "omml_formula_extract" => Some(Case::OmmlFormulaExtract),
         "pptx_drawingml_extract" => Some(Case::PptxDrawingmlExtract),
         "pptx_drawingml_range_scan" => Some(Case::PptxDrawingmlRangeScan),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
@@ -8966,6 +8975,7 @@ fn print_usage() {
                                        docx_source_backed_one_edit_save,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        omml_formula_range_scan,\n\
+                                       omml_formula_extract,\n\
                                        pptx_drawingml_extract,pptx_drawingml_range_scan,\n\
                                        pptx_eager_batch_edit_save,\n\
                                        pptx_source_backed_batch_edit_save,\n\
@@ -15319,6 +15329,27 @@ fn oracle_omml_ranges(xml: &[u8]) -> Result<Vec<(u32, u32)>, Box<dyn Error>> {
     Ok(ranges)
 }
 
+fn oracle_omml_formulas(xml: &[u8]) -> Result<Vec<String>, Box<dyn Error>> {
+    let ranges = oracle_omml_ranges(xml)?;
+    let mut formulas = Vec::with_capacity(ranges.len());
+    for (start, length) in ranges {
+        let start = usize::try_from(start)?;
+        let length = usize::try_from(length)?;
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| io::Error::other("OMML oracle formula range overflows"))?;
+        let formula = xml
+            .get(start..end)
+            .ok_or_else(|| io::Error::other("OMML oracle formula range is invalid"))?;
+        formulas.push(
+            std::str::from_utf8(formula)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+                .to_owned(),
+        );
+    }
+    Ok(formulas)
+}
+
 fn oracle_decode_reference(reference: &BytesRef<'_>) -> Result<String, Box<dyn Error>> {
     if let Some(character) = reference
         .resolve_char_ref()
@@ -15592,6 +15623,7 @@ fn build_ooxml_tracker_corpus() -> Result<OoxmlTrackerCorpus, Box<dyn Error>> {
     let omml = omml.into_bytes();
     let drawingml = drawingml.into_bytes();
     let expected_omml_ranges = oracle_omml_ranges(&omml)?;
+    let expected_omml_formulas = oracle_omml_formulas(&omml)?;
     let expected_drawingml_text = oracle_drawingml_text(&drawingml, Some('\n'))?;
     let expected_drawingml_ranges = oracle_drawingml_ranges(&drawingml, b"p")?;
 
@@ -15602,6 +15634,13 @@ fn build_ooxml_tracker_corpus() -> Result<OoxmlTrackerCorpus, Box<dyn Error>> {
     })?;
     if actual_omml_ranges != expected_omml_ranges {
         return Err(io::Error::other("OMML tracker setup disagrees with NsReader oracle").into());
+    }
+    let actual_omml_formulas = extract_omml_formulas(&omml)?;
+    if actual_omml_formulas != expected_omml_formulas {
+        return Err(io::Error::other(
+            "OMML formula extractor setup disagrees with NsReader oracle",
+        )
+        .into());
     }
     let actual_drawingml_text = extract_drawingml_text(&drawingml, Some('\n'))?;
     if actual_drawingml_text != expected_drawingml_text {
@@ -15658,12 +15697,14 @@ fn build_ooxml_tracker_corpus() -> Result<OoxmlTrackerCorpus, Box<dyn Error>> {
         omml,
         drawingml,
         expected_omml_ranges,
+        expected_omml_formulas,
         expected_drawingml_text,
         expected_drawingml_ranges,
     })
 }
 
 enum OoxmlTrackerProjection {
+    Formulas(Vec<String>),
     Text(String),
     Ranges(Vec<(u32, u32)>),
 }
@@ -15677,6 +15718,15 @@ fn ooxml_tracker_range_digest(ranges: &[(u32, u32)]) -> String {
     sha256_hex(&bytes)
 }
 
+fn ooxml_tracker_formula_digest(formulas: &[String]) -> Result<String, Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    for formula in formulas {
+        bytes.extend_from_slice(&u64::try_from(formula.len())?.to_le_bytes());
+        bytes.extend_from_slice(formula.as_bytes());
+    }
+    Ok(sha256_hex(&bytes))
+}
+
 fn run_ooxml_tracker_case(
     case: Case,
     corpus: &OoxmlTrackerCorpus,
@@ -15685,6 +15735,7 @@ fn run_ooxml_tracker_case(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let expected_digest = match case {
         Case::OmmlFormulaRangeScan => ooxml_tracker_range_digest(&corpus.expected_omml_ranges),
+        Case::OmmlFormulaExtract => ooxml_tracker_formula_digest(&corpus.expected_omml_formulas)?,
         Case::PptxDrawingmlExtract => sha256_hex(corpus.expected_drawingml_text.as_bytes()),
         Case::PptxDrawingmlRangeScan => {
             ooxml_tracker_range_digest(&corpus.expected_drawingml_ranges)
@@ -15706,6 +15757,9 @@ fn run_ooxml_tracker_case(
                 )?;
                 OoxmlTrackerProjection::Ranges(ranges)
             },
+            Case::OmmlFormulaExtract => {
+                OoxmlTrackerProjection::Formulas(extract_omml_formulas(&corpus.omml)?)
+            },
             Case::PptxDrawingmlExtract => {
                 OoxmlTrackerProjection::Text(extract_drawingml_text(&corpus.drawingml, Some('\n'))?)
             },
@@ -15726,6 +15780,9 @@ fn run_ooxml_tracker_case(
         let matches_oracle = match (&projection, case) {
             (OoxmlTrackerProjection::Ranges(actual), Case::OmmlFormulaRangeScan) => {
                 actual == &corpus.expected_omml_ranges
+            },
+            (OoxmlTrackerProjection::Formulas(actual), Case::OmmlFormulaExtract) => {
+                actual == &corpus.expected_omml_formulas
             },
             (OoxmlTrackerProjection::Text(actual), Case::PptxDrawingmlExtract) => {
                 actual == &corpus.expected_drawingml_text
@@ -15849,7 +15906,10 @@ fn run_case_with_config(
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
         },
-        Case::OmmlFormulaRangeScan | Case::PptxDrawingmlExtract | Case::PptxDrawingmlRangeScan => {
+        Case::OmmlFormulaRangeScan
+        | Case::OmmlFormulaExtract
+        | Case::PptxDrawingmlExtract
+        | Case::PptxDrawingmlRangeScan => {
             Err("OOXML namespace-tracker cases use their dedicated fixed corpus runner".into())
         },
         Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave => {
@@ -41765,7 +41825,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 347);
+        assert_eq!(selectable_count, 348);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -41773,6 +41833,7 @@ mod tests {
     fn ooxml_tracker_selectors_are_opt_in_and_nsreader_verified() {
         let cases = [
             Case::OmmlFormulaRangeScan,
+            Case::OmmlFormulaExtract,
             Case::PptxDrawingmlExtract,
             Case::PptxDrawingmlRangeScan,
         ];
