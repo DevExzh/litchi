@@ -1,13 +1,15 @@
 //! Row, column, and worksheet-default edit tests.
 
+use std::sync::Arc;
+
 use super::super::*;
 use super::support::{
     defaults_workbook, styled_column_workbook, styled_row_workbook, styled_workbook,
+    two_sheet_workbook,
 };
 
 use crate::column::Outline;
 use crate::{StyleState, Value};
-use litchi_opc::Part;
 
 fn page_break_workbook() -> Workbook {
     let source = two_sheet_workbook(WorksheetKind::Worksheet);
@@ -44,7 +46,7 @@ fn worksheet_page_break_projection_reuses_successful_snapshot_parse() {
 
     let first = sheet.page_breaks().expect("first page-break read");
     let cached = sheet.data.page_breaks.get().expect("cached projection");
-    let cached_address = cached as *const _;
+    let cached_address = std::ptr::from_ref(cached);
     assert_eq!(&first, cached);
 
     let mut caller_copy = first.clone();
@@ -61,7 +63,7 @@ fn worksheet_page_break_projection_reuses_successful_snapshot_parse() {
     let second = sheet.page_breaks().expect("second page-break read");
     let cached_again = sheet.data.page_breaks.get().expect("cached projection");
     assert_eq!(first, second);
-    assert_eq!(cached_address, cached_again as *const _);
+    assert_eq!(cached_address, std::ptr::from_ref(cached_again));
 }
 
 #[test]
@@ -86,7 +88,7 @@ fn worksheet_page_break_cache_hit_still_validates_sheet_kind() {
         .expect("source lookup")
         .expect("source worksheet");
     source_sheet.page_breaks().expect("source page breaks");
-    let source_cache = std::sync::Arc::clone(&source_sheet.data.page_breaks);
+    let source_cache = Arc::clone(&source_sheet.data.page_breaks);
 
     let mut package = source.inner.package.clone();
     let workbook_part = package
@@ -113,10 +115,7 @@ fn worksheet_page_break_cache_hit_still_validates_sheet_kind() {
         .expect("target lookup")
         .expect("unknown sheet");
     assert_eq!(unknown.kind(), WorksheetKind::Unknown);
-    assert!(std::sync::Arc::ptr_eq(
-        &source_cache,
-        &unknown.data.page_breaks
-    ));
+    assert!(Arc::ptr_eq(&source_cache, &unknown.data.page_breaks));
     assert!(matches!(
         unknown.page_breaks(),
         Err(Error::NotWorksheet { .. })
@@ -135,10 +134,10 @@ fn worksheet_page_break_cache_is_shared_across_unchanged_publication() {
         .expect("source lookup")
         .expect("source worksheet");
     let original = source_sheet.page_breaks().expect("source page breaks");
-    let source_cache = std::sync::Arc::clone(&source_sheet.data.page_breaks);
+    let source_cache = Arc::clone(&source_sheet.data.page_breaks);
 
     let mut edit = source.edit().expect("edit");
-    edit.sheet(1usize)
+    edit.tab(1usize)
         .expect("unrelated sheet lookup")
         .expect("unrelated worksheet")
         .activate();
@@ -149,10 +148,7 @@ fn worksheet_page_break_cache_is_shared_across_unchanged_publication() {
         .expect("descendant lookup")
         .expect("descendant worksheet");
 
-    assert!(std::sync::Arc::ptr_eq(
-        &source_cache,
-        &descendant.data.page_breaks
-    ));
+    assert!(Arc::ptr_eq(&source_cache, &descendant.data.page_breaks));
     assert_eq!(
         descendant.page_breaks().expect("descendant page breaks"),
         original
@@ -167,17 +163,14 @@ fn worksheet_page_break_cache_is_snapshot_local_across_clones_and_noop_edits() {
         .expect("source lookup")
         .expect("source worksheet");
     let original = source_sheet.page_breaks().expect("source page breaks");
-    let source_cache = std::sync::Arc::clone(&source_sheet.data.page_breaks);
+    let source_cache = Arc::clone(&source_sheet.data.page_breaks);
 
     let clone = source.clone();
     let clone_sheet = clone
         .sheet(0usize)
         .expect("clone lookup")
         .expect("clone worksheet");
-    assert!(std::sync::Arc::ptr_eq(
-        &source_cache,
-        &clone_sheet.data.page_breaks
-    ));
+    assert!(Arc::ptr_eq(&source_cache, &clone_sheet.data.page_breaks));
 
     let mut clone_edit = clone.edit().expect("clone edit");
     clone_edit
@@ -190,10 +183,7 @@ fn worksheet_page_break_cache_is_snapshot_local_across_clones_and_noop_edits() {
         .sheet(0usize)
         .expect("changed lookup")
         .expect("changed worksheet");
-    assert!(!std::sync::Arc::ptr_eq(
-        &source_cache,
-        &changed_sheet.data.page_breaks
-    ));
+    assert!(!Arc::ptr_eq(&source_cache, &changed_sheet.data.page_breaks));
     assert_eq!(
         source_sheet.page_breaks().expect("source remains"),
         original
@@ -209,10 +199,7 @@ fn worksheet_page_break_cache_is_snapshot_local_across_clones_and_noop_edits() {
         .sheet(0usize)
         .expect("no-op lookup")
         .expect("no-op worksheet");
-    assert!(std::sync::Arc::ptr_eq(
-        &source_cache,
-        &no_op_sheet.data.page_breaks
-    ));
+    assert!(Arc::ptr_eq(&source_cache, &no_op_sheet.data.page_breaks));
 }
 
 #[test]
@@ -223,7 +210,7 @@ fn worksheet_page_break_projection_is_invalidated_by_publication() {
         .expect("source lookup")
         .expect("source worksheet");
     let original = source_sheet.page_breaks().expect("source page breaks");
-    let original_cache = std::sync::Arc::clone(&source_sheet.data.page_breaks);
+    let original_cache = Arc::clone(&source_sheet.data.page_breaks);
 
     let mut edit = source.edit().expect("edit");
     edit.move_page_breaks(0usize, 1usize)
@@ -241,11 +228,11 @@ fn worksheet_page_break_projection_is_invalidated_by_publication() {
         .expect("target lookup")
         .expect("target worksheet");
 
-    assert!(!std::sync::Arc::ptr_eq(
+    assert!(!Arc::ptr_eq(
         &original_cache,
         &moved_source.data.page_breaks
     ));
-    assert!(!std::sync::Arc::ptr_eq(
+    assert!(!Arc::ptr_eq(
         &original_cache,
         &moved_target.data.page_breaks
     ));
