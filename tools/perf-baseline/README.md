@@ -182,7 +182,7 @@ Four additional opt-in XLSB lifecycle selectors (`xlsb_semantic_open`,
 sparse BIFF12 corpora. Archive cloning, workbook/worksheet preparation, and
 verification stay outside the timer; the full scan times only boxed
 `worksheet.cells()` consumption and verifies an exact canonical cell digest.
-These selectors bring the matrix to 346 names while leaving the default 36
+These selectors bring the matrix to 348 names while leaving the default 36
 cases / 198 records unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
