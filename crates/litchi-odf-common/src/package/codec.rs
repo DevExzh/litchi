@@ -501,14 +501,6 @@ pub fn is_media_path(path: &str) -> bool {
         || has_ascii_extension(path, b".svg")
 }
 
-fn is_manifest_element(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-    local: &[u8],
-) -> bool {
-    namespace_is_manifest(namespace) && element.local_name().as_ref() == local
-}
-
 fn namespace_is_manifest(namespace: &ResolveResult<'_>) -> bool {
     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == MANIFEST_NAMESPACE)
 }
