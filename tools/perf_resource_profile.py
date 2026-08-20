@@ -15,8 +15,9 @@ artifact directory.  The DOCX semantic/full-text ABBA mode (optionally
 including the one-paragraph text case) uses explicit control/candidate
 binaries, requires matching deterministic corpus manifests,
 and labels all harness elapsed values as instrumented resource observations.
-The XLSX borrowed-parser ABBA mode applies the same retained-artifact contract
-to its fixed tiny-read and medium edit/save selector tuple.
+The strict XLSX borrowed-parser ABBA mode requires ``/usr/bin/time``,
+``heaptrack``, and ``heaptrack_print`` and applies the same retained-artifact
+contract to its fixed tiny-read and medium edit/save selector tuple.
 Source/sink counters are logical harness counters.
 ``strace`` values are whole-process syscall observations and must not be read
 as decompressed or recompressed byte counts.
@@ -44,7 +45,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 SCHEMA_VERSION = 1
 TOOL_NAME = "litchi-resource-profile"
-TOOL_VERSION = "0.1.3"
+TOOL_VERSION = "0.1.4"
 ABBA_SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_MANIFEST = REPO_ROOT / "tools" / "perf-baseline" / "Cargo.toml"
@@ -1007,10 +1008,24 @@ def _bytes_token(value: str) -> int | None:
     match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\s*([KMGT]?)(?:i?B)?", value.strip(), re.IGNORECASE)
     if not match:
         return _numeric_token(value)
-    number = float(match.group(1))
+    try:
+        number = float(match.group(1))
+    except (OverflowError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
     unit = match.group(2).upper()
     scale = {"": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}[unit]
-    return int(number * scale)
+    try:
+        scaled = number * scale
+    except OverflowError:
+        return None
+    if not math.isfinite(scaled):
+        return None
+    try:
+        return int(scaled)
+    except (OverflowError, ValueError):
+        return None
 
 
 def parse_heaptrack_print(path: Path, *, retained: bool = False) -> dict[str, Any]:
@@ -1066,13 +1081,18 @@ def parse_heaptrack_histogram(path: Path) -> int | None:
     total = 0
     found = False
     for line in text.splitlines():
+        if not line.strip():
+            continue
         fields = line.split("\t")
         if len(fields) != 2:
-            continue
-        size = _numeric_token(fields[0])
-        count = _numeric_token(fields[1])
+            return None
+        tokens = [field.strip() for field in fields]
+        if any(not re.fullmatch(r"[0-9]+(?:,[0-9]{3})*", token) for token in tokens):
+            return None
+        size = _numeric_token(tokens[0])
+        count = _numeric_token(tokens[1])
         if size is None or count is None or size < 0 or count < 0:
-            continue
+            return None
         total += size * count
         found = True
     return total if found else None
@@ -1819,8 +1839,10 @@ XLSX_XML_BORROWED_RESULT_IDENTITY: dict[str, tuple[bool, bool, bool]] = {
 }
 
 # These are the complete deterministic manifests from retained 0251 evidence.
-# A cross-leg match alone is insufficient: a newly generated but consistently
-# altered corpus must not become a valid comparison input.
+# The existing harness schema has no stable ``corpus_id`` field, so the
+# identity contract is the exact pinned manifest plus its archive SHA-256 and
+# canonical-manifest SHA-256.  A cross-leg match alone is insufficient: a
+# newly generated but consistently altered corpus must not become valid.
 XLSX_XML_BORROWED_TINY_CORPUS_MANIFEST: dict[str, Any] = {
     "name": "xlsx-tiny",
     "generator": "litchi-xlsx-synthetic-v1",
@@ -2463,6 +2485,27 @@ def _finite_resource_value(value: Any) -> float | int | None:
     return value
 
 
+def _parsed_resource_metric(leg: dict[str, Any], metric: str) -> float | int | None:
+    if metric.startswith("time."):
+        timed = leg.get("time")
+        parsed = timed.get("parsed") if isinstance(timed, dict) else None
+        if isinstance(parsed, dict):
+            return _finite_resource_value(parsed.get(metric.split(".", 1)[1]))
+        return None
+    if metric.startswith("heaptrack."):
+        heaptrack = leg.get("heaptrack")
+        parsed: Any = None
+        if isinstance(heaptrack, dict):
+            printed = heaptrack.get("print")
+            if isinstance(printed, dict):
+                parsed = printed.get("parsed")
+            if parsed is None:
+                parsed = heaptrack.get("parsed")
+        if isinstance(parsed, dict):
+            return _finite_resource_value(parsed.get(metric.split(".", 1)[1]))
+    return None
+
+
 def _leg_resource_metric(leg: dict[str, Any], metric: str) -> float | int | None:
     direct = leg.get("resource_metrics")
     if isinstance(direct, dict) and metric in direct:
@@ -2485,24 +2528,58 @@ def _leg_resource_metric(leg: dict[str, Any], metric: str) -> float | int | None
                     if isinstance(elapsed, dict):
                         return _finite_resource_value(elapsed.get(statistic))
         return None
+    if metric.startswith("time.") or metric.startswith("heaptrack."):
+        return _parsed_resource_metric(leg, metric)
+    return None
+
+
+def _xlsx_xml_borrowed_resource_metric(
+    leg: dict[str, Any], metric: str
+) -> float | int | None:
+    """Read strict XLSX process metrics from parsed artifacts only.
+
+    A legacy ``resource_metrics`` summary may still be present for publication,
+    but it cannot override the retained /usr/bin/time or heaptrack totals.  If
+    a caller supplies one of the strict totals there, it must agree exactly
+    with the parsed source or the evidence is rejected as ambiguous.
+    """
+    if metric not in XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS:
+        return _leg_resource_metric(leg, metric)
     if metric.startswith("time."):
         timed = leg.get("time")
         parsed = timed.get("parsed") if isinstance(timed, dict) else None
-        if isinstance(parsed, dict):
-            return _finite_resource_value(parsed.get(metric.split(".", 1)[1]))
-        return None
-    if metric.startswith("heaptrack."):
+        if (
+            not isinstance(timed, dict)
+            or timed.get("status") != "ok"
+            or not isinstance(parsed, dict)
+            or parsed.get("status") != "ok"
+        ):
+            derived = None
+        else:
+            derived = _parsed_resource_metric(leg, metric)
+    else:
         heaptrack = leg.get("heaptrack")
-        parsed: Any = None
-        if isinstance(heaptrack, dict):
-            printed = heaptrack.get("print")
-            if isinstance(printed, dict):
-                parsed = printed.get("parsed")
-            if parsed is None:
-                parsed = heaptrack.get("parsed")
-        if isinstance(parsed, dict):
-            return _finite_resource_value(parsed.get(metric.split(".", 1)[1]))
-    return None
+        printed = heaptrack.get("print") if isinstance(heaptrack, dict) else None
+        parsed = printed.get("parsed") if isinstance(printed, dict) else None
+        if (
+            not isinstance(heaptrack, dict)
+            or heaptrack.get("status") != "ok"
+            or not isinstance(printed, dict)
+            or printed.get("status") != "ok"
+            or not isinstance(parsed, dict)
+            or parsed.get("status") != "ok"
+        ):
+            derived = None
+        else:
+            derived = _parsed_resource_metric(leg, metric)
+    direct = leg.get("resource_metrics")
+    if isinstance(direct, dict) and metric in direct:
+        direct_value = _finite_resource_value(direct[metric])
+        if direct_value is None or derived is None or direct_value != derived:
+            raise ResourceProfileInputError(
+                f"strict XLSX {metric} resource_metrics value does not match parsed evidence"
+            )
+    return derived
 
 
 def _require_retained_resource_artifact(value: Any, location: str) -> dict[str, Any]:
@@ -2624,7 +2701,7 @@ def validate_xlsx_xml_borrowed_resource_legs(
                     f"{location}.heaptrack.print.parsed.{field} is missing or non-finite"
                 )
         values = {
-            metric: _leg_resource_metric(leg, metric)
+            metric: _xlsx_xml_borrowed_resource_metric(leg, metric)
             for metric in XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS
         }
         for metric, value in values.items():
@@ -2659,9 +2736,11 @@ def validate_xlsx_xml_borrowed_acceptance(
     for metric in XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS:
         pair_results: dict[str, Any] = {}
         for control_label, candidate_label, pair_label in pairs:
-            control = _finite_resource_value(_leg_resource_metric(by_label[control_label], metric))
+            control = _finite_resource_value(
+                _xlsx_xml_borrowed_resource_metric(by_label[control_label], metric)
+            )
             candidate = _finite_resource_value(
-                _leg_resource_metric(by_label[candidate_label], metric)
+                _xlsx_xml_borrowed_resource_metric(by_label[candidate_label], metric)
             )
             if control is None or candidate is None:
                 raise ResourceProfileInputError(
@@ -2798,6 +2877,7 @@ def abba_statistics(
     legs: Sequence[dict[str, Any]],
     *,
     metric_specs: Sequence[tuple[str, str]] = RESOURCE_METRIC_SPECS,
+    metric_reader: Callable[[dict[str, Any], str], float | int | None] = _leg_resource_metric,
 ) -> dict[str, Any]:
     """Emit descriptive paired resource statistics without accepting a speedup."""
     if any(not isinstance(leg, dict) for leg in legs):
@@ -2806,7 +2886,7 @@ def abba_statistics(
     validate_abba_order(labels)
     metrics: dict[str, Any] = {}
     for metric, description in metric_specs:
-        values = {label: _leg_resource_metric(leg, metric) for label, leg in zip(labels, legs)}
+        values = {label: metric_reader(leg, metric) for label, leg in zip(labels, legs)}
         controls = [values["A1"], values["A2"]]
         candidates = [values["B1"], values["B2"]]
         metrics[metric] = {
@@ -3770,6 +3850,7 @@ def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
     statistics_report = abba_statistics(
         legs,
         metric_specs=XLSX_XML_BORROWED_RESOURCE_METRIC_SPECS,
+        metric_reader=_xlsx_xml_borrowed_resource_metric,
     )
     published_legs = []
     for leg, harness_identity in zip(legs, validation["harness_identities"]):
