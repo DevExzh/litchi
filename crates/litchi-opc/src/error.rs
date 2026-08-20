@@ -67,6 +67,11 @@ pub enum OpcError {
     )]
     DuplicateContentTypeOverride { existing: String, candidate: String },
 
+    #[error(
+        "Duplicate or ASCII-case-equivalent reserved content-types members: '{existing}' and '{candidate}'"
+    )]
+    DuplicateContentTypesMember { existing: String, candidate: String },
+
     #[error("Invalid content type extension: {0}")]
     InvalidContentTypeExtension(String),
 
@@ -301,6 +306,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::InvalidContentTypesManifest(_)
             | OpcError::DuplicateContentTypeDefault(_)
             | OpcError::DuplicateContentTypeOverride { .. }
+            | OpcError::DuplicateContentTypesMember { .. }
             | OpcError::InvalidContentTypeExtension(_)
             | OpcError::InvalidRelationship(_)
             | OpcError::InvalidRelationshipsManifest(_)
