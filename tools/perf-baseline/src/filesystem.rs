@@ -14,7 +14,7 @@ use std::{
     process::{Command, Stdio},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -288,7 +288,7 @@ pub(crate) struct PptxSourceReplayEvidence {
     pub selected_position: Option<usize>,
     pub read_calls: u64,
     pub read_bytes: u64,
-    pub read_range_sizes: Vec<u64>,
+    pub read_return_sizes: Vec<u64>,
     pub slide_payload_read_calls: u64,
     pub slide_payload_read_bytes: u64,
     pub slide_payload_covered_bytes: u64,
@@ -323,7 +323,7 @@ pub(crate) struct DocxSourceReplayEvidence {
     pub paragraph_count: usize,
     pub open_read_calls: u64,
     pub open_read_bytes: u64,
-    pub open_read_request_sizes: Vec<u64>,
+    pub open_read_return_sizes: Vec<u64>,
     pub open_main_payload_overlap_bytes: u64,
     pub open_media_payload_overlap_bytes: u64,
     pub open_unselected_payload_overlap_bytes: u64,
@@ -334,7 +334,7 @@ pub(crate) struct DocxSourceReplayEvidence {
     pub open_core_payload_covered_bytes: u64,
     pub preparation_read_calls: u64,
     pub preparation_read_bytes: u64,
-    pub preparation_read_request_sizes: Vec<u64>,
+    pub preparation_read_return_sizes: Vec<u64>,
     pub preparation_main_payload_overlap_bytes: u64,
     pub preparation_main_payload_covered_bytes: u64,
     pub preparation_main_payload_fully_covered: bool,
@@ -346,7 +346,7 @@ pub(crate) struct DocxSourceReplayEvidence {
     pub preparation_core_payload_covered_bytes: u64,
     pub query_read_calls: u64,
     pub query_read_bytes: u64,
-    pub query_read_request_sizes: Vec<u64>,
+    pub query_read_return_sizes: Vec<u64>,
     pub query_main_payload_overlap_bytes: u64,
     pub query_media_payload_overlap_bytes: u64,
     pub query_unselected_payload_overlap_bytes: u64,
@@ -438,15 +438,19 @@ pub(crate) struct ReadSizeBuckets {
 }
 
 impl ReadSizeBuckets {
-    fn observe(&mut self, bytes: u64) {
-        match bytes {
-            0 => self.bytes_0 += 1,
-            1..=512 => self.bytes_1_to_512 += 1,
-            513..=4096 => self.bytes_513_to_4096 += 1,
-            4097..=16384 => self.bytes_4097_to_16384 += 1,
-            16385..=65536 => self.bytes_16385_to_65536 += 1,
-            _ => self.bytes_over_65536 += 1,
-        }
+    fn observe(&mut self, bytes: u64) -> io::Result<()> {
+        let bucket = match bytes {
+            0 => &mut self.bytes_0,
+            1..=512 => &mut self.bytes_1_to_512,
+            513..=4096 => &mut self.bytes_513_to_4096,
+            4097..=16384 => &mut self.bytes_4097_to_16384,
+            16385..=65536 => &mut self.bytes_16385_to_65536,
+            _ => &mut self.bytes_over_65536,
+        };
+        *bucket = bucket
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("source request-size bucket count overflows u64"))?;
+        Ok(())
     }
 
     const fn is_empty(&self) -> bool {
@@ -1725,7 +1729,7 @@ struct PptxReplaySource {
     selected_slide_range: Option<Range<u64>>,
     counters: Mutex<PptxReplayCounters>,
     coverage: Mutex<PptxReplayCoverage>,
-    request_sizes: Mutex<Vec<u64>>,
+    return_sizes: Mutex<Vec<u64>>,
 }
 
 impl PptxReplaySource {
@@ -1746,7 +1750,7 @@ impl PptxReplaySource {
             selected_slide_range,
             counters: Mutex::new(PptxReplayCounters::default()),
             coverage: Mutex::new(PptxReplayCoverage::default()),
-            request_sizes: Mutex::new(Vec::new()),
+            return_sizes: Mutex::new(Vec::new()),
         }
     }
 
@@ -1834,9 +1838,9 @@ impl PptxReplaySource {
         }
         append_overlaps(&request, &self.media_ranges, &mut coverage.media);
         drop(coverage);
-        self.request_sizes
+        self.return_sizes
             .lock()
-            .map_err(|_| io::Error::other("PPTX replay request sizes are poisoned"))?
+            .map_err(|_| io::Error::other("PPTX replay return sizes are poisoned"))?
             .push(count_u64);
         Ok(())
     }
@@ -1851,13 +1855,13 @@ impl PptxReplaySource {
             .lock()
             .map_err(|_| io::Error::other("PPTX replay coverage is poisoned"))?
             .clone();
-        let mut request_sizes = self
-            .request_sizes
+        let mut return_sizes = self
+            .return_sizes
             .lock()
-            .map_err(|_| io::Error::other("PPTX replay request sizes are poisoned"))?
+            .map_err(|_| io::Error::other("PPTX replay return sizes are poisoned"))?
             .clone();
-        request_sizes.sort_unstable();
-        Ok((counters, coverage, request_sizes))
+        return_sizes.sort_unstable();
+        Ok((counters, coverage, return_sizes))
     }
 }
 
@@ -2092,7 +2096,7 @@ fn replay_pptx_source(
         },
         _ => return Err("non-source PPTX operation passed to source replay".into()),
     }
-    let (counters, coverage, request_sizes) = replay.snapshot()?;
+    let (counters, coverage, return_sizes) = replay.snapshot()?;
     let unselected_slide_ranges = slide_ranges
         .iter()
         .enumerate()
@@ -2165,7 +2169,7 @@ fn replay_pptx_source(
         .then_some(PPTX_FILE_SELECTED_POSITION),
         read_calls: counters.read_calls,
         read_bytes: counters.read_bytes,
-        read_range_sizes: request_sizes,
+        read_return_sizes: return_sizes,
         slide_payload_read_calls: counters.slide_payload_read_calls,
         slide_payload_read_bytes: counters.slide_payload_read_bytes,
         slide_payload_covered_bytes,
@@ -2198,7 +2202,7 @@ struct DocxReplayCounters {
 #[derive(Clone, Debug)]
 struct DocxReplaySnapshot {
     counters: DocxReplayCounters,
-    request_sizes: Vec<u64>,
+    return_sizes: Vec<u64>,
     read_ranges: Vec<Range<u64>>,
 }
 
@@ -2216,7 +2220,7 @@ struct DocxReplaySource {
     version: SourceVersion,
     ranges: DocxReplayRanges,
     counters: Mutex<DocxReplayCounters>,
-    request_sizes: Mutex<Vec<u64>>,
+    return_sizes: Mutex<Vec<u64>>,
     read_ranges: Mutex<Vec<Range<u64>>>,
 }
 
@@ -2230,7 +2234,7 @@ impl DocxReplaySource {
             ),
             ranges,
             counters: Mutex::new(DocxReplayCounters::default()),
-            request_sizes: Mutex::new(Vec::new()),
+            return_sizes: Mutex::new(Vec::new()),
             read_ranges: Mutex::new(Vec::new()),
         }
     }
@@ -2269,9 +2273,9 @@ impl DocxReplaySource {
             "DOCX core payload overlap",
         )?;
         drop(counters);
-        self.request_sizes
+        self.return_sizes
             .lock()
-            .map_err(|_| io::Error::other("DOCX replay request sizes are poisoned"))?
+            .map_err(|_| io::Error::other("DOCX replay return sizes are poisoned"))?
             .push(count);
         self.read_ranges
             .lock()
@@ -2285,10 +2289,10 @@ impl DocxReplaySource {
             .counters
             .lock()
             .map_err(|_| io::Error::other("DOCX replay counters are poisoned"))?;
-        let request_sizes = self
-            .request_sizes
+        let return_sizes = self
+            .return_sizes
             .lock()
-            .map_err(|_| io::Error::other("DOCX replay request sizes are poisoned"))?
+            .map_err(|_| io::Error::other("DOCX replay return sizes are poisoned"))?
             .clone();
         let read_ranges = self
             .read_ranges
@@ -2297,7 +2301,7 @@ impl DocxReplaySource {
             .clone();
         Ok(DocxReplaySnapshot {
             counters,
-            request_sizes,
+            return_sizes,
             read_ranges,
         })
     }
@@ -2350,7 +2354,7 @@ fn docx_replay_phase(
         core_payload_overlap_bytes: after.counters.core_payload_overlap_bytes
             - before.counters.core_payload_overlap_bytes,
     };
-    let request_sizes = after.request_sizes[before.request_sizes.len()..].to_vec();
+    let return_sizes = after.return_sizes[before.return_sizes.len()..].to_vec();
     let read_ranges = &after.read_ranges[before.read_ranges.len()..];
     let main_payload_covered_bytes =
         covered_bytes(std::slice::from_ref(&ranges.main), read_ranges).unwrap_or_default();
@@ -2361,7 +2365,7 @@ fn docx_replay_phase(
     let main_payload_fully_covered = range_fully_covered(&ranges.main, read_ranges);
     DocxReplayPhase {
         counters,
-        request_sizes,
+        return_sizes,
         main_payload_covered_bytes,
         main_payload_fully_covered,
         media_payload_covered_bytes,
@@ -2373,7 +2377,7 @@ fn docx_replay_phase(
 #[derive(Clone, Debug)]
 struct DocxReplayPhase {
     counters: DocxReplayCounters,
-    request_sizes: Vec<u64>,
+    return_sizes: Vec<u64>,
     main_payload_covered_bytes: u64,
     main_payload_fully_covered: bool,
     media_payload_covered_bytes: u64,
@@ -2458,7 +2462,7 @@ fn replay_docx_source(
         (
             DocxReplayPhase {
                 counters: DocxReplayCounters::default(),
-                request_sizes: Vec::new(),
+                return_sizes: Vec::new(),
                 main_payload_covered_bytes: 0,
                 main_payload_fully_covered: false,
                 media_payload_covered_bytes: 0,
@@ -2467,7 +2471,7 @@ fn replay_docx_source(
             },
             DocxReplayPhase {
                 counters: DocxReplayCounters::default(),
-                request_sizes: Vec::new(),
+                return_sizes: Vec::new(),
                 main_payload_covered_bytes: 0,
                 main_payload_fully_covered: false,
                 media_payload_covered_bytes: 0,
@@ -2479,7 +2483,7 @@ fn replay_docx_source(
     let open_phase = docx_replay_phase(
         &DocxReplaySnapshot {
             counters: DocxReplayCounters::default(),
-            request_sizes: Vec::new(),
+            return_sizes: Vec::new(),
             read_ranges: Vec::new(),
         },
         &open,
@@ -2526,7 +2530,7 @@ fn replay_docx_source(
         paragraph_count,
         open_read_calls: open_phase.counters.read_calls,
         open_read_bytes: open_phase.counters.read_bytes,
-        open_read_request_sizes: open_phase.request_sizes,
+        open_read_return_sizes: open_phase.return_sizes,
         open_main_payload_overlap_bytes: open_phase.counters.main_payload_overlap_bytes,
         open_media_payload_overlap_bytes: open_phase.counters.media_payload_overlap_bytes,
         open_unselected_payload_overlap_bytes: open_phase.counters.unselected_payload_overlap_bytes,
@@ -2537,7 +2541,7 @@ fn replay_docx_source(
         open_core_payload_covered_bytes: open_phase.core_payload_covered_bytes,
         preparation_read_calls: preparation.counters.read_calls,
         preparation_read_bytes: preparation.counters.read_bytes,
-        preparation_read_request_sizes: preparation.request_sizes,
+        preparation_read_return_sizes: preparation.return_sizes,
         preparation_main_payload_overlap_bytes: preparation.counters.main_payload_overlap_bytes,
         preparation_main_payload_covered_bytes: preparation.main_payload_covered_bytes,
         preparation_main_payload_fully_covered: preparation.main_payload_fully_covered,
@@ -2551,7 +2555,7 @@ fn replay_docx_source(
         preparation_core_payload_covered_bytes: preparation.core_payload_covered_bytes,
         query_read_calls: query.counters.read_calls,
         query_read_bytes: query.counters.read_bytes,
-        query_read_request_sizes: query.request_sizes,
+        query_read_return_sizes: query.return_sizes,
         query_main_payload_overlap_bytes: query.counters.main_payload_overlap_bytes,
         query_media_payload_overlap_bytes: query.counters.media_payload_overlap_bytes,
         query_unselected_payload_overlap_bytes: query.counters.unselected_payload_overlap_bytes,
@@ -2586,6 +2590,15 @@ struct ReadTotals {
     returned_bytes: u64,
 }
 
+/// Harness-only logical source wrapper.
+///
+/// A call and its requested output length are recorded before delegating to
+/// the wrapped source. Returned bytes are recorded only after the source's
+/// successful result is validated. An underlying I/O error propagates after
+/// recording a requested-only attempt; an over-returning source is rejected
+/// and marks the metric snapshot unavailable. Either error fails the sample,
+/// and neither attempt contributes returned bytes. These counters describe
+/// the wrapper boundary, not physical I/O.
 struct CountingReadAt {
     inner: Arc<dyn ReadAt>,
     calls: AtomicU64,
@@ -2595,6 +2608,7 @@ struct CountingReadAt {
     largest_returned_bytes: AtomicU64,
     in_flight: AtomicU64,
     max_concurrent: AtomicU64,
+    metrics_failed: AtomicBool,
     request_sizes: Mutex<Vec<u64>>,
     pattern: Mutex<ReadPatternState>,
 }
@@ -2654,28 +2668,63 @@ impl CountingReadAt {
             largest_returned_bytes: AtomicU64::new(0),
             in_flight: AtomicU64::new(0),
             max_concurrent: AtomicU64::new(0),
+            metrics_failed: AtomicBool::new(false),
             request_sizes: Mutex::new(Vec::new()),
             pattern: Mutex::new(ReadPatternState::default()),
         }
     }
 
+    fn fail_metrics(&self, error: io::Error) -> io::Error {
+        self.metrics_failed.store(true, Ordering::SeqCst);
+        error
+    }
+
+    fn checked_add(
+        &self,
+        counter: &AtomicU64,
+        amount: u64,
+        label: &'static str,
+    ) -> io::Result<u64> {
+        checked_atomic_add(counter, amount, label).map_err(|error| self.fail_metrics(error))
+    }
+
     fn snapshot(&self) -> io::Result<ReadMetrics> {
+        if self.metrics_failed.load(Ordering::SeqCst) {
+            return Err(io::Error::other(
+                "filesystem source metrics are unavailable after a counter failure",
+            ));
+        }
         let mut request_sizes = self
             .request_sizes
             .lock()
-            .map_err(|_| io::Error::other("filesystem source request sizes are poisoned"))?
+            .map_err(|_| {
+                self.fail_metrics(io::Error::other(
+                    "filesystem source request sizes are poisoned",
+                ))
+            })?
             .clone();
         request_sizes.sort_unstable();
         let mut request_size_buckets = ReadSizeBuckets::default();
         for &size in &request_sizes {
-            request_size_buckets.observe(size);
+            request_size_buckets
+                .observe(size)
+                .map_err(|error| self.fail_metrics(error))?;
         }
         let max_concurrent = self.max_concurrent.load(Ordering::SeqCst);
         let pattern = self
             .pattern
             .lock()
-            .map_err(|_| io::Error::other("filesystem source pattern metrics are poisoned"))?
+            .map_err(|_| {
+                self.fail_metrics(io::Error::other(
+                    "filesystem source pattern metrics are poisoned",
+                ))
+            })?
             .classify(max_concurrent);
+        if self.metrics_failed.load(Ordering::SeqCst) {
+            return Err(io::Error::other(
+                "filesystem source metrics failed while taking a snapshot",
+            ));
+        }
         Ok(ReadMetrics {
             calls: self.calls.load(Ordering::SeqCst),
             requested_bytes: self.requested_bytes.load(Ordering::SeqCst),
@@ -2698,11 +2747,52 @@ impl CountingReadAt {
     }
 }
 
-struct InFlight<'a>(&'a AtomicU64);
+fn checked_atomic_add(counter: &AtomicU64, amount: u64, label: &str) -> io::Result<u64> {
+    let mut current = counter.load(Ordering::SeqCst);
+    loop {
+        let next = current
+            .checked_add(amount)
+            .ok_or_else(|| io::Error::other(format!("filesystem source {label} overflow")))?;
+        match counter.compare_exchange_weak(
+            current,
+            next,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => return Ok(next),
+            Err(observed) => current = observed,
+        }
+    }
+}
+
+fn checked_atomic_sub(counter: &AtomicU64, amount: u64, label: &str) -> io::Result<u64> {
+    let mut current = counter.load(Ordering::SeqCst);
+    loop {
+        let next = current
+            .checked_sub(amount)
+            .ok_or_else(|| io::Error::other(format!("filesystem source {label} underflow")))?;
+        match counter.compare_exchange_weak(
+            current,
+            next,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => return Ok(next),
+            Err(observed) => current = observed,
+        }
+    }
+}
+
+struct InFlight<'a> {
+    counter: &'a AtomicU64,
+    metrics_failed: &'a AtomicBool,
+}
 
 impl Drop for InFlight<'_> {
     fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::SeqCst);
+        if checked_atomic_sub(self.counter, 1, "in-flight reads").is_err() {
+            self.metrics_failed.store(true, Ordering::SeqCst);
+        }
     }
 }
 
@@ -2713,28 +2803,47 @@ impl ReadAt for CountingReadAt {
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
         let requested = u64::try_from(output.len())
-            .map_err(|_| io::Error::other("requested source range does not fit u64"))?;
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        self.requested_bytes.fetch_add(requested, Ordering::SeqCst);
+            .map_err(|error| self.fail_metrics(io::Error::other(error.to_string())))?;
+        self.checked_add(&self.calls, 1, "read calls")?;
+        self.checked_add(&self.requested_bytes, requested, "requested bytes")?;
         self.largest_requested_bytes
             .fetch_max(requested, Ordering::SeqCst);
         self.request_sizes
             .lock()
-            .map_err(|_| io::Error::other("filesystem source request sizes are poisoned"))?
+            .map_err(|_| {
+                self.fail_metrics(io::Error::other(
+                    "filesystem source request sizes are poisoned",
+                ))
+            })?
             .push(requested);
-        let in_flight = self.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+        let in_flight = self.checked_add(&self.in_flight, 1, "in-flight reads")?;
         self.max_concurrent.fetch_max(in_flight, Ordering::SeqCst);
-        let _guard = InFlight(&self.in_flight);
+        let _guard = InFlight {
+            counter: &self.in_flight,
+            metrics_failed: &self.metrics_failed,
+        };
         let read = self.inner.read_at(offset, output)?;
         let returned = u64::try_from(read)
-            .map_err(|_| io::Error::other("filesystem source return count does not fit u64"))?;
-        self.returned_bytes.fetch_add(returned, Ordering::SeqCst);
+            .map_err(|error| self.fail_metrics(io::Error::other(error.to_string())))?;
+        if returned > requested {
+            return Err(self.fail_metrics(io::Error::other(
+                "filesystem source returned more bytes than requested",
+            )));
+        }
+        self.checked_add(&self.returned_bytes, returned, "returned bytes")?;
         self.largest_returned_bytes
             .fetch_max(returned, Ordering::SeqCst);
-        self.pattern
+        let mut pattern = self
+            .pattern
             .lock()
-            .map_err(|_| io::Error::other("filesystem source pattern metrics are poisoned"))?
-            .observe(offset, requested, read)?;
+            .map_err(|_| {
+                self.fail_metrics(io::Error::other(
+                    "filesystem source pattern metrics are poisoned",
+                ))
+            })?;
+        pattern
+            .observe(offset, requested, read)
+            .map_err(|error| self.fail_metrics(error))?;
         Ok(read)
     }
 
@@ -3408,14 +3517,88 @@ fn filesystem_root(requested_root: Option<&Path>) -> io::Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, sync::Arc};
+    use std::{
+        fs,
+        panic::{AssertUnwindSafe, catch_unwind},
+        sync::{Arc, Barrier, atomic::Ordering},
+        thread,
+    };
 
-    use litchi_core::{OwnedSource, ReadAt};
+    use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 
     use super::{
         CacheSelection, ChildMode, ColdAdvice, CountingReadAt, Operation, ReadPattern,
-        ReadSizeBuckets,
+        ReadPatternState, ReadSizeBuckets, checked_atomic_add, checked_atomic_sub,
     };
+
+    struct OverReturningSource;
+
+    impl ReadAt for OverReturningSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(16)
+        }
+
+        fn read_at(&self, _offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            Ok(output.len() + 1)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(1, 0))
+        }
+    }
+
+    struct FailingSource;
+
+    impl ReadAt for FailingSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(16)
+        }
+
+        fn read_at(&self, _offset: u64, _output: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("synthetic source failure"))
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(2, 0))
+        }
+    }
+
+    struct ExactReturningSource;
+
+    impl ReadAt for ExactReturningSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(u64::MAX)
+        }
+
+        fn read_at(&self, _offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            output.fill(0);
+            Ok(output.len())
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(3, 0))
+        }
+    }
+
+    struct ConcurrentExactSource {
+        barrier: Arc<Barrier>,
+    }
+
+    impl ReadAt for ConcurrentExactSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(64)
+        }
+
+        fn read_at(&self, _offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            self.barrier.wait();
+            output.fill(0);
+            Ok(output.len())
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(4, 0))
+        }
+    }
 
     #[test]
     fn filesystem_case_names_are_explicit_and_parseable() {
@@ -3572,14 +3755,14 @@ mod tests {
         assert_eq!(phase.media_payload_covered_bytes, 20);
         assert_eq!(phase.unselected_payload_covered_bytes, 0);
         assert_eq!(phase.core_payload_covered_bytes, 0);
-        assert_eq!(phase.request_sizes, vec![20, 20]);
+        assert_eq!(phase.return_sizes, vec![20, 20]);
     }
 
     #[test]
     fn read_size_buckets_are_fixed_and_boundary_stable() {
         let mut buckets = ReadSizeBuckets::default();
         for size in [0, 1, 512, 513, 4096, 4097, 16384, 16385, 65536, 65537] {
-            buckets.observe(size);
+            buckets.observe(size).unwrap();
         }
         assert_eq!(buckets.bytes_0, 1);
         assert_eq!(buckets.bytes_1_to_512, 2);
@@ -3629,6 +3812,99 @@ mod tests {
         let mut output = [0_u8; 2];
         assert_eq!(source.read_at(3, &mut output).unwrap(), 2);
         assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+    }
+
+    #[test]
+    fn counting_source_rejects_over_return_before_recording_returned_bytes() {
+        let source = CountingReadAt::new(Arc::new(OverReturningSource));
+        let mut output = [0_u8; 4];
+        let error = source.read_at(0, &mut output).unwrap_err();
+        assert!(error.to_string().contains("more bytes than requested"));
+        assert_eq!(source.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(source.requested_bytes.load(Ordering::SeqCst), 4);
+        assert_eq!(source.returned_bytes.load(Ordering::SeqCst), 0);
+        assert_eq!(source.largest_returned_bytes.load(Ordering::SeqCst), 0);
+        assert!(source.snapshot().is_err());
+    }
+
+    #[test]
+    fn counting_source_records_failed_attempt_as_requested_only() {
+        let source = CountingReadAt::new(Arc::new(FailingSource));
+        let mut output = [0_u8; 4];
+        assert!(source.read_at(0, &mut output).is_err());
+        assert_eq!(source.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(source.requested_bytes.load(Ordering::SeqCst), 4);
+        assert_eq!(source.returned_bytes.load(Ordering::SeqCst), 0);
+        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+    }
+
+    #[test]
+    fn counting_source_marks_counter_overflow_unavailable() {
+        let source = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 8])));
+        source.calls.store(u64::MAX, Ordering::SeqCst);
+        let mut output = [0_u8; 1];
+        let error = source.read_at(0, &mut output).unwrap_err();
+        assert!(error.to_string().contains("read calls overflow"));
+        assert!(source.snapshot().is_err());
+
+        let counter = std::sync::atomic::AtomicU64::new(u64::MAX);
+        assert!(checked_atomic_add(&counter, 1, "test counter").is_err());
+        assert_eq!(counter.load(Ordering::SeqCst), u64::MAX);
+
+        let in_flight = std::sync::atomic::AtomicU64::new(0);
+        assert!(checked_atomic_sub(&in_flight, 1, "test in-flight").is_err());
+        assert_eq!(in_flight.load(Ordering::SeqCst), 0);
+
+        let mut buckets = ReadSizeBuckets {
+            bytes_0: u64::MAX,
+            ..ReadSizeBuckets::default()
+        };
+        assert!(buckets.observe(0).is_err());
+        assert_eq!(buckets.bytes_0, u64::MAX);
+    }
+
+    #[test]
+    fn counting_source_rejects_invalid_range_arithmetic() {
+        let mut state = ReadPatternState::default();
+        assert!(state.observe(u64::MAX, 1, 1).is_err());
+
+        let source = CountingReadAt::new(Arc::new(ExactReturningSource));
+        let mut output = [0_u8; 1];
+        assert!(source.read_at(u64::MAX, &mut output).is_err());
+        assert_eq!(source.returned_bytes.load(Ordering::SeqCst), 1);
+        assert!(source.snapshot().is_err());
+    }
+
+    #[test]
+    fn counting_source_marks_concurrent_observations_unknown() {
+        let source = Arc::new(CountingReadAt::new(Arc::new(ConcurrentExactSource {
+            barrier: Arc::new(Barrier::new(2)),
+        })));
+        let first_source = Arc::clone(&source);
+        let first = thread::spawn(move || {
+            let mut output = [0_u8; 2];
+            first_source.read_at(0, &mut output)
+        });
+        let second_source = Arc::clone(&source);
+        let second = thread::spawn(move || {
+            let mut output = [0_u8; 2];
+            second_source.read_at(2, &mut output)
+        });
+        assert_eq!(first.join().unwrap().unwrap(), 2);
+        assert_eq!(second.join().unwrap().unwrap(), 2);
+        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+        assert!(source.max_concurrent.load(Ordering::SeqCst) >= 2);
+    }
+
+    #[test]
+    fn counting_source_poisoned_metrics_fail_closed() {
+        let source = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 8])));
+        let poisoned = catch_unwind(AssertUnwindSafe(|| {
+            let _guard = source.request_sizes.lock().unwrap();
+            panic!("poison request-size metrics");
+        }));
+        assert!(poisoned.is_err());
+        assert!(source.snapshot().is_err());
     }
 
     #[test]

@@ -223,9 +223,14 @@ pub(crate) struct CfbPhaseMetrics {
 pub(crate) struct OperationMetrics {
     /// Number of values in every measured vector below.
     pub sample_count: usize,
-    /// All vectors are ordered exactly like the case result's
-    /// `elapsed_ns.samples` vector, after its deterministic sort.
+    /// Stable child identity for every aligned metric vector.
+    pub sample_indices: Vec<usize>,
+    /// All vectors are ordered by `(elapsed_ns, sample_index)`; the explicit
+    /// identity vector resolves otherwise indistinguishable elapsed ties.
     pub alignment: &'static str,
+    /// Filesystem timings are retained as evidence only. They are not a
+    /// latency claim or a matched eager/source performance comparison.
+    pub latency_claim: &'static str,
     pub source: SourceMetrics,
     pub process: ProcessMetrics,
     pub sink: SinkMetrics,
@@ -234,7 +239,8 @@ pub(crate) struct OperationMetrics {
     pub cfb_phases: CfbPhaseMetrics,
 }
 
-const ALIGNMENT: &str = "elapsed_ns.samples";
+const ALIGNMENT: &str = "elapsed_ns.samples_by_elapsed_then_sample_index";
+const LATENCY_CLAIM: &str = "evidence_only_filesystem_selector";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
 const SOURCE_PATTERN_SCOPE: &str = "operation_logical_read_at_range_order_not_physical_io";
 const SOURCE_COMPRESSED_SCOPE: &str = "unavailable_read_at_has_no_compressed_member_boundary";
@@ -304,6 +310,18 @@ pub(crate) fn aggregate(
     }
     let selected = selected.into_iter().collect::<Vec<&SampleEvidence>>();
     let sample_count = selected.len();
+    let sample_indices = selected
+        .iter()
+        .map(|sample| sample.sample_index)
+        .collect::<Vec<_>>();
+    let mut sorted_sample_indices = sample_indices.clone();
+    sorted_sample_indices.sort_unstable();
+    if sorted_sample_indices.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(format!(
+            "operation metrics {cache_state} sample identity is not unique"
+        )
+        .into());
+    }
     let first_scope = selected
         .first()
         .map(|sample| sample.logical_read_counter_scope.clone())
@@ -442,7 +460,9 @@ pub(crate) fn aggregate(
 
     Ok(OperationMetrics {
         sample_count,
+        sample_indices,
         alignment: ALIGNMENT,
+        latency_claim: LATENCY_CLAIM,
         source,
         process,
         sink,
@@ -934,6 +954,8 @@ mod tests {
         ];
         let warm = aggregate(&samples, "warm", &[20, 10]).unwrap();
         assert_eq!(warm.sample_count, 2);
+        assert_eq!(warm.sample_indices, vec![1, 0]);
+        assert_eq!(warm.latency_claim, "evidence_only_filesystem_selector");
         assert_eq!(warm.source.logical_read_calls.values, Some(vec![1, 0]));
         assert_eq!(
             warm.source.logical_read_largest_requested_bytes.values,
@@ -948,10 +970,39 @@ mod tests {
     }
 
     #[test]
+    fn tied_elapsed_samples_keep_stable_sample_identity_alignment() {
+        let samples = vec![
+            sample(2, "warm", 10, Some(metrics())),
+            sample(1, "warm", 10, Some(metrics())),
+            sample(0, "warm", 20, Some(metrics())),
+        ];
+        let envelope = aggregate(&samples, "warm", &[10, 10, 20]).unwrap();
+        assert_eq!(
+            envelope.sample_indices,
+            vec![1, 2, 0],
+            "ties must use sample index rather than unstable elapsed sorting"
+        );
+        assert_eq!(
+            envelope.source.logical_read_calls.values,
+            Some(vec![1, 2, 0])
+        );
+    }
+
+    #[test]
     fn exact_cardinality_is_required() {
         let samples = vec![sample(0, "warm", 10, Some(metrics()))];
         let error = aggregate(&samples, "warm", &[10, 20]).unwrap_err();
         assert!(error.to_string().contains("sample count"));
+    }
+
+    #[test]
+    fn duplicate_sample_identity_fails_closed() {
+        let samples = vec![
+            sample(0, "warm", 10, Some(metrics())),
+            sample(0, "warm", 20, Some(metrics())),
+        ];
+        let error = aggregate(&samples, "warm", &[10, 20]).unwrap_err();
+        assert!(error.to_string().contains("sample identity is not unique"));
     }
 
     #[test]

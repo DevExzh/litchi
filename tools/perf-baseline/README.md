@@ -221,8 +221,9 @@ query roots are prepared outside timing and the timer covers only the named
 root query. Independent untimed `litchi_docx::source_backed::Package` replays
 record catalog/open reads and, for query selectors, complete coverage of the
 compressed main-document range during document preparation plus zero
-media/unselected/core overlap during the query. Request sizes, range coverage,
-materializations, and an explicit classification are also recorded. Full
+media/unselected/core overlap during the query. Completed return sizes, range
+coverage, materializations, and an explicit classification are also recorded.
+Full
 eager/source semantic parity, exact source hash, logical OPC
 part/relationship/content-type/blob-hash gates, media hashes, and source
 immutability remain verification outside timing. This is correctness and
@@ -2600,9 +2601,11 @@ published bytes. The configuration records selected cache states, process
 isolation, fresh-child sampling, and whether a caller-selected filesystem root
 was used. PPTX ordinary-root samples additionally record
 `logical_read_counter_scope` and, for source candidates only, an untimed
-`pptx_source_replay` object with source hash, total request sizes, exact slide
+`pptx_source_replay` object with source hash, completed return sizes, exact slide
 and media payload-range overlap, selected/unselected slide counters, union
 coverage bytes, full-range coverage counts, semantic hash, and classification.
+Its `read_return_sizes` vector records bytes returned by each logical replay
+read, not requested buffer lengths.
 Selected replay classification requires the complete target compressed range;
 list replay classification requires every slide range. Eager PPTX samples set
 the replay object to null and mark the generic counter scope
@@ -2619,8 +2622,12 @@ contiguous observations in completion order, while a non-contiguous transition
 is `random`. Empty, short, concurrent, or insufficient observations are
 `unknown`; invalid range arithmetic fails closed. The label says nothing about
 kernel readahead, page-cache behavior, device/network requests, or physical I/O.
-Largest range
-sizes and requested/returned byte totals have the same logical-source boundary.
+Largest range sizes and requested/returned byte totals have the same
+logical-source boundary. An attempted `ReadAt` increments calls and requested
+bytes before delegation; an underlying error leaves returned bytes unchanged,
+and a source that returns more than the requested buffer is rejected before
+returned-byte accounting. Counter overflow, invalid range arithmetic, and
+poisoned metric state fail the sample rather than emitting fabricated values.
 The timed generic `ReadAt` and atomic-save callbacks expose no exact compressed
 member, decompressed-byte, or recompressed-byte boundary, so the corresponding
 `operation_metrics.source` vectors are explicitly `unavailable` (or
@@ -2629,8 +2636,11 @@ not substituted.
 
 Each filesystem `CaseResult` additionally carries an additive
 `operation_metrics` envelope. Its `sample_count` and `alignment` identify the
-sorted `elapsed_ns.samples` vector, and every measured numeric vector has that
-same cardinality and order. The envelope separates logical source-read
+sorted `elapsed_ns.samples` vector; `sample_indices` records the stable child
+identity used to order ties. Every measured numeric vector has that same
+cardinality and order. `latency_claim` is explicitly
+`evidence_only_filesystem_selector`, so these elapsed vectors are not a
+comparator or eager/source latency claim. The envelope separates logical source-read
 vectors (including largest range sizes); the aligned categorical
 `logical_read_pattern` vector is descriptive and is not a numeric policy
 metric. It also separates procfs process vectors, post-operation output length,
