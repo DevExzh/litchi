@@ -2340,10 +2340,14 @@ fn preflight_flat_logical_entries(
     archive: &ZipArchive<'_>,
     limits: LogicalEntryLimits,
 ) -> Result<()> {
+    let mut seen_metadata = HashSet::new();
     for physical in archive
         .physical_entries()
         .filter(|entry| !entry.is_directory())
     {
+        if limits.includes_metadata() {
+            preflight_semantic_metadata_authority(physical, b"", &mut seen_metadata)?;
+        }
         preflight_logical_entry(physical, physical.raw_name(), limits)?;
     }
     Ok(())
@@ -2607,16 +2611,76 @@ fn preflight_legacy_outer_logical_entries(
     limits: LogicalEntryLimits,
 ) -> Result<()> {
     let raw_prefix = legacy_raw_outer_prefix(archive, index_name)?;
+    let mut seen_metadata = HashSet::new();
     for physical in archive
         .physical_entries()
         .filter(|entry| !entry.is_directory() && entry.name() != index_name)
     {
+        if limits.includes_metadata() {
+            preflight_semantic_metadata_authority(physical, raw_prefix, &mut seen_metadata)?;
+        }
         let raw_name = physical.raw_name();
         if let Some(logical_name) = raw_name.strip_prefix(raw_prefix) {
             preflight_logical_entry(physical, logical_name, limits)?;
         }
     }
     Ok(())
+}
+
+fn preflight_semantic_metadata_authority(
+    physical: &PhysicalEntry,
+    raw_prefix: &[u8],
+    seen: &mut HashSet<&'static [u8]>,
+) -> Result<()> {
+    let central = physical.raw_name().strip_prefix(raw_prefix);
+    let local = physical.local_header().name.strip_prefix(raw_prefix);
+    let Some(authority) = semantic_metadata_authority_collision(central, local)? else {
+        return Ok(());
+    };
+    if !seen.insert(authority) {
+        return Err(Error::InvalidBundle(format!(
+            "duplicate semantic metadata authority is ambiguous: {}",
+            String::from_utf8_lossy(authority)
+        )));
+    }
+    Ok(())
+}
+
+fn semantic_metadata_authority_collision(
+    central: Option<&[u8]>,
+    local: Option<&[u8]>,
+) -> Result<Option<&'static [u8]>> {
+    for &authority in [
+        b"Metadata/Properties.plist".as_slice(),
+        b"Metadata/BuildVersionHistory.plist",
+        b"Metadata/DocumentIdentifier",
+    ]
+    .as_slice()
+    {
+        let central_exact = central == Some(authority);
+        let local_exact = local == Some(authority);
+        let central_alias = central
+            .is_some_and(|name| name != authority && raw_path_normalizes_to(name, authority));
+        let local_alias =
+            local.is_some_and(|name| name != authority && raw_path_normalizes_to(name, authority));
+
+        // Keep Catalog's established selected-entry diagnostics for the
+        // ordinary central-authority case: the existing logical preflight
+        // reports a local/central header mismatch. The inverse case (a local
+        // exact authority hidden behind a non-exact central name) would not
+        // otherwise be visited by that preflight, so reject it here before
+        // collection can read or silently skip the payload.
+        if (local_exact && !central_exact) || central_alias || (local_alias && !central_exact) {
+            return Err(Error::InvalidBundle(format!(
+                "semantic metadata authority has non-canonical or one-sided ZIP names: {}",
+                String::from_utf8_lossy(authority)
+            )));
+        }
+        if central_exact {
+            return Ok(Some(authority));
+        }
+    }
+    Ok(None)
 }
 
 fn legacy_raw_outer_prefix<'a>(archive: &'a ZipArchive<'_>, index_name: &str) -> Result<&'a [u8]> {
@@ -3487,6 +3551,19 @@ mod tests {
         ));
         assert_eq!(crate::zip::test_entry_read_count(), 0);
 
+        let central_near_name = raw_named_zip(authority, local_near_name, 0, 0, b"properties");
+        crate::zip::reset_test_entry_read_count();
+        assert!(matches!(
+            Catalog::__from_bytes_with_logical_entry_limits(
+                &central_near_name,
+                Limits::default(),
+                LogicalEntryLimits::PAGES_METADATA,
+            ),
+            Err(Error::InvalidBundle(message))
+                if message.contains("semantic metadata authority has non-canonical or one-sided ZIP names")
+        ));
+        assert_eq!(crate::zip::test_entry_read_count(), 0);
+
         let method_mismatch = raw_named_zip(authority, authority, 99, 0, b"properties");
         crate::zip::reset_test_entry_read_count();
         assert!(matches!(
@@ -3518,13 +3595,19 @@ mod tests {
         ];
         let bytes = zip(&entries)?;
 
+        let shared: Arc<[u8]> = bytes.clone().into();
         crate::zip::reset_test_entry_read_count();
-        let semantic = Catalog::__from_bytes_with_logical_entry_limits(
-            &bytes,
+        let semantic = Catalog::__from_shared_bytes_with_logical_entry_limits(
+            Arc::clone(&shared),
             Limits::default(),
             LogicalEntryLimits::SEMANTIC_METADATA,
         )?;
-        assert_eq!(crate::zip::test_entry_read_count(), 5);
+        assert_eq!(
+            crate::zip::test_entry_read_count(),
+            5,
+            "selective Keynote-style metadata open must not read media"
+        );
+        assert!(Arc::ptr_eq(&shared, &semantic.shared_source()));
         assert_eq!(
             semantic.iter().map(Entry::name).collect::<Vec<_>>(),
             [
@@ -3539,7 +3622,8 @@ mod tests {
         assert_eq!(semantic.source_provenance(), SourceProvenance::SemanticZip);
 
         crate::zip::reset_test_entry_read_count();
-        let generic = Catalog::from_bytes(&bytes)?;
+        let generic =
+            Catalog::from_shared_bytes_with_limits(Arc::clone(&shared), Limits::default())?;
         assert_eq!(crate::zip::test_entry_read_count(), 8);
         assert_eq!(generic.len(), 8);
         assert!(generic.source_is_exact());
