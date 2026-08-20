@@ -410,6 +410,7 @@ enum PreparedBacking {
 enum PathProfile {
     IndexOnly,
     Properties,
+    KeynoteProperties,
     SemanticMetadata(Format),
     SemanticMetadataAny,
 }
@@ -467,7 +468,12 @@ impl PreparedSource {
     /// profile.
     #[doc(hidden)]
     pub fn __from_bytes_with_pages_metadata(value: &[u8], limits: Limits) -> Result<Option<Self>> {
-        Self::from_bytes_with_catalog_metadata(value, limits, Some(Format::Pages))
+        Self::from_bytes_with_catalog_profile(
+            value,
+            limits,
+            Some(Format::Pages),
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )
     }
 
     /// Prepare borrowed package bytes for an archive-free semantic reader.
@@ -490,7 +496,12 @@ impl PreparedSource {
         value: &[u8],
         limits: Limits,
     ) -> Result<Option<Self>> {
-        Self::from_bytes_with_catalog_metadata(value, limits, None)
+        Self::from_bytes_with_catalog_profile(
+            value,
+            limits,
+            None,
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )
     }
 
     /// Prepare borrowed package bytes for Numbers' archive-free semantic
@@ -509,10 +520,11 @@ impl PreparedSource {
         Self::from_bytes_with_semantic_projection(value, limits, Format::Numbers)
     }
 
-    fn from_bytes_with_catalog_metadata(
+    fn from_bytes_with_catalog_profile(
         value: &[u8],
         limits: Limits,
         expected: Option<Format>,
+        logical_entry_limits: LogicalEntryLimits,
     ) -> Result<Option<Self>> {
         if !check_prepared_candidate(value, limits)? {
             return Ok(None);
@@ -529,7 +541,7 @@ impl PreparedSource {
         let catalog = SourceCatalog::__from_bytes_with_logical_entry_limits(
             value,
             archive_limits,
-            LogicalEntryLimits::SEMANTIC_METADATA,
+            logical_entry_limits,
         )
         .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
@@ -614,7 +626,12 @@ impl PreparedSource {
         value: Arc<[u8]>,
         limits: Limits,
     ) -> Result<Option<Self>> {
-        Self::from_shared_bytes_with_catalog_metadata(value, limits, Some(Format::Pages))
+        Self::from_shared_bytes_with_catalog_profile(
+            value,
+            limits,
+            Some(Format::Pages),
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )
     }
 
     /// Prepare shared package bytes for an archive-free semantic reader.
@@ -635,7 +652,12 @@ impl PreparedSource {
         value: Arc<[u8]>,
         limits: Limits,
     ) -> Result<Option<Self>> {
-        Self::from_shared_bytes_with_catalog_metadata(value, limits, None)
+        Self::from_shared_bytes_with_catalog_profile(
+            value,
+            limits,
+            None,
+            LogicalEntryLimits::SEMANTIC_METADATA,
+        )
     }
 
     /// Prepare shared package bytes for Numbers' archive-free semantic reader
@@ -654,10 +676,11 @@ impl PreparedSource {
         Self::from_bytes_with_semantic_projection(&value, limits, Format::Numbers)
     }
 
-    fn from_shared_bytes_with_catalog_metadata(
+    fn from_shared_bytes_with_catalog_profile(
         value: Arc<[u8]>,
         limits: Limits,
         expected: Option<Format>,
+        logical_entry_limits: LogicalEntryLimits,
     ) -> Result<Option<Self>> {
         if !check_prepared_candidate(&value, limits)? {
             return Ok(None);
@@ -674,7 +697,7 @@ impl PreparedSource {
         let catalog = SourceCatalog::__from_shared_bytes_with_logical_entry_limits(
             value,
             archive_limits,
-            LogicalEntryLimits::SEMANTIC_METADATA,
+            logical_entry_limits,
         )
         .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
@@ -776,6 +799,17 @@ impl PreparedSource {
         Self::from_path_with_profile(value.as_ref(), limits, PathProfile::Properties)
     }
 
+    /// Prepare a Keynote archive-free path source while selecting only the
+    /// canonical `Metadata/Properties.plist` authority. Build-version and
+    /// document-identifier members remain outside this Keynote profile.
+    #[doc(hidden)]
+    pub fn __from_path_with_keynote_properties(
+        value: impl AsRef<Path>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_path_with_profile(value.as_ref(), limits, PathProfile::KeynoteProperties)
+    }
+
     /// Prepare a packaged file or app-authored directory for an archive-free
     /// semantic reader.
     ///
@@ -871,10 +905,22 @@ impl PreparedSource {
                         Self::from_bytes_with_semantic_projection(&source, limits, Format::Numbers)
                     },
                     PathProfile::SemanticMetadata(expected) => {
-                        Self::from_shared_bytes_with_catalog_metadata(
+                        Self::from_shared_bytes_with_catalog_profile(
                             source.into(),
                             limits,
                             Some(expected),
+                            LogicalEntryLimits::SEMANTIC_METADATA,
+                        )
+                    },
+                    PathProfile::KeynoteProperties => {
+                        #[cfg(windows)]
+                        return Self::from_shared_bytes_with_limits(source.into(), limits);
+                        #[cfg(not(windows))]
+                        Self::from_shared_bytes_with_catalog_profile(
+                            source.into(),
+                            limits,
+                            Some(Format::Keynote),
+                            LogicalEntryLimits::SEMANTIC_PROPERTIES,
                         )
                     },
                     PathProfile::SemanticMetadataAny => {
@@ -884,7 +930,12 @@ impl PreparedSource {
                         #[cfg(windows)]
                         return Self::from_shared_bytes_with_limits(source.into(), limits);
                         #[cfg(not(windows))]
-                        Self::from_shared_bytes_with_catalog_metadata(source.into(), limits, None)
+                        Self::from_shared_bytes_with_catalog_profile(
+                            source.into(),
+                            limits,
+                            None,
+                            LogicalEntryLimits::SEMANTIC_METADATA,
+                        )
                     },
                     PathProfile::IndexOnly | PathProfile::Properties => {
                         Self::from_shared_bytes_with_limits(source.into(), limits)
@@ -898,6 +949,9 @@ impl PreparedSource {
                         FrozenDirectoryBundle::open_with_limits(path, archive)
                     },
                     PathProfile::Properties => {
+                        FrozenDirectoryBundle::open_with_properties(path, archive)
+                    },
+                    PathProfile::KeynoteProperties => {
                         FrozenDirectoryBundle::open_with_properties(path, archive)
                     },
                     PathProfile::SemanticMetadata(expected) => {
@@ -2789,6 +2843,71 @@ mod tests {
                 .find(|entry| entry.name() == "Data/image.png")
                 .is_some_and(litchi_iwa_archive::package::Entry::is_opaque)
         );
+    }
+
+    #[test]
+    fn keynote_properties_profile_ignores_other_metadata_authorities() -> std::io::Result<()> {
+        let temp = Temp::new()?;
+        let properties = b"canonical properties";
+
+        let malformed = document_package_with_members(
+            Format::Keynote,
+            &[
+                ("Metadata/Properties.plist", properties),
+                ("Metadata/BuildVersionHistory.plist", b"not a plist"),
+                ("Metadata/DocumentIdentifier", b"not an identifier"),
+            ],
+        );
+        let malformed_path = temp.0.join("malformed.key");
+        fs::write(&malformed_path, malformed)?;
+        let malformed_source = PreparedSource::__from_path_with_keynote_properties(
+            &malformed_path,
+            Limits::default(),
+        )?
+        .expect("malformed foreign sidecars do not affect Keynote");
+        let (_components, _limits, captured) = malformed_source.__into_semantic_parts().unwrap();
+        assert_eq!(captured.as_deref(), Some(properties.as_slice()));
+
+        let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
+        let oversized_bytes = document_package_with_members(
+            Format::Keynote,
+            &[
+                ("Metadata/Properties.plist", properties),
+                ("Metadata/BuildVersionHistory.plist", &oversized),
+                ("Metadata/DocumentIdentifier", &oversized),
+            ],
+        );
+        let oversized_path = temp.0.join("oversized.key");
+        fs::write(&oversized_path, oversized_bytes)?;
+        let oversized_source = PreparedSource::__from_path_with_keynote_properties(
+            &oversized_path,
+            Limits::default(),
+        )?
+        .expect("oversized foreign sidecars do not affect Keynote");
+        let (_components, _limits, captured) = oversized_source.__into_semantic_parts().unwrap();
+        assert_eq!(captured.as_deref(), Some(properties.as_slice()));
+
+        let mut opaque_bytes = document_package_with_members(
+            Format::Keynote,
+            &[
+                ("Metadata/Properties.plist", properties),
+                ("Metadata/BuildVersionHistory.plist", b"opaque history"),
+                ("Metadata/DocumentIdentifier", b"opaque identifier"),
+            ],
+        );
+        patch_zip_member_compression_to_opaque(
+            &mut opaque_bytes,
+            "Metadata/BuildVersionHistory.plist",
+        );
+        patch_zip_member_compression_to_opaque(&mut opaque_bytes, "Metadata/DocumentIdentifier");
+        let opaque_path = temp.0.join("opaque.key");
+        fs::write(&opaque_path, opaque_bytes)?;
+        let opaque_source =
+            PreparedSource::__from_path_with_keynote_properties(&opaque_path, Limits::default())?
+                .expect("opaque foreign sidecars do not affect Keynote");
+        let (_components, _limits, captured) = opaque_source.__into_semantic_parts().unwrap();
+        assert_eq!(captured.as_deref(), Some(properties.as_slice()));
+        Ok(())
     }
 
     #[test]

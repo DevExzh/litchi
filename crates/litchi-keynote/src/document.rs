@@ -83,7 +83,7 @@ impl Document {
         path: impl AsRef<Path>,
         options: DocumentReadOptions,
     ) -> Result<Self, ReadError> {
-        let source = litchi_iwa_detect::PreparedSource::__from_path_with_semantic_metadata(
+        let source = litchi_iwa_detect::PreparedSource::__from_path_with_keynote_properties(
             path,
             options.source(),
         )?

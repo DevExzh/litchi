@@ -3137,24 +3137,61 @@ declarations. Existing native Numbers basic and formula/rich-text fixtures
 continue to provide application semantic acceptance; this read-only
 implementation change introduces no native save/reopen or performance claim.
 
-## 2026-08-20 amendment: selective iWork semantic package ingress
+## 2026-08-20 amendment: selective iWork semantic package ingress (scoped follow-up)
 
-Read-only iWork coordinator paths and the archive-free Keynote `Document` now
-use `PreparedSource`'s semantic metadata catalog profile for packaged files.
-After the canonical `Document.iwa` root classifies the application, the
-profile preflights and materializes only canonical IWA members plus the three
-bounded semantic metadata authorities. `Data/`, `Preview/`, unknown sidecars,
-and unsupported opaque media remain in the retained exact source allocation
-but are not inflated or copied into the logical catalog. Directory-backed
-semantic ingress uses the same existing selective shape.
+This scoped follow-up refines and supersedes the broad ingress wording added
+earlier on 2026-08-20. The read-only facade coordinator (`litchi::iwork::Document`)
+uses the three-authority `SEMANTIC_METADATA` profile for byte, shared-byte,
+and supported directory ingress. Its non-Windows packaged-file path first
+classifies the canonical `Document.iwa` root, then selects only canonical IWA
+members plus `Metadata/Properties.plist`,
+`Metadata/BuildVersionHistory.plist`, and `Metadata/DocumentIdentifier`.
+The archive-free Keynote `Document` has a narrower, format-specific
+`SEMANTIC_PROPERTIES` profile: only `Metadata/Properties.plist` is selected;
+BuildVersionHistory and DocumentIdentifier payloads are deliberately outside
+that profile. Pages keeps the three-authority profile. The ordinary full
+`SourceCatalog` and `litchi_keynote::Package` paths remain eager preserve/edit
+paths.
 
-The shared-byte path retains allocation identity through `SourceCatalog`, and
-the exact source writer still emits every untouched member, including opaque
-media. The selected IWA graph and metadata sidecars use the existing
-component/semantic handoffs, so object indexing, graph validation, physical
-limits, and selected-authority error categories are unchanged. Full
-`litchi_keynote::Package` constructors remain the preserve/edit capability and
-continue to materialize their complete logical catalog; this amendment makes
-no lazy-media claim for those mutation paths. Archive instrumentation covers
-the Keynote-shaped profile: media-free preparation reads only the selected
-five members, while an explicit full-catalog request reads all members.
+The platform limitation is explicit. Windows `SemanticMetadataAny` packaged
+file ingress falls back to the generic full catalog because its path adapter
+cannot provide the selective capture invariant; the Keynote properties path
+likewise keeps that generic Windows fallback. Byte and shared-byte semantic
+profiles remain selective on all platforms. Keynote directory ingress uses
+the existing Properties-only frozen profile, while the facade's generic
+semantic directory ingress selects its three authorities. Neither a semantic
+Document nor a directory-backed snapshot retains an exact ZIP allocation.
+
+Exact source identity is retained only while the `PreparedSource`/`SourceCatalog`
+preserve handoff remains alive. `SourceCatalog::write_to`/`to_bytes` and the
+full Package preserve paths can therefore emit untouched members, including
+opaque media; the semantic handoffs copy the selected component/metadata
+state and release that source before publishing a Document. The selected
+IWA graph and metadata sidecars still use the existing bounded component and
+semantic handoffs, but this amendment does not claim that all limits or error
+categories are unchanged: container-level ZIP checks remain in force, and
+the selected logical profile applies its 64 KiB and supported-compression
+checks before payload materialization. Those selected failures retain the
+existing typed archive `InvalidBundle`/`Limit` categories (and their facade
+mapping). In the Keynote Properties-only profile, malformed, opaque, or
+oversized BuildVersionHistory/DocumentIdentifier payloads are ignored; the
+same conditions on selected authorities remain errors. Paired alias-only
+metadata names remain ignored, one-sided exact/alias authority collisions are
+rejected, and ordinary exact local/central mismatches retain their existing
+diagnostic.
+
+The evidence below is instrumentation, not a wall-clock or memory benchmark:
+
+| Instrumented scope | Selected archive-entry reads | Full-catalog reads | Preservation state |
+| --- | ---: | ---: | --- |
+| Modern synthetic `SEMANTIC_METADATA` catalog (8 members) | 5 | 8 | `SourceCatalog` retains the source allocation; logical provenance is projected |
+| Modern synthetic `SEMANTIC_PROPERTIES` catalog (7 members) | 2 | 7 | `SourceCatalog` retains the source allocation until semantic handoff |
+| Shared `PreparedSource` using `SEMANTIC_METADATA` | 1 root inspection + 5 selected-catalog reads = 6 | — | The semantic handoff releases the source before Document publication |
+
+No performance gain is claimed from these counts. A future performance
+record may add wall-clock, allocation, and resident-memory measurements after
+the benchmark harness has evidence for the same profiles. The earlier
+Pages/materialization wording is therefore narrowed here: Pages remains the
+three-authority case, Keynote is Properties-only, and “retained exact source”
+and exact-writing claims apply only to the live `PreparedSource`/`SourceCatalog`
+or full Package preserve paths, not to semantic Documents or directories.
