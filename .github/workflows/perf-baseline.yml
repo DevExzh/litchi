@@ -41,7 +41,14 @@ on:
       - 'tools/perf-baseline/**'
       - 'tools/perf_compare.py'
       - 'tools/test_perf_compare.py'
+      - 'tools/perf_abba_package.py'
+      - 'tools/test_perf_abba_package.py'
+      - 'tools/perf_abba_summary.py'
+      - 'tools/test_perf_abba_summary.py'
+      - 'tools/perf_resource_profile.py'
+      - 'tools/test_perf_resource_profile.py'
       - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   pull_request:
@@ -84,7 +91,14 @@ on:
       - 'tools/perf-baseline/**'
       - 'tools/perf_compare.py'
       - 'tools/test_perf_compare.py'
+      - 'tools/perf_abba_package.py'
+      - 'tools/test_perf_abba_package.py'
+      - 'tools/perf_abba_summary.py'
+      - 'tools/test_perf_abba_summary.py'
+      - 'tools/perf_resource_profile.py'
+      - 'tools/test_perf_resource_profile.py'
       - 'docs/performance/perf-regression-policy-v1.json'
+      - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   workflow_dispatch:
@@ -130,8 +144,13 @@ jobs:
           cargo check --locked --manifest-path "$PERF_MANIFEST"
           cargo test --locked --manifest-path "$PERF_MANIFEST"
 
-      - name: Test fail-closed performance comparator
-        run: python3 -m unittest tools.test_perf_compare
+      - name: Test fail-closed performance Python tooling
+        run: |
+          python3 -m unittest \
+            tools.test_perf_compare \
+            tools.test_perf_abba_summary \
+            tools.test_perf_abba_package \
+            tools.test_perf_resource_profile
 
       - name: Run deterministic smoke baseline
         run: |

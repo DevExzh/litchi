@@ -129,16 +129,20 @@ python3 tools/perf_compare.py \
   --summary-out target/perf/comparison/perf-regression.txt
 ```
 
-Run the comparator regressions independently with:
+Run the performance-tooling unit suites independently with:
 
 ```sh
-python3 -m unittest tools.test_perf_compare
+python3 -m unittest \
+  tools.test_perf_compare \
+  tools.test_perf_abba_summary \
+  tools.test_perf_abba_package \
+  tools.test_perf_resource_profile
 ```
 
 ## CI scope
 
-Pull requests and ordinary pushes run only the comparator unit tests and the
-existing deterministic performance correctness smoke. They do not apply
+Pull requests and ordinary pushes run the performance-tooling unit suites and
+the existing deterministic performance correctness smoke. They do not apply
 latency thresholds to hosted-runner smoke data.
 
 The `Performance baseline` workflow exposes an optional manual
