@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0228-docx-family-layout-floor-calibration",
+  "artifacts": [
+    {
+      "path": "pptx-file-source-open-0228a-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 38195,
+      "compressed_sha256": "cda6584d0e59b061e7fe5feeb10027e4e74a2908a312d984646beccba6bfdcaa",
+      "uncompressed_bytes": 22209410,
+      "uncompressed_sha256": "14be80fce9030c1fc8344419fab66b8a97713ea1cc0ca3623cd2c2df9e765fb0"
+    },
+    {
+      "path": "pptx-file-source-open-0228a-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 37939,
+      "compressed_sha256": "c077702ac36bedfb431f853a047579a2dc3affd04377584b06815b87b130d977",
+      "uncompressed_bytes": 22209417,
+      "uncompressed_sha256": "b0a42a3d74360b54080738818927a5559056c1708813b40ffae555c3ef038214"
+    },
+    {
+      "path": "pptx-file-source-open-0228a-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 37929,
+      "compressed_sha256": "75fb9c470b82569abbd698adc9dbdbee2afccf9e24ee615922e56981c926b2ca",
+      "uncompressed_bytes": 22209415,
+      "uncompressed_sha256": "8a3697b803850c532351f57a00e2395629c8a49a76fdcaf577a5f7f08b3b6f41"
+    },
+    {
+      "path": "pptx-file-source-open-0228a-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 38864,
+      "compressed_sha256": "4e0766da5522f1f6ef3719adb8db9b03fb255f92b1fed6709a45e5ee05460f30",
+      "uncompressed_bytes": 22209570,
+      "uncompressed_sha256": "d0db132f9086f55ca28f6669ced27af3640aaa2c8498cdcb3dc7c59529ce1a90"
+    },
+    {
+      "path": "pptx-file-source-open-0228a-summary.json",
+      "role": "derived_summary",
+      "bytes": 4494,
+      "sha256": "d8cde7e1901a753ccf55b00df8cdf4375e99245b2fe212cefc44715d88a1a979"
+    }
+  ]
+}

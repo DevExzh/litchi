@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "change": "0228-docx-family-layout-floor-calibration",
+  "decision": "drift-rejected-excluded: control-leg drift exceeded ceilings and the ONE permitted rerun failed drift again \u2014 pair excluded from floor consolidation, all stats uncalibrated. Evidence: rerun r1 vs r4: cold-requested p50 +570.4%, mean +653.0%, p95 +1686.8% (catastrophic); warm rows reproducible across all four control legs. Cause: cold-requested page-cache bimodality \u2014 the eviction request sometimes genuinely misses and the whole distribution shifts ~6-7x (a1/a2/r1 p50 ~6.1-6.4 ms vs r4 41.0 ms).",
+  "claim_scope": "none (probe executes zero changed code; every reading is layout noise)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "1d503363657f7badb0d2c321ca208dbe9e9cbf22765745fc8ccd1a1a7ab1e1cd",
+      "candidate_sha256": "5a08ca1283dc29304849c1cdd7f5958b3c187d651346af3b9bcabc3a84a851a4",
+      "note": "control is the banked post-0227 binary; probe a adds never-executed parser-shaped padding in litchi-docx (+3,872 B .text; DOCX-family layout-noise floor calibration, the 0223/0226 analog)"
+    }
+  },
+  "provenance": {
+    "source_revision": "3ab0bbd1b5dda6da72deabb8f7ec707df7fb8aaf",
+    "source_state": "HEAD 3ab0bbd1b banked through 0227 (both binaries); the probe additionally carries never-executed padding in litchi-docx",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "pptx-source-backed-media",
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "archive_bytes": 17017139,
+    "archive_member_count": 445
+  },
+  "selector": "pptx_file_source_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2981411.0,
+          "mean": 3018298.552,
+          "p95": 3283128.0,
+          "p99": 3534396.0
+        },
+        "b1": {
+          "p50": 2925137.5,
+          "mean": 2954916.882,
+          "p95": 3222563.0,
+          "p99": 3521908.0
+        },
+        "b2": {
+          "p50": 2910949.0,
+          "mean": 2949397.482,
+          "p95": 3234227.0,
+          "p99": 3425878.0
+        },
+        "a2": {
+          "p50": 3005065.0,
+          "mean": 3698754.37,
+          "p95": 5430354.0,
+          "p99": 13355668.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.887479,
+          "mean": 2.099914,
+          "p95": 1.844735,
+          "p99": 0.353328
+        },
+        "a2_to_b2": {
+          "p50": 3.131912,
+          "mean": 20.259709,
+          "p95": 40.441691,
+          "p99": 74.348883
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 0.793383,
+          "mean": 22.544351,
+          "p95": 65.401836,
+          "p99": 277.876955
+        },
+        "candidate": {
+          "p50": -0.485054,
+          "mean": -0.186787,
+          "p95": 0.361948,
+          "p99": -2.726647
+        }
+      },
+      "accepted_statistics": [
+        "p50"
+      ],
+      "rejected_statistics": {
+        "mean": "control drift +22.54% exceeds 5%",
+        "p95": "control drift +65.40% exceeds 10%",
+        "p99": "control drift +277.88% exceeds 15%"
+      },
+      "adverse_both_statistics": []
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

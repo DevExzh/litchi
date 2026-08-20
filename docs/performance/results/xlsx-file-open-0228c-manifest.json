@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "change": "0228-docx-family-layout-floor-calibration",
+  "artifacts": [
+    {
+      "path": "xlsx-file-open-0228c-a1.json.zst",
+      "role": "control_a1",
+      "compressed_bytes": 2670,
+      "compressed_sha256": "b22597e23732674bb5ca1af78ee5f914547077215a71c431dadb1a556a589183",
+      "uncompressed_bytes": 12852,
+      "uncompressed_sha256": "bc071c2279c3c94dd92d6f008168aa313ddac868d56ec099182c45c7065a96f9"
+    },
+    {
+      "path": "xlsx-file-open-0228c-b1.json.zst",
+      "role": "candidate_b1",
+      "compressed_bytes": 2716,
+      "compressed_sha256": "5c27eab9fea000d23aa7cfbf46f38f39a0458d647999e4d8d748314b9b4eebec",
+      "uncompressed_bytes": 12860,
+      "uncompressed_sha256": "87ebc91c88e587baca856191392c3a461fdb2a61647daf4941d07513dd71741f"
+    },
+    {
+      "path": "xlsx-file-open-0228c-b2.json.zst",
+      "role": "candidate_b2",
+      "compressed_bytes": 2639,
+      "compressed_sha256": "988698b87b575db43cf3e08d113815965a0809d96b842f297bc08513ec25817a",
+      "uncompressed_bytes": 12860,
+      "uncompressed_sha256": "bcb4614870a45cd4a810768bd3784e6ea0e66c35ae8d4fda43da254cddf7d707"
+    },
+    {
+      "path": "xlsx-file-open-0228c-a2.json.zst",
+      "role": "control_a2",
+      "compressed_bytes": 2657,
+      "compressed_sha256": "4da5895f3905b6b7666ded930aed3783c9b97f5d5b9a1dbf33de84cd516c9ac7",
+      "uncompressed_bytes": 12857,
+      "uncompressed_sha256": "f009c784ae810c6aa5f4d5d7dd33f009cf895552a69a409c6c4b43b62013c575"
+    },
+    {
+      "path": "xlsx-file-open-0228c-summary.json",
+      "role": "derived_summary",
+      "bytes": 4515,
+      "sha256": "acdc90ef7b9e9e622a525c0de5a77ae3bf0877cbf89b50697cc2daa8f2c6068f"
+    }
+  ]
+}
