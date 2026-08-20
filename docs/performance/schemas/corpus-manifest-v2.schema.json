@@ -1,0 +1,433 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DevExzh/litchi/schema/performance/corpus-manifest-v2.json",
+  "title": "Litchi performance corpus catalog schema 2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "manifest_kind",
+    "catalog_id",
+    "canonicalization",
+    "catalog_sha256",
+    "content_set_sha256",
+    "build",
+    "corpora",
+    "case_bindings"
+  ],
+  "properties": {
+    "manifest_version": { "const": 2 },
+    "manifest_kind": { "const": "corpus-catalog" },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "canonicalization": { "$ref": "#/$defs/canonicalization" },
+    "catalog_sha256": { "$ref": "#/$defs/sha256" },
+    "content_set_sha256": { "$ref": "#/$defs/sha256" },
+    "build": { "$ref": "#/$defs/build" },
+    "corpora": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/corpus" },
+      "uniqueItems": true
+    },
+    "case_bindings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/caseBinding" },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "hash"],
+      "properties": {
+        "algorithm": { "const": "sorted-json-utf8-compact-v1" },
+        "hash": { "const": "sha256" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "tool_version",
+        "git_revision",
+        "git_worktree_dirty",
+        "source_files"
+      ],
+      "properties": {
+        "tool": { "type": "string", "minLength": 1 },
+        "tool_version": { "type": "string", "minLength": 1 },
+        "git_revision": { "type": ["string", "null"] },
+        "git_worktree_dirty": { "type": ["boolean", "null"] },
+        "source_files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceFile" }
+        }
+      }
+    },
+    "sourceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "legacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "generator",
+        "package_format",
+        "shape",
+        "payload_kind",
+        "compression",
+        "entry_count",
+        "archive_member_count",
+        "entry_bytes",
+        "uncompressed_payload_bytes",
+        "archive_bytes",
+        "archive_sha256",
+        "target_entry",
+        "target_payload_bytes",
+        "target_payload_sha256",
+        "xlsx"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "generator": { "type": "string", "minLength": 1 },
+        "package_format": { "type": "string", "minLength": 1 },
+        "shape": { "type": "string", "minLength": 1 },
+        "payload_kind": { "type": "string", "minLength": 1 },
+        "compression": { "type": "string", "minLength": 1 },
+        "entry_count": { "type": "integer", "minimum": 0 },
+        "archive_member_count": { "type": "integer", "minimum": 0 },
+        "entry_bytes": { "type": "integer", "minimum": 0 },
+        "uncompressed_payload_bytes": { "type": "integer", "minimum": 0 },
+        "archive_bytes": { "type": "integer", "minimum": 0 },
+        "archive_sha256": { "$ref": "#/$defs/sha256" },
+        "target_entry": { "type": "string", "minLength": 1 },
+        "target_payload_bytes": { "type": "integer", "minimum": 0 },
+        "target_payload_sha256": { "$ref": "#/$defs/sha256" },
+        "rtf_variant": { "type": "string" },
+        "xlsx": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/legacyXlsx" }
+          ]
+        }
+      }
+    },
+    "legacyXlsx": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sheet_count",
+        "rows_per_sheet",
+        "columns_per_sheet",
+        "one_percent_update_count",
+        "source_members"
+      ],
+      "properties": {
+        "sheet_count": { "type": "integer", "minimum": 0 },
+        "rows_per_sheet": { "type": "integer", "minimum": 0 },
+        "columns_per_sheet": { "type": "integer", "minimum": 0 },
+        "one_percent_update_count": { "type": "integer", "minimum": 0 },
+        "source_members": { "$ref": "#/$defs/sourceMembers" }
+      }
+    },
+    "sourceMembers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workbook", "worksheets", "shared_strings", "styles"],
+      "properties": {
+        "workbook": { "type": "string", "minLength": 1 },
+        "worksheets": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "shared_strings": { "type": ["string", "null"] },
+        "styles": { "type": ["string", "null"] }
+      }
+    },
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "legacy_v1",
+        "format",
+        "size_class",
+        "categories",
+        "generator",
+        "provenance",
+        "bytes",
+        "shape_parameters",
+        "relationships",
+        "security",
+        "input",
+        "limits",
+        "members",
+        "targets",
+        "coverage"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+:sha256:[0-9a-f]{64}$" },
+        "name": { "type": "string", "minLength": 1 },
+        "legacy_v1": { "$ref": "#/$defs/legacy" },
+        "format": { "type": "string", "minLength": 1 },
+        "size_class": {
+          "enum": ["tiny", "small", "medium", "large", "very-large", "unknown"]
+        },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "generator": { "$ref": "#/$defs/generator" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "bytes": { "$ref": "#/$defs/bytes" },
+        "shape_parameters": { "type": "object" },
+        "relationships": { "$ref": "#/$defs/relationships" },
+        "security": { "$ref": "#/$defs/security" },
+        "input": { "$ref": "#/$defs/input" },
+        "limits": { "$ref": "#/$defs/limits" },
+        "members": { "$ref": "#/$defs/members" },
+        "targets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/target" }
+        },
+        "coverage": { "$ref": "#/$defs/coverage" }
+      }
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "revision", "algorithm_id", "seed_spec", "parameters"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["synthetic", "fixture", "transformed", "unknown"] },
+        "revision": { "type": ["string", "null"] },
+        "algorithm_id": { "type": ["string", "null"] },
+        "seed_spec": { "type": ["string", "null"] },
+        "parameters": { "type": "object" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_kind",
+        "source_path",
+        "producer",
+        "producer_version",
+        "source_sha256",
+        "license_spdx",
+        "license_evidence",
+        "redistributable"
+      ],
+      "properties": {
+        "source_kind": {
+          "enum": ["generated", "repository-fixture", "external-fixture", "unknown"]
+        },
+        "source_path": { "type": ["string", "null"] },
+        "producer": { "type": ["string", "null"] },
+        "producer_version": { "type": ["string", "null"] },
+        "source_sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "license_spdx": { "type": ["string", "null"] },
+        "license_evidence": { "type": ["string", "null"] },
+        "redistributable": { "type": ["boolean", "null"] }
+      }
+    },
+    "bytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archive_bytes",
+        "archive_sha256",
+        "logical_payload_bytes",
+        "text_bytes",
+        "media_bytes",
+        "metadata_bytes"
+      ],
+      "properties": {
+        "archive_bytes": { "type": "integer", "minimum": 0 },
+        "archive_sha256": { "$ref": "#/$defs/sha256" },
+        "logical_payload_bytes": { "type": "integer", "minimum": 0 },
+        "text_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "media_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "metadata_bytes": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "relationship_count",
+        "dependency_closure_nodes",
+        "dependency_closure_edges",
+        "max_depth",
+        "max_out_degree"
+      ],
+      "properties": {
+        "status": { "enum": ["complete", "partial", "not-applicable", "unknown"] },
+        "relationship_count": { "type": ["integer", "null"], "minimum": 0 },
+        "dependency_closure_nodes": { "type": ["integer", "null"], "minimum": 0 },
+        "dependency_closure_edges": { "type": ["integer", "null"], "minimum": 0 },
+        "max_depth": { "type": ["integer", "null"], "minimum": 0 },
+        "max_out_degree": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["encryption", "signature", "protection", "macros", "external_links"],
+      "properties": {
+        "encryption": { "$ref": "#/$defs/securityFeature" },
+        "signature": { "$ref": "#/$defs/securityFeature" },
+        "protection": { "$ref": "#/$defs/protection" },
+        "macros": { "$ref": "#/$defs/securityFeature" },
+        "external_links": { "$ref": "#/$defs/externalLinks" }
+      }
+    },
+    "securityFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "kind", "evidence"],
+      "properties": {
+        "state": { "enum": ["absent", "present", "synthetic", "unknown"] },
+        "kind": { "type": ["string", "null"] },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "protection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "scopes", "evidence"],
+      "properties": {
+        "state": { "enum": ["absent", "present", "synthetic", "unknown"] },
+        "scopes": { "type": "array", "items": { "type": "string" } },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "externalLinks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "count", "targets_sha256", "evidence"],
+      "properties": {
+        "state": { "enum": ["absent", "present", "synthetic", "unknown"] },
+        "count": { "type": ["integer", "null"], "minimum": 0 },
+        "targets_sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validity", "malformation_kind", "expected_behavior", "within_limits", "evidence"],
+      "properties": {
+        "validity": { "enum": ["well-formed", "malformed", "adversarial", "unknown"] },
+        "malformation_kind": { "type": ["string", "null"] },
+        "expected_behavior": { "enum": ["accept", "refuse", "unknown"] },
+        "within_limits": { "type": ["boolean", "null"] },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "profile_sha256", "observed"],
+      "properties": {
+        "profile_id": { "type": ["string", "null"] },
+        "profile_sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "observed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["input_bytes", "members", "relationships", "materialized_bytes"],
+          "properties": {
+            "input_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "members": { "type": ["integer", "null"], "minimum": 0 },
+            "relationships": { "type": ["integer", "null"], "minimum": 0 },
+            "materialized_bytes": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        }
+      }
+    },
+    "members": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "items"],
+      "properties": {
+        "status": { "enum": ["complete", "partial", "unavailable"] },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/member" }
+        }
+      }
+    },
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "name",
+        "kind",
+        "logical_bytes",
+        "stored_bytes",
+        "sha256",
+        "stored_sha256",
+        "role"
+      ],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "logical_bytes": { "type": "integer", "minimum": 0 },
+        "stored_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "stored_sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "role": { "type": ["string", "null"] }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry", "logical_bytes", "sha256"],
+      "properties": {
+        "entry": { "type": "string", "minLength": 1 },
+        "logical_bytes": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timed_cases", "guard_cases", "inventory_only"],
+      "properties": {
+        "timed_cases": { "type": "array", "items": { "type": "string" } },
+        "guard_cases": { "type": "array", "items": { "type": "string" } },
+        "inventory_only": { "type": "boolean" }
+      }
+    },
+    "caseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case", "corpus_id", "legacy_name", "legacy_archive_sha256", "role"],
+      "properties": {
+        "case": { "type": "string", "minLength": 1 },
+        "corpus_id": { "type": "string", "pattern": "^[a-z0-9-]+:sha256:[0-9a-f]{64}$" },
+        "legacy_name": { "type": "string", "minLength": 1 },
+        "legacy_archive_sha256": { "$ref": "#/$defs/sha256" },
+        "role": { "enum": ["timed", "guard", "inventory-only"] }
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 mod cold_verified;
+mod corpus_manifest;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
@@ -2396,6 +2397,7 @@ struct Options {
     range_simulation: RangeSimulationConfig,
     execution_workers: Vec<usize>,
     output: Option<PathBuf>,
+    corpus_manifest: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -2509,6 +2511,8 @@ struct Report {
     results: Vec<CaseResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     filesystem_evidence: Option<Vec<filesystem::Evidence>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    corpus_catalog: Option<corpus_manifest::CatalogReferenceV2>,
 }
 
 #[derive(Serialize)]
@@ -8080,6 +8084,35 @@ fn main() -> Result<(), Box<dyn Error>> {
         execution_workers: options.execution_workers,
     };
     let parallel_metrics = parallel_metrics::collect(&configuration, &results)?;
+
+    let report_environment = environment(filesystem::host_evidence(
+        options.filesystem_root.as_deref(),
+        !filesystem_evidence.is_empty(),
+    ));
+    let corpus_catalog = if options.corpus_manifest.is_some() {
+        let records = results
+            .iter()
+            .map(|result| {
+                Ok(corpus_manifest::LegacyCaseCorpus {
+                    case: result.case.to_owned(),
+                    corpus: serde_json::to_value(&result.corpus)?,
+                })
+            })
+            .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+        let catalog = corpus_manifest::CorpusCatalogV2::from_legacy_results(
+            &records,
+            corpus_manifest::BuildIdentityV2 {
+                tool: env!("CARGO_PKG_NAME").to_owned(),
+                tool_version: env!("CARGO_PKG_VERSION").to_owned(),
+                git_revision: report_environment.git_revision.clone(),
+                git_worktree_dirty: report_environment.git_worktree_dirty,
+                source_files: Vec::new(),
+            },
+        )?;
+        Some(catalog)
+    } else {
+        None
+    };
     let report = Report {
         schema_version: SCHEMA_VERSION,
         tool: Tool {
@@ -8093,17 +8126,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             target_os: std::env::consts::OS,
             target_arch: std::env::consts::ARCH,
         },
-        environment: environment(filesystem::host_evidence(
-            options.filesystem_root.as_deref(),
-            !filesystem_evidence.is_empty(),
-        )),
+        environment: report_environment,
         configuration,
         parallel_metrics,
         results,
         filesystem_evidence: (!filesystem_evidence.is_empty()).then_some(filesystem_evidence),
+        corpus_catalog: corpus_catalog.as_ref().map(|catalog| catalog.reference()),
     };
 
-    write_report(&report, options.output.as_ref())
+    write_report(&report, options.output.as_ref())?;
+    if let (Some(path), Some(catalog)) = (&options.corpus_manifest, corpus_catalog.as_ref()) {
+        corpus_manifest::write_catalog(path, catalog)?;
+    }
+    Ok(())
 }
 
 fn parse_options() -> Result<Options, Box<dyn Error>> {
@@ -8123,6 +8158,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut range_simulation = RangeSimulationConfig::default();
     let mut execution_workers = default_execution_workers()?;
     let mut output = None;
+    let mut corpus_manifest = None;
     let mut arguments = std::env::args().skip(1);
 
     while let Some(argument) = arguments.next() {
@@ -8214,6 +8250,11 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                     output = Some(PathBuf::from(value));
                 }
             },
+            "--corpus-manifest" => {
+                corpus_manifest = Some(PathBuf::from(
+                    arguments.next().ok_or("--corpus-manifest requires PATH")?,
+                ));
+            },
             "--help" | "-h" => {
                 print_usage();
                 std::process::exit(0);
@@ -8239,6 +8280,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         range_simulation,
         execution_workers,
         output,
+        corpus_manifest,
     })
 }
 
@@ -9124,6 +9166,8 @@ fn print_usage() {
                                        Maximum physical range (default: {DEFAULT_RANGE_MAX_PHYSICAL_BYTES})\n\
            --workers LIST              Scaling workers: 1,2,4,8,available (capped/deduped)\n\
            --json PATH                 Write JSON to PATH; use - or omit for stdout\n\
+           --corpus-manifest PATH      Write schema-2 corpus catalog sidecar and\n\
+                                       include its additive reference in the report\n\
            --help                      Show this help"
     );
 }

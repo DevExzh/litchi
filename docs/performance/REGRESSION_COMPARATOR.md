@@ -99,6 +99,18 @@ also written when `--summary-out` is supplied, and is always printed to stdout.
 Exit 2 is used if the required JSON output or a requested summary output cannot
 be written.
 
+## Additive corpus catalog
+
+The harness can emit a schema-2 corpus catalog sidecar with
+`--corpus-manifest PATH`.  The report keeps schema 1 and receives only an
+optional `corpus_catalog` reference, so the existing 198-key identity digest
+and all older reports remain compatible.  The catalog's
+`content_set_sha256` identifies the exact corpus/member set; its
+`catalog_sha256` additionally covers generator, producer, security, malformed
+input, limits, and provenance metadata.  See
+[`CORPUS_MANIFEST_V2.md`](CORPUS_MANIFEST_V2.md) for the migration and
+truthfulness rules.
+
 ## Exact invocation
 
 Capture reference and candidate reports in the same controlled environment

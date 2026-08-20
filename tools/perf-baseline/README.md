@@ -548,8 +548,14 @@ The validation/section and scalar-cell selectors are opt-in and do not alter the
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
-  --warmup 3 --samples 15 --json target/perf/container-baseline.json
+  --warmup 3 --samples 15 --json target/perf/container-baseline.json \
+  --corpus-manifest target/perf/container-baseline.corpus-v2.json
 ```
+
+`--corpus-manifest` writes the additive schema-2 deterministic corpus catalog
+and places a reference under `corpus_catalog` in the schema-1 report.  It does
+not change the existing case/corpus identity keys or their comparator digest.
+See [`docs/performance/CORPUS_MANIFEST_V2.md`](../../docs/performance/CORPUS_MANIFEST_V2.md).
 
 For a short local smoke run:
 
