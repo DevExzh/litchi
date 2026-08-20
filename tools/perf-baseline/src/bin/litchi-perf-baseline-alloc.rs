@@ -4,8 +4,9 @@
 //! process-global `GlobalAlloc` wrapper and its narrowly scoped unsafe calls.
 
 mod allocator {
-    use super::allocation_metrics;
     use std::alloc::{GlobalAlloc, Layout, System};
+
+    use litchi_perf_baseline::allocation_metrics;
 
     struct CountingSystemAllocator;
 
@@ -74,6 +75,8 @@ mod allocator {
             allocation_metrics::enable();
             let before = allocation_metrics::snapshot();
             let layout = Layout::from_size_align(256, 8).unwrap();
+            // SAFETY: `layout` is valid and this direct call uses the same
+            // allocator whose returned pointer is deallocated below.
             let pointer = unsafe { GLOBAL_ALLOCATOR.alloc(layout) };
             assert!(!pointer.is_null());
             let during = allocation_metrics::snapshot();
@@ -85,6 +88,8 @@ mod allocator {
             assert!(during.allocated_bytes >= before.allocated_bytes + 256);
             assert!(during.live_bytes >= before.live_bytes + 256);
             assert!(during.peak_live_bytes >= during.live_bytes);
+            // SAFETY: `pointer` came from `GLOBAL_ALLOCATOR.alloc(layout)` and
+            // has not been freed or otherwise used since that call.
             unsafe { GLOBAL_ALLOCATOR.dealloc(pointer, layout) };
             let after = allocation_metrics::snapshot();
             assert_eq!(
@@ -102,14 +107,21 @@ mod allocator {
             allocation_metrics::enable();
             let before = allocation_metrics::snapshot();
             let old_layout = Layout::from_size_align(16, 8).unwrap();
+            // SAFETY: `old_layout` is valid for this direct allocator call.
             let pointer = unsafe { GLOBAL_ALLOCATOR.alloc(old_layout) };
             assert!(!pointer.is_null());
+            // SAFETY: `pointer` was returned for `old_layout` by the same
+            // allocator, and the old allocation remains owned by this test.
             let grown = unsafe { GLOBAL_ALLOCATOR.realloc(pointer, old_layout, 32) };
             assert!(!grown.is_null());
             let grown_layout = Layout::from_size_align(32, 8).unwrap();
+            // SAFETY: `grown` was returned by the preceding realloc and
+            // `grown_layout` describes its current allocation.
             let shrunk = unsafe { GLOBAL_ALLOCATOR.realloc(grown, grown_layout, 8) };
             assert!(!shrunk.is_null());
             let final_layout = Layout::from_size_align(8, 8).unwrap();
+            // SAFETY: `shrunk` was returned by the preceding realloc and
+            // `final_layout` describes its current allocation.
             unsafe { GLOBAL_ALLOCATOR.dealloc(shrunk, final_layout) };
             let after = allocation_metrics::snapshot();
             assert_eq!(
@@ -129,6 +141,8 @@ mod allocator {
             allocation_metrics::enable();
             let before = allocation_metrics::snapshot();
             let layout = Layout::from_size_align(isize::MAX as usize, 1).unwrap();
+            // SAFETY: `layout` satisfies the `GlobalAlloc` layout contract;
+            // this test deliberately exercises the allocator's null result.
             let pointer = unsafe { GLOBAL_ALLOCATOR.alloc(layout) };
             assert!(pointer.is_null(), "the maximal layout should be rejected");
             let after = allocation_metrics::snapshot();
