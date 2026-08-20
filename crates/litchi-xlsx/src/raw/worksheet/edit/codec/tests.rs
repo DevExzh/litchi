@@ -35,3 +35,20 @@ fn snapshot_scan_builds_sorted_edit_slots() {
     assert_eq!(layout.sheet_data.rows[0].cells.len(), 1);
     assert_eq!(layout.sheet_data.rows[1].cells[0].address.a1(), "B2");
 }
+
+#[test]
+fn snapshot_scan_restores_namespace_scope_after_a_rebinding() {
+    let source = format!(
+        r#"<x:worksheet xmlns:x="{MAIN}"><x:sheetData><x:row r="1"><x:c r="A1"/></x:row><x:row xmlns:x="urn:future" r="2"><x:c r="B2"/></x:row><x:row r="3"><x:c r="C3"/></x:row></x:sheetData></x:worksheet>"#
+    );
+    let layout = scan(source.as_bytes()).expect("worksheet scan");
+    assert_eq!(
+        layout
+            .sheet_data
+            .rows
+            .iter()
+            .map(|row| row.number)
+            .collect::<Vec<_>>(),
+        [1, 3]
+    );
+}
