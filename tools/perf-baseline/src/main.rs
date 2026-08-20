@@ -2988,6 +2988,8 @@ struct SourceSummary {
     ordinary_payload_read_bytes: Vec<u64>,
     max_in_flight_reads: Vec<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    zip_index: Option<ZipIndexSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     ordinary_payload_materializations: Option<Vec<u64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx: Option<XlsxSourceSummary>,
@@ -3055,6 +3057,15 @@ struct SourceSummary {
     rtf_paragraph_split_merge: Option<RtfParagraphSplitMergeSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     doc_owner_public_phases: Option<DocOwnerPublicPhaseSummary>,
+}
+
+/// Actual member-count evidence retained by the ZIP index selector.  The
+/// expected count comes from the deterministic corpus manifest; the observed
+/// vector contains measured samples only, excluding warm-up iterations.
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+struct ZipIndexSummary {
+    expected_member_count: usize,
+    observed_member_counts: Vec<usize>,
 }
 
 /// Per-sample phase attribution for the native DOC owner/public-reader seam.
@@ -32241,20 +32252,38 @@ fn run_zip_index(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    let expected_member_count = corpus.manifest.archive_member_count;
+    let mut observed_member_counts = Vec::with_capacity(samples);
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
         let archive = ArchiveReader::new(&corpus.archive)?;
         let observed = archive.file_names().count();
         std::hint::black_box(observed);
-        record_elapsed(
-            &mut elapsed,
-            iteration,
-            warmup_iterations,
-            started.elapsed(),
-        )?;
+        let duration = started.elapsed();
+        if observed != expected_member_count {
+            return Err(format!(
+                "ZIP index member count differs from deterministic manifest: observed={observed}, expected={expected_member_count}"
+            )
+            .into());
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        if iteration >= warmup_iterations {
+            observed_member_counts.push(observed);
+        }
     }
-    Ok(result(Case::ZipIndex, corpus, elapsed, None))
+    Ok(result_with_source(
+        Case::ZipIndex,
+        corpus,
+        elapsed,
+        SourceSummary {
+            zip_index: Some(ZipIndexSummary {
+                expected_member_count,
+                observed_member_counts,
+            }),
+            ..SourceSummary::default()
+        },
+    ))
 }
 
 fn run_zip_read_one(
@@ -40894,6 +40923,37 @@ mod tests {
                 .partname()
                 .membername(),
             first.target_name
+        );
+    }
+
+    #[test]
+    fn zip_index_retains_member_count_oracle_and_actual_samples() {
+        let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Compressible).unwrap();
+        let measured = run_case(Case::ZipIndex, &corpus, 1, 2).unwrap();
+        let evidence = measured.source.unwrap().zip_index.unwrap();
+
+        assert_eq!(
+            evidence.expected_member_count,
+            corpus.manifest.archive_member_count
+        );
+        assert_eq!(
+            evidence.observed_member_counts,
+            vec![corpus.manifest.archive_member_count; 2]
+        );
+        assert_eq!(measured.elapsed_ns.samples.len(), 2);
+        assert!(Case::DEFAULT.contains(&Case::ZipIndex));
+    }
+
+    #[test]
+    fn zip_index_rejects_manifest_count_drift() {
+        let mut corpus = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        corpus.manifest.archive_member_count += 1;
+        let error = run_case(Case::ZipIndex, &corpus, 0, 1).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("ZIP index member count differs from deterministic manifest")
         );
     }
 
