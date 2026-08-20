@@ -1772,7 +1772,14 @@ fn assert_source_sha256(source: &Path, expected_sha256: &str) -> Result<(), Box<
 /// Handles the private child protocol. `true` means the normal report path is
 /// skipped.
 pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
-    let mut arguments = env::args_os().skip(1);
+    run_child_arguments(env::args_os().skip(1))
+}
+
+fn run_child_arguments<I>(arguments: I) -> Result<bool, Box<dyn Error>>
+where
+    I: IntoIterator<Item = std::ffi::OsString>,
+{
+    let mut arguments = arguments.into_iter();
     let Some(first) = arguments.next() else {
         return Ok(false);
     };
@@ -3881,8 +3888,11 @@ fn filesystem_root(requested_root: Option<&Path>) -> io::Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use std::{
+        env,
+        ffi::OsString,
         fs,
         panic::{AssertUnwindSafe, catch_unwind},
+        process::Command,
         sync::{Arc, Barrier, atomic::Ordering},
         thread,
     };
@@ -4392,10 +4402,14 @@ mod tests {
             logical_read_calls: 0,
             logical_read_requested_bytes: 0,
             logical_read_bytes: 0,
+            logical_read_largest_requested_bytes: 0,
+            logical_read_largest_returned_bytes: 0,
+            logical_read_pattern: None,
             max_concurrent_reads: 0,
             logical_read_request_sizes: Vec::new(),
             logical_read_request_size_buckets: ReadSizeBuckets::default(),
             cold_advice: ColdAdvice::NotRequested,
+            cold_verified: None,
             process_metrics: None,
             allocation_metrics,
             output_sha256: None,
@@ -4430,6 +4444,37 @@ mod tests {
         );
         let absent = serde_json::to_value(child(None)).unwrap();
         assert!(absent.get("allocation_metrics").is_none());
+    }
+
+    #[test]
+    fn executing_failing_child_exits_without_success_json() {
+        let output = Command::new(env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "filesystem::tests::failing_child_probe",
+                "--nocapture",
+            ])
+            .env("LITCHI_PERF_FAILING_CHILD_PROBE", "1")
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty(), "failing child emitted JSON");
+    }
+
+    #[test]
+    fn failing_child_probe() {
+        if env::var_os("LITCHI_PERF_FAILING_CHILD_PROBE").is_none() {
+            return;
+        }
+        let error = super::run_child_arguments([
+            OsString::from("--filesystem-child"),
+            OsString::from("opc_file_eager_open"),
+            OsString::from("/definitely/missing/litchi-perf-source"),
+            OsString::from("/definitely/missing/litchi-perf-destination"),
+            OsString::from("warm"),
+        ])
+        .unwrap_err();
+        panic!("{error}");
     }
 
     #[test]

@@ -272,6 +272,110 @@ def operation_metrics_report_fields():
     }
 
 
+ALLOCATOR_VECTOR_FIELDS = (
+    "allocation_calls",
+    "deallocation_calls",
+    "reallocation_calls",
+    "failed_allocation_calls",
+    "allocated_bytes",
+    "deallocated_bytes",
+    "live_bytes_before",
+    "live_bytes_after",
+    "peak_live_bytes_before",
+    "peak_live_bytes_after",
+)
+
+
+def allocator_policy_fixture():
+    comparison_policy = policy()
+    comparison_policy["tool_identity"] = {
+        **copy.deepcopy(TOOL),
+        "binary": "litchi-perf-baseline-alloc",
+        "instrumentation": "system_allocator_operation_scoped",
+    }
+    comparison_policy["expected_build_identity"] = {
+        "allocator": "CountingSystemAllocator(std::alloc::System)"
+    }
+    comparison_policy["expected_result_count"] = 2
+    comparison_policy["required_cases"] = ["opc_file_eager_open"]
+    comparison_policy["result_key_fields"] = ["case", "corpus", "cache_state"]
+    corpus = report()["results"][0]["corpus"]
+    corpus_identity = json.dumps(
+        corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    comparison_policy["expected_result_keys_sha256"] = perf_compare.result_key_manifest_sha256(
+        [
+            ("opc_file_eager_open", corpus_identity, "warm"),
+            ("opc_file_eager_open", corpus_identity, "cold-requested"),
+        ]
+    )
+    comparison_policy["expected_configuration"] = {
+        "samples_per_case": 5,
+        "filesystem_cache_states": ["warm", "cold-requested"],
+    }
+    comparison_policy["metric_classes"] = [
+        {
+            "name": "allocation",
+            "max_regression_percent": 5.0,
+            "path_globs": ["operation_metrics/allocation/*/values"],
+            "presence": "required",
+        }
+    ]
+    return comparison_policy
+
+
+def allocator_operation_metrics(value=100, sample_count=5):
+    operation_metrics = operation_metrics_report_fields()
+    allocation = {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+    }
+    for field in ALLOCATOR_VECTOR_FIELDS:
+        allocation[field] = {
+            "values": [value] * sample_count,
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+        }
+    operation_metrics["allocation"] = allocation
+    return operation_metrics
+
+
+def allocator_report(value=100, revision="baseline"):
+    result = report(value=value, revision=revision)
+    result["tool"]["binary"] = "litchi-perf-baseline-alloc"
+    result["tool"]["instrumentation"] = "system_allocator_operation_scoped"
+    result["environment"]["allocator"] = "CountingSystemAllocator(std::alloc::System)"
+    result["configuration"]["cases"] = ["opc_file_eager_open"]
+    result["configuration"]["filesystem_cache_states"] = ["warm", "cold-requested"]
+    result["filesystem_evidence"] = [
+        {
+            "case": "opc_file_eager_open",
+            "sample_count": 5,
+            "cache_states": ["warm", "cold-requested"],
+            "samples": [
+                {
+                    "sample_index": sample_index,
+                    "cache_state": cache_state,
+                    "allocation_metrics": {
+                        "status": "measured",
+                        "scope": "operation_global_system_allocator",
+                    },
+                }
+                for cache_state in ("warm", "cold-requested")
+                for sample_index in range(5)
+            ],
+        }
+    ]
+    first = result["results"][0]
+    first["case"] = "opc_file_eager_open"
+    first["cache_state"] = "warm"
+    first["operation_metrics"] = allocator_operation_metrics(value)
+    second = copy.deepcopy(first)
+    second["cache_state"] = "cold-requested"
+    result["results"].append(second)
+    return result
+
+
 def descriptive_parallel_report(value=100, revision="baseline"):
     measured = report(value, revision)
     result = measured["results"][0]
@@ -468,6 +572,39 @@ class PerfCompareTests(unittest.TestCase):
             allocator_policy["tool_identity"]["instrumentation"],
             "system_allocator_operation_scoped",
         )
+        self.assertEqual(
+            allocator_policy["expected_build_identity"]["allocator"],
+            "CountingSystemAllocator(std::alloc::System)",
+        )
+        allocator_manifest = json.loads(
+            (
+                repository
+                / "docs/performance/results/perf-regression-allocator-manifest-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            allocator_policy["expected_result_keys_sha256"],
+            allocator_manifest["result_keys_sha256"],
+        )
+        corpus = allocator_manifest["corpora"]["few-large-incompressible"]
+        corpus_identity = json.dumps(
+            corpus, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+        self.assertEqual(
+            allocator_manifest["result_keys_sha256"],
+            perf_compare.result_key_manifest_sha256(
+                [
+                    ("opc_file_eager_open", corpus_identity, "warm"),
+                    ("opc_file_eager_open", corpus_identity, "cold-requested"),
+                ]
+            ),
+        )
+        invalid_identity = copy.deepcopy(allocator_policy)
+        invalid_identity["tool_identity"]["binary"] = "litchi-perf-baseline"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "allocator policy.*binary"
+        ):
+            perf_compare.validate_policy(invalid_identity)
         allocator_report = report()
         allocator_report["tool"]["binary"] = "litchi-perf-baseline-alloc"
         allocator_report["tool"]["instrumentation"] = "system_allocator_operation_scoped"
@@ -1108,34 +1245,139 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(regression["metric"], "metrics.allocation_calls")
 
     def test_allocator_instrumentation_withholds_elapsed_latency_claims(self):
-        comparison_policy = policy()
-        comparison_policy["tool_identity"]["instrumentation"] = "system_allocator"
-        comparison_policy["tool_identity"]["binary"] = "litchi-perf-baseline-alloc"
-        baseline = report()
-        current = report(revision="current")
-        for item in (baseline, current):
-            item["tool"]["instrumentation"] = "system_allocator"
-            item["tool"]["binary"] = "litchi-perf-baseline-alloc"
-            item["results"][0]["operation_metrics"] = {
-                "allocation": {
-                    "status": "measured",
-                    "scope": "operation_global_system_allocator",
-                    "allocation_calls": {"values": [100] * 5, "status": "measured"},
-                }
-            }
-        current["results"][0]["operation_metrics"]["allocation"][
-            "allocation_calls"
-        ]["values"] = [110] * 5
+        comparison_policy = allocator_policy_fixture()
+        baseline = allocator_report()
+        current = allocator_report(revision="current")
+        for item in current["results"]:
+            item["operation_metrics"]["allocation"]["allocation_calls"][
+                "values"
+            ] = [110] * 5
         result = perf_compare.compare_reports(baseline, current, comparison_policy)
         self.assertEqual(result["status"], "regression")
         self.assertEqual(result["summary"]["latency_claims"], "withheld_instrumentation")
+        self.assertEqual(result["summary"]["latency_compared_results"], 0)
         self.assertFalse(
             any(item["metric_class"] == "latency" for item in result["comparisons"])
         )
         self.assertEqual(
             {item["metric"] for item in result["regressions"]},
-            {"operation_metrics.allocation.allocation_calls.values"},
+            {
+                "operation_metrics.allocation.allocation_calls.values",
+                "operation_metrics.allocation.deallocation_calls.values",
+                "operation_metrics.allocation.reallocation_calls.values",
+                "operation_metrics.allocation.failed_allocation_calls.values",
+                "operation_metrics.allocation.allocated_bytes.values",
+                "operation_metrics.allocation.deallocated_bytes.values",
+                "operation_metrics.allocation.live_bytes_before.values",
+                "operation_metrics.allocation.live_bytes_after.values",
+                "operation_metrics.allocation.peak_live_bytes_before.values",
+                "operation_metrics.allocation.peak_live_bytes_after.values",
+            },
         )
+
+    def test_allocator_filesystem_policy_requires_measured_vectors(self):
+        comparison_policy = allocator_policy_fixture()
+        baseline = allocator_report()
+        current = allocator_report(revision="current")
+        self.assertEqual(
+            perf_compare.report_result_key_manifest_sha256(
+                baseline,
+                2,
+                result_key_fields=("case", "corpus", "cache_state"),
+            ),
+            comparison_policy["expected_result_keys_sha256"],
+        )
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["latency_claims"], "withheld_instrumentation")
+        self.assertEqual(result["summary"]["compared_metrics"], 20)
+
+        missing = allocator_report(revision="current")
+        del missing["results"][0]["operation_metrics"]["allocation"][
+            "live_bytes_after"
+        ]["values"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "invalid schema|values"
+        ):
+            perf_compare.compare_reports(baseline, missing, comparison_policy)
+
+        unavailable = allocator_report(revision="current")
+        unavailable["results"][0]["operation_metrics"]["allocation"]["status"] = (
+            "unavailable"
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "status must be 'measured'"
+        ):
+            perf_compare.compare_reports(baseline, unavailable, comparison_policy)
+
+        mismatched = allocator_report(revision="current")
+        mismatched["results"][1]["operation_metrics"]["allocation"][
+            "scope"
+        ] = "other_scope"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "scope must be"
+        ):
+            perf_compare.compare_reports(baseline, mismatched, comparison_policy)
+
+    def test_allocator_policy_rejects_bad_cardinality_and_non_filesystem_rows(self):
+        comparison_policy = allocator_policy_fixture()
+        baseline = allocator_report()
+        current = allocator_report(revision="current")
+        current["results"][0]["operation_metrics"]["allocation"][
+            "allocation_calls"
+        ]["values"] = []
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "must be non-empty"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        current = allocator_report(revision="current")
+        current["filesystem_evidence"][0]["samples"].pop()
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "cardinality"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        current = allocator_report(revision="current")
+        current["filesystem_evidence"][0]["cache_states"] = ["warm"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "cache_states"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        current = allocator_report(revision="current")
+        current["results"][0]["case"] = "opc_open"
+        current["filesystem_evidence"][0]["case"] = "opc_open"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "filesystem case"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_metric_walker_treats_status_and_scope_as_metadata(self):
+        comparison_policy = policy()
+        comparison_policy["metric_classes"] = [
+            {
+                "name": "broad",
+                "max_regression_percent": 5.0,
+                "path_globs": ["**/*"],
+                "presence": "optional",
+            }
+        ]
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline, current):
+            item["results"][0]["metrics"] = {
+                "status": "measured",
+                "scope": "operation_global_system_allocator",
+                "sample_count": 5,
+                "measured": [7] * 5,
+            }
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+        metrics = {item["metric"] for item in result["comparisons"]}
+        self.assertIn("metrics.measured", metrics)
+        self.assertNotIn("metrics.status", metrics)
+        self.assertNotIn("metrics.scope", metrics)
 
     def test_zero_baseline_metric_fails_on_nonzero_current(self):
         baseline = report()

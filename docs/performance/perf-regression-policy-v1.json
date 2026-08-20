@@ -156,10 +156,10 @@
       "name": "rss",
       "max_regression_percent": 5.0,
       "path_globs": [
-        "**/*rss*",
-        "**/*resident_set*",
-        "*rss*",
-        "*resident_set*"
+        "**/*rss*/values",
+        "**/*resident_set*/values",
+        "*rss*/values",
+        "*resident_set*/values"
       ],
       "presence": "optional"
     },
