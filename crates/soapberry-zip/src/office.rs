@@ -3126,11 +3126,243 @@ const _: () = {
 /// let content2 = archive.read("word/document.xml")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// Completed payloads are retained in a bounded weighted LRU cache. Concurrent
+/// cold reads of one member share one decompression flight; a failed flight is
+/// removed after waking its waiters so a later call can retry.
+///
+/// [`LazyArchiveCacheLimits`] controls the retained cache, while the archive's
+/// [`ArchiveLimits`] continue to govern declared and materialized ZIP sizes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LazyArchiveCacheLimits {
+    max_bytes: usize,
+    max_entries: usize,
+}
+
+impl LazyArchiveCacheLimits {
+    /// Default maximum retained payload bytes.
+    pub const DEFAULT_MAX_BYTES: usize = 8 * 1024 * 1024;
+    /// Default maximum number of retained payloads.
+    pub const DEFAULT_MAX_ENTRIES: usize = 128;
+
+    /// Construct finite cache limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ErrorKind::InvalidInput`] when either limit is zero.
+    pub fn new(max_bytes: usize, max_entries: usize) -> Result<Self, Error> {
+        if max_bytes == 0 {
+            return Err(ErrorKind::InvalidInput {
+                msg: "lazy archive cache byte limit must be non-zero".to_string(),
+            }
+            .into());
+        }
+        if max_entries == 0 {
+            return Err(ErrorKind::InvalidInput {
+                msg: "lazy archive cache entry limit must be non-zero".to_string(),
+            }
+            .into());
+        }
+        Ok(Self {
+            max_bytes,
+            max_entries,
+        })
+    }
+
+    /// Maximum total decompressed bytes retained by the cache.
+    #[must_use]
+    pub const fn max_bytes(self) -> usize {
+        self.max_bytes
+    }
+
+    /// Maximum number of completed payloads retained by the cache.
+    #[must_use]
+    pub const fn max_entries(self) -> usize {
+        self.max_entries
+    }
+}
+
+impl Default for LazyArchiveCacheLimits {
+    fn default() -> Self {
+        Self {
+            max_bytes: Self::DEFAULT_MAX_BYTES,
+            max_entries: Self::DEFAULT_MAX_ENTRIES,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LazyCacheEntry {
+    data: Arc<Vec<u8>>,
+    weight: usize,
+    last_used: u64,
+}
+
+#[derive(Debug, Default)]
+struct LazyCacheState {
+    entries: HashMap<String, LazyCacheEntry>,
+    flights: HashMap<String, Arc<LazyFlight>>,
+    total_bytes: usize,
+    next_recency: u64,
+    generation: u64,
+}
+
+impl LazyCacheState {
+    fn touch(&mut self, name: &str) {
+        let recency = self.next_recency();
+        if let Some(entry) = self.entries.get_mut(name) {
+            entry.last_used = recency;
+        }
+    }
+
+    fn next_recency(&mut self) -> u64 {
+        if self.next_recency == u64::MAX {
+            let mut entries = self.entries.values_mut().collect::<Vec<_>>();
+            entries.sort_unstable_by_key(|entry| entry.last_used);
+            for (index, entry) in entries.into_iter().enumerate() {
+                entry.last_used = u64::try_from(index).unwrap_or(u64::MAX);
+            }
+            self.next_recency = u64::try_from(self.entries.len()).unwrap_or(u64::MAX);
+        }
+        let recency = self.next_recency;
+        self.next_recency = self.next_recency.saturating_add(1);
+        recency
+    }
+
+    fn evict_oldest(&mut self) -> bool {
+        let Some(oldest_name) = self
+            .entries
+            .iter()
+            // The cache owns one reference. An additional reference belongs
+            // to a caller and pins the payload until that caller releases it.
+            .filter(|(_, entry)| Arc::strong_count(&entry.data) == 1)
+            .min_by_key(|(_, entry)| entry.last_used)
+            .map(|(name, _)| name.clone())
+        else {
+            return false;
+        };
+        if let Some(removed) = self.entries.remove(&oldest_name) {
+            self.total_bytes = self.total_bytes.saturating_sub(removed.weight);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn insert(&mut self, name: String, data: Arc<Vec<u8>>, limits: LazyArchiveCacheLimits) {
+        let weight = data.len();
+        if weight > limits.max_bytes() {
+            return;
+        }
+        while self.entries.len() >= limits.max_entries()
+            || self.total_bytes.saturating_add(weight) > limits.max_bytes()
+        {
+            if !self.evict_oldest() {
+                return;
+            }
+        }
+        if self.entries.try_reserve(1).is_err() {
+            return;
+        }
+        let last_used = self.next_recency();
+        if let Some(previous) = self.entries.insert(
+            name,
+            LazyCacheEntry {
+                data,
+                weight,
+                last_used,
+            },
+        ) {
+            self.total_bytes = self.total_bytes.saturating_sub(previous.weight);
+        }
+        self.total_bytes = self.total_bytes.saturating_add(weight);
+    }
+
+    fn clear_entries(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.entries.clear();
+        self.total_bytes = 0;
+    }
+}
+
+#[derive(Debug, Default)]
+struct LazyFlightState {
+    complete: bool,
+    data: Option<Arc<Vec<u8>>>,
+}
+
+#[derive(Debug)]
+struct LazyFlight {
+    generation: u64,
+    state: std::sync::Mutex<LazyFlightState>,
+    completed: std::sync::Condvar,
+}
+
+impl LazyFlight {
+    fn new(generation: u64) -> Self {
+        Self {
+            generation,
+            state: std::sync::Mutex::new(LazyFlightState::default()),
+            completed: std::sync::Condvar::new(),
+        }
+    }
+
+    fn complete_success(&self, data: Arc<Vec<u8>>) {
+        let mut state = lock_lazy_cache(&self.state);
+        state.data = Some(data);
+        state.complete = true;
+        self.completed.notify_all();
+    }
+
+    fn complete_failure(&self) {
+        let mut state = lock_lazy_cache(&self.state);
+        state.complete = true;
+        self.completed.notify_all();
+    }
+
+    fn wait(&self) -> Option<Arc<Vec<u8>>> {
+        let mut state = lock_lazy_cache(&self.state);
+        while !state.complete {
+            state = self
+                .completed
+                .wait(state)
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+        }
+        state.data.as_ref().map(Arc::clone)
+    }
+}
+
+fn lock_lazy_cache<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+enum LazyCacheLookup {
+    Hit(Arc<Vec<u8>>),
+    Wait(Arc<LazyFlight>),
+    Load(Arc<LazyFlight>),
+    Bypass,
+}
+
+fn remove_lazy_flight(cache: &mut LazyCacheState, name: &str, flight: &Arc<LazyFlight>) {
+    if cache
+        .flights
+        .get(name)
+        .is_some_and(|registered| Arc::ptr_eq(registered, flight))
+    {
+        cache.flights.remove(name);
+    }
+}
+
 pub struct LazyArchiveReader<'data> {
     /// The underlying archive reader (for decompression)
     inner: ArchiveReader<'data>,
-    /// Thread-safe cache of decompressed files
-    cache: std::sync::RwLock<HashMap<String, std::sync::Arc<Vec<u8>>>>,
+    /// Thread-safe cache and same-member decompression flights.
+    cache: std::sync::Mutex<LazyCacheState>,
+    cache_limits: LazyArchiveCacheLimits,
+    #[cfg(test)]
+    cold_loads: std::sync::atomic::AtomicU64,
 }
 
 impl<'data> LazyArchiveReader<'data> {
@@ -3141,11 +3373,37 @@ impl<'data> LazyArchiveReader<'data> {
 
     /// Create a lazy reader with explicit resource limits.
     pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self, Error> {
+        Self::new_with_limits_and_cache_limits(data, limits, LazyArchiveCacheLimits::default())
+    }
+
+    /// Create a lazy reader with explicit cache limits.
+    pub fn new_with_cache_limits(
+        data: &'data [u8],
+        cache_limits: LazyArchiveCacheLimits,
+    ) -> Result<Self, Error> {
+        Self::new_with_limits_and_cache_limits(data, ArchiveLimits::default(), cache_limits)
+    }
+
+    /// Create a lazy reader with explicit archive and cache limits.
+    pub fn new_with_limits_and_cache_limits(
+        data: &'data [u8],
+        limits: ArchiveLimits,
+        cache_limits: LazyArchiveCacheLimits,
+    ) -> Result<Self, Error> {
         let inner = ArchiveReader::new_with_limits(data, limits)?;
         Ok(Self {
             inner,
-            cache: std::sync::RwLock::new(HashMap::new()),
+            cache: std::sync::Mutex::new(LazyCacheState::default()),
+            cache_limits,
+            #[cfg(test)]
+            cold_loads: std::sync::atomic::AtomicU64::new(0),
         })
+    }
+
+    /// Return the finite retention policy used by this reader's cache.
+    #[must_use]
+    pub const fn cache_limits(&self) -> LazyArchiveCacheLimits {
+        self.cache_limits
     }
 
     /// Return declared metadata without reading, decompressing, or caching a member.
@@ -3196,28 +3454,76 @@ impl<'data> LazyArchiveReader<'data> {
         }
         let normalized = lookup.name;
 
-        // Fast path: check if already cached (read lock)
-        {
-            let cache = self.cache.read().unwrap();
-            if let Some(data) = cache.get(&normalized) {
-                return Ok(std::sync::Arc::clone(data));
+        loop {
+            let cache_lookup = {
+                let mut cache = lock_lazy_cache(&self.cache);
+                if let Some(data) = cache
+                    .entries
+                    .get(&normalized)
+                    .map(|entry| Arc::clone(&entry.data))
+                {
+                    cache.touch(&normalized);
+                    LazyCacheLookup::Hit(data)
+                } else if let Some(flight) = cache.flights.get(&normalized) {
+                    LazyCacheLookup::Wait(Arc::clone(flight))
+                } else if cache.flights.try_reserve(1).is_err() {
+                    // Cache bookkeeping is best effort. A failed internal
+                    // reservation must not change decompression/error behavior.
+                    LazyCacheLookup::Bypass
+                } else {
+                    let flight = Arc::new(LazyFlight::new(cache.generation));
+                    cache
+                        .flights
+                        .insert(normalized.clone(), Arc::clone(&flight));
+                    #[cfg(test)]
+                    self.cold_loads
+                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    LazyCacheLookup::Load(flight)
+                }
+            };
+
+            match cache_lookup {
+                LazyCacheLookup::Hit(data) => return Ok(data),
+                LazyCacheLookup::Bypass => return self.inner.read(&normalized).map(Arc::new),
+                LazyCacheLookup::Wait(flight) => {
+                    // A failed flight carries no Error: the original owner
+                    // returns its original error, while waiters retry and
+                    // therefore preserve each operation's error/source chain.
+                    if let Some(data) = flight.wait() {
+                        return Ok(data);
+                    }
+                },
+                LazyCacheLookup::Load(flight) => {
+                    let result = self.inner.read(&normalized).map(Arc::new);
+                    match result {
+                        Ok(data) => {
+                            let mut cache = lock_lazy_cache(&self.cache);
+                            if cache.generation == flight.generation {
+                                cache.insert(
+                                    normalized.clone(),
+                                    Arc::clone(&data),
+                                    self.cache_limits,
+                                );
+                            }
+                            // Publish before removing the flight. This keeps
+                            // oversized and generation-fenced successes shared
+                            // with callers that arrive during completion.
+                            flight.complete_success(Arc::clone(&data));
+                            remove_lazy_flight(&mut cache, &normalized, &flight);
+                            return Ok(data);
+                        },
+                        Err(error) => {
+                            let mut cache = lock_lazy_cache(&self.cache);
+                            // Wake waiters before allowing a retrying loader to
+                            // install a replacement flight.
+                            flight.complete_failure();
+                            remove_lazy_flight(&mut cache, &normalized, &flight);
+                            return Err(error);
+                        },
+                    }
+                },
             }
         }
-
-        // Slow path: decompress and cache (write lock)
-        let data = self.inner.read(name)?;
-        let arc = std::sync::Arc::new(data);
-
-        {
-            let mut cache = self.cache.write().unwrap();
-            // Double-check in case another thread cached it while we were decompressing
-            if let Some(existing) = cache.get(&normalized) {
-                return Ok(std::sync::Arc::clone(existing));
-            }
-            cache.insert(normalized, std::sync::Arc::clone(&arc));
-        }
-
-        Ok(arc)
     }
 
     /// Decompress and verify one member directly into a caller-owned sink.
@@ -3341,12 +3647,17 @@ impl<'data> LazyArchiveReader<'data> {
 
     /// Get the number of cached files.
     pub fn cache_size(&self) -> usize {
-        self.cache.read().unwrap().len()
+        lock_lazy_cache(&self.cache).entries.len()
+    }
+
+    /// Get the total decompressed bytes retained by the cache.
+    pub fn cache_bytes(&self) -> usize {
+        lock_lazy_cache(&self.cache).total_bytes
     }
 
     /// Clear the decompression cache to free memory.
     pub fn clear_cache(&self) {
-        self.cache.write().unwrap().clear();
+        lock_lazy_cache(&self.cache).clear_entries();
     }
 
     /// Take ownership of cached data, consuming the cache.
@@ -3354,11 +3665,12 @@ impl<'data> LazyArchiveReader<'data> {
     /// Returns all cached files and clears the cache. This is useful when
     /// you want to take ownership of the decompressed data without cloning.
     pub fn take_cache(&self) -> HashMap<String, Vec<u8>> {
-        let mut cache = self.cache.write().unwrap();
-        let mut result = HashMap::with_capacity(cache.len());
-        for (name, arc) in cache.drain() {
+        let mut cache = lock_lazy_cache(&self.cache);
+        cache.generation = cache.generation.wrapping_add(1);
+        let mut result = HashMap::with_capacity(cache.entries.len());
+        for (name, entry) in cache.entries.drain() {
             // Try to unwrap the Arc; if there are other references, clone instead
-            match std::sync::Arc::try_unwrap(arc) {
+            match std::sync::Arc::try_unwrap(entry.data) {
                 Ok(data) => {
                     result.insert(name, data);
                 },
@@ -3367,6 +3679,7 @@ impl<'data> LazyArchiveReader<'data> {
                 },
             }
         }
+        cache.total_bytes = 0;
         result
     }
 }
@@ -5101,6 +5414,210 @@ mod tests {
             matches!(all[1].1, Err(ref error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
         );
         assert_eq!(reader.cache_size(), 2);
+    }
+
+    #[test]
+    fn lazy_shared_concurrent_cold_reads_share_one_flight() {
+        const CALLERS: usize = 8;
+        let payload = vec![b'x'; 1024 * 1024];
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("payload", &payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = Arc::new(LazyArchiveReader::new(&bytes).unwrap());
+        let ready = Arc::new(std::sync::Barrier::new(CALLERS + 1));
+        let values = std::thread::scope(|scope| {
+            let handles = (0..CALLERS)
+                .map(|_| {
+                    let reader = Arc::clone(&reader);
+                    let ready = Arc::clone(&ready);
+                    scope.spawn(move || {
+                        ready.wait();
+                        reader.read_shared("payload")
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            ready.wait();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().expect("lazy reader worker should not panic"))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .expect("concurrent cold reads should succeed");
+        assert!(
+            values
+                .windows(2)
+                .all(|pair| Arc::ptr_eq(&pair[0], &pair[1]))
+        );
+        assert_eq!(reader.cold_loads.load(Ordering::SeqCst), 1);
+        assert_eq!(reader.cache_size(), 1);
+        assert_eq!(reader.cache_bytes(), payload.len());
+    }
+
+    #[test]
+    fn lazy_shared_failed_flight_wakes_waiters_and_allows_retry() {
+        const CALLERS: usize = 6;
+        let mut bytes = bulk_fixture();
+        corrupt_payload(&mut bytes, b"bad");
+        let reader = Arc::new(LazyArchiveReader::new(&bytes).unwrap());
+        let ready = Arc::new(std::sync::Barrier::new(CALLERS + 1));
+        std::thread::scope(|scope| {
+            let handles = (0..CALLERS)
+                .map(|_| {
+                    let reader = Arc::clone(&reader);
+                    let ready = Arc::clone(&ready);
+                    scope.spawn(move || {
+                        ready.wait();
+                        reader.read_shared("bad")
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            ready.wait();
+            for handle in handles {
+                let result = handle.join().expect("lazy reader worker should not panic");
+                assert!(matches!(
+                    result,
+                    Err(error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. })
+                ));
+            }
+        });
+        assert_eq!(reader.cache_size(), 0);
+        let first_failure_count = reader.cold_loads.load(Ordering::SeqCst);
+
+        let retry = reader.read_shared("bad");
+        assert!(matches!(
+            retry,
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. })
+        ));
+        assert_eq!(
+            reader.cold_loads.load(Ordering::SeqCst),
+            first_failure_count + 1
+        );
+        assert_eq!(reader.cache_size(), 0);
+    }
+
+    #[test]
+    fn lazy_cache_limits_bound_weight_and_entries_with_exact_lru() {
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"first", b"one"),
+            FixtureEntry::stored(b"second", b"two"),
+            FixtureEntry::stored(b"third", b"tre"),
+        ]);
+        let cache_limits = LazyArchiveCacheLimits::new(6, 2).unwrap();
+        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+
+        assert_eq!(reader.cache_limits(), cache_limits);
+        assert_eq!(reader.read_shared("first").unwrap().as_slice(), b"one");
+        assert_eq!(reader.read_shared("second").unwrap().as_slice(), b"two");
+        assert_eq!(reader.cache_size(), 2);
+        assert_eq!(reader.cache_bytes(), 6);
+
+        // Touch `first`, then insert `third`: exact LRU must evict `second`.
+        assert_eq!(reader.read_shared("first").unwrap().as_slice(), b"one");
+        assert_eq!(reader.read_shared("third").unwrap().as_slice(), b"tre");
+        assert_eq!(reader.cache_size(), 2);
+        assert_eq!(reader.cache_bytes(), 6);
+
+        let cold_loads = reader.cold_loads.load(Ordering::SeqCst);
+        assert_eq!(reader.read_shared("second").unwrap().as_slice(), b"two");
+        assert_eq!(reader.cold_loads.load(Ordering::SeqCst), cold_loads + 1);
+        assert_eq!(reader.cache_size(), 2);
+        assert_eq!(reader.cache_bytes(), 6);
+    }
+
+    #[test]
+    fn lazy_read_returns_fresh_vec_while_shared_reads_preserve_arc() {
+        let bytes = fixture(&[FixtureEntry::stored(b"payload", b"body")]);
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+
+        let mut first = reader.read("payload").unwrap();
+        first[0] = b'X';
+        assert_eq!(reader.read("payload").unwrap(), b"body");
+
+        let shared_first = reader.read_shared("payload").unwrap();
+        let shared_second = reader.read_shared("payload").unwrap();
+        assert!(Arc::ptr_eq(&shared_first, &shared_second));
+    }
+
+    #[test]
+    fn lazy_cache_limits_reject_zero_capacity() {
+        assert!(matches!(
+            LazyArchiveCacheLimits::new(0, 1),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+        assert!(matches!(
+            LazyArchiveCacheLimits::new(1, 0),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+    }
+
+    #[test]
+    fn lazy_cache_skips_oversized_and_externally_pinned_payloads() {
+        let bytes = fixture(&[
+            FixtureEntry::stored(b"first", b"one"),
+            FixtureEntry::stored(b"second", b"two"),
+            FixtureEntry::stored(b"third", b"tre"),
+            FixtureEntry::stored(b"large", b"larger!!"),
+        ]);
+        let cache_limits = LazyArchiveCacheLimits::new(6, 2).unwrap();
+        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+
+        let first = reader.read_shared("first").unwrap();
+        let second = reader.read_shared("second").unwrap();
+        let _ = reader.read_shared("third").unwrap();
+        assert_eq!(reader.cache_size(), 2);
+        assert_eq!(reader.cache_bytes(), 6);
+        assert_eq!(first.as_slice(), b"one");
+        assert_eq!(second.as_slice(), b"two");
+
+        drop(first);
+        let third = reader.read_shared("third").unwrap();
+        assert_eq!(third.as_slice(), b"tre");
+        assert_eq!(reader.cache_size(), 2);
+        assert_eq!(reader.cache_bytes(), 6);
+
+        let large = reader.read_shared("large").unwrap();
+        assert_eq!(large.as_slice(), b"larger!!");
+        assert_eq!(reader.cache_size(), 2);
+        assert_eq!(reader.cache_bytes(), 6);
+        drop(large);
+    }
+
+    #[test]
+    fn lazy_cache_uses_canonical_member_names_and_clear_fences_flights() {
+        let bytes = fixture(&[FixtureEntry::stored(b"dir/../body.xml", b"body")]);
+        let reader = LazyArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+        let first = reader.read_shared("/./dir/../body.xml").unwrap();
+        let second = reader.read_shared("body.xml").unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(reader.cache_size(), 1);
+
+        // A generation change prevents an already-registered old flight from
+        // repopulating the cache after a clear. The actual member read still
+        // remains available to its current callers.
+        let flight = {
+            let mut cache = lock_lazy_cache(&reader.cache);
+            let flight = Arc::new(LazyFlight::new(cache.generation));
+            cache
+                .flights
+                .insert("body.xml".to_string(), Arc::clone(&flight));
+            flight
+        };
+        reader.clear_cache();
+        {
+            let mut cache = lock_lazy_cache(&reader.cache);
+            if cache.generation == flight.generation {
+                cache.insert(
+                    "body.xml".to_string(),
+                    Arc::new(b"stale".to_vec()),
+                    reader.cache_limits,
+                );
+            }
+            remove_lazy_flight(&mut cache, "body.xml", &flight);
+        }
+        assert_eq!(reader.cache_size(), 0);
+        assert_eq!(reader.cache_bytes(), 0);
     }
 
     #[test]
