@@ -84,10 +84,16 @@ impl<'a> Lexer<'a> {
     pub(super) fn observe_group_token(&mut self, token: &Token<'a>) -> RtfResult<()> {
         match token {
             Token::OpenBrace => {
+                if self.binary_destinations.len() >= crate::codec::parser::MAX_GROUP_NESTING_DEPTH {
+                    return Err(RtfError::MalformedDocument(
+                        "RTF group nesting depth exceeds the safety limit".to_string(),
+                    ));
+                }
                 // The parser owns the format's 32-level structural-depth
-                // diagnostic.  This lightweight tracker is only for
-                // destination-aware `binN` ceilings, so it is bounded by the
-                // lexer token budget rather than changing parser diagnostics.
+                // diagnostic as well as the destination-aware `binN` ceilings.
+                // Rejecting the next open brace here prevents malformed input
+                // from growing the destination stack and token stream far
+                // beyond the depth the recursive parser can safely consume.
                 self.binary_destinations.try_reserve(1).map_err(|_err| {
                     RtfError::AllocationFailed {
                         resource: "lexer destination stack",
