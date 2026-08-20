@@ -1,9 +1,102 @@
 //! Transaction joins, conflicts, and cross-facet edit tests.
 
 use super::super::*;
+use super::support::part_text;
 
 use crate::cell::{Number, Value};
 use crate::{History, HistoryLimits, Margins, PageMargin};
+
+fn strict_unknown_worksheet() -> Workbook {
+    let source = Workbook::new().expect("source workbook");
+    let mut package = source.inner.package.clone();
+    package
+        .get_part_mut(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .set_blob(
+            br#"<x:worksheet xmlns:x="http://purl.oclc.org/ooxml/spreadsheetml/main" xmlns:u="urn:litchi:future"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>7</x:v></x:c></x:row></x:sheetData><u:future marker="keep"/></x:worksheet>"#.to_vec(),
+        );
+    Workbook::from_package(package).expect("strict unknown worksheet")
+}
+
+fn test_margins() -> Margins {
+    Margins::new(
+        PageMargin::from_inches(0.7).expect("left margin"),
+        PageMargin::from_inches(0.8).expect("right margin"),
+        PageMargin::from_inches(1.0).expect("top margin"),
+        PageMargin::from_inches(1.1).expect("bottom margin"),
+        PageMargin::from_inches(0.3).expect("header margin"),
+        PageMargin::from_inches(0.4).expect("footer margin"),
+    )
+}
+
+#[test]
+fn metadata_only_edit_preserves_strict_namespace_and_unknown_xml() {
+    let source = strict_unknown_worksheet();
+    let margins = test_margins();
+    let mut edit = source.edit().expect("metadata edit");
+    edit.put_page_margins("Sheet1", margins)
+        .expect("put margins")
+        .expect("worksheet selector");
+    let committed = edit.commit().expect("metadata commit");
+    let xml = part_text(committed.workbook(), "/xl/worksheets/sheet1.xml");
+
+    assert!(xml.contains("<x:worksheet"));
+    assert!(xml.contains("<u:future marker=\"keep\"/>"));
+    assert!(xml.contains("<x:pageMargins"));
+    assert_eq!(
+        committed
+            .workbook()
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .page_margins()
+            .expect("page margins read"),
+        Some(margins)
+    );
+}
+
+#[test]
+fn metadata_only_edit_rejects_malformed_worksheet_like_the_source_parser() {
+    let source = Workbook::new().expect("source workbook");
+    let mut package = source.inner.package.clone();
+    let uri = source.inner.sheets[0].part_uri.clone();
+    let malformed = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData></worksheet>"#;
+    package
+        .get_part_mut(&uri)
+        .expect("worksheet part")
+        .set_blob(malformed.to_vec());
+    let malformed = Workbook::from_package(package).expect("catalog validation");
+    let mut edit = malformed.edit().expect("metadata edit");
+    edit.put_page_margins("Sheet1", test_margins())
+        .expect("stage margins")
+        .expect("worksheet selector");
+    assert!(edit.commit().is_err());
+}
+
+#[test]
+fn metadata_only_edit_with_the_existing_value_is_a_byte_no_op() {
+    let source = Workbook::new().expect("source workbook");
+    let margins = test_margins();
+    let mut install = source.edit().expect("install edit");
+    install
+        .put_page_margins("Sheet1", margins)
+        .expect("put margins")
+        .expect("worksheet selector");
+    let installed = install.commit().expect("install commit");
+    let before = installed.workbook().to_plain_bytes().expect("before bytes");
+
+    let mut no_op = installed.workbook().edit().expect("no-op edit");
+    no_op
+        .put_page_margins("Sheet1", margins)
+        .expect("put existing margins")
+        .expect("worksheet selector");
+    let no_op = no_op.commit().expect("no-op commit");
+    assert!(no_op.patch().is_empty());
+    assert_eq!(
+        no_op.workbook().to_plain_bytes().expect("after bytes"),
+        before
+    );
+}
 
 #[test]
 fn page_margins_merge_replay_inverse_and_record_history() {
