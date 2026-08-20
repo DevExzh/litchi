@@ -330,6 +330,32 @@ fn exact_noop_reproduces_every_source_byte() {
 }
 
 #[test]
+fn rolled_back_document_operations_use_the_exact_signed_source_path() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:x="urn:litchi:test"><w:body><w:p><w:r><w:t>alpha</w:t><x:opaque value="preserve"/></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let (source_bytes, main, unused) = fixture_for_document(document, rt::OFFICE_DOCUMENT, true);
+    let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
+    let read_at: Arc<dyn ReadAt> = source;
+    let package = source_backed::Package::from_read_at(read_at).unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "temporary")
+        .unwrap();
+    edit.replace_paragraph_text(Position::new(0), "alpha")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(commit.patch().operations().len(), 2);
+    assert!(!commit.patch().changed());
+    let mut output = Vec::new();
+    package
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source_bytes);
+}
+
+#[test]
 fn stale_commit_and_changed_source_fail_before_output() {
     let (source_bytes, main, unused) = fixture();
     let source = Arc::new(ObservedSource::new(source_bytes, main, unused));

@@ -785,7 +785,13 @@ impl Package {
             }
             .into());
         }
-        if commit.patch().operations().is_empty() {
+        // Semantic operations are bookkeeping, not the publication
+        // authorization. An edit may temporarily change a document and then
+        // restore the exact source bytes before commit. Only the patch's
+        // byte-identity check is allowed to select the exact-source path;
+        // this also avoids asking a rewritten target to stand in for an
+        // unsupported source payload.
+        if !commit.patch().changed() {
             self.package
                 .write_part_overlays_shared_to_stream(writer, Vec::new())
                 .map_err(Error::from)?;
