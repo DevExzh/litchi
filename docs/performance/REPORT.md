@@ -11,6 +11,18 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## PPTX named-slide selector ABBA evidence (change 0253)
+
+[Change 0253](changes/0253-pptx-named-slide-abba.md) records the corrected
+named-slide candidate/control release package. All 12 statistic cells are
+rejected: the tiny one-edit selector has one adverse-both cell (p99), and the
+named and harness-paired numeric repeated-edit selectors on the large fixed
+named-slide corpus have direction disagreement at all four statistics. No
+latency statistic is accepted and the production candidate is not landed.
+The package also records the independent `slide:0/name` target/oracle
+identity and the compatibility fallback from the newer summary tool to the
+matching base-197 schema tool.
+
 ## XLSX borrowed XML worksheet parsing ABBA evidence (change 0251)
 
 [Change 0251](changes/0251-xlsx-xml-borrowed-abba.md) records the matched
