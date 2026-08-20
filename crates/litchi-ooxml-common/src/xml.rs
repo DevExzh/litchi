@@ -4,8 +4,10 @@ use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
-use quick_xml::reader::NsReader;
+use quick_xml::reader::Reader;
 use thiserror::Error;
+
+use crate::binding_tracker::{BindingTracker, BindingTrackerError};
 
 /// Return whether a value follows the XML 1.0 Fifth Edition `NCName` grammar.
 ///
@@ -43,6 +45,13 @@ const OMML_NAMESPACE: &[u8] = OMML_NAMESPACE_URI.as_bytes();
 const STRICT_OMML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/math";
 const MAX_OMML_SCAN_DEPTH: usize = 128;
 const MAX_OMML_SCAN_NODES: usize = 1_000_000;
+
+fn map_binding_error(error: BindingTrackerError) -> XmlError {
+    match error {
+        BindingTrackerError::Namespace(error) => XmlError::Malformed(error),
+        BindingTrackerError::DepthOverflow => XmlError::Invalid(error.to_string()),
+    }
+}
 
 /// Decode a numeric or predefined XML entity reference.
 /// # Errors
@@ -183,19 +192,41 @@ where
         Other,
     }
 
-    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut reader = Reader::from_reader(xml_bytes);
+    let mut tracker = BindingTracker::new();
+    let mut pending_pop = false;
     let mut capture: Option<(usize, usize)> = None;
     let mut depth = 0usize;
     let mut nodes = 0usize;
 
     loop {
+        if pending_pop {
+            tracker.pop();
+            pending_pop = false;
+        }
         let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
             XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
         })?;
         let event = {
-            let (namespace, event) = reader
-                .read_resolved_event()
+            let event = reader
+                .read_event()
                 .map_err(|error| XmlError::Malformed(error.to_string()))?;
+            let namespace = match &event {
+                Event::Start(element) => {
+                    tracker.push(element).map_err(map_binding_error)?;
+                    tracker.resolve_element(element.name()).0
+                },
+                Event::Empty(element) => {
+                    tracker.push(element).map_err(map_binding_error)?;
+                    pending_pop = true;
+                    tracker.resolve_element(element.name()).0
+                },
+                Event::End(element) => {
+                    pending_pop = true;
+                    tracker.resolve_element(element.name()).0
+                },
+                _ => ResolveResult::Unbound,
+            };
             match &event {
                 Event::Start(_) => {
                     nodes = nodes.checked_add(1).ok_or_else(|| {
@@ -362,6 +393,7 @@ pub fn omml_formula_xml(xml_bytes: &[u8], start: u32, length: u32) -> Result<Str
 mod tests {
     use super::*;
     use quick_xml::Reader;
+    use quick_xml::reader::NsReader;
 
     #[test]
     fn duplicate_unqualified_attributes_are_rejected() {
@@ -435,6 +467,164 @@ mod tests {
         assert_eq!(emitted, 0);
     }
 
+    fn scan_omml_formula_ranges_nsreader_oracle(
+        xml_bytes: &[u8],
+    ) -> std::result::Result<Vec<(u32, u32)>, XmlError> {
+        enum ScanEvent {
+            Start,
+            NestedStart,
+            Empty,
+            End,
+            Eof,
+            Other,
+        }
+
+        let mut reader = NsReader::from_reader(xml_bytes);
+        let mut capture: Option<(usize, usize)> = None;
+        let mut ranges = Vec::new();
+        let mut depth = 0usize;
+        let mut nodes = 0usize;
+        loop {
+            let event_start = usize::try_from(reader.buffer_position()).map_err(|error| {
+                XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
+            })?;
+            let event = {
+                let (namespace, event) = reader
+                    .read_resolved_event()
+                    .map_err(|error| XmlError::Malformed(error.to_string()))?;
+                match &event {
+                    Event::Start(_) => {
+                        nodes = nodes.checked_add(1).ok_or_else(|| {
+                            XmlError::Invalid("OMML element counter overflow".to_string())
+                        })?;
+                        if nodes > MAX_OMML_SCAN_NODES {
+                            return Err(XmlError::Invalid(format!(
+                                "OMML XML exceeds {MAX_OMML_SCAN_NODES} elements"
+                            )));
+                        }
+                        depth = depth.checked_add(1).ok_or_else(|| {
+                            XmlError::Invalid("OMML nesting is too deep".to_string())
+                        })?;
+                        if depth > MAX_OMML_SCAN_DEPTH {
+                            return Err(XmlError::Invalid(format!(
+                                "OMML nesting exceeds the {MAX_OMML_SCAN_DEPTH} depth limit"
+                            )));
+                        }
+                    },
+                    Event::Empty(_) => {
+                        nodes = nodes.checked_add(1).ok_or_else(|| {
+                            XmlError::Invalid("OMML element counter overflow".to_string())
+                        })?;
+                        if nodes > MAX_OMML_SCAN_NODES {
+                            return Err(XmlError::Invalid(format!(
+                                "OMML XML exceeds {MAX_OMML_SCAN_NODES} elements"
+                            )));
+                        }
+                    },
+                    Event::End(_) => {
+                        depth = depth
+                            .checked_sub(1)
+                            .ok_or_else(|| XmlError::Invalid("invalid OMML nesting".to_string()))?;
+                    },
+                    _ => {},
+                }
+                match event {
+                    Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                    Event::Start(element) if is_omml_name(&namespace, element.name(), b"oMath") => {
+                        ScanEvent::Start
+                    },
+                    Event::Empty(element)
+                        if capture.is_none()
+                            && is_omml_name(&namespace, element.name(), b"oMath") =>
+                    {
+                        ScanEvent::Empty
+                    },
+                    Event::End(_) if capture.is_some() => ScanEvent::End,
+                    Event::Eof => ScanEvent::Eof,
+                    _ => ScanEvent::Other,
+                }
+            };
+            let event_end = usize::try_from(reader.buffer_position()).map_err(|error| {
+                XmlError::Invalid(format!("OMML offset does not fit usize: {error}"))
+            })?;
+            match event {
+                ScanEvent::Start => capture = Some((event_start, 1)),
+                ScanEvent::NestedStart => {
+                    let Some((_, depth)) = capture.as_mut() else {
+                        return Err(XmlError::Invalid(
+                            "missing captured OMML formula".to_string(),
+                        ));
+                    };
+                    *depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| XmlError::Invalid("OMML nesting is too deep".to_string()))?;
+                },
+                ScanEvent::Empty => ranges.push((
+                    u32::try_from(event_start).map_err(|error| {
+                        XmlError::Invalid(format!("OMML offset exceeds u32: {error}"))
+                    })?,
+                    u32::try_from(event_end - event_start).map_err(|error| {
+                        XmlError::Invalid(format!("OMML length exceeds u32: {error}"))
+                    })?,
+                )),
+                ScanEvent::End => {
+                    let Some((_, depth)) = capture.as_mut() else {
+                        return Err(XmlError::Invalid(
+                            "missing captured OMML formula".to_string(),
+                        ));
+                    };
+                    *depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| XmlError::Invalid("invalid OMML nesting".to_string()))?;
+                    if *depth == 0 {
+                        let Some((start, _)) = capture.take() else {
+                            return Err(XmlError::Invalid(
+                                "missing OMML formula range".to_string(),
+                            ));
+                        };
+                        ranges.push((
+                            u32::try_from(start).map_err(|error| {
+                                XmlError::Invalid(format!("OMML offset exceeds u32: {error}"))
+                            })?,
+                            u32::try_from(event_end - start).map_err(|error| {
+                                XmlError::Invalid(format!("OMML length exceeds u32: {error}"))
+                            })?,
+                        ));
+                    }
+                },
+                ScanEvent::Eof if capture.is_some() || depth != 0 => {
+                    return Err(XmlError::Invalid("unterminated OMML formula".to_string()));
+                },
+                ScanEvent::Eof => break,
+                ScanEvent::Other => {},
+            }
+        }
+        Ok(ranges)
+    }
+
+    fn scan_omml_formula_ranges_tracked(
+        xml: &[u8],
+    ) -> std::result::Result<Vec<(u32, u32)>, XmlError> {
+        let mut ranges = Vec::new();
+        scan_omml_formula_ranges::<XmlError>(xml, |start, length| {
+            ranges.push((start, length));
+            Ok(())
+        })?;
+        Ok(ranges)
+    }
+
+    fn assert_omml_tracker_parity(xml: &[u8]) {
+        let tracked_ranges = scan_omml_formula_ranges_tracked(xml);
+        let oracle = scan_omml_formula_ranges_nsreader_oracle(xml);
+        match (tracked_ranges, oracle) {
+            (Ok(tracked), Ok(oracle)) => assert_eq!(tracked, oracle),
+            (Err(tracked), Err(oracle)) => assert_eq!(tracked.to_string(), oracle.to_string()),
+            (tracked, oracle) => {
+                panic!("tracker/oracle outcome mismatch: {tracked:?} vs {oracle:?}")
+            },
+        }
+    }
+
     #[test]
     fn rejects_omml_structural_depth_over_bound() {
         let mut xml = String::from("<root>");
@@ -445,5 +635,99 @@ mod tests {
             scan_omml_formula_ranges::<XmlError>(xml.as_bytes(), |_, _| Ok(())),
             Err(XmlError::Invalid(message)) if message.contains("depth limit")
         ));
+    }
+
+    #[test]
+    fn omml_tracker_matches_nsreader_on_event_and_namespace_adversaries() {
+        let xml_namespace = "http://www.w3.org/XML/1998/namespace";
+        let xmlns_namespace = "http://www.w3.org/2000/xmlns/";
+        let declaration_attributes = |count: usize| {
+            (0..count)
+                .map(|index| format!(r#"xmlns:n{index}="urn:n{index}""#))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let fixtures = [
+            format!(
+                "<?xml version=\"1.0\"?><!-- before --><root xmlns:m=\"{}\"><![CDATA[ignored]]><m:oMath><!-- inside --><m:r><m:t>x</m:t></m:r></m:oMath><?after?> </root>",
+                OMML_NAMESPACE_URI
+            ),
+            format!(
+                r#"<root xmlns:m="{OMML_NAMESPACE_URI}" xmlns:q="urn:outer"><q:holder xmlns:q="urn:inner"><m:oMath><m:r/></m:oMath></q:holder></root>"#
+            ),
+            format!(
+                r#"<root xmlns:m="{OMML_NAMESPACE_URI}"><m:oMath/><scope xmlns:m="urn:foreign"><m:oMath/></scope><m:oMath/></root>"#
+            ),
+            // A malformed attribute after the valid declaration is handled
+            // by quick-xml's unchecked namespace scan as a silent stop.
+            format!(
+                r#"<root xmlns:m="{OMML_NAMESPACE_URI}" m:broken="unterminated><m:oMath/></root>"#
+            ),
+            // HTML-style malformed attributes are returned as an event; the
+            // namespace scan must stop there and not invent later bindings.
+            format!(r#"<root broken xmlns:m="{OMML_NAMESPACE_URI}"><m:oMath/></root>"#),
+            format!(r#"<root broken= xmlns:m="{OMML_NAMESPACE_URI}"><m:oMath/></root>"#),
+            format!(r#"<root xmlns:m="{OMML_NAMESPACE_URI}" broken><m:oMath/></root>"#),
+            format!(
+                r#"<root xmlns:m="{OMML_NAMESPACE_URI}" xmlns:xml="{xml_namespace}"><m:oMath/></root>"#
+            ),
+            format!(
+                r#"<root xmlns:m="{OMML_NAMESPACE_URI}" xmlns:bad="{xmlns_namespace}"><m:oMath/></root>"#
+            ),
+            // The exact limit is inclusive: m plus 255 additional bindings.
+            format!(
+                r#"<root xmlns:m="{OMML_NAMESPACE_URI}" {}><m:oMath/></root>"#,
+                declaration_attributes(255)
+            ),
+            // The declaration limit is checked in declaration order, even
+            // though none of these prefixes are used by the formula.
+            format!(
+                r#"<root xmlns:m="{OMML_NAMESPACE_URI}" {}><m:oMath/></root>"#,
+                declaration_attributes(256)
+            ),
+        ];
+        for fixture in fixtures {
+            assert_omml_tracker_parity(fixture.as_bytes());
+        }
+    }
+
+    #[test]
+    fn omml_namespace_scan_silently_stops_at_malformed_attributes() {
+        for xml in [
+            format!(r#"<root broken xmlns:m="{OMML_NAMESPACE_URI}"><m:oMath/></root>"#),
+            format!(r#"<root broken= xmlns:m="{OMML_NAMESPACE_URI}"><m:oMath/></root>"#),
+        ] {
+            let mut reader = NsReader::from_reader(xml.as_bytes());
+            assert!(matches!(
+                reader.read_resolved_event(),
+                Ok((_, Event::Start(_)))
+            ));
+            assert_omml_tracker_parity(xml.as_bytes());
+        }
+    }
+
+    #[test]
+    fn omml_tracker_preserves_malformed_token_and_unterminated_errors() {
+        for fixture in [
+            br#"<root xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r></root>"#.as_slice(),
+            br#"<root xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath a="unterminated></root>"#.as_slice(),
+        ] {
+            assert_omml_tracker_parity(fixture);
+        }
+    }
+
+    #[test]
+    fn omml_tracker_preserves_explicit_structural_bounds() {
+        let mut at_limit = String::from("<root>");
+        at_limit.push_str(&"<node>".repeat(MAX_OMML_SCAN_DEPTH - 1));
+        at_limit.push_str(&"</node>".repeat(MAX_OMML_SCAN_DEPTH - 1));
+        at_limit.push_str("</root>");
+        assert_omml_tracker_parity(at_limit.as_bytes());
+
+        let mut too_deep = String::from("<root>");
+        too_deep.push_str(&"<node>".repeat(MAX_OMML_SCAN_DEPTH));
+        too_deep.push_str(&"</node>".repeat(MAX_OMML_SCAN_DEPTH));
+        too_deep.push_str("</root>");
+        assert_omml_tracker_parity(too_deep.as_bytes());
     }
 }
