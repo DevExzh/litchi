@@ -22,6 +22,7 @@ use crate::{CaseResult, Configuration, SourceSummary};
 
 const SCHEMA_VERSION: u32 = 1;
 const SCOPE: &str = "explicit_local_execution_only";
+const CLAIM: &str = "descriptive";
 const CONFIGURED_WORKER_SCOPE: &str = "configuration.execution_workers";
 const CONFIGURED_CASE_WORKER_SCOPE: &str = "result.execution.worker_count";
 const CONFIGURED_OPC_WORKER_SCOPE: &str = "result.source.opc_cache.worker_count";
@@ -31,9 +32,9 @@ const TASK_SCOPE: &str = "result.execution.logical_tasks";
 const CHUNK_SCOPE: &str = "result.execution.deterministic_chunk_count";
 const SIMULATION_CHUNK_SCOPE: &str = "result.source.simulation.physical_request_count";
 const CFB_SELECTIVE_CHUNK_SCOPE: &str =
-    "result.source.cfb_selective.simulation.total.physical_request_count";
+    "result.source.cfb_selective.simulation.read.physical_request_count";
 const CFB_OPEN_STREAM_CHUNK_SCOPE: &str =
-    "result.source.cfb_open_stream.simulation.samples.aggregate.physical_request_count";
+    "result.source.cfb_open_stream.simulation.samples.per_operation.physical_request_count_sum";
 const PROCESS_THREAD_SCOPE: &str = "process_thread_count";
 const LOCK_WAIT_SCOPE: &str = "lock_wait_ns";
 
@@ -121,6 +122,7 @@ pub(crate) struct CaseMetrics {
 pub(crate) struct ReportMetrics {
     pub schema_version: u32,
     pub scope: &'static str,
+    pub claim: &'static str,
     pub configured_worker_budget: Metric,
     pub observed_process_thread_count: Metric,
     pub cases: Vec<CaseMetrics>,
@@ -163,6 +165,7 @@ struct CaseInput {
     persistent_worker_teams_created: Option<usize>,
     chunk_evidence: ChunkEvidence,
     elapsed_sample_count: usize,
+    elapsed_sample_order: Vec<usize>,
 }
 
 /// Build the envelope from the harness's typed report pieces.
@@ -174,15 +177,21 @@ pub(crate) fn collect(
     configuration: &Configuration,
     results: &[CaseResult],
 ) -> Result<ReportMetrics, Box<dyn Error>> {
-    let configured_worker_budget = configured_worker_budget(&configuration.execution_workers)?;
+    let configured_worker_values = configured_worker_values(&configuration.execution_workers)?;
+    let configured_worker_budget =
+        Metric::measured_u64s(configured_worker_values.clone(), CONFIGURED_WORKER_SCOPE);
     let cases = results
         .iter()
         .enumerate()
-        .map(|(index, result)| case_metrics(case_input(result), index))
+        .map(|(index, result)| {
+            let input = case_input(result)?;
+            case_metrics(input, index, &configured_worker_values)
+        })
         .collect::<Result<Vec<_>, InputError>>()?;
     Ok(ReportMetrics {
         schema_version: SCHEMA_VERSION,
         scope: SCOPE,
+        claim: CLAIM,
         configured_worker_budget,
         observed_process_thread_count: Metric::unavailable(
             PROCESS_THREAD_SCOPE,
@@ -192,7 +201,7 @@ pub(crate) fn collect(
     })
 }
 
-fn case_input(result: &CaseResult) -> CaseInput {
+fn case_input(result: &CaseResult) -> Result<CaseInput, InputError> {
     let source = result.source.as_ref();
     let execution = result.execution.as_ref();
     let (opc_cache_worker_count, persistent_worker_teams_created) = source
@@ -204,7 +213,7 @@ fn case_input(result: &CaseResult) -> CaseInput {
             )
         })
         .unwrap_or((None, None));
-    CaseInput {
+    Ok(CaseInput {
         case: result.case.to_owned(),
         cache_state: result.cache_state.map(str::to_owned),
         corpus_sha256: (!result.corpus.archive_sha256.is_empty())
@@ -213,14 +222,15 @@ fn case_input(result: &CaseResult) -> CaseInput {
         logical_tasks: execution.map(|execution| execution.logical_tasks),
         opc_cache_worker_count,
         persistent_worker_teams_created,
-        chunk_evidence: source_chunk_evidence(source),
+        chunk_evidence: source_chunk_evidence(source)?,
         elapsed_sample_count: result.elapsed_ns.samples.len(),
-    }
+        elapsed_sample_order: result.elapsed_ns.sample_order.clone(),
+    })
 }
 
-fn source_chunk_evidence(source: Option<&SourceSummary>) -> ChunkEvidence {
+fn source_chunk_evidence(source: Option<&SourceSummary>) -> Result<ChunkEvidence, InputError> {
     let Some(source) = source else {
-        return ChunkEvidence::None;
+        return Ok(ChunkEvidence::None);
     };
     let mut candidates = Vec::new();
     if let Some(simulation) = source.simulation.as_ref() {
@@ -234,7 +244,7 @@ fn source_chunk_evidence(source: Option<&SourceSummary>) -> ChunkEvidence {
             candidates.push(ChunkVector {
                 scope: CFB_SELECTIVE_CHUNK_SCOPE,
                 values: simulation
-                    .total
+                    .read
                     .iter()
                     .map(|phase| phase.physical_request_count)
                     .collect(),
@@ -248,22 +258,39 @@ fn source_chunk_evidence(source: Option<&SourceSummary>) -> ChunkEvidence {
                 values: simulation
                     .samples
                     .iter()
-                    .map(|sample| sample.aggregate.physical_request_count)
-                    .collect(),
+                    .enumerate()
+                    .map(|(sample_index, sample)| {
+                        sample.per_operation.iter().try_fold(0_u64, |total, phase| {
+                            total
+                                .checked_add(phase.physical_request_count)
+                                .ok_or_else(|| {
+                                    InputError(format!(
+                                        "source.cfb_open_stream.simulation.samples[{sample_index}] "
+                                            "per-operation request count overflows u64"
+                                    ))
+                                })
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
             });
         }
     }
-    match candidates.len() {
+    Ok(match candidates.len() {
         0 => ChunkEvidence::None,
         1 => match candidates.pop() {
             Some(candidate) => ChunkEvidence::One(candidate),
             None => ChunkEvidence::None,
         },
         _ => ChunkEvidence::Ambiguous,
-    }
+    })
 }
 
 fn configured_worker_budget(workers: &[usize]) -> Result<Metric, InputError> {
+    let values = configured_worker_values(workers)?;
+    Ok(Metric::measured_u64s(values, CONFIGURED_WORKER_SCOPE))
+}
+
+fn configured_worker_values(workers: &[usize]) -> Result<Vec<u64>, InputError> {
     if workers.is_empty() {
         return Err(InputError(
             "configuration.execution_workers must not be empty".to_owned(),
@@ -279,11 +306,16 @@ fn configured_worker_budget(workers: &[usize]) -> Result<Metric, InputError> {
             "configuration.execution_workers must be sorted and unique".to_owned(),
         ));
     }
-    Ok(Metric::measured_u64s(values, CONFIGURED_WORKER_SCOPE))
+    Ok(values)
 }
 
-fn case_metrics(input: CaseInput, index: usize) -> Result<CaseMetrics, InputError> {
+fn case_metrics(
+    input: CaseInput,
+    index: usize,
+    configured_workers: &[u64],
+) -> Result<CaseMetrics, InputError> {
     let location = format!("results[{index}]");
+    validate_case_worker_counts(&input, configured_workers, &location)?;
     let configured_worker_count = configured_worker_count(&input, &location)?;
     let observed_local_worker_count = observed_local_worker_count(&input, &location)?;
     let deterministic_task_count = match input.logical_tasks {
@@ -338,15 +370,40 @@ fn configured_worker_count(input: &CaseInput, location: &str) -> Result<Metric, 
     }
 }
 
+fn validate_case_worker_counts(
+    input: &CaseInput,
+    configured_workers: &[u64],
+    location: &str,
+) -> Result<(), InputError> {
+    for (field, worker) in [
+        ("execution.worker_count", input.execution_worker_count),
+        (
+            "source.opc_cache.worker_count",
+            input.opc_cache_worker_count,
+        ),
+    ] {
+        let Some(worker) = worker else {
+            continue;
+        };
+        let worker = positive_usize(worker, &format!("{location}.{field}"))?;
+        if !configured_workers.contains(&worker) {
+            return Err(InputError(format!(
+                "{location}.{field}={worker} is absent from configuration.execution_workers"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn observed_local_worker_count(input: &CaseInput, location: &str) -> Result<Metric, InputError> {
     let Some(worker_count) = input.opc_cache_worker_count else {
-        return Ok(Metric::unavailable(
+        return Ok(Metric::not_applicable(
             OBSERVED_WORKER_SCOPE,
-            "configured worker width is not an observed process thread count",
+            "result does not create an explicit local worker team",
         ));
     };
     let Some(teams) = input.persistent_worker_teams_created else {
-        return Ok(Metric::unavailable(
+        return Ok(Metric::not_applicable(
             OBSERVED_WORKER_SCOPE,
             "local worker-team creation count is not exposed",
         ));
@@ -357,9 +414,9 @@ fn observed_local_worker_count(input: &CaseInput, location: &str) -> Result<Metr
     )?;
     match teams {
         1 => Ok(Metric::measured_u64(worker_count, OBSERVED_WORKER_SCOPE)),
-        0 => Ok(Metric::unavailable(
+        0 => Ok(Metric::not_applicable(
             OBSERVED_WORKER_SCOPE,
-            "no local worker team was created",
+            "serial result created no local worker team",
         )),
         _ => Ok(Metric::unavailable(
             OBSERVED_WORKER_SCOPE,
@@ -395,9 +452,48 @@ fn deterministic_chunk_count(input: &CaseInput, location: &str) -> Result<Metric
                     input.elapsed_sample_count
                 )));
             }
-            Ok(Metric::measured_u64s(vector.values.clone(), vector.scope))
+            let values =
+                reorder_to_elapsed_samples(&vector.values, &input.elapsed_sample_order, location)?;
+            Ok(Metric::measured_u64s(values, vector.scope))
         },
     }
+}
+
+fn reorder_to_elapsed_samples(
+    values: &[u64],
+    sample_order: &[usize],
+    location: &str,
+) -> Result<Vec<u64>, InputError> {
+    if values.len() != sample_order.len() {
+        return Err(InputError(format!(
+            "{location} sample-order length {} does not match chunk vector length {}",
+            sample_order.len(),
+            values.len()
+        )));
+    }
+    let mut seen = vec![false; values.len()];
+    let mut reordered = Vec::with_capacity(values.len());
+    for (sorted_index, &original_index) in sample_order.iter().enumerate() {
+        if original_index >= values.len() {
+            return Err(InputError(format!(
+                "{location} sample_order[{sorted_index}]={original_index} is outside "
+                    "the retained sample vector"
+            )));
+        }
+        if seen[original_index] {
+            return Err(InputError(format!(
+                "{location} sample_order repeats original sample {original_index}"
+            )));
+        }
+        seen[original_index] = true;
+        reordered.push(values[original_index]);
+    }
+    if seen.iter().any(|observed| !observed) {
+        return Err(InputError(format!(
+            "{location} sample_order is not a complete retained-sample permutation"
+        )));
+    }
+    Ok(reordered)
 }
 
 fn positive_usize(value: usize, location: &str) -> Result<u64, InputError> {
@@ -417,9 +513,77 @@ mod tests {
     #![allow(clippy::expect_used, reason = "test assertions panic by design")]
 
     use super::{
-        CaseInput, ChunkEvidence, ChunkVector, MetricStatus, case_metrics,
+        CaseInput, ChunkEvidence, ChunkVector, MetricStatus, case_metrics, collect,
         configured_worker_budget, source_chunk_evidence,
     };
+
+    fn configuration() -> super::super::Configuration {
+        super::super::Configuration {
+            samples_per_case: 2,
+            warmup_iterations_per_case: 0,
+            filesystem_cache_states: vec!["warm"],
+            filesystem_fresh_child_per_sample: true,
+            filesystem_process_isolated: true,
+            filesystem_root_selected: false,
+            cases: vec!["test"],
+            corpus_shapes: Vec::new(),
+            payload_kinds: Vec::new(),
+            writer_shapes: Vec::new(),
+            xlsx_shapes: Vec::new(),
+            xlsx_cell_crud_shapes: Vec::new(),
+            xlsx_row_visibility_shapes: Vec::new(),
+            semantic_shapes: Vec::new(),
+            rtf_variants: Vec::new(),
+            range_simulation: super::super::RangeSimulationConfig::default(),
+            execution_workers: vec![1, 2, 4],
+        }
+    }
+
+    fn corpus() -> super::super::CorpusManifest {
+        super::super::CorpusManifest {
+            name: "test".to_owned(),
+            generator: "test",
+            package_format: "opc",
+            shape: "tiny",
+            payload_kind: "compressible",
+            compression: "stored",
+            entry_count: 1,
+            archive_member_count: 1,
+            entry_bytes: 1,
+            uncompressed_payload_bytes: 1,
+            archive_bytes: 1,
+            archive_sha256: "archive".to_owned(),
+            target_entry: "part".to_owned(),
+            target_payload_bytes: 1,
+            target_payload_sha256: "payload".to_owned(),
+            rtf_variant: None,
+            xlsx: None,
+        }
+    }
+
+    fn typed_result() -> super::super::CaseResult {
+        super::super::CaseResult {
+            case: "test",
+            cache_state: None,
+            corpus: corpus(),
+            elapsed_ns: super::super::statistics(vec![20, 10]),
+            sink: None,
+            source: Some(super::super::SourceSummary {
+                simulation: Some(super::super::RangeSimulationSummary {
+                    physical_request_count: vec![11, 22],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            execution: Some(super::super::ExecutionSummary {
+                worker_count: 2,
+                logical_tasks: 3,
+                logical_bytes: 30,
+            }),
+            output_sha256: None,
+            operation_metrics: None,
+        }
+    }
 
     fn input() -> CaseInput {
         CaseInput {
@@ -432,7 +596,39 @@ mod tests {
             persistent_worker_teams_created: None,
             chunk_evidence: ChunkEvidence::None,
             elapsed_sample_count: 0,
+            elapsed_sample_order: Vec::new(),
         }
+    }
+
+    #[test]
+    fn collect_validates_typed_shape_and_reorders_chunk_evidence() {
+        let report = collect(&configuration(), &[typed_result()]).expect("valid report");
+        assert_eq!(report.claim, "descriptive");
+        assert_eq!(
+            report.configured_worker_budget.value,
+            Some(serde_json::json!([1, 2, 4]))
+        );
+        let case = &report.cases[0];
+        assert_eq!(
+            case.configured_worker_count.value,
+            Some(serde_json::json!(2))
+        );
+        assert_eq!(
+            case.deterministic_task_count.value,
+            Some(serde_json::json!(3))
+        );
+        assert_eq!(
+            case.deterministic_chunk_count.value,
+            Some(serde_json::json!([22, 11]))
+        );
+        assert_eq!(
+            case.observed_local_worker_count.status,
+            MetricStatus::NotApplicable
+        );
+        assert_eq!(
+            report.observed_process_thread_count.status,
+            MetricStatus::Unavailable
+        );
     }
 
     #[test]
@@ -442,7 +638,7 @@ mod tests {
         let mut input = input();
         input.execution_worker_count = Some(2);
         input.logical_tasks = Some(6);
-        let case = case_metrics(input, 0).expect("valid metrics");
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("valid metrics");
         assert_eq!(case.configured_worker_count.status, MetricStatus::Measured);
         assert_eq!(case.deterministic_task_count.status, MetricStatus::Measured);
         assert_eq!(
@@ -451,7 +647,7 @@ mod tests {
         );
         assert_eq!(
             case.observed_local_worker_count.status,
-            MetricStatus::Unavailable
+            MetricStatus::NotApplicable
         );
         assert_eq!(case.lock_wait_ns.status, MetricStatus::Unavailable);
         assert_eq!(
@@ -465,7 +661,7 @@ mod tests {
         let mut input = input();
         input.opc_cache_worker_count = Some(4);
         input.persistent_worker_teams_created = Some(1);
-        let case = case_metrics(input, 0).expect("valid metrics");
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("valid metrics");
         assert_eq!(case.configured_worker_count.status, MetricStatus::Measured);
         assert_eq!(
             case.observed_local_worker_count.status,
@@ -479,13 +675,52 @@ mod tests {
     }
 
     #[test]
+    fn treats_serial_zero_team_as_not_applicable() {
+        let mut input = input();
+        input.opc_cache_worker_count = Some(1);
+        input.persistent_worker_teams_created = Some(0);
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("serial metrics");
+        assert_eq!(
+            case.observed_local_worker_count.status,
+            MetricStatus::NotApplicable
+        );
+        assert_eq!(case.observed_local_worker_count.value, None);
+    }
+
+    #[test]
+    fn treats_multiple_worker_teams_as_ambiguous() {
+        let mut input = input();
+        input.opc_cache_worker_count = Some(2);
+        input.persistent_worker_teams_created = Some(2);
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("ambiguous metrics");
+        assert_eq!(
+            case.observed_local_worker_count.status,
+            MetricStatus::Unavailable
+        );
+        assert_eq!(case.observed_local_worker_count.value, None);
+    }
+
+    #[test]
+    fn rejects_result_worker_width_outside_configured_budget() {
+        let mut input = input();
+        input.execution_worker_count = Some(8);
+        input.logical_tasks = Some(1);
+        assert!(case_metrics(input, 0, &[1, 2, 4]).is_err());
+
+        let mut input = input();
+        input.opc_cache_worker_count = Some(8);
+        input.persistent_worker_teams_created = Some(1);
+        assert!(case_metrics(input, 0, &[1, 2, 4]).is_err());
+    }
+
+    #[test]
     fn never_converts_waiter_counts_or_bytes_into_lock_or_chunk_metrics() {
         let mut input = input();
         input.execution_worker_count = Some(1);
         input.logical_tasks = Some(8);
         input.opc_cache_worker_count = Some(1);
         input.persistent_worker_teams_created = Some(1);
-        let case = case_metrics(input, 0).expect("valid metrics");
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("valid metrics");
         assert_eq!(case.lock_wait_ns.value, None);
         assert_eq!(case.deterministic_chunk_count.value, None);
     }
@@ -494,11 +729,12 @@ mod tests {
     fn records_range_simulator_request_chunks_per_retained_sample() {
         let mut input = input();
         input.elapsed_sample_count = 2;
+        input.elapsed_sample_order = vec![0, 1];
         input.chunk_evidence = ChunkEvidence::One(ChunkVector {
             scope: "result.source.simulation.physical_request_count",
             values: vec![3, 4],
         });
-        let case = case_metrics(input, 0).expect("valid metrics");
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("valid metrics");
         assert_eq!(
             case.deterministic_chunk_count.status,
             MetricStatus::Measured
@@ -518,7 +754,9 @@ mod tests {
             }),
             ..Default::default()
         };
-        let ChunkEvidence::One(vector) = source_chunk_evidence(Some(&source)) else {
+        let ChunkEvidence::One(vector) =
+            source_chunk_evidence(Some(&source)).expect("typed range simulation should parse")
+        else {
             panic!("typed range simulation should produce one chunk vector");
         };
         assert_eq!(
@@ -532,19 +770,21 @@ mod tests {
     fn rejects_chunk_vectors_that_cannot_align_to_retained_samples() {
         let mut input = input();
         input.elapsed_sample_count = 2;
+        input.elapsed_sample_order = vec![0, 1];
         input.chunk_evidence = ChunkEvidence::One(ChunkVector {
             scope: "result.source.simulation.physical_request_count",
             values: vec![3],
         });
-        assert!(case_metrics(input, 0).is_err());
+        assert!(case_metrics(input, 0, &[1, 2, 4]).is_err());
     }
 
     #[test]
     fn leaves_ambiguous_chunk_sources_unavailable() {
         let mut input = input();
         input.elapsed_sample_count = 1;
+        input.elapsed_sample_order = vec![0];
         input.chunk_evidence = ChunkEvidence::Ambiguous;
-        let case = case_metrics(input, 0).expect("ambiguous evidence is reportable");
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("ambiguous evidence is reportable");
         assert_eq!(
             case.deterministic_chunk_count.status,
             MetricStatus::Unavailable
