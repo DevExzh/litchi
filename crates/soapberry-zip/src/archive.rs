@@ -59,7 +59,15 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
     pub fn entries(&self) -> ZipSliceEntries<'_> {
         let data = self.data.as_ref();
         let directory_start = self.eocd.directory_offset();
-        let entry_data = &data[(directory_start as usize)..self.eocd.head_eocd_offset() as usize];
+        let directory_end = self.eocd.directory_end_offset();
+        let entry_data = usize::try_from(directory_start)
+            .ok()
+            .and_then(|start| {
+                usize::try_from(directory_end)
+                    .ok()
+                    .and_then(|end| data.get(start..end))
+            })
+            .unwrap_or_default();
         ZipSliceEntries {
             entry_data,
             base_offset: self.eocd.base_offset(),
@@ -113,10 +121,17 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
     /// The comment of the zip file.
     pub fn comment(&self) -> ZipStr<'_> {
         let data = self.data.as_ref();
-        let comment_start =
-            self.eocd.tail_eocd_offset() as usize + EndOfCentralDirectoryRecordFixed::SIZE;
+        let Some(comment_start) = usize::try_from(self.eocd.tail_eocd_offset())
+            .ok()
+            .and_then(|offset| offset.checked_add(EndOfCentralDirectoryRecordFixed::SIZE))
+        else {
+            return ZipStr::new(&[]);
+        };
         let comment_len = self.eocd.comment_len();
-        ZipStr::new(&data[comment_start..comment_start + comment_len])
+        let Some(comment_end) = comment_start.checked_add(comment_len) else {
+            return ZipStr::new(&[]);
+        };
+        ZipStr::new(data.get(comment_start..comment_end).unwrap_or_default())
     }
 
     /// Converts the [`ZipSliceArchive`] into a general [`ZipArchive`].
@@ -150,7 +165,10 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
     /// validate that the entire compressed data is present.
     pub fn get_entry(&self, entry: ZipArchiveEntryWayfinder) -> Result<ZipSliceEntry<'_>, Error> {
         let data = self.data.as_ref();
-        let header = &data[(entry.local_header_offset as usize).min(data.len())..];
+        let header_offset = usize::try_from(entry.local_header_offset)
+            .unwrap_or(data.len())
+            .min(data.len());
+        let header = &data[header_offset..];
         let file_header = ZipLocalFileHeaderFixed::parse(header)?;
         let variable_length = file_header.variable_length();
 
@@ -198,7 +216,9 @@ pub struct ZipSliceEntry<'a> {
 impl<'a> ZipSliceEntry<'a> {
     /// Returns the raw, compressed data of the entry as a byte slice.
     pub fn data(&self) -> &'a [u8] {
-        &self.data[self.data_start_offset as usize..]
+        self.data
+            .get(self.data_start_offset as usize..)
+            .unwrap_or_default()
     }
 
     /// Returns a verifier for the CRC and uncompressed size of the entry.
@@ -228,9 +248,14 @@ impl<'a> ZipSliceEntry<'a> {
     ///
     /// See [`ZipEntry::compressed_data_range`] for more details.
     pub fn compressed_data_range(&self) -> (u64, u64) {
-        let compressed_data_start = self.local_header_offset + self.data_start_offset as u64;
-        let compressed_data_end =
-            compressed_data_start + (self.data.len() - self.data_start_offset as usize) as u64;
+        let compressed_data_start = self
+            .local_header_offset
+            .saturating_add(self.data_start_offset as u64);
+        let compressed_data_end = compressed_data_start.saturating_add(
+            self.data
+                .len()
+                .saturating_sub(self.data_start_offset as usize) as u64,
+        );
         (compressed_data_start, compressed_data_end)
     }
 
@@ -238,25 +263,42 @@ impl<'a> ZipSliceEntry<'a> {
     ///
     /// See [`ZipLocalFileHeader`] for more details.
     pub fn extra_fields(&self) -> ExtraFields<'_> {
-        let header =
-            ZipLocalFileHeaderFixed::parse(self.data).expect("header has already been parsed");
+        let Ok(header) = ZipLocalFileHeaderFixed::parse(self.data) else {
+            return ExtraFields::new(&[]);
+        };
         let file_name_len = header.file_name_len as usize;
         let extra_field_len = header.extra_field_len as usize;
-        let extra_field_start = ZipLocalFileHeaderFixed::SIZE + file_name_len;
-        let extra_field_end = extra_field_start + extra_field_len;
-        ExtraFields::new(&self.data[extra_field_start..extra_field_end])
+        let Some(extra_field_start) = ZipLocalFileHeaderFixed::SIZE.checked_add(file_name_len)
+        else {
+            return ExtraFields::new(&[]);
+        };
+        let Some(extra_field_end) = extra_field_start.checked_add(extra_field_len) else {
+            return ExtraFields::new(&[]);
+        };
+        ExtraFields::new(
+            self.data
+                .get(extra_field_start..extra_field_end)
+                .unwrap_or_default(),
+        )
     }
 
     /// Returns the file path from the local file header.
     ///
     /// See [`ZipLocalFileHeader`] for more details.
     pub fn file_path(&self) -> ZipFilePath<RawPath<'_>> {
-        let header =
-            ZipLocalFileHeaderFixed::parse(self.data).expect("header has already been parsed");
+        let Ok(header) = ZipLocalFileHeaderFixed::parse(self.data) else {
+            return ZipFilePath::from_bytes(&[]);
+        };
         let file_name_len = header.file_name_len as usize;
         let filename_start = ZipLocalFileHeaderFixed::SIZE;
-        let filename_end = filename_start + file_name_len;
-        ZipFilePath::from_bytes(&self.data[filename_start..filename_end])
+        let Some(filename_end) = filename_start.checked_add(file_name_len) else {
+            return ZipFilePath::from_bytes(&[]);
+        };
+        ZipFilePath::from_bytes(
+            self.data
+                .get(filename_start..filename_end)
+                .unwrap_or_default(),
+        )
     }
 }
 
@@ -330,7 +372,10 @@ impl<'data> ZipSliceEntries<'data> {
             file_comment,
             self.current_offset,
         );
-        entry.local_header_offset += self.base_offset;
+        entry.local_header_offset = entry
+            .local_header_offset
+            .checked_add(self.base_offset)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
         self.current_offset += (self.entry_data.len() - entry_data.len()) as u64;
         self.entry_data = entry_data;
         Ok(Some(entry))
@@ -494,7 +539,7 @@ impl<R> ZipArchive<R> {
             end: 0,
             offset: self.eocd.directory_offset(),
             base_offset: self.eocd.base_offset(),
-            central_dir_end_pos: self.eocd.head_eocd_offset(),
+            central_dir_end_pos: self.eocd.directory_end_offset(),
             metadata_bytes: 0,
             max_metadata_bytes,
         }
@@ -788,8 +833,7 @@ where
             .get_ref()
             .read_exact_at(&mut header_buffer, self.entry.local_header_offset)?;
 
-        let local_header_fixed =
-            ZipLocalFileHeaderFixed::parse(&header_buffer).expect("header has already been parsed");
+        let local_header_fixed = ZipLocalFileHeaderFixed::parse(&header_buffer)?;
         let file_name_len = local_header_fixed.file_name_len as usize;
         let extra_field_len = local_header_fixed.extra_field_len as usize;
         let total_variable_len = file_name_len + extra_field_len;
@@ -1138,9 +1182,11 @@ where
             self.offset = variable_data_end;
             self.pos = self.end;
             let data = &self.metadata_buffer[..variable_length];
-            let (file_name, extra_field, file_comment, _) = file_header
-                .parse_variable_length(data)
-                .expect("variable length spill read precheck failed");
+            let Some((file_name, extra_field, file_comment, _)) =
+                file_header.parse_variable_length(data)
+            else {
+                return Err(Error::from(ErrorKind::Eof));
+            };
             let mut file_header = ZipFileHeaderRecord::from_parts(
                 file_header,
                 file_name,
@@ -1148,7 +1194,10 @@ where
                 file_comment,
                 central_directory_offset,
             );
-            file_header.local_header_offset += self.base_offset;
+            file_header.local_header_offset = file_header
+                .local_header_offset
+                .checked_add(self.base_offset)
+                .ok_or_else(|| Error::from(ErrorKind::Eof))?;
             return Ok(Some(file_header));
         }
 
@@ -1169,9 +1218,11 @@ where
         }
 
         let data = &self.buffer[self.pos..self.end];
-        let (file_name, extra_field, file_comment, _) = file_header
-            .parse_variable_length(data)
-            .expect("variable length precheck failed");
+        let Some((file_name, extra_field, file_comment, _)) =
+            file_header.parse_variable_length(data)
+        else {
+            return Err(Error::from(ErrorKind::Eof));
+        };
         let mut file_header = ZipFileHeaderRecord::from_parts(
             file_header,
             file_name,
@@ -1179,7 +1230,10 @@ where
             file_comment,
             central_directory_offset,
         );
-        file_header.local_header_offset += self.base_offset;
+        file_header.local_header_offset = file_header
+            .local_header_offset
+            .checked_add(self.base_offset)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
         self.pos += variable_length;
         Ok(Some(file_header))
     }
@@ -2086,14 +2140,16 @@ mod tests {
             35, 0,
         ];
 
-        let archive = ZipArchive::from_slice(data).unwrap();
-        let mut entries = archive.entries();
-        assert!(entries.next_entry().is_err());
+        assert!(matches!(
+            ZipArchive::from_slice(data),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidEndOfCentralDirectory)
+        ));
 
         let mut buf = vec![0u8; RECOMMENDED_BUFFER_SIZE];
-        let archive = ZipArchive::from_seekable(Cursor::new(data), &mut buf).unwrap();
-        let mut entries = archive.entries(&mut buf);
-        assert!(entries.next_entry().is_err());
+        assert!(matches!(
+            ZipArchive::from_seekable(Cursor::new(data), &mut buf),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidEndOfCentralDirectory)
+        ));
     }
 
     #[test]

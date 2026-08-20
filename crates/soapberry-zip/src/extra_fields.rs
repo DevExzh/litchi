@@ -187,7 +187,11 @@ impl ExtraFieldsContainer {
         let mut extra_fields = ExtraFields::new(fields);
         let entries = self.entries.as_slice();
         for entry in entries {
-            let extra_field = extra_fields.next_data().expect("Entry should have data");
+            let Some(extra_field) = extra_fields.next_data() else {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "extra field container is internally inconsistent".to_string(),
+                }));
+            };
             let write = entry.intersects(filter);
             if write {
                 writer.write_all(extra_field)?;

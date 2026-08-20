@@ -60,12 +60,14 @@ impl ZipLocator {
     }
 
     fn locate_in_byte_slice(&self, data: &[u8]) -> Result<EndOfCentralDirectory, Error> {
-        let location = find_end_of_central_dir_signature(data, self.max_search_space as usize)
+        let max_search_space = usize::try_from(self.max_search_space).unwrap_or(usize::MAX);
+        let location = find_end_of_central_dir_signature(data, max_search_space)
             .ok_or(ErrorKind::MissingEndOfCentralDirectory)?;
 
         let mut eocd = self
             .locate_in_byte_slice_impl(data, location)
             .map_err(|e| e.with_eocd_offset(location as u64))?;
+        eocd.validate_source(data.len())?;
 
         // Transparently verify that the self reported central directory points
         // to a valid entry. If it is not a valid entry, we can attempt to
@@ -74,21 +76,27 @@ impl ZipLocator {
         // marker, which should hold true in the vast majority of cases. If both
         // checks fail, defer returning an error until the user explicitly wants
         // to iterate through the central directory.
-        let first_entry = data
-            .get(eocd.central_dir_offset as usize..)
+        let first_entry = usize::try_from(eocd.central_dir_offset)
+            .ok()
+            .and_then(|offset| data.get(offset..))
             .filter(|d| ZipFileHeaderFixed::parse(d).is_ok());
 
         match first_entry {
             None if !eocd.is_zip64() => {
-                let cd_offset = eocd.eocd_offset.saturating_sub(eocd.central_dir_size);
+                let cd_offset = eocd
+                    .eocd_offset
+                    .checked_sub(eocd.central_dir_size)
+                    .ok_or_else(|| Error::from(ErrorKind::InvalidEndOfCentralDirectory))?;
 
-                let first_entry = data
-                    .get(cd_offset as usize..)
+                let first_entry = usize::try_from(cd_offset)
+                    .ok()
+                    .and_then(|offset| data.get(offset..))
                     .filter(|d| ZipFileHeaderFixed::parse(d).is_ok());
 
                 if first_entry.is_some() {
                     eocd.base_offset = cd_offset.saturating_sub(eocd.central_dir_offset);
                     eocd.central_dir_offset = cd_offset;
+                    eocd.validate_source(data.len())?;
                 }
 
                 Ok(eocd)
@@ -107,9 +115,14 @@ impl ZipLocator {
         let eocd = EndOfCentralDirectoryRecord::from_parts(location as u64, eocd);
 
         // Validate comment is completely present in the slice
-        let comment_start = location + EndOfCentralDirectoryRecordFixed::SIZE;
+        let comment_start = location
+            .checked_add(EndOfCentralDirectoryRecordFixed::SIZE)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
         let comment_len = eocd.comment_len as usize;
-        if comment_start + comment_len > data.len() {
+        let comment_end = comment_start
+            .checked_add(comment_len)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        if comment_end > data.len() {
             return Err(Error::from(ErrorKind::Eof));
         }
 
@@ -120,7 +133,11 @@ impl ZipLocator {
         let zip64l =
             &data[location.saturating_sub(Zip64EndOfCentralDirectoryLocatorRecord::SIZE)..];
         let zip64_locator = Zip64EndOfCentralDirectoryLocatorRecord::parse(zip64l)?;
-        let zip64_eocd = &data[(zip64_locator.directory_offset as usize).min(data.len())..];
+        let zip64_offset = usize::try_from(zip64_locator.directory_offset)
+            .map_err(|_| Error::from(ErrorKind::InvalidEndOfCentralDirectory))?;
+        let zip64_eocd = data
+            .get(zip64_offset..)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
         let zip64_record = Zip64EndOfCentralDirectoryRecord::parse(zip64_eocd)?;
 
         let zip64 =
@@ -428,13 +445,19 @@ impl ZipLocator {
         // Check if the rest of the buffer doesn't completely contain the comment.
         if end_of_central_directory.len() < comment_len {
             let pos = end_of_central_directory.len();
-            let comment_offset =
-                eocd_offset + EndOfCentralDirectoryRecordFixed::SIZE as u64 + pos as u64;
+            let comment_offset = eocd_offset
+                .checked_add(EndOfCentralDirectoryRecordFixed::SIZE as u64)
+                .and_then(|offset| offset.checked_add(pos as u64));
             let remaining_comment_len = comment_len - pos;
 
             // Try to read a single byte to validate the rest of the comment is accessible
             let mut temp_buf = [0u8; 1];
-            let end_comment_offset = comment_offset + remaining_comment_len as u64 - 1;
+            let Some(end_comment_offset) = comment_offset
+                .and_then(|offset| offset.checked_add(remaining_comment_len as u64))
+                .and_then(|offset| offset.checked_sub(1))
+            else {
+                return Err((reader.inner, Error::from(ErrorKind::Eof)));
+            };
             if let Err(e) = reader.read_exact_at(&mut temp_buf, end_comment_offset) {
                 return Err((reader.inner, Error::io(e)));
             }
@@ -568,13 +591,66 @@ impl EndOfCentralDirectory {
     }
 
     fn validate(&self) -> Result<(), Error> {
-        // It doesn't make sense if the start of the central directory is after
-        // the end.
-        if self.directory_offset() > self.head_eocd_offset() {
+        let head_eocd_offset = self.head_eocd_offset();
+        let tail_eocd_offset = self.tail_eocd_offset();
+        let Some(central_directory_end) =
+            self.central_dir_offset.checked_add(self.central_dir_size)
+        else {
+            return Err(Error::from(ErrorKind::InvalidEndOfCentralDirectory));
+        };
+
+        // The ZIP64 EOCD, when present, must precede the terminal EOCD. The
+        // central directory itself must fit entirely between its start and
+        // the first EOCD record; accepting only the start offset leaves
+        // malformed sizes to panic later while constructing slice ranges.
+        if head_eocd_offset > tail_eocd_offset || central_directory_end > head_eocd_offset {
+            return Err(Error::from(ErrorKind::InvalidEndOfCentralDirectory));
+        }
+
+        // Keep comment-end arithmetic checked even for reader-backed inputs;
+        // slice-backed inputs additionally validate the source length below.
+        let Some(_) = self
+            .eocd_offset
+            .checked_add(EndOfCentralDirectoryRecordFixed::SIZE as u64)
+            .and_then(|offset| offset.checked_add(self.comment_len as u64))
+        else {
+            return Err(Error::from(ErrorKind::InvalidEndOfCentralDirectory));
+        };
+
+        Ok(())
+    }
+
+    fn validate_source(&self, source_len: usize) -> Result<(), Error> {
+        let source_len = u64::try_from(source_len)
+            .map_err(|_| Error::from(ErrorKind::InvalidEndOfCentralDirectory))?;
+        let central_directory_end = self
+            .central_dir_offset
+            .checked_add(self.central_dir_size)
+            .ok_or_else(|| Error::from(ErrorKind::InvalidEndOfCentralDirectory))?;
+        let eocd_end = self
+            .eocd_offset
+            .checked_add(EndOfCentralDirectoryRecordFixed::SIZE as u64)
+            .and_then(|offset| offset.checked_add(self.comment_len as u64))
+            .ok_or_else(|| Error::from(ErrorKind::InvalidEndOfCentralDirectory))?;
+
+        if central_directory_end > self.head_eocd_offset()
+            || eocd_end > source_len
+            || self.head_eocd_offset() > source_len
+        {
             return Err(Error::from(ErrorKind::InvalidEndOfCentralDirectory));
         }
 
         Ok(())
+    }
+
+    #[inline]
+    pub(crate) fn directory_end_offset(&self) -> u64 {
+        // `validate` is called before an EndOfCentralDirectory is stored in an
+        // archive. Saturating keeps this accessor panic-free if an internal
+        // caller ever constructs one without validation.
+        self.central_dir_offset
+            .saturating_add(self.central_dir_size)
+            .min(self.head_eocd_offset())
     }
 
     #[inline]
@@ -819,7 +895,8 @@ where
     loop {
         // We either want to read into the entire buffer (sans the bytes that
         // were carried over from the last read). Or we want to read the remainder
-        let read_size = (buffer.len() - carry_over).min(remaining as usize);
+        let read_size =
+            (buffer.len() - carry_over).min(usize::try_from(remaining).unwrap_or(usize::MAX));
 
         // Need to jump back to the start of the previous read and then how much
         // we want to read
@@ -1068,6 +1145,60 @@ mod tests {
         assert!(matches!(error.kind(), ErrorKind::BufferTooSmall));
         assert_eq!(error.eocd_offset(), Some(ZipFileHeaderFixed::SIZE as u64));
         assert_eq!(reader.read_log().first(), Some(&(end_offset - 21, 21)));
+    }
+
+    #[test]
+    fn slice_locator_rejects_central_directory_range_past_eocd_without_panicking() {
+        let mut data = ordinary_archive(&[]);
+        let eocd_offset = data.len() - EndOfCentralDirectoryRecordFixed::SIZE;
+        data[eocd_offset + 12..eocd_offset + 16].copy_from_slice(&u32::MAX.to_le_bytes());
+
+        let result = std::panic::catch_unwind(|| ZipLocator::new().locate_in_slice(data));
+        assert!(result.is_ok(), "malformed EOCD must not panic");
+        let result = result.unwrap();
+        let Err((_data, error)) = result else {
+            panic!("central-directory range must be rejected before archive construction");
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::InvalidEndOfCentralDirectory
+        ));
+    }
+
+    #[test]
+    fn zip64_central_directory_range_overflow_is_a_typed_rejection() {
+        let eocd = EndOfCentralDirectoryRecord {
+            offset: u64::MAX,
+            central_dir_size: 0,
+            central_dir_offset: 0,
+            num_entries: 0,
+            comment_len: 0,
+        };
+        let zip64 = Zip64EndOfCentralDirectory {
+            offset: u64::MAX,
+            central_dir_offset: u64::MAX - 1,
+            central_dir_size: 2,
+            num_entries: 0,
+        };
+
+        let result = EndOfCentralDirectory::create_zip64(eocd, zip64);
+        assert!(matches!(
+            result,
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidEndOfCentralDirectory)
+        ));
+    }
+
+    #[test]
+    fn oversized_search_space_remains_bounded_by_the_source_without_panicking() {
+        let data = ordinary_archive(&[]);
+        let result = std::panic::catch_unwind(|| {
+            ZipLocator::new()
+                .max_search_space(u64::MAX)
+                .locate_in_slice(data)
+        });
+
+        assert!(result.is_ok(), "an oversized search limit must not panic");
+        assert!(result.unwrap().is_ok());
     }
 
     #[quickcheck]
