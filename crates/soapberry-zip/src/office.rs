@@ -4208,6 +4208,39 @@ mod tests {
     }
 
     #[test]
+    fn archive_readers_reject_lossy_names_colliding_with_valid_replacement_names() {
+        // `from_utf8_lossy` maps each malformed sequence to U+FFFD.  A valid
+        // ZIP name may contain that same scalar value, so comparing only the
+        // raw bytes would otherwise leave two members under one public lookup
+        // key.  Exercise both central-directory orders because the index must
+        // reject whichever spelling it encounters second.
+        let valid_replacement = b"collision\xef\xbf\xbd.bin";
+        for entries in [
+            [
+                FixtureEntry::stored(b"collision\xff.bin", b"invalid"),
+                FixtureEntry::stored(valid_replacement, b"valid"),
+            ],
+            [
+                FixtureEntry::stored(valid_replacement, b"valid"),
+                FixtureEntry::stored(b"collision\xff.bin", b"invalid"),
+            ],
+        ] {
+            let bytes = fixture(&entries);
+            for result in [
+                ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).map(|_| ()),
+                indexed_archive_result(bytes.clone(), ArchiveLimits::UNBOUNDED).map(|_| ()),
+            ] {
+                assert!(matches!(
+                    result,
+                    Err(error)
+                        if matches!(error.kind(), ErrorKind::InvalidInput { msg }
+                            if msg.contains("duplicate normalized file names"))
+                ));
+            }
+        }
+    }
+
+    #[test]
     fn archive_lookups_apply_the_same_normalization_as_ingress() {
         let bytes = fixture(&[FixtureEntry::stored(b"dir/../body.xml", b"body")]);
         let reader = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
