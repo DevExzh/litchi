@@ -22,7 +22,7 @@ from typing import Any, Iterable
 
 
 COMPARATOR_NAME = "litchi-perf-compare"
-COMPARATOR_VERSION = "1.2.0"
+COMPARATOR_VERSION = "1.3.0"
 SUPPORTED_POLICY_SCHEMA = 2
 SUPPORTED_REPORT_SCHEMA = 1
 
@@ -479,12 +479,66 @@ def _metric_class_for_path(
     return matching[0] if matching else None
 
 
+_METRIC_VECTOR_MISSING = object()
+_METRIC_VECTOR_KEYS = {"values", "status", "scope"}
+_METRIC_VECTOR_STATUSES = {"measured", "not_applicable", "unavailable"}
+
+
+def _unwrap_metric_vector(value: Any, path: str) -> Any:
+    """Return a MetricVector's values without exposing wrapper fields to policy.
+
+    Operation metrics serialize each vector as an object containing a status and
+    scope, with ``values`` omitted when it is not applicable or unavailable.
+    Policy globs intentionally name the logical metric (for example
+    ``*write_calls``), not its serialization detail (``write_calls.values``).
+    Recognizing the wrapper before policy matching keeps status/scope metadata
+    out of numeric traversal while retaining strict validation of malformed
+    wrappers.
+    """
+    if not isinstance(value, dict) or not {"status", "scope"} <= set(value):
+        return _METRIC_VECTOR_MISSING
+    unknown = set(value) - _METRIC_VECTOR_KEYS
+    if unknown:
+        names = ", ".join(sorted(unknown))
+        raise ComparisonInputError(
+            f"{path} MetricVector wrapper has unknown keys: {names}"
+        )
+    status = value["status"]
+    if not isinstance(status, str) or status not in _METRIC_VECTOR_STATUSES:
+        raise ComparisonInputError(
+            f"{path}.status must be one of {sorted(_METRIC_VECTOR_STATUSES)}"
+        )
+    scope = value["scope"]
+    if not isinstance(scope, str) or not scope:
+        raise ComparisonInputError(f"{path}.scope must be a non-empty string")
+    has_values = "values" in value
+    values = value.get("values")
+    if has_values and values is not None and not isinstance(values, list):
+        raise ComparisonInputError(
+            f"{path}.values must be a sample vector or omitted when unavailable"
+        )
+    if status == "measured" and (not has_values or values is None):
+        raise ComparisonInputError(
+            f"{path}.values is required for a measured MetricVector"
+        )
+    if status != "measured" and has_values and values is not None:
+        raise ComparisonInputError(
+            f"{path}.values must be omitted for a {status} MetricVector"
+        )
+    return values
+
+
 def _walk_metrics(
     value: Any,
     path: str,
     policy: dict[str, Any],
     selected: dict[str, tuple[str, float, float, str]],
 ) -> None:
+    vector_values = _unwrap_metric_vector(value, path)
+    if vector_values is not _METRIC_VECTOR_MISSING:
+        if vector_values is None:
+            return
+        value = vector_values
     metric_class = _metric_class_for_path(path, policy)
     if metric_class is not None:
         presence = metric_class["presence"]

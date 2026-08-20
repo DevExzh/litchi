@@ -2588,10 +2588,13 @@ vectors, procfs process vectors, post-operation output length, publication
 counters, and OPC materialization counts. A vector with a measured zero is
 serialized as a numeric zero; unsupported or unavailable values omit the
 numeric vector and retain an explicit `status` (`not_applicable` or
-`unavailable`). Procfs process vectors include operation deltas for `rchar`,
-`wchar`, `read_bytes`, `write_bytes`, `cancelled_write_bytes`, `syscr`,
-`syscw`, faults, context switches, and RSS. `peak_rss_bytes` is the
-process-lifetime after-sample `VmHWM`, not an operation peak, and
+`unavailable`). The `/proc/self/io` vectors (`rchar`, `wchar`, `read_bytes`,
+`write_bytes`, `cancelled_write_bytes`, `syscr`, and `syscw`) use the explicit
+scope `child_process_interval_delta_including_procfs_probe_overhead`. The
+after-snapshot procfs read can itself add `rchar` and `syscr`; these vectors
+therefore provide no operation-only or physical-storage attribution. Other
+procfs vectors include faults, context switches, and RSS. `peak_rss_bytes` is
+the process-lifetime after-sample `VmHWM`, not an operation peak, and
 `rss_delta_bytes` is not a peak. The envelope makes no allocation,
 copied-byte, decompressed-byte, or recompressed-byte claim because the
 filesystem child does not instrument those quantities. The existing raw
