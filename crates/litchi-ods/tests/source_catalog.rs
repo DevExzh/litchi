@@ -253,6 +253,38 @@ fn catalog_excludes_inert_dde_cached_tables_and_matches_eager_sheets() {
 }
 
 #[test]
+fn catalog_excludes_self_closing_dde_cache_before_real_sheet() {
+    let content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:dde-links><table:dde-link><table:table/></table:dde-link></table:dde-links><table:table table:name="Real"><table:table-row/></table:table></office:spreadsheet></office:body></office:document-content>"#
+    );
+    let bytes = package_with_content(&content);
+    let eager = Spreadsheet::from_bytes(bytes.clone()).expect("eager self-closing DDE owner");
+    assert_eq!(
+        eager
+            .sheets()
+            .iter()
+            .map(|sheet| sheet.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Real"]
+    );
+
+    let catalog = SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("self-closing DDE catalog open");
+    assert_eq!(
+        catalog.sheet_names().expect("self-closing DDE names"),
+        ["Real"]
+    );
+    assert_eq!(catalog.sheet_count().expect("self-closing DDE count"), 1);
+    assert_eq!(
+        catalog
+            .sheet_at(0)
+            .expect("self-closing DDE selected sheet")
+            .expect("real worksheet exists"),
+        eager.sheets()[0].clone()
+    );
+}
+
+#[test]
 fn catalog_preserves_validation_precedence_for_malformed_xml() {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:table table:name="Broken"></office:spreadsheet>"#
