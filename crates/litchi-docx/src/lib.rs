@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod binding_tracker;
 mod error;
 
 pub mod alt;
