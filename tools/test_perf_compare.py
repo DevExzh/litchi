@@ -126,16 +126,23 @@ def metric_vector(values, *, status="measured", scope="test_scope"):
     return wrapper
 
 
+def pattern_vector(values, *, status="measured", scope="pattern_scope"):
+    return metric_vector(values, status=status, scope=scope)
+
+
 def operation_metrics_report_fields():
     def not_applicable(scope):
         return metric_vector(None, status="not_applicable", scope=scope)
     process_scope = "procfs_operation_delta"
     proc_io_scope = "child_process_interval_delta_including_procfs_probe_overhead"
     source_scope = "operation_logical_read_at"
+    pattern_scope = "operation_logical_read_at_range_order_not_physical_io"
     cfb_source_scope = "timed_cfb_phase_logical_read_at"
     return {
         "sample_count": 5,
-        "alignment": "elapsed_ns.samples",
+        "sample_indices": list(range(5)),
+        "alignment": perf_compare.OPERATION_ALIGNMENT,
+        "latency_claim": perf_compare.EVIDENCE_ONLY_LATENCY_CLAIM,
         "source": {
             "status": "measured",
             "counter_scope": "timed_read_at",
@@ -145,6 +152,30 @@ def operation_metrics_report_fields():
             ),
             "logical_read_returned_bytes": metric_vector(
                 [20] * 5, scope=source_scope
+            ),
+            "logical_read_largest_requested_bytes": metric_vector(
+                [20] * 5, scope=source_scope
+            ),
+            "logical_read_largest_returned_bytes": metric_vector(
+                [20] * 5, scope=source_scope
+            ),
+            "logical_read_pattern": pattern_vector(
+                ["sequential"] * 5, scope=pattern_scope
+            ),
+            "compressed_bytes": metric_vector(
+                None,
+                status="unavailable",
+                scope="unavailable_read_at_has_no_compressed_member_boundary",
+            ),
+            "decompressed_bytes": metric_vector(
+                None,
+                status="unavailable",
+                scope="unavailable_read_at_has_no_decompressed_byte_boundary",
+            ),
+            "recompressed_bytes": metric_vector(
+                None,
+                status="unavailable",
+                scope="unavailable_atomic_save_has_no_recompressed_byte_boundary",
             ),
             "max_concurrent_reads": metric_vector([1] * 5, scope=source_scope),
         },
@@ -243,7 +274,16 @@ class PerfCompareTests(unittest.TestCase):
     def operation_metrics_policy(self):
         comparison_policy = policy()
         comparison_policy["metric_classes"][-1]["path_globs"].extend(
-            ["**/*faults", "**/*read_bytes", "**/*write_calls"]
+            [
+                "**/*faults",
+                "**/*read_bytes",
+                "**/*write_calls",
+                "**/*logical_read_requested_bytes",
+                "**/*logical_read_returned_bytes",
+                "**/*logical_read_largest_requested_bytes",
+                "**/*logical_read_largest_returned_bytes",
+                "**/*max_concurrent_reads",
+            ]
         )
         return comparison_policy
 
@@ -361,7 +401,7 @@ class PerfCompareTests(unittest.TestCase):
             baseline, current, self.operation_metrics_policy()
         )
         self.assertEqual(result["status"], "pass")
-        self.assertEqual(result["summary"]["compared_metrics"], 12)
+        self.assertEqual(result["summary"]["compared_metrics"], 14)
 
         current["results"][0]["operation_metrics"]["sink"]["write_calls"][
             "values"
@@ -369,6 +409,15 @@ class PerfCompareTests(unittest.TestCase):
         current["results"][0]["operation_metrics"]["process"]["read_bytes"][
             "values"
         ] = [5] * 5
+        current["results"][0]["operation_metrics"]["source"][
+            "logical_read_requested_bytes"
+        ]["values"] = [30] * 5
+        current["results"][0]["operation_metrics"]["source"][
+            "logical_read_returned_bytes"
+        ]["values"] = [30] * 5
+        current["results"][0]["operation_metrics"]["source"][
+            "max_concurrent_reads"
+        ]["values"] = [2] * 5
         result = perf_compare.compare_reports(
             baseline, current, self.operation_metrics_policy()
         )
@@ -377,9 +426,69 @@ class PerfCompareTests(unittest.TestCase):
             {
                 "operation_metrics.process.read_bytes",
                 "operation_metrics.sink.write_calls",
+                "operation_metrics.source.logical_read_requested_bytes",
+                "operation_metrics.source.logical_read_returned_bytes",
+                "operation_metrics.source.max_concurrent_reads",
             }
             <= {item["metric"] for item in result["regressions"]}
         )
+
+    def test_filesystem_evidence_latency_is_excluded_from_comparison(self):
+        baseline = report(value=100)
+        current = report(value=200, revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["operation_metrics"] = operation_metrics_report_fields()
+            item["operation_metrics"][
+                "latency_claim"
+            ] = perf_compare.EVIDENCE_ONLY_LATENCY_CLAIM
+        result = perf_compare.compare_reports(
+            baseline, current, self.operation_metrics_policy()
+        )
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["latency_compared_results"], 0)
+        self.assertEqual(result["summary"]["latency_excluded_results"], 1)
+        self.assertNotIn(
+            "elapsed_ns.p50", {item["metric"] for item in result["comparisons"]}
+        )
+
+    def test_latency_claim_mismatch_fails_closed(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"][
+            "latency_claim"
+        ] = perf_compare.COMPARABLE_LATENCY_CLAIM
+        current_source = current["results"][0]["operation_metrics"]["source"]
+        current_source["status"] = "not_applicable"
+        current_source["counter_scope"] = "not_applicable_in_process_sink"
+        for field, vector in current_source.items():
+            if field in {"status", "counter_scope"}:
+                continue
+            vector["status"] = "not_applicable"
+            vector.pop("values", None)
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "latency claim mismatch"
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+    def test_measured_source_requires_evidence_only_latency_claim(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"][
+            "latency_claim"
+        ] = perf_compare.COMPARABLE_LATENCY_CLAIM
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "measured source metrics require",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
 
     def test_malformed_metric_vector_wrapper_fails_closed(self):
         baseline = report()
@@ -472,9 +581,13 @@ class PerfCompareTests(unittest.TestCase):
         baseline = report()
         current = report(revision="current")
         baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        del current["results"][0]["operation_metrics"]["source"][
+            "logical_read_calls"
+        ]
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError,
-            "MetricVector path mismatch.*operation_metrics",
+            "operation_metrics.source keys mismatch.*logical_read_calls",
         ):
             perf_compare.compare_reports(
                 baseline, current, self.operation_metrics_policy()
@@ -606,6 +719,60 @@ class PerfCompareTests(unittest.TestCase):
                         baseline, current, self.operation_metrics_policy()
                     )
 
+        for field, value, pattern in (
+            ("sample_indices", [0, 0, 2, 3, 4], "sample_indices must be unique"),
+            ("sample_indices", [0, 1, 2], "sample_indices has 3 samples"),
+        ):
+            with self.subTest(envelope_field=field, value=value):
+                baseline = report()
+                current = report(revision="current")
+                baseline["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"][field] = value
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError, pattern
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, self.operation_metrics_policy()
+                    )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["sample_indices"] = [
+            1,
+            0,
+            2,
+            3,
+            4,
+        ]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "increase across tied elapsed samples",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["source"][
+            "logical_read_pattern"
+        ]["values"] = ["bogus"] * 5
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "logical_read_pattern.*one of"
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
     def test_p50_and_p95_regressions_are_reported(self):
         result = perf_compare.compare_reports(report(), report(120, "current"), policy())
         self.assertEqual(result["status"], "regression")
@@ -657,6 +824,35 @@ class PerfCompareTests(unittest.TestCase):
             perf_compare.ComparisonInputError, "case/corpus key mismatch"
         ):
             perf_compare.compare_reports(report(), current, policy())
+
+    def test_cache_state_is_part_of_result_identity(self):
+        baseline = report()
+        current = report(revision="current")
+        corpus_identity = json.dumps(
+            baseline["results"][0]["corpus"],
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        comparison_policy = policy()
+        comparison_policy["expected_result_keys_sha256"] = (
+            perf_compare.result_key_manifest_sha256(
+                [("opc_open", corpus_identity, "warm")]
+            )
+        )
+        baseline["results"][0]["cache_state"] = "warm"
+        current["results"][0]["cache_state"] = "warm"
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+        self.assertTrue(
+            all(item["cache_state"] == "warm" for item in result["comparisons"])
+        )
+
+        current["results"][0]["cache_state"] = "cold-requested"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "case/corpus key mismatch"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
 
     def test_same_sided_corpus_replacement_fails_policy_manifest(self):
         baseline = report(corpus_sha="changed")
