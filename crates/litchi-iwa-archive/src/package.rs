@@ -467,6 +467,16 @@ impl ExactArtifacts {
         Arc::ptr_eq(candidate, &self.source) || candidate.as_ref() == self.source.as_ref()
     }
 
+    /// Return whether `candidate` exactly matches the retained source bytes.
+    ///
+    /// This borrowed form is used by the low-level physical patch API. It
+    /// avoids allocating a temporary shared owner merely to perform the
+    /// exact source check; compact fingerprints remain diagnostics only.
+    #[must_use]
+    fn authorizes_bytes(&self, candidate: &[u8]) -> bool {
+        candidate == self.source.as_ref()
+    }
+
     /// Return the exact target-to-source inverse pair.
     #[must_use]
     pub fn is_byte_noop(&self) -> bool {
@@ -493,6 +503,106 @@ impl ExactArtifacts {
     #[must_use]
     pub fn target(&self) -> Arc<[u8]> {
         Arc::clone(&self.target)
+    }
+}
+
+/// An error applying a process-local physical iWork package patch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ReassemblyPatchError {
+    /// The candidate source does not exactly match the retained source.
+    #[error("iWork archive patch source does not match its exact source artifact")]
+    Conflict,
+
+    /// The exact target copy could not be reserved.
+    #[error("iWork archive patch allocation failed for {amount} bytes")]
+    Allocation {
+        /// Number of target bytes that could not be reserved.
+        amount: usize,
+    },
+}
+
+/// A process-local, exact-source-checked physical iWork package patch.
+///
+/// The patch retains immutable source and target ZIP artifacts and makes no
+/// semantic claims about their members. It is therefore suitable for the
+/// bounded low-level reassembly boundary, while semantic format owners remain
+/// responsible for validating their own projected state before publication.
+/// Fingerprints are compact diagnostics only; [`Self::apply`] authorizes a
+/// source with a complete byte comparison. The patch is not a durable or
+/// serialized interchange format.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ReassemblyPatch {
+    artifacts: ExactArtifacts,
+}
+
+impl fmt::Debug for ReassemblyPatch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ReassemblyPatch")
+            .field("source_fingerprint", &self.source_fingerprint())
+            .field("target_fingerprint", &self.target_fingerprint())
+            .finish_non_exhaustive()
+    }
+}
+
+impl ReassemblyPatch {
+    fn new(source: Arc<[u8]>, target: Arc<[u8]>) -> Self {
+        Self {
+            artifacts: ExactArtifacts::new(source, target),
+        }
+    }
+
+    /// Return the source artifact's compact diagnostic fingerprint.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.artifacts.source_fingerprint()
+    }
+
+    /// Return the target artifact's compact diagnostic fingerprint.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.artifacts.target_fingerprint()
+    }
+
+    /// Return whether source and target are byte-for-byte identical.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.artifacts.is_byte_noop()
+    }
+
+    /// Return the exact target-to-source inverse patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            artifacts: self.artifacts.inverse(),
+        }
+    }
+
+    /// Apply this patch to an exact source artifact.
+    ///
+    /// The candidate may use a different allocation, but its complete bytes
+    /// must match the retained source. The returned bytes are an exact copy of
+    /// the retained target artifact. A source conflict is rejected before any
+    /// target allocation occurs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReassemblyPatchError::Conflict`] for a foreign or stale
+    /// source, or [`ReassemblyPatchError::Allocation`] when the target copy
+    /// cannot be reserved.
+    pub fn apply(&self, source: &[u8]) -> std::result::Result<Vec<u8>, ReassemblyPatchError> {
+        if !self.artifacts.authorizes_bytes(source) {
+            return Err(ReassemblyPatchError::Conflict);
+        }
+        let target = self.artifacts.target();
+        let mut copy = Vec::new();
+        copy.try_reserve_exact(target.len()).map_err(|_error| {
+            ReassemblyPatchError::Allocation {
+                amount: target.len(),
+            }
+        })?;
+        copy.extend_from_slice(target.as_ref());
+        Ok(copy)
     }
 }
 
@@ -1342,6 +1452,49 @@ impl Catalog {
     /// patched without losing physical metadata.
     pub fn reassemble_to_bytes(&self, edits: &[EntryEdit<'_>], limits: Limits) -> Result<Vec<u8>> {
         self.reassemble_with_deletions_to_bytes(edits, &[], limits)
+    }
+
+    /// Reassemble a flat package into a reversible, exact-source patch.
+    ///
+    /// The patch retains the complete immutable source and target ZIP
+    /// artifacts. It can be applied to an independently allocated copy of the
+    /// exact source and inverted without re-running semantic or physical
+    /// selection. Store and Deflate members follow the same preservation and
+    /// refusal rules as [`Self::reassemble_to_bytes`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same bounded reassembly and allocation errors as
+    /// [`Self::reassemble_to_bytes`].
+    pub fn reassemble_to_patch(
+        &self,
+        edits: &[EntryEdit<'_>],
+        limits: Limits,
+    ) -> Result<ReassemblyPatch> {
+        self.reassemble_with_deletions_to_patch(edits, &[], limits)
+    }
+
+    /// Reassemble a flat package into a reversible patch after replacing and
+    /// deleting existing members.
+    ///
+    /// A non-empty mutation list is accepted only when this catalog retains an
+    /// exact flat ZIP source. Legacy nested `Index.zip`, projected semantic
+    /// catalogs, ZIP64 layouts, ambiguous selections, and unsupported selected
+    /// compression methods remain typed refusals from the underlying bounded
+    /// reassembler.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same bounded reassembly and allocation errors as
+    /// [`Self::reassemble_with_deletions_to_bytes`].
+    pub fn reassemble_with_deletions_to_patch(
+        &self,
+        edits: &[EntryEdit<'_>],
+        deleted_names: &[&str],
+        limits: Limits,
+    ) -> Result<ReassemblyPatch> {
+        let target = self.reassemble_with_deletions_to_bytes(edits, deleted_names, limits)?;
+        Ok(ReassemblyPatch::new(self.shared_source(), target.into()))
     }
 
     /// Reassemble a flat package after replacing and deleting existing
@@ -3485,6 +3638,77 @@ mod tests {
         let debug = format!("{changed_pair:?}");
         assert!(!debug.contains("same bytes"));
         assert!(!debug.contains("same bytez"));
+    }
+
+    #[test]
+    fn reassembly_patch_applies_inverts_and_rejects_foreign_sources() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let patch = catalog.reassemble_to_patch(
+            &[EntryEdit::new(
+                "Opaque/entry.bin",
+                b"patched physical payload",
+            )],
+            Limits::default(),
+        )?;
+        assert!(!patch.is_noop());
+
+        let target = patch.apply(&bytes)?;
+        let target_catalog = Catalog::from_bytes(&target)?;
+        let source_entries = catalog.iter().collect::<Vec<_>>();
+        let target_entries = target_catalog.iter().collect::<Vec<_>>();
+        assert_eq!(target_entries[0].data(), source_entries[0].data());
+        assert_eq!(
+            target_entries[0].raw_record().local_record(),
+            source_entries[0].raw_record().local_record()
+        );
+        assert_eq!(
+            target_entries[0].raw_record().central_directory_record(),
+            source_entries[0].raw_record().central_directory_record()
+        );
+        assert_eq!(target_entries[1].data(), b"patched physical payload");
+
+        let inverse = patch.inverse();
+        assert_eq!(inverse.apply(&target)?, bytes);
+        assert_eq!(inverse.inverse(), patch);
+        assert!(matches!(
+            patch.apply(b"foreign package source"),
+            Err(ReassemblyPatchError::Conflict)
+        ));
+
+        let no_op = catalog.reassemble_to_patch(&[], Limits::default())?;
+        assert!(no_op.is_noop());
+        assert_eq!(no_op.apply(&bytes)?, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn reassembly_patch_preserves_typed_refusals() -> Result<()> {
+        let (opaque_bytes, _, _) = physical_zip(99);
+        let opaque_catalog = Catalog::from_bytes(&opaque_bytes)?;
+        assert!(matches!(
+            opaque_catalog.reassemble_to_patch(
+                &[EntryEdit::new("Opaque/entry.bin", b"cannot edit")],
+                Limits::default()
+            ),
+            Err(Error::Reassembly(_))
+        ));
+
+        let index = zip(&[("Index/Document.iwa", b"iwa")])?;
+        let legacy = zip(&[
+            ("legacy.pages/Index.zip", index.as_slice()),
+            ("legacy.pages/Data/a", b"a"),
+        ])?;
+        let legacy_catalog = Catalog::from_bytes(&legacy)?;
+        assert!(matches!(
+            legacy_catalog.reassemble_with_deletions_to_patch(
+                &[],
+                &["Data/a"],
+                Limits::default()
+            ),
+            Err(Error::Reassembly(message)) if message.contains("legacy nested Index.zip")
+        ));
+        Ok(())
     }
 
     #[test]
