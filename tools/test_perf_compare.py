@@ -451,7 +451,7 @@ class PerfCompareTests(unittest.TestCase):
             baseline, current, self.operation_metrics_policy()
         )
         self.assertEqual(result["status"], "pass")
-        self.assertEqual(result["summary"]["compared_metrics"], 12)
+        self.assertEqual(result["summary"]["compared_metrics"], 14)
 
     def test_parallel_envelope_metadata_and_sample_order_fail_closed(self):
         current = descriptive_parallel_report(revision="current")
