@@ -3,6 +3,14 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0247 — XLSX bytes-facade ABBA evidence (0230 package)](changes/0247-xlsx-bytes-abba-evidence.md)
+(the independently audited `0230-xlsx-bytes-20260821` package measures only
+in-memory `Workbook::from_bytes(Vec<u8>)` and its named lifecycle). The
+candidate source tree equals landed `9aaf9d136`; `xlsx_bytes_open` accepts
+exact p95/p99 readings only because p50/mean are drift-rejected, and
+`xlsx_bytes_open_lifecycle` accepts all four statistics. No source-file,
+filesystem/cold-cache, physical-I/O, preservation, output-byte, allocation,
+RSS, or broad XLSX claim is made.)
 [change 0229 — DOCX text-path hand-rolled binding tracker](changes/0229-docx-text-binding-tracker.md)
 (full-text latency readings are recorded for the semantic and ordinary-root
 selectors, but the overall verdict is provisionally withheld under the 0228
