@@ -41,13 +41,11 @@ pub(super) fn parse_processed_defaults(
     let mut defaults = None;
 
     loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(error.to_string()))?;
         let decoder = reader.decoder();
-        let event = reader
-            .read_event()
-            .map_err(|error| invalid(error.to_string()))?
-            .into_owned();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+        let resolver = reader.resolver();
         match event {
             Event::Start(element) if stack.is_empty() => {
                 if closed_root || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet") {
@@ -209,13 +207,11 @@ impl Parser {
         let mut closed_root = false;
 
         loop {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| invalid(error.to_string()))?;
             let decoder = reader.decoder();
-            let event = reader
-                .read_event()
-                .map_err(|error| invalid(error.to_string()))?
-                .into_owned();
-            let resolver = reader.resolver().clone();
-            let (namespace, event) = resolver.resolve_event(event);
+            let resolver = reader.resolver();
             match event {
                 Event::Start(element) if stack.is_empty() => {
                     if closed_root
