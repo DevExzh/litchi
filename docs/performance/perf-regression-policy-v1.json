@@ -47,6 +47,7 @@
   "tool_identity": {
     "name": "litchi-perf-baseline",
     "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
     "profile": "release",
     "target_os": "linux",
     "target_arch": "x86_64",
@@ -137,6 +138,14 @@
         "**/*allocated_bytes/values",
         "**/*deallocated_bytes",
         "**/*deallocated_bytes/values",
+        "**/*live_bytes_before",
+        "**/*live_bytes_before/values",
+        "**/*live_bytes_after",
+        "**/*live_bytes_after/values",
+        "**/*peak_live_bytes_before",
+        "**/*peak_live_bytes_before/values",
+        "**/*peak_live_bytes_after",
+        "**/*peak_live_bytes_after/values",
         "*allocation_calls",
         "*allocations",
         "*allocated_bytes"
