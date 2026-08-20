@@ -285,6 +285,24 @@ pub struct Inventory {
     stories: Arc<Vec<StoryInfo>>,
     relationships: Arc<Vec<ExternalHyperlinkRelationship>>,
     diagnostics: Arc<Vec<Diagnostic>>,
+    /// Ranges into `relationships`, aligned with `stories`.
+    ///
+    /// The public inventory remains an immutable value, while redaction plans
+    /// can select the relationships belonging to one story without scanning
+    /// every story relationship for each story.  The ranges retain no source
+    /// bytes and are bounded by the same relationship/story limits used while
+    /// capturing the inventory.
+    story_relationships: Arc<Vec<StoryRelationshipRange>>,
+    /// Relationship indexes ordered by target URL.  The index stores only
+    /// relationship positions, so target strings are not duplicated in the
+    /// immutable snapshot.
+    target_order: Arc<Vec<usize>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct StoryRelationshipRange {
+    start: usize,
+    end: usize,
 }
 
 impl Inventory {
@@ -540,13 +558,15 @@ impl Snapshot {
             })?;
         let mut removed_relationships = 0usize;
         let mut unwrapped_hyperlinks = 0usize;
-        for story in self.stories.iter() {
+        for (story_index, story) in self.stories.iter().enumerate() {
             let mut ids = Vec::new();
-            for relationship in self
+            let relationship_range = self
                 .inventory
-                .relationships
-                .iter()
-                .filter(|relationship| relationship.part_name == story.part.as_str())
+                .story_relationships
+                .get(story_index)
+                .ok_or_else(|| invalid("story hyperlink relationship index is out of sync"))?;
+            for relationship in
+                &self.inventory.relationships[relationship_range.start..relationship_range.end]
             {
                 if targets.binary_search(&relationship.target_url).is_ok() {
                     if removed_relationships >= self.limits.max_selected_relationships {
@@ -590,12 +610,17 @@ impl Snapshot {
             }
         }
         for target in &targets {
-            if !self
+            let present = self
                 .inventory
-                .relationships
-                .iter()
-                .any(|relationship| relationship.target_url == *target)
-            {
+                .target_order
+                .binary_search_by(|index| {
+                    self.inventory.relationships[*index]
+                        .target_url
+                        .as_str()
+                        .cmp(target.as_str())
+                })
+                .is_ok();
+            if !present {
                 return Err(invalid(format!(
                     "story hyperlink target is not present: {target}"
                 )));
@@ -965,6 +990,8 @@ pub(crate) fn capture_source(package: &SourceBackedPackage, limits: Limits) -> R
             .then_with(|| left.relationship_id.cmp(&right.relationship_id))
     });
     let diagnostics = coalesce_diagnostics(diagnostics)?;
+    let (story_relationships, target_order) =
+        build_relationship_indexes(&story_infos, &relationship_inventory)?;
     let source_fingerprint = package.source_artifact().fingerprint()?;
     let observed = package.source_version()?;
     if observed != source_version {
@@ -984,8 +1011,54 @@ pub(crate) fn capture_source(package: &SourceBackedPackage, limits: Limits) -> R
             stories: Arc::new(story_infos),
             relationships: Arc::new(relationship_inventory),
             diagnostics: Arc::new(diagnostics),
+            story_relationships,
+            target_order,
         },
     })
+}
+
+/// Build the immutable lookup structures used by repeated story redaction
+/// planning.  Relationship records are already in canonical `(part, id)`
+/// order, so each story's contiguous range can be found with two binary
+/// searches.  Target validation uses a second order of integer positions and
+/// therefore does not clone the target strings.
+fn build_relationship_indexes(
+    stories: &[StoryInfo],
+    relationships: &[ExternalHyperlinkRelationship],
+) -> Result<(Arc<Vec<StoryRelationshipRange>>, Arc<Vec<usize>>)> {
+    let mut story_relationships = Vec::new();
+    story_relationships
+        .try_reserve_exact(stories.len())
+        .map_err(|source| Error::Allocation {
+            resource: "story hyperlink relationship story index",
+            source,
+        })?;
+    for story in stories {
+        let start = relationships.partition_point(|relationship| {
+            relationship.part_name.as_str() < story.part_name.as_str()
+        });
+        let end = relationships.partition_point(|relationship| {
+            relationship.part_name.as_str() <= story.part_name.as_str()
+        });
+        story_relationships.push(StoryRelationshipRange { start, end });
+    }
+
+    let mut target_order = Vec::new();
+    target_order
+        .try_reserve_exact(relationships.len())
+        .map_err(|source| Error::Allocation {
+            resource: "story hyperlink target index",
+            source,
+        })?;
+    target_order.extend(0..relationships.len());
+    target_order.sort_unstable_by(|left, right| {
+        relationships[*left]
+            .target_url
+            .cmp(&relationships[*right].target_url)
+            .then_with(|| left.cmp(right))
+    });
+
+    Ok((Arc::new(story_relationships), Arc::new(target_order)))
 }
 
 fn capture_stories(
@@ -2045,5 +2118,64 @@ fn limit(resource: &'static str, maximum: usize, actual: usize) -> Error {
         resource,
         maximum,
         actual,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn story(part_name: &str) -> StoryInfo {
+        StoryInfo {
+            part_name: part_name.to_owned(),
+            kind: StoryKind::Main,
+        }
+    }
+
+    fn relationship(
+        part_name: &str,
+        relationship_id: &str,
+        target_url: &str,
+    ) -> ExternalHyperlinkRelationship {
+        ExternalHyperlinkRelationship {
+            part_name: part_name.to_owned(),
+            kind: StoryKind::Main,
+            relationship_id: relationship_id.to_owned(),
+            target_url: target_url.to_owned(),
+            wrapper_count: 1,
+        }
+    }
+
+    #[test]
+    fn relationship_indexes_preserve_story_ranges_and_target_order() {
+        let stories = [story("/word/header1.xml"), story("/word/document.xml")];
+        let relationships = [
+            relationship("/word/document.xml", "rId1", "https://z.invalid/"),
+            relationship("/word/document.xml", "rId2", "https://a.invalid/"),
+            relationship("/word/header1.xml", "rId1", "https://a.invalid/"),
+        ];
+
+        let (story_ranges, target_order) =
+            build_relationship_indexes(&stories, &relationships).unwrap();
+
+        assert_eq!(
+            story_ranges.as_slice(),
+            &[
+                StoryRelationshipRange { start: 2, end: 3 },
+                StoryRelationshipRange { start: 0, end: 2 },
+            ]
+        );
+        let ordered_targets = target_order
+            .iter()
+            .map(|index| relationships[*index].target_url.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            ordered_targets,
+            [
+                "https://a.invalid/",
+                "https://a.invalid/",
+                "https://z.invalid/",
+            ]
+        );
     }
 }
