@@ -108,8 +108,12 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 
             // First try OOXML detection (most common), except for a
             // validated ordinary ODF package with no OPC catalog marker.
-            if !normal_odf && let Some(result) = ooxml::detect_zip_format(bytes) {
-                return Some(result);
+            if !normal_odf {
+                #[cfg(test)]
+                super::record_opc_probe();
+                if let Some(result) = ooxml::detect_zip_format(bytes) {
+                    return Some(result);
+                }
             }
         }
 
@@ -142,8 +146,12 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 
 #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
 fn is_normal_odf_package(bytes: &[u8]) -> bool {
+    let limits = crate::opc::ReadLimits::default();
     litchi_odf_common::detect::packaged_mime(bytes).is_some()
-        && litchi_odf_common::detect::packaged_has_ooxml_catalog(bytes) == Some(false)
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
+            bytes,
+            super::catalog_probe_limits(limits),
+        ) == Some(false)
 }
 
 /// Detect file format from any reader that implements Read + Seek.
@@ -197,8 +205,10 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
             ))]
             let normal_odf =
-                litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader(reader)
-                    == Some(false);
+                litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader_with_limits(
+                    reader,
+                    super::catalog_probe_limits(crate::opc::ReadLimits::default()),
+                ) == Some(false);
             #[cfg(all(
                 not(any(feature = "odt", feature = "ods", feature = "odp")),
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
@@ -208,6 +218,8 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             if !normal_odf {
                 reader.seek(SeekFrom::Start(0)).ok()?;
+                #[cfg(test)]
+                super::record_opc_probe();
                 if let Some(format) = ooxml::detect_zip_format_from_reader(reader) {
                     return Some(format);
                 }
@@ -275,6 +287,7 @@ fn iwork_format(format: litchi_iwa_detect::Format) -> Option<FileFormat> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(feature = "odt", feature = "docx"))]
     use std::io::Write;
 
     #[test]
@@ -303,17 +316,21 @@ mod tests {
             .unwrap();
         writer.add_file("content.xml", b"<content/>").unwrap();
         let ordinary = writer.finish_to_bytes().unwrap();
+        super::super::reset_opc_probe_count();
         assert_eq!(
             detect_file_format_from_bytes(&ordinary),
             Some(FileFormat::Odt)
         );
+        assert_eq!(super::super::opc_probe_count(), 0);
         let mut reader = std::io::Cursor::new(ordinary.clone());
         reader.set_position(3);
+        super::super::reset_opc_probe_count();
         assert_eq!(
             detect_format_from_reader(&mut reader),
             Some(FileFormat::Odt)
         );
         assert_eq!(reader.position(), 3);
+        assert_eq!(super::super::opc_probe_count(), 0);
 
         let mut writer = litchi_odf_common::core::PackageWriter::new();
         writer
@@ -324,14 +341,166 @@ mod tests {
             .add_file("[Content_Types].xml", b"<broken/>")
             .unwrap();
         let malformed_catalog = writer.finish_to_bytes().unwrap();
+        super::super::reset_opc_probe_count();
         assert_eq!(
             detect_file_format_from_bytes(&malformed_catalog),
             Some(FileFormat::Odt)
         );
+        assert_eq!(super::super::opc_probe_count(), 1);
 
         let mut malformed_zip = ordinary;
         malformed_zip.truncate(malformed_zip.len() - 1);
         assert_eq!(detect_file_format_from_bytes(&malformed_zip), None);
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", feature = "docx"))]
+    fn catalog_gate_counts_only_canonical_ordinary_odf_as_a_skip() {
+        fn zip_entries(entries: &[(&str, &[u8])]) -> Vec<u8> {
+            let mut output = std::io::Cursor::new(Vec::new());
+            let mut writer = zip::ZipWriter::new(&mut output);
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            for (name, value) in entries {
+                writer.start_file(*name, options).unwrap();
+                writer.write_all(value).unwrap();
+            }
+            writer.finish().unwrap();
+            output.into_inner()
+        }
+
+        fn central_record(bytes: &[u8], name: &[u8]) -> usize {
+            let mut offset = bytes
+                .windows(4)
+                .position(|signature| signature == b"PK\x01\x02")
+                .unwrap();
+            loop {
+                let name_len = usize::from(u16::from_le_bytes(
+                    bytes[offset + 28..offset + 30].try_into().unwrap(),
+                ));
+                let extra_len = usize::from(u16::from_le_bytes(
+                    bytes[offset + 30..offset + 32].try_into().unwrap(),
+                ));
+                let comment_len = usize::from(u16::from_le_bytes(
+                    bytes[offset + 32..offset + 34].try_into().unwrap(),
+                ));
+                if &bytes[offset + 46..offset + 46 + name_len] == name {
+                    return offset;
+                }
+                offset += 46 + name_len + extra_len + comment_len;
+            }
+        }
+
+        fn assert_probe(bytes: &[u8], expected: usize) {
+            super::super::reset_opc_probe_count();
+            let _ = detect_file_format_from_bytes(bytes);
+            assert_eq!(super::super::opc_probe_count(), expected);
+        }
+
+        let ordinary = zip_entries(&[
+            (
+                "mimetype",
+                litchi_odf_common::constants::ODF_TEXT.as_bytes(),
+            ),
+            ("content.xml", b"<content/>"),
+        ]);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&ordinary),
+            Some(false)
+        );
+        assert_probe(&ordinary, 0);
+
+        let alias = zip_entries(&[
+            (
+                "mimetype",
+                litchi_odf_common::constants::ODF_TEXT.as_bytes(),
+            ),
+            ("./content.xml", b"<content/>"),
+        ]);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&alias),
+            None
+        );
+        assert_probe(&alias, 1);
+
+        let duplicate = zip_entries(&[
+            (
+                "mimetype",
+                litchi_odf_common::constants::ODF_TEXT.as_bytes(),
+            ),
+            ("content.xml", b"one"),
+            ("content.xml", b"two"),
+        ]);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&duplicate),
+            None
+        );
+        assert_probe(&duplicate, 1);
+
+        let case_catalog = zip_entries(&[
+            (
+                "mimetype",
+                litchi_odf_common::constants::ODF_TEXT.as_bytes(),
+            ),
+            ("[content_types].xml", b"<broken/>"),
+        ]);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&case_catalog),
+            Some(true)
+        );
+        assert_probe(&case_catalog, 1);
+
+        let mut trailing = ordinary.clone();
+        trailing.extend_from_slice(b"trailing");
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&trailing),
+            None
+        );
+        assert_probe(&trailing, 1);
+
+        let mut malformed = ordinary.clone();
+        malformed.pop();
+        assert_probe(&malformed, 1);
+
+        let mut zip64 = ordinary.clone();
+        let eocd = zip64
+            .windows(4)
+            .rposition(|signature| signature == b"PK\x05\x06")
+            .unwrap();
+        zip64[eocd + 8..eocd + 12].copy_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&zip64),
+            None
+        );
+        assert_probe(&zip64, 1);
+
+        let mut invalid_utf8 = ordinary.clone();
+        let central = central_record(&invalid_utf8, b"content.xml");
+        invalid_utf8[central + 46] = 0xff;
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&invalid_utf8),
+            None
+        );
+        assert_probe(&invalid_utf8, 1);
+
+        for flag in [0x0008_u16, 0x0001_u16] {
+            let mut flagged = ordinary.clone();
+            let central = central_record(&flagged, b"content.xml");
+            flagged[central + 8..central + 10].copy_from_slice(&flag.to_le_bytes());
+            assert_eq!(
+                litchi_odf_common::detect::packaged_has_ooxml_catalog(&flagged),
+                None
+            );
+            assert_probe(&flagged, 1);
+        }
+
+        let mut prefixed = b"prefix".to_vec();
+        prefixed.extend_from_slice(&ordinary);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&prefixed),
+            None
+        );
+        assert_probe(&prefixed, 0);
     }
 
     #[test]
@@ -364,10 +533,12 @@ mod tests {
             .unwrap();
         writer.finish().unwrap();
 
+        super::super::reset_opc_probe_count();
         assert_eq!(
             detect_file_format_from_bytes(output.get_ref()),
             Some(FileFormat::Docx)
         );
+        assert_eq!(super::super::opc_probe_count(), 1);
     }
 
     #[test]
