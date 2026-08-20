@@ -13909,7 +13909,7 @@ fn build_pptx_slide_name_index_corpus(shape: SemanticShape) -> Result<Corpus, Bo
             })
         })
         .ok_or("PPTX slide-name index text byte count overflows usize")?;
-    let target_payload = semantic_pptx_text(0, 0, false).into_bytes();
+    let target_payload = pptx_named_slide_name(0).into_bytes();
     Ok(Corpus {
         manifest: CorpusManifest {
             name: format!("pptx-slide-name-index-{}", shape.name()),
@@ -16418,28 +16418,79 @@ fn verify_pptx_selector_error_oracle(corpus: &Corpus) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-fn build_pptx_selector_output(
+fn escape_pptx_xml_text(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn rewrite_pptx_shape_text(
+    payload: &[u8],
+    shape_index: usize,
+    source_text: &str,
+    replacement: &str,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let xml = std::str::from_utf8(payload)?;
+    let (start, marker) = xml
+        .match_indices("<a:t>")
+        .nth(shape_index)
+        .ok_or("PPTX selector oracle target shape text is missing")?;
+    let content_start = start
+        .checked_add(marker.len())
+        .ok_or("PPTX selector oracle text start overflows usize")?;
+    let content_end = content_start
+        .checked_add(
+            xml.get(content_start..)
+                .ok_or("PPTX selector oracle text start is outside XML")?
+                .find("</a:t>")
+                .ok_or("PPTX selector oracle target shape text is unterminated")?,
+        )
+        .ok_or("PPTX selector oracle text end overflows usize")?;
+    if xml.get(content_start..content_end) != Some(source_text) {
+        return Err("PPTX selector oracle source shape text differs from specification".into());
+    }
+    let replacement = escape_pptx_xml_text(replacement);
+    let mut output = String::with_capacity(
+        xml.len()
+            .checked_sub(content_end - content_start)
+            .and_then(|length| length.checked_add(replacement.len()))
+            .ok_or("PPTX selector oracle output size overflows usize")?,
+    );
+    output.push_str(
+        xml.get(..content_start)
+            .ok_or("PPTX selector oracle text prefix is outside XML")?,
+    );
+    output.push_str(&replacement);
+    output.push_str(
+        xml.get(content_end..)
+            .ok_or("PPTX selector oracle text suffix is outside XML")?,
+    );
+    Ok(output.into_bytes())
+}
+
+/// Build the expected publication through the raw OPC graph rather than the
+/// opened-presentation transaction used by the measured candidate.
+fn build_pptx_selector_oracle(
     corpus: &Corpus,
     shape: SemanticShape,
     edits: &[PptxSelectorEdit],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
     for operation in edits {
-        if !edit.set_shape_text(
-            operation.slide_index,
+        let part_name = PackURI::new(format!(
+            "/ppt/slides/slide{}.xml",
+            operation.slide_index + 1
+        ))?;
+        let source = package.get_part(&part_name)?.blob().to_vec();
+        let replacement = rewrite_pptx_shape_text(
+            &source,
             operation.shape_index,
+            &semantic_pptx_text(operation.slide_index, operation.shape_index, false),
             operation.text.as_str(),
-        )? {
-            return Err("PPTX numeric-selector oracle unexpectedly reported no change".into());
-        }
+        )?;
+        package.get_part_mut(&part_name)?.set_blob(replacement);
     }
-    let commit = edit.commit()?;
-    if !commit.is_changed() {
-        return Err("PPTX numeric-selector oracle did not produce a changed commit".into());
-    }
-    package.apply_opened_presentation_commit(commit)?;
-    let output = package.to_bytes()?;
+    let output = PackageWriter::to_bytes(&package)?;
     let reopened = litchi_pptx::Package::from_bytes(&output)?;
     let mut updated = Vec::with_capacity(edits.len());
     for operation in edits {
@@ -22935,7 +22986,9 @@ fn run_pptx_slide_name_index(
         return Err("non-PPTX slide-name index case passed to slide-name runner".into());
     }
     let edits = pptx_selector_edits(shape, repeated);
-    let expected_output = build_pptx_selector_output(corpus, shape, &edits)?;
+    // Build the independent publication and exercise selector refusals once
+    // before the sample loop; neither setup path belongs to the timed edit.
+    let expected_output = build_pptx_selector_oracle(corpus, shape, &edits)?;
     verify_pptx_selector_error_oracle(corpus)?;
     let mut updated = Vec::with_capacity(edits.len());
     for operation in &edits {
@@ -22977,7 +23030,7 @@ fn run_pptx_slide_name_index(
         let output = package.to_bytes()?;
         let duration = started.elapsed();
         if output != expected_output {
-            return Err("PPTX selector output differs from the exact numeric oracle".into());
+            return Err("PPTX selector output differs from the independent raw OPC oracle".into());
         }
         let reopened = litchi_pptx::Package::from_bytes(&output)?;
         verify_semantic_pptx(&reopened, shape, &updated)?;
@@ -43388,6 +43441,13 @@ mod tests {
         let tiny_again = build_pptx_slide_name_index_corpus(SemanticShape::Tiny).unwrap();
         assert_eq!(tiny.archive, tiny_again.archive);
         assert_eq!(tiny.manifest.entry_count, 12);
+        assert_eq!(tiny.manifest.target_entry, "slide:0/name");
+        assert_eq!(tiny.target_name, "slide:0/name");
+        assert_eq!(tiny.target_payload, pptx_named_slide_name(0).as_bytes());
+        assert_eq!(
+            tiny.manifest.target_payload_sha256,
+            sha256_hex(pptx_named_slide_name(0).as_bytes())
+        );
         let named_one = run_case(Case::PptxNamedOneEditSave, &tiny, 0, 1).unwrap();
         assert!(named_one.output_sha256.is_some());
 
