@@ -36,7 +36,22 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraph_count(&self) -> Result<usize> {
-        Ok(self.paragraphs()?.len())
+        let text = self.text_extractor.text();
+        self.fib.get_all_subdoc_ranges().into_iter().try_fold(
+            0usize,
+            |count, (_, start_cp, end_cp)| {
+                count
+                    .checked_add(ParagraphExtractor::count_paragraphs_in_range(
+                        text,
+                        (start_cp, end_cp),
+                    ))
+                    .ok_or_else(|| {
+                        PackageError::Corrupted(
+                            "DOC paragraph count exceeds the addressable range".to_owned(),
+                        )
+                    })
+            },
+        )
     }
 
     /// Get the number of tables in the document.
