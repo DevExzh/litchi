@@ -95,9 +95,22 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 
     // Check ZIP-based formats (if matched)
     if mask.is_zip() {
-        // First try OOXML detection (most common)
-        if let Some(result) = ooxml::detect_zip_format(bytes) {
-            return Some(result);
+        // A valid ODF catalog without an OPC content-types member cannot be
+        // an OOXML package. Keep the cheap ODF path ahead of the full OPC
+        // probe, while retaining OOXML-first precedence for polyglots and
+        // malformed ZIPs (where the catalog probe deliberately returns None).
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        {
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+            let normal_odf = is_normal_odf_package(bytes);
+            #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp")))]
+            let normal_odf = false;
+
+            // First try OOXML detection (most common), except for a
+            // validated ordinary ODF package with no OPC catalog marker.
+            if !normal_odf && let Some(result) = ooxml::detect_zip_format(bytes) {
+                return Some(result);
+            }
         }
 
         // Then try ODF detection
@@ -125,6 +138,12 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
     }
 
     None
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+fn is_normal_odf_package(bytes: &[u8]) -> bool {
+    litchi_odf_common::detect::packaged_mime(bytes).is_some()
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog(bytes) == Some(false)
 }
 
 /// Detect file format from any reader that implements Read + Seek.
@@ -173,8 +192,21 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
         if header_len >= utils::ZIP_SIGNATURE.len()
             && signature_matches(&header[..header_len], utils::ZIP_SIGNATURE)
         {
+            #[cfg(all(
+                any(feature = "odt", feature = "ods", feature = "odp"),
+                any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+            ))]
+            let normal_odf =
+                litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader(reader)
+                    == Some(false);
+            #[cfg(all(
+                not(any(feature = "odt", feature = "ods", feature = "odp")),
+                any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+            ))]
+            let normal_odf = false;
+
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-            {
+            if !normal_odf {
                 reader.seek(SeekFrom::Start(0)).ok()?;
                 if let Some(format) = ooxml::detect_zip_format_from_reader(reader) {
                     return Some(format);
@@ -243,6 +275,7 @@ fn iwork_format(format: litchi_iwa_detect::Format) -> Option<FileFormat> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     #[test]
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
@@ -256,6 +289,85 @@ mod tests {
             Some(FileFormat::Odc)
         );
         assert_eq!(reader.position(), 7);
+    }
+
+    #[test]
+    #[cfg(all(
+        any(feature = "odt", feature = "ods", feature = "odp"),
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    fn packaged_odf_detection_handles_ordinary_and_malformed_catalogs() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_TEXT)
+            .unwrap();
+        writer.add_file("content.xml", b"<content/>").unwrap();
+        let ordinary = writer.finish_to_bytes().unwrap();
+        assert_eq!(
+            detect_file_format_from_bytes(&ordinary),
+            Some(FileFormat::Odt)
+        );
+        let mut reader = std::io::Cursor::new(ordinary.clone());
+        reader.set_position(3);
+        assert_eq!(
+            detect_format_from_reader(&mut reader),
+            Some(FileFormat::Odt)
+        );
+        assert_eq!(reader.position(), 3);
+
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_TEXT)
+            .unwrap();
+        writer.add_file("content.xml", b"<content/>").unwrap();
+        writer
+            .add_file("[Content_Types].xml", b"<broken/>")
+            .unwrap();
+        let malformed_catalog = writer.finish_to_bytes().unwrap();
+        assert_eq!(
+            detect_file_format_from_bytes(&malformed_catalog),
+            Some(FileFormat::Odt)
+        );
+
+        let mut malformed_zip = ordinary;
+        malformed_zip.truncate(malformed_zip.len() - 1);
+        assert_eq!(detect_file_format_from_bytes(&malformed_zip), None);
+    }
+
+    #[test]
+    #[cfg(all(feature = "odt", feature = "docx"))]
+    fn valid_ooxml_odf_polyglot_keeps_ooxml_precedence() {
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        writer.start_file("mimetype", options).unwrap();
+        writer
+            .write_all(litchi_odf_common::constants::ODF_TEXT.as_bytes())
+            .unwrap();
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("word/document.xml", options).unwrap();
+        writer
+            .write_all(br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#)
+            .unwrap();
+        writer.finish().unwrap();
+
+        assert_eq!(
+            detect_file_format_from_bytes(output.get_ref()),
+            Some(FileFormat::Docx)
+        );
     }
 
     #[test]
