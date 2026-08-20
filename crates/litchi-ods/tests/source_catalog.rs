@@ -7,6 +7,8 @@ use litchi_core::{Error, OwnedSource, ReadAt, SourceVersion};
 use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
 use litchi_ods::{ReadLimits, SourceBackedSpreadsheetCatalog, Spreadsheet};
 
+mod support;
+
 const MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -64,12 +66,7 @@ fn aliased_package() -> Vec<u8> {
 }
 
 fn package_with_content(content: &str) -> Vec<u8> {
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
-    writer.set_mimetype(MIME).expect("ODS MIME");
-    writer
-        .add_file("content.xml", content.as_bytes())
-        .expect("content.xml");
-    writer.finish_to_bytes().expect("content package bytes")
+    support::raw_package(&[("content.xml", content.as_bytes(), "text/xml")])
 }
 
 struct ProbeSource {
