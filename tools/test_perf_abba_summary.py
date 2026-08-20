@@ -818,6 +818,29 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         ):
             perf_abba_summary.summarize_reports(legs)
 
+        fixed_ods = four_legs()
+        for leg in fixed_ods:
+            leg["configuration"]["cases"] = [
+                "ods_source_backed_one_edit_save",
+                "ods_source_backed_one_percent_edit_save",
+            ]
+            for index, result in enumerate(leg["results"]):
+                result["case"] = leg["configuration"]["cases"][index]
+                result["corpus"].update(
+                    name="ods-media-publication",
+                    generator="litchi-ods-media-publication-v1",
+                    shape="media-rich",
+                )
+        perf_abba_summary.summarize_reports(fixed_ods)
+
+        for leg in fixed_ods:
+            for result in leg["results"]:
+                result["corpus"]["generator"] = "unknown-generator"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "cover result shapes"
+        ):
+            perf_abba_summary.summarize_reports(fixed_ods)
+
         filesystem = four_legs()
         for leg in filesystem:
             leg["configuration"]["cases"] = ["docx_file_source_full_text"]
@@ -985,6 +1008,41 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         legs[2]["results"][0]["source"]["cfb_open_stream"][
             "source_version_check"
         ] = "changed version fence"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "source identity"
+        ):
+            perf_abba_summary.summarize_reports(legs)
+
+    def test_ods_source_cell_timings_and_reads_are_measurements_not_identity(self):
+        legs = four_legs()
+        for leg_index, leg in enumerate(legs):
+            for result in leg["results"]:
+                result["source"] = {
+                    "read_calls": [10 + leg_index],
+                    "read_bytes": [100 + leg_index],
+                    "max_in_flight_reads": [],
+                    "ods_source_cell": {
+                        "source_archive_sha256": "a" * 64,
+                        "output_sha256": "b" * 64,
+                        "source_hash_verified": True,
+                        "lifecycle_ns": [100 + leg_index],
+                        "content_source_read_calls": [2 + leg_index],
+                        "content_source_read_bytes": [20 + leg_index],
+                    },
+                }
+        summary = perf_abba_summary.summarize_reports(legs)
+        source = summary["results"][0]["source"]
+        self.assertNotIn("read_calls", source)
+        self.assertNotIn("read_bytes", source)
+        ods = source["ods_source_cell"]
+        self.assertEqual(ods["source_archive_sha256"], "a" * 64)
+        self.assertEqual(ods["output_sha256"], "b" * 64)
+        for field in perf_abba_summary.ODS_SOURCE_CELL_MEASUREMENTS:
+            self.assertNotIn(field, ods)
+
+        legs[2]["results"][0]["source"]["ods_source_cell"][
+            "source_archive_sha256"
+        ] = "c" * 64
         with self.assertRaisesRegex(
             perf_abba_summary.AbbaSummaryInputError, "source identity"
         ):
