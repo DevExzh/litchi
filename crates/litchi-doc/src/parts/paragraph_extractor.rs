@@ -667,6 +667,7 @@ mod tests {
             (17, utf16_len),
             (utf16_len, utf16_len),
             (utf16_len + 1, utf16_len + 2),
+            (utf16_len + 2, utf16_len + 1),
         ];
 
         for range in ranges {
