@@ -264,6 +264,23 @@ User time (seconds): nope
         self.assertEqual(rows[0]["sink"]["write_calls"], 4)
         self.assertNotIn("target_payload_sha256", rows[0]["corpus"])
 
+    def test_artifact_reports_exact_retained_hash_and_size(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "retained.bin"
+            path.write_bytes(b"retained-artifact")
+            retained = perf_resource_profile.artifact(path, retained=True)
+            missing = perf_resource_profile.artifact(
+                Path(directory) / "missing.bin", retained=True
+            )
+        self.assertTrue(retained["present"])
+        self.assertTrue(retained["retained"])
+        self.assertEqual(retained["bytes"], len(b"retained-artifact"))
+        self.assertEqual(
+            retained["sha256"], perf_resource_profile.sha256_bytes(b"retained-artifact")
+        )
+        self.assertFalse(missing["present"])
+        self.assertIsNone(missing["sha256"])
+
     def test_missing_heaptrack_is_not_zero(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "missing.txt"
@@ -280,6 +297,8 @@ User time (seconds): nope
 calls to allocation functions: 12 (3/s)
 MOST TEMPORARY ALLOCATIONS
 34 temporary allocations of 56 allocations in total (60.7%)
+11 temporary allocations of 12 allocations in total (91.7%) from
+some::other::stack::group
 temporary memory allocations: 57 (4/s)
 peak heap memory consumption: 2.50M
 peak RSS (including heaptrack overhead): 4.00M
@@ -294,6 +313,18 @@ peak RSS (including heaptrack overhead): 4.00M
         self.assertEqual(parsed["peak_heap_bytes"], int(2.5 * 1024 * 1024))
         self.assertEqual(parsed["peak_rss_bytes"], 4 * 1024 * 1024)
         self.assertEqual(allocated, 28)
+
+    def test_heaptrack_parser_rejects_stack_group_without_process_total(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / "stack-only.txt"
+            summary.write_text(
+                "MOST TEMPORARY ALLOCATIONS\n"
+                "34 temporary allocations of 56 allocations in total (60.7%)\n",
+                encoding="utf-8",
+            )
+            parsed = perf_resource_profile.parse_heaptrack_print(summary)
+        self.assertEqual(parsed["status"], "unparsed")
+        self.assertIsNone(parsed["temporary_allocations"])
 
     def test_retained_docx_heaptrack_report_is_reprocessed_from_verified_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -915,6 +946,167 @@ peak RSS (including heaptrack overhead): 4.00M
             )
         return legs
 
+    @staticmethod
+    def _xlsx_xml_borrowed_report(
+        revision="1" * 40,
+        *,
+        samples=3,
+        cases=perf_resource_profile.XLSX_XML_BORROWED_CASES,
+    ):
+        cases = tuple(cases)
+        report = ResourceProfileParserTests._abba_report(
+            revision, corpus_shape="tiny", samples=samples
+        )
+        report["configuration"] = {
+            "samples_per_case": samples,
+            "warmup_iterations_per_case": 1,
+            "cases": list(cases),
+            "xlsx_shapes": ["tiny"],
+            "xlsx_cell_crud_shapes": ["medium"],
+        }
+        tiny_corpus = {
+            "name": "xlsx-tiny",
+            "generator": "litchi-xlsx-synthetic-v1",
+            "package_format": "XLSX/OPC/ZIP",
+            "shape": "tiny",
+            "payload_kind": "deterministic-integer-grid",
+            "compression": "deflate",
+            "entry_count": 192,
+            "archive_member_count": 8,
+            "entry_bytes": 4,
+            "uncompressed_payload_bytes": 768,
+            "archive_bytes": 3561,
+            "archive_sha256": "a" * 64,
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "b" * 64,
+            "xlsx": {
+                "sheet_count": 3,
+                "rows_per_sheet": 8,
+                "columns_per_sheet": 8,
+                "one_percent_update_count": 2,
+                "source_members": {
+                    "workbook": "xl/workbook.xml",
+                    "worksheets": [
+                        "xl/worksheets/sheet1.xml",
+                        "xl/worksheets/sheet2.xml",
+                        "xl/worksheets/sheet3.xml",
+                    ],
+                    "shared_strings": None,
+                    "styles": "xl/styles.xml",
+                },
+            },
+        }
+        medium_corpus = {
+            **tiny_corpus,
+            "name": "xlsx-cell-values-medium",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "shape": "medium",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "entry_count": 9216,
+            "archive_member_count": 17,
+            "uncompressed_payload_bytes": 4_231_168,
+            "archive_bytes": 4_226_429,
+            "archive_sha256": "c" * 64,
+            "xlsx": {
+                "sheet_count": 4,
+                "rows_per_sheet": 48,
+                "columns_per_sheet": 48,
+                "one_percent_update_count": 93,
+                "source_members": {
+                    "workbook": "xl/workbook.xml",
+                    "worksheets": [
+                        "xl/worksheets/sheet1.xml",
+                        "xl/worksheets/sheet2.xml",
+                        "xl/worksheets/sheet3.xml",
+                        "xl/worksheets/sheet4.xml",
+                    ],
+                    "shared_strings": None,
+                    "styles": "xl/styles.xml",
+                },
+            },
+        }
+        results = []
+        for offset, case in enumerate(cases):
+            result = {
+                "case": case,
+                "corpus": dict(
+                    medium_corpus
+                    if case
+                    in {
+                        "xlsx_eager_cell_values_one_edit_save",
+                        "xlsx_source_backed_cell_values_one_edit_save",
+                    }
+                    else tiny_corpus
+                ),
+                "elapsed_ns": {
+                    "unit": "ns",
+                    "samples": [100 + offset] * samples,
+                    "min": 100 + offset,
+                    "p50": 100 + offset,
+                    "p95": 110 + offset,
+                    "p99": 120 + offset,
+                    "max": 120 + offset,
+                    "mean": 105 + offset,
+                    "standard_deviation": 5,
+                    "confidence_interval_95": {
+                        "method": "two-sided Student's t interval for the mean",
+                        "lower": 90 + offset,
+                        "upper": 120 + offset,
+                    },
+                },
+            }
+            if case == "xlsx_source_first_cell":
+                result["source"] = {"read_calls": [1] * samples, "read_bytes": [32] * samples}
+            elif case == "xlsx_eager_cell_values_one_edit_save":
+                result["sink"] = {
+                    "accepted_bytes": 100,
+                    "write_calls": 2,
+                    "largest_write": 64,
+                }
+                result["output_sha256"] = "d" * 64
+            elif case == "xlsx_source_backed_cell_values_one_edit_save":
+                result["source"] = {
+                    "read_calls": [2] * samples,
+                    "read_bytes": [64] * samples,
+                }
+                result["sink"] = {
+                    "accepted_bytes": 120,
+                    "write_calls": 3,
+                    "largest_write": 64,
+                }
+                result["output_sha256"] = "e" * 64
+            results.append(result)
+        report["results"] = results
+        return report
+
+    @classmethod
+    def _xlsx_xml_borrowed_legs(cls, root, *, samples=3):
+        binaries = {}
+        for variant, content in (
+            ("control", b"xlsx-borrowed-control-binary"),
+            ("candidate", b"xlsx-borrowed-candidate-binary"),
+        ):
+            path = Path(root) / f"{variant}-xlsx-borrowed-binary"
+            path.write_bytes(content)
+            path.chmod(0o755)
+            binaries[variant] = perf_resource_profile.binary_identity(path, label=variant)
+        legs = []
+        for leg in perf_resource_profile.ABBA_LEG_ORDER:
+            variant = perf_resource_profile.ABBA_LEG_VARIANTS[leg]
+            revision = "1" * 40 if variant == "control" else "2" * 40
+            legs.append(
+                {
+                    "leg": leg,
+                    "variant": variant,
+                    "binary_identity": dict(binaries[variant]),
+                    "harness_report": cls._xlsx_xml_borrowed_report(
+                        revision, samples=samples
+                    ),
+                }
+            )
+        return legs
+
     def test_docx_parser_exposes_explicit_comparison_cli(self):
         parsed = perf_resource_profile.build_parser().parse_args(
             [
@@ -977,6 +1169,426 @@ peak RSS (including heaptrack overhead): 4.00M
             ]
         )
         self.assertEqual(alias.workload, "docx-semantic-full-text")
+
+    def test_xlsx_xml_borrowed_parser_exposes_fixed_cli_and_defaults(self):
+        parsed = perf_resource_profile.build_parser().parse_args(
+            [
+                "compare-xlsx-xml-borrowed",
+                "--control-binary",
+                "/tmp/control",
+                "--candidate-binary",
+                "/tmp/candidate",
+            ]
+        )
+        self.assertEqual(parsed.command, "compare-xlsx-xml-borrowed")
+        self.assertIs(parsed.function, perf_resource_profile.run_xlsx_xml_borrowed_abba)
+        self.assertEqual(parsed.warmup, 30)
+        self.assertEqual(parsed.samples, 500)
+        run = perf_resource_profile.build_parser().parse_args(
+            [
+                "run",
+                "--workload",
+                perf_resource_profile.XLSX_XML_BORROWED_ID,
+                "--control-binary",
+                "/tmp/control",
+                "--candidate-binary",
+                "/tmp/candidate",
+            ]
+        )
+        perf_resource_profile._apply_run_sampling_defaults(run)
+        self.assertEqual(run.warmup, 30)
+        self.assertEqual(run.samples, 500)
+        self.assertEqual(
+            perf_resource_profile.xlsx_xml_borrowed_args(),
+            (
+                "--case",
+                ",".join(perf_resource_profile.XLSX_XML_BORROWED_CASES),
+                "--xlsx-shape",
+                "tiny",
+                "--xlsx-cell-crud-shape",
+                "medium",
+            ),
+        )
+
+    def test_xlsx_xml_borrowed_validation_binds_four_rows_and_identity_channels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            expected = {
+                "samples_per_case": 3,
+                "warmup_iterations_per_case": 1,
+                "cases": list(perf_resource_profile.XLSX_XML_BORROWED_CASES),
+                "xlsx_shapes": ["tiny"],
+                "xlsx_cell_crud_shapes": ["medium"],
+            }
+            legs = self._xlsx_xml_borrowed_legs(directory)
+            validated = perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                legs, expected_configuration=expected
+            )
+            self.assertEqual(validated["workload"], perf_resource_profile.XLSX_XML_BORROWED_ID)
+            self.assertEqual(
+                [item["case"] for item in validated["corpus_identities"]],
+                list(perf_resource_profile.XLSX_XML_BORROWED_CASES),
+            )
+            self.assertEqual(
+                [item["case"] for item in validated["result_identities"]],
+                list(perf_resource_profile.XLSX_XML_BORROWED_CASES),
+            )
+            self.assertFalse(validated["result_identities"][0]["source_present"])
+            self.assertTrue(validated["result_identities"][1]["source_present"])
+            self.assertTrue(validated["result_identities"][3]["output_present"])
+
+            reordered = self._xlsx_xml_borrowed_legs(directory)
+            reordered[0]["harness_report"]["results"].reverse()
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError, "cases must be"
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(reordered)
+
+            source_mismatch = self._xlsx_xml_borrowed_legs(directory)
+            source_mismatch[1]["harness_report"]["results"][1]["source"]["read_calls"][
+                0
+            ] = 999
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "source/sink/output identities",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    source_mismatch
+                )
+
+            output_mismatch = self._xlsx_xml_borrowed_legs(directory)
+            output_mismatch[2]["harness_report"]["results"][2]["output_sha256"] = "f" * 64
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "source/sink/output identities",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    output_mismatch
+                )
+
+            sink_mismatch = self._xlsx_xml_borrowed_legs(directory)
+            sink_mismatch[0]["harness_report"]["results"][2]["sink"][
+                "write_calls"
+            ] = 99
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "source/sink/output identities",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    sink_mismatch
+                )
+
+            corpus_mismatch = self._xlsx_xml_borrowed_legs(directory)
+            corpus_mismatch[3]["harness_report"]["results"][0]["corpus"][
+                "archive_sha256"
+            ] = "9" * 64
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "corpus identities",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    corpus_mismatch
+                )
+
+    def test_xlsx_xml_borrowed_metrics_are_case_specific_and_resource_only(self):
+        report = self._xlsx_xml_borrowed_report()
+        metrics = perf_resource_profile.instrumented_harness_metrics(
+            report, perf_resource_profile.XLSX_XML_BORROWED_CASES
+        )
+        self.assertEqual(metrics["harness.xlsx_first_cell.elapsed_ns.p50"], 100)
+        self.assertEqual(
+            metrics[
+                "harness.xlsx_source_backed_cell_values_one_edit_save.elapsed_ns.p50"
+            ],
+            103,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            fallback_legs = self._xlsx_xml_borrowed_legs(directory)
+            fallback_stats = perf_resource_profile.abba_statistics(
+                fallback_legs,
+                metric_specs=(
+                    (
+                        "harness.xlsx_source_first_cell.elapsed_ns.p50",
+                        "instrumented source-first-cell elapsed; not latency evidence",
+                    ),
+                ),
+            )
+            self.assertEqual(
+                fallback_stats["metrics"][
+                    "harness.xlsx_source_first_cell.elapsed_ns.p50"
+                ]["values_by_leg"]["A1"],
+                101,
+            )
+            legs = self._xlsx_xml_borrowed_legs(directory)
+            for leg in legs:
+                leg["resource_metrics"] = {
+                    "harness.xlsx_first_cell.elapsed_ns.p50": 100,
+                    "time.max_rss_kib": 1024,
+                    "heaptrack.allocation_calls": 200,
+                }
+            stats = perf_resource_profile.abba_statistics(
+                legs,
+                metric_specs=perf_resource_profile.XLSX_XML_BORROWED_RESOURCE_METRIC_SPECS,
+            )
+        self.assertIn("time.max_rss_kib", stats["metrics"])
+        self.assertIn("heaptrack.allocation_calls", stats["metrics"])
+        self.assertIn(
+            "not latency evidence",
+            stats["metrics"]["harness.xlsx_first_cell.elapsed_ns.p50"]["description"],
+        )
+        self.assertIn(
+            "whole-process",
+            stats["metrics"]["time.max_rss_kib"]["description"],
+        )
+        json.dumps(stats, allow_nan=False)
+
+    def test_xlsx_xml_borrowed_leg_retains_time_heaptrack_and_harness_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "control-xlsx-borrowed-binary"
+            binary.write_bytes(b"control-xlsx-borrowed")
+            binary.chmod(0o755)
+            artifact_root = root / "artifacts"
+            descriptor = perf_resource_profile.binary_identity(binary, label="control")
+
+            def fake_run(command, *, stdout_path, stderr_path, timeout_seconds):
+                del timeout_seconds
+                command = list(command)
+                if "--json" in command:
+                    report_path = Path(command[command.index("--json") + 1])
+                    report_path.write_text(
+                        json.dumps(self._xlsx_xml_borrowed_report()),
+                        encoding="utf-8",
+                    )
+                if "-o" in command and "--record-only" not in command:
+                    time_path = Path(command[command.index("-o") + 1])
+                    time_path.write_text(
+                        """\
+Maximum resident set size (kbytes): 123
+User time (seconds): 1.25
+System time (seconds): 0.50
+Elapsed (wall clock) time (h:mm:ss or m:ss): 0:02.75
+Voluntary context switches: 12
+Involuntary context switches: 3
+Major (requiring I/O) page faults: 1
+Minor (reclaiming a frame) page faults: 34
+""",
+                        encoding="utf-8",
+                    )
+                if "--record-only" in command:
+                    prefix = Path(command[command.index("-o") + 1])
+                    prefix.with_suffix(".zst").write_bytes(b"capture")
+                if "-H" in command:
+                    histogram = Path(command[command.index("-H") + 1])
+                    histogram.write_text("4\t3\n", encoding="utf-8")
+                    stdout_path.write_text(
+                        "calls to allocation functions: 1\n"
+                        "MOST TEMPORARY ALLOCATIONS\n"
+                        "1 temporary allocations of 2 allocations in total (50%)\n"
+                        "temporary memory allocations: 2\n"
+                        "peak heap memory consumption: 1K\n"
+                        "peak RSS (including heaptrack overhead): 2K\n",
+                        encoding="utf-8",
+                    )
+                return {
+                    "command": command,
+                    "returncode": 0,
+                    "timed_out": False,
+                    "wall_ns": 1,
+                    "stdout": {},
+                    "stderr": {},
+                    "stderr_excerpt": None,
+                }
+
+            with mock.patch.object(
+                perf_resource_profile, "run_command", side_effect=fake_run
+            ):
+                leg = perf_resource_profile.profile_xlsx_xml_borrowed_abba_leg(
+                    leg="A1",
+                    variant="control",
+                    binary=binary,
+                    binary_descriptor=descriptor,
+                    artifact_root=artifact_root,
+                    warmup=1,
+                    samples=3,
+                    tools={
+                        "time": {"available": True, "path": "/usr/bin/time"},
+                        "heaptrack": {"available": True, "path": "heaptrack"},
+                        "heaptrack_print": {
+                            "available": True,
+                            "path": "heaptrack_print",
+                        },
+                    },
+                    timeout_seconds=1,
+                )
+        self.assertEqual(leg["latency_evidence"]["status"], "not_measured")
+        self.assertIn(
+            "harness.xlsx_source_first_cell.elapsed_ns.p50",
+            leg["resource_metrics"],
+        )
+        self.assertTrue(leg["harness"]["report"]["retained"])
+        self.assertEqual(len(leg["harness"]["report"]["sha256"]), 64)
+        self.assertTrue(leg["harness"]["run"]["stdout"]["retained"])
+        self.assertTrue(leg["time"]["parsed"]["artifact"]["retained"])
+        self.assertEqual(len(leg["time"]["parsed"]["artifact"]["sha256"]), 64)
+        self.assertEqual(leg["heaptrack"]["status"], "ok")
+        self.assertEqual(
+            leg["heaptrack"]["harness_identity"]["status"], "validated"
+        )
+        self.assertTrue(leg["heaptrack"]["harness"]["retained"])
+        self.assertEqual(len(leg["heaptrack"]["harness"]["sha256"]), 64)
+        self.assertTrue(leg["heaptrack"]["run"]["stdout"]["retained"])
+        self.assertTrue(leg["heaptrack"]["capture"]["retained"])
+        self.assertTrue(leg["heaptrack"]["print"]["artifact"]["retained"])
+        self.assertTrue(leg["heaptrack"]["print"]["run"]["stdout"]["retained"])
+        self.assertTrue(
+            leg["heaptrack"]["print"]["parsed"]["histogram_artifact"]["retained"]
+        )
+        command = leg["harness"]["command"]
+        self.assertIn(",".join(perf_resource_profile.XLSX_XML_BORROWED_CASES), command)
+        self.assertIn("tiny", command)
+        self.assertIn("medium", command)
+
+    def test_xlsx_xml_borrowed_heaptrack_harness_identity_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "control-xlsx-borrowed-binary"
+            binary.write_bytes(b"control-xlsx-borrowed")
+            binary.chmod(0o755)
+            expected_report = self._xlsx_xml_borrowed_report()
+            expected_identity = (
+                perf_resource_profile._xlsx_xml_borrowed_harness_identity(
+                    expected_report, "timed.harness_report"
+                )
+            )
+            heaptrack_workdir = root / "artifacts" / "a1"
+            heaptrack_workdir.mkdir(parents=True)
+
+            def fake_run(command, *, stdout_path, stderr_path, timeout_seconds):
+                del timeout_seconds
+                command = list(command)
+                if "--json" in command:
+                    report_path = Path(command[command.index("--json") + 1])
+                    report = self._xlsx_xml_borrowed_report()
+                    if "--record-only" in command:
+                        report["results"][1]["source"]["read_bytes"][0] = 999
+                    report_path.write_text(json.dumps(report), encoding="utf-8")
+                if "--record-only" in command:
+                    prefix = Path(command[command.index("-o") + 1])
+                    prefix.with_suffix(".zst").write_bytes(b"capture")
+                if "-H" in command:
+                    histogram = Path(command[command.index("-H") + 1])
+                    histogram.write_text("4\t3\n", encoding="utf-8")
+                    stdout_path.write_text(
+                        "calls to allocation functions: 1\n"
+                        "MOST TEMPORARY ALLOCATIONS\n"
+                        "1 temporary allocations of 2 allocations in total (50%)\n"
+                        "temporary memory allocations: 2\n"
+                        "peak heap memory consumption: 1K\n"
+                        "peak RSS (including heaptrack overhead): 2K\n",
+                        encoding="utf-8",
+                    )
+                return {
+                    "command": command,
+                    "returncode": 0,
+                    "timed_out": False,
+                    "wall_ns": 1,
+                    "stdout": {},
+                    "stderr": {},
+                    "stderr_excerpt": None,
+                }
+
+            with mock.patch.object(
+                perf_resource_profile, "run_command", side_effect=fake_run
+            ):
+                with self.assertRaisesRegex(
+                    perf_resource_profile.ResourceProfileInputError,
+                    "heaptrack harness identity does not match timed leg identity",
+                ):
+                    perf_resource_profile._profile_abba_heaptrack(
+                        binary,
+                        perf_resource_profile.XLSX_XML_BORROWED_ARGS,
+                        heaptrack_workdir,
+                        {
+                            "heaptrack": {"available": True, "path": "heaptrack"},
+                            "heaptrack_print": {
+                                "available": True,
+                                "path": "heaptrack_print",
+                            },
+                        },
+                        warmup=1,
+                        samples=3,
+                        timeout_seconds=1,
+                        expected_harness_identity=expected_identity,
+                        harness_identity_validator=(
+                            lambda value, location: perf_resource_profile._xlsx_xml_borrowed_harness_identity(
+                                value, location
+                            )
+                        ),
+                    )
+
+    def test_xlsx_xml_borrowed_abba_orchestration_publishes_identity_and_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legs = self._xlsx_xml_borrowed_legs(root)
+            output = root / "xlsx-xml-borrowed.json"
+            artifacts = root / "xlsx-xml-borrowed-artifacts"
+
+            def fake_leg(**kwargs):
+                leg = next(item for item in legs if item["leg"] == kwargs["leg"])
+                return {
+                    **leg,
+                    "harness": {"logical_measurements": []},
+                    "time": {"status": "unsupported"},
+                    "heaptrack": {"status": "unsupported"},
+                    "latency_evidence": dict(perf_resource_profile.LATENCY_SEPARATION),
+                    "resource_metrics": {},
+                    "artifact_directory": str(artifacts / kwargs["leg"].lower()),
+                }
+
+            unavailable = {
+                "available": False,
+                "path": None,
+                "version": None,
+                "binary_sha256": None,
+                "returncode": None,
+            }
+            arguments = argparse.Namespace(
+                control_binary=root / "control-xlsx-borrowed-binary",
+                candidate_binary=root / "candidate-xlsx-borrowed-binary",
+                output=output,
+                artifact_dir=artifacts,
+                warmup=1,
+                samples=3,
+                timeout=1,
+            )
+            with mock.patch.object(
+                perf_resource_profile,
+                "profile_xlsx_xml_borrowed_abba_leg",
+                side_effect=fake_leg,
+            ), mock.patch.object(
+                perf_resource_profile, "probe_tool", return_value=unavailable
+            ):
+                self.assertEqual(
+                    perf_resource_profile.run_xlsx_xml_borrowed_abba(arguments), 0
+                )
+            published = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(
+            published["scope"]["workload"], perf_resource_profile.XLSX_XML_BORROWED_ID
+        )
+        self.assertEqual(
+            published["scope"]["cases"],
+            list(perf_resource_profile.XLSX_XML_BORROWED_CASES),
+        )
+        self.assertEqual(published["scope"]["xlsx_shape"], "tiny")
+        self.assertEqual(published["scope"]["xlsx_cell_crud_shape"], "medium")
+        self.assertEqual(published["latency_evidence"]["status"], "not_measured")
+        self.assertEqual(len(published["corpus_identities"]), 4)
+        self.assertEqual(len(published["result_identities"]), 4)
+        self.assertEqual(published["tools"]["heaptrack"]["available"], False)
+        for leg in published["legs"]:
+            self.assertNotIn("harness_report", leg)
+            self.assertIn("harness_identity", leg)
+            self.assertIn("result_identities", leg["harness_identity"])
 
     def test_docx_optional_flag_requires_explicit_docx_abba_dispatch(self):
         generic = perf_resource_profile.build_parser().parse_args(

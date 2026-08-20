@@ -37,7 +37,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 
 SCHEMA_VERSION = 1
@@ -63,6 +63,13 @@ DEFAULT_DOCX_ABBA_OUTPUT = (
     / "performance"
     / "results"
     / "docx-semantic-resource-abba-current.json"
+)
+DEFAULT_XLSX_XML_BORROWED_ABBA_OUTPUT = (
+    REPO_ROOT
+    / "docs"
+    / "performance"
+    / "results"
+    / "xlsx-xml-borrowed-resource-abba-current.json"
 )
 MAX_UNTRACKED_FILES = 4096
 MAX_UNTRACKED_FILE_BYTES = 16 * 1024 * 1024
@@ -169,6 +176,27 @@ XLSX_MANAGED_BATCH_ARGS: tuple[str, ...] = (
     "--xlsx-cell-crud-shape",
     XLSX_MANAGED_BATCH_SHAPE,
 )
+XLSX_XML_BORROWED_ID = "xlsx-xml-borrowed"
+XLSX_XML_BORROWED_ID_ALIASES: tuple[str, ...] = (
+    XLSX_XML_BORROWED_ID,
+    "xlsx-borrowed",
+)
+XLSX_XML_BORROWED_CASES: tuple[str, ...] = (
+    "xlsx_first_cell",
+    "xlsx_source_first_cell",
+    "xlsx_eager_cell_values_one_edit_save",
+    "xlsx_source_backed_cell_values_one_edit_save",
+)
+XLSX_XML_BORROWED_SHAPE = "tiny"
+XLSX_XML_BORROWED_CELL_CRUD_SHAPE = "medium"
+XLSX_XML_BORROWED_ARGS: tuple[str, ...] = (
+    "--case",
+    ",".join(XLSX_XML_BORROWED_CASES),
+    "--xlsx-shape",
+    XLSX_XML_BORROWED_SHAPE,
+    "--xlsx-cell-crud-shape",
+    XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
+)
 DOCX_SEMANTIC_ID = "docx-semantic"
 DOCX_SEMANTIC_ID_ALIASES: tuple[str, ...] = (
     DOCX_SEMANTIC_ID,
@@ -263,6 +291,46 @@ def _docx_resource_metric_specs(
 
 DOCX_RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = _docx_resource_metric_specs(
     DOCX_SEMANTIC_CASES
+)
+
+
+def _normalize_xlsx_xml_borrowed_cases(
+    cases: Sequence[str] | None = None,
+) -> tuple[str, ...]:
+    selected = XLSX_XML_BORROWED_CASES if cases is None else tuple(cases)
+    if selected != XLSX_XML_BORROWED_CASES:
+        raise ResourceProfileInputError(
+            "XLSX XML borrowed resource cases must be the fixed four-case tuple"
+        )
+    return selected
+
+
+def xlsx_xml_borrowed_cases() -> tuple[str, ...]:
+    """Return the fixed borrowed-parser case tuple used by resource ABBA."""
+    return XLSX_XML_BORROWED_CASES
+
+
+def xlsx_xml_borrowed_args(
+    cases: Sequence[str] = XLSX_XML_BORROWED_CASES,
+) -> tuple[str, ...]:
+    """Build the exact tiny/medium harness arguments for borrowed-parser ABBA."""
+    selected = _normalize_xlsx_xml_borrowed_cases(cases)
+    if selected == XLSX_XML_BORROWED_CASES:
+        return XLSX_XML_BORROWED_ARGS
+    # Keep the construction explicit if the fixed tuple is ever reviewed; the
+    # normalizer currently rejects this branch for strict identity.
+    return (
+        "--case",
+        ",".join(selected),
+        "--xlsx-shape",
+        XLSX_XML_BORROWED_SHAPE,
+        "--xlsx-cell-crud-shape",
+        XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
+    )
+
+
+XLSX_XML_BORROWED_RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = (
+    _docx_resource_metric_specs(XLSX_XML_BORROWED_CASES)
 )
 
 
@@ -1730,6 +1798,258 @@ def _docx_harness_results(
     return configuration, validated
 
 
+XLSX_XML_BORROWED_RESULT_IDENTITY: dict[str, tuple[bool, bool, bool]] = {
+    # source, sink, and output are deliberately separate identity channels;
+    # an absent channel is meaningful and must remain absent in every leg.
+    "xlsx_first_cell": (False, False, False),
+    "xlsx_source_first_cell": (True, False, False),
+    "xlsx_eager_cell_values_one_edit_save": (False, True, True),
+    "xlsx_source_backed_cell_values_one_edit_save": (True, True, True),
+}
+
+
+def _xlsx_xml_borrowed_harness_results(
+    report: Any,
+    location: str,
+    *,
+    cases: Sequence[str] = XLSX_XML_BORROWED_CASES,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Validate the exact four-row XLSX borrowed-parser harness report.
+
+    The tiny read selectors and medium cell-edit selectors intentionally use
+    different deterministic corpora.  Identity is therefore checked per
+    case, then compared across ABBA legs, rather than incorrectly requiring
+    all four rows in one report to share one archive.
+    """
+    selected_cases = _normalize_xlsx_xml_borrowed_cases(cases)
+    if not isinstance(report, dict):
+        raise ResourceProfileInputError(f"{location} must be an object")
+    if report.get("schema_version") != SCHEMA_VERSION:
+        raise ResourceProfileInputError(
+            f"{location}.schema_version must be {SCHEMA_VERSION!r}"
+        )
+    configuration = report.get("configuration")
+    if not isinstance(configuration, dict):
+        raise ResourceProfileInputError(f"{location}.configuration must be an object")
+    sample_count = _requested_sample_count(configuration, f"{location}.configuration")
+    expected_configuration = {
+        "cases": list(selected_cases),
+        "xlsx_shapes": [XLSX_XML_BORROWED_SHAPE],
+        "xlsx_cell_crud_shapes": [XLSX_XML_BORROWED_CELL_CRUD_SHAPE],
+    }
+    for key, expected in expected_configuration.items():
+        if configuration.get(key) != expected:
+            raise ResourceProfileInputError(
+                f"{location}.configuration.{key} must be {expected!r}; "
+                f"got {configuration.get(key)!r}"
+            )
+    results = report.get("results")
+    if not isinstance(results, list) or len(results) != len(selected_cases):
+        raise ResourceProfileInputError(
+            f"{location}.results must contain exactly the four XLSX borrowed-parser rows"
+        )
+    observed_cases = [
+        result.get("case") if isinstance(result, dict) else None for result in results
+    ]
+    if tuple(observed_cases) != selected_cases:
+        raise ResourceProfileInputError(
+            f"{location}.results cases must be {list(selected_cases)!r}; "
+            f"got {observed_cases!r}"
+        )
+
+    required_manifest_keys = (
+        "name",
+        "generator",
+        "package_format",
+        "shape",
+        "payload_kind",
+        "compression",
+        "entry_count",
+        "archive_member_count",
+        "entry_bytes",
+        "uncompressed_payload_bytes",
+        "archive_bytes",
+        "archive_sha256",
+        "target_entry",
+        "target_payload_bytes",
+        "target_payload_sha256",
+        "xlsx",
+    )
+    expected_corpus = {
+        "xlsx_first_cell": {
+            "name": "xlsx-tiny",
+            "generator": "litchi-xlsx-synthetic-v1",
+            "shape": XLSX_XML_BORROWED_SHAPE,
+            "payload_kind": "deterministic-integer-grid",
+        },
+        "xlsx_source_first_cell": {
+            "name": "xlsx-tiny",
+            "generator": "litchi-xlsx-synthetic-v1",
+            "shape": XLSX_XML_BORROWED_SHAPE,
+            "payload_kind": "deterministic-integer-grid",
+        },
+        "xlsx_eager_cell_values_one_edit_save": {
+            "name": "xlsx-cell-values-medium",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "shape": XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        },
+        "xlsx_source_backed_cell_values_one_edit_save": {
+            "name": "xlsx-cell-values-medium",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "shape": XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        },
+    }
+    validated: list[dict[str, Any]] = []
+    result_identities: list[dict[str, Any]] = []
+    for index, result in enumerate(results):
+        result_location = f"{location}.results[{index}]"
+        if not isinstance(result, dict):
+            raise ResourceProfileInputError(f"{result_location} must be an object")
+        case = result["case"]
+        _validate_elapsed_statistics(
+            result.get("elapsed_ns"),
+            sample_count=sample_count,
+            location=f"{result_location}.elapsed_ns",
+        )
+        corpus = result.get("corpus")
+        if not isinstance(corpus, dict) or not corpus:
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus must be a non-empty object"
+            )
+        for key in required_manifest_keys:
+            if key not in corpus:
+                raise ResourceProfileInputError(
+                    f"{result_location}.corpus.{key} is required for XLSX identity"
+                )
+        expected = expected_corpus[case]
+        for key, expected_value in expected.items():
+            if corpus.get(key) != expected_value:
+                raise ResourceProfileInputError(
+                    f"{result_location}.corpus.{key} must be {expected_value!r}"
+                )
+        if corpus.get("package_format") != "XLSX/OPC/ZIP":
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.package_format must be 'XLSX/OPC/ZIP'"
+            )
+        if corpus.get("compression") != "deflate":
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.compression must be 'deflate'"
+            )
+        if corpus.get("target_entry") != "Sheet1!A1":
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.target_entry must be 'Sheet1!A1'"
+            )
+        for key in (
+            "entry_count",
+            "archive_member_count",
+            "entry_bytes",
+            "uncompressed_payload_bytes",
+            "archive_bytes",
+            "target_payload_bytes",
+        ):
+            value = corpus.get(key)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ResourceProfileInputError(
+                    f"{result_location}.corpus.{key} must be a non-negative integer"
+                )
+        _validate_sha256(
+            corpus.get("archive_sha256"), f"{result_location}.corpus.archive_sha256"
+        )
+        _validate_sha256(
+            corpus.get("target_payload_sha256"),
+            f"{result_location}.corpus.target_payload_sha256",
+        )
+        xlsx = corpus["xlsx"]
+        if not isinstance(xlsx, dict):
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.xlsx must be an object"
+            )
+        for key in (
+            "sheet_count",
+            "rows_per_sheet",
+            "columns_per_sheet",
+            "one_percent_update_count",
+        ):
+            value = xlsx.get(key)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ResourceProfileInputError(
+                    f"{result_location}.corpus.xlsx.{key} must be a non-negative integer"
+                )
+        source_members = xlsx.get("source_members")
+        if not isinstance(source_members, dict):
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.xlsx.source_members must be an object"
+            )
+        for key in ("workbook", "styles"):
+            value = source_members.get(key)
+            if not isinstance(value, str) or not value:
+                raise ResourceProfileInputError(
+                    f"{result_location}.corpus.xlsx.source_members.{key} must be a string"
+                )
+        worksheets = source_members.get("worksheets")
+        if (
+            not isinstance(worksheets, list)
+            or not worksheets
+            or any(not isinstance(value, str) or not value for value in worksheets)
+        ):
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.xlsx.source_members.worksheets must be non-empty strings"
+            )
+        shared_strings = source_members.get("shared_strings")
+        if shared_strings is not None and (
+            not isinstance(shared_strings, str) or not shared_strings
+        ):
+            raise ResourceProfileInputError(
+                f"{result_location}.corpus.xlsx.source_members.shared_strings must be a string or null"
+            )
+
+        expected_source, expected_sink, expected_output = XLSX_XML_BORROWED_RESULT_IDENTITY[case]
+        source = result.get("source")
+        sink = result.get("sink")
+        output = result.get("output_sha256")
+        if (source is not None) != expected_source:
+            raise ResourceProfileInputError(
+                f"{result_location}.source presence does not match fixed {case} identity"
+            )
+        if (sink is not None) != expected_sink:
+            raise ResourceProfileInputError(
+                f"{result_location}.sink presence does not match fixed {case} identity"
+            )
+        if (output is not None) != expected_output:
+            raise ResourceProfileInputError(
+                f"{result_location}.output_sha256 presence does not match fixed {case} identity"
+            )
+        if source is not None:
+            if not isinstance(source, dict) or not source:
+                raise ResourceProfileInputError(
+                    f"{result_location}.source must be a non-empty object"
+                )
+            _canonical_json(source, f"{result_location}.source")
+        if sink is not None:
+            if not isinstance(sink, dict) or not sink:
+                raise ResourceProfileInputError(
+                    f"{result_location}.sink must be a non-empty object"
+                )
+            _canonical_json(sink, f"{result_location}.sink")
+        if output is not None:
+            _validate_sha256(output, f"{result_location}.output_sha256")
+        result_identity = {
+            "case": case,
+            "source_present": source is not None,
+            "source": source,
+            "sink_present": sink is not None,
+            "sink": sink,
+            "output_present": output is not None,
+            "output_sha256": output,
+        }
+        _canonical_json(result_identity, f"{result_location} identity")
+        validated.append(result)
+        result_identities.append(result_identity)
+    return configuration, validated, result_identities
+
+
 def _require_revision(report: dict[str, Any], location: str) -> str:
     environment = report.get("environment")
     if not isinstance(environment, dict):
@@ -1746,12 +2066,47 @@ def _require_revision(report: dict[str, Any], location: str) -> str:
     return revision
 
 
+def _xlsx_xml_borrowed_harness_identity(
+    report: Any,
+    location: str,
+    *,
+    cases: Sequence[str] = XLSX_XML_BORROWED_CASES,
+) -> dict[str, Any]:
+    """Return the identity channels shared by timed and heaptrack harnesses.
+
+    Elapsed samples are deliberately excluded: the second process is
+    instrumented and therefore has different resource-observation timing.
+    Configuration, corpus rows, source/sink/output channels, revision, tool,
+    and stable environment remain exact identity requirements.
+    """
+    configuration, results, result_identities = _xlsx_xml_borrowed_harness_results(
+        report, location, cases=cases
+    )
+    revision = _require_revision(report, location)
+    environment = _harness_environment_identity(report, location)
+    tool = _harness_tool_identity(report, location)
+    return {
+        "schema_version": report["schema_version"],
+        "tool": tool,
+        "environment": environment,
+        "git_revision": revision,
+        "git_worktree_dirty": False,
+        "configuration": configuration,
+        "corpus": [
+            {"case": result["case"], "corpus": result["corpus"]}
+            for result in results
+        ],
+        "result_identities": result_identities,
+    }
+
+
 def validate_abba_inputs(
     legs: Sequence[dict[str, Any]],
     *,
     expected_configuration: dict[str, Any] | None = None,
     workload: str = "xlsx",
     docx_cases: Sequence[str] | None = None,
+    xlsx_cases: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Validate clean binary/revision/corpus/config identity for four ABBA legs.
 
@@ -1760,12 +2115,17 @@ def validate_abba_inputs(
     statistics are interpreted, and a missing identity is an error rather than
     an implicit match.
     """
-    if workload not in {"xlsx", DOCX_SEMANTIC_ID}:
+    if workload not in {"xlsx", DOCX_SEMANTIC_ID, XLSX_XML_BORROWED_ID}:
         raise ResourceProfileInputError(f"unsupported ABBA workload: {workload!r}")
     selected_docx_cases = (
         _normalize_docx_cases(docx_cases)
         if workload == DOCX_SEMANTIC_ID
         else DOCX_SEMANTIC_CASES
+    )
+    selected_xlsx_cases = (
+        _normalize_xlsx_xml_borrowed_cases(xlsx_cases)
+        if workload == XLSX_XML_BORROWED_ID
+        else XLSX_XML_BORROWED_CASES
     )
     if len(legs) != len(ABBA_LEG_ORDER):
         raise ResourceProfileInputError(
@@ -1784,6 +2144,7 @@ def validate_abba_inputs(
     tools: list[Any] = []
     environments: list[dict[str, Any]] = []
     harness_identities: list[dict[str, Any]] = []
+    result_identity_sets: list[list[dict[str, Any]]] = []
     for index, leg in enumerate(legs):
         location = f"legs[{index}]"
         if not isinstance(leg, dict):
@@ -1817,13 +2178,26 @@ def validate_abba_inputs(
                 {"case": result["case"], "corpus": result["corpus"]}
                 for result in results
             ]
+            result_identities: list[dict[str, Any]] = []
+        elif workload == XLSX_XML_BORROWED_ID:
+            configuration, results, result_identities = _xlsx_xml_borrowed_harness_results(
+                report,
+                f"{location}.harness_report",
+                cases=selected_xlsx_cases,
+            )
+            corpus_value = [
+                {"case": result["case"], "corpus": result["corpus"]}
+                for result in results
+            ]
         else:
             configuration, result = _harness_result(
                 report, f"{location}.harness_report"
             )
             corpus_value = result["corpus"]
+            result_identities = []
         configurations.append(configuration)
         corpora.append(corpus_value)
+        result_identity_sets.append(result_identities)
         report_location = f"{location}.harness_report"
         revision = _require_revision(report, report_location)
         revisions[label] = revision
@@ -1831,18 +2205,19 @@ def validate_abba_inputs(
         environments.append(environment_identity)
         tool = _harness_tool_identity(report, report_location)
         tools.append(tool)
-        harness_identities.append(
-            {
-                "leg": label,
-                "variant": expected_variant,
-                "schema_version": report["schema_version"],
-                "tool": tool,
-                "environment": environment_identity,
-                "git_revision": revision,
-                "git_worktree_dirty": False,
-                "configuration": configuration,
-            }
-        )
+        harness_identity = {
+            "leg": label,
+            "variant": expected_variant,
+            "schema_version": report["schema_version"],
+            "tool": tool,
+            "environment": environment_identity,
+            "git_revision": revision,
+            "git_worktree_dirty": False,
+            "configuration": configuration,
+        }
+        if workload == XLSX_XML_BORROWED_ID:
+            harness_identity["result_identities"] = result_identities
+        harness_identities.append(harness_identity)
 
     configuration_identity = _canonical_json(configurations[0], "ABBA configuration")
     if any(_canonical_json(item, "ABBA configuration") != configuration_identity for item in configurations[1:]):
@@ -1852,8 +2227,23 @@ def validate_abba_inputs(
         _canonical_json(item, "ABBA corpus") != corpus_identity_json
         for item in corpora[1:]
     ):
+        if workload == XLSX_XML_BORROWED_ID:
+            raise ResourceProfileInputError(
+                "ABBA XLSX borrowed-parser corpus identities do not match"
+            )
         label = "DOCX semantic corpora" if workload == DOCX_SEMANTIC_ID else "XLSX corpora"
         raise ResourceProfileInputError(f"ABBA {label} do not match")
+    if workload == XLSX_XML_BORROWED_ID:
+        result_identity_json = _canonical_json(
+            result_identity_sets[0], "ABBA XLSX result identities"
+        )
+        if any(
+            _canonical_json(item, "ABBA XLSX result identities") != result_identity_json
+            for item in result_identity_sets[1:]
+        ):
+            raise ResourceProfileInputError(
+                "ABBA XLSX borrowed-parser source/sink/output identities do not match"
+            )
     tool_identity = _canonical_json(tools[0], "ABBA tool identity")
     if any(_canonical_json(item, "ABBA tool identity") != tool_identity for item in tools[1:]):
         raise ResourceProfileInputError("ABBA harness tool identities do not match")
@@ -1907,7 +2297,22 @@ def validate_abba_inputs(
         if workload == DOCX_SEMANTIC_ID
         else None
     )
-    return {
+    xlsx_corpus_identities = (
+        [
+            {
+                "case": item["case"],
+                "corpus": item["corpus"],
+                "identity": corpus_identity(item["corpus"]),
+                "identity_sha256": sha256_bytes(
+                    _canonical_json(item["corpus"], "XLSX corpus").encode("utf-8")
+                ),
+            }
+            for item in corpora[0]
+        ]
+        if workload == XLSX_XML_BORROWED_ID
+        else None
+    )
+    validation = {
         "status": "validated",
         "workload": workload,
         "leg_order": list(ABBA_LEG_ORDER),
@@ -1917,14 +2322,21 @@ def validate_abba_inputs(
         "candidate_binary_sha256": binary_hashes["B1"],
         "configuration": configurations[0],
         "corpus": corpora[0],
-        "corpus_identities": docx_corpus_identities
-        if workload == DOCX_SEMANTIC_ID
-        else corpus_identity(corpora[0]),
+        "corpus_identities": (
+            docx_corpus_identities
+            if workload == DOCX_SEMANTIC_ID
+            else xlsx_corpus_identities
+            if workload == XLSX_XML_BORROWED_ID
+            else corpus_identity(corpora[0])
+        ),
         "tool": tools[0],
         "environment": environments[0],
         "harness_identities": harness_identities,
         "claim": "identity validation only; no performance or speedup claim",
     }
+    if workload == XLSX_XML_BORROWED_ID:
+        validation["result_identities"] = result_identity_sets[0]
+    return validation
 
 
 def validate_docx_abba_inputs(
@@ -1939,6 +2351,22 @@ def validate_docx_abba_inputs(
         expected_configuration=expected_configuration,
         workload=DOCX_SEMANTIC_ID,
         docx_cases=cases,
+    )
+
+
+def validate_xlsx_xml_borrowed_abba_inputs(
+    legs: Sequence[dict[str, Any]],
+    *,
+    expected_configuration: dict[str, Any] | None = None,
+    cases: Sequence[str] = XLSX_XML_BORROWED_CASES,
+) -> dict[str, Any]:
+    """Validate the strict four-case XLSX borrowed-parser resource workload."""
+    selected = _normalize_xlsx_xml_borrowed_cases(cases)
+    return validate_abba_inputs(
+        legs,
+        expected_configuration=expected_configuration,
+        workload=XLSX_XML_BORROWED_ID,
+        xlsx_cases=selected,
     )
 
 
@@ -1958,14 +2386,23 @@ def _leg_resource_metric(leg: dict[str, Any], metric: str) -> float | int | None
     direct = leg.get("resource_metrics")
     if isinstance(direct, dict) and metric in direct:
         return _finite_resource_value(direct[metric])
-    if metric.startswith("harness.elapsed_ns."):
+    if metric.startswith("harness.") and ".elapsed_ns." in metric:
         report = leg.get("harness_report") or leg.get("report")
         if isinstance(report, dict):
             results = report.get("results")
-            if isinstance(results, list) and len(results) == 1 and isinstance(results[0], dict):
-                elapsed = results[0].get("elapsed_ns")
-                if isinstance(elapsed, dict):
-                    return _finite_resource_value(elapsed.get(metric.rsplit(".", 1)[1]))
+            if isinstance(results, list):
+                fields = metric.split(".")
+                statistic = fields[-1]
+                case = ".".join(fields[1:-2]) if len(fields) >= 4 else None
+                case = case or None
+                for result in results:
+                    if not isinstance(result, dict):
+                        continue
+                    if case is not None and result.get("case") != case:
+                        continue
+                    elapsed = result.get("elapsed_ns")
+                    if isinstance(elapsed, dict):
+                        return _finite_resource_value(elapsed.get(statistic))
         return None
     if metric.startswith("time."):
         timed = leg.get("time")
@@ -2363,6 +2800,8 @@ def _profile_abba_heaptrack(
     warmup: int,
     samples: int,
     timeout_seconds: float,
+    expected_harness_identity: dict[str, Any] | None = None,
+    harness_identity_validator: Callable[[Any, str], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Collect an optional retained heaptrack process-total profile for one leg."""
     heaptrack_tool = tools.get("heaptrack", {})
@@ -2400,6 +2839,46 @@ def _profile_abba_heaptrack(
         "harness": artifact(profile_json, retained=True),
         "captures": [artifact(path, retained=True) for path in captures],
     }
+    if expected_harness_identity is not None:
+        if harness_identity_validator is None:
+            raise ResourceProfileInputError(
+                "heaptrack harness identity validator is required when timed identity is supplied"
+            )
+        if profile_json.is_file():
+            try:
+                heaptrack_report = load_json(profile_json)
+                observed_identity = harness_identity_validator(
+                    heaptrack_report, "heaptrack.harness_report"
+                )
+            except (OSError, ValueError) as error:
+                raise ResourceProfileInputError(
+                    f"heaptrack harness report is invalid: {error}"
+                ) from error
+            expected_json = _canonical_json(
+                expected_harness_identity, "timed harness identity"
+            )
+            observed_json = _canonical_json(
+                observed_identity, "heaptrack harness identity"
+            )
+            expected_sha256 = sha256_bytes(expected_json.encode("utf-8"))
+            observed_sha256 = sha256_bytes(observed_json.encode("utf-8"))
+            if observed_json != expected_json:
+                raise ResourceProfileInputError(
+                    "heaptrack harness identity does not match timed leg identity: "
+                    f"timed_sha256={expected_sha256}, heaptrack_sha256={observed_sha256}"
+                )
+            result["harness_identity"] = {
+                "status": "validated",
+                "sha256": observed_sha256,
+                "scope": (
+                    "exact configuration, corpus, source/sink/output, revision, "
+                    "tool, and stable environment identity"
+                ),
+            }
+        else:
+            raise ResourceProfileInputError(
+                "heaptrack harness report was not produced; cannot validate timed leg identity"
+            )
     if not captures:
         result["capture"] = artifact(workdir / "heaptrack-profile", retained=True)
         if run["returncode"] == 0:
@@ -2637,6 +3116,110 @@ def profile_docx_semantic_abba_leg(
     }
 
 
+def profile_xlsx_xml_borrowed_abba_leg(
+    *,
+    leg: str,
+    variant: str,
+    binary: Path,
+    binary_descriptor: dict[str, Any],
+    artifact_root: Path,
+    warmup: int,
+    samples: int,
+    tools: dict[str, dict[str, Any]],
+    timeout_seconds: float,
+    cases: Sequence[str] = XLSX_XML_BORROWED_CASES,
+) -> dict[str, Any]:
+    """Run one retained four-case XLSX borrowed-parser resource leg."""
+    selected_cases = _normalize_xlsx_xml_borrowed_cases(cases)
+    if leg not in ABBA_LEG_VARIANTS or ABBA_LEG_VARIANTS[leg] != variant:
+        raise ResourceProfileInputError(f"invalid ABBA leg/variant pair: {leg!r}/{variant!r}")
+    leg_dir = artifact_root / leg.lower()
+    leg_dir.mkdir(parents=True, exist_ok=True)
+    harness_json = leg_dir / "harness.json"
+    stdout = leg_dir / "harness-stdout.txt"
+    stderr = leg_dir / "harness-stderr.txt"
+    harness_args = xlsx_xml_borrowed_args(selected_cases)
+    command = _profile_command(
+        binary,
+        harness_args,
+        warmup=warmup,
+        samples=samples,
+        output=harness_json,
+    )
+    time_tool = tools.get("time", {})
+    time_report = leg_dir / "time-v.txt"
+    timed_command = (
+        [str(time_tool["path"]), "-v", "-o", str(time_report), "--", *command]
+        if time_tool.get("available")
+        else command
+    )
+    run = run_command(
+        timed_command,
+        stdout_path=stdout,
+        stderr_path=stderr,
+        timeout_seconds=timeout_seconds,
+    )
+    run = _retain_run_artifacts(run, stdout, stderr)
+    if run["returncode"] != 0 or not harness_json.is_file():
+        raise RuntimeError(
+            f"harness failed for {leg}: returncode={run['returncode']} stderr={run['stderr_excerpt']}"
+        )
+    report = load_json(harness_json)
+    harness_identity = _xlsx_xml_borrowed_harness_identity(
+        report, "timed.harness_report", cases=selected_cases
+    )
+    resource_metrics = instrumented_harness_metrics(report, selected_cases)
+    if time_tool.get("available"):
+        parsed_time = parse_time_report(time_report, retained=True)
+        time_result: dict[str, Any] = {
+            "status": parsed_time.get("status", "unparsed"),
+            "command": command_record(timed_command),
+            "run": run,
+            "parsed": parsed_time,
+            "scope": "whole process; instrumented resource observation, not latency evidence",
+        }
+    else:
+        time_result = {
+            "status": "unsupported",
+            "reason": "GNU /usr/bin/time unavailable",
+            "scope": "whole process when available; not latency evidence",
+        }
+    return {
+        "leg": leg,
+        "variant": variant,
+        "binary_identity": dict(binary_descriptor),
+        "harness": {
+            "command": command_record(command),
+            "run": run,
+            "report": artifact(harness_json, retained=True),
+            "logical_measurements": logical_measurements(report),
+            "instrumented_resource_metrics": resource_metrics,
+        },
+        # Keep the complete report private until strict identity validation has
+        # consumed every result row and its source/sink/output channels.
+        "harness_report": report,
+        "resource_metrics": resource_metrics,
+        "latency_evidence": dict(LATENCY_SEPARATION),
+        "time": time_result,
+        "heaptrack": _profile_abba_heaptrack(
+            binary,
+            harness_args,
+            leg_dir,
+            tools,
+            warmup=warmup,
+            samples=samples,
+            timeout_seconds=timeout_seconds,
+            expected_harness_identity=harness_identity,
+            harness_identity_validator=lambda value, location: (
+                _xlsx_xml_borrowed_harness_identity(
+                    value, location, cases=selected_cases
+                )
+            ),
+        ),
+        "artifact_directory": str(leg_dir),
+    }
+
+
 def _fixed_xlsx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
     return {
         "warmup_iterations": warmup,
@@ -2650,6 +3233,31 @@ def _fixed_xlsx_abba_configuration(warmup: int, samples: int) -> dict[str, Any]:
             "xlsx_cell_crud_shapes": [XLSX_MANAGED_BATCH_SHAPE],
         },
         "leg_order": list(ABBA_LEG_ORDER),
+    }
+
+
+def _fixed_xlsx_xml_borrowed_abba_configuration(
+    warmup: int,
+    samples: int,
+    cases: Sequence[str] = XLSX_XML_BORROWED_CASES,
+) -> dict[str, Any]:
+    selected_cases = _normalize_xlsx_xml_borrowed_cases(cases)
+    return {
+        "warmup_iterations": warmup,
+        "samples": samples,
+        "cases": list(selected_cases),
+        "xlsx_shape": XLSX_XML_BORROWED_SHAPE,
+        "xlsx_cell_crud_shape": XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
+        "harness_expected": {
+            "samples_per_case": samples,
+            "warmup_iterations_per_case": warmup,
+            "cases": list(selected_cases),
+            "xlsx_shapes": [XLSX_XML_BORROWED_SHAPE],
+            "xlsx_cell_crud_shapes": [XLSX_XML_BORROWED_CELL_CRUD_SHAPE],
+        },
+        "leg_order": list(ABBA_LEG_ORDER),
+        "latency_evidence": dict(LATENCY_SEPARATION),
+        "resource_tools": ["/usr/bin/time", "heaptrack", "heaptrack_print"],
     }
 
 
@@ -2787,6 +3395,160 @@ def run_xlsx_managed_batch_abba(arguments: argparse.Namespace) -> int:
             "Missing optional tools remain unsupported/null; no zero is substituted.",
             "Allocation and RSS values are whole-process observations, including profiler overhead where applicable.",
             "Copy bytes, decompressed bytes, and physical-cold I/O are not measured.",
+        ],
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("x", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2, sort_keys=True, allow_nan=False)
+        handle.write("\n")
+    return 0
+
+
+def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
+    """Run strict retained A1/B1/B2/A2 XLSX borrowed-parser resource evidence."""
+    selected_cases = _normalize_xlsx_xml_borrowed_cases(
+        getattr(arguments, "cases", XLSX_XML_BORROWED_CASES)
+    )
+    control = binary_identity(Path(arguments.control_binary), label="control")
+    candidate = binary_identity(Path(arguments.candidate_binary), label="candidate")
+    if control["binary_sha256"] == candidate["binary_sha256"]:
+        raise ResourceProfileInputError("control and candidate binary hashes are identical")
+    output_path = Path(arguments.output).expanduser().resolve()
+    artifact_root = (
+        Path(arguments.artifact_dir).expanduser().resolve()
+        if arguments.artifact_dir
+        else output_path.with_name(output_path.stem + "-artifacts")
+    )
+    output_path, artifact_root = reserve_abba_paths(output_path, artifact_root)
+    tools = {
+        "time": probe_tool("/usr/bin/time", ("--version",)),
+        "heaptrack": probe_tool("heaptrack", ("--version",)),
+        "heaptrack_print": probe_tool("heaptrack_print", ("--version",)),
+    }
+    legs: list[dict[str, Any]] = []
+    for leg in ABBA_LEG_ORDER:
+        variant = ABBA_LEG_VARIANTS[leg]
+        descriptor = control if variant == "control" else candidate
+        legs.append(
+            profile_xlsx_xml_borrowed_abba_leg(
+                leg=leg,
+                variant=variant,
+                binary=Path(descriptor["path"]),
+                binary_descriptor=descriptor,
+                artifact_root=artifact_root,
+                warmup=arguments.warmup,
+                samples=arguments.samples,
+                tools=tools,
+                timeout_seconds=arguments.timeout,
+                cases=selected_cases,
+            )
+        )
+    control_after = binary_identity(Path(arguments.control_binary), label="control")
+    candidate_after = binary_identity(Path(arguments.candidate_binary), label="candidate")
+    if control_after["binary_sha256"] != control["binary_sha256"]:
+        raise ResourceProfileInputError(
+            "control binary changed during XLSX borrowed-parser ABBA execution"
+        )
+    if control_after["mode_bits"] != control["mode_bits"]:
+        raise ResourceProfileInputError("control binary mode changed during ABBA execution")
+    if candidate_after["binary_sha256"] != candidate["binary_sha256"]:
+        raise ResourceProfileInputError(
+            "candidate binary changed during XLSX borrowed-parser ABBA execution"
+        )
+    if candidate_after["mode_bits"] != candidate["mode_bits"]:
+        raise ResourceProfileInputError("candidate binary mode changed during ABBA execution")
+
+    fixed_configuration = _fixed_xlsx_xml_borrowed_abba_configuration(
+        arguments.warmup,
+        arguments.samples,
+        selected_cases,
+    )
+    validation = validate_abba_inputs(
+        legs,
+        expected_configuration=fixed_configuration["harness_expected"],
+        workload=XLSX_XML_BORROWED_ID,
+    )
+    statistics_report = abba_statistics(
+        legs,
+        metric_specs=XLSX_XML_BORROWED_RESOURCE_METRIC_SPECS,
+    )
+    published_legs = []
+    for leg, harness_identity in zip(legs, validation["harness_identities"]):
+        published = {
+            key: value for key, value in leg.items() if key != "harness_report"
+        }
+        published["harness_identity"] = harness_identity
+        published_legs.append(published)
+    canonical_harness_identity = {
+        "schema_version": SCHEMA_VERSION,
+        "tool": validation["tool"],
+        "environment": validation["environment"],
+        "configuration": validation["configuration"],
+        "leg_revisions": {
+            identity["leg"]: identity["git_revision"]
+            for identity in validation["harness_identities"]
+        },
+        "clean_worktrees": True,
+    }
+    report = {
+        "schema_version": SCHEMA_VERSION,
+        "abba_schema_version": ABBA_SCHEMA_VERSION,
+        "tool": {
+            "name": TOOL_NAME,
+            "version": TOOL_VERSION,
+            "mode": "xlsx-xml-borrowed-abba-resource-profile",
+            "python_standard_library_only": True,
+        },
+        "scope": {
+            "workload": XLSX_XML_BORROWED_ID,
+            "cases": list(selected_cases),
+            "xlsx_shape": XLSX_XML_BORROWED_SHAPE,
+            "xlsx_cell_crud_shape": XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
+            "claim": (
+                "four fresh process legs in fixed A1/B1/B2/A2 order over exact tiny "
+                "and medium XLSX corpora; descriptive allocation/RSS/resource "
+                "comparison only and no automatic latency or speedup claim"
+            ),
+            "resource_scope": (
+                "instrumented harness summaries plus whole-process /usr/bin/time and "
+                "optional heaptrack allocation/peak-heap/peak-RSS observations"
+            ),
+            "instrumented_elapsed": "retained for resource-leg alignment only; not latency evidence",
+            "physical_io": (
+                "no physical I/O claim; no cache flush, source-byte, decompressed-byte, "
+                "recompressed-byte, or memory-copy counter is collected"
+            ),
+        },
+        "latency_evidence": dict(LATENCY_SEPARATION),
+        "host_environment": environment(),
+        "binary_identity": {"control": control, "candidate": candidate},
+        "configuration": fixed_configuration,
+        "corpus_identities": validation["corpus_identities"],
+        "result_identities": validation["result_identities"],
+        "canonical_harness_identity": canonical_harness_identity,
+        "tools": tools,
+        "validation": validation,
+        "legs": published_legs,
+        "statistics": statistics_report,
+        "perf_counters": {
+            "status": "not_measured",
+            "reason": "perf counters are not collected or synthesized by this mode",
+            "counters": {event: {"value": None, "available": False} for event in EVENTS},
+        },
+        "not_measured": dict(NOT_MEASURED_RESOURCE_DIMENSIONS),
+        "physical_io_claim_scope": (
+            "whole-process profiler observations do not identify physical source reads, "
+            "decompression, recompression, or memory copies"
+        ),
+        "artifact_directory": str(artifact_root),
+        "limitations": [
+            "Control and candidate revisions must come from clean release harness worktrees.",
+            "The four case names, order, tiny/medium shapes, and identity channels are fixed.",
+            "Missing optional tools remain unsupported/null; no zero is substituted.",
+            "Instrumented harness elapsed values are not latency evidence.",
+            "Allocation and RSS values are whole-process observations, including profiler overhead.",
+            "Source, sink, and output identities are compared exactly per case; absent values remain absent.",
+            "Physical I/O, copy bytes, decompressed bytes, and recompressed bytes are not measured.",
         ],
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3106,7 +3868,21 @@ def build_identity(
     return identity
 
 
+def _apply_run_sampling_defaults(arguments: argparse.Namespace) -> None:
+    """Apply mode-specific run defaults while keeping ordinary run lightweight."""
+    requested = getattr(arguments, "workload", None)
+    only = getattr(arguments, "only", None)
+    borrowed = requested in XLSX_XML_BORROWED_ID_ALIASES or (
+        requested is None and only in XLSX_XML_BORROWED_ID_ALIASES
+    )
+    if getattr(arguments, "warmup", None) is None:
+        arguments.warmup = 30 if borrowed else 1
+    if getattr(arguments, "samples", None) is None:
+        arguments.samples = 500 if borrowed else 3
+
+
 def run_profile(arguments: argparse.Namespace) -> int:
+    _apply_run_sampling_defaults(arguments)
     abba_control = getattr(arguments, "control_binary", None)
     abba_candidate = getattr(arguments, "candidate_binary", None)
     if getattr(arguments, "include_one_paragraph_text", False) and (
@@ -3135,16 +3911,22 @@ def run_profile(arguments: argparse.Namespace) -> int:
         if arguments.only and arguments.only not in {
             XLSX_MANAGED_BATCH_ID,
             *DOCX_SEMANTIC_ID_ALIASES,
+            *XLSX_XML_BORROWED_ID_ALIASES,
         }:
             raise ResourceProfileInputError(
-                "ABBA mode only supports --only xlsx-managed-batch or --only docx-semantic"
+                "ABBA mode only supports --only xlsx-managed-batch, "
+                "xlsx-xml-borrowed, or docx-semantic"
             )
         if requested_workload in DOCX_SEMANTIC_ID_ALIASES:
             requested_workload = DOCX_SEMANTIC_ID
+        elif requested_workload in XLSX_XML_BORROWED_ID_ALIASES:
+            requested_workload = XLSX_XML_BORROWED_ID
         if requested_workload is None:
             requested_workload = (
                 DOCX_SEMANTIC_ID
                 if arguments.only in DOCX_SEMANTIC_ID_ALIASES
+                else XLSX_XML_BORROWED_ID
+                if arguments.only in XLSX_XML_BORROWED_ID_ALIASES
                 else XLSX_MANAGED_BATCH_ID
             )
         if getattr(arguments, "include_one_paragraph_text", False) and (
@@ -3155,6 +3937,8 @@ def run_profile(arguments: argparse.Namespace) -> int:
             )
         if arguments.only in DOCX_SEMANTIC_ID_ALIASES:
             only_workload = DOCX_SEMANTIC_ID
+        elif arguments.only in XLSX_XML_BORROWED_ID_ALIASES:
+            only_workload = XLSX_XML_BORROWED_ID
         else:
             only_workload = arguments.only
         if only_workload and only_workload != requested_workload:
@@ -3181,6 +3965,10 @@ def run_profile(arguments: argparse.Namespace) -> int:
             if arguments.output == DEFAULT_OUTPUT:
                 abba_arguments.output = DEFAULT_DOCX_ABBA_OUTPUT
             return run_docx_semantic_abba(abba_arguments)
+        if requested_workload == XLSX_XML_BORROWED_ID:
+            if arguments.output == DEFAULT_OUTPUT:
+                abba_arguments.output = DEFAULT_XLSX_XML_BORROWED_ABBA_OUTPUT
+            return run_xlsx_xml_borrowed_abba(abba_arguments)
         if arguments.output == DEFAULT_OUTPUT:
             abba_arguments.output = DEFAULT_ABBA_OUTPUT
         return run_xlsx_managed_batch_abba(abba_arguments)
@@ -3337,7 +4125,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--only", help="comma-separated workload IDs")
     run.add_argument(
         "--workload",
-        choices=(XLSX_MANAGED_BATCH_ID, *DOCX_SEMANTIC_ID_ALIASES),
+        choices=(
+            XLSX_MANAGED_BATCH_ID,
+            *XLSX_XML_BORROWED_ID_ALIASES,
+            *DOCX_SEMANTIC_ID_ALIASES,
+        ),
         help="resource ABBA workload when explicit control/candidate binaries are supplied",
     )
     run.add_argument(
@@ -3367,8 +4159,8 @@ def build_parser() -> argparse.ArgumentParser:
             "case tuple"
         ),
     )
-    run.add_argument("--warmup", type=int, default=1)
-    run.add_argument("--samples", type=int, default=3)
+    run.add_argument("--warmup", type=int)
+    run.add_argument("--samples", type=int)
     run.add_argument("--timeout", type=float, default=600.0)
     run.set_defaults(function=run_profile)
     abba = subparsers.add_parser(
@@ -3402,6 +4194,41 @@ def build_parser() -> argparse.ArgumentParser:
     abba.add_argument("--samples", type=int, default=30)
     abba.add_argument("--timeout", type=float, default=600.0)
     abba.set_defaults(function=run_xlsx_managed_batch_abba)
+
+    borrowed = subparsers.add_parser(
+        "compare-xlsx-xml-borrowed",
+        aliases=("abba-xlsx-xml-borrowed", "compare-xlsx-borrowed"),
+        help=(
+            "run strict retained A1/B1/B2/A2 resource evidence for the fixed "
+            "XLSX borrowed-parser four-case workload"
+        ),
+    )
+    borrowed.add_argument(
+        "--control-binary",
+        "--control",
+        "--before-binary",
+        dest="control_binary",
+        type=Path,
+        required=True,
+    )
+    borrowed.add_argument(
+        "--candidate-binary",
+        "--candidate",
+        "--after-binary",
+        dest="candidate_binary",
+        type=Path,
+        required=True,
+    )
+    borrowed.add_argument("--output", type=Path, default=DEFAULT_XLSX_XML_BORROWED_ABBA_OUTPUT)
+    borrowed.add_argument(
+        "--artifact-dir",
+        type=Path,
+        help="directory for retained per-leg harness/time/heaptrack artifacts",
+    )
+    borrowed.add_argument("--warmup", type=int, default=30)
+    borrowed.add_argument("--samples", type=int, default=500)
+    borrowed.add_argument("--timeout", type=float, default=600.0)
+    borrowed.set_defaults(function=run_xlsx_xml_borrowed_abba)
 
     docx = subparsers.add_parser(
         "compare-docx-semantic",
@@ -3457,6 +4284,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     if arguments.command == "run":
+        _apply_run_sampling_defaults(arguments)
         if arguments.warmup < 0 or arguments.samples < 1 or arguments.timeout <= 0:
             raise SystemExit("--warmup must be non-negative, --samples and --timeout must be positive")
     elif arguments.command in {
@@ -3464,6 +4292,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "abba-xlsx-managed-batch",
         "abba",
         "compare",
+        "compare-xlsx-xml-borrowed",
+        "abba-xlsx-xml-borrowed",
+        "compare-xlsx-borrowed",
         "compare-docx-semantic",
         "abba-docx-semantic",
         "compare-docx",
