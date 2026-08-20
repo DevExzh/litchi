@@ -21,6 +21,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "numbers_table_data_list"
+path = "fuzz_targets/numbers_table_data_list.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

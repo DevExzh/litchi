@@ -4204,4 +4204,989 @@ mod tests {
             })
         ));
     }
+
+    fn fixed64(output: &mut Vec<u8>, number: u32, value: u64) {
+        key(output, number, 1);
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn fixed32(output: &mut Vec<u8>, number: u32, value: u32) {
+        key(output, number, 5);
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn unknown_fields(output: &mut Vec<u8>, number: u32) {
+        v(output, number, 0xfeed);
+        b(output, number + 1, b"unknown-bytes");
+        fixed64(output, number + 2, 0x0102_0304_0506_0708);
+        fixed32(output, number + 3, 0x090a_0b0c);
+        unknown_group(output, number + 4, number + 5, 0xbeef);
+    }
+
+    fn unknown_groups_to_depth(output: &mut Vec<u8>, number: u32, depth: usize) {
+        key(output, number, 3);
+        if depth > 1 {
+            unknown_groups_to_depth(output, number + 1, depth - 1);
+        } else {
+            v(output, number + 1, 1);
+        }
+        key(output, number, 4);
+    }
+
+    fn prost_reference(
+        identifier: u64,
+        deprecated_type: Option<i32>,
+        deprecated_is_external: Option<bool>,
+    ) -> crate::tsp::Reference {
+        crate::tsp::Reference {
+            identifier,
+            deprecated_type,
+            deprecated_is_external,
+        }
+    }
+
+    fn formula_oracle() -> crate::tsce::FormulaArchive {
+        crate::tsce::FormulaArchive {
+            ast_node_array: crate::tsce::AstNodeArrayArchive::default(),
+            host_column: Some(7),
+            host_row: Some(8),
+            host_column_is_negative: Some(false),
+            host_row_is_negative: Some(true),
+            ..Default::default()
+        }
+    }
+
+    fn format_oracle() -> crate::tsk::FormatStructArchive {
+        crate::tsk::FormatStructArchive {
+            format_type: Some(4),
+            decimal_places: Some(2),
+            currency_code: Some("CNY".to_owned()),
+            show_thousands_separator: Some(false),
+            ..Default::default()
+        }
+    }
+
+    fn custom_format_oracle() -> crate::tsk::CustomFormatArchive {
+        crate::tsk::CustomFormatArchive {
+            name: "custom".to_owned(),
+            format_type_pre_bnc: 5,
+            default_format: Box::new(format_oracle()),
+            format_type: Some(6),
+            ..Default::default()
+        }
+    }
+
+    fn import_warning_oracle() -> tst::ImportWarningSetArchive {
+        tst::ImportWarningSetArchive {
+            cond_format_expr: Some(true),
+            cond_format_stop_if_true: Some(false),
+            ..Default::default()
+        }
+    }
+
+    fn cell_spec_oracle() -> tst::CellSpecArchive {
+        tst::CellSpecArchive {
+            interaction_type: 3,
+            chooser_control_start_w_first: Some(false),
+            ..Default::default()
+        }
+    }
+
+    fn list_entry_oracle(key: u32, populated: bool) -> tst::table_data_list::ListEntry {
+        if populated {
+            tst::table_data_list::ListEntry {
+                key,
+                refcount: 12,
+                string: Some("雪 value".to_owned()),
+                reference: Some(prost_reference(101, Some(-7), Some(false))),
+                formula: Some(formula_oracle()),
+                format: Some(format_oracle()),
+                custom_format: Some(custom_format_oracle()),
+                rich_text_payload: Some(prost_reference(102, None, None)),
+                comment_storage: Some(prost_reference(103, Some(4), None)),
+                import_warning_set: Some(import_warning_oracle()),
+                cell_spec: Some(cell_spec_oracle()),
+            }
+        } else {
+            tst::table_data_list::ListEntry {
+                key,
+                refcount: 0,
+                ..Default::default()
+            }
+        }
+    }
+
+    fn list_oracle() -> tst::TableDataList {
+        tst::TableDataList {
+            list_type: tst::table_data_list::ListType::Format as i32,
+            next_list_id: 77,
+            entries: vec![list_entry_oracle(19, true), list_entry_oracle(3, false)],
+            segments: vec![
+                prost_reference(201, Some(9), Some(false)),
+                prost_reference(202, None, None),
+            ],
+            is_new_for_bnc: Some(false),
+        }
+    }
+
+    fn segment_oracle() -> tst::TableDataListSegment {
+        tst::TableDataListSegment {
+            list_type: tst::table_data_list::ListType::Formula as i32,
+            key_range: crate::tsp::Range {
+                location: 0x1234,
+                length: 0x5678,
+            },
+            entries: vec![list_entry_oracle(41, true), list_entry_oracle(2, false)],
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct ReferenceFact {
+        identifier: u64,
+        deprecated_type: Option<i32>,
+        deprecated_is_external: Option<bool>,
+    }
+
+    fn strict_reference_fact(reference: ReferenceSnapshot) -> ReferenceFact {
+        ReferenceFact {
+            identifier: reference.identifier(),
+            deprecated_type: reference.deprecated_type(),
+            deprecated_is_external: reference.deprecated_is_external(),
+        }
+    }
+
+    fn prost_reference_fact(reference: &crate::tsp::Reference) -> ReferenceFact {
+        ReferenceFact {
+            identifier: reference.identifier,
+            deprecated_type: reference.deprecated_type,
+            deprecated_is_external: reference.deprecated_is_external,
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct ListEntryFact {
+        key: u32,
+        ref_count: u32,
+        string_value: Option<String>,
+        reference: Option<ReferenceFact>,
+        formula: Option<Vec<u8>>,
+        format: Option<Vec<u8>>,
+        custom_format: Option<Vec<u8>>,
+        rich_text_payload: Option<ReferenceFact>,
+        comment_storage: Option<ReferenceFact>,
+        import_warning_set: Option<Vec<u8>>,
+        cell_spec: Option<Vec<u8>>,
+    }
+
+    fn strict_entry_fact(entry: TableDataListEntrySnapshot<'_>) -> ListEntryFact {
+        ListEntryFact {
+            key: entry.key(),
+            ref_count: entry.ref_count(),
+            string_value: entry.string_value().map(str::to_owned),
+            reference: entry.reference().map(strict_reference_fact),
+            formula: entry.formula().map(<[u8]>::to_vec),
+            format: entry.format().map(<[u8]>::to_vec),
+            custom_format: entry.custom_format().map(<[u8]>::to_vec),
+            rich_text_payload: entry.rich_text_payload().map(strict_reference_fact),
+            comment_storage: entry.comment_storage().map(strict_reference_fact),
+            import_warning_set: entry.import_warning_set().map(<[u8]>::to_vec),
+            cell_spec: entry.cell_spec().map(<[u8]>::to_vec),
+        }
+    }
+
+    fn prost_entry_fact(entry: &tst::table_data_list::ListEntry) -> ListEntryFact {
+        ListEntryFact {
+            key: entry.key,
+            ref_count: entry.refcount,
+            string_value: entry.string.clone(),
+            reference: entry.reference.as_ref().map(prost_reference_fact),
+            formula: entry.formula.as_ref().map(|value| value.encode_to_vec()),
+            format: entry.format.as_ref().map(|value| value.encode_to_vec()),
+            custom_format: entry
+                .custom_format
+                .as_ref()
+                .map(|value| value.encode_to_vec()),
+            rich_text_payload: entry.rich_text_payload.as_ref().map(prost_reference_fact),
+            comment_storage: entry.comment_storage.as_ref().map(prost_reference_fact),
+            import_warning_set: entry
+                .import_warning_set
+                .as_ref()
+                .map(|value| value.encode_to_vec()),
+            cell_spec: entry.cell_spec.as_ref().map(|value| value.encode_to_vec()),
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct SegmentFact {
+        raw: Vec<u8>,
+        reference: ReferenceFact,
+    }
+
+    #[derive(Default)]
+    struct ListCollector {
+        entries: Vec<ListEntryFact>,
+        segments: Vec<SegmentFact>,
+        source_range: Option<(usize, usize)>,
+        borrowed_payloads: Vec<(usize, usize)>,
+    }
+
+    impl ListCollector {
+        fn for_source(source: &[u8]) -> Self {
+            let start = source.as_ptr() as usize;
+            Self {
+                source_range: Some((start, start.saturating_add(source.len()))),
+                ..Default::default()
+            }
+        }
+
+        fn assert_borrowed(&mut self, payload: &[u8]) {
+            let Some((source_start, source_end)) = self.source_range else {
+                return;
+            };
+            if payload.is_empty() {
+                return;
+            }
+            let payload_start = payload.as_ptr() as usize;
+            let payload_end = payload_start.saturating_add(payload.len());
+            assert!(payload_start >= source_start);
+            assert!(payload_end <= source_end);
+            self.borrowed_payloads.push((payload_start, payload.len()));
+        }
+    }
+
+    impl StorageVisitor for ListCollector {
+        fn visit_list_entry(
+            &mut self,
+            entry: TableDataListEntrySnapshot<'_>,
+        ) -> Result<(), DecodeError> {
+            if let Some(string) = entry.string_value() {
+                self.assert_borrowed(string.as_bytes());
+            }
+            for payload in [
+                entry.formula(),
+                entry.format(),
+                entry.custom_format(),
+                entry.import_warning_set(),
+                entry.cell_spec(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                self.assert_borrowed(payload);
+            }
+            self.entries.push(strict_entry_fact(entry));
+            Ok(())
+        }
+
+        fn visit_list_segment(
+            &mut self,
+            reference: ReferenceRecord<'_>,
+        ) -> Result<(), DecodeError> {
+            self.assert_borrowed(reference.raw());
+            self.segments.push(SegmentFact {
+                raw: reference.raw().to_vec(),
+                reference: strict_reference_fact(reference.reference()),
+            });
+            Ok(())
+        }
+    }
+
+    fn list_minimal() -> Vec<u8> {
+        let mut source = Vec::new();
+        v(&mut source, 1, 1);
+        v(&mut source, 2, 2);
+        source
+    }
+
+    fn entry_minimal() -> Vec<u8> {
+        let mut source = Vec::new();
+        v(&mut source, 1, 1);
+        v(&mut source, 2, 2);
+        source
+    }
+
+    fn range_minimal() -> Vec<u8> {
+        let mut source = Vec::new();
+        v(&mut source, 1, 4);
+        v(&mut source, 2, 8);
+        source
+    }
+
+    fn segment_minimal() -> Vec<u8> {
+        let mut source = Vec::new();
+        v(&mut source, 1, 1);
+        b(&mut source, 2, &range_minimal());
+        source
+    }
+
+    fn assert_invalid_list(source: &[u8], label: &str) {
+        assert!(
+            decode_table_data_list(source, options(source)).is_err(),
+            "{label} unexpectedly decoded"
+        );
+    }
+
+    fn assert_invalid_entry(source: &[u8], label: &str) {
+        assert!(
+            decode_table_data_list_entry(source, options(source)).is_err(),
+            "{label} unexpectedly decoded"
+        );
+    }
+
+    fn assert_invalid_segment(source: &[u8], label: &str) {
+        assert!(
+            decode_table_data_list_segment(source, options(source)).is_err(),
+            "{label} unexpectedly decoded"
+        );
+    }
+
+    #[test]
+    fn list_root_entry_and_segment_match_prost_presence_order_borrowing_and_reports() {
+        let expected = list_oracle();
+        let source = expected.encode_to_vec();
+        let before = source.clone();
+        let prost = tst::TableDataList::decode(source.as_slice()).unwrap();
+        let expected_entries = prost
+            .entries
+            .iter()
+            .map(prost_entry_fact)
+            .collect::<Vec<_>>();
+        let expected_segments = prost
+            .segments
+            .iter()
+            .map(|reference| SegmentFact {
+                raw: reference.encode_to_vec(),
+                reference: prost_reference_fact(reference),
+            })
+            .collect::<Vec<_>>();
+
+        let mut visitor = ListCollector::for_source(&source);
+        let (visited, visitor_report) =
+            decode_table_data_list_with_visitor(&source, options(&source), &mut visitor).unwrap();
+        let (scalar, scalar_report) =
+            decode_table_data_list_with_report(&source, options(&source)).unwrap();
+
+        assert_eq!(source, before);
+        assert_eq!(visited, scalar);
+        assert_eq!(visitor_report, scalar_report);
+        assert_eq!(visited.list_type(), prost.list_type);
+        assert_eq!(visited.next_list_id(), prost.next_list_id);
+        assert_eq!(visited.is_new_for_bnc(), prost.is_new_for_bnc);
+        assert_eq!(visitor.entries, expected_entries);
+        assert_eq!(visitor.segments, expected_segments);
+        assert_eq!(visitor.entries[0].key, 19);
+        assert_eq!(visitor.entries[1].key, 3);
+        assert_eq!(visitor.segments[0].reference.identifier, 201);
+        assert_eq!(visitor.segments[1].reference.identifier, 202);
+        assert!(visitor.borrowed_payloads.len() >= 8);
+
+        let absent_source = list_minimal();
+        let absent_prost = tst::TableDataList::decode(absent_source.as_slice()).unwrap();
+        let absent = decode_table_data_list(&absent_source, options(&absent_source)).unwrap();
+        assert_eq!(absent.is_new_for_bnc(), None);
+        assert_eq!(absent_prost.is_new_for_bnc, None);
+    }
+
+    #[test]
+    fn list_entry_all_fields_match_prost_wire_payloads_and_presence() {
+        let expected = list_entry_oracle(29, true);
+        let source = expected.encode_to_vec();
+        let before = source.clone();
+        let prost = tst::table_data_list::ListEntry::decode(source.as_slice()).unwrap();
+        let strict = decode_table_data_list_entry(&source, options(&source)).unwrap();
+
+        assert_eq!(source, before);
+        assert_eq!(strict_entry_fact(strict), prost_entry_fact(&prost));
+        assert_eq!(strict.key(), prost.key);
+        assert_eq!(strict.ref_count(), prost.refcount);
+        assert_eq!(strict.string_value(), prost.string.as_deref());
+        assert_eq!(
+            strict.reference().map(strict_reference_fact),
+            prost.reference.as_ref().map(prost_reference_fact)
+        );
+        assert_eq!(
+            strict.rich_text_payload().map(strict_reference_fact),
+            prost.rich_text_payload.as_ref().map(prost_reference_fact)
+        );
+        assert_eq!(
+            strict.comment_storage().map(strict_reference_fact),
+            prost.comment_storage.as_ref().map(prost_reference_fact)
+        );
+        assert!(strict.formula().is_some() && prost.formula.is_some());
+        assert!(strict.format().is_some() && prost.format.is_some());
+        assert!(strict.custom_format().is_some() && prost.custom_format.is_some());
+        assert!(strict.import_warning_set().is_some() && prost.import_warning_set.is_some());
+        assert!(strict.cell_spec().is_some() && prost.cell_spec.is_some());
+
+        let sparse = list_entry_oracle(30, false).encode_to_vec();
+        let sparse_prost = tst::table_data_list::ListEntry::decode(sparse.as_slice()).unwrap();
+        let sparse_strict = decode_table_data_list_entry(&sparse, options(&sparse)).unwrap();
+        assert_eq!(
+            strict_entry_fact(sparse_strict),
+            prost_entry_fact(&sparse_prost)
+        );
+        assert_eq!(sparse_strict.string_value(), None);
+        assert_eq!(sparse_strict.reference(), None);
+        assert_eq!(sparse_strict.formula(), None);
+        assert_eq!(sparse_strict.format(), None);
+        assert_eq!(sparse_strict.custom_format(), None);
+        assert_eq!(sparse_strict.rich_text_payload(), None);
+        assert_eq!(sparse_strict.comment_storage(), None);
+        assert_eq!(sparse_strict.import_warning_set(), None);
+        assert_eq!(sparse_strict.cell_spec(), None);
+    }
+
+    #[test]
+    fn list_segment_matches_prost_range_entry_order_borrowing_and_reports() {
+        let expected = segment_oracle();
+        let source = expected.encode_to_vec();
+        let before = source.clone();
+        let prost = tst::TableDataListSegment::decode(source.as_slice()).unwrap();
+        let mut visitor = ListCollector::for_source(&source);
+        let (visited, visitor_report) =
+            decode_table_data_list_segment_with_visitor(&source, options(&source), &mut visitor)
+                .unwrap();
+        let (scalar, scalar_report) =
+            decode_table_data_list_segment_with_report(&source, options(&source)).unwrap();
+
+        assert_eq!(source, before);
+        assert_eq!(visited, scalar);
+        assert_eq!(visitor_report, scalar_report);
+        assert_eq!(visited.list_type(), prost.list_type);
+        assert_eq!(visited.key_range_location(), prost.key_range.location);
+        assert_eq!(visited.key_range_length(), prost.key_range.length);
+        assert_eq!(
+            visitor.entries,
+            prost
+                .entries
+                .iter()
+                .map(prost_entry_fact)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(visitor.entries[0].key, 41);
+        assert_eq!(visitor.entries[1].key, 2);
+        let range_bytes = prost.key_range.encode_to_vec();
+        assert_eq!(visited.key_range(), range_bytes.as_slice());
+        assert!(visitor.borrowed_payloads.len() >= 6);
+    }
+
+    #[test]
+    fn list_routes_accept_unknown_scalar_bytes_fixed_and_matched_groups_without_mutation() {
+        let expected = list_oracle();
+        let mut root = expected.encode_to_vec();
+        unknown_fields(&mut root, 90);
+        let root_before = root.clone();
+        let mut root_visitor = ListCollector::for_source(&root);
+        let root_prost = tst::TableDataList::decode(root.as_slice()).unwrap();
+        let (root_snapshot, root_report) =
+            decode_table_data_list_with_visitor(&root, options(&root), &mut root_visitor).unwrap();
+        assert_eq!(root, root_before);
+        assert_eq!(root_snapshot.list_type(), root_prost.list_type);
+        assert_eq!(root_snapshot.next_list_id(), root_prost.next_list_id);
+        assert_eq!(root_snapshot.is_new_for_bnc(), root_prost.is_new_for_bnc);
+        assert_eq!(root_visitor.entries.len(), root_prost.entries.len());
+        assert_eq!(root_visitor.segments.len(), root_prost.segments.len());
+        assert!(root_report.fields() > 0);
+
+        let mut entry = list_entry_oracle(31, true).encode_to_vec();
+        unknown_fields(&mut entry, 120);
+        let entry_before = entry.clone();
+        let entry_prost = tst::table_data_list::ListEntry::decode(entry.as_slice()).unwrap();
+        let entry_strict = decode_table_data_list_entry(&entry, options(&entry)).unwrap();
+        assert_eq!(entry, entry_before);
+        assert_eq!(
+            strict_entry_fact(entry_strict),
+            prost_entry_fact(&entry_prost)
+        );
+
+        let mut segment = segment_oracle().encode_to_vec();
+        unknown_fields(&mut segment, 150);
+        let segment_before = segment.clone();
+        let segment_prost = tst::TableDataListSegment::decode(segment.as_slice()).unwrap();
+        let segment_strict = decode_table_data_list_segment(&segment, options(&segment)).unwrap();
+        assert_eq!(segment, segment_before);
+        assert_eq!(segment_strict.list_type(), segment_prost.list_type);
+        assert_eq!(
+            segment_strict.key_range_location(),
+            segment_prost.key_range.location
+        );
+        assert_eq!(
+            segment_strict.key_range_length(),
+            segment_prost.key_range.length
+        );
+    }
+
+    #[test]
+    fn list_root_malformed_matrix_rejects_wire_varint_presence_reference_truncation_and_groups() {
+        let valid = list_minimal();
+        let mut cases = Vec::<(&str, Vec<u8>)>::new();
+
+        let mut missing_list_type = Vec::new();
+        v(&mut missing_list_type, 2, 2);
+        cases.push(("missing required list type", missing_list_type));
+        let mut missing_next_list_id = Vec::new();
+        v(&mut missing_next_list_id, 1, 1);
+        cases.push(("missing required next list id", missing_next_list_id));
+        let mut duplicate_list_type = valid.clone();
+        v(&mut duplicate_list_type, 1, 2);
+        cases.push(("duplicate required list type", duplicate_list_type));
+        let mut duplicate_next_list_id = valid.clone();
+        v(&mut duplicate_next_list_id, 2, 3);
+        cases.push(("duplicate required next list id", duplicate_next_list_id));
+        let mut duplicate_optional = valid.clone();
+        v(&mut duplicate_optional, 5, 0);
+        v(&mut duplicate_optional, 5, 1);
+        cases.push(("duplicate optional is_new", duplicate_optional));
+        let mut wrong_list_type_wire = Vec::new();
+        b(&mut wrong_list_type_wire, 1, &[]);
+        v(&mut wrong_list_type_wire, 2, 2);
+        cases.push(("wrong list type wire", wrong_list_type_wire));
+        let mut wrong_next_id_wire = Vec::new();
+        v(&mut wrong_next_id_wire, 1, 1);
+        b(&mut wrong_next_id_wire, 2, &[]);
+        cases.push(("wrong next list id wire", wrong_next_id_wire));
+        let mut wrong_bool_wire = valid.clone();
+        b(&mut wrong_bool_wire, 5, &[]);
+        cases.push(("wrong is_new wire", wrong_bool_wire));
+        let mut noncanonical = Vec::new();
+        key(&mut noncanonical, 1, 0);
+        noncanonical.extend_from_slice(&[0x81, 0x00]);
+        v(&mut noncanonical, 2, 2);
+        cases.push(("noncanonical list type varint", noncanonical));
+        let mut overflowing = Vec::new();
+        v(&mut overflowing, 1, 1);
+        v(&mut overflowing, 2, u64::from(u32::MAX) + 1);
+        cases.push(("overflowing next list id", overflowing));
+        let mut invalid_bool = valid.clone();
+        v(&mut invalid_bool, 5, 2);
+        cases.push(("invalid is_new bool", invalid_bool));
+        let mut zero_reference = valid.clone();
+        b(&mut zero_reference, 4, &reference(0));
+        cases.push(("zero segment reference", zero_reference));
+        let mut external = valid.clone();
+        b(&mut external, 4, &external_reference(301));
+        cases.push(("external segment reference", external));
+        let mut malformed_reference = valid.clone();
+        b(&mut malformed_reference, 4, &[0x80]);
+        cases.push(("truncated segment reference", malformed_reference));
+        let mut truncated = valid.clone();
+        truncated.pop();
+        cases.push(("truncated root", truncated));
+        let mut unclosed_group = valid.clone();
+        key(&mut unclosed_group, 90, 3);
+        v(&mut unclosed_group, 91, 1);
+        cases.push(("unclosed root group", unclosed_group));
+        let mut mismatched_group = valid.clone();
+        key(&mut mismatched_group, 90, 3);
+        key(&mut mismatched_group, 91, 4);
+        cases.push(("mismatched root group", mismatched_group));
+        let mut stray_end_group = valid.clone();
+        key(&mut stray_end_group, 90, 4);
+        cases.push(("stray root end group", stray_end_group));
+
+        for (label, source) in cases {
+            assert_invalid_list(&source, label);
+        }
+
+        let mut deep = valid;
+        unknown_groups_to_depth(&mut deep, 100, 6);
+        let error = decode_table_data_list(
+            &deep,
+            DecodeOptions::new(
+                deep.len(),
+                usize::MAX,
+                usize::MAX,
+                3,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+    }
+
+    #[test]
+    fn list_entry_malformed_matrix_rejects_required_optional_and_nested_payload_failures() {
+        let mut cases = Vec::<(&str, Vec<u8>)>::new();
+        cases.push(("missing required key", {
+            let mut source = Vec::new();
+            v(&mut source, 2, 2);
+            source
+        }));
+        cases.push(("missing required refcount", {
+            let mut source = Vec::new();
+            v(&mut source, 1, 1);
+            source
+        }));
+        let valid = entry_minimal();
+        let mut duplicate_key = valid.clone();
+        v(&mut duplicate_key, 1, 2);
+        cases.push(("duplicate required key", duplicate_key));
+        let mut duplicate_refcount = valid.clone();
+        v(&mut duplicate_refcount, 2, 3);
+        cases.push(("duplicate required refcount", duplicate_refcount));
+
+        let populated = list_entry_oracle(17, true).encode_to_vec();
+        for (label, number, payload) in [
+            ("string", 3, b"second".to_vec()),
+            ("reference", 4, reference(401)),
+            ("formula", 5, formula_oracle().encode_to_vec()),
+            ("format", 6, format_oracle().encode_to_vec()),
+            ("custom format", 8, custom_format_oracle().encode_to_vec()),
+            ("rich text payload", 9, reference(402)),
+            ("comment storage", 10, reference(403)),
+            (
+                "import warning set",
+                11,
+                import_warning_oracle().encode_to_vec(),
+            ),
+            ("cell spec", 12, cell_spec_oracle().encode_to_vec()),
+        ] {
+            let mut duplicate = populated.clone();
+            b(&mut duplicate, number, &payload);
+            cases.push((
+                match label {
+                    "string" => "duplicate optional string",
+                    "reference" => "duplicate optional reference",
+                    "formula" => "duplicate optional formula",
+                    "format" => "duplicate optional format",
+                    "custom format" => "duplicate optional custom format",
+                    "rich text payload" => "duplicate optional rich text payload",
+                    "comment storage" => "duplicate optional comment storage",
+                    "import warning set" => "duplicate optional import warning set",
+                    "cell spec" => "duplicate optional cell spec",
+                    _ => unreachable!(),
+                },
+                duplicate,
+            ));
+        }
+
+        for number in [1_u32, 2] {
+            let mut wrong_wire = Vec::new();
+            b(&mut wrong_wire, number, &[]);
+            if number == 1 {
+                v(&mut wrong_wire, 2, 2);
+            } else {
+                v(&mut wrong_wire, 1, 1);
+            }
+            cases.push(("wrong required field wire", wrong_wire));
+        }
+        for number in [3_u32, 4, 5, 6, 8, 9, 10, 11, 12] {
+            let mut wrong_wire = entry_minimal();
+            v(&mut wrong_wire, number, 1);
+            cases.push(("wrong optional bytes wire", wrong_wire));
+        }
+
+        let mut noncanonical_key = Vec::new();
+        key(&mut noncanonical_key, 1, 0);
+        noncanonical_key.extend_from_slice(&[0x81, 0x00]);
+        v(&mut noncanonical_key, 2, 2);
+        cases.push(("noncanonical key varint", noncanonical_key));
+        let mut overflowing_refcount = Vec::new();
+        v(&mut overflowing_refcount, 1, 1);
+        v(&mut overflowing_refcount, 2, u64::from(u32::MAX) + 1);
+        cases.push(("overflowing refcount", overflowing_refcount));
+        let mut invalid_utf8 = entry_minimal();
+        b(&mut invalid_utf8, 3, &[0xff]);
+        cases.push(("invalid UTF-8 string", invalid_utf8));
+
+        for number in [4_u32, 9, 10] {
+            let mut zero = entry_minimal();
+            b(&mut zero, number, &reference(0));
+            cases.push(("zero selected reference", zero));
+            let mut external = entry_minimal();
+            b(&mut external, number, &external_reference(501));
+            cases.push(("external selected reference", external));
+            let mut malformed = entry_minimal();
+            b(&mut malformed, number, &[0x80]);
+            cases.push(("malformed selected reference", malformed));
+        }
+        for number in [5_u32, 6, 8, 11, 12] {
+            let mut malformed = entry_minimal();
+            b(&mut malformed, number, &[0x80]);
+            cases.push(("malformed opaque payload", malformed));
+            let mut wrong_wire = entry_minimal();
+            b(&mut wrong_wire, number, &[0x0f]);
+            cases.push(("invalid opaque payload wire", wrong_wire));
+        }
+        let mut truncated = populated.clone();
+        truncated.pop();
+        cases.push(("truncated entry", truncated));
+        let mut unclosed_group = populated.clone();
+        key(&mut unclosed_group, 90, 3);
+        cases.push(("unclosed entry group", unclosed_group));
+        let mut mismatched_group = populated.clone();
+        key(&mut mismatched_group, 90, 3);
+        key(&mut mismatched_group, 91, 4);
+        cases.push(("mismatched entry group", mismatched_group));
+
+        for (label, source) in cases {
+            assert_invalid_entry(&source, label);
+        }
+
+        let mut deep = entry_minimal();
+        unknown_groups_to_depth(&mut deep, 100, 6);
+        let error = decode_table_data_list_entry(
+            &deep,
+            DecodeOptions::new(
+                deep.len(),
+                usize::MAX,
+                usize::MAX,
+                3,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+    }
+
+    #[test]
+    fn list_segment_and_range_malformed_matrix_rejects_required_wire_varint_truncation_and_groups()
+    {
+        let valid = segment_minimal();
+        let mut cases = Vec::<(&str, Vec<u8>)>::new();
+        let mut missing_list_type = Vec::new();
+        b(&mut missing_list_type, 2, &range_minimal());
+        cases.push(("missing segment list type", missing_list_type));
+        let mut missing_range = Vec::new();
+        v(&mut missing_range, 1, 1);
+        cases.push(("missing segment range", missing_range));
+        let mut duplicate_list_type = valid.clone();
+        v(&mut duplicate_list_type, 1, 2);
+        cases.push(("duplicate segment list type", duplicate_list_type));
+        let mut duplicate_range = valid.clone();
+        b(&mut duplicate_range, 2, &range_minimal());
+        cases.push(("duplicate segment range", duplicate_range));
+        let mut wrong_list_type_wire = Vec::new();
+        b(&mut wrong_list_type_wire, 1, &[]);
+        b(&mut wrong_list_type_wire, 2, &range_minimal());
+        cases.push(("wrong segment list type wire", wrong_list_type_wire));
+        let mut wrong_range_wire = Vec::new();
+        v(&mut wrong_range_wire, 1, 1);
+        v(&mut wrong_range_wire, 2, 1);
+        cases.push(("wrong segment range wire", wrong_range_wire));
+        let mut malformed_range = Vec::new();
+        v(&mut malformed_range, 1, 1);
+        let mut range = Vec::new();
+        v(&mut range, 1, 4);
+        b(&mut malformed_range, 2, &range);
+        cases.push(("missing range length", malformed_range));
+        let mut duplicate_range_location = Vec::new();
+        v(&mut duplicate_range_location, 1, 1);
+        let mut range = Vec::new();
+        v(&mut range, 1, 4);
+        v(&mut range, 1, 5);
+        v(&mut range, 2, 8);
+        b(&mut duplicate_range_location, 2, &range);
+        cases.push(("duplicate range location", duplicate_range_location));
+        let mut duplicate_range_length = Vec::new();
+        v(&mut duplicate_range_length, 1, 1);
+        let mut range = Vec::new();
+        v(&mut range, 1, 4);
+        v(&mut range, 2, 8);
+        v(&mut range, 2, 9);
+        b(&mut duplicate_range_length, 2, &range);
+        cases.push(("duplicate range length", duplicate_range_length));
+        let mut wrong_range_location_wire = Vec::new();
+        v(&mut wrong_range_location_wire, 1, 1);
+        let mut range = Vec::new();
+        b(&mut range, 1, &[]);
+        v(&mut range, 2, 8);
+        b(&mut wrong_range_location_wire, 2, &range);
+        cases.push(("wrong range location wire", wrong_range_location_wire));
+        let mut noncanonical_range = Vec::new();
+        v(&mut noncanonical_range, 1, 1);
+        let mut range = Vec::new();
+        key(&mut range, 1, 0);
+        range.extend_from_slice(&[0x84, 0x00]);
+        v(&mut range, 2, 8);
+        b(&mut noncanonical_range, 2, &range);
+        cases.push(("noncanonical range location", noncanonical_range));
+        let mut overflowing_range = Vec::new();
+        v(&mut overflowing_range, 1, 1);
+        let mut range = Vec::new();
+        v(&mut range, 1, u64::from(u32::MAX) + 1);
+        v(&mut range, 2, 8);
+        b(&mut overflowing_range, 2, &range);
+        cases.push(("overflowing range location", overflowing_range));
+        let mut truncated = valid.clone();
+        truncated.pop();
+        cases.push(("truncated segment", truncated));
+        let mut truncated_range = Vec::new();
+        v(&mut truncated_range, 1, 1);
+        b(&mut truncated_range, 2, &[0x0a]);
+        cases.push(("truncated range", truncated_range));
+        let mut unclosed_group = valid.clone();
+        key(&mut unclosed_group, 90, 3);
+        cases.push(("unclosed segment group", unclosed_group));
+        let mut mismatched_group = valid.clone();
+        key(&mut mismatched_group, 90, 3);
+        key(&mut mismatched_group, 91, 4);
+        cases.push(("mismatched segment group", mismatched_group));
+
+        for (label, source) in cases {
+            assert_invalid_segment(&source, label);
+        }
+
+        let mut deep = valid;
+        unknown_groups_to_depth(&mut deep, 100, 6);
+        let error = decode_table_data_list_segment(
+            &deep,
+            DecodeOptions::new(
+                deep.len(),
+                usize::MAX,
+                usize::MAX,
+                3,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+    }
+
+    #[test]
+    fn list_exact_limits_are_inclusive_and_each_max_minus_one_is_typed() {
+        let source = list_oracle().encode_to_vec();
+        let (_, report) = decode_table_data_list_with_report(&source, options(&source)).unwrap();
+        let exact = DecodeOptions::new(
+            source.len(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.references(),
+            report.text_bytes(),
+        );
+        let (_, exact_report) = decode_table_data_list_with_report(&source, exact).unwrap();
+        assert_eq!(exact_report, report);
+
+        let error = decode_table_data_list(
+            &source,
+            DecodeOptions::new(
+                source.len() - 1,
+                usize::MAX,
+                usize::MAX,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Bytes { .. })
+        ));
+        let error = decode_table_data_list(
+            &source,
+            DecodeOptions::new(
+                source.len(),
+                report.fields() - 1,
+                usize::MAX,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+        let error = decode_table_data_list(
+            &source,
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                report.work_bytes() - 1,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+        let error = decode_table_data_list(
+            &source,
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                usize::MAX,
+                64,
+                report.references() - 1,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::References { .. })
+        ));
+        let error = decode_table_data_list(
+            &source,
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                usize::MAX,
+                64,
+                usize::MAX,
+                report.text_bytes() - 1,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Text { .. })
+        ));
+        let error = decode_table_data_list(
+            &source,
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                usize::MAX,
+                report.max_depth() - 1,
+                usize::MAX,
+                usize::MAX,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+    }
+
+    #[test]
+    fn list_callbacks_are_observable_before_a_later_entry_error_and_source_stays_immutable() {
+        let first = list_entry_oracle(61, false).encode_to_vec();
+        let mut malformed_later = entry_minimal();
+        v(&mut malformed_later, 1, 62);
+        let mut source = list_minimal();
+        b(&mut source, 3, &first);
+        b(&mut source, 3, &malformed_later);
+        let before = source.clone();
+
+        // StorageVisitor is intentionally streaming: a callback for the first
+        // entry can run before strict validation discovers a later duplicate.
+        // The codec cannot roll that callback back; callers must stage effects.
+        let mut visitor = ListCollector::for_source(&source);
+        assert!(
+            decode_table_data_list_with_visitor(&source, options(&source), &mut visitor).is_err()
+        );
+        assert_eq!(visitor.entries.len(), 1);
+        assert_eq!(visitor.entries[0].key, 61);
+        assert_eq!(source, before);
+    }
 }

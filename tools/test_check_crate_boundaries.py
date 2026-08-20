@@ -9187,6 +9187,170 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_extractor_no_eager_table_data_list_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = decode_table_data_list_with_visitor(bytes);\n"
+                "    let _ = decode_table_data_list_segment_with_visitor(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tst::{TableDataList, TableDataListSegment};\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = TableDataList::decode(bytes);\n"
+                "        let _ = TableDataListSegment::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "unqualified TableDataList": (
+                "let _ = TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "tst namespace TableDataList": (
+                "let _ = tst::TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "fully qualified namespace TableDataList": (
+                "let _ = litchi_iwa_protos::tst::TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "arbitrary qualified TableDataList": (
+                "let _ = crate::numbers::wire::TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "unqualified TableDataListSegment": (
+                "let _ = TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "tst namespace TableDataListSegment": (
+                "let _ = tst::TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "fully qualified namespace TableDataListSegment": (
+                "let _ = litchi_iwa_protos::tst::TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "arbitrary qualified TableDataListSegment": (
+                "let _ = crate::numbers::wire::TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+        }
+        for label, (marker, expected_label) in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers extractor production source uses "
+                        f"{expected_label}: "
+                        "crates/litchi-numbers/src/package/extractor.rs:2",
+                        violations,
+                    )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_allows_unrelated_decodes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::Tile::decode(bytes);\n"
+                "    let _ = tst::TableDataListArchive::decode(bytes);\n"
+                "    let _ = decode_table_data_list(bytes);\n"
+                "    let _ = decode_table_data_list_segment(bytes);\n"
+                "    let _ = decode_table_data_list_with_visitor(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tst::TableDataList::decode\n"
+                'const NOTE: &str = "TableDataListSegment::decode";\n'
+                "/* litchi_iwa_protos::tst::TableDataList::decode */\n"
+                'const RAW: &str = r###"crate::wire::TableDataListSegment::decode"###;\n'
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_ignores_legacy_monolith_sources(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates/litchi-ooxml/src/package/extractor.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn legacy_projection(bytes: &[u8]) {\n"
+                "    let _ = litchi_ooxml::tst::TableDataList::decode(bytes);\n"
+                "    let _ = litchi_ooxml::tst::TableDataListSegment::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_focused_numbers_names_package_no_eager_prost_allows_test_only_usage(
         self,
     ) -> None:

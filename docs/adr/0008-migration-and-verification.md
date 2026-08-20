@@ -10886,3 +10886,37 @@ save or mutation claim. It is not a complete extractor, Numbers, or monolith
 exit: eight production generated decodes remain in the extractor, old
 `litchi-iwa` Tile paths remain, and debt 015 and all 14 ordered migration debts
 are unchanged.
+
+## 2026-08-21 Numbers TableDataList/Segment strict-ingress verification gate
+
+The focused Numbers extractor's native `TST.TableDataList` and
+`TST.TableDataListSegment` routes now use a strict handwritten canonical-wire
+visitor with a private Buffa lazy view. Package and Document use this strict
+ingress. Document deliberately skips comment resolution; Package keeps strict
+comment validation. The visitor retains only candidate-local final semantic
+values and bounded segment-id/key state, using fallible reserves. This is a
+bounded semantic materialization design, not a no-`Vec` or end-to-end zero-copy
+claim.
+
+The verification matrix covers required and duplicate fields, canonical
+keys/wires/varints, UTF-8, references, segment ranges, duplicate keys and
+segment IDs, ownership, candidate publication, later-wire-error precedence,
+and source atomicity. Package ceilings remain 512 MiB input and output, one
+million fields, nesting depth 64, and 16 million aggregate work units; tighter
+per-payload and text budgets are checked before fallible allocation. The
+selected raw bytes remain the preservation authority. FormulaArchive and the
+compatibility comment path remain migration debt, and six generated extractor
+decodes remain: four table-model decodes, one formula decode, and one comment
+decode.
+
+Evidence on 2026-08-21 is 230 passing `litchi-iwa-protos` tests, 47 focused
+extractor tests, nine TDL integration tests, and 276 boundary tests. The live
+graph remains 64 packages, 240 internal declarations, and 14 ordered debts.
+The TDL fuzz corpus has 11 seeds; 100 nightly ASan runs completed without an
+artifact. A 1,200-by-8 Numbers document was saved and reopened through the
+application with strings, formula results, an intentional formula error, rich
+text, and a persisted comment, with no repair dialog. Its archive has
+DataList members, but no parsed type-6011 Segment evidence was established.
+This gate proves focused correctness and boundedness only. It adds no native
+segment or save-mutation claim, performance result, host exit, dependency-edge
+retirement, or complete monolith-exit claim.
