@@ -25,7 +25,7 @@ use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::office::{EntryId, IndexedArchive};
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -340,10 +340,11 @@ impl Default for SourceCacheLimits {
 /// Content-free point-in-time diagnostics for a source-backed payload cache.
 ///
 /// Counters are monotonically increasing for the package lifetime and use
-/// relaxed atomic updates, so a snapshot is observational rather than a
-/// globally linearized transaction. `retained_entries`, `retained_bytes`, and
-/// `in_flight_loads` are captured together while the cache takes its existing
-/// short lock. No member names, part URIs, or ZIP entry IDs are exposed.
+/// checked relaxed atomic updates, so a snapshot is observational rather than
+/// a globally linearized transaction. `retained_entries`, `retained_bytes`,
+/// and `in_flight_loads` are captured together while the cache takes its
+/// existing short lock. No member names, part URIs, or ZIP entry IDs are
+/// exposed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SourceCacheDiagnostics {
     /// Requests satisfied directly from a retained payload entry.
@@ -427,18 +428,182 @@ pub struct SourceCacheDiagnostics {
     pub budget_cache_reserved_objects: u64,
 }
 
+/// The event-counter portion of a source-cache diagnostic interval.
+///
+/// This deliberately excludes point-in-time gauges such as retained bytes and
+/// in-flight loads. Use [`SourceCacheDiagnostics::checked_counter_delta`] to
+/// construct one from two snapshots; a counter regression is rejected rather
+/// than interpreted as a wrapped interval.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SourceCacheCounterDelta {
+    /// Requests satisfied directly from a retained payload entry.
+    pub hits: u64,
+    /// Requests that became the loader for a cold payload read.
+    pub cold_loads: u64,
+    /// Requests that found an existing same-part cold load and waited for it.
+    pub waiter_joins: u64,
+    /// Cold reads that completed successfully.
+    pub successful_loads: u64,
+    /// Cold reads that failed before publication.
+    pub failed_loads: u64,
+    /// Retained entries removed to satisfy cache capacity.
+    pub evictions: u64,
+    /// Successful cold reads returned without retention.
+    pub bypasses: u64,
+    /// Successful cold reads bypassed because their payload was oversized.
+    pub oversized_bypasses: u64,
+    /// Requests or successful loads bypassed after cache bookkeeping
+    /// allocation failed.
+    pub allocation_bypasses: u64,
+    /// Managed budget reservation refusals attributed to the cache or its
+    /// source-backed publication counters.
+    pub budget_reservation_failures: u64,
+}
+
+/// Failure returned by a fail-closed source-cache diagnostic operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SourceCacheDiagnosticsError {
+    /// A checked diagnostic counter could not be incremented without wrapping.
+    CounterOverflow,
+    /// The cache state mutex was poisoned by a panic while it was held.
+    StatePoisoned,
+    /// A supposedly monotonic counter decreased between two snapshots.
+    CounterMovedBackwards {
+        /// Counter whose interval was invalid.
+        counter: &'static str,
+    },
+}
+
+impl std::fmt::Display for SourceCacheDiagnosticsError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CounterOverflow => formatter
+                .write_str("source-cache diagnostic counter overflowed; metrics are unavailable"),
+            Self::StatePoisoned => formatter
+                .write_str("source-cache diagnostic state is poisoned; metrics are unavailable"),
+            Self::CounterMovedBackwards { counter } => {
+                write!(formatter, "source-cache counter {counter} moved backwards")
+            },
+        }
+    }
+}
+
+impl std::error::Error for SourceCacheDiagnosticsError {}
+
+impl SourceCacheDiagnostics {
+    /// Compute a checked interval for the monotonic event counters.
+    ///
+    /// The returned delta contains event counters only; current cache gauges
+    /// are intentionally not subtracted. A counter regression is an invalid
+    /// or wrapped interval and returns an error. Callers collecting metrics
+    /// should obtain both snapshots through
+    /// [`SourceBackedPackage::try_cache_diagnostics`].
+    pub fn checked_counter_delta(
+        before: Self,
+        after: Self,
+    ) -> std::result::Result<SourceCacheCounterDelta, SourceCacheDiagnosticsError> {
+        let subtract = |counter: &'static str, after: u64, before: u64| {
+            after
+                .checked_sub(before)
+                .ok_or(SourceCacheDiagnosticsError::CounterMovedBackwards { counter })
+        };
+        Ok(SourceCacheCounterDelta {
+            hits: subtract("hits", after.hits, before.hits)?,
+            cold_loads: subtract("cold_loads", after.cold_loads, before.cold_loads)?,
+            waiter_joins: subtract("waiter_joins", after.waiter_joins, before.waiter_joins)?,
+            successful_loads: subtract(
+                "successful_loads",
+                after.successful_loads,
+                before.successful_loads,
+            )?,
+            failed_loads: subtract("failed_loads", after.failed_loads, before.failed_loads)?,
+            evictions: subtract("evictions", after.evictions, before.evictions)?,
+            bypasses: subtract("bypasses", after.bypasses, before.bypasses)?,
+            oversized_bypasses: subtract(
+                "oversized_bypasses",
+                after.oversized_bypasses,
+                before.oversized_bypasses,
+            )?,
+            allocation_bypasses: subtract(
+                "allocation_bypasses",
+                after.allocation_bypasses,
+                before.allocation_bypasses,
+            )?,
+            budget_reservation_failures: subtract(
+                "budget_reservation_failures",
+                after.budget_reservation_failures,
+                before.budget_reservation_failures,
+            )?,
+        })
+    }
+}
+
 #[derive(Debug, Default)]
+struct DiagnosticState {
+    overflowed: AtomicBool,
+}
+
+#[derive(Debug)]
+struct DiagnosticCounter {
+    value: AtomicU64,
+    state: Arc<DiagnosticState>,
+}
+
+impl DiagnosticCounter {
+    fn new(state: Arc<DiagnosticState>) -> Self {
+        Self {
+            value: AtomicU64::new(0),
+            state,
+        }
+    }
+
+    fn increment(&self) {
+        if self
+            .value
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+                value.checked_add(1)
+            })
+            .is_err()
+        {
+            self.state.overflowed.store(true, Ordering::Release);
+        }
+    }
+
+    fn load(&self) -> u64 {
+        self.value.load(Ordering::Relaxed)
+    }
+}
+
+#[derive(Debug)]
 struct CacheCounters {
-    hits: AtomicU64,
-    cold_loads: AtomicU64,
-    waiter_joins: AtomicU64,
-    successful_loads: AtomicU64,
-    failed_loads: AtomicU64,
-    evictions: AtomicU64,
-    bypasses: AtomicU64,
-    oversized_bypasses: AtomicU64,
-    allocation_bypasses: AtomicU64,
-    budget_reservation_failures: AtomicU64,
+    hits: DiagnosticCounter,
+    cold_loads: DiagnosticCounter,
+    waiter_joins: DiagnosticCounter,
+    successful_loads: DiagnosticCounter,
+    failed_loads: DiagnosticCounter,
+    evictions: DiagnosticCounter,
+    bypasses: DiagnosticCounter,
+    oversized_bypasses: DiagnosticCounter,
+    allocation_bypasses: DiagnosticCounter,
+    budget_reservation_failures: DiagnosticCounter,
+}
+
+impl CacheCounters {
+    fn new(state: Arc<DiagnosticState>) -> Self {
+        Self {
+            hits: DiagnosticCounter::new(Arc::clone(&state)),
+            cold_loads: DiagnosticCounter::new(Arc::clone(&state)),
+            waiter_joins: DiagnosticCounter::new(Arc::clone(&state)),
+            successful_loads: DiagnosticCounter::new(Arc::clone(&state)),
+            failed_loads: DiagnosticCounter::new(Arc::clone(&state)),
+            evictions: DiagnosticCounter::new(Arc::clone(&state)),
+            bypasses: DiagnosticCounter::new(Arc::clone(&state)),
+            oversized_bypasses: DiagnosticCounter::new(Arc::clone(&state)),
+            allocation_bypasses: DiagnosticCounter::new(Arc::clone(&state)),
+            budget_reservation_failures: DiagnosticCounter::new(state),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -482,8 +647,8 @@ struct SourceSnapshot {
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
     execution_failure: Option<Arc<Mutex<Option<ExecutionError>>>>,
-    input_reservation_failures: Option<Arc<AtomicU64>>,
-    output_reservation_failures: Option<Arc<AtomicU64>>,
+    input_reservation_failures: Option<Arc<DiagnosticCounter>>,
+    output_reservation_failures: Option<Arc<DiagnosticCounter>>,
 }
 
 /// Process-local identity for one opened source-backed package lineage.
@@ -704,7 +869,7 @@ struct OutputBudgetedSink<W> {
     inner: W,
     context: ExecutionContext,
     failure: Arc<Mutex<Option<ExecutionError>>>,
-    output_reservation_failures: Arc<AtomicU64>,
+    output_reservation_failures: Arc<DiagnosticCounter>,
 }
 
 impl<W: Write> OutputBudgetedSink<W> {
@@ -748,8 +913,7 @@ impl<W: Write> OutputBudgetedSink<W> {
                     ExecutionError::ResourceLimit(limit)
                         if limit.resource == Resource::OutputBytes
                 ) {
-                    self.output_reservation_failures
-                        .fetch_add(1, Ordering::Relaxed);
+                    self.output_reservation_failures.increment();
                 }
                 let message = error.to_string();
                 self.record_failure(error);
@@ -1046,17 +1210,23 @@ struct PartCache {
     limits: SourceCacheLimits,
     state: Mutex<CacheState>,
     counters: CacheCounters,
+    diagnostics: Arc<DiagnosticState>,
     budget: Option<ExecutionContext>,
-    input_reservation_failures: Option<Arc<AtomicU64>>,
-    output_reservation_failures: Option<Arc<AtomicU64>>,
+    input_reservation_failures: Option<Arc<DiagnosticCounter>>,
+    output_reservation_failures: Option<Arc<DiagnosticCounter>>,
 }
 
 impl PartCache {
     fn new(limits: SourceCacheLimits) -> Self {
+        Self::new_with_diagnostics(limits, Arc::new(DiagnosticState::default()))
+    }
+
+    fn new_with_diagnostics(limits: SourceCacheLimits, diagnostics: Arc<DiagnosticState>) -> Self {
         Self {
             limits,
             state: Mutex::new(CacheState::default()),
-            counters: CacheCounters::default(),
+            counters: CacheCounters::new(Arc::clone(&diagnostics)),
+            diagnostics,
             budget: None,
             input_reservation_failures: None,
             output_reservation_failures: None,
@@ -1066,13 +1236,15 @@ impl PartCache {
     fn new_managed(
         limits: SourceCacheLimits,
         context: ExecutionContext,
-        input_reservation_failures: Arc<AtomicU64>,
-        output_reservation_failures: Arc<AtomicU64>,
+        diagnostics: Arc<DiagnosticState>,
+        input_reservation_failures: Arc<DiagnosticCounter>,
+        output_reservation_failures: Arc<DiagnosticCounter>,
     ) -> Self {
         Self {
             limits,
             state: Mutex::new(CacheState::default()),
-            counters: CacheCounters::default(),
+            counters: CacheCounters::new(Arc::clone(&diagnostics)),
+            diagnostics,
             budget: Some(context),
             input_reservation_failures: Some(input_reservation_failures),
             output_reservation_failures: Some(output_reservation_failures),
@@ -1091,12 +1263,10 @@ impl PartCache {
     }
 
     fn record_budget_reservation_failure(&self) {
-        self.counters
-            .budget_reservation_failures
-            .fetch_add(1, Ordering::Relaxed);
+        self.counters.budget_reservation_failures.increment();
     }
 
-    fn reservation_failure_counter(&self) -> Option<&AtomicU64> {
+    fn reservation_failure_counter(&self) -> Option<&DiagnosticCounter> {
         self.budget
             .as_ref()
             .map(|_| &self.counters.budget_reservation_failures)
@@ -1120,11 +1290,11 @@ impl PartCache {
         let clock = state.clock;
         if let Some(entry) = state.entries.get_mut(&entry_id) {
             entry.last_used = clock;
-            self.counters.hits.fetch_add(1, Ordering::Relaxed);
+            self.counters.hits.increment();
             return Ok(CacheAccess::Hit(entry.payload.clone()));
         }
         if let Some(flight) = state.flights.get(&entry_id) {
-            self.counters.waiter_joins.fetch_add(1, Ordering::Relaxed);
+            self.counters.waiter_joins.increment();
             return Ok(CacheAccess::Waiter(Arc::clone(flight)));
         }
 
@@ -1132,10 +1302,8 @@ impl PartCache {
         let payload_object_reservation = self.reserve_object_for_load()?;
         if state.flights.try_reserve(1).is_err() {
             self.charge_cold_work(declared_bytes)?;
-            self.counters.cold_loads.fetch_add(1, Ordering::Relaxed);
-            self.counters
-                .allocation_bypasses
-                .fetch_add(1, Ordering::Relaxed);
+            self.counters.cold_loads.increment();
+            self.counters.allocation_bypasses.increment();
             return Ok(CacheAccess::Bypass(LoadResources {
                 reservation,
                 payload_object_reservation,
@@ -1149,7 +1317,7 @@ impl PartCache {
             payload_object_reservation,
         ));
         state.flights.insert(entry_id, Arc::clone(&flight));
-        self.counters.cold_loads.fetch_add(1, Ordering::Relaxed);
+        self.counters.cold_loads.increment();
         Ok(CacheAccess::Loader(flight))
     }
 
@@ -1163,9 +1331,7 @@ impl PartCache {
             Ok(reservation) => Ok(Some(Arc::new(reservation))),
             Err(error) => {
                 if matches!(error, ExecutionError::ResourceLimit(_)) {
-                    self.counters
-                        .budget_reservation_failures
-                        .fetch_add(1, Ordering::Relaxed);
+                    self.record_budget_reservation_failure();
                 }
                 Err(error)
             },
@@ -1198,9 +1364,7 @@ impl PartCache {
             Ok(reservation) => Ok(Some(Arc::new(reservation))),
             Err(first_error) => {
                 if matches!(first_error, ExecutionError::ResourceLimit(_)) {
-                    self.counters
-                        .budget_reservation_failures
-                        .fetch_add(1, Ordering::Relaxed);
+                    self.record_budget_reservation_failure();
                 }
                 // Cache retention is best effort. If a shared ancestor is
                 // currently full, dropping all clean entries can make room
@@ -1210,9 +1374,7 @@ impl PartCache {
                     Ok(reservation) => Ok(Some(Arc::new(reservation))),
                     Err(error) => {
                         if matches!(error, ExecutionError::ResourceLimit(_)) {
-                            self.counters
-                                .budget_reservation_failures
-                                .fetch_add(1, Ordering::Relaxed);
+                            self.record_budget_reservation_failure();
                         }
                         Err(error)
                     },
@@ -1253,7 +1415,7 @@ impl PartCache {
             state.total_bytes = state
                 .total_bytes
                 .saturating_sub(removed.payload.bytes.len());
-            self.counters.evictions.fetch_add(1, Ordering::Relaxed);
+            self.counters.evictions.increment();
             true
         } else {
             false
@@ -1276,9 +1438,7 @@ impl PartCache {
             // This is the final cooperative cancellation point immediately
             // before publishing a clean value into the shared cache.
             self.check_context()?;
-            self.counters
-                .successful_loads
-                .fetch_add(1, Ordering::Relaxed);
+            self.counters.successful_loads.increment();
             self.record_retention(self.insert_locked(&mut state, entry_id, payload));
         }
         // Complete before removing the flight so an oversized, deliberately
@@ -1294,7 +1454,7 @@ impl PartCache {
     }
 
     fn complete_failure(&self, entry_id: EntryId, flight: &Arc<LoadFlight>) {
-        self.counters.failed_loads.fetch_add(1, Ordering::Relaxed);
+        self.counters.failed_loads.increment();
         // Publish failure to current waiters before allowing a new retrying
         // loader to install a replacement flight.
         flight.finish_failure();
@@ -1318,34 +1478,28 @@ impl PartCache {
         // Keep the no-flight allocation-fallback path under the same
         // pre-publication cancellation contract as the normal flight path.
         self.check_context()?;
-        self.counters
-            .successful_loads
-            .fetch_add(1, Ordering::Relaxed);
+        self.counters.successful_loads.increment();
         self.record_retention(self.insert_locked(&mut state, entry_id, payload));
         Ok(())
     }
 
     fn complete_bypass_failure(&self) {
-        self.counters.failed_loads.fetch_add(1, Ordering::Relaxed);
+        self.counters.failed_loads.increment();
     }
 
     fn record_retention(&self, retention: CacheRetention) {
         match retention {
             CacheRetention::Retained => {},
             CacheRetention::Oversized => {
-                self.counters.bypasses.fetch_add(1, Ordering::Relaxed);
-                self.counters
-                    .oversized_bypasses
-                    .fetch_add(1, Ordering::Relaxed);
+                self.counters.bypasses.increment();
+                self.counters.oversized_bypasses.increment();
             },
             CacheRetention::Pinned => {
-                self.counters.bypasses.fetch_add(1, Ordering::Relaxed);
+                self.counters.bypasses.increment();
             },
             CacheRetention::AllocationFailure => {
-                self.counters.bypasses.fetch_add(1, Ordering::Relaxed);
-                self.counters
-                    .allocation_bypasses
-                    .fetch_add(1, Ordering::Relaxed);
+                self.counters.bypasses.increment();
+                self.counters.allocation_bypasses.increment();
             },
         }
     }
@@ -1392,6 +1546,27 @@ impl PartCache {
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.diagnostics_snapshot(&state)
+    }
+
+    fn try_diagnostics(
+        &self,
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| SourceCacheDiagnosticsError::StatePoisoned)?;
+        if self.diagnostics.overflowed.load(Ordering::Acquire) {
+            return Err(SourceCacheDiagnosticsError::CounterOverflow);
+        }
+        let snapshot = self.diagnostics_snapshot(&state);
+        if self.diagnostics.overflowed.load(Ordering::Acquire) {
+            return Err(SourceCacheDiagnosticsError::CounterOverflow);
+        }
+        Ok(snapshot)
+    }
+
+    fn diagnostics_snapshot(&self, state: &CacheState) -> SourceCacheDiagnostics {
         // A successful loader briefly owns the same reservation through its
         // cache entry, completion payload, and returned handles. Count only
         // unique reservation identities so a diagnostic snapshot cannot
@@ -1469,27 +1644,33 @@ impl PartCache {
         let budget_reservation_failures = self
             .counters
             .budget_reservation_failures
-            .load(Ordering::Relaxed)
-            .saturating_add(
+            .load()
+            .checked_add(
                 self.input_reservation_failures
                     .as_ref()
-                    .map_or(0, |counter| counter.load(Ordering::Relaxed)),
+                    .map_or(0, |counter| counter.load()),
             )
-            .saturating_add(
-                self.output_reservation_failures
-                    .as_ref()
-                    .map_or(0, |counter| counter.load(Ordering::Relaxed)),
-            );
+            .and_then(|total| {
+                total.checked_add(
+                    self.output_reservation_failures
+                        .as_ref()
+                        .map_or(0, |counter| counter.load()),
+                )
+            })
+            .unwrap_or_else(|| {
+                self.diagnostics.overflowed.store(true, Ordering::Release);
+                u64::MAX
+            });
         SourceCacheDiagnostics {
-            hits: self.counters.hits.load(Ordering::Relaxed),
-            cold_loads: self.counters.cold_loads.load(Ordering::Relaxed),
-            waiter_joins: self.counters.waiter_joins.load(Ordering::Relaxed),
-            successful_loads: self.counters.successful_loads.load(Ordering::Relaxed),
-            failed_loads: self.counters.failed_loads.load(Ordering::Relaxed),
-            evictions: self.counters.evictions.load(Ordering::Relaxed),
-            bypasses: self.counters.bypasses.load(Ordering::Relaxed),
-            oversized_bypasses: self.counters.oversized_bypasses.load(Ordering::Relaxed),
-            allocation_bypasses: self.counters.allocation_bypasses.load(Ordering::Relaxed),
+            hits: self.counters.hits.load(),
+            cold_loads: self.counters.cold_loads.load(),
+            waiter_joins: self.counters.waiter_joins.load(),
+            successful_loads: self.counters.successful_loads.load(),
+            failed_loads: self.counters.failed_loads.load(),
+            evictions: self.counters.evictions.load(),
+            bypasses: self.counters.bypasses.load(),
+            oversized_bypasses: self.counters.oversized_bypasses.load(),
+            allocation_bypasses: self.counters.allocation_bypasses.load(),
             retained_entries: state.entries.len(),
             retained_bytes: state.total_bytes,
             in_flight_loads: state.flights.len(),
@@ -1593,6 +1774,7 @@ impl SourceBackedPackage {
         limits
             .check(ReadResource::InputBytes, length, limits.max_input_bytes())
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let diagnostics = Arc::new(DiagnosticState::default());
         let snapshot = SourceSnapshot {
             source: Arc::clone(&source),
             version,
@@ -1677,7 +1859,7 @@ impl SourceBackedPackage {
             parts: catalog_parts,
             parts_by_name,
             non_part_members,
-            cache: PartCache::new(SourceCacheLimits::default()),
+            cache: PartCache::new_with_diagnostics(SourceCacheLimits::default(), diagnostics),
             catalog_object_reservation: None,
         })
     }
@@ -1770,8 +1952,13 @@ impl SourceBackedPackage {
         let execution_failure = context
             .as_ref()
             .map(|_| Arc::new(Mutex::new(None::<ExecutionError>)));
-        let input_reservation_failures = context.as_ref().map(|_| Arc::new(AtomicU64::new(0)));
-        let output_reservation_failures = context.as_ref().map(|_| Arc::new(AtomicU64::new(0)));
+        let diagnostics = Arc::new(DiagnosticState::default());
+        let input_reservation_failures = context
+            .as_ref()
+            .map(|_| Arc::new(DiagnosticCounter::new(Arc::clone(&diagnostics))));
+        let output_reservation_failures = context
+            .as_ref()
+            .map(|_| Arc::new(DiagnosticCounter::new(Arc::clone(&diagnostics))));
         let version = source.version()?;
         let length = source.len()?;
         limits.check(ReadResource::InputBytes, length, limits.max_input_bytes())?;
@@ -1904,11 +2091,12 @@ impl SourceBackedPackage {
             PartCache::new_managed(
                 cache_limits,
                 context,
+                diagnostics,
                 input_reservation_failures,
                 output_reservation_failures,
             )
         } else {
-            PartCache::new(cache_limits)
+            PartCache::new_with_diagnostics(cache_limits, diagnostics)
         };
         Ok(Self {
             source: snapshot,
@@ -2031,6 +2219,24 @@ impl SourceBackedPackage {
             .as_ref()
             .map_or(0, |reservation| reservation.amount());
         diagnostics
+    }
+
+    /// Return a fail-closed payload-cache diagnostic snapshot.
+    ///
+    /// Unlike [`Self::cache_diagnostics`], this instrumentation-oriented
+    /// variant reports a poisoned cache-state mutex or a checked counter
+    /// overflow as an error. Ordinary compatibility callers can continue to
+    /// use the infallible method; benchmark and telemetry code should use this
+    /// method so an invalid snapshot cannot be mistaken for a valid interval.
+    pub fn try_cache_diagnostics(
+        &self,
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
+        let mut diagnostics = self.cache.try_diagnostics()?;
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        Ok(diagnostics)
     }
 
     /// Check the caller-supplied execution policy for a source-backed
@@ -4425,7 +4631,7 @@ fn content_types_with_overrides(
     overrides: &[(PackURI, String)],
     limits: ReadLimits,
     context: Option<&ExecutionContext>,
-    reservation_failures: Option<&AtomicU64>,
+    reservation_failures: Option<&DiagnosticCounter>,
 ) -> Result<(Vec<u8>, Option<Arc<Reservation>>)> {
     if overrides.is_empty() {
         return Ok((source.to_vec(), None));
@@ -4521,7 +4727,7 @@ fn content_types_with_overrides(
             .map_err(|error| {
                 if matches!(error, ExecutionError::ResourceLimit(_)) {
                     if let Some(counter) = reservation_failures {
-                        counter.fetch_add(1, Ordering::Relaxed);
+                        counter.increment();
                     }
                 }
                 map_execution_error(error)
@@ -4820,7 +5026,7 @@ fn record_source_execution_failure(snapshot: &SourceSnapshot, error: ExecutionEr
 
 fn record_input_reservation_failure(snapshot: &SourceSnapshot) {
     if let Some(counter) = snapshot.input_reservation_failures.as_ref() {
-        counter.fetch_add(1, Ordering::Relaxed);
+        counter.increment();
     }
 }
 
@@ -7075,6 +7281,77 @@ mod tests {
         assert_eq!(
             SourceCacheLimits::new(1, 0),
             Err(SourceCacheLimitError::ZeroMaximumEntries)
+        );
+    }
+
+    #[test]
+    fn checked_counter_delta_rejects_a_regression() {
+        let before = SourceCacheDiagnostics {
+            hits: 4,
+            ..SourceCacheDiagnostics::default()
+        };
+        let after = SourceCacheDiagnostics {
+            hits: 3,
+            ..SourceCacheDiagnostics::default()
+        };
+
+        assert_eq!(
+            SourceCacheDiagnostics::checked_counter_delta(before, after),
+            Err(SourceCacheDiagnosticsError::CounterMovedBackwards { counter: "hits" })
+        );
+    }
+
+    #[test]
+    fn checked_counter_delta_preserves_event_counts_without_gauge_subtraction() {
+        let before = SourceCacheDiagnostics {
+            hits: 2,
+            retained_entries: 1,
+            retained_bytes: 10,
+            ..SourceCacheDiagnostics::default()
+        };
+        let after = SourceCacheDiagnostics {
+            hits: 5,
+            retained_entries: 0,
+            retained_bytes: 0,
+            ..SourceCacheDiagnostics::default()
+        };
+
+        assert_eq!(
+            SourceCacheDiagnostics::checked_counter_delta(before, after)
+                .expect("valid counter interval"),
+            SourceCacheCounterDelta {
+                hits: 3,
+                ..SourceCacheCounterDelta::default()
+            }
+        );
+    }
+
+    #[test]
+    fn checked_counter_overflow_fails_closed_snapshot() {
+        let cache = PartCache::new(SourceCacheLimits::new(3, 3).unwrap());
+        cache.counters.hits.value.store(u64::MAX, Ordering::Relaxed);
+        cache.counters.hits.increment();
+
+        assert_eq!(
+            cache.try_diagnostics(),
+            Err(SourceCacheDiagnosticsError::CounterOverflow)
+        );
+        assert_eq!(cache.counters.hits.load(), u64::MAX);
+    }
+
+    #[test]
+    fn poisoned_cache_state_fails_closed_snapshot() {
+        let cache = Arc::new(PartCache::new(SourceCacheLimits::new(3, 3).unwrap()));
+        let poisoner = Arc::clone(&cache);
+        let join = std::thread::spawn(move || {
+            let _state = poisoner.state.lock().expect("unpoisoned cache state");
+            panic!("test cache-state poison");
+        });
+        assert!(join.join().is_err());
+
+        assert_eq!(
+            cache.try_diagnostics(),
+            Err(SourceCacheDiagnosticsError::StatePoisoned)
         );
     }
 
