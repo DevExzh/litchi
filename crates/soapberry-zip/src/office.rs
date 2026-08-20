@@ -4716,18 +4716,7 @@ mod tests {
 
     #[test]
     fn positional_index_handles_central_records_larger_than_recommended_scratch() {
-        let name = vec![b'n'; 4 * 1024];
-        let extra = vec![b'e'; 40 * 1024];
-        let comment = vec![b'c'; 40 * 1024];
-        let metadata_bytes = (name.len() + extra.len() + comment.len()) as u64;
-        let bytes = fixture(&[FixtureEntry {
-            name: &name,
-            extra: &extra,
-            comment: &comment,
-            compressed_size: 7,
-            uncompressed_size: 7,
-            data: b"payload",
-        }]);
+        let (bytes, metadata_bytes) = oversized_metadata_fixture();
 
         // The central record is valid but its variable fields exceed the
         // public 64 KiB recommendation. The positional iterator must spill
@@ -4740,7 +4729,7 @@ mod tests {
             .next_entry()
             .expect("read oversized central record")
             .expect("record exists");
-        assert_eq!(entry.file_path().as_ref().len(), name.len());
+        assert_eq!(entry.file_path().as_ref().len(), 4 * 1024);
         assert_eq!(entry.metadata_size_hint(), metadata_bytes);
         assert!(entries.next_entry().expect("finish directory").is_none());
 
@@ -4756,6 +4745,101 @@ mod tests {
             metadata_bytes,
             metadata_bytes - 1,
         );
+    }
+
+    #[test]
+    fn positional_iterator_continues_from_oversized_record_to_ordinary_record() {
+        let (bytes, metadata_bytes) = oversized_and_ordinary_fixture(true);
+        let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let archive = ZipArchive::from_seekable(Cursor::new(bytes), &mut scratch)
+            .expect("locate archive with the recommended scratch size");
+        let mut entries = archive.entries(&mut scratch);
+
+        {
+            let entry = entries
+                .next_entry()
+                .expect("read oversized central record")
+                .expect("oversized record exists");
+            assert_eq!(entry.file_path().as_ref().len(), 4 * 1024);
+            assert_eq!(entry.metadata_size_hint(), metadata_bytes);
+        }
+
+        let ordinary = entries
+            .next_entry()
+            .expect("continue after oversized record")
+            .expect("ordinary record exists");
+        assert_eq!(ordinary.file_path().as_ref(), b"ordinary");
+        assert!(entries.next_entry().expect("finish directory").is_none());
+    }
+
+    #[test]
+    fn positional_iterator_continues_from_ordinary_record_to_oversized_record() {
+        let (bytes, metadata_bytes) = oversized_and_ordinary_fixture(false);
+        let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let archive = ZipArchive::from_seekable(Cursor::new(bytes), &mut scratch)
+            .expect("locate archive with the recommended scratch size");
+        let mut entries = archive.entries(&mut scratch);
+
+        let ordinary = entries
+            .next_entry()
+            .expect("read ordinary central record")
+            .expect("ordinary record exists");
+        assert_eq!(ordinary.file_path().as_ref(), b"ordinary");
+
+        let oversized = entries
+            .next_entry()
+            .expect("continue to oversized record")
+            .expect("oversized record exists");
+        assert_eq!(oversized.file_path().as_ref().len(), 4 * 1024);
+        assert_eq!(oversized.metadata_size_hint(), metadata_bytes);
+        assert!(entries.next_entry().expect("finish directory").is_none());
+    }
+
+    #[test]
+    fn prefixed_positional_archive_applies_base_offset_to_oversized_records() {
+        let (archive_bytes, metadata_bytes) = oversized_metadata_fixture();
+        let prefix = vec![0xa5; 7];
+        let prefix_len = prefix.len() as u64;
+        let mut bytes = prefix.clone();
+        bytes.extend_from_slice(&archive_bytes);
+
+        let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let archive = ZipArchive::from_seekable(Cursor::new(bytes), &mut scratch)
+            .expect("locate prefixed archive");
+        let mut entries = archive.entries(&mut scratch);
+        let entry = entries
+            .next_entry()
+            .expect("read prefixed oversized record")
+            .expect("record exists");
+        assert_eq!(entry.metadata_size_hint(), metadata_bytes);
+        assert_eq!(entry.local_header_offset(), prefix_len);
+    }
+
+    #[test]
+    fn truncated_oversized_variable_section_returns_typed_eof() {
+        let (bytes, metadata_bytes) = oversized_metadata_fixture();
+        let located = ZipArchive::from_slice(&bytes).expect("valid source fixture");
+        let central_offset = usize::try_from(located.directory_offset()).unwrap();
+        let eocd_offset = usize::try_from(located.eocd_offset()).unwrap();
+        let central_size = eocd_offset - central_offset;
+        let missing = 1024;
+        assert!(metadata_bytes > missing as u64);
+
+        let mut truncated = bytes[..eocd_offset - missing].to_vec();
+        truncated.extend_from_slice(&bytes[eocd_offset..]);
+        let truncated_eocd_offset = eocd_offset - missing;
+        let truncated_central_size = u32::try_from(central_size - missing).unwrap();
+        truncated[truncated_eocd_offset + 12..truncated_eocd_offset + 16]
+            .copy_from_slice(&truncated_central_size.to_le_bytes());
+
+        let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let archive = ZipArchive::from_seekable(Cursor::new(truncated), &mut scratch)
+            .expect("locate truncated archive for structural iteration");
+        let mut entries = archive.entries(&mut scratch);
+        let error = entries
+            .next_entry()
+            .expect_err("truncated oversized metadata must fail");
+        assert!(matches!(error.kind(), ErrorKind::Eof));
     }
 
     #[test]
@@ -5301,6 +5385,44 @@ mod tests {
                 data,
             }
         }
+    }
+
+    fn oversized_metadata_fixture() -> (Vec<u8>, u64) {
+        let name = vec![b'n'; 4 * 1024];
+        let extra = vec![b'e'; 40 * 1024];
+        let comment = vec![b'c'; 40 * 1024];
+        let metadata_bytes = (name.len() + extra.len() + comment.len()) as u64;
+        let bytes = fixture(&[FixtureEntry {
+            name: &name,
+            extra: &extra,
+            comment: &comment,
+            compressed_size: 7,
+            uncompressed_size: 7,
+            data: b"payload",
+        }]);
+        (bytes, metadata_bytes)
+    }
+
+    fn oversized_and_ordinary_fixture(oversized_first: bool) -> (Vec<u8>, u64) {
+        let name = vec![b'n'; 4 * 1024];
+        let extra = vec![b'e'; 40 * 1024];
+        let comment = vec![b'c'; 40 * 1024];
+        let metadata_bytes = (name.len() + extra.len() + comment.len()) as u64;
+        let oversized = FixtureEntry {
+            name: &name,
+            extra: &extra,
+            comment: &comment,
+            compressed_size: 7,
+            uncompressed_size: 7,
+            data: b"payload",
+        };
+        let ordinary = FixtureEntry::stored(b"ordinary", b"");
+        let entries = if oversized_first {
+            [oversized, ordinary]
+        } else {
+            [ordinary, oversized]
+        };
+        (fixture(&entries), metadata_bytes)
     }
 
     fn fixture(entries: &[FixtureEntry<'_>]) -> Vec<u8> {
