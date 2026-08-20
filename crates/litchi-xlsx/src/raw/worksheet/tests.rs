@@ -8,6 +8,7 @@ use crate::row;
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
 
 const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_S: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 
 #[test]
 fn plain_worksheets_skip_only_the_unneeded_extension_capture() {
@@ -31,6 +32,20 @@ fn rejected_plain_worksheets_keep_extension_error_precedence() {
         format!(r#"<worksheet xmlns="{S}"><sheetData><row r="1"></sheetData></worksheet>"#);
     assert!(!x14ac::may_contain_descent(malformed.as_bytes()));
     let error = parse(malformed.as_bytes(), || Ok(None)).expect_err("malformed worksheet");
+    assert!(
+        error
+            .to_string()
+            .contains("invalid worksheet extension XML"),
+        "unexpected error precedence: {error}"
+    );
+}
+
+#[test]
+fn malformed_alternate_content_keeps_x14ac_error_precedence() {
+    let malformed = format!(
+        r#"<x:worksheet xmlns:x="{S}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="future"><x:sheetFormatPr x14ac:dyDescent="0.2"/></mc:AlternateContent></x:worksheet>"#
+    );
+    let error = parse(malformed.as_bytes(), || Ok(None)).expect_err("malformed AlternateContent");
     assert!(
         error
             .to_string()
@@ -76,6 +91,36 @@ fn parses_exact_sparse_values_formulas_and_explicit_empty_cells() {
         formula.cached().map(Cache::value),
         Some(Value::Text(value)) if value.as_str() == "cached"
     ));
+}
+
+#[test]
+fn namespace_equivalent_worksheet_events_have_identical_results() {
+    let plain = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#
+    );
+    let prefixed = format!(
+        r#"<x:worksheet xmlns:x="{S}" xmlns:y="{S}" xmlns="urn:not-spreadsheet"><y:sheetData><y:row r="1"><y:c r="A1"><y:v>7</y:v></y:c></y:row></y:sheetData></x:worksheet>"#
+    );
+    let strict = format!(
+        r#"<worksheet xmlns="{STRICT_S}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#
+    );
+
+    let plain = parse(plain.as_bytes(), || Ok(None)).expect("plain worksheet");
+    let prefixed = parse(prefixed.as_bytes(), || Ok(None)).expect("prefixed worksheet");
+    let strict = parse(strict.as_bytes(), || Ok(None)).expect("strict worksheet");
+    let address = Address::from_a1("A1").expect("address");
+    assert_eq!(plain.entries().len(), prefixed.entries().len());
+    assert_eq!(plain.get(address), prefixed.get(address));
+    assert_eq!(plain.get(address), strict.get(address));
+}
+
+#[test]
+fn namespace_rebinding_to_another_uri_is_not_treated_as_core_content() {
+    let xml = format!(
+        r#"<x:worksheet xmlns:x="{S}" xmlns:y="urn:not-spreadsheet"><x:sheetData><x:row r="1"><y:c r="A1"><y:v>7</y:v></y:c></x:row></x:sheetData></x:worksheet>"#
+    );
+    let store = parse(xml.as_bytes(), || Ok(None)).expect("unknown namespace should be ignored");
+    assert!(store.entries().is_empty());
 }
 
 #[test]
@@ -231,7 +276,7 @@ fn focused_defaults_follow_the_active_mce_branch() {
                 xmlns:future="urn:future" mc:Ignorable="x14ac future">
                 <mc:AlternateContent>
                     <mc:Choice Requires="future">
-                        <sheetFormatPr defaultRowHeight="20" x14ac:dyDescent="0.5"/>
+                        <sheetFormatPr xmlns:x14ac="urn:not-x14ac" defaultRowHeight="20" x14ac:dyDescent="0.5"/>
                     </mc:Choice>
                     <mc:Fallback>
                         <sheetFormatPr defaultRowHeight="15" x14ac:dyDescent="0.25"/>
