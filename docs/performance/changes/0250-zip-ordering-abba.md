@@ -5,6 +5,8 @@ Date: 2026-08-21
 Status: rejected on latency evidence; do not land the production
 monotonic-offset sort fast path; retain the candidate only
 
+Claim registry ID: `claim-0250-zip-ordering`
+
 ## Evidence-package identity
 
 The independently audited package is retained outside the repository at
