@@ -1428,11 +1428,15 @@ impl<R: Read + Seek> OleFile<R> {
         start_sector: u32,
         declared_size: u64,
     ) -> Result<Vec<u8>, OleError> {
-        let sectors = collect_sector_chain(&self.fat, start_sector, "FAT")?;
+        // Validate the complete chain before allocating the payload.  A
+        // bounded walk detects cycles without retaining a per-read chain or
+        // visited bitset, while preserving validation of sectors beyond the
+        // logical stream end.
+        let chain_len = count_sector_chain(&self.fat, start_sector, "FAT")?;
         let size = usize::try_from(declared_size)
             .map_err(|_err| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
         let required_sectors = size.div_ceil(self.sector_size);
-        if sectors.len() < required_sectors {
+        if chain_len < required_sectors {
             return Err(OleError::CorruptedFile(
                 "FAT chain is shorter than the declared stream size".to_string(),
             ));
@@ -1443,8 +1447,51 @@ impl<R: Read + Seek> OleFile<R> {
         // turn those into an avoidable allocation.
         let mut data = try_filled_vec(size, 0u8, "FAT stream data")?;
 
-        // Batch read contiguous sectors
-        self.read_sectors_batched(&sectors[..required_sectors], &mut data)?;
+        // Replay only the sectors needed for the declared payload. The first
+        // pass has already validated the complete chain, including any excess
+        // sectors after the logical end.
+        let mut sector = start_sector;
+        let mut walked = 0_usize;
+        let mut logical_sector = 0_usize;
+        let mut pending_sector = None;
+        while logical_sector < required_sectors {
+            let run_start = if let Some(pending) = pending_sector.take() {
+                pending
+            } else {
+                let Some(run_start) =
+                    next_sector_in_chain(&self.fat, &mut sector, &mut walked, "FAT")?
+                else {
+                    return Err(OleError::CorruptedFile(
+                        "FAT chain is shorter than the declared stream size".to_string(),
+                    ));
+                };
+                run_start
+            };
+            let mut run_count = 1_usize;
+            let mut last_sector = run_start;
+            while logical_sector + run_count < required_sectors {
+                let Some(next) = next_sector_in_chain(&self.fat, &mut sector, &mut walked, "FAT")?
+                else {
+                    return Err(OleError::CorruptedFile(
+                        "FAT chain is shorter than the declared stream size".to_string(),
+                    ));
+                };
+                let contiguous = last_sector.checked_add(1).ok_or_else(|| {
+                    OleError::CorruptedFile("contiguous sector index overflow".to_string())
+                })?;
+                if next != contiguous {
+                    // The lookahead has already advanced `sector` past
+                    // `next`; retain that sector as the next run's start.
+                    pending_sector = Some(next);
+                    break;
+                }
+                last_sector = next;
+                run_count += 1;
+            }
+
+            self.read_contiguous_sectors(run_start, run_count, &mut data, logical_sector)?;
+            logical_sector += run_count;
+        }
 
         Ok(data)
     }
@@ -1476,36 +1523,52 @@ impl<R: Read + Seek> OleFile<R> {
                 count += 1;
             }
 
-            // Read the entire contiguous run in one I/O operation
-            let position = (u64::from(start_sector) + 1)
-                .checked_mul(self.sector_size as u64)
-                .ok_or_else(|| OleError::CorruptedFile("Sector offset overflow".to_string()))?;
-            if position >= self.file_size {
-                return Err(OleError::CorruptedFile(format!(
-                    "Sector {start_sector} is outside the file"
-                )));
-            }
-            let read_size = count
-                .checked_mul(self.sector_size)
-                .ok_or_else(|| OleError::CorruptedFile("batched read size overflow".to_string()))?;
-            let buffer_offset = i.checked_mul(self.sector_size).ok_or_else(|| {
-                OleError::CorruptedFile("batched buffer offset overflow".to_string())
-            })?;
-            let buffer_remaining = buffer.len().checked_sub(buffer_offset).ok_or_else(|| {
-                OleError::CorruptedFile("batched read buffer offset overflow".to_string())
-            })?;
-            let requested = read_size.min(buffer_remaining);
-
-            // The buffer arrives zero-filled, so a truncated final sector keeps
-            // its real bytes and reads as zeroes beyond the end of the file.
-            if requested > 0 {
-                let present = self.present_sector_bytes(position, requested);
-                self.reader.seek(SeekFrom::Start(position))?;
-                self.reader
-                    .read_exact(&mut buffer[buffer_offset..buffer_offset + present])?;
-            }
+            self.read_contiguous_sectors(start_sector, count, buffer, i)?;
 
             i += count;
+        }
+
+        Ok(())
+    }
+
+    /// Read one contiguous run into the sector-indexed portion of `buffer`.
+    ///
+    /// Keeping the offset calculation here preserves the checked arithmetic
+    /// and error ordering of [`Self::read_sectors_batched`] while allowing the
+    /// streaming chain reader to avoid materializing a sector list.
+    fn read_contiguous_sectors(
+        &mut self,
+        start_sector: u32,
+        count: usize,
+        buffer: &mut [u8],
+        sector_index: usize,
+    ) -> Result<(), OleError> {
+        let position = (u64::from(start_sector) + 1)
+            .checked_mul(self.sector_size as u64)
+            .ok_or_else(|| OleError::CorruptedFile("Sector offset overflow".to_string()))?;
+        if position >= self.file_size {
+            return Err(OleError::CorruptedFile(format!(
+                "Sector {start_sector} is outside the file"
+            )));
+        }
+        let read_size = count
+            .checked_mul(self.sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("batched read size overflow".to_string()))?;
+        let buffer_offset = sector_index
+            .checked_mul(self.sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("batched buffer offset overflow".to_string()))?;
+        let buffer_remaining = buffer.len().checked_sub(buffer_offset).ok_or_else(|| {
+            OleError::CorruptedFile("batched read buffer offset overflow".to_string())
+        })?;
+        let requested = read_size.min(buffer_remaining);
+
+        // The buffer arrives zero-filled, so a truncated final sector keeps
+        // its real bytes and reads as zeroes beyond the end of the file.
+        if requested > 0 {
+            let present = self.present_sector_bytes(position, requested);
+            self.reader.seek(SeekFrom::Start(position))?;
+            self.reader
+                .read_exact(&mut buffer[buffer_offset..buffer_offset + present])?;
         }
 
         Ok(())
@@ -1544,11 +1607,13 @@ impl<R: Read + Seek> OleFile<R> {
             .ministream
             .as_ref()
             .ok_or_else(|| OleError::CorruptedFile("No mini stream".to_string()))?;
-        let sectors = collect_sector_chain(&self.minifat, start_sector, "MiniFAT")?;
+        // Validate the complete chain without retaining one sector entry and
+        // one visited bit per call. This also keeps validating excess chain
+        // entries, as the previous owned-chain path did.
+        let chain_len = count_sector_chain(&self.minifat, start_sector, "MiniFAT")?;
         let stream_len = usize::try_from(size)
             .map_err(|_err| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
-        let chain_capacity = sectors
-            .len()
+        let chain_capacity = chain_len
             .checked_mul(self.mini_sector_size)
             .ok_or_else(|| OleError::CorruptedFile("MiniFAT stream size overflow".to_string()))?;
         if chain_capacity < stream_len {
@@ -1560,8 +1625,17 @@ impl<R: Read + Seek> OleFile<R> {
         // Pre-allocate result buffer with exact size needed
         let mut data = try_vec_with_capacity(stream_len, "MiniFAT stream data")?;
 
-        // Copy all mini sectors
-        for &sector in &sectors {
+        // Replay the chain directly. Check each sector before calculating the
+        // copy length to retain the historical one-extra-sector bounds check
+        // when the chain contains more storage than the declared stream size.
+        let mut sector = start_sector;
+        let mut walked = 0_usize;
+        loop {
+            let Some(sector) =
+                next_sector_in_chain(&self.minifat, &mut sector, &mut walked, "MiniFAT")?
+            else {
+                break;
+            };
             let position = usize::try_from(sector)
                 .ok()
                 .and_then(|sector_id| sector_id.checked_mul(self.mini_sector_size))
@@ -1917,6 +1991,112 @@ fn try_filled_vec<T: Clone>(
     let mut values = try_vec_with_capacity(len, resource)?;
     values.resize(len, value);
     Ok(values)
+}
+
+/// Advance through an allocation chain without retaining its entries.
+///
+/// The allocation table bounds the number of distinct valid sectors. Checking
+/// the current index before the bounded-walk cycle guard preserves the
+/// existing invalid-index error when a chain points outside the table, while a
+/// repeated valid index is reported as a cycle after at most one table-length
+/// walk. The next marker is validated in the same order as
+/// [`collect_sector_chain`].
+fn next_sector_in_chain(
+    allocation_table: &[u32],
+    sector: &mut u32,
+    walked: &mut usize,
+    table_name: &str,
+) -> Result<Option<u32>, OleError> {
+    if *sector == ENDOFCHAIN {
+        return Ok(None);
+    }
+
+    let current = *sector;
+    let index = usize::try_from(current)
+        .map_err(|_err| OleError::CorruptedFile(format!("Invalid sector index in {table_name}")))?;
+    if index >= allocation_table.len() {
+        return Err(OleError::CorruptedFile(format!(
+            "Invalid sector index {current} in {table_name}"
+        )));
+    }
+    if *walked >= allocation_table.len() {
+        return Err(OleError::CorruptedFile(format!(
+            "Cycle detected in {table_name} chain at sector {current}"
+        )));
+    }
+
+    let next = *allocation_table.get(index).ok_or_else(|| {
+        OleError::CorruptedFile(format!("Invalid sector index {current} in {table_name}"))
+    })?;
+    if next != ENDOFCHAIN && next >= MAXREGSECT {
+        return Err(OleError::CorruptedFile(format!(
+            "Invalid sector marker 0x{next:08X} in {table_name} chain"
+        )));
+    }
+    *sector = next;
+    *walked += 1;
+    Ok(Some(current))
+}
+
+/// Count and validate a complete allocation chain without allocating scratch.
+fn count_sector_chain(
+    allocation_table: &[u32],
+    start_sector: u32,
+    table_name: &str,
+) -> Result<usize, OleError> {
+    let mut sector = start_sector;
+    let mut slow = start_sector;
+    let mut fast = start_sector;
+    let mut count = 0_usize;
+    while sector != ENDOFCHAIN {
+        sector = checked_next_sector(allocation_table, sector, table_name)?;
+        count = count.checked_add(1).ok_or_else(|| {
+            OleError::CorruptedFile(format!("{table_name} chain length overflow"))
+        })?;
+
+        if slow != ENDOFCHAIN {
+            slow = checked_next_sector(allocation_table, slow, table_name)?;
+        }
+        if fast != ENDOFCHAIN {
+            fast = checked_next_sector(allocation_table, fast, table_name)?;
+        }
+        if fast != ENDOFCHAIN {
+            fast = checked_next_sector(allocation_table, fast, table_name)?;
+        }
+        if slow != ENDOFCHAIN && slow == fast {
+            // Floyd's tortoise-and-hare walk finds a cycle in constant space;
+            // reset one pointer to recover the same first repeated sector
+            // that the old visited bitset reported.
+            let mut entry = start_sector;
+            let mut meeting = slow;
+            while entry != meeting {
+                entry = checked_next_sector(allocation_table, entry, table_name)?;
+                meeting = checked_next_sector(allocation_table, meeting, table_name)?;
+            }
+            return Err(OleError::CorruptedFile(format!(
+                "Cycle detected in {table_name} chain at sector {entry}"
+            )));
+        }
+    }
+    Ok(count)
+}
+
+fn checked_next_sector(
+    allocation_table: &[u32],
+    sector: u32,
+    table_name: &str,
+) -> Result<u32, OleError> {
+    let index = usize::try_from(sector)
+        .map_err(|_err| OleError::CorruptedFile(format!("Invalid sector index in {table_name}")))?;
+    let next = *allocation_table.get(index).ok_or_else(|| {
+        OleError::CorruptedFile(format!("Invalid sector index {sector} in {table_name}"))
+    })?;
+    if next != ENDOFCHAIN && next >= MAXREGSECT {
+        return Err(OleError::CorruptedFile(format!(
+            "Invalid sector marker 0x{next:08X} in {table_name} chain"
+        )));
+    }
+    Ok(next)
 }
 
 fn read_u16_le(bytes: &[u8], description: &str) -> Result<u16, OleError> {
@@ -2577,6 +2757,134 @@ mod tests {
         };
 
         assert_eq!(file.read_stream_from_fat(0, 3).unwrap(), b"abc");
+    }
+
+    fn synthetic_fat_file(fat: Vec<u32>, bytes: Vec<u8>) -> OleFile<Cursor<Vec<u8>>> {
+        OleFile {
+            reader: Cursor::new(bytes.clone()),
+            file_size: bytes.len() as u64,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat,
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: Vec::new(),
+        }
+    }
+
+    fn synthetic_minifat_file(minifat: Vec<u32>, ministream: Vec<u8>) -> OleFile<Cursor<Vec<u8>>> {
+        OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat,
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: Some(ministream),
+            sector_roles: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn fat_stream_replays_fragmented_chain_in_order_at_exact_size() {
+        let mut bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        bytes[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 3].copy_from_slice(b"one");
+        bytes[3 * SECTOR_SIZE_V3..3 * SECTOR_SIZE_V3 + 3].copy_from_slice(b"two");
+        let mut file = synthetic_fat_file(vec![2, ENDOFCHAIN, ENDOFCHAIN], bytes);
+
+        let data = file.read_stream_from_fat(0, 512 + 3).unwrap();
+        assert_eq!(&data[..3], b"one");
+        assert!(data[3..512].iter().all(|&byte| byte == 0));
+        assert_eq!(&data[512..], b"two");
+    }
+
+    #[test]
+    fn fat_stream_chain_errors_remain_allocation_free_and_ordered() {
+        let bytes = vec![0u8; 3 * SECTOR_SIZE_V3];
+
+        let mut short = synthetic_fat_file(vec![ENDOFCHAIN], bytes.clone());
+        assert!(matches!(
+            short.read_stream_from_fat(0, 513),
+            Err(OleError::CorruptedFile(message))
+                if message == "FAT chain is shorter than the declared stream size"
+        ));
+
+        let mut excess = synthetic_fat_file(vec![1, ENDOFCHAIN], bytes.clone());
+        assert_eq!(excess.read_stream_from_fat(0, 1).unwrap(), vec![0]);
+
+        let mut cycle = synthetic_fat_file(vec![1, 2, 1], bytes.clone());
+        assert!(matches!(
+            cycle.read_stream_from_fat(0, 1),
+            Err(OleError::CorruptedFile(message))
+                if message == "Cycle detected in FAT chain at sector 1"
+        ));
+
+        let mut invalid = synthetic_fat_file(vec![2], bytes);
+        assert!(matches!(
+            invalid.read_stream_from_fat(0, 1),
+            Err(OleError::CorruptedFile(message))
+                if message == "Invalid sector index 2 in FAT"
+        ));
+    }
+
+    #[test]
+    fn minifat_stream_replays_fragmented_chain_in_order_at_exact_size() {
+        let mut ministream = vec![0u8; 3 * 64];
+        ministream[..3].copy_from_slice(b"one");
+        ministream[2 * 64..2 * 64 + 3].copy_from_slice(b"two");
+        let mut file = synthetic_minifat_file(vec![2, ENDOFCHAIN, ENDOFCHAIN], ministream);
+
+        let data = file.read_stream_from_minifat(0, 64 + 3).unwrap();
+        assert_eq!(&data[..3], b"one");
+        assert!(data[3..64].iter().all(|&byte| byte == 0));
+        assert_eq!(&data[64..], b"two");
+    }
+
+    #[test]
+    fn minifat_stream_chain_errors_and_extra_sector_bounds_remain_unchanged() {
+        let ministream = vec![0u8; 2 * 64];
+
+        let mut short = synthetic_minifat_file(vec![ENDOFCHAIN], ministream.clone());
+        assert!(matches!(
+            short.read_stream_from_minifat(0, 65),
+            Err(OleError::CorruptedFile(message))
+                if message == "MiniFAT chain is shorter than the declared stream size"
+        ));
+
+        let mut excess = synthetic_minifat_file(vec![1, ENDOFCHAIN], ministream.clone());
+        assert_eq!(excess.read_stream_from_minifat(0, 1).unwrap(), vec![0]);
+
+        let mut cycle = synthetic_minifat_file(vec![1, 2, 1], ministream.clone());
+        assert!(matches!(
+            cycle.read_stream_from_minifat(0, 1),
+            Err(OleError::CorruptedFile(message))
+                if message == "Cycle detected in MiniFAT chain at sector 1"
+        ));
+
+        let mut invalid = synthetic_minifat_file(vec![2], ministream.clone());
+        assert!(matches!(
+            invalid.read_stream_from_minifat(0, 1),
+            Err(OleError::CorruptedFile(message))
+                if message == "Invalid sector index 2 in MiniFAT"
+        ));
+
+        let mut out_of_bounds = synthetic_minifat_file(vec![1, ENDOFCHAIN], vec![0; 64]);
+        assert!(matches!(
+            out_of_bounds.read_stream_from_minifat(0, 1),
+            Err(OleError::CorruptedFile(message)) if message == "Mini sector out of bounds"
+        ));
     }
 
     #[test]
