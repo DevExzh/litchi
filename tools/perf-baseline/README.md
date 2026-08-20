@@ -192,7 +192,7 @@ worksheet names, count, and full text. An untimed typed eager
 `litchi_xlsx::Workbook` semantic projection (including names, count, and full
 text), archive SHA-256, and independently opened eager OPC/property metadata
 digest guard each case. These selectors bring the
-selectable matrix to 343 names while leaving the default 36 cases / 198
+selectable matrix to 344 names while leaving the default 36 cases / 198
 records unchanged.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
