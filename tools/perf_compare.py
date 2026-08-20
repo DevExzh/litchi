@@ -337,6 +337,16 @@ _PARALLEL_METRICS_SCHEMA = 1
 _PARALLEL_METRICS_CLAIM = "descriptive"
 _PARALLEL_METRICS_SCOPE = "explicit_local_execution_only"
 _PARALLEL_METRIC_STATUSES = {"measured", "not_applicable", "unavailable"}
+_PARALLEL_U64_MAX = (1 << 64) - 1
+_PARALLEL_CHUNK_SCOPE = "result.execution.deterministic_chunk_count"
+_PARALLEL_SIMULATION_CHUNK_SCOPE = "result.source.simulation.physical_request_count"
+_PARALLEL_CFB_SELECTIVE_CHUNK_SCOPE = (
+    "result.source.cfb_selective.simulation.read.physical_request_count"
+)
+_PARALLEL_CFB_OPEN_CHUNK_SCOPE = (
+    "result.source.cfb_open_stream.simulation.samples.per_operation."
+    "physical_request_count_sum"
+)
 
 
 def _parallel_exact_keys(
@@ -371,8 +381,10 @@ def _parallel_numeric_value(value: Any, path: str) -> None:
     if isinstance(value, bool):
         raise ComparisonInputError(f"{path} must be a non-negative integer")
     if isinstance(value, int):
-        if value < 0:
-            raise ComparisonInputError(f"{path} must be non-negative")
+        if value < 0 or value > _PARALLEL_U64_MAX:
+            raise ComparisonInputError(
+                f"{path} must be an unsigned 64-bit integer"
+            )
         return
     if isinstance(value, list):
         for index, item in enumerate(value):
@@ -381,12 +393,37 @@ def _parallel_numeric_value(value: Any, path: str) -> None:
     raise ComparisonInputError(f"{path} must be a non-negative integer or vector")
 
 
+def _parallel_scalar_value(value: Any, path: str) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        or value > _PARALLEL_U64_MAX
+    ):
+        raise ComparisonInputError(
+            f"{path} must be a non-negative unsigned 64-bit integer scalar"
+        )
+    return value
+
+
+def _parallel_u64_vector(value: Any, path: str) -> list[int]:
+    if not isinstance(value, list):
+        raise ComparisonInputError(f"{path} must be an unsigned 64-bit integer vector")
+    return [
+        _parallel_scalar_value(item, f"{path}[{index}]")
+        for index, item in enumerate(value)
+    ]
+
+
 def _parallel_worker_vector(value: Any, path: str) -> list[int]:
     if (
         not isinstance(value, list)
         or not value
         or any(
-            isinstance(item, bool) or not isinstance(item, int) or item <= 0
+            isinstance(item, bool)
+            or not isinstance(item, int)
+            or item <= 0
+            or item > _PARALLEL_U64_MAX
             for item in value
         )
         or value != sorted(set(value))
@@ -399,7 +436,11 @@ def _parallel_worker_vector(value: Any, path: str) -> list[int]:
 
 def _validate_parallel_result_worker(
     result: dict[str, Any], result_path: str, configured_workers: list[int]
-) -> None:
+) -> tuple[int | None, int | None, int | None]:
+    """Validate raw worker fields and return execution/opc/team facts."""
+
+    execution_worker: int | None = None
+    logical_tasks: int | None = None
     execution = result.get("execution")
     if execution is not None:
         execution_object = _require_object(execution, f"{result_path}.execution")
@@ -417,13 +458,22 @@ def _validate_parallel_result_worker(
                 f"{result_path}.execution.worker_count={worker} is absent from "
                 "configuration.execution_workers"
             )
+        execution_worker = worker
+        logical_tasks = execution_object.get("logical_tasks")
+        if logical_tasks is None:
+            raise ComparisonInputError(
+                f"{result_path}.execution.logical_tasks is required when execution is present"
+            )
+        _parallel_scalar_value(
+            logical_tasks, f"{result_path}.execution.logical_tasks"
+        )
     source = result.get("source")
     if source is None:
-        return
+        return execution_worker, None, None
     source_object = _require_object(source, f"{result_path}.source")
     opc_cache = source_object.get("opc_cache")
     if opc_cache is None:
-        return
+        return execution_worker, None, None
     opc_cache_object = _require_object(
         opc_cache, f"{result_path}.source.opc_cache"
     )
@@ -437,6 +487,12 @@ def _validate_parallel_result_worker(
             f"{result_path}.source.opc_cache.worker_count={worker} is absent from "
             "configuration.execution_workers"
         )
+    teams = opc_cache_object.get("persistent_worker_teams_created")
+    if teams is not None:
+        _parallel_scalar_value(
+            teams, f"{result_path}.source.opc_cache.persistent_worker_teams_created"
+        )
+    return execution_worker, worker, teams
 
 
 def _validate_parallel_metric(
@@ -448,6 +504,7 @@ def _validate_parallel_metric(
     vector_length: int | None = None,
     require_vector: bool = False,
     require_positive_vector: bool = False,
+    scalar_only: bool = False,
 ) -> tuple[str, Any | None]:
     obj = _parallel_exact_keys(
         value,
@@ -472,6 +529,8 @@ def _validate_parallel_metric(
             raise ComparisonInputError(f"{path}.reason must be omitted when measured")
         metric_value = obj["value"]
         _parallel_numeric_value(metric_value, f"{path}.value")
+        if scalar_only:
+            _parallel_scalar_value(metric_value, f"{path}.value")
         if require_vector and not isinstance(metric_value, list):
             raise ComparisonInputError(f"{path}.value must be a vector")
         if vector_length is not None:
@@ -482,7 +541,13 @@ def _validate_parallel_metric(
                     f"{path}.value has {len(metric_value)} samples; expected {vector_length}"
                 )
         if require_positive_vector:
-            if not isinstance(metric_value, list) or any(item <= 0 for item in metric_value):
+            if not isinstance(metric_value, list) or any(
+                isinstance(item, bool)
+                or not isinstance(item, int)
+                or item <= 0
+                or item > _PARALLEL_U64_MAX
+                for item in metric_value
+            ):
                 raise ComparisonInputError(
                     f"{path}.value must be a non-empty positive worker vector"
                 )
@@ -499,12 +564,26 @@ def _validate_parallel_metric(
 
 def _validate_parallel_sample_order(
     result: dict[str, Any], result_path: str
-) -> int:
+) -> tuple[int, list[int]]:
     elapsed = _require_object(result.get("elapsed_ns"), f"{result_path}.elapsed_ns")
     samples = elapsed.get("samples")
     if not isinstance(samples, list):
         raise ComparisonInputError(
             f"{result_path}.elapsed_ns.samples must be a list"
+        )
+    for index, sample in enumerate(samples):
+        if (
+            isinstance(sample, bool)
+            or not isinstance(sample, int)
+            or sample < 0
+            or sample > _PARALLEL_U64_MAX
+        ):
+            raise ComparisonInputError(
+                f"{result_path}.elapsed_ns.samples[{index}] must be an unsigned 64-bit integer"
+            )
+    if samples != sorted(samples):
+        raise ComparisonInputError(
+            f"{result_path}.elapsed_ns.samples must be sorted in ascending order"
         )
     order = elapsed.get("sample_order")
     if not isinstance(order, list) or len(order) != len(samples):
@@ -519,7 +598,140 @@ def _validate_parallel_sample_order(
         raise ComparisonInputError(
             f"{result_path}.elapsed_ns.sample_order must be a complete permutation"
         )
-    return len(samples)
+    if any(
+        samples[index] == samples[index + 1]
+        and order[index] > order[index + 1]
+        for index in range(len(samples) - 1)
+    ):
+        raise ComparisonInputError(
+            f"{result_path}.elapsed_ns.sample_order does not preserve sorted sample identity"
+        )
+    return len(samples), order
+
+
+def _parallel_source_chunk_candidates(
+    result: dict[str, Any], result_path: str
+) -> list[tuple[str, list[int]]]:
+    """Return exact per-sample chunk vectors exposed by the result source."""
+
+    candidates: list[tuple[str, list[int]]] = []
+    source = result.get("source")
+    if source is not None:
+        source_object = _require_object(source, f"{result_path}.source")
+        simulation = source_object.get("simulation")
+        if simulation is not None:
+            simulation_object = _require_object(
+                simulation, f"{result_path}.source.simulation"
+            )
+            if "physical_request_count" in simulation_object:
+                candidates.append(
+                    (
+                        _PARALLEL_SIMULATION_CHUNK_SCOPE,
+                        _parallel_u64_vector(
+                            simulation_object["physical_request_count"],
+                            f"{result_path}.source.simulation.physical_request_count",
+                        ),
+                    )
+                )
+
+        cfb_selective = source_object.get("cfb_selective")
+        if cfb_selective is not None:
+            cfb_selective_object = _require_object(
+                cfb_selective, f"{result_path}.source.cfb_selective"
+            )
+            simulation = cfb_selective_object.get("simulation")
+            if simulation is not None:
+                simulation_object = _require_object(
+                    simulation, f"{result_path}.source.cfb_selective.simulation"
+                )
+                if "read" in simulation_object:
+                    read = simulation_object["read"]
+                    if not isinstance(read, list):
+                        raise ComparisonInputError(
+                            f"{result_path}.source.cfb_selective.simulation.read "
+                            "must be a list"
+                        )
+                    values: list[int] = []
+                    for index, phase in enumerate(read):
+                        phase_object = _require_object(
+                            phase,
+                            f"{result_path}.source.cfb_selective.simulation.read[{index}]",
+                        )
+                        values.append(
+                            _parallel_scalar_value(
+                                phase_object.get("physical_request_count"),
+                                f"{result_path}.source.cfb_selective.simulation.read"
+                                f"[{index}].physical_request_count",
+                            )
+                        )
+                    candidates.append((_PARALLEL_CFB_SELECTIVE_CHUNK_SCOPE, values))
+
+        cfb_open_stream = source_object.get("cfb_open_stream")
+        if cfb_open_stream is not None:
+            cfb_open_stream_object = _require_object(
+                cfb_open_stream, f"{result_path}.source.cfb_open_stream"
+            )
+            simulation = cfb_open_stream_object.get("simulation")
+            if simulation is not None:
+                simulation_object = _require_object(
+                    simulation, f"{result_path}.source.cfb_open_stream.simulation"
+                )
+                if "samples" in simulation_object:
+                    samples = simulation_object["samples"]
+                    if not isinstance(samples, list):
+                        raise ComparisonInputError(
+                            f"{result_path}.source.cfb_open_stream.simulation.samples "
+                            "must be a list"
+                        )
+                    values = []
+                    for sample_index, sample in enumerate(samples):
+                        sample_object = _require_object(
+                            sample,
+                            f"{result_path}.source.cfb_open_stream.simulation.samples"
+                            f"[{sample_index}]",
+                        )
+                        per_operation = sample_object.get("per_operation")
+                        if not isinstance(per_operation, list):
+                            raise ComparisonInputError(
+                                f"{result_path}.source.cfb_open_stream.simulation.samples"
+                                f"[{sample_index}].per_operation must be a list"
+                            )
+                        total = 0
+                        for operation_index, phase in enumerate(per_operation):
+                            phase_object = _require_object(
+                                phase,
+                                f"{result_path}.source.cfb_open_stream.simulation."
+                                f"samples[{sample_index}].per_operation[{operation_index}]",
+                            )
+                            total += _parallel_scalar_value(
+                                phase_object.get("physical_request_count"),
+                                f"{result_path}.source.cfb_open_stream.simulation."
+                                f"samples[{sample_index}].per_operation[{operation_index}]"
+                                ".physical_request_count",
+                            )
+                            if total > _PARALLEL_U64_MAX:
+                                raise ComparisonInputError(
+                                    f"{result_path}.source.cfb_open_stream.simulation."
+                                    f"samples[{sample_index}].per_operation request count "
+                                    "overflows u64"
+                                )
+                        values.append(total)
+                    candidates.append((_PARALLEL_CFB_OPEN_CHUNK_SCOPE, values))
+
+    execution = result.get("execution")
+    if execution is not None:
+        execution_object = _require_object(execution, f"{result_path}.execution")
+        if "deterministic_chunk_count" in execution_object:
+            candidates.append(
+                (
+                    _PARALLEL_CHUNK_SCOPE,
+                    _parallel_u64_vector(
+                        execution_object["deterministic_chunk_count"],
+                        f"{result_path}.execution.deterministic_chunk_count",
+                    ),
+                )
+            )
+    return candidates
 
 
 def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
@@ -581,6 +793,7 @@ def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
         f"{label}.parallel_metrics.observed_process_thread_count",
         "process_thread_count",
         expected_status="unavailable",
+        scalar_only=True,
     )
 
     results = report.get("results")
@@ -616,7 +829,23 @@ def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
             not isinstance(case["cache_state"], str) or not case["cache_state"]
         ):
             raise ComparisonInputError(f"{case_path}.cache_state must be non-empty")
-        _validate_parallel_result_worker(result, result_path, configured_workers)
+        result_cache_state = result.get("cache_state")
+        if result_cache_state is not None:
+            if not isinstance(result_cache_state, str) or not result_cache_state:
+                raise ComparisonInputError(
+                    f"{result_path}.cache_state must be a non-empty string"
+                )
+            if case.get("cache_state") != result_cache_state:
+                raise ComparisonInputError(
+                    f"{case_path}.cache_state does not match {result_path}.cache_state"
+                )
+        elif "cache_state" in case:
+            raise ComparisonInputError(
+                f"{case_path}.cache_state is present but {result_path}.cache_state is absent"
+            )
+        execution_worker, opc_worker, worker_teams = _validate_parallel_result_worker(
+            result, result_path, configured_workers
+        )
         corpus = _require_object(result.get("corpus"), f"{result_path}.corpus")
         corpus_sha = corpus.get("archive_sha256")
         if isinstance(corpus_sha, str) and corpus_sha:
@@ -628,56 +857,149 @@ def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
             raise ComparisonInputError(
                 f"{case_path}.corpus_sha256 requires a non-empty result corpus digest"
             )
-        sample_count = _validate_parallel_sample_order(result, result_path)
+        sample_count, sample_order = _validate_parallel_sample_order(result, result_path)
+        if execution_worker is None and opc_worker is None:
+            expected_configured_status = "not_applicable"
+            expected_configured_value = None
+            expected_configured_scope = "result.execution.worker_count"
+        elif (
+            execution_worker is not None
+            and opc_worker is not None
+            and execution_worker != opc_worker
+        ):
+            expected_configured_status = "unavailable"
+            expected_configured_value = None
+            expected_configured_scope = "result.execution.worker_count"
+        else:
+            expected_configured_status = "measured"
+            expected_configured_value = (
+                execution_worker if execution_worker is not None else opc_worker
+            )
+            expected_configured_scope = (
+                "result.execution.worker_count"
+                if execution_worker is not None
+                else "result.source.opc_cache.worker_count"
+            )
         configured_status, configured_value = _validate_parallel_metric(
             case["configured_worker_count"],
             f"{case_path}.configured_worker_count",
             {"result.execution.worker_count", "result.source.opc_cache.worker_count"},
+            expected_status=expected_configured_status,
+            scalar_only=True,
         )
-        if (
-            configured_status == "measured"
-            and configured_value not in configured_workers
-        ):
+        _parallel_scope_matches(
+            case["configured_worker_count"]["scope"],
+            expected_configured_scope,
+            f"{case_path}.configured_worker_count.scope",
+        )
+        if configured_status == "measured" and configured_value != expected_configured_value:
+            raise ComparisonInputError(
+                f"{case_path}.configured_worker_count.value does not match the result worker width"
+            )
+        if configured_status == "measured" and configured_value not in configured_workers:
             raise ComparisonInputError(
                 f"{case_path}.configured_worker_count.value is absent from "
                 f"{label}.configuration.execution_workers"
             )
+
+        if opc_worker is None or worker_teams is None or worker_teams == 0:
+            expected_observed_status = "not_applicable"
+            expected_observed_value = None
+        elif worker_teams == 1:
+            expected_observed_status = "measured"
+            expected_observed_value = opc_worker
+        else:
+            expected_observed_status = "unavailable"
+            expected_observed_value = None
         observed_status, observed_value = _validate_parallel_metric(
             case["observed_local_worker_count"],
             f"{case_path}.observed_local_worker_count",
             "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+            expected_status=expected_observed_status,
+            scalar_only=True,
         )
-        if (
-            observed_status == "measured"
-            and observed_value not in configured_workers
-        ):
+        if observed_status == "measured" and observed_value != expected_observed_value:
+            raise ComparisonInputError(
+                f"{case_path}.observed_local_worker_count.value does not match the "
+                f"{result_path}.source.opc_cache.worker_count"
+            )
+        if observed_status == "measured" and observed_value not in configured_workers:
             raise ComparisonInputError(
                 f"{case_path}.observed_local_worker_count.value is absent from "
                 f"{label}.configuration.execution_workers"
             )
-        _validate_parallel_metric(
+
+        expected_task_status = "measured" if execution_worker is not None else "not_applicable"
+        expected_task_value = (
+            result["execution"]["logical_tasks"] if execution_worker is not None else None
+        )
+        task_status, task_value = _validate_parallel_metric(
             case["deterministic_task_count"],
             f"{case_path}.deterministic_task_count",
             "result.execution.logical_tasks",
+            expected_status=expected_task_status,
+            scalar_only=True,
         )
-        _validate_parallel_metric(
+        if task_status == "measured" and task_value != expected_task_value:
+            raise ComparisonInputError(
+                f"{case_path}.deterministic_task_count.value does not match "
+                f"{result_path}.execution.logical_tasks"
+            )
+
+        chunk_candidates = _parallel_source_chunk_candidates(result, result_path)
+        if len(chunk_candidates) > 1:
+            expected_chunk_status = "unavailable"
+            expected_chunk_scope = _PARALLEL_CHUNK_SCOPE
+            expected_chunk_values = None
+        elif not chunk_candidates:
+            expected_chunk_status = (
+                "unavailable" if execution_worker is not None else "not_applicable"
+            )
+            expected_chunk_scope = _PARALLEL_CHUNK_SCOPE
+            expected_chunk_values = None
+        else:
+            expected_chunk_scope, source_values = chunk_candidates[0]
+            if not source_values:
+                expected_chunk_status = "unavailable"
+                expected_chunk_values = None
+            else:
+                if len(source_values) != sample_count:
+                    raise ComparisonInputError(
+                        f"{result_path}.{expected_chunk_scope} has {len(source_values)} "
+                        f"values; elapsed_ns.samples has {sample_count}"
+                    )
+                expected_chunk_status = "measured"
+                expected_chunk_values = [source_values[index] for index in sample_order]
+        chunk_status, chunk_value = _validate_parallel_metric(
             case["deterministic_chunk_count"],
             f"{case_path}.deterministic_chunk_count",
-            {
-                "result.execution.deterministic_chunk_count",
-                "result.source.simulation.physical_request_count",
-                "result.source.cfb_selective.simulation.read.physical_request_count",
-                "result.source.cfb_open_stream.simulation.samples.per_operation."
-                "physical_request_count_sum",
-            },
+            expected_chunk_scope,
+            expected_status=expected_chunk_status,
             vector_length=sample_count,
         )
+        if chunk_status == "measured" and chunk_value != expected_chunk_values:
+            raise ComparisonInputError(
+                f"{case_path}.deterministic_chunk_count.value does not match "
+                f"{result_path}.{expected_chunk_scope} after sample_order alignment"
+            )
         _validate_parallel_metric(
             case["lock_wait_ns"],
             f"{case_path}.lock_wait_ns",
             "lock_wait_ns",
             expected_status="unavailable",
+            scalar_only=True,
         )
+
+
+def validate_parallel_metrics(report: Any, label: str = "report") -> None:
+    """Validate an emitted descriptive parallel-metrics envelope.
+
+    This public wrapper lets summary and packaging tools apply the same
+    fail-closed schema and result cross-checks without comparing the envelope
+    as a performance metric.
+    """
+
+    _validate_parallel_metrics(_require_object(report, label), label)
 
 
 def _validate_report_identity(

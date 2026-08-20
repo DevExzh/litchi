@@ -2742,7 +2742,12 @@ it from bytes.
 `lock_wait_ns` is unavailable because waiter counts are not lock-time
 measurements. The envelope never reads process-global thread lists, converts
 CPU utilization or waiter counts into worker/lock metrics, or infers chunks
-from bytes. Every unavailable value carries a scope and reason.
+from bytes. Every unavailable value carries a scope and reason. The comparator
+cross-checks measured scalar and sample-vector values against their result and
+configuration fields, including cache-state identity and the exact sorted
+`sample_order`; the ABBA summary and package tools apply the same validation
+when a schema-v1 report emits this envelope. None treats the descriptive
+parallel evidence as a latency or resource regression metric.
 
 Publication cases may additionally emit `output_sha256`, independently
 identifying the deterministic changed archive without changing schema v1. For

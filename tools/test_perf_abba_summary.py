@@ -201,6 +201,70 @@ def four_legs():
     ]
 
 
+def with_parallel_metrics(reports):
+    reports = copy.deepcopy(reports)
+    for report_value in reports:
+        report_value["configuration"]["execution_workers"] = [1, 2]
+        cases = []
+        for result in report_value["results"]:
+            samples = result["elapsed_ns"]["samples"]
+            sample_order = list(range(len(samples)))
+            result["elapsed_ns"]["sample_order"] = sample_order
+            result["execution"] = {"worker_count": 2, "logical_tasks": 3}
+            result["source"]["simulation"] = {
+                "physical_request_count": list(range(1, len(samples) + 1))
+            }
+            cases.append(
+                {
+                    "case": result["case"],
+                    "corpus_sha256": result["corpus"]["archive_sha256"],
+                    "configured_worker_count": {
+                        "status": "measured",
+                        "value": 2,
+                        "scope": "result.execution.worker_count",
+                    },
+                    "observed_local_worker_count": {
+                        "status": "not_applicable",
+                        "scope": "result.source.opc_cache.worker_count_with_one_"
+                        "created_local_worker_team",
+                        "reason": "result does not create an explicit local worker team",
+                    },
+                    "deterministic_task_count": {
+                        "status": "measured",
+                        "value": 3,
+                        "scope": "result.execution.logical_tasks",
+                    },
+                    "deterministic_chunk_count": {
+                        "status": "measured",
+                        "value": list(range(1, len(samples) + 1)),
+                        "scope": "result.source.simulation.physical_request_count",
+                    },
+                    "lock_wait_ns": {
+                        "status": "unavailable",
+                        "scope": "lock_wait_ns",
+                        "reason": "no exact instrumented lock boundary is present",
+                    },
+                }
+            )
+        report_value["parallel_metrics"] = {
+            "schema_version": 1,
+            "scope": "explicit_local_execution_only",
+            "claim": "descriptive",
+            "configured_worker_budget": {
+                "status": "measured",
+                "value": [1, 2],
+                "scope": "configuration.execution_workers",
+            },
+            "observed_process_thread_count": {
+                "status": "unavailable",
+                "scope": "process_thread_count",
+                "reason": "no process-global thread counter is collected",
+            },
+            "cases": cases,
+        }
+    return reports
+
+
 class PerfAbbaSummaryTests(unittest.TestCase):
     def test_recomputes_statistics_and_emits_every_multi_shape_row(self):
         summary = perf_abba_summary.summarize_reports(four_legs())
@@ -219,6 +283,21 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             elapsed_summary["same_implementation_drift_percent"]["control"]["p50"], 10.0
         )
         self.assertEqual(elapsed_summary["accepted_statistics"], ["p99"])
+
+    def test_validates_descriptive_parallel_metrics_without_comparing_them(self):
+        reports = with_parallel_metrics(four_legs())
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(summary["verification"]["result_count"], 2)
+
+        malformed = copy.deepcopy(reports)
+        malformed[0]["parallel_metrics"]["cases"][0]["deterministic_task_count"][
+            "value"
+        ] = [3]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "deterministic_task_count.value must be a non-negative",
+        ):
+            perf_abba_summary.summarize_reports(malformed)
 
     def test_default_drift_ceilings_and_custom_ceilings_are_applied_per_statistic(self):
         legs = reports_for_values(
