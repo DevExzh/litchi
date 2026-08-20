@@ -1219,6 +1219,7 @@ struct PartCache {
 }
 
 impl PartCache {
+    #[cfg(test)]
     fn new(limits: SourceCacheLimits) -> Self {
         Self::new_with_diagnostics(limits, Arc::new(DiagnosticState::default()))
     }

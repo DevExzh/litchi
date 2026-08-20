@@ -473,6 +473,7 @@ impl CorpusManifestV2 {
     pub(crate) fn from_legacy(legacy: LegacyCorpusManifestV1) -> Result<Self, ManifestError> {
         let archive_bytes = u64::try_from(legacy.archive_bytes)
             .map_err(|_| ManifestError::new("archive byte count does not fit u64"))?;
+        let archive_member_count = u64::try_from(legacy.archive_member_count).ok();
         let logical_payload_bytes = u64::try_from(legacy.uncompressed_payload_bytes)
             .map_err(|_| ManifestError::new("logical byte count does not fit u64"))?;
         let entry_count = u64::try_from(legacy.entry_count)
@@ -600,7 +601,7 @@ impl CorpusManifestV2 {
                 profile_sha256: None,
                 observed: ObservedLimitsV2 {
                     input_bytes: Some(archive_bytes),
-                    members: u64::try_from(legacy.archive_member_count).ok(),
+                    members: archive_member_count,
                     relationships: None,
                     materialized_bytes: None,
                 },
