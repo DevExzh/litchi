@@ -40693,7 +40693,7 @@ mod tests {
         PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
         RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
         SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
-        SourceBackedPackage, WindowedHashingSink, WriteSizeBuckets, WriterShape,
+        SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
         XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
@@ -40729,7 +40729,7 @@ mod tests {
         run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
         run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
-        updated_writer_text, writer_shape, xlsx_cell_count,
+        updated_writer_text, verify_xlsx_cells, writer_shape, xlsx_cell_count, xlsx_spec,
     };
 
     #[test]
