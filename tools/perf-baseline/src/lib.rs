@@ -14330,6 +14330,19 @@ fn xlsx_row_visibility_variant_bytes(
                 )?;
         },
         "signed" => {
+            let source = package;
+            package = OpcPackage::new();
+            for part in source.iter_parts() {
+                package.try_add_part(part.clone_part())?;
+            }
+            for relationship in source.rels().iter() {
+                package.rels_mut().try_add_relationship(
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.r_id().to_owned(),
+                    relationship.target_mode(),
+                )?;
+            }
             let signature = PackURI::new("/_xmlsignatures/origin.sigs")?;
             package.try_add_part(Box::new(BlobPart::new(
                 signature,
@@ -41195,7 +41208,7 @@ mod tests {
         // `Case` is the central selectable-name enumeration. Keep the
         // documented current count mechanically tied to that enum until a
         // generated registry replaces the exhaustive `Case::name` match.
-        let source = include_str!("main.rs");
+        let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")
             .and_then(|(_, rest)| rest.split_once("\n}\n\nimpl Case"))
@@ -41218,7 +41231,7 @@ mod tests {
 
     #[test]
     fn selectable_case_registry_has_complete_name_and_parse_mappings() {
-        let source = include_str!("main.rs");
+        let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")
             .and_then(|(_, rest)| rest.split_once("\n}\n\nimpl Case"))

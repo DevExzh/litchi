@@ -1188,7 +1188,7 @@ mod tests {
             allocation.live_bytes_before.values,
             Some(vec![1_036, 1_000])
         );
-        let json = serde_json::to_value(allocation).unwrap();
+        let json = serde_json::to_value(&allocation).unwrap();
         assert_eq!(json["status"], "measured");
         assert_eq!(
             json["allocation_calls"]["values"],
