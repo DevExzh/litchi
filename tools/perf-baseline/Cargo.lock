@@ -1020,6 +1020,7 @@ dependencies = [
  "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
+ "memchr",
  "quick-xml",
  "serde_json",
  "sha2 0.11.0",
