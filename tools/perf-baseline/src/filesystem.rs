@@ -1443,12 +1443,8 @@ fn record_sample(
         logical_read_calls: invocation.child.logical_read_calls,
         logical_read_requested_bytes: invocation.child.logical_read_requested_bytes,
         logical_read_bytes: invocation.child.logical_read_bytes,
-        logical_read_largest_requested_bytes: invocation
-            .child
-            .logical_read_largest_requested_bytes,
-        logical_read_largest_returned_bytes: invocation
-            .child
-            .logical_read_largest_returned_bytes,
+        logical_read_largest_requested_bytes: invocation.child.logical_read_largest_requested_bytes,
+        logical_read_largest_returned_bytes: invocation.child.logical_read_largest_returned_bytes,
         logical_read_pattern: invocation.child.logical_read_pattern,
         max_concurrent_reads: invocation.child.max_concurrent_reads,
         logical_read_request_sizes: invocation.child.logical_read_request_sizes,
@@ -1929,8 +1925,8 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
     let cold_verified = cold_verified_preparation
         .map(|preparation| cold_verified::complete(preparation, before, after));
-    let snapshot = counter
-        .map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
+    let snapshot =
+        counter.map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
     let logical_read_counter_scope = if operation.is_cfb_owned() {
         "not_applicable_immutable_owned_slice"
     } else if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
@@ -3080,12 +3076,7 @@ fn checked_atomic_add(counter: &AtomicU64, amount: u64, label: &str) -> io::Resu
         let next = current
             .checked_add(amount)
             .ok_or_else(|| io::Error::other(format!("filesystem source {label} overflow")))?;
-        match counter.compare_exchange_weak(
-            current,
-            next,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
+        match counter.compare_exchange_weak(current, next, Ordering::SeqCst, Ordering::SeqCst) {
             Ok(_) => return Ok(next),
             Err(observed) => current = observed,
         }
@@ -3098,12 +3089,7 @@ fn checked_atomic_sub(counter: &AtomicU64, amount: u64, label: &str) -> io::Resu
         let next = current
             .checked_sub(amount)
             .ok_or_else(|| io::Error::other(format!("filesystem source {label} underflow")))?;
-        match counter.compare_exchange_weak(
-            current,
-            next,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
+        match counter.compare_exchange_weak(current, next, Ordering::SeqCst, Ordering::SeqCst) {
             Ok(_) => return Ok(next),
             Err(observed) => current = observed,
         }
@@ -3160,14 +3146,11 @@ impl ReadAt for CountingReadAt {
         self.checked_add(&self.returned_bytes, returned, "returned bytes")?;
         self.largest_returned_bytes
             .fetch_max(returned, Ordering::SeqCst);
-        let mut pattern = self
-            .pattern
-            .lock()
-            .map_err(|_| {
-                self.fail_metrics(io::Error::other(
-                    "filesystem source pattern metrics are poisoned",
-                ))
-            })?;
+        let mut pattern = self.pattern.lock().map_err(|_| {
+            self.fail_metrics(io::Error::other(
+                "filesystem source pattern metrics are poisoned",
+            ))
+        })?;
         pattern
             .observe(offset, requested, read)
             .map_err(|error| self.fail_metrics(error))?;
@@ -4155,13 +4138,19 @@ mod tests {
         let mut second = [0_u8; 2];
         assert_eq!(source.read_at(0, &mut first).unwrap(), 2);
         assert_eq!(source.read_at(5, &mut second).unwrap(), 2);
-        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Random));
+        assert_eq!(
+            source.snapshot().unwrap().pattern,
+            Some(ReadPattern::Random)
+        );
 
         let short = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 1])));
         let mut output = [0_u8; 2];
         assert_eq!(short.read_at(0, &mut output).unwrap(), 1);
         assert_eq!(short.read_at(1, &mut output).unwrap(), 0);
-        assert_eq!(short.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+        assert_eq!(
+            short.snapshot().unwrap().pattern,
+            Some(ReadPattern::Unknown)
+        );
     }
 
     #[test]
@@ -4169,7 +4158,10 @@ mod tests {
         let source = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 8])));
         let mut output = [0_u8; 2];
         assert_eq!(source.read_at(3, &mut output).unwrap(), 2);
-        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+        assert_eq!(
+            source.snapshot().unwrap().pattern,
+            Some(ReadPattern::Unknown)
+        );
     }
 
     #[test]
@@ -4193,7 +4185,10 @@ mod tests {
         assert_eq!(source.calls.load(Ordering::SeqCst), 1);
         assert_eq!(source.requested_bytes.load(Ordering::SeqCst), 4);
         assert_eq!(source.returned_bytes.load(Ordering::SeqCst), 0);
-        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+        assert_eq!(
+            source.snapshot().unwrap().pattern,
+            Some(ReadPattern::Unknown)
+        );
     }
 
     #[test]
@@ -4250,7 +4245,10 @@ mod tests {
         });
         assert_eq!(first.join().unwrap().unwrap(), 2);
         assert_eq!(second.join().unwrap().unwrap(), 2);
-        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+        assert_eq!(
+            source.snapshot().unwrap().pattern,
+            Some(ReadPattern::Unknown)
+        );
         assert!(source.max_concurrent.load(Ordering::SeqCst) >= 2);
     }
 
