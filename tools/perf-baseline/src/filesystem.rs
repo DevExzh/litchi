@@ -1285,6 +1285,19 @@ fn run_one(
                 .cold_verified
                 .clone()
                 .ok_or("cold-verified child omitted its proof")?;
+            if proof.aligned_source_sha256.as_deref() != Some(verified_sha256) {
+                return Err(
+                    "cold-verified proof source hash differs from the prepared aligned source"
+                        .into(),
+                );
+            }
+            let aligned_source_bytes = fs::metadata(verified_source)?.len();
+            if proof.aligned_source_bytes != Some(aligned_source_bytes) {
+                return Err(
+                    "cold-verified proof source size differs from the prepared aligned source"
+                        .into(),
+                );
+            }
             cold_verified_samples
                 .get_or_insert_with(Vec::new)
                 .push(proof.clone());
@@ -3653,8 +3666,14 @@ fn verify_docx_operation(
     if eager.paragraph_count()? != super::SemanticShape::Medium.docx_paragraphs() {
         return Err("DOCX filesystem corpus paragraph count differs from specification".into());
     }
-    if docx_archive_signature(&bytes)? != docx_archive_signature(&corpus.archive)? {
-        return Err("DOCX filesystem archive topology or payload hashes differ".into());
+    let aligned_signature = docx_archive_signature(&bytes)?;
+    let corpus_signature = docx_archive_signature(&corpus.archive)?;
+    if aligned_signature.semantic_sha256 != corpus_signature.semantic_sha256 {
+        return Err(format!(
+            "DOCX filesystem archive topology or payload hashes differ (aligned bytes {}, corpus bytes {})",
+            aligned_signature.physical_bytes, corpus_signature.physical_bytes
+        )
+        .into());
     }
     assert_source_sha256(source, &source_sha256)?;
     Ok(())
@@ -3724,7 +3743,13 @@ fn docx_table_projection(
     Ok((row_count, rows))
 }
 
-fn docx_archive_signature(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DocxArchiveSignature {
+    physical_bytes: usize,
+    semantic_sha256: String,
+}
+
+fn docx_archive_signature(bytes: &[u8]) -> Result<DocxArchiveSignature, Box<dyn Error>> {
     let package = OpcPackage::from_bytes(bytes)?;
     let mut parts = package
         .iter_parts()
@@ -3764,12 +3789,14 @@ fn docx_archive_signature(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
         })
         .collect::<Vec<_>>();
     package_relationships.sort();
-    Ok(super::sha256_hex(&serde_json::to_vec(&(
-        bytes.len(),
-        package.part_count(),
-        package_relationships,
-        parts,
-    ))?))
+    Ok(DocxArchiveSignature {
+        physical_bytes: bytes.len(),
+        semantic_sha256: super::sha256_hex(&serde_json::to_vec(&(
+            package.part_count(),
+            package_relationships,
+            parts,
+        ))?),
+    })
 }
 
 fn pptx_presentation_signature(
@@ -4292,6 +4319,21 @@ mod tests {
         assert!(Operation::PptxSourceOpen.supports_cold_verified());
         assert!(Operation::DocxSourceOpenFullTextLifecycle.supports_cold_verified());
         assert!(Operation::OpcSourceOpen.supports_cold_verified());
+    }
+
+    #[test]
+    fn padded_docx_archive_keeps_semantic_corpus_identity() {
+        let corpus = super::build_docx_source_edit_corpus().unwrap();
+        let aligned =
+            super::cold_verified::page_aligned_archive(&corpus.archive, 4096, true).unwrap();
+        assert_eq!(aligned.len() % 4096, 0);
+        let corpus_signature = super::docx_archive_signature(&corpus.archive).unwrap();
+        let aligned_signature = super::docx_archive_signature(&aligned).unwrap();
+        assert_eq!(
+            aligned_signature.semantic_sha256,
+            corpus_signature.semantic_sha256
+        );
+        assert_eq!(aligned_signature.physical_bytes, aligned.len());
     }
 
     #[test]

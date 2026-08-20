@@ -737,12 +737,15 @@ default cache selection unchanged.
 
 Cold-verified samples are admitted only when all of the following hold:
 
-- the source is a regular, non-empty, page-aligned file on an allowlisted
-  block-backed filesystem (`ext2/3/4`, `xfs`, `btrfs`, `f2fs`, or `zfs`);
+- the source is a regular, non-empty, page-aligned file opened read-write on an
+  allowlisted block-backed filesystem identified from the opened FD's numeric
+  `statfs` magic (`0xef53` ext2/3/4, `0x58465342` XFS, `0x9123683e` Btrfs,
+  `0xf2f52010` F2FS, or `0x2fc12fc1` ZFS);
 - the source has been `fsync`ed and accepted `posix_fadvise(DONTNEED)` advice;
-- external `fincore --json --bytes --output FILE,SIZE,RES,DIRTY,WRITEBACK`
-  emits one strict JSON record immediately before the timed operation with
-  zero resident, dirty, and writeback bytes; and
+- the canonical, hashed, versioned external `fincore` binary emits one strict
+  JSON record immediately before the timed operation with zero resident,
+  dirty, and writeback bytes; raw stderr and method/fallback evidence are
+  retained, and any unrecognized fallback is ineligible; and
 - the child’s `/proc/self/io` `read_bytes` delta is positive during the
   source-touching interval.
 
@@ -756,10 +759,13 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 ```
 
 The verifier creates a private page-aligned source copy (ZIP alignment uses
-the EOCD comment field and does not change logical package members).  It never
-reports source paths or device identifiers.  `filesystem_evidence` records an
-explicit `cold_verified_status` for every requested case and keeps ineligible
-cases out of timed results; a status such as `ineligible_filesystem_unsupported`,
+the EOCD comment field and does not change logical package members).  It does
+not add source paths or device identifiers to the report; raw fincore stderr is
+retained byte-for-byte and may contain a tool-emitted path.  Each eligible
+proof records the aligned source SHA-256 and size, numeric filesystem magic,
+and canonical fincore path/SHA-256/version.  `filesystem_evidence` records an explicit
+`cold_verified_status` for every requested case and keeps ineligible cases out
+of timed results; a status such as `ineligible_filesystem_unsupported`,
 `ineligible_fincore_invalid_json`, or `ineligible_read_bytes_zero` is a
 successful fail-closed outcome, not a cold result.  A verified result proves
 page-cache residency/dirty/writeback state plus process `read_bytes` only.  It
