@@ -133,6 +133,26 @@ fn fallback_package(messages: Vec<RawMessage>) -> TestResult<Vec<u8>> {
     )?)
 }
 
+fn duplicate_member_zip(first: &[u8], second: &[u8]) -> TestResult<Vec<u8>> {
+    const TARGET: &str = "Index/Document.iwa";
+    // Keep the placeholder the same length as TARGET so the valid ZIP emitted
+    // by the package writer can be rewritten without changing its offsets.
+    const PLACEHOLDER: &str = "Index/Document.jwa";
+    let mut bytes = litchi_iwa_archive::package::to_bytes(
+        [(TARGET, first), (PLACEHOLDER, second)],
+        ArchiveLimits::default(),
+    )?;
+    let mut occurrences = 0;
+    for offset in 0..=bytes.len() - PLACEHOLDER.len() {
+        if bytes[offset..offset + PLACEHOLDER.len()].starts_with(PLACEHOLDER.as_bytes()) {
+            bytes[offset..offset + PLACEHOLDER.len()].copy_from_slice(TARGET.as_bytes());
+            occurrences += 1;
+        }
+    }
+    assert_eq!(occurrences, 2, "expected local and central ZIP names");
+    Ok(bytes)
+}
+
 fn cross_component_duplicate_package() -> TestResult<Vec<u8>> {
     let component = |messages| -> TestResult<Vec<u8>> {
         Ok(SnappyStream::compress(
@@ -646,13 +666,7 @@ fn public_read_errors_redact_paths_members_and_control_characters() -> TestResul
     assert_content_free(&path_error, &[path_sentinel, "998244353"]);
 
     let member_sentinel = "private-member-sentinel-776655443";
-    let duplicate = litchi_iwa_archive::package::to_bytes(
-        [
-            ("Index/Document.iwa", member_sentinel.as_bytes()),
-            ("Index/Document.iwa", b"duplicate".as_slice()),
-        ],
-        ArchiveLimits::default(),
-    )?;
+    let duplicate = duplicate_member_zip(member_sentinel.as_bytes(), b"duplicate")?;
     let member_error =
         Document::from_bytes(&duplicate).expect_err("duplicate malformed member must fail");
     assert_content_free(&member_error, &[member_sentinel, "776655443"]);

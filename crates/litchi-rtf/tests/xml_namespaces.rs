@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod support;
+
 use litchi_rtf::{RtfDocument, RtfWriter, XmlNamespace};
 use std::borrow::Cow;
 use std::fs;
@@ -92,7 +94,6 @@ fn handles_bundled_libreoffice_xml_namespace_fixtures() {
         "sw/qa/core/data/rtf/pass/tdf116851.rtf",
         "sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf",
         "sw/qa/extras/odfexport/data/tdf165315.rtf",
-        "sw/qa/extras/rtfexport/data/FWDP90_min.rtf",
     ];
     let root = concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -118,4 +119,26 @@ fn handles_bundled_libreoffice_xml_namespace_fixtures() {
                 && entry.namespace == "http://schemas.microsoft.com/office/word/2003/wordml"
         }));
     }
+
+    let malformed = fs::read(format!("{root}/sw/qa/extras/rtfexport/data/FWDP90_min.rtf")).unwrap();
+    // FWDP90_min.rtf has one extra closing brace after the root group. Keep
+    // the vendored bytes untouched and assert strict trailing-token rejection.
+    assert!(
+        matches!(
+            RtfDocument::parse_bytes(&malformed),
+            Err(litchi_rtf::RtfError::MalformedDocument(message))
+                if message == "RTF document contains trailing non-whitespace tokens"
+        ),
+        "expected strict trailing-token rejection for FWDP90_min.rtf"
+    );
+    let prefix = support::first_balanced_rtf_root_prefix(&malformed)
+        .expect("FWDP90_min.rtf should have a balanced first root group");
+    let document = RtfDocument::parse_bytes(prefix)
+        .unwrap_or_else(|error| panic!("failed to parse FWDP90_min.rtf root: {error}"));
+    let namespaces = document
+        .xml_namespaces()
+        .expect("FWDP90_min.rtf root exposed no XML namespace table");
+    assert!(namespaces.iter().any(|entry| {
+        entry.id == 1 && entry.namespace == "http://schemas.microsoft.com/office/word/2003/wordml"
+    }));
 }

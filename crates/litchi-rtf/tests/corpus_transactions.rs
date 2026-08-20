@@ -112,6 +112,23 @@ fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
         microsoft.fields()[0].instruction
     );
 
+    let passive = Document::parse(r"{\rtf1\ansi{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
+    let changed = TransferPlan::field(&passive, 0, &microsoft_target)
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_snapshot();
+    assert_ne!(
+        changed.to_bytes().unwrap(),
+        microsoft_target.to_bytes().unwrap()
+    );
+    let reopened = Document::from_bytes(&changed.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.fields().len(), 1);
+    assert_eq!(
+        reopened.fields()[0].instruction,
+        passive.fields()[0].instruction
+    );
+
     let libreoffice = Document::from_bytes(
         &std::fs::read(corpus(
             "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf",

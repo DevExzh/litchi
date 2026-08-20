@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod support;
+
 use litchi_rtf::{Revision, RevisionAuthor, RevisionType, RtfDocument, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
@@ -145,7 +147,6 @@ fn handles_bundled_libreoffice_revision_fixtures() {
         "sw/qa/extras/rtfexport/data/text-change-tracking.rtf",
         "sw/qa/extras/rtfexport/data/redline.rtf",
         "sw/qa/extras/rtfexport/data/fdo55504-1-min.rtf",
-        "sw/qa/extras/rtfexport/data/FWDP90_min.rtf",
         "sw/qa/extras/rtfimport/data/tdf167710.rtf",
     ];
     let root = concat!(
@@ -169,4 +170,24 @@ fn handles_bundled_libreoffice_revision_fixtures() {
             "fixture has no revision authors: {fixture}"
         );
     }
+
+    let malformed = fs::read(format!("{root}/sw/qa/extras/rtfexport/data/FWDP90_min.rtf")).unwrap();
+    // FWDP90_min.rtf has one extra closing brace after the root group. Keep
+    // the vendored bytes untouched and assert strict trailing-token rejection.
+    assert!(
+        matches!(
+            RtfDocument::parse_bytes(&malformed),
+            Err(litchi_rtf::RtfError::MalformedDocument(message))
+                if message == "RTF document contains trailing non-whitespace tokens"
+        ),
+        "expected strict trailing-token rejection for FWDP90_min.rtf"
+    );
+    let prefix = support::first_balanced_rtf_root_prefix(&malformed)
+        .expect("FWDP90_min.rtf should have a balanced first root group");
+    let document = RtfDocument::parse_bytes(prefix)
+        .unwrap_or_else(|error| panic!("failed to parse FWDP90_min.rtf root: {error}"));
+    assert!(
+        !document.revision_authors().is_empty(),
+        "fixture has no revision authors: FWDP90_min.rtf"
+    );
 }

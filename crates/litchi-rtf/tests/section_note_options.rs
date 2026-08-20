@@ -328,7 +328,15 @@ fn rejects_section_note_controls_after_the_parsed_document_group() {
             if message.contains("trailing non-whitespace")
     ));
 
-    assert!(RtfDocument::parse(r"{\rtf1 Body\sftnbj}").is_err());
+    let document = RtfDocument::parse(r"{\rtf1\sectd\sftnbj Body}").unwrap();
+    assert_eq!(document.text(), "Body");
+    assert_eq!(
+        document.sections()[0]
+            .properties
+            .note_options
+            .footnote_placement,
+        Some(SectionFootnotePlacement::BottomOfPage)
+    );
 }
 
 #[test]
