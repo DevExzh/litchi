@@ -47,7 +47,10 @@ use soapberry_zip::office::ArchiveReader;
 ///
 /// This projection deliberately contains no ZIP implementation types. The
 /// facade inspects the physical bundle and parses only `Document.iwa`, while
-/// leaving unrelated `.iwa` members opaque to format detection.
+/// leaving unrelated `.iwa` members opaque to format detection. The retained
+/// [`document`](Self::document) archive is itself a selected view containing
+/// only object identifier `1`; unrelated object headers and payload extents
+/// are still validated before they are discarded.
 #[derive(Debug)]
 pub struct DetectionRoot {
     has_iwa_components: bool,
@@ -68,7 +71,11 @@ impl DetectionRoot {
         self.has_keynote_components
     }
 
-    /// Borrow the parsed root `Document.iwa`, if present.
+    /// Borrow the selected parsed root `Document.iwa`, if present.
+    ///
+    /// Only objects with archive identifier `1` are retained. This detection
+    /// view is not a lossless component archive; callers that need to inspect
+    /// or edit every object must use [`SourceCatalog`] instead.
     #[must_use]
     pub const fn document(&self) -> Option<&Archive> {
         self.document.as_ref()
@@ -172,8 +179,9 @@ fn detection_root_from_exact_document(
         package::preflight_semantic_iwa(entry, entry.name())?;
         let compressed = archive.read_entry(entry)?;
         let stream = SnappyStream::decompress_with_limits(&compressed, limits.snappy_limits()?)?;
-        Some(Archive::parse_with_limits(
+        Some(Archive::parse_objects_with_identifier_with_limits(
             stream.as_bytes(),
+            1,
             limits.effective_archive_limits()?,
         )?)
     } else {

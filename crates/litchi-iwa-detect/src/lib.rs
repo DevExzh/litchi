@@ -1930,7 +1930,7 @@ fn invalid_application_authority(number: u32, reason: &str) -> Error {
 
 fn root_format(data: &[u8], limits: Limits) -> Result<Option<Format>> {
     let stream = SnappyStream::decompress_with_limits(data, limits.snappy_limits()?)?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let archive = Archive::parse_objects_with_identifier(stream.as_bytes(), 1)?;
     root_format_archive(&archive)
 }
 
