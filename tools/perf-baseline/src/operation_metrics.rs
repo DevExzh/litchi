@@ -26,6 +26,9 @@ pub(crate) enum MetricStatus {
     /// The metric is supported in principle, but the child could not collect
     /// it for this run (for example, procfs is unavailable).
     Unavailable,
+    /// A counter or checked sample difference overflowed and the numeric
+    /// vector was intentionally withheld.
+    Overflow,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -220,6 +223,27 @@ pub(crate) struct CfbPhaseMetrics {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub(crate) struct AllocationMetrics {
+    pub status: MetricStatus,
+    pub scope: String,
+    pub allocation_calls: MetricVector,
+    pub deallocation_calls: MetricVector,
+    pub reallocation_calls: MetricVector,
+    pub failed_allocation_calls: MetricVector,
+    pub allocated_bytes: MetricVector,
+    pub deallocated_bytes: MetricVector,
+    /// Absolute process live bytes before the timed operation. These values
+    /// are deliberately not reset or presented as an operation peak.
+    pub live_bytes_before: MetricVector,
+    /// Absolute process live bytes after the timed operation.
+    pub live_bytes_after: MetricVector,
+    /// Absolute process high-water live bytes before the timed operation.
+    pub peak_live_bytes_before: MetricVector,
+    /// Absolute process high-water live bytes after the timed operation.
+    pub peak_live_bytes_after: MetricVector,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct OperationMetrics {
     /// Number of values in every measured vector below.
     pub sample_count: usize,
@@ -237,6 +261,8 @@ pub(crate) struct OperationMetrics {
     pub publication: PublicationMetrics,
     pub materialization: MaterializationMetrics,
     pub cfb_phases: CfbPhaseMetrics,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allocation: Option<AllocationMetrics>,
 }
 
 const ALIGNMENT: &str = "elapsed_ns.samples_by_elapsed_then_sample_index";
@@ -262,6 +288,7 @@ const PUBLICATION_SCOPE: &str = "logical_publication_counter";
 const MATERIALIZATION_SCOPE: &str = "logical_materialization_counter";
 const CFB_PHASE_ELAPSED_SCOPE: &str = "timed_cfb_phase_elapsed_ns";
 const CFB_PHASE_SOURCE_SCOPE: &str = "timed_cfb_phase_logical_read_at";
+const ALLOCATION_SCOPE: &str = "operation_global_system_allocator";
 
 /// Builds the additive envelope for one warm or cold `CaseResult`.
 ///
@@ -459,6 +486,7 @@ pub(crate) fn aggregate(
         )?,
     };
     let cfb_phases = cfb_phase_metrics(&selected)?;
+    let allocation = allocation_metrics(&selected)?;
 
     Ok(OperationMetrics {
         sample_count,
@@ -471,7 +499,102 @@ pub(crate) fn aggregate(
         publication,
         materialization,
         cfb_phases,
+        allocation,
     })
+}
+
+fn allocation_metrics(
+    samples: &[&SampleEvidence],
+) -> Result<Option<AllocationMetrics>, Box<dyn Error>> {
+    let presence = samples
+        .iter()
+        .map(|sample| sample.allocation_metrics.is_some())
+        .collect::<Vec<_>>();
+    let all_present = presence.iter().all(|present| *present);
+    let all_absent = presence.iter().all(|present| !present);
+    if !all_present && !all_absent {
+        return Err("operation metrics allocation option cardinality is asymmetric".into());
+    }
+    if all_absent {
+        return Ok(None);
+    }
+
+    let observations = samples
+        .iter()
+        .map(|sample| {
+            sample
+                .allocation_metrics
+                .as_ref()
+                .expect("presence was checked for every sample")
+        })
+        .collect::<Vec<_>>();
+    let first_status = observations[0].status;
+    let first_scope = observations[0].scope.clone();
+    if observations
+        .iter()
+        .any(|sample| sample.status != first_status || sample.scope != first_scope)
+    {
+        return Err("operation metrics allocation status or scope changes between samples".into());
+    }
+    let absent = |status: MetricStatus| MetricVector::absent(status, ALLOCATION_SCOPE);
+    if first_status != crate::allocation_metrics::Status::Measured {
+        let status = match first_status {
+            crate::allocation_metrics::Status::Unavailable => MetricStatus::Unavailable,
+            crate::allocation_metrics::Status::Overflow => MetricStatus::Overflow,
+            crate::allocation_metrics::Status::Measured => unreachable!(),
+        };
+        return Ok(Some(AllocationMetrics {
+            status,
+            scope: first_scope,
+            allocation_calls: absent(status),
+            deallocation_calls: absent(status),
+            reallocation_calls: absent(status),
+            failed_allocation_calls: absent(status),
+            allocated_bytes: absent(status),
+            deallocated_bytes: absent(status),
+            live_bytes_before: absent(status),
+            live_bytes_after: absent(status),
+            peak_live_bytes_before: absent(status),
+            peak_live_bytes_after: absent(status),
+        }));
+    }
+
+    let measured = |name: &str, value: fn(&crate::allocation_metrics::Sample) -> Option<u64>| {
+        let values = observations
+            .iter()
+            .map(|sample| value(sample))
+            .collect::<Vec<_>>();
+        if values.iter().any(Option::is_none) {
+            return Err(format!("operation metrics allocation {name} value is missing").into());
+        }
+        Ok(MetricVector::measured(
+            values
+                .into_iter()
+                .map(|value| value.expect("presence was checked for every sample"))
+                .collect(),
+            ALLOCATION_SCOPE,
+        ))
+    };
+    Ok(Some(AllocationMetrics {
+        status: MetricStatus::Measured,
+        scope: first_scope,
+        allocation_calls: measured("allocation_calls", |sample| sample.allocation_calls)?,
+        deallocation_calls: measured("deallocation_calls", |sample| sample.deallocation_calls)?,
+        reallocation_calls: measured("reallocation_calls", |sample| sample.reallocation_calls)?,
+        failed_allocation_calls: measured("failed_allocation_calls", |sample| {
+            sample.failed_allocation_calls
+        })?,
+        allocated_bytes: measured("allocated_bytes", |sample| sample.allocated_bytes)?,
+        deallocated_bytes: measured("deallocated_bytes", |sample| sample.deallocated_bytes)?,
+        live_bytes_before: measured("live_bytes_before", |sample| sample.live_bytes_before)?,
+        live_bytes_after: measured("live_bytes_after", |sample| sample.live_bytes_after)?,
+        peak_live_bytes_before: measured("peak_live_bytes_before", |sample| {
+            sample.peak_live_bytes_before
+        })?,
+        peak_live_bytes_after: measured("peak_live_bytes_after", |sample| {
+            sample.peak_live_bytes_after
+        })?,
+    }))
 }
 
 /// Builds operation metrics for an in-process case whose sink summary was
@@ -939,6 +1062,7 @@ mod tests {
             logical_read_request_sizes: vec![10],
             logical_read_request_size_buckets: ReadSizeBuckets::default(),
             process_metrics,
+            allocation_metrics: None,
             output_sha256: None,
             output_bytes: None,
             opc_materialized_parts: None,
@@ -1014,6 +1138,72 @@ mod tests {
             envelope.source.logical_read_calls.values,
             Some(vec![1, 2, 0])
         );
+    }
+
+    #[test]
+    fn allocation_vectors_are_aligned_and_absolute_live_counts_are_retained() {
+        let allocation = |calls, allocated, before, after| crate::allocation_metrics::Sample {
+            status: crate::allocation_metrics::Status::Measured,
+            scope: "operation_global_system_allocator".to_owned(),
+            allocation_calls: Some(calls),
+            deallocation_calls: Some(2),
+            reallocation_calls: Some(1),
+            failed_allocation_calls: Some(0),
+            allocated_bytes: Some(allocated),
+            deallocated_bytes: Some(64),
+            live_bytes_before: Some(before),
+            live_bytes_after: Some(after),
+            peak_live_bytes_before: Some(before + 10),
+            peak_live_bytes_after: Some(after + 10),
+        };
+        let mut first = sample(0, "warm", 20, Some(metrics()));
+        first.allocation_metrics = Some(allocation(7, 100, 1_000, 1_036));
+        let mut second = sample(1, "warm", 10, Some(metrics()));
+        second.allocation_metrics = Some(allocation(5, 80, 1_036, 1_052));
+        let envelope = aggregate(&[first, second], "warm", &[20, 10]).unwrap();
+        let allocation = envelope.allocation.unwrap();
+        assert_eq!(allocation.status, MetricStatus::Measured);
+        assert_eq!(allocation.allocation_calls.values, Some(vec![5, 7]));
+        assert_eq!(
+            allocation.live_bytes_before.values,
+            Some(vec![1_036, 1_000])
+        );
+        let json = serde_json::to_value(allocation).unwrap();
+        assert_eq!(json["status"], "measured");
+        assert_eq!(
+            json["allocation_calls"]["values"],
+            Value::from(vec![5_u64, 7])
+        );
+        assert_eq!(
+            json["live_bytes_after"]["values"],
+            Value::from(vec![1_052_u64, 1_036])
+        );
+    }
+
+    #[test]
+    fn allocation_overflow_omits_numeric_vectors() {
+        let mut sample = sample(0, "warm", 10, Some(metrics()));
+        sample.allocation_metrics = Some(crate::allocation_metrics::Sample {
+            status: crate::allocation_metrics::Status::Overflow,
+            scope: "operation_global_system_allocator".to_owned(),
+            allocation_calls: None,
+            deallocation_calls: None,
+            reallocation_calls: None,
+            failed_allocation_calls: None,
+            allocated_bytes: None,
+            deallocated_bytes: None,
+            live_bytes_before: None,
+            live_bytes_after: None,
+            peak_live_bytes_before: None,
+            peak_live_bytes_after: None,
+        });
+        let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
+        let allocation = envelope.allocation.unwrap();
+        assert_eq!(allocation.status, MetricStatus::Overflow);
+        assert!(allocation.allocation_calls.values.is_none());
+        let json = serde_json::to_value(allocation).unwrap();
+        assert_eq!(json["status"], "overflow");
+        assert!(json["allocation_calls"].get("values").is_none());
     }
 
     #[test]

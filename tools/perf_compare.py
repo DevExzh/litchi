@@ -5,7 +5,9 @@ The comparator intentionally uses only the Python standard library.  A policy
 pins the accepted report shape, identity fields, sample floor, percentile
 validation, metric presence, and regression thresholds.  Exit status is 0 for
 a passing comparison, 1 for measured regressions, and 2 for invalid or
-incomparable input.
+incomparable input. Reports carrying the benchmark-only allocator
+instrumentation identity retain elapsed validation but withhold latency
+comparisons; optional operation metrics remain comparable.
 """
 
 from __future__ import annotations
@@ -1180,7 +1182,7 @@ def _metric_class_for_path(
 
 _METRIC_VECTOR_MISSING = object()
 _METRIC_VECTOR_KEYS = {"values", "status", "scope"}
-_METRIC_VECTOR_STATUSES = {"measured", "not_applicable", "unavailable"}
+_METRIC_VECTOR_STATUSES = {"measured", "not_applicable", "unavailable", "overflow"}
 
 _OPERATION_METRICS_KEYS = {
     "sample_count",
@@ -1194,6 +1196,19 @@ _OPERATION_METRICS_KEYS = {
     "materialization",
     "cfb_phases",
 }
+_ALLOCATION_VECTOR_KEYS = (
+    "allocation_calls",
+    "deallocation_calls",
+    "reallocation_calls",
+    "failed_allocation_calls",
+    "allocated_bytes",
+    "deallocated_bytes",
+    "live_bytes_before",
+    "live_bytes_after",
+    "peak_live_bytes_before",
+    "peak_live_bytes_after",
+)
+_ALLOCATION_METRICS_KEYS = {"status", "scope", *_ALLOCATION_VECTOR_KEYS}
 _SOURCE_METRICS_KEYS = {
     "status",
     "counter_scope",
@@ -1437,7 +1452,8 @@ def _validate_operation_metrics(
             f"{path} strict validation requires supported report schema "
             f"{SUPPORTED_REPORT_SCHEMA}, got {report_schema}"
         )
-    obj = _require_exact_keys(value, path, _OPERATION_METRICS_KEYS)
+    operation_keys = _OPERATION_METRICS_KEYS | ({"allocation"} if "allocation" in value else set())
+    obj = _require_exact_keys(value, path, operation_keys)
     sample_count = len(elapsed_samples)
     declared_sample_count = obj["sample_count"]
     if (
@@ -1637,6 +1653,27 @@ def _validate_operation_metrics(
         _validate_phase_set(
             phases[key], f"{path}.cfb_phases.{key}", phase_status, sample_count
         )
+    allocation = obj.get("allocation")
+    if allocation is not None:
+        allocation = _require_exact_keys(
+            allocation, f"{path}.allocation", _ALLOCATION_METRICS_KEYS
+        )
+        allocation_status = _validate_metric_status(
+            allocation["status"], f"{path}.allocation.status"
+        )
+        if allocation["scope"] != "operation_global_system_allocator":
+            raise ComparisonInputError(
+                f"{path}.allocation.scope must be 'operation_global_system_allocator'"
+            )
+        for key in _ALLOCATION_VECTOR_KEYS:
+            vector_status = _validate_metric_vector(
+                allocation[key], f"{path}.allocation.{key}", sample_count
+            )
+            if vector_status != allocation_status:
+                raise ComparisonInputError(
+                    f"{path}.allocation.status does not match "
+                    f"{path}.allocation.{key}.status"
+                )
 
 
 def _unwrap_metric_vector(value: Any, path: str) -> Any:

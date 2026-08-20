@@ -17,6 +17,7 @@ TOOL = {
     "profile": "release",
     "target_os": "linux",
     "target_arch": "x86_64",
+    "instrumentation": "none",
 }
 
 
@@ -809,6 +810,16 @@ class PerfAbbaSummaryTests(unittest.TestCase):
                 perf_abba_summary.AbbaSummaryInputError, message
             ):
                 perf_abba_summary.summarize_reports(legs)
+
+    def test_allocator_instrumentation_is_not_accepted_for_latency_abba(self):
+        legs = four_legs()
+        for leg in legs:
+            leg["tool"]["instrumentation"] = "system_allocator"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "instrumentation.*latency ABBA",
+        ):
+            perf_abba_summary.summarize_reports(legs)
 
         legs = four_legs()
         for leg in legs:

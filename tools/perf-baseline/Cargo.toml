@@ -4,6 +4,14 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[features]
+allocator-metrics = []
+
+[[bin]]
+name = "litchi-perf-baseline-alloc"
+path = "src/main.rs"
+required-features = ["allocator-metrics"]
+
 [dependencies]
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
 litchi-core = { path = "../../crates/litchi-core" }
