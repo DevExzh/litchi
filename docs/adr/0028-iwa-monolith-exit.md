@@ -3249,3 +3249,31 @@ Numbers package, or monolith. No measured performance, latency, RSS, native
 save, or native mutation claim follows. Eight production generated decodes
 remain in the extractor, old `litchi-iwa` Tile paths remain, and debt 015 plus
 all 14 ordered migration debts are unchanged.
+
+## 2026-08-21 amendment: Numbers TableDataList/Segment bounded ingress
+
+The focused Numbers package now routes `TST.TableDataList` and
+`TST.TableDataListSegment` through a strict handwritten wire visitor backed by
+a private Buffa lazy projection. Package and Document use the same strict
+ingress. Document skips comment resolution by design; Package remains strict
+when retaining comments. Candidate publication retains only final semantic
+table values and bounded segment-id/key state, with fallible reserves; this is
+not a claim that all intermediate state is absent or that the path is
+end-to-end zero-copy.
+
+Required/duplicate/canonical-wire/UTF-8/reference/range/ownership checks,
+candidate atomicity, and later-wire-error precedence remain enforced. The
+package ceilings are 512 MiB input and output, 1,000,000 fields, nesting 64,
+and 16,000,000 work units, with tighter payload and text budgets before
+allocation. Six generated extractor decodes remain (four table-model, one
+FormulaArchive, and one comment), while FormulaArchive/comment migration
+debt, legacy monolith/dependency edges, and all 14 ordered debts remain open.
+
+Focused evidence on 2026-08-21 is 230 protocol tests, 47 extractor tests, nine
+integration tests, 276 boundary tests, and an 11-seed fuzz corpus with 100
+nightly ASan runs and no artifacts. A native 1,200-by-8 Numbers document was
+saved and reopened with strings, formulas, an intentional formula error, rich
+text, and a persisted comment and showed no repair dialog. The archive has
+DataList members, but no parsed type-6011 Segment was proven. This is a
+correctness/boundedness slice only: no native segment or save-mutation,
+performance, host-exit, or complete monolith-retirement claim is made.

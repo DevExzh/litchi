@@ -389,3 +389,37 @@ follows. This is not a complete extractor, Numbers, or monolith exit: eight
 production generated decodes remain in the extractor, the older `litchi-iwa`
 Tile paths remain, and debt 015 plus all 14 ordered migration debts are
 unchanged.
+
+## 2026-08-21 amendment: bounded Numbers TableDataList and Segment ingress
+
+The focused Numbers extractor now routes native `TST.TableDataList` and
+`TST.TableDataListSegment` payloads through a strict handwritten wire router
+and the private Buffa lazy-view projection. The same strict ingress is used by
+both Package and Document extraction. Document intentionally skips comment
+resolution, as required by its projection contract; Package retains strict
+comment validation. Production retains only the final semantic table values
+needed by a candidate, plus bounded segment-id/key tracking where required,
+with fallible reserves. It does not claim zero-copy operation or the absence
+of all `Vec`/`HashSet` storage.
+
+The route preserves required-field, duplicate, canonical-wire, UTF-8,
+reference, segment-range, ownership, and candidate-publication checks. Input,
+output, field, nesting, and aggregate work remain bounded by the package
+ceilings of 512 MiB, 512 MiB, 1,000,000 fields, depth 64, and 16,000,000 work
+units, with tighter per-payload and semantic text budgets applied before
+fallible allocation. Unknown bytes remain owned by the raw component and are
+not re-encoded by the private view. FormulaArchive and the compatibility
+comment path remain explicit migration debt; six generated extractor decodes
+remain (four table-model decodes, one formula decode, and one comment decode).
+
+The 2026-08-21 evidence records 230 `litchi-iwa-protos` tests, 47 focused
+extractor tests, nine TDL integration tests, and 276 boundary tests. The live
+boundary graph remains 64 packages, 240 declarations, and 14 ordered debts.
+The fuzz target has 11 seeds and completed 100 nightly ASan runs without an
+artifact. A real Numbers 1,200-by-8 file was created, saved, closed, and
+reopened through the application; strings, formula results, an intentional
+formula error, rich text, and a persisted comment were observed without a
+repair dialog. The archive listing contains DataList members, but no parsed
+type-6011 Segment was established. This is correctness and boundedness
+evidence only: it makes no native segment, native save-mutation, performance,
+host-exit, or complete-monolith-retirement claim.

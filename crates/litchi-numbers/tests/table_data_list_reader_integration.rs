@@ -1,0 +1,694 @@
+//! Integration coverage for the generated-free outer Numbers table-data-list
+//! projection.
+//!
+//! The package graph below is intentionally small and bounded.  It uses the
+//! generated protobuf types only as a test oracle; production ingress must
+//! retain the raw bytes and project the selected outer list through the strict
+//! generated-free codec.
+
+use std::error::Error as StdError;
+use std::sync::Arc;
+
+use litchi_iwa_archive::Limits as ArchiveLimits;
+use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
+use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst, tswp};
+use litchi_numbers::cell::Value;
+use litchi_numbers::{Document, Package};
+use litchi_numbers_wire::BncCell;
+use prost::Message as _;
+
+type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
+
+const DOCUMENT_MESSAGE_TYPE: u32 = 1;
+const SHEET_MESSAGE_TYPE: u32 = 2;
+const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
+const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+const TILE_MESSAGE_TYPE: u32 = 6_002;
+const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
+const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
+const RICH_TEXT_PAYLOAD_MESSAGE_TYPE: u32 = 6_218;
+const STORAGE_MESSAGE_TYPE: u32 = 2_001;
+const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const FORMULA_ERROR_FLAG: u32 = 0x0000_0800;
+
+const ROOT_ID: u64 = 1;
+const SHEET_ID: u64 = 2;
+const TABLE_INFO_ID: u64 = 3;
+const TABLE_MODEL_ID: u64 = 4;
+const SIDECAR_ID: u64 = 5;
+const TILE_ID: u64 = 6;
+const RICH_TEXT_PAYLOAD_ID: u64 = 101;
+const RICH_TEXT_STORAGE_ID: u64 = 102;
+const COMMENT_STORAGE_ID: u64 = 111;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Corruption {
+    None,
+    MalformedLaterSegmentPayload,
+    MissingSegmentPayload,
+    DuplicateSegmentPayload,
+    MissingSegmentReference,
+    DuplicateSegmentReference,
+    WrongSegmentType,
+    RangeOverflow,
+    EntryOutsideRange,
+    DuplicateRootKey,
+    DuplicateSegmentKey,
+    SelectedMalformedList,
+}
+
+fn reference(identifier: u64) -> tsp::Reference {
+    tsp::Reference {
+        identifier,
+        ..Default::default()
+    }
+}
+
+fn bounded<T>(items: impl IntoIterator<Item = T>, maximum: usize) -> TestResult<Vec<T>> {
+    let mut values = Vec::new();
+    values.try_reserve(maximum)?;
+    for value in items {
+        if values.len() == maximum {
+            return Err(std::io::Error::other("synthetic test builder bound exceeded").into());
+        }
+        values.push(value);
+    }
+    Ok(values)
+}
+
+fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<ArchiveObject> {
+    Ok(ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: message_type,
+            data,
+        }],
+    )?)
+}
+
+fn string_entry(key: u32, value: &str) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount: 1,
+        string: Some(value.to_owned()),
+        ..Default::default()
+    }
+}
+
+fn formula_archive() -> tsce::FormulaArchive {
+    tsce::FormulaArchive {
+        ast_node_array: tsce::AstNodeArrayArchive {
+            ast_node: vec![AstNodeArchive {
+                ast_node_type: AstNodeType::NumberNode as i32,
+                ast_number_node_number: Some(203.0),
+                ..Default::default()
+            }],
+        },
+        ..Default::default()
+    }
+}
+
+fn formula_entry(key: u32) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount: 1,
+        formula: Some(formula_archive()),
+        ..Default::default()
+    }
+}
+
+fn formula_error_entry(key: u32) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount: 1,
+        string: Some("#VALUE!".to_owned()),
+        ..Default::default()
+    }
+}
+
+fn rich_text_entry(key: u32) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount: 1,
+        rich_text_payload: Some(reference(RICH_TEXT_PAYLOAD_ID)),
+        ..Default::default()
+    }
+}
+
+fn comment_entry(key: u32) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount: 1,
+        comment_storage: Some(reference(COMMENT_STORAGE_ID)),
+        ..Default::default()
+    }
+}
+
+fn formula_error_cell(identifier: u32) -> TestResult<Vec<u8>> {
+    // BNC cells have an eight-byte prefix and a four-byte field mask before
+    // fields in the canonical layout.  The test-only raw construction keeps
+    // the wire fixture independent of private production constants while
+    // exercising the public BncCell parser on the resulting bytes.
+    let mut bytes = BncCell::minimal().encode();
+    bytes[1] = 8;
+    bytes[8..12].copy_from_slice(&FORMULA_ERROR_FLAG.to_le_bytes());
+    bytes.extend_from_slice(&identifier.to_le_bytes());
+    BncCell::parse(&bytes)?;
+    Ok(bytes)
+}
+
+fn segment_entries(
+    list_type: tst::table_data_list::ListType,
+    key: u32,
+) -> Vec<tst::table_data_list::ListEntry> {
+    match list_type {
+        tst::table_data_list::ListType::String => vec![string_entry(
+            key,
+            match key {
+                4 => "String segment one",
+                7 => "String segment two",
+                _ => "String segment unused",
+            },
+        )],
+        tst::table_data_list::ListType::Formula => vec![formula_entry(key)],
+        tst::table_data_list::ListType::FormulaError => vec![formula_error_entry(key)],
+        tst::table_data_list::ListType::RichTextPayload => vec![rich_text_entry(key)],
+        tst::table_data_list::ListType::CommentStorage => vec![comment_entry(key)],
+        _ => Vec::new(),
+    }
+}
+
+fn segment_object(
+    identifier: u64,
+    list_type: tst::table_data_list::ListType,
+    key: u32,
+    corruption: Corruption,
+) -> TestResult<ArchiveObject> {
+    if matches!(
+        corruption,
+        Corruption::MalformedLaterSegmentPayload if identifier == 51
+    ) {
+        return object(identifier, TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE, vec![0xff]);
+    }
+    if matches!(corruption, Corruption::MissingSegmentPayload if identifier == 51) {
+        return object(identifier, 9_999, vec![0]);
+    }
+
+    let segment_list_type = if matches!(
+        corruption,
+        Corruption::WrongSegmentType if identifier == 51
+    ) {
+        tst::table_data_list::ListType::Formula
+    } else {
+        list_type
+    };
+    let segment_key = if matches!(
+        corruption,
+        Corruption::EntryOutsideRange if identifier == 51
+    ) {
+        key.saturating_add(8)
+    } else if matches!(
+        corruption,
+        Corruption::DuplicateSegmentKey if identifier == 51
+    ) {
+        7
+    } else {
+        key
+    };
+    let range_location = if matches!(
+        corruption,
+        Corruption::DuplicateSegmentKey if identifier == 51
+    ) {
+        7
+    } else {
+        key
+    };
+    let key_range = if matches!(corruption, Corruption::RangeOverflow if identifier == 51) {
+        tsp::Range {
+            location: u32::MAX,
+            length: 1,
+        }
+    } else {
+        tsp::Range {
+            location: range_location,
+            length: 1,
+        }
+    };
+    let segment = tst::TableDataListSegment {
+        list_type: segment_list_type as i32,
+        key_range,
+        entries: segment_entries(list_type, segment_key),
+    };
+    let data = segment.encode_to_vec();
+    if matches!(corruption, Corruption::DuplicateSegmentPayload if identifier == 51) {
+        return Ok(ArchiveObject::new(
+            identifier,
+            bounded(
+                [
+                    RawMessage {
+                        type_: TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE,
+                        data: data.clone(),
+                    },
+                    RawMessage {
+                        type_: TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE,
+                        data,
+                    },
+                ],
+                2,
+            )?,
+        )?);
+    }
+    object(identifier, TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE, data)
+}
+
+fn string_segment_references(corruption: Corruption) -> Vec<tsp::Reference> {
+    match corruption {
+        Corruption::MissingSegmentReference => vec![reference(52), reference(9_999)],
+        Corruption::DuplicateSegmentReference => vec![reference(52), reference(52)],
+        _ => vec![reference(52), reference(51)],
+    }
+}
+
+fn list_message(
+    list_type: tst::table_data_list::ListType,
+    entries: Vec<tst::table_data_list::ListEntry>,
+    segments: Vec<tsp::Reference>,
+) -> tst::TableDataList {
+    tst::TableDataList {
+        list_type: list_type as i32,
+        next_list_id: 120,
+        entries,
+        segments,
+        ..Default::default()
+    }
+}
+
+fn sidecar_object(corruption: Corruption) -> TestResult<ArchiveObject> {
+    let mut string_entries = bounded(
+        [
+            string_entry(17, "String root unused"),
+            string_entry(5, "String root"),
+        ],
+        2,
+    )?;
+    if matches!(corruption, Corruption::DuplicateRootKey) {
+        string_entries[1].key = string_entries[0].key;
+    }
+    let string_list = list_message(
+        tst::table_data_list::ListType::String,
+        string_entries,
+        string_segment_references(corruption),
+    );
+
+    let formula_list = list_message(
+        tst::table_data_list::ListType::Formula,
+        bounded([formula_entry(21), formula_entry(3)], 2)?,
+        bounded([reference(62), reference(61)], 2)?,
+    );
+    let formula_error_list = list_message(
+        tst::table_data_list::ListType::FormulaError,
+        bounded([formula_error_entry(30), formula_error_entry(2)], 2)?,
+        bounded([reference(72), reference(71)], 2)?,
+    );
+    let rich_text_list = list_message(
+        tst::table_data_list::ListType::RichTextPayload,
+        bounded([rich_text_entry(40), rich_text_entry(1)], 2)?,
+        bounded([reference(82), reference(81)], 2)?,
+    );
+    let comment_list = list_message(
+        tst::table_data_list::ListType::CommentStorage,
+        bounded([comment_entry(50), comment_entry(2)], 2)?,
+        bounded([reference(92), reference(91)], 2)?,
+    );
+
+    let mut payloads = bounded(
+        [
+            RawMessage {
+                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                data: string_list.encode_to_vec(),
+            },
+            RawMessage {
+                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                data: formula_list.encode_to_vec(),
+            },
+            RawMessage {
+                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                data: formula_error_list.encode_to_vec(),
+            },
+            RawMessage {
+                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                data: rich_text_list.encode_to_vec(),
+            },
+            RawMessage {
+                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                data: comment_list.encode_to_vec(),
+            },
+        ],
+        5,
+    )?;
+    if matches!(corruption, Corruption::SelectedMalformedList) {
+        payloads[0].data = vec![0xff];
+    }
+    Ok(ArchiveObject::new(SIDECAR_ID, payloads)?)
+}
+
+fn rich_text_payload_object() -> TestResult<ArchiveObject> {
+    let payload = tst::RichTextPayloadArchive {
+        storage: reference(RICH_TEXT_STORAGE_ID),
+        range: None,
+        cellid: tst::CellId {
+            packed_data: 1,
+            expanded_coord: None,
+        },
+    };
+    let mut result = object(
+        RICH_TEXT_PAYLOAD_ID,
+        RICH_TEXT_PAYLOAD_MESSAGE_TYPE,
+        payload.encode_to_vec(),
+    )?;
+    let message = result
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or_else(|| std::io::Error::other("rich-text payload message missing"))?;
+    message.object_references.try_reserve(1)?;
+    message.object_references.push(RICH_TEXT_STORAGE_ID);
+    Ok(result)
+}
+
+fn rich_text_storage_object() -> TestResult<ArchiveObject> {
+    object(
+        RICH_TEXT_STORAGE_ID,
+        STORAGE_MESSAGE_TYPE,
+        tswp::StorageArchive {
+            kind: Some(tswp::storage_archive::KindType::Cell as i32),
+            text: bounded(["Rich segment".to_owned()], 1)?,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )
+}
+
+fn comment_storage_object() -> TestResult<ArchiveObject> {
+    object(
+        COMMENT_STORAGE_ID,
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        tsd::CommentStorageArchive {
+            text: Some("Comment retained by Package".to_owned()),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )
+}
+
+fn table_model() -> tst::TableModelArchive {
+    tst::TableModelArchive {
+        table_id: "table-data-list-table-id".to_owned(),
+        table_name: "Mixed table-data-list table".to_owned(),
+        number_of_rows: 5,
+        number_of_columns: 1,
+        base_data_store: tst::DataStore {
+            row_headers: tst::HeaderStorage {
+                bucket_hash_function: 1,
+                ..Default::default()
+            },
+            column_headers: reference(SIDECAR_ID),
+            tiles: tst::TileStorage {
+                tiles: vec![tst::tile_storage::Tile {
+                    tileid: 0,
+                    tile: reference(TILE_ID),
+                }],
+                tile_size: Some(256),
+                ..Default::default()
+            },
+            string_table: reference(SIDECAR_ID),
+            style_table: reference(SIDECAR_ID),
+            formula_table: reference(SIDECAR_ID),
+            formula_error_table: Some(reference(SIDECAR_ID)),
+            rich_text_table: Some(reference(SIDECAR_ID)),
+            comment_storage_table: Some(reference(SIDECAR_ID)),
+            format_table_pre_bnc: reference(SIDECAR_ID),
+            next_row_strip_id: 1,
+            next_column_strip_id: 1,
+            row_tile_tree: tst::TableRbTree::default(),
+            column_tile_tree: tst::TableRbTree::default(),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+fn table_tile(comment_identifier: u32) -> TestResult<tst::Tile> {
+    let mut string_cell = BncCell::minimal();
+    string_cell.set_string(7);
+    let mut formula_cell = BncCell::minimal();
+    formula_cell.set_formula_reference(7);
+    let error_cell = formula_error_cell(8)?;
+    let mut rich_text_cell = BncCell::minimal();
+    rich_text_cell.set_rich_text(6);
+    let mut number_cell = BncCell::minimal();
+    number_cell.set_number(42.0)?;
+    number_cell.set_comment_identifier(Some(comment_identifier));
+
+    let rows = [
+        string_cell.encode(),
+        formula_cell.encode(),
+        error_cell,
+        rich_text_cell.encode(),
+        number_cell.encode(),
+    ];
+    let mut row_infos = Vec::new();
+    row_infos.try_reserve(rows.len())?;
+    for (row, storage) in rows.into_iter().enumerate() {
+        row_infos.push(tst::TileRowInfo {
+            tile_row_index: u32::try_from(row)?,
+            cell_count: 1,
+            storage_version: Some(5),
+            cell_storage_buffer: Some(storage),
+            cell_offsets: Some(vec![0, 0]),
+            ..Default::default()
+        });
+    }
+    Ok(tst::Tile {
+        max_column: 0,
+        max_row: 4,
+        num_cells: 5,
+        numrows: 5,
+        row_infos,
+        storage_version: Some(5),
+        last_saved_in_bnc: Some(true),
+        ..Default::default()
+    })
+}
+
+fn synthetic_table_data_list_package(
+    corruption: Corruption,
+    comment_identifier: u32,
+) -> TestResult<Vec<u8>> {
+    let mut objects = Vec::new();
+    objects.try_reserve(20)?;
+    objects.push(object(
+        ROOT_ID,
+        DOCUMENT_MESSAGE_TYPE,
+        tn::DocumentArchive {
+            sheets: bounded([reference(SHEET_ID)], 1)?,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?);
+    objects.push(object(
+        SHEET_ID,
+        SHEET_MESSAGE_TYPE,
+        tn::SheetArchive {
+            name: "Mixed table-data-list sheet".to_owned(),
+            drawable_infos: bounded([reference(TABLE_INFO_ID)], 1)?,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?);
+    objects.push(object(
+        TABLE_INFO_ID,
+        TABLE_INFO_MESSAGE_TYPE,
+        tst::TableInfoArchive {
+            table_model: reference(TABLE_MODEL_ID),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?);
+    objects.push(object(
+        TABLE_MODEL_ID,
+        TABLE_MODEL_MESSAGE_TYPE,
+        table_model().encode_to_vec(),
+    )?);
+    objects.push(sidecar_object(corruption)?);
+
+    let tile = table_tile(comment_identifier)?;
+    objects.push(object(TILE_ID, TILE_MESSAGE_TYPE, tile.encode_to_vec())?);
+
+    for (identifier, list_type, key) in [
+        (51, tst::table_data_list::ListType::String, 4),
+        (52, tst::table_data_list::ListType::String, 7),
+        (61, tst::table_data_list::ListType::Formula, 4),
+        (62, tst::table_data_list::ListType::Formula, 7),
+        (71, tst::table_data_list::ListType::FormulaError, 4),
+        (72, tst::table_data_list::ListType::FormulaError, 8),
+        (81, tst::table_data_list::ListType::RichTextPayload, 3),
+        (82, tst::table_data_list::ListType::RichTextPayload, 6),
+        (91, tst::table_data_list::ListType::CommentStorage, 9),
+        (92, tst::table_data_list::ListType::CommentStorage, 12),
+    ] {
+        objects.push(segment_object(identifier, list_type, key, corruption)?);
+    }
+    objects.push(rich_text_payload_object()?);
+    objects.push(rich_text_storage_object()?);
+    objects.push(comment_storage_object()?);
+
+    let archive = Archive { objects };
+    let iwa = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(litchi_iwa_archive::package::to_bytes(
+        [("Index/Document.iwa", iwa.as_slice())],
+        ArchiveLimits::default(),
+    )?)
+}
+
+fn assert_semantics(document: &Document) -> TestResult {
+    document.validate()?;
+    let sheet = document
+        .sheet(0)?
+        .ok_or_else(|| std::io::Error::other("synthetic table-data-list sheet is missing"))?;
+    assert_eq!(sheet.name(), "Mixed table-data-list sheet");
+    let table = sheet
+        .tables()
+        .next()
+        .ok_or_else(|| std::io::Error::other("synthetic table-data-list table is missing"))?;
+    assert_eq!(table.name(), "Mixed table-data-list table");
+    assert_eq!((table.row_count(), table.column_count()), (5, 1));
+    assert_eq!(table.cell_count(), 5);
+    assert!(matches!(
+        table.get_a1("A1")?,
+        Some(Value::Text(value)) if value == "String segment two"
+    ));
+    assert!(matches!(
+        table.get_a1("A2")?,
+        Some(Value::Formula(value)) if value == "=203"
+    ));
+    assert!(matches!(
+        table.get_a1("A3")?,
+        Some(Value::Error(value)) if value == "#VALUE!"
+    ));
+    assert!(matches!(
+        table.get_a1("A4")?,
+        Some(Value::Text(value)) if value == "Rich segment"
+    ));
+    assert!(matches!(
+        table.get_a1("A5")?,
+        Some(Value::Number(value)) if value.get().to_bits() == 42.0_f64.to_bits()
+    ));
+    assert_eq!(
+        document.plain_text()?,
+        "Mixed table-data-list sheet\nMixed table-data-list table\nString segment two\n=203\nERROR: #VALUE!\nRich segment\n42"
+    );
+    Ok(())
+}
+
+fn assert_rejected_by_both_readers(corruption: Corruption) -> TestResult {
+    let bytes = synthetic_table_data_list_package(corruption, 12)?;
+    let original = bytes.clone();
+    assert!(Package::from_bytes(&bytes).is_err());
+    assert_eq!(
+        bytes, original,
+        "Package parsing mutated its borrowed source"
+    );
+    assert!(Document::from_bytes(&bytes).is_err());
+    assert_eq!(
+        bytes, original,
+        "Document parsing mutated its borrowed source"
+    );
+    Ok(())
+}
+
+#[test]
+fn mixed_root_and_segments_project_all_selected_lists_through_package_and_reopen() -> TestResult {
+    let bytes = synthetic_table_data_list_package(Corruption::None, 12)?;
+    let original = bytes.clone();
+
+    let package = Package::from_bytes(&bytes)?;
+    assert_semantics(package.document())?;
+    assert_eq!(package.sheets(), package.document().sheets());
+    assert_eq!(
+        bytes, original,
+        "Package parsing mutated its borrowed source"
+    );
+
+    let borrowed = Document::from_bytes(&bytes)?;
+    assert_semantics(&borrowed)?;
+    assert_eq!(
+        bytes, original,
+        "Document parsing mutated its borrowed source"
+    );
+
+    let reopened = Document::from_shared_bytes(Arc::from(bytes.clone()))?;
+    assert_semantics(&reopened)?;
+    assert_eq!(bytes, original, "Document reopen mutated its source copy");
+    Ok(())
+}
+
+#[test]
+fn malformed_later_segment_is_rejected_atomically_by_package_and_document() -> TestResult {
+    assert_rejected_by_both_readers(Corruption::MalformedLaterSegmentPayload)
+}
+
+#[test]
+fn missing_segment_payload_is_rejected_atomically() -> TestResult {
+    assert_rejected_by_both_readers(Corruption::MissingSegmentPayload)
+}
+
+#[test]
+fn duplicate_segment_payload_is_rejected_atomically() -> TestResult {
+    assert_rejected_by_both_readers(Corruption::DuplicateSegmentPayload)
+}
+
+#[test]
+fn missing_or_duplicate_segment_reference_is_rejected_atomically() -> TestResult {
+    assert_rejected_by_both_readers(Corruption::MissingSegmentReference)?;
+    assert_rejected_by_both_readers(Corruption::DuplicateSegmentReference)
+}
+
+#[test]
+fn wrong_segment_type_range_overflow_and_out_of_range_entries_are_rejected() -> TestResult {
+    assert_rejected_by_both_readers(Corruption::WrongSegmentType)?;
+    assert_rejected_by_both_readers(Corruption::RangeOverflow)?;
+    assert_rejected_by_both_readers(Corruption::EntryOutsideRange)
+}
+
+#[test]
+fn duplicate_root_and_segment_keys_are_rejected_before_publication() -> TestResult {
+    assert_rejected_by_both_readers(Corruption::DuplicateRootKey)?;
+    assert_rejected_by_both_readers(Corruption::DuplicateSegmentKey)
+}
+
+#[test]
+fn selected_malformed_list_is_strict_in_package_and_document_paths() -> TestResult {
+    assert_rejected_by_both_readers(Corruption::SelectedMalformedList)
+}
+
+#[test]
+fn document_ignores_valid_and_dangling_comment_ids_while_package_stays_strict() -> TestResult {
+    let valid = synthetic_table_data_list_package(Corruption::None, 12)?;
+    let valid_original = valid.clone();
+    let package = Package::from_bytes(&valid)?;
+    assert_semantics(package.document())?;
+    let document = Document::from_bytes(&valid)?;
+    assert_semantics(&document)?;
+    assert_eq!(valid, valid_original);
+
+    let dangling = synthetic_table_data_list_package(Corruption::None, 999)?;
+    let dangling_original = dangling.clone();
+    assert!(Package::from_bytes(&dangling).is_err());
+    assert_eq!(dangling, dangling_original);
+    let document = Document::from_bytes(&dangling)?;
+    assert_semantics(&document)?;
+    assert_eq!(dangling, dangling_original);
+    Ok(())
+}
