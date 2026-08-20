@@ -79,6 +79,30 @@ fn parses_exact_sparse_values_formulas_and_explicit_empty_cells() {
 }
 
 #[test]
+fn namespace_equivalent_worksheet_events_have_identical_results() {
+    let plain = format!(
+        r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#
+    );
+    let prefixed = format!(
+        r#"<x:worksheet xmlns:x="{S}" xmlns:y="{S}" xmlns="urn:not-spreadsheet"><y:sheetData><y:row r="1"><y:c r="A1"><y:v>7</y:v></y:c></y:row></y:sheetData></x:worksheet>"#
+    );
+
+    let plain = parse(plain.as_bytes(), || Ok(None)).expect("plain worksheet");
+    let prefixed = parse(prefixed.as_bytes(), || Ok(None)).expect("prefixed worksheet");
+    let address = Address::from_a1("A1").expect("address");
+    assert_eq!(plain.entries().len(), prefixed.entries().len());
+    assert_eq!(plain.get(address), prefixed.get(address));
+}
+
+#[test]
+fn namespace_rebinding_to_another_uri_remains_rejected() {
+    let xml = format!(
+        r#"<x:worksheet xmlns:x="{S}" xmlns:y="urn:not-spreadsheet"><x:sheetData><x:row r="1"><y:c r="A1"><y:v>7</y:v></y:c></x:row></x:sheetData></x:worksheet>"#
+    );
+    assert!(parse(xml.as_bytes(), || Ok(None)).is_err());
+}
+
+#[test]
 fn parses_sparse_merges_and_rejects_ambiguous_merge_markup() {
     let xml = format!(
         r#"<worksheet xmlns="{S}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="2"><c r="B2"><v>2</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:C3"/><mergeCell ref="E5:F5"/></mergeCells></worksheet>"#

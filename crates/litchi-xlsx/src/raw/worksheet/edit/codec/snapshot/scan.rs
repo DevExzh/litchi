@@ -189,14 +189,12 @@ pub(crate) fn scan(content: &[u8]) -> Result<Layout> {
 
     loop {
         let event_start = position(&reader)?;
-        let decoder = reader.decoder();
-        let event = reader
-            .read_event()
-            .map_err(|error| invalid(error.to_string()))?
-            .into_owned();
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(error.to_string()))?;
         let event_end = position(&reader)?;
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+        let decoder = reader.decoder();
+        let resolver = reader.resolver();
         match event {
             Event::Start(element) => {
                 let parent = stack.last().map(|frame| frame.kind);
