@@ -38652,12 +38652,29 @@ fn run_cfb_open_stream_bulk(
     let (sector_size, target_start_sector, target_is_minifat, root_ministream_bytes) =
         cfb_open_stream_identity(corpus)?;
     let limits = cfb_shared_limits(corpus)?;
-    let mut total_requested_bytes = 0usize;
-    for name in &invocation_stream_names {
-        total_requested_bytes = total_requested_bytes
-            .checked_add(cfb_open_stream_expected_payload(corpus, name)?.len())
-            .ok_or("CFB bulk workload bytes overflow")?;
+    // Prepare the deterministic oracle before any measured sample. Hashes
+    // recorded below are computed from the actual returned buffers, while
+    // these independent expected values continue to guard correctness.
+    let expected_outputs = invocation_stream_names
+        .iter()
+        .map(|name| cfb_open_stream_expected_payload(corpus, name))
+        .collect::<Result<Vec<_>, _>>()?;
+    let expected_hashes = expected_outputs
+        .iter()
+        .map(|output| sha256_hex(output))
+        .collect::<Vec<_>>();
+    let expected_payload_sha256 = invocation_stream_names
+        .iter()
+        .zip(&expected_hashes)
+        .find_map(|(name, hash)| (name == &corpus.target_name).then(|| hash.clone()))
+        .ok_or("CFB bulk workload has no target payload hash")?;
+    if expected_payload_sha256 != corpus.manifest.target_payload_sha256 {
+        return Err("CFB bulk deterministic target hash differs from manifest".into());
     }
+    let total_requested_bytes = expected_outputs
+        .iter()
+        .try_fold(0usize, |total, output| total.checked_add(output.len()))
+        .ok_or("CFB bulk workload bytes overflow")?;
     let path_storage = invocation_stream_names
         .iter()
         .map(|name| vec![name.as_str()])
@@ -38686,7 +38703,6 @@ fn run_cfb_open_stream_bulk(
     let mut expected_direct_physical_range = Vec::with_capacity(samples);
     let mut output_sha256 = Vec::with_capacity(samples);
     let mut returned_payload_bytes = Vec::with_capacity(samples);
-    let mut expected_payload_sha256 = None;
     let source_version_check =
         "public SharedOleFile::source_version verified before and after bulk_read operations";
 
@@ -38729,21 +38745,19 @@ fn run_cfb_open_stream_bulk(
         if outputs.len() != invocation_stream_names.len() {
             return Err("CFB bulk output count differs from workload".into());
         }
-        for (name, output) in invocation_stream_names.iter().zip(&outputs) {
-            if output != &cfb_open_stream_expected_payload(corpus, name)? {
+        for (output, expected) in outputs.iter().zip(&expected_outputs) {
+            if output != expected {
                 return Err("CFB bulk output differs from deterministic workload payload".into());
             }
         }
-        let hashes = invocation_stream_names
+        let hashes = outputs
             .iter()
-            .map(|name| cfb_open_stream_expected_hash(corpus, name))
-            .collect::<Result<Vec<_>, _>>()?;
-        if let Some(expected) = expected_payload_sha256.as_deref() {
-            if expected != corpus.manifest.target_payload_sha256 {
-                return Err("CFB bulk expected target hash changed across samples".into());
+            .map(|output| sha256_hex(output))
+            .collect::<Vec<_>>();
+        for (hash, expected) in hashes.iter().zip(&expected_hashes) {
+            if hash != expected {
+                return Err("CFB bulk output hash differs from deterministic workload".into());
             }
-        } else {
-            expected_payload_sha256 = Some(corpus.manifest.target_payload_sha256.clone());
         }
         let total_duration = open_duration
             .checked_add(operation_duration)
@@ -38783,8 +38797,6 @@ fn run_cfb_open_stream_bulk(
             );
         }
     }
-    let expected_payload_sha256 =
-        expected_payload_sha256.ok_or("CFB bulk produced no expected payload hash")?;
     let source = SourceSummary {
         cfb_open_stream: Some(CfbOpenStreamEvidence {
             timing_scope: "fresh validated open plus one bounded public bulk-read operation; corpus construction, refusal check, source snapshots, hashes, and output validation are excluded from elapsed_ns",
@@ -38850,6 +38862,14 @@ fn run_cfb_open_stream_concurrent(
         cfb_open_stream_identity(corpus)?;
     let limits = cfb_shared_limits(corpus)?;
     let target_len = corpus.target_payload.len();
+    // Prepare the deterministic oracle before any measured overlap. Hashes
+    // recorded below are computed from the actual returned buffers, while
+    // these independent expected values continue to guard correctness.
+    let expected_output = cfb_open_stream_expected_payload(corpus, &corpus.target_name)?;
+    let expected_payload_sha256 = cfb_open_stream_expected_hash(corpus, &corpus.target_name)?;
+    if expected_payload_sha256 != corpus.manifest.target_payload_sha256 {
+        return Err("CFB concurrent deterministic target hash differs from manifest".into());
+    }
     let mut elapsed = Vec::with_capacity(samples);
     let mut open_ns = Vec::with_capacity(samples);
     let mut operation_ns = Vec::with_capacity(samples);
@@ -38871,7 +38891,6 @@ fn run_cfb_open_stream_concurrent(
     let mut expected_direct_physical_range = Vec::with_capacity(samples);
     let mut output_sha256 = Vec::with_capacity(samples);
     let mut returned_payload_bytes = Vec::with_capacity(samples);
-    let mut expected_payload_sha256 = None;
     let source_version_check = "public SharedOleFile::source_version verified before and after overlapping open_stream operations";
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -38952,23 +38971,16 @@ fn run_cfb_open_stream_concurrent(
         ) {
             return Err("CFB concurrent missing-path error variant was not preserved".into());
         }
-        if first != corpus.target_payload || second != corpus.target_payload {
+        if first != expected_output || second != expected_output {
             return Err("CFB concurrent output differs from deterministic target payload".into());
         }
         let operation_snapshot = metrics.snapshot()?;
         if open_snapshot.read_calls == 0 || operation_snapshot.read_calls == 0 {
             return Err("CFB concurrent workload performed no measured source reads".into());
         }
-        let hashes = vec![
-            corpus.manifest.target_payload_sha256.clone(),
-            corpus.manifest.target_payload_sha256.clone(),
-        ];
-        if let Some(expected) = expected_payload_sha256.as_deref() {
-            if expected != corpus.manifest.target_payload_sha256 {
-                return Err("CFB concurrent expected target hash changed across samples".into());
-            }
-        } else {
-            expected_payload_sha256 = Some(corpus.manifest.target_payload_sha256.clone());
+        let hashes = vec![sha256_hex(&first), sha256_hex(&second)];
+        if hashes.iter().any(|hash| hash != &expected_payload_sha256) {
+            return Err("CFB concurrent output hash differs from deterministic workload".into());
         }
         let total_duration = open_duration
             .checked_add(operation_duration)
@@ -39006,8 +39018,6 @@ fn run_cfb_open_stream_concurrent(
             ]);
         }
     }
-    let expected_payload_sha256 =
-        expected_payload_sha256.ok_or("CFB concurrent produced no expected payload hash")?;
     let source = SourceSummary {
         cfb_open_stream: Some(CfbOpenStreamEvidence {
             timing_scope: "fresh validated open plus two overlapping same-target open_stream operations; a harness-only source gate releases the direct target reads after both workers enter; corpus construction, refusal check, source snapshots, hashes, and output validation are excluded from elapsed_ns",
