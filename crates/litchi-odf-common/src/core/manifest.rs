@@ -4,17 +4,9 @@ use crate::package as common_package;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use litchi_core::{Error, Result};
-use quick_xml::XmlVersion;
-use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
-const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
-const LOEXT_NAMESPACE: &[u8] =
-    b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 pub(crate) const MAX_PBKDF2_ITERATIONS: u32 = 10_000_000;
 const MAX_SALT_BYTES: usize = 1_024;
 pub(crate) const MAX_ARGON2_ITERATIONS: u32 = 10;
@@ -164,16 +156,21 @@ struct TypedManifestObserver {
 }
 
 impl common_package::ManifestScanObserver for TypedManifestObserver {
-    fn event<'namespace, 'event>(
+    fn wants_attributes(&self) -> bool {
+        true
+    }
+
+    fn event(
         &mut self,
-        reader: &NsReader<&[u8]>,
-        namespace: &ResolveResult<'namespace>,
-        event: &Event<'event>,
+        event: common_package::ManifestScanEvent,
+        attributes: Option<common_package::ManifestScanAttributes>,
         file_entry_path: Option<&str>,
         file_entry_size: Option<u64>,
     ) -> Result<()> {
+        use common_package::{ManifestScanElement, ManifestScanEvent};
+
         match event {
-            Event::Start(element) if is_manifest_element(namespace, element, b"file-entry") => {
+            ManifestScanEvent::Start(ManifestScanElement::FileEntry) => {
                 if self.current_path.is_some() {
                     return Err(Error::InvalidFormat(
                         "Nested manifest file entries are invalid".to_string(),
@@ -185,72 +182,57 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
                 self.current_path = Some(try_copy_string(path, "ODF encrypted manifest path")?);
                 self.current_size = file_entry_size;
             },
-            Event::Empty(element) if is_manifest_element(namespace, element, b"file-entry") => {
+            ManifestScanEvent::Empty(ManifestScanElement::FileEntry) => {
                 // Neutral file-entry validation and indexing are owned by
                 // litchi-odf-common. There is no encryption subtree to
                 // inspect on an empty element.
             },
-            Event::Start(element)
-                if is_manifest_element(namespace, element, b"encryption-data") =>
-            {
+            ManifestScanEvent::Start(ManifestScanElement::EncryptionData) => {
                 if self.current_path.is_none() || self.encryption.is_some() {
                     return Err(Error::InvalidFormat(
                         "Misplaced or duplicate manifest encryption data".to_string(),
                     ));
                 }
                 self.encryption = Some(PartialEncryption {
-                    checksum: parse_encryption_checksum(reader, element)?,
+                    checksum: parse_encryption_checksum(required_attributes(attributes)?)?,
                     ..PartialEncryption::default()
                 });
             },
-            Event::Empty(element)
-                if is_manifest_element(namespace, element, b"encryption-data") =>
-            {
+            ManifestScanEvent::Empty(ManifestScanElement::EncryptionData) => {
                 if self.current_path.is_none() || self.encryption.is_some() {
                     return Err(Error::InvalidFormat(
                         "Misplaced or duplicate manifest encryption data".to_string(),
                     ));
                 }
-                parse_encryption_checksum(reader, element)?;
+                parse_encryption_checksum(required_attributes(attributes)?)?;
                 return Err(Error::InvalidFormat(
                     "ODF package has encrypted entries with incomplete encryption metadata"
                         .to_string(),
                 ));
             },
-            Event::Start(element) | Event::Empty(element)
-                if is_manifest_element(namespace, element, b"algorithm") =>
-            {
-                let algorithm = parse_algorithm(reader, element)?;
-                set_once(
-                    &mut encryption_mut(&mut self.encryption)?.algorithm,
-                    algorithm,
-                    "algorithm",
-                )?;
+            ManifestScanEvent::Start(ManifestScanElement::Algorithm)
+            | ManifestScanEvent::Empty(ManifestScanElement::Algorithm) => {
+                let encryption = encryption_mut(&mut self.encryption)?;
+                let algorithm = parse_algorithm(required_attributes(attributes)?)?;
+                set_once(&mut encryption.algorithm, algorithm, "algorithm")?;
             },
-            Event::Start(element) | Event::Empty(element)
-                if is_manifest_element(namespace, element, b"start-key-generation") =>
-            {
-                let start_key = parse_start_key(reader, element)?;
-                set_once(
-                    &mut encryption_mut(&mut self.encryption)?.start_key,
-                    start_key,
-                    "start-key-generation",
-                )?;
+            ManifestScanEvent::Start(ManifestScanElement::StartKeyGeneration)
+            | ManifestScanEvent::Empty(ManifestScanElement::StartKeyGeneration) => {
+                let encryption = encryption_mut(&mut self.encryption)?;
+                let start_key = parse_start_key(required_attributes(attributes)?)?;
+                set_once(&mut encryption.start_key, start_key, "start-key-generation")?;
             },
-            Event::Start(element) | Event::Empty(element)
-                if is_manifest_element(namespace, element, b"key-derivation") =>
-            {
-                let key_derivation = parse_key_derivation(reader, element)?;
+            ManifestScanEvent::Start(ManifestScanElement::KeyDerivation)
+            | ManifestScanEvent::Empty(ManifestScanElement::KeyDerivation) => {
+                let encryption = encryption_mut(&mut self.encryption)?;
+                let key_derivation = parse_key_derivation(required_attributes(attributes)?)?;
                 set_once(
-                    &mut encryption_mut(&mut self.encryption)?.key_derivation,
+                    &mut encryption.key_derivation,
                     key_derivation,
                     "key-derivation",
                 )?;
             },
-            Event::End(element)
-                if namespace_is_manifest(namespace)
-                    && element.local_name().as_ref() == b"encryption-data" =>
-            {
+            ManifestScanEvent::End(ManifestScanElement::EncryptionData) => {
                 let path = self.current_path.as_ref().ok_or_else(|| {
                     Error::InvalidFormat("Encryption data has no file entry".to_string())
                 })?;
@@ -264,10 +246,7 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
                 }
                 self.completed_encryption = Some(descriptor);
             },
-            Event::End(element)
-                if namespace_is_manifest(namespace)
-                    && element.local_name().as_ref() == b"file-entry" =>
-            {
+            ManifestScanEvent::End(ManifestScanElement::FileEntry) => {
                 if self.encryption.is_some() {
                     return Err(Error::InvalidFormat(
                         "Unterminated manifest encryption data".to_string(),
@@ -277,29 +256,29 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
                     let path = self.current_path.take().ok_or_else(|| {
                         Error::InvalidFormat("Manifest entry has no file path".to_string())
                     })?;
+                    self.encrypted_entries
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODF typed encrypted manifest entries",
+                            source,
+                        })?;
                     self.encrypted_entries.insert(path, descriptor);
                 } else {
                     self.current_path = None;
                 }
                 self.current_size = None;
             },
-            Event::Eof => {
+            ManifestScanEvent::Eof => {
                 if self.current_path.is_some() || self.encryption.is_some() {
                     return Err(Error::InvalidFormat(
                         "Incomplete manifest file entry".to_string(),
                     ));
                 }
             },
-            Event::Start(_)
-            | Event::End(_)
-            | Event::Empty(_)
-            | Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+            ManifestScanEvent::Start(ManifestScanElement::Other)
+            | ManifestScanEvent::Empty(ManifestScanElement::Other)
+            | ManifestScanEvent::End(ManifestScanElement::Other)
+            | ManifestScanEvent::Other => {},
         }
         Ok(())
     }
@@ -332,12 +311,13 @@ impl Manifest {
                 source,
             })?;
         for (path, entry) in neutral_entries {
+            let encryption = observer.encrypted_entries.remove(&path);
             entries.insert(
                 path,
                 ManifestEntry {
                     media_type: entry.media_type,
                     size: entry.size,
-                    encryption: observer.encrypted_entries.remove(&path),
+                    encryption,
                 },
             );
         }
@@ -373,101 +353,37 @@ impl Manifest {
     }
 }
 
-fn is_manifest_element(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-    local: &[u8],
-) -> bool {
-    namespace_is_manifest(namespace) && element.local_name().as_ref() == local
+fn required_attributes(
+    attributes: Option<common_package::ManifestScanAttributes>,
+) -> Result<common_package::ManifestScanAttributes> {
+    attributes
+        .ok_or_else(|| Error::InvalidFormat("Manifest scan did not provide attributes".to_string()))
 }
 
-fn namespace_is_manifest(namespace: &ResolveResult<'_>) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == MANIFEST_NAMESPACE)
-}
-
-fn manifest_attributes(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
+fn take_manifest_attributes(
+    attributes: common_package::ManifestScanAttributes,
 ) -> Result<HashMap<Vec<u8>, String>> {
-    let mut values = HashMap::new();
-    for raw_attribute in element.attributes() {
-        let attribute = raw_attribute.map_err(|error| {
-            Error::InvalidFormat(format!("Invalid manifest attribute: {error}"))
-        })?;
-        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        if !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE) {
-            continue;
-        }
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| {
-                Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
-            })?;
-        if values.contains_key(local.as_ref()) {
-            return Err(Error::InvalidFormat(
-                "Duplicate manifest attribute".to_string(),
-            ));
-        }
-        values.try_reserve(1).map_err(|source| Error::Allocation {
-            resource: "ODF typed manifest attributes",
-            source,
-        })?;
-        let key = try_copy_bytes(local.as_ref(), "ODF typed manifest attribute name")?;
-        let value = match value {
-            Cow::Owned(value) => value,
-            Cow::Borrowed(value) => try_copy_string(value, "ODF typed manifest attribute value")?,
-        };
-        values.insert(key, value);
+    match attributes {
+        common_package::ManifestScanAttributes::Manifest(attributes) => attributes,
+        common_package::ManifestScanAttributes::ManifestAndLoext(_) => Err(Error::InvalidFormat(
+            "Manifest scan attributes have an unexpected shape".to_string(),
+        )),
     }
-    Ok(values)
 }
 
 #[allow(
     clippy::type_complexity,
     reason = "Manifest and LibreOffice extension attributes must be returned separately."
 )]
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "quick-xml's non-exhaustive ResolveResult needs forward-compatible namespace handling."
-)]
-fn manifest_and_loext_attributes(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
+fn take_manifest_and_loext_attributes(
+    attributes: common_package::ManifestScanAttributes,
 ) -> Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)> {
-    let mut manifest = HashMap::new();
-    let mut loext = HashMap::new();
-    for raw_attribute in element.attributes() {
-        let attribute = raw_attribute.map_err(|error| {
-            Error::InvalidFormat(format!("Invalid manifest attribute: {error}"))
-        })?;
-        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let target = match namespace {
-            ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE => &mut manifest,
-            ResolveResult::Bound(Namespace(uri)) if uri == LOEXT_NAMESPACE => &mut loext,
-            _ => continue,
-        };
-        let value = attribute
-            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| {
-                Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
-            })?;
-        if target.contains_key(local.as_ref()) {
-            return Err(Error::InvalidFormat(
-                "Duplicate manifest key-derivation attribute".to_string(),
-            ));
-        }
-        target.try_reserve(1).map_err(|source| Error::Allocation {
-            resource: "ODF key-derivation attributes",
-            source,
-        })?;
-        let key = try_copy_bytes(local.as_ref(), "ODF key-derivation attribute name")?;
-        let value = match value {
-            Cow::Owned(value) => value,
-            Cow::Borrowed(value) => try_copy_string(value, "ODF key-derivation attribute value")?,
-        };
-        target.insert(key, value);
+    match attributes {
+        common_package::ManifestScanAttributes::Manifest(_) => Err(Error::InvalidFormat(
+            "Manifest scan attributes have an unexpected shape".to_string(),
+        )),
+        common_package::ManifestScanAttributes::ManifestAndLoext(attributes) => attributes,
     }
-    Ok((manifest, loext))
 }
 
 fn required<'a>(attributes: &'a HashMap<Vec<u8>, String>, name: &[u8]) -> Result<&'a str> {
@@ -495,8 +411,7 @@ fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn parse_checksum(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<ManifestChecksum> {
-    let attributes = manifest_attributes(reader, element)?;
+fn parse_checksum(attributes: &HashMap<Vec<u8>, String>) -> Result<ManifestChecksum> {
     let algorithm = match required(&attributes, b"checksum-type")? {
         "SHA1/1K" | "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0#sha1-1k" => {
             ManifestChecksumAlgorithm::Sha1First1024
@@ -525,10 +440,9 @@ fn parse_checksum(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<
 }
 
 fn parse_encryption_checksum(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
+    attributes: common_package::ManifestScanAttributes,
 ) -> Result<Option<ManifestChecksum>> {
-    let attributes = manifest_attributes(reader, element)?;
+    let attributes = take_manifest_attributes(attributes)?;
     let has_type = attributes.contains_key(b"checksum-type".as_slice());
     let has_value = attributes.contains_key(b"checksum".as_slice());
     if has_type != has_value {
@@ -539,7 +453,7 @@ fn parse_encryption_checksum(
     if !has_type {
         return Ok(None);
     }
-    parse_checksum(reader, element).map(Some).map_err(|error| {
+    parse_checksum(&attributes).map(Some).map_err(|error| {
         Error::InvalidFormat(format!(
             "ODF package has encrypted entries with invalid metadata: {error}"
         ))
@@ -547,10 +461,9 @@ fn parse_encryption_checksum(
 }
 
 fn parse_algorithm(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
+    attributes: common_package::ManifestScanAttributes,
 ) -> Result<ManifestEncryptionAlgorithm> {
-    let attributes = manifest_attributes(reader, element)?;
+    let attributes = take_manifest_attributes(attributes)?;
     let name = required(&attributes, b"algorithm-name")?;
     let iv = decode_base64(
         required(&attributes, b"initialisation-vector")?,
@@ -612,10 +525,9 @@ fn fixed_iv<const N: usize>(
 }
 
 fn parse_start_key(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
+    attributes: common_package::ManifestScanAttributes,
 ) -> Result<ManifestStartKeyGeneration> {
-    let attributes = manifest_attributes(reader, element)?;
+    let attributes = take_manifest_attributes(attributes)?;
     let (algorithm, expected_size) = match required(&attributes, b"start-key-generation-name")? {
         "SHA1" | "http://www.w3.org/2000/09/xmldsig#sha1" => (ManifestStartKeyGeneration::Sha1, 20),
         "http://www.w3.org/2001/04/xmlenc#sha256" | "http://www.w3.org/2000/09/xmldsig#sha256" => {
@@ -639,10 +551,9 @@ fn parse_start_key(
 }
 
 fn parse_key_derivation(
-    reader: &NsReader<&[u8]>,
-    element: &BytesStart<'_>,
+    attributes: common_package::ManifestScanAttributes,
 ) -> Result<ManifestKeyDerivation> {
-    let (attributes, loext_attributes) = manifest_and_loext_attributes(reader, element)?;
+    let (attributes, loext_attributes) = take_manifest_and_loext_attributes(attributes)?;
     let name = required(&attributes, b"key-derivation-name")?;
     let salt = decode_base64(required(&attributes, b"salt")?, "salt")?;
     match name {
@@ -961,6 +872,66 @@ mod tests {
     }
 
     #[test]
+    fn accepts_default_namespace_and_nested_manifest_prefix_scopes() {
+        let xml = r#"<manifest xmlns="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
+          <file-entry m:full-path="content.xml" m:media-type="text/xml" m:size="1">
+            <encryption-data xmlns:a="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
+              <a:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/>
+              <start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/>
+              <key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/>
+            </encryption-data>
+          </file-entry>
+        </manifest>"#;
+        let manifest = Manifest::parse(xml).unwrap();
+        assert!(manifest.entries["content.xml"].encryption.is_some());
+    }
+
+    #[test]
+    fn preserves_exact_encryption_error_precedence_and_messages() {
+        let misplaced = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:algorithm m:initialisation-vector="not-base64"/></m:manifest>"#;
+        assert_eq!(
+            Manifest::parse(misplaced).unwrap_err().to_string(),
+            "Invalid format: Encryption child appears outside encryption-data"
+        );
+
+        let missing = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:initialisation-vector="AAAAAAAAAAAAAAAAAAAAAA=="/></m:encryption-data></m:file-entry></m:manifest>"#;
+        assert_eq!(
+            Manifest::parse(missing).unwrap_err().to_string(),
+            "Invalid format: Missing manifest attribute 'algorithm-name'"
+        );
+
+        let empty = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data/></m:file-entry></m:manifest>"#;
+        assert_eq!(
+            Manifest::parse(empty).unwrap_err().to_string(),
+            "Invalid format: ODF package has encrypted entries with incomplete encryption metadata"
+        );
+
+        let duplicate_algorithm = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/></m:encryption-data></m:file-entry></m:manifest>"#;
+        assert_eq!(
+            Manifest::parse(duplicate_algorithm)
+                .unwrap_err()
+                .to_string(),
+            "Invalid format: Duplicate manifest algorithm element"
+        );
+    }
+
+    #[test]
+    fn ignores_wrong_namespace_encryption_children() {
+        let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><x:algorithm xmlns:x="urn:example:not-an-odf-namespace" x:algorithm-name="vendor" x:initialisation-vector="AQ=="/></m:encryption-data></m:file-entry></m:manifest>"#;
+        assert_eq!(
+            Manifest::parse(xml).unwrap_err().to_string(),
+            "Invalid format: Missing encryption algorithm"
+        );
+    }
+
+    #[test]
+    fn keeps_neutral_xml_errors_ahead_of_observer_errors() {
+        let xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="content.xml" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="vendor" m:initialisation-vector="AQ=="/></m:encryption-data></m:file-entry><m:broken"#;
+        let error = Manifest::parse(xml).unwrap_err().to_string();
+        assert!(error.starts_with("Invalid format: Invalid manifest XML:"));
+    }
+
+    #[test]
     fn neutral_errors_keep_precedence_over_earlier_encryption_errors() {
         let duplicate_after_bad_encryption = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
           <m:file-entry m:full-path="content.xml" m:media-type="text/xml" m:size="1">
@@ -973,7 +944,10 @@ mod tests {
         let error = Manifest::parse(duplicate_after_bad_encryption)
             .unwrap_err()
             .to_string();
-        assert!(error.contains("Duplicate manifest file entry 'content.xml'"));
+        assert_eq!(
+            error,
+            "Invalid format: Duplicate manifest file entry 'content.xml'"
+        );
 
         let malformed_size_before_encryption = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
           <m:file-entry m:full-path="content.xml" m:media-type="text/xml" m:size="not-a-number">
@@ -994,6 +968,9 @@ mod tests {
           <alt:file-entry alt:full-path="content.xml" alt:media-type="text/xml"/>
         </alt:manifest>"#;
         let error = Manifest::parse(xml).unwrap_err().to_string();
-        assert!(error.contains("Duplicate manifest file entry 'content.xml'"));
+        assert_eq!(
+            error,
+            "Invalid format: Duplicate manifest file entry 'content.xml'"
+        );
     }
 }
