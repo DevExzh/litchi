@@ -17,7 +17,9 @@ use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
 use litchi_xlsx::tab_state::{Commit, SourceBackedEditor};
-use litchi_xlsx::{Error, Package, ReadLimits, Visibility};
+use litchi_xlsx::{
+    Error, Package, ReadLimits, SourceBackedWorkbook, Visibility, Workbook, WorksheetKind,
+};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const TRANSITIONAL: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -35,6 +37,8 @@ const CHART_REL: &str =
 const STRICT_CHART_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet";
 const DIALOG_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet";
+const STRICT_DIALOG_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet";
 const MACRO_REL: &str = "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet";
 const CHART_CT: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 
@@ -416,6 +420,24 @@ fn activation_and_implicit_relocation_use_three_parts_and_are_reversible() {
         assert_eq!(commit.snapshot().active_tab().unwrap().name(), "Three");
         assert_eq!(commit.diagnostics().touched_parts(), 3);
     }
+}
+
+#[test]
+fn strict_dialog_sheet_kind_matches_eager_and_source_catalogs() {
+    let bytes = fixture(Fixture {
+        strict: true,
+        three_kind: Some((STRICT_DIALOG_REL, "application/xml", "dialogsheet")),
+        ..Fixture::default()
+    });
+    let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+    let source = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+
+    let eager_sheet = eager.sheet("Three").unwrap().unwrap();
+    let source_sheet = source.sheet("Three").unwrap().unwrap();
+    assert_eq!(eager_sheet.kind(), WorksheetKind::Dialog);
+    assert_eq!(source_sheet.kind(), eager_sheet.kind());
+    assert_eq!(source_sheet.name(), eager_sheet.name());
+    assert_eq!(source_sheet.position(), eager_sheet.position());
 }
 
 #[test]

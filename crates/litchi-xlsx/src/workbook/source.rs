@@ -39,6 +39,8 @@ const STRICT_CHARTSHEET_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet";
 const DIALOGSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet";
+const STRICT_DIALOGSHEET_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet";
 const MACROSHEET_REL: &str = "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet";
 const INTL_MACROSHEET_REL: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
@@ -826,7 +828,7 @@ pub(crate) fn validate_sheet_graph(
                 require_content_type(sheet, part.content_type(), CHARTSHEET_CONTENT_TYPE)?;
                 WorksheetKind::Chart
             },
-            DIALOGSHEET_REL => WorksheetKind::Dialog,
+            DIALOGSHEET_REL | STRICT_DIALOGSHEET_REL => WorksheetKind::Dialog,
             MACROSHEET_REL | INTL_MACROSHEET_REL => WorksheetKind::Macro,
             _ => WorksheetKind::Unknown,
         };
