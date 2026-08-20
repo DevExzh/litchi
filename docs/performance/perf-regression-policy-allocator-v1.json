@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "policy_id": "litchi-hosted-default-matrix-v2",
+  "policy_id": "litchi-hosted-allocator-matrix-v1",
   "minimum_samples": 15,
   "expected_result_count": 198,
   "expected_result_keys_sha256": "3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f",
@@ -47,11 +47,11 @@
   "tool_identity": {
     "name": "litchi-perf-baseline",
     "version": "0.1.0",
-    "binary": "litchi-perf-baseline",
+    "binary": "litchi-perf-baseline-alloc",
     "profile": "release",
     "target_os": "linux",
     "target_arch": "x86_64",
-    "instrumentation": "none"
+    "instrumentation": "system_allocator_operation_scoped"
   },
   "build_identity_fields": [
     "rustc_version",
@@ -172,17 +172,11 @@
         "**/*faults",
         "source/*read_calls",
         "source/*read_bytes",
-        "**/*logical_read_requested_bytes",
-        "**/*logical_read_returned_bytes",
-        "**/*max_concurrent_reads",
         "sink/write_calls",
         "source/*materializations",
-        "**/*largest_requested_bytes",
-        "**/*largest_returned_bytes",
-        "**/*compressed_bytes",
+        "**/*copied_bytes",
         "**/*decompressed_bytes",
         "**/*recompressed_bytes",
-        "**/*copied_bytes",
         "**/*work_units",
         "source/*max_in_flight*",
         "source/*maximum_in_flight*",

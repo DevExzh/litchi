@@ -225,7 +225,7 @@ pub(crate) struct CfbPhaseMetrics {
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct AllocationMetrics {
     pub status: MetricStatus,
-    pub scope: String,
+    pub scope: crate::allocation_metrics::Scope,
     pub allocation_calls: MetricVector,
     pub deallocation_calls: MetricVector,
     pub reallocation_calls: MetricVector,
@@ -529,7 +529,7 @@ fn allocation_metrics(
         })
         .collect::<Vec<_>>();
     let first_status = observations[0].status;
-    let first_scope = observations[0].scope.clone();
+    let first_scope = observations[0].scope;
     if observations
         .iter()
         .any(|sample| sample.status != first_status || sample.scope != first_scope)
@@ -1096,6 +1096,23 @@ mod tests {
         }
     }
 
+    fn measured_allocation_sample(calls: u64) -> crate::allocation_metrics::Sample {
+        crate::allocation_metrics::Sample {
+            status: crate::allocation_metrics::Status::Measured,
+            scope: crate::allocation_metrics::Scope::OperationGlobalSystemAllocator,
+            allocation_calls: Some(calls),
+            deallocation_calls: Some(2),
+            reallocation_calls: Some(1),
+            failed_allocation_calls: Some(0),
+            allocated_bytes: Some(100),
+            deallocated_bytes: Some(64),
+            live_bytes_before: Some(1_000),
+            live_bytes_after: Some(1_036),
+            peak_live_bytes_before: Some(1_010),
+            peak_live_bytes_after: Some(1_046),
+        }
+    }
+
     #[test]
     fn warm_and_cold_partitioning_is_exact_and_sorted_like_elapsed() {
         let samples = vec![
@@ -1144,7 +1161,7 @@ mod tests {
     fn allocation_vectors_are_aligned_and_absolute_live_counts_are_retained() {
         let allocation = |calls, allocated, before, after| crate::allocation_metrics::Sample {
             status: crate::allocation_metrics::Status::Measured,
-            scope: "operation_global_system_allocator".to_owned(),
+            scope: crate::allocation_metrics::Scope::OperationGlobalSystemAllocator,
             allocation_calls: Some(calls),
             deallocation_calls: Some(2),
             reallocation_calls: Some(1),
@@ -1178,6 +1195,51 @@ mod tests {
             json["live_bytes_after"]["values"],
             Value::from(vec![1_052_u64, 1_036])
         );
+        assert_eq!(
+            allocation.peak_live_bytes_before.values,
+            Some(vec![1_046, 1_010])
+        );
+        assert_eq!(
+            allocation.peak_live_bytes_after.values,
+            Some(vec![1_062, 1_046])
+        );
+    }
+
+    #[test]
+    fn allocation_status_scope_and_cardinality_are_strict() {
+        let mut measured = sample(0, "warm", 10, Some(metrics()));
+        measured.allocation_metrics = Some(measured_allocation_sample(1));
+        let mut overflow = sample(1, "warm", 20, Some(metrics()));
+        overflow.allocation_metrics = Some(crate::allocation_metrics::Sample {
+            status: crate::allocation_metrics::Status::Overflow,
+            scope: crate::allocation_metrics::Scope::OperationGlobalSystemAllocator,
+            allocation_calls: None,
+            deallocation_calls: None,
+            reallocation_calls: None,
+            failed_allocation_calls: None,
+            allocated_bytes: None,
+            deallocated_bytes: None,
+            live_bytes_before: None,
+            live_bytes_after: None,
+            peak_live_bytes_before: None,
+            peak_live_bytes_after: None,
+        });
+        let error = aggregate(&[measured.clone(), overflow], "warm", &[10, 20]).unwrap_err();
+        assert!(error.to_string().contains("status or scope"));
+
+        measured
+            .allocation_metrics
+            .as_mut()
+            .unwrap()
+            .peak_live_bytes_after = None;
+        let error = aggregate(&[measured.clone()], "warm", &[10]).unwrap_err();
+        assert!(error.to_string().contains("peak_live_bytes_after"));
+
+        measured.allocation_metrics = None;
+        let mut present = sample(1, "warm", 20, Some(metrics()));
+        present.allocation_metrics = Some(measured_allocation_sample(2));
+        let error = aggregate(&[measured, present], "warm", &[10, 20]).unwrap_err();
+        assert!(error.to_string().contains("option cardinality"));
     }
 
     #[test]
@@ -1185,7 +1247,7 @@ mod tests {
         let mut sample = sample(0, "warm", 10, Some(metrics()));
         sample.allocation_metrics = Some(crate::allocation_metrics::Sample {
             status: crate::allocation_metrics::Status::Overflow,
-            scope: "operation_global_system_allocator".to_owned(),
+            scope: crate::allocation_metrics::Scope::OperationGlobalSystemAllocator,
             allocation_calls: None,
             deallocation_calls: None,
             reallocation_calls: None,

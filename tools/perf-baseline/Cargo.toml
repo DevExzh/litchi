@@ -9,7 +9,7 @@ allocator-metrics = []
 
 [[bin]]
 name = "litchi-perf-baseline-alloc"
-path = "src/main.rs"
+path = "src/bin/litchi-perf-baseline-alloc.rs"
 required-features = ["allocator-metrics"]
 
 [dependencies]
