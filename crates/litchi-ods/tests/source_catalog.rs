@@ -62,6 +62,15 @@ fn aliased_package() -> Vec<u8> {
     writer.finish_to_bytes().expect("aliased package bytes")
 }
 
+fn package_with_content(content: &str) -> Vec<u8> {
+    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    writer.set_mimetype(MIME).expect("ODS MIME");
+    writer
+        .add_file("content.xml", content.as_bytes())
+        .expect("content.xml");
+    writer.finish_to_bytes().expect("content package bytes")
+}
+
 struct ProbeSource {
     source: OwnedSource,
     revision: AtomicU64,
@@ -209,4 +218,43 @@ fn catalog_handles_namespace_aliases_and_empty_selected_worksheets() {
         .expect("empty worksheet exists");
     assert_eq!(selected.name, "Empty");
     assert!(selected.rows.is_empty());
+}
+
+#[test]
+fn catalog_preserves_validation_precedence_for_malformed_xml() {
+    let content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:table table:name="Broken"></office:spreadsheet>"#
+    );
+    let error = SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(
+        package_with_content(&content),
+    )))
+    .expect_err("malformed content must be refused");
+    assert!(
+        matches!(error, Error::InvalidFormat(message) if message.contains("invalid ODS content.xml"))
+    );
+}
+
+#[test]
+fn catalog_rejects_duplicate_and_nested_worksheet_entries() {
+    let duplicate = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:table table:name="Same"/><table:table table:name="Same"/></office:spreadsheet></office:body></office:document-content>"#
+    );
+    let duplicate_error = SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(
+        package_with_content(&duplicate),
+    )))
+    .expect_err("duplicate sheet names must be refused");
+    assert!(
+        matches!(duplicate_error, Error::InvalidFormat(message) if message.contains("duplicated"))
+    );
+
+    let nested = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:table table:name="Outer"><table:table table:name="Inner"/></table:table></office:spreadsheet></office:body></office:document-content>"#
+    );
+    let nested_error = SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(
+        package_with_content(&nested),
+    )))
+    .expect_err("nested worksheet entries must be refused");
+    assert!(
+        matches!(nested_error, Error::InvalidFormat(message) if message.contains("direct child"))
+    );
 }

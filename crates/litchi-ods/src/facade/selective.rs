@@ -38,7 +38,7 @@ use zeroize::Zeroizing;
 use super::ReadLimits;
 use crate::{
     Spreadsheet,
-    authoring::validate_content_xml,
+    authoring::{ValidateHandler, is_office_namespace, validate_size},
     worksheet::{Sheet, codec::OFFICE_NAMESPACE, codec::TABLE_NAMESPACE},
 };
 
@@ -471,11 +471,19 @@ fn read_content(package: &SourceBackedPackage) -> Result<String> {
 }
 
 fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
-    validate_content_xml(xml)?;
+    // Keep the mandatory ODS hierarchy validation and the worksheet catalog
+    // scan on one tokenizer.  The catalog is deliberately narrower than the
+    // semantic worksheet parser, but it must retain the same structural
+    // refusal boundary as the established owner.  Errors from the catalog
+    // are delayed until the validation handler reaches EOF so a malformed XML
+    // stream retains the historical validation/parser error precedence.
+    validate_size(xml)?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
+    let mut validate = ValidateHandler::default();
+    let mut catalog_error = None;
     let mut depth = 0usize;
     let mut spreadsheet_depth = None;
     let mut entries = Vec::new();
@@ -484,7 +492,8 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
     loop {
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODS XML: {error}")))?;
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODS content.xml: {error}")))?;
+        validate.on_event(is_office_namespace(&resolved), &event)?;
         let namespace = NamespaceKind::from_resolved(&resolved);
         match event {
             Event::Start(element) => {
@@ -497,11 +506,19 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                 }
                 if namespace == NamespaceKind::Table && local.as_ref() == b"table" {
                     if spreadsheet_depth != depth.checked_sub(1) {
-                        return Err(Error::InvalidFormat(
-                            "table:table must be a direct child of office:spreadsheet".to_string(),
-                        ));
+                        catalog_error.get_or_insert_with(|| {
+                            Error::InvalidFormat(
+                                "table:table must be a direct child of office:spreadsheet"
+                                    .to_string(),
+                            )
+                        });
+                    } else if catalog_error.is_none() {
+                        if let Err(error) =
+                            add_catalog_entry(&mut entries, &mut names, &element, &reader)
+                        {
+                            catalog_error = Some(error);
+                        }
                     }
-                    add_catalog_entry(&mut entries, &mut names, &element, &reader)?;
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("ODS XML nesting depth overflows usize".to_string())
@@ -517,11 +534,19 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
                 }
                 if namespace == NamespaceKind::Table && local.as_ref() == b"table" {
                     if spreadsheet_depth != depth.checked_sub(1) {
-                        return Err(Error::InvalidFormat(
-                            "table:table must be a direct child of office:spreadsheet".to_string(),
-                        ));
+                        catalog_error.get_or_insert_with(|| {
+                            Error::InvalidFormat(
+                                "table:table must be a direct child of office:spreadsheet"
+                                    .to_string(),
+                            )
+                        });
+                    } else if catalog_error.is_none() {
+                        if let Err(error) =
+                            add_catalog_entry(&mut entries, &mut names, &element, &reader)
+                        {
+                            catalog_error = Some(error);
+                        }
                     }
-                    add_catalog_entry(&mut entries, &mut names, &element, &reader)?;
                 }
             },
             Event::End(_) => {
@@ -542,6 +567,10 @@ fn scan_catalog(xml: &str) -> Result<Vec<SheetCatalogEntry>> {
             | Event::GeneralRef(_) => {},
         }
         buffer.clear();
+    }
+    validate.finish()?;
+    if let Some(error) = catalog_error {
+        return Err(error);
     }
     Ok(entries)
 }
@@ -729,7 +758,10 @@ impl Wrapper {
 }
 
 fn find_sheet_range(xml: &str, target: usize) -> Result<(Option<Range<usize>>, Wrapper)> {
-    validate_content_xml(xml)?;
+    // `scan_catalog` validated this exact source before the catalog was
+    // published.  The source version is checked before and after every public
+    // read, so re-validating the entire document here would only repeat the
+    // structural pass without widening the safety boundary.
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
