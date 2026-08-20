@@ -112,7 +112,7 @@ CFB selective-read cases,
 four matched native XLS existing-comment publication cases,
 six matched native XLS fixed-width numeric publication cases,
 four matched native XLS worksheet-visibility publication cases,
-four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 16
+four opaque-heavy common OLE2 stage/edit-save cases, 24 native OLE2 semantic cases, 17
 DOCX/PPTX semantic cases, 21 RTF semantic cases (15 transport/read/edit
 cases plus six logical-tail publication cases), 38 ODF semantic cases, one
 ODF `mimetype` repair-plan case, and six matched ODF content-COW publication
@@ -138,6 +138,12 @@ byte-exactly against the eager owned oracle, with per-sample
 stage/commit/publication phase sums and a single untimed `InstrumentedSource`
 replay. This brings the selectable matrix to 341 names while leaving the
 default 36 cases / 198 records unchanged.
+One additional opt-in DOCX semantic selector
+(`docx_semantic_one_paragraph_text`) locates the middle paragraph before timing
+and times only `Paragraph::text()` for the tiny, medium, and large shapes; exact
+text and error guards remain outside the timed interval. This brings the
+selectable matrix to 342 names while leaving the default 36 cases / 198 records
+unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
 and a temporary source file. The first times exactly
@@ -1213,12 +1219,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --xlsx-shape tiny --json -
 ```
 
-Run the complete tiny semantic DOCX/PPTX smoke matrix (16 records):
+Run the complete tiny semantic DOCX/PPTX smoke matrix (17 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
-  --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
+  --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_one_paragraph_text,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
   --json target/perf/semantic-office-smoke.json
 ```
 
@@ -2369,7 +2375,11 @@ native-Office claim is made.
   `Package::from_reader`; the prepared owned input clone is outside timing.
 - `docx_semantic_list_paragraphs` / `docx_semantic_one_paragraph` /
   `docx_semantic_full_text`: list every paragraph, inspect one middle paragraph
-  through `document().paragraph(index)`, or extract complete document text.
+  through `document().paragraph(index)` with scanner-only timing, or extract
+  complete document text.
+- `docx_semantic_one_paragraph_text`: locate the middle paragraph before timing
+  and time only its `Paragraph::text()` call; exact text/error checks and the
+  complete semantic verification remain outside the timed interval.
 - `docx_semantic_create_small`: author and serialize the tiny corpus entirely
   through public DOCX APIs, then reopen and fully verify it.
 - `docx_semantic_noop_edit_save`, `docx_semantic_one_edit_save`, and

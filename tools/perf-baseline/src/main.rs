@@ -842,6 +842,7 @@ enum Case {
     DocxSemanticOpen,
     DocxSemanticListParagraphs,
     DocxSemanticOneParagraph,
+    DocxSemanticOneParagraphText,
     DocxSemanticFullText,
     DocxSemanticCreateSmall,
     DocxSemanticNoopEditSave,
@@ -1321,6 +1322,7 @@ impl Case {
             Self::DocxSemanticOpen => "docx_semantic_open",
             Self::DocxSemanticListParagraphs => "docx_semantic_list_paragraphs",
             Self::DocxSemanticOneParagraph => "docx_semantic_one_paragraph",
+            Self::DocxSemanticOneParagraphText => "docx_semantic_one_paragraph_text",
             Self::DocxSemanticFullText => "docx_semantic_full_text",
             Self::DocxSemanticCreateSmall => "docx_semantic_create_small",
             Self::DocxSemanticNoopEditSave => "docx_semantic_noop_edit_save",
@@ -1624,6 +1626,7 @@ impl Case {
             Self::DocxSemanticOpen
                 | Self::DocxSemanticListParagraphs
                 | Self::DocxSemanticOneParagraph
+                | Self::DocxSemanticOneParagraphText
                 | Self::DocxSemanticFullText
                 | Self::DocxSemanticCreateSmall
                 | Self::DocxSemanticNoopEditSave
@@ -8594,6 +8597,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_semantic_open" => Some(Case::DocxSemanticOpen),
         "docx_semantic_list_paragraphs" => Some(Case::DocxSemanticListParagraphs),
         "docx_semantic_one_paragraph" => Some(Case::DocxSemanticOneParagraph),
+        "docx_semantic_one_paragraph_text" => Some(Case::DocxSemanticOneParagraphText),
         "docx_semantic_full_text" => Some(Case::DocxSemanticFullText),
         "docx_semantic_create_small" => Some(Case::DocxSemanticCreateSmall),
         "docx_semantic_noop_edit_save" => Some(Case::DocxSemanticNoopEditSave),
@@ -8967,7 +8971,8 @@ fn print_usage() {
                                        rtf_picture_payload_batch_replace,rtf_picture_batch_remove,\n\
                                        rtf_streaming_create,\n\
                                        docx_semantic_open,docx_semantic_list_paragraphs,\n\
-                                       docx_semantic_one_paragraph,docx_semantic_full_text,\n\
+                                       docx_semantic_one_paragraph,docx_semantic_one_paragraph_text,\n\
+                                       docx_semantic_full_text,\n\
                                        docx_semantic_create_small,docx_semantic_noop_edit_save,\n\
                                        docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,\n\
                                        pptx_semantic_open,pptx_semantic_list_slides,\n\
@@ -15395,6 +15400,7 @@ fn run_case_with_config(
         Case::DocxSemanticOpen
         | Case::DocxSemanticListParagraphs
         | Case::DocxSemanticOneParagraph
+        | Case::DocxSemanticOneParagraphText
         | Case::DocxSemanticFullText
         | Case::DocxSemanticCreateSmall
         | Case::DocxSemanticNoopEditSave
@@ -22267,6 +22273,28 @@ fn run_semantic_docx(
                 }
                 verify_semantic_docx(&package, shape, &[])?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocxSemanticOneParagraphText => {
+                let package =
+                    litchi_docx::Package::from_reader(Cursor::new(corpus.archive.clone()))?;
+                let document = package.document()?;
+                let index = shape.docx_paragraphs() / 2;
+                let paragraph = document
+                    .paragraph(index)?
+                    .ok_or("semantic DOCX selected paragraph is missing")?;
+                let expected_text = semantic_docx_text(index, false);
+                let started = Instant::now();
+                let text_result = paragraph.text();
+                let duration = started.elapsed();
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+                let text = text_result?;
+                if text != expected_text {
+                    return Err(
+                        "semantic DOCX selected paragraph differs from specification".into(),
+                    );
+                }
+                verify_semantic_docx(&package, shape, &[])?;
+                std::hint::black_box(text);
             },
             Case::DocxSemanticFullText => {
                 let package =
@@ -40870,7 +40898,23 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 341);
+        assert_eq!(selectable_count, 342);
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn docx_semantic_paragraph_selectors_have_distinct_opt_in_mappings() {
+        let scanner = Case::DocxSemanticOneParagraph;
+        let text = Case::DocxSemanticOneParagraphText;
+        assert_eq!(parse_case(scanner.name()), Some(scanner));
+        assert_eq!(parse_case(text.name()), Some(text));
+        assert_eq!(scanner.name(), "docx_semantic_one_paragraph");
+        assert_eq!(text.name(), "docx_semantic_one_paragraph_text");
+        assert_ne!(scanner, text);
+        assert!(scanner.uses_semantic_docx());
+        assert!(text.uses_semantic_docx());
+        assert!(!Case::DEFAULT.contains(&scanner));
+        assert!(!Case::DEFAULT.contains(&text));
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
