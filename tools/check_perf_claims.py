@@ -679,6 +679,12 @@ def verify_abba_package(
     manifest = load_json(manifest_path, location=str(manifest_path))
     if not isinstance(manifest, dict) or manifest.get("schema_version") != 1 or manifest.get("manifest_kind") != "litchi-perf-abba-artifacts":
         raise ClaimInputError(f"ABBA manifest {evidence['id']} has unsupported schema")
+    _require_keys(
+        manifest,
+        {"artifacts", "change", "change_id", "compression", "manifest_kind", "manifest_path", "schema_version", "self_excluded", "summary", "summary_identity"},
+        {"artifacts", "change", "change_id", "compression", "manifest_kind", "manifest_path", "schema_version", "self_excluded", "summary", "summary_identity"},
+        f"{evidence['id']}.manifest",
+    )
     if manifest.get("manifest_path") != manifest_path.name:
         raise ClaimInputError(f"ABBA manifest {evidence['id']} manifest_path mismatch")
     if manifest.get("change_id") != claim["change_id"] or manifest.get("change") != claim["change_id"]:
@@ -691,10 +697,23 @@ def verify_abba_package(
     if summary_raw_sha != summary_meta["sha256"]:
         raise ClaimInputError(f"summary hash mismatch for {evidence['id']}")
     summary = load_json(summary_path, location=str(summary_path))
+    summary_object = _require_object(summary, f"{evidence['id']}.summary")
+    _require_keys(
+        summary_object,
+        {"environment", "harness_identity", "implementation_identity", "protocol", "report_identity", "results", "schema_version", "tool", "verification"},
+        {"environment", "harness_identity", "implementation_identity", "protocol", "report_identity", "results", "schema_version", "tool", "verification"},
+        f"{evidence['id']}.summary",
+    )
     canonical_sha = hashlib.sha256(canonical_bytes(summary)).hexdigest()
     if canonical_sha != summary_meta["canonical_sha256"]:
         raise ClaimInputError(f"summary canonical hash mismatch for {evidence['id']}")
     manifest_summary = _require_object(manifest.get("summary"), f"{evidence['id']}.manifest.summary")
+    _require_keys(
+        manifest_summary,
+        {"bytes", "canonical_bytes", "canonical_sha256", "path", "report_identity", "result_count", "schema_version", "sha256", "tool"},
+        {"bytes", "canonical_bytes", "canonical_sha256", "path", "report_identity", "result_count", "schema_version", "sha256", "tool"},
+        f"{evidence['id']}.manifest.summary",
+    )
     for key, expected in (("path", summary_meta["path"]), ("sha256", summary_meta["sha256"]), ("canonical_sha256", summary_meta["canonical_sha256"]), ("schema_version", 1)):
         if manifest_summary.get(key) != expected:
             raise ClaimInputError(f"ABBA manifest {evidence['id']} summary.{key} mismatch")
