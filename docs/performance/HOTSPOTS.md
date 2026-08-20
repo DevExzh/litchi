@@ -3,6 +3,15 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0250 — ZIP ordering/index ABBA evidence](changes/0250-zip-ordering-abba.md)
+(the eight-row `zip_index` package accepts no statistic; adverse-both counts
+are p50=5, mean=3, p95=3, and p99=3. The compressible tiny, many-small, and
+wide-root rows are adverse at all four statistics. The production
+monotonic-offset sort fast path is not landed; the candidate is retained only.
+This is short in-memory evidence with no physical-I/O, allocation/RSS, or
+cold-cache claim. The independent ZIP-index count oracle landed in
+`5eb8c1959`/`197bd3645`; it is a correctness change, not fast-path approval.
+No broad ZIP/OPC claim.)
 [change 0249 — ODS known-change source publication ABBA](changes/0249-ods-known-change-source-publication-abba.md)
 (neither selector has an accepted statistic: `one_edit` is adverse-both at
 p95/p99, and `one_percent` disagrees in paired direction at all four. Drift

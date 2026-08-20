@@ -11,6 +11,18 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## ZIP ordering/index ABBA evidence (change 0250)
+
+[Change 0250](changes/0250-zip-ordering-abba.md) records the eight-row
+`zip_index` package over the four default shapes and two payload kinds. No
+statistic is accepted; adverse-both counts are p50=5, mean=3, p95=3, and
+p99=3, with the compressible tiny, many-small, and wide-root rows adverse at
+all four statistics. The production monotonic-offset sort fast path is not
+landed and the candidate is retained only. This is very short in-memory
+selector evidence with no physical-I/O, allocation/RSS, or cold-cache claim.
+The independent ZIP-index count oracle landed in `5eb8c1959`/`197bd3645` as a
+correctness change, not production fast-path approval. No broad ZIP/OPC claim.
+
 ## DOCX text-path hand-rolled binding tracker (change 0229)
 
 [Change 0229](changes/0229-docx-text-binding-tracker.md) records a narrow
