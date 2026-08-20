@@ -73,6 +73,7 @@ const CFB_SELECTIVE_CORPUS_GENERATOR: &str = "litchi-cfb-selective-read-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
 const PPT_PICTURES_CORPUS_GENERATOR: &str = "litchi-ppt-pictures-lazy-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
+const XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR: &str = "litchi-xlsx-named-sheet-lookup-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const DOCX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
@@ -467,6 +468,39 @@ impl XlsxShape {
     }
 }
 
+/// Deterministic worksheet-catalog sizes for the opt-in named-selector probe.
+///
+/// These are deliberately separate from `XlsxShape`: the ordinary XLSX
+/// matrix measures cell workloads, while this probe isolates catalog lookup
+/// cost with one small cell per sheet and prepares each workbook before the
+/// timed selector loop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum XlsxNamedSheetCatalog {
+    Four,
+    SixtyFour,
+    Large,
+}
+
+impl XlsxNamedSheetCatalog {
+    const ALL: [Self; 3] = [Self::Four, Self::SixtyFour, Self::Large];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Four => "4",
+            Self::SixtyFour => "64",
+            Self::Large => "large",
+        }
+    }
+
+    const fn sheet_count(self) -> usize {
+        match self {
+            Self::Four => 4,
+            Self::SixtyFour => 64,
+            Self::Large => 256,
+        }
+    }
+}
+
 impl WriterShape {
     const ALL: [Self; 3] = [Self::Tiny, Self::Large, Self::PayloadHeavy];
 
@@ -791,6 +825,12 @@ enum Case {
     PptPicturesSourceBackedOpenAllImages,
     XlsxOpenOwned,
     XlsxListSheets,
+    XlsxEagerNamedSheetLookup4,
+    XlsxSourceNamedSheetLookup4,
+    XlsxEagerNamedSheetLookup64,
+    XlsxSourceNamedSheetLookup64,
+    XlsxEagerNamedSheetLookupLarge,
+    XlsxSourceNamedSheetLookupLarge,
     XlsxFirstCell,
     XlsxFullCellScan,
     XlsxNarrowColumnRangeScan,
@@ -1271,6 +1311,12 @@ impl Case {
             },
             Self::XlsxOpenOwned => "xlsx_open_owned",
             Self::XlsxListSheets => "xlsx_list_sheets",
+            Self::XlsxEagerNamedSheetLookup4 => "xlsx_eager_named_sheet_lookup_4",
+            Self::XlsxSourceNamedSheetLookup4 => "xlsx_source_named_sheet_lookup_4",
+            Self::XlsxEagerNamedSheetLookup64 => "xlsx_eager_named_sheet_lookup_64",
+            Self::XlsxSourceNamedSheetLookup64 => "xlsx_source_named_sheet_lookup_64",
+            Self::XlsxEagerNamedSheetLookupLarge => "xlsx_eager_named_sheet_lookup_large",
+            Self::XlsxSourceNamedSheetLookupLarge => "xlsx_source_named_sheet_lookup_large",
             Self::XlsxFirstCell => "xlsx_first_cell",
             Self::XlsxFullCellScan => "xlsx_full_cell_scan",
             Self::XlsxNarrowColumnRangeScan => "xlsx_narrow_column_range_scan",
@@ -1615,6 +1661,42 @@ impl Case {
                 | Self::XlsxRangeSourceListSheets
                 | Self::XlsxRangeSourceFirstCell
                 | Self::XlsxRangeSourceNarrowColumnRangeScan
+        )
+    }
+
+    const fn is_xlsx_named_sheet_lookup(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerNamedSheetLookup4
+                | Self::XlsxSourceNamedSheetLookup4
+                | Self::XlsxEagerNamedSheetLookup64
+                | Self::XlsxSourceNamedSheetLookup64
+                | Self::XlsxEagerNamedSheetLookupLarge
+                | Self::XlsxSourceNamedSheetLookupLarge
+        )
+    }
+
+    const fn xlsx_named_sheet_catalog(self) -> Option<XlsxNamedSheetCatalog> {
+        match self {
+            Self::XlsxEagerNamedSheetLookup4 | Self::XlsxSourceNamedSheetLookup4 => {
+                Some(XlsxNamedSheetCatalog::Four)
+            },
+            Self::XlsxEagerNamedSheetLookup64 | Self::XlsxSourceNamedSheetLookup64 => {
+                Some(XlsxNamedSheetCatalog::SixtyFour)
+            },
+            Self::XlsxEagerNamedSheetLookupLarge | Self::XlsxSourceNamedSheetLookupLarge => {
+                Some(XlsxNamedSheetCatalog::Large)
+            },
+            _ => None,
+        }
+    }
+
+    const fn is_xlsx_named_sheet_source_backed(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceNamedSheetLookup4
+                | Self::XlsxSourceNamedSheetLookup64
+                | Self::XlsxSourceNamedSheetLookupLarge
         )
     }
 
@@ -7342,6 +7424,33 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xlsx_named_sheet_lookup())
+    {
+        // Keep selector correctness and all archive/source construction out of
+        // the measured loops. The oracle also exercises the Unicode/case,
+        // missing-name, and duplicate-canonical-name invariants once per run.
+        verify_xlsx_named_sheet_lookup_oracle()?;
+        for catalog in XlsxNamedSheetCatalog::ALL {
+            let corpus = build_xlsx_named_sheet_lookup_corpus(catalog)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.xlsx_named_sheet_catalog() == Some(catalog))
+            {
+                results.push(run_xlsx_named_sheet_lookup(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
     if options.cases.iter().any(|case| case.uses_xlsx()) {
         for shape in &options.xlsx_shapes {
             let corpus = build_xlsx_corpus(*shape)?;
@@ -8619,6 +8728,12 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_open_owned" => Some(Case::XlsxOpenOwned),
         "xlsx_list_sheets" => Some(Case::XlsxListSheets),
+        "xlsx_eager_named_sheet_lookup_4" => Some(Case::XlsxEagerNamedSheetLookup4),
+        "xlsx_source_named_sheet_lookup_4" => Some(Case::XlsxSourceNamedSheetLookup4),
+        "xlsx_eager_named_sheet_lookup_64" => Some(Case::XlsxEagerNamedSheetLookup64),
+        "xlsx_source_named_sheet_lookup_64" => Some(Case::XlsxSourceNamedSheetLookup64),
+        "xlsx_eager_named_sheet_lookup_large" => Some(Case::XlsxEagerNamedSheetLookupLarge),
+        "xlsx_source_named_sheet_lookup_large" => Some(Case::XlsxSourceNamedSheetLookupLarge),
         "xlsx_first_cell" => Some(Case::XlsxFirstCell),
         "xlsx_full_cell_scan" => Some(Case::XlsxFullCellScan),
         "xlsx_narrow_column_range_scan" => Some(Case::XlsxNarrowColumnRangeScan),
@@ -9003,7 +9118,11 @@ fn print_usage() {
                                        ppt_pictures_source_backed_cached_repeat,\n\
                                        ppt_pictures_eager_open_all_images,\n\
                                        ppt_pictures_source_backed_open_all_images,\n\
-                                       xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
+                                       xlsx_open_owned,xlsx_list_sheets,\n\
+                                       xlsx_eager_named_sheet_lookup_4,\n\
+                                       xlsx_eager_named_sheet_lookup_64,\n\
+                                       xlsx_eager_named_sheet_lookup_large,\n\
+                                       xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
                                        xlsx_noop_commit,xlsx_noop_commit_save,\n\
                                        xlsx_one_cell_commit,xlsx_one_cell_commit_first_read,\n\
@@ -9029,6 +9148,9 @@ fn print_usage() {
                                        xlsx_eager_row_visibility_batch_edit_save,\n\
                                        xlsx_source_backed_row_visibility_batch_edit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
+                                       xlsx_source_named_sheet_lookup_4,\n\
+                                       xlsx_source_named_sheet_lookup_64,\n\
+                                       xlsx_source_named_sheet_lookup_large,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
                                        xlsx_file_open,xlsx_file_open_lifecycle,\n\
@@ -13795,6 +13917,155 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     })
 }
 
+fn build_xlsx_named_sheet_lookup_corpus(
+    catalog: XlsxNamedSheetCatalog,
+) -> Result<Corpus, Box<dyn Error>> {
+    let spec = XlsxCorpus {
+        sheet_count: catalog.sheet_count(),
+        row_count: 1,
+        column_count: 1,
+        one_percent_updates: Vec::new(),
+        cell_inventory: None,
+    };
+    let workbook = build_xlsx_workbook(&spec)?;
+    let archive = workbook.to_bytes()?;
+    let reopened = Workbook::from_bytes(archive.clone())?;
+    verify_xlsx_cells(&reopened, &spec, &[])?;
+
+    let cell_count = xlsx_cell_count(&spec)?;
+    let target = XlsxCoordinate {
+        sheet: spec.sheet_count - 1,
+        row: 0,
+        column: 0,
+    };
+    let target_name = xlsx_cell_name(target);
+    let target_payload = xlsx_value(target).to_string().into_bytes();
+    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
+
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("xlsx-named-sheet-lookup-{}", catalog.name()),
+            generator: XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR,
+            package_format: "XLSX/OPC/ZIP",
+            shape: "named-sheet-catalog",
+            payload_kind: "deterministic-one-cell-per-sheet",
+            compression: "deflate",
+            entry_count: cell_count,
+            archive_member_count,
+            entry_bytes: std::mem::size_of::<i32>(),
+            uncompressed_payload_bytes: cell_count
+                .checked_mul(std::mem::size_of::<i32>())
+                .ok_or("XLSX named-sheet logical payload size overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: target_name.clone(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: Some(XlsxManifest {
+                sheet_count: spec.sheet_count,
+                rows_per_sheet: spec.row_count,
+                columns_per_sheet: spec.column_count,
+                one_percent_update_count: spec.one_percent_updates.len(),
+                source_members,
+            }),
+        },
+        archive,
+        target_name,
+        target_payload,
+        xlsx: Some(spec),
+    })
+}
+
+/// Prove the selector contract on a small non-ASCII catalog before any timed
+/// named-sheet run. The same archive is checked through eager and source-backed
+/// facades, while the duplicate check exercises the authoring-side invariant
+/// that makes the sorted production index unambiguous.
+fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
+    let workbook = Workbook::new()?;
+    let mut edit = workbook.edit()?;
+    {
+        let mut first = edit
+            .tab("Sheet1")?
+            .ok_or("XLSX selector oracle is missing the initial sheet")?;
+        first.rename("Résumé")?;
+    }
+    edit.add("Στοιχεία")?;
+    edit.add("数据")?;
+    let committed = edit.commit()?.workbook().clone();
+    let bytes = committed.to_bytes()?;
+    let owned = Workbook::from_bytes(bytes.clone())?;
+    let source = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes)))?;
+    let expected = [
+        "Résumé".to_owned(),
+        "Στοιχεία".to_owned(),
+        "数据".to_owned(),
+    ];
+
+    let owned_names = owned
+        .sheets()
+        .map(|sheet| sheet.name().to_owned())
+        .collect::<Vec<_>>();
+    let source_names = source
+        .sheets()
+        .map(|sheet| sheet.name().to_owned())
+        .collect::<Vec<_>>();
+    if owned_names != expected || source_names != expected {
+        return Err("XLSX selector oracle changed Unicode sheet spelling or order".into());
+    }
+
+    for (query, expected_name) in [
+        ("rE\u{301}SUME\u{301}", "Résumé"),
+        ("ΣΤΟΙΧΕΊΑ", "Στοιχεία"),
+        ("数据", "数据"),
+    ] {
+        let owned_sheet = owned
+            .sheet(query)?
+            .ok_or("XLSX eager selector oracle missed an existing sheet")?;
+        let source_sheet = source
+            .sheet(query)?
+            .ok_or("XLSX source selector oracle missed an existing sheet")?;
+        if owned_sheet.name() != expected_name || source_sheet.name() != expected_name {
+            return Err("XLSX selector oracle changed case-folded Unicode matching".into());
+        }
+    }
+    if owned.sheet("missing-selector")?.is_some() || source.sheet("missing-selector")?.is_some() {
+        return Err("XLSX selector oracle changed missing-name behavior".into());
+    }
+
+    let duplicate = Workbook::new()?;
+    let mut duplicate_edit = duplicate.edit()?;
+    duplicate_edit.add("Data")?;
+    duplicate_edit.add("data")?;
+    if duplicate_edit.commit().is_ok() {
+        return Err("XLSX selector oracle accepted duplicate canonical sheet names".into());
+    }
+
+    let duplicate_seed = Workbook::new()?;
+    let mut duplicate_seed_edit = duplicate_seed.edit()?;
+    duplicate_seed_edit.add("Data")?;
+    let duplicate_seed = duplicate_seed_edit.commit()?.workbook().clone();
+    let mut duplicate_package = OpcPackage::from_bytes(duplicate_seed.to_bytes()?)?;
+    let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+    let workbook_xml =
+        String::from_utf8(duplicate_package.get_part(&workbook_uri)?.blob().to_vec())?;
+    let duplicate_xml = workbook_xml.replacen("name=\"Data\"", "name=\"sheet1\"", 1);
+    if duplicate_xml == workbook_xml {
+        return Err("XLSX selector oracle could not construct duplicate fixture".into());
+    }
+    duplicate_package
+        .get_part_mut(&workbook_uri)?
+        .set_blob(duplicate_xml.into_bytes());
+    let duplicate_archive = PackageWriter::to_bytes(&duplicate_package)?;
+    if Workbook::from_bytes(duplicate_archive.clone()).is_ok()
+        || SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(duplicate_archive))).is_ok()
+    {
+        return Err("XLSX selector oracle accepted duplicate parsed catalog names".into());
+    }
+    Ok(())
+}
+
 fn xlsx_cell_crud_inventory(shape: XlsxCellCrudShape) -> Vec<Vec<XlsxCoordinate>> {
     let sheet_count = 4;
     let mut inventory = Vec::with_capacity(sheet_count);
@@ -15404,6 +15675,14 @@ fn run_case_with_config(
         },
         Case::XlsxOpenOwned => run_xlsx_open_owned(corpus, warmup_iterations, samples),
         Case::XlsxListSheets => run_xlsx_list_sheets(corpus, warmup_iterations, samples),
+        Case::XlsxEagerNamedSheetLookup4
+        | Case::XlsxSourceNamedSheetLookup4
+        | Case::XlsxEagerNamedSheetLookup64
+        | Case::XlsxSourceNamedSheetLookup64
+        | Case::XlsxEagerNamedSheetLookupLarge
+        | Case::XlsxSourceNamedSheetLookupLarge => {
+            Err("XLSX named-sheet cases use their dedicated catalog runner".into())
+        },
         Case::XlsxFirstCell => run_xlsx_first_cell(corpus, warmup_iterations, samples),
         Case::XlsxFullCellScan => run_xlsx_full_cell_scan(corpus, warmup_iterations, samples),
         Case::XlsxNarrowColumnRangeScan => {
@@ -29159,6 +29438,80 @@ fn run_xlsx_open_owned(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     Ok(result(Case::XlsxOpenOwned, corpus, elapsed, None))
+}
+
+fn run_xlsx_named_sheet_lookup(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let catalog = case
+        .xlsx_named_sheet_catalog()
+        .ok_or("non-named-sheet case passed to XLSX named selector runner")?;
+    if spec.sheet_count != catalog.sheet_count() {
+        return Err("XLSX named selector catalog differs from case selection".into());
+    }
+    let target_name = xlsx_sheet_name(spec.sheet_count - 1);
+    let target_query = target_name.to_ascii_lowercase();
+    let iteration_count = iteration_count(warmup_iterations, samples)?;
+
+    if case.is_xlsx_named_sheet_source_backed() {
+        // Workbook catalog construction and source instrumentation are setup,
+        // not selector work. Reset before the first timed query so the source
+        // vector proves that named lookup remains metadata-only.
+        let source = xlsx_instrumented_source(corpus)?;
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+        if workbook.len() != spec.sheet_count {
+            return Err("source-backed named selector catalog has the wrong sheet count".into());
+        }
+        source.reset();
+        let mut elapsed = Vec::with_capacity(samples);
+        let mut source_summary = SourceSummary::default();
+        for iteration in 0..iteration_count {
+            source.reset();
+            let started = Instant::now();
+            let sheet = workbook
+                .sheet(std::hint::black_box(target_query.as_str()))?
+                .ok_or("source-backed named selector missed its target sheet")?;
+            let duration = started.elapsed();
+            let metrics = source.snapshot();
+            if metrics != SourceSnapshot::default() {
+                return Err("source-backed named selector performed worksheet I/O".into());
+            }
+            if sheet.name() != target_name {
+                return Err("source-backed named selector returned the wrong sheet".into());
+            }
+            std::hint::black_box(sheet);
+            if iteration >= warmup_iterations {
+                source_summary.record_xlsx(metrics);
+            }
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+        Ok(result_with_source(case, corpus, elapsed, source_summary))
+    } else {
+        // Parse and catalog the owned workbook once; only the immutable named
+        // selector itself belongs to the timed loop.
+        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        if workbook.len() != spec.sheet_count {
+            return Err("owned named selector catalog has the wrong sheet count".into());
+        }
+        let mut elapsed = Vec::with_capacity(samples);
+        for iteration in 0..iteration_count {
+            let started = Instant::now();
+            let sheet = workbook
+                .sheet(std::hint::black_box(target_query.as_str()))?
+                .ok_or("owned named selector missed its target sheet")?;
+            let duration = started.elapsed();
+            if sheet.name() != target_name {
+                return Err("owned named selector returned the wrong sheet".into());
+            }
+            std::hint::black_box(sheet);
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+        Ok(result(case, corpus, elapsed, None))
+    }
 }
 
 fn run_xlsx_list_sheets(
@@ -45659,6 +46012,37 @@ mod tests {
         let measured = run_case(Case::XlsxOneCellCommitFirstRead, &first, 0, 1).unwrap();
         assert_eq!(measured.case, "xlsx_one_cell_commit_first_read");
         assert_eq!(measured.elapsed_ns.samples.len(), 1);
+    }
+
+    #[test]
+    fn xlsx_named_sheet_selectors_are_opt_in_and_cover_catalog_oracle() {
+        super::verify_xlsx_named_sheet_lookup_oracle().unwrap();
+        let cases = [
+            Case::XlsxEagerNamedSheetLookup4,
+            Case::XlsxSourceNamedSheetLookup4,
+            Case::XlsxEagerNamedSheetLookup64,
+            Case::XlsxSourceNamedSheetLookup64,
+            Case::XlsxEagerNamedSheetLookupLarge,
+            Case::XlsxSourceNamedSheetLookupLarge,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.is_xlsx_named_sheet_lookup());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        for catalog in super::XlsxNamedSheetCatalog::ALL {
+            let first = super::build_xlsx_named_sheet_lookup_corpus(catalog).unwrap();
+            let second = super::build_xlsx_named_sheet_lookup_corpus(catalog).unwrap();
+            assert_eq!(first.archive, second.archive, "catalog {}", catalog.name());
+            assert_eq!(
+                first.manifest.generator,
+                super::XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR
+            );
+            assert_eq!(
+                first.manifest.xlsx.as_ref().unwrap().sheet_count,
+                catalog.sheet_count()
+            );
+        }
     }
 
     #[test]

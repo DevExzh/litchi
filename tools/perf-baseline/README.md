@@ -2401,6 +2401,13 @@ native-Office claim is made.
   `Workbook::from_bytes`; the input clone happens before timing.
 - `xlsx_list_sheets`: enumerate sheet names after an already-open workbook,
   without asking any worksheet for cell semantics.
+- `xlsx_eager_named_sheet_lookup_4` / `_64` / `_large`: opt-in eager lookup of
+  the final sheet by a case-folded name in deterministic 4-, 64-, and 256-sheet
+  catalogs. Workbook construction, catalog validation, and the Unicode/case,
+  missing-name, and duplicate-name oracle are outside the timed selector loop.
+- `xlsx_source_named_sheet_lookup_4` / `_64` / `_large`: matched source-backed
+  selectors over the same catalogs. Source reads are reset and checked outside
+  the timing boundary; the selector is expected to remain metadata-only.
 - `xlsx_first_cell`: access the first stored cell (`Sheet1!A1`) from an
   already-open workbook, measuring the first worksheet semantic access.
 - `xlsx_full_cell_scan`: enumerate every stored cell in `Sheet1` through the
