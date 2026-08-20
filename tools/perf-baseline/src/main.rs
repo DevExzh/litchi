@@ -14975,6 +14975,47 @@ fn verify_xlsx_cells(
     Ok(())
 }
 
+fn xlsx_typed_full_text(
+    workbook: &Workbook,
+    spec: &XlsxCorpus,
+) -> Result<String, Box<dyn Error>> {
+    let mut output = String::new();
+    for sheet_index in 0..spec.sheet_count {
+        let name = xlsx_sheet_name(sheet_index);
+        let sheet = workbook
+            .sheet(name.as_str())?
+            .ok_or("typed eager XLSX text oracle is missing a worksheet")?;
+        let extent = sheet
+            .stored_extent()?
+            .ok_or("typed eager XLSX text oracle worksheet has no stored extent")?;
+        let (end_row, end_column) = extent.end();
+        if usize::try_from(end_row)? != spec.row_count
+            || usize::try_from(end_column)? != spec.column_count
+        {
+            return Err("typed eager XLSX text oracle extent differs from corpus".into());
+        }
+        for row in 0..end_row {
+            for column in 0..end_column {
+                if column > 0 {
+                    output.push('\t');
+                }
+                let Some(XlsxCell::Value(XlsxValue::Number(value))) =
+                    sheet.cell((row, column))?.stored()
+                else {
+                    return Err("typed eager XLSX text oracle contains a non-numeric cell".into());
+                };
+                if let Ok(integer) = value.as_str().parse::<i64>() {
+                    output.push_str(&integer.to_string());
+                } else {
+                    output.push_str(&value.as_f64().unwrap_or_default().to_string());
+                }
+            }
+            output.push('\n');
+        }
+    }
+    Ok(output)
+}
+
 fn writer_text(kind: &str, first: usize, second: usize, third: usize) -> String {
     format!(
         "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
@@ -29573,19 +29614,24 @@ fn run_xlsx_bytes_root_access(
     if expected_names.len() != spec.sheet_count || expected_count != spec.sheet_count {
         return Err("typed eager XLSX bytes oracle worksheet shape differs from corpus".into());
     }
+    let expected_text = xlsx_typed_full_text(&eager, spec)?;
+    drop(eager);
     if sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
         || corpus.archive.len() != corpus.manifest.archive_bytes
     {
         return Err("XLSX bytes root archive differs from its deterministic manifest".into());
     }
 
-    // The umbrella projection is also prepared before timing, so the measured
-    // lifecycle only accounts for the selected facade operation.
-    let oracle =
-        litchi::Workbook::from_bytes(corpus.archive.clone()).map_err(|error| error.to_string())?;
-    let expected_text = oracle.text().map_err(|error| error.to_string())?;
-    let expected_metadata_sha256 =
-        xlsx_root_metadata_digest(&oracle.metadata().map_err(|error| error.to_string())?)?;
+    // Read metadata through an independently opened eager OPC/property path;
+    // the facade workbook is never used to manufacture its own oracle.
+    let package = OpcPackage::from_bytes(&corpus.archive)?;
+    let expected_metadata = litchi::ooxml_common::properties::read(&package)
+        .map_err(|error| error.to_string())?
+        .map(litchi_core::Metadata::from)
+        .unwrap_or_default();
+    let expected_metadata_sha256 = xlsx_root_metadata_digest(&expected_metadata)?;
+    drop(expected_metadata);
+    drop(package);
 
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
