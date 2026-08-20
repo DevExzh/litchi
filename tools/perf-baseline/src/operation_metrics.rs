@@ -928,6 +928,7 @@ mod tests {
             elapsed_ns,
             parent_wall_ns: elapsed_ns,
             cold_advice: ColdAdvice::NotRequested,
+            cold_verified: None,
             logical_read_counter_scope: "timed_read_at".to_owned(),
             logical_read_calls: index as u64,
             logical_read_requested_bytes: 10,

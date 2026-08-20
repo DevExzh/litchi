@@ -1360,6 +1360,18 @@ production-performance claim. See
 [`0087`](changes/0087-filesystem-cache-state-evidence.md) and the
 [compact counter summary](results/filesystem-smoke-0096-summary.json).
 
+Change 0236 adds an opt-in `cold-verified` state without changing the
+`cold-requested` default. It is Linux-only and admits only regular, non-empty,
+page-aligned sources on an allowlisted block-backed filesystem after source
+`fsync`, accepted `posix_fadvise(DONTNEED)`, and a strict external `fincore`
+JSON proof of zero resident, dirty, and writeback bytes. The timed operation
+must produce a positive process `/proc/self/io` `read_bytes` delta. Prepared
+query controls are excluded. Ineligible host/proof conditions are explicit
+statuses and emit no timed result. This proves page-cache and process-I/O
+conditions only; it makes no physical-media or device-cache claim and has no
+captured performance result. See
+[`0236`](changes/0236-cold-verified-filesystem-evidence.md).
+
 Source-backed OPC payload retention is now optionally charged to a caller's
 hierarchical `Budget`. The managed cache preserves pinned handles, reserves
 active single-flight loads, evicts only unpinned clean entries, and reports

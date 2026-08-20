@@ -728,6 +728,44 @@ Use `--filesystem-root PATH` to place the source, destination, and sibling
 temporary files under a caller-selected filesystem; the report records only
 that a root was selected, not the path itself.
 
+`cold-requested` remains the existing advisory state.  It records an accepted
+Linux `posix_fadvise(DONTNEED)` request and does not imply that the source was
+evicted.  The opt-in `--filesystem-cache cold-verified` state is stricter and
+Linux-only.  It runs only source-touching open/lifecycle/save controls (the
+prepared PPTX/DOCX query controls are explicitly ineligible), and leaves the
+default cache selection unchanged.
+
+Cold-verified samples are admitted only when all of the following hold:
+
+- the source is a regular, non-empty, page-aligned file on an allowlisted
+  block-backed filesystem (`ext2/3/4`, `xfs`, `btrfs`, `f2fs`, or `zfs`);
+- the source has been `fsync`ed and accepted `posix_fadvise(DONTNEED)` advice;
+- external `fincore --json --bytes --output FILE,SIZE,RES,DIRTY,WRITEBACK`
+  emits one strict JSON record immediately before the timed operation with
+  zero resident, dirty, and writeback bytes; and
+- the child’s `/proc/self/io` `read_bytes` delta is positive during the
+  source-touching interval.
+
+Use, for example:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 1 --samples 5 --filesystem-cache cold-verified \
+  --filesystem-root /path/on/ext4 \
+  --case opc_file_source_open --json target/perf/filesystem-cold-verified.json
+```
+
+The verifier creates a private page-aligned source copy (ZIP alignment uses
+the EOCD comment field and does not change logical package members).  It never
+reports source paths or device identifiers.  `filesystem_evidence` records an
+explicit `cold_verified_status` for every requested case and keeps ineligible
+cases out of timed results; a status such as `ineligible_filesystem_unsupported`,
+`ineligible_fincore_invalid_json`, or `ineligible_read_bytes_zero` is a
+successful fail-closed outcome, not a cold result.  A verified result proves
+page-cache residency/dirty/writeback state plus process `read_bytes` only.  It
+does not prove physical-media temperature, device-cache state, or durable
+storage latency.
+
 Each sample uses a fresh child process and reports child operation time plus
 parent-observed wall time. A separate child primes the warm path immediately
 before each warm sample; the cold sample requests Linux `posix_fadvise`

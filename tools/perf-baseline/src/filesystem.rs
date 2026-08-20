@@ -21,7 +21,7 @@ use std::{
 
 use litchi_cfb::{OleFile, OverlayLimits, SameLengthStreamOverlay, SharedOleFile};
 use litchi_core::{FileSource, ReadAt, SourceVersion};
-use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage};
+use litchi_opc::{OpcPackage, PackURI, PackageWriter, SourceBackedPackage};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use soapberry_zip::ZipArchive;
@@ -71,6 +71,7 @@ pub(crate) enum ReadPattern {
 pub(crate) struct CacheSelection {
     warm: bool,
     cold_requested: bool,
+    cold_verified: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -189,6 +190,7 @@ impl Default for CacheSelection {
         Self {
             warm: true,
             cold_requested: true,
+            cold_verified: false,
         }
     }
 }
@@ -201,21 +203,26 @@ impl CacheSelection {
         let mut selection = Self {
             warm: false,
             cold_requested: false,
+            cold_verified: false,
         };
         for state in value.split(',') {
             match state {
                 "warm" => selection.warm = true,
                 "cold-requested" => selection.cold_requested = true,
+                "cold-verified" => selection.cold_verified = true,
                 _ => {
                     return Err(format!(
-                        "invalid --filesystem-cache state {state:?}; expected warm or cold-requested"
+                        "invalid --filesystem-cache state {state:?}; expected warm, cold-requested, or cold-verified"
                     )
                     .into());
                 },
             }
         }
-        if !selection.warm && !selection.cold_requested {
-            return Err("--filesystem-cache selection must include warm or cold-requested".into());
+        if !selection.warm && !selection.cold_requested && !selection.cold_verified {
+            return Err(
+                "--filesystem-cache selection must include warm, cold-requested, or cold-verified"
+                    .into(),
+            );
         }
         Ok(selection)
     }
@@ -228,13 +235,20 @@ impl CacheSelection {
         self.cold_requested
     }
 
+    pub(crate) const fn cold_verified(self) -> bool {
+        self.cold_verified
+    }
+
     pub(crate) fn names(self) -> Vec<&'static str> {
-        let mut names = Vec::with_capacity(2);
+        let mut names = Vec::with_capacity(3);
         if self.warm {
             names.push("warm");
         }
         if self.cold_requested {
             names.push("cold-requested");
+        }
+        if self.cold_verified {
+            names.push("cold-verified");
         }
         names
     }
@@ -255,6 +269,8 @@ struct ChildResult {
     logical_read_request_sizes: Vec<u64>,
     logical_read_request_size_buckets: ReadSizeBuckets,
     cold_advice: ColdAdvice,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cold_verified: Option<cold_verified::Sample>,
     process_metrics: Option<process_metrics::Delta>,
     output_sha256: Option<String>,
     output_bytes: Option<u64>,
@@ -269,6 +285,33 @@ struct ChildResult {
     pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_source_replay: Option<DocxSourceReplayEvidence>,
+}
+
+impl ChildResult {
+    fn ineligible_cold_verified(proof: cold_verified::Sample) -> Self {
+        Self {
+            elapsed_ns: 0,
+            logical_read_counter_scope: "cold_verified_ineligible".to_owned(),
+            logical_read_calls: 0,
+            logical_read_requested_bytes: 0,
+            logical_read_bytes: 0,
+            max_concurrent_reads: 0,
+            logical_read_request_sizes: Vec::new(),
+            logical_read_request_size_buckets: ReadSizeBuckets::default(),
+            cold_advice: ColdAdvice::NotRequested,
+            cold_verified: Some(proof),
+            process_metrics: None,
+            output_sha256: None,
+            output_bytes: None,
+            opc_materialized_parts: None,
+            cfb_changed_spans: None,
+            cfb_published_bytes: None,
+            cfb_phases: None,
+            cfb_owned: None,
+            pptx_source_replay: None,
+            docx_source_replay: None,
+        }
+    }
 }
 
 /// Untimed source-backed replay evidence for the ordinary-root PPTX cases.
@@ -372,24 +415,30 @@ pub(crate) enum ColdAdvice {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ChildMode {
     Prime,
+    VerifiedPrime,
     Warm,
     Cold,
+    ColdVerified,
 }
 
 impl ChildMode {
     const fn name(self) -> &'static str {
         match self {
             Self::Prime => "prime",
+            Self::VerifiedPrime => "verified-prime",
             Self::Warm => "warm",
             Self::Cold => "cold",
+            Self::ColdVerified => "cold-verified",
         }
     }
 
     fn parse(value: &str) -> Option<Self> {
         match value {
             "prime" => Some(Self::Prime),
+            "verified-prime" => Some(Self::VerifiedPrime),
             "warm" => Some(Self::Warm),
             "cold" => Some(Self::Cold),
+            "cold-verified" => Some(Self::ColdVerified),
             _ => None,
         }
     }
@@ -402,6 +451,8 @@ pub(crate) struct SampleEvidence {
     pub elapsed_ns: u64,
     pub parent_wall_ns: u64,
     pub cold_advice: ColdAdvice,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cold_verified: Option<cold_verified::Sample>,
     pub logical_read_counter_scope: String,
     pub logical_read_calls: u64,
     pub logical_read_requested_bytes: u64,
@@ -473,6 +524,14 @@ pub(crate) struct Evidence {
     pub fresh_child_per_sample: bool,
     pub samples: Vec<SampleEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub cold_verified_status: Option<cold_verified::Status>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cold_verified_samples: Option<Vec<cold_verified::Sample>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cold_verified_claim_scope: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cold_verified_fincore_command: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cfb_owned: Option<Vec<CfbOwnedSampleEvidence>>,
 }
 
@@ -489,6 +548,7 @@ pub(crate) struct CfbOwnedSampleEvidence {
 pub(crate) struct Run {
     pub warm_result: Option<super::CaseResult>,
     pub cold_result: Option<super::CaseResult>,
+    pub cold_verified_result: Option<super::CaseResult>,
     pub evidence: Evidence,
 }
 
@@ -822,6 +882,13 @@ impl Operation {
         )
     }
 
+    /// Prepared query controls have already opened/materialized their source
+    /// before the timed interval, so a page-cache proof would not describe the
+    /// operation being measured.  Open and lifecycle controls remain eligible.
+    const fn supports_cold_verified(self) -> bool {
+        !self.is_pptx_query() && !self.is_docx_query()
+    }
+
     const fn pptx_query_name(self) -> Option<&'static str> {
         match self {
             Self::PptxEagerOpen | Self::PptxSourceOpen => None,
@@ -1023,11 +1090,72 @@ fn run_one(
     };
     write_synced(&source_path, &corpus.archive)?;
     assert_source_sha256(&source_path, &corpus.manifest.archive_sha256)?;
+    let (verified_source_path, verified_source_sha256, mut cold_verified_status) =
+        if cache_selection.cold_verified() && operation.supports_cold_verified() {
+            match cold_verified::page_size_for_harness() {
+                Ok(page_size_bytes) => {
+                    let aligned = cold_verified::page_aligned_archive(
+                        &corpus.archive,
+                        page_size_bytes,
+                        !operation.is_cfb(),
+                    );
+                    match aligned {
+                        Ok(aligned) => {
+                            let path = root.join(format!("{stem}.cold-verified"));
+                            match write_synced(&path, &aligned) {
+                                Ok(()) => {
+                                    let hash = super::sha256_hex(&aligned);
+                                    let preflight = cold_verified::prepare(&path);
+                                    let status = preflight.status;
+                                    (Some(path), Some(hash), Some(status))
+                                },
+                                Err(_) => (
+                                    None,
+                                    None,
+                                    Some(cold_verified::Status::IneligibleSourceWriteFailed),
+                                ),
+                            }
+                        },
+                        Err(status) => (None, None, Some(status)),
+                    }
+                },
+                Err(status) => (None, None, Some(status)),
+            }
+        } else if cache_selection.cold_verified() {
+            (
+                None,
+                None,
+                Some(cold_verified::Status::IneligiblePreparedQueryControl),
+            )
+        } else {
+            (None, None, None)
+        };
+    let mut cold_verified_samples =
+        if cold_verified_status.is_some_and(|status| !status.is_eligible()) {
+            verified_source_path
+                .as_deref()
+                .map(cold_verified::prepare)
+                .filter(|sample| !sample.status.is_eligible())
+                .map(|sample| vec![sample])
+        } else {
+            None
+        };
     let destination_path = root.join(format!("{stem}.destination"));
     let expected_digest = operation
         .is_save()
         .then(|| expected_digest(operation, corpus))
         .transpose()?;
+    let verified_expected_digest = if cache_selection.cold_verified()
+        && operation.supports_cold_verified()
+        && cold_verified_status == Some(cold_verified::Status::Eligible)
+    {
+        verified_source_path
+            .as_deref()
+            .map(|path| expected_digest_for_source(operation, path))
+            .transpose()?
+    } else {
+        None
+    };
 
     // Untimed warmups are independent children. Each measured sample then
     // primes with a separate child immediately before the selected measured
@@ -1048,6 +1176,7 @@ fn run_one(
 
     let mut warm_elapsed = Vec::with_capacity(samples);
     let mut cold_elapsed = Vec::with_capacity(samples);
+    let mut cold_verified_elapsed = Vec::with_capacity(samples);
     let mut sample_evidence = Vec::with_capacity(samples * 2);
     let mut cfb_owned_evidence = Vec::new();
     for sample_index in 0..samples {
@@ -1072,7 +1201,7 @@ fn run_one(
                 ChildMode::Warm,
                 &corpus.manifest.archive_sha256,
             )?;
-            verify_child_output(operation, &source_path, &destination_path, corpus)?;
+            verify_child_output(operation, &source_path, &destination_path, corpus, false)?;
             warm_elapsed.push(warm.child.elapsed_ns);
             record_sample(
                 &mut sample_evidence,
@@ -1107,7 +1236,7 @@ fn run_one(
                 ChildMode::Cold,
                 &corpus.manifest.archive_sha256,
             )?;
-            verify_child_output(operation, &source_path, &destination_path, corpus)?;
+            verify_child_output(operation, &source_path, &destination_path, corpus, false)?;
             cold_elapsed.push(cold.child.elapsed_ns);
             record_sample(
                 &mut sample_evidence,
@@ -1116,6 +1245,62 @@ fn run_one(
                 cold,
                 operation,
                 expected_digest.as_deref(),
+                stem,
+                &mut cfb_owned_evidence,
+            )?;
+        }
+
+        if cache_selection.cold_verified()
+            && operation.supports_cold_verified()
+            && cold_verified_status.is_some_and(|status| status.is_eligible())
+        {
+            let verified_source = verified_source_path
+                .as_deref()
+                .ok_or("cold-verified source was not prepared")?;
+            let verified_sha256 = verified_source_sha256
+                .as_deref()
+                .ok_or("cold-verified source hash was not prepared")?;
+            if operation.is_save() {
+                seed_destination(&destination_path, &corpus.archive)?;
+            }
+            let _ = spawn_checked_child(
+                operation,
+                verified_source,
+                &destination_path,
+                ChildMode::VerifiedPrime,
+                verified_sha256,
+            )?;
+            if operation.is_save() {
+                seed_destination(&destination_path, &corpus.archive)?;
+            }
+            let verified = spawn_checked_child(
+                operation,
+                verified_source,
+                &destination_path,
+                ChildMode::ColdVerified,
+                verified_sha256,
+            )?;
+            let proof = verified
+                .child
+                .cold_verified
+                .clone()
+                .ok_or("cold-verified child omitted its proof")?;
+            cold_verified_samples
+                .get_or_insert_with(Vec::new)
+                .push(proof.clone());
+            if !proof.status.is_eligible() {
+                cold_verified_status = Some(proof.status);
+                continue;
+            }
+            verify_child_output(operation, verified_source, &destination_path, corpus, true)?;
+            cold_verified_elapsed.push(verified.child.elapsed_ns);
+            record_sample(
+                &mut sample_evidence,
+                sample_index,
+                "cold-verified",
+                verified,
+                operation,
+                verified_expected_digest.as_deref(),
                 stem,
                 &mut cfb_owned_evidence,
             )?;
@@ -1140,7 +1325,23 @@ fn run_one(
             corpus,
             cold_elapsed,
             "cold-requested",
-            expected_digest,
+            expected_digest.clone(),
+            &sample_evidence,
+        )?)
+    } else {
+        None
+    };
+    let cold_verified_result = if cache_selection.cold_verified()
+        && operation.supports_cold_verified()
+        && cold_verified_status == Some(cold_verified::Status::Eligible)
+        && cold_verified_elapsed.len() == samples
+    {
+        Some(filesystem_result(
+            case,
+            corpus,
+            cold_verified_elapsed,
+            "cold-verified",
+            verified_expected_digest,
             &sample_evidence,
         )?)
     } else {
@@ -1158,8 +1359,20 @@ fn run_one(
             cache_states: cache_selection.names(),
             fresh_child_per_sample: true,
             samples: sample_evidence,
+            cold_verified_status: cache_selection
+                .cold_verified()
+                .then_some(cold_verified_status)
+                .flatten(),
+            cold_verified_samples: cold_verified_samples,
+            cold_verified_claim_scope: cache_selection
+                .cold_verified()
+                .then_some(cold_verified::CLAIM_SCOPE),
+            cold_verified_fincore_command: cache_selection
+                .cold_verified()
+                .then_some(cold_verified::FINCORE_COMMAND),
             cfb_owned: (!cfb_owned_evidence.is_empty()).then_some(cfb_owned_evidence),
         },
+        cold_verified_result,
     })
 }
 
@@ -1173,6 +1386,16 @@ fn record_sample(
     stem: &str,
     cfb_owned_evidence: &mut Vec<CfbOwnedSampleEvidence>,
 ) -> Result<(), Box<dyn Error>> {
+    if cache_state == "cold-verified" {
+        let proof = invocation
+            .child
+            .cold_verified
+            .as_ref()
+            .ok_or("cold-verified sample omitted its proof")?;
+        if !proof.status.is_eligible() || proof.read_bytes_delta.unwrap_or(0) == 0 {
+            return Err("cold-verified sample did not prove a positive storage read".into());
+        }
+    }
     validate_cfb_owned_evidence(operation, &invocation.child)?;
     if !operation.is_cfb_owned() {
         validate_cfb_phase_evidence(operation, &invocation.child)?;
@@ -1202,6 +1425,7 @@ fn record_sample(
         elapsed_ns: invocation.child.elapsed_ns,
         parent_wall_ns: invocation.parent_wall_ns,
         cold_advice: invocation.child.cold_advice,
+        cold_verified: invocation.child.cold_verified,
         logical_read_counter_scope: invocation.child.logical_read_counter_scope,
         logical_read_calls: invocation.child.logical_read_calls,
         logical_read_requested_bytes: invocation.child.logical_read_requested_bytes,
@@ -1415,6 +1639,53 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
     }
 }
 
+/// Computes the deterministic save digest for the private page-aligned
+/// verifier source.  ZIP source-backed publication intentionally preserves
+/// the verifier's EOCD comment, and a padded CFB source has a different
+/// physical length, so the ordinary corpus digest is not the right sink
+/// expectation for a verified sample.
+fn expected_digest_for_source(
+    operation: Operation,
+    source: &Path,
+) -> Result<String, Box<dyn Error>> {
+    match operation {
+        Operation::OpcEagerSave => {
+            let target_uri =
+                PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
+            let mut package = OpcPackage::from_bytes(&fs::read(source)?)?;
+            package
+                .get_part_mut(&target_uri)?
+                .set_blob(filesystem_opc_replacement()?);
+            Ok(super::sha256_hex(&PackageWriter::to_bytes(&package)?))
+        },
+        Operation::OpcSourceSave => {
+            let target_uri =
+                PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
+            let package = SourceBackedPackage::from_read_at(Arc::new(FileSource::open(source)?))?;
+            let mut output = Vec::new();
+            package.write_part_overlay_to_stream(
+                &mut output,
+                &target_uri,
+                filesystem_opc_replacement()?,
+            )?;
+            Ok(super::sha256_hex(&output))
+        },
+        Operation::CfbOverlaySave | Operation::CfbOwnedOverlaySave => {
+            let shared = SharedOleFile::open(Arc::new(super::OwnedSource::new(fs::read(source)?)))?;
+            let overlay = SameLengthStreamOverlay::new(
+                vec![super::OLE_COMMON_TARGET.to_owned()],
+                Arc::from(FILESYSTEM_OLE_COMMON_REPLACEMENT.to_vec()),
+            );
+            let plan =
+                shared.plan_same_length_stream_overlays(vec![overlay], OverlayLimits::default())?;
+            let mut output = Vec::new();
+            plan.write_to(&mut output)?;
+            Ok(super::sha256_hex(&output))
+        },
+        _ => Err("verified source digest requested for a non-save operation".into()),
+    }
+}
+
 fn spawn_child(
     operation: Operation,
     source: &Path,
@@ -1511,11 +1782,20 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
             .ok_or("filesystem child is missing its mode")?
             .to_string_lossy(),
     )
-    .ok_or("filesystem child mode must be prime, warm, or cold")?;
+    .ok_or("filesystem child mode must be prime, verified-prime, warm, cold, or cold-verified")?;
     if arguments.next().is_some() {
         return Err("filesystem child received unexpected arguments".into());
     }
     let operation = Operation::parse(&case_name).ok_or("unknown filesystem child case")?;
+    if mode == ChildMode::ColdVerified && !operation.supports_cold_verified() {
+        serde_json::to_writer(
+            io::stdout().lock(),
+            &ChildResult::ineligible_cold_verified(cold_verified::Sample::ineligible(
+                cold_verified::Status::IneligiblePreparedQueryControl,
+            )),
+        )?;
+        return Ok(true);
+    }
     let opc_replacement = matches!(
         operation,
         Operation::OpcEagerSave | Operation::OpcSourceSave
@@ -1526,6 +1806,31 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         request_cold(&source)
     } else {
         ColdAdvice::NotRequested
+    };
+    let (cold_verified_preparation, verified_before) = if mode == ChildMode::ColdVerified {
+        let preparation = cold_verified::prepare(&source);
+        if !preparation.status.is_eligible() {
+            serde_json::to_writer(
+                io::stdout().lock(),
+                &ChildResult::ineligible_cold_verified(preparation),
+            )?;
+            return Ok(true);
+        }
+        let before = match process_metrics::Snapshot::read() {
+            Ok(before) => before,
+            Err(_) => {
+                let mut ineligible = preparation;
+                ineligible.status = cold_verified::Status::IneligibleProcIoUnavailable;
+                serde_json::to_writer(
+                    io::stdout().lock(),
+                    &ChildResult::ineligible_cold_verified(ineligible),
+                )?;
+                return Ok(true);
+            },
+        };
+        (Some(preparation), Some(before))
+    } else {
+        (None, None)
     };
     // Existing query controls compare prepared eager/source roots, so root
     // construction is outside their query timer. Lifecycle controls leave
@@ -1549,7 +1854,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     } else {
         None
     };
-    let before = process_metrics::Snapshot::read().ok();
+    let before = verified_before.or_else(|| process_metrics::Snapshot::read().ok());
     let started = Instant::now();
     let mut details = OperationDetails::default();
     let counter = match operation {
@@ -1609,6 +1914,8 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
+    let cold_verified = cold_verified_preparation
+        .map(|preparation| cold_verified::complete(preparation, before, after));
     let snapshot = counter
         .map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
     let logical_read_counter_scope = if operation.is_cfb_owned() {
@@ -1643,7 +1950,13 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     // Correctness and hashing are intentionally after the timed operation and
     // after the operation-only counters have been sampled.
     let corpus = filesystem_corpus(operation)?;
-    verify_child_output(operation, &source, &destination, &corpus)?;
+    verify_child_output(
+        operation,
+        &source,
+        &destination,
+        &corpus,
+        matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
+    )?;
     let output = operation
         .is_save()
         .then(|| fs::read(&destination))
@@ -1666,6 +1979,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         logical_read_request_sizes: snapshot.request_sizes,
         logical_read_request_size_buckets: snapshot.request_size_buckets,
         cold_advice,
+        cold_verified,
         process_metrics: process_delta,
         output_sha256,
         output_bytes,
@@ -3203,6 +3517,7 @@ fn verify_child_output(
     source: &Path,
     destination: &Path,
     corpus: &super::Corpus,
+    allow_page_aligned_source: bool,
 ) -> Result<(), Box<dyn Error>> {
     match operation {
         Operation::OpcEagerOpen => {
@@ -3262,7 +3577,9 @@ fn verify_child_output(
         | Operation::PptxEagerOpenSlideCountLifecycle
         | Operation::PptxSourceOpenSlideCountLifecycle
         | Operation::PptxEagerOpenSelectedSlideLifecycle
-        | Operation::PptxSourceOpenSelectedSlideLifecycle => verify_pptx_operation(source, corpus),
+        | Operation::PptxSourceOpenSelectedSlideLifecycle => {
+            verify_pptx_operation(source, corpus, allow_page_aligned_source)
+        },
         Operation::DocxEagerOpen
         | Operation::DocxSourceOpen
         | Operation::DocxEagerParagraphCount
@@ -3274,20 +3591,28 @@ fn verify_child_output(
         | Operation::DocxEagerOpenParagraphCountLifecycle
         | Operation::DocxSourceOpenParagraphCountLifecycle
         | Operation::DocxEagerOpenFullTextLifecycle
-        | Operation::DocxSourceOpenFullTextLifecycle => verify_docx_operation(source, corpus),
+        | Operation::DocxSourceOpenFullTextLifecycle => {
+            verify_docx_operation(source, corpus, allow_page_aligned_source)
+        },
     }
 }
 
-fn verify_pptx_operation(source: &Path, corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
+fn verify_pptx_operation(
+    source: &Path,
+    corpus: &super::Corpus,
+    allow_page_aligned_source: bool,
+) -> Result<(), Box<dyn Error>> {
     if corpus.manifest.generator != PPTX_FILE_CORPUS_GENERATOR {
         return Err("PPTX filesystem source has the wrong corpus generator".into());
     }
     let bytes = fs::read(source)?;
-    if super::sha256_hex(&bytes) != corpus.manifest.archive_sha256 {
-        return Err("PPTX filesystem source hash differs from corpus manifest".into());
-    }
-    if bytes.len() != corpus.manifest.archive_bytes {
-        return Err("PPTX filesystem source length differs from corpus manifest".into());
+    if !allow_page_aligned_source {
+        if super::sha256_hex(&bytes) != corpus.manifest.archive_sha256 {
+            return Err("PPTX filesystem source hash differs from corpus manifest".into());
+        }
+        if bytes.len() != corpus.manifest.archive_bytes {
+            return Err("PPTX filesystem source length differs from corpus manifest".into());
+        }
     }
     let eager = litchi::Presentation::from_bytes(bytes)?;
     let source_backed = litchi::Presentation::open(source)?;
@@ -3302,17 +3627,23 @@ fn verify_pptx_operation(source: &Path, corpus: &super::Corpus) -> Result<(), Bo
     Ok(())
 }
 
-fn verify_docx_operation(source: &Path, corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
+fn verify_docx_operation(
+    source: &Path,
+    corpus: &super::Corpus,
+    allow_page_aligned_source: bool,
+) -> Result<(), Box<dyn Error>> {
     if corpus.manifest.generator != DOCX_FILE_CORPUS_GENERATOR {
         return Err("DOCX filesystem source has the wrong corpus generator".into());
     }
     let bytes = fs::read(source)?;
-    if bytes.len() != corpus.manifest.archive_bytes {
-        return Err("DOCX filesystem source length differs from corpus manifest".into());
-    }
     let source_sha256 = super::sha256_hex(&bytes);
-    if source_sha256 != corpus.manifest.archive_sha256 {
-        return Err("DOCX filesystem source hash differs from corpus manifest".into());
+    if !allow_page_aligned_source {
+        if bytes.len() != corpus.manifest.archive_bytes {
+            return Err("DOCX filesystem source length differs from corpus manifest".into());
+        }
+        if source_sha256 != corpus.manifest.archive_sha256 {
+            return Err("DOCX filesystem source hash differs from corpus manifest".into());
+        }
     }
     let eager = litchi::Document::from_bytes(bytes.clone())?;
     let source_backed = litchi::Document::open(source)?;
@@ -3911,12 +4242,24 @@ mod tests {
     fn cold_state_labels_are_distinct_from_warm_and_unsupported() {
         assert_ne!(ColdAdvice::NotRequested as u8, ColdAdvice::Requested as u8);
         assert_eq!(ChildMode::parse("cold"), Some(ChildMode::Cold));
+        assert_eq!(
+            ChildMode::parse("verified-prime"),
+            Some(ChildMode::VerifiedPrime)
+        );
+        assert_eq!(
+            ChildMode::parse("cold-verified"),
+            Some(ChildMode::ColdVerified)
+        );
         assert_eq!(ChildMode::parse("warm"), Some(ChildMode::Warm));
         assert_eq!(ChildMode::parse("prime"), Some(ChildMode::Prime));
     }
 
     #[test]
     fn cache_selection_is_explicit_and_additive() {
+        let default = CacheSelection::default();
+        assert!(default.warm());
+        assert!(default.cold_requested());
+        assert!(!default.cold_verified());
         assert_eq!(CacheSelection::parse("warm").unwrap().names(), ["warm"]);
         assert_eq!(
             CacheSelection::parse("warm,cold-requested")
@@ -3928,8 +4271,27 @@ mod tests {
             CacheSelection::parse("cold-requested").unwrap().names(),
             ["cold-requested"]
         );
+        assert_eq!(
+            CacheSelection::parse("cold-verified").unwrap().names(),
+            ["cold-verified"]
+        );
+        assert_eq!(
+            CacheSelection::parse("warm,cold-requested,cold-verified")
+                .unwrap()
+                .names(),
+            ["warm", "cold-requested", "cold-verified"]
+        );
         assert!(CacheSelection::parse("hot").is_err());
         assert!(CacheSelection::parse("").is_err());
+    }
+
+    #[test]
+    fn prepared_query_controls_are_not_cold_verified() {
+        assert!(!Operation::PptxSourceSelectedSlide.supports_cold_verified());
+        assert!(!Operation::DocxSourceFullText.supports_cold_verified());
+        assert!(Operation::PptxSourceOpen.supports_cold_verified());
+        assert!(Operation::DocxSourceOpenFullTextLifecycle.supports_cold_verified());
+        assert!(Operation::OpcSourceOpen.supports_cold_verified());
     }
 
     #[test]

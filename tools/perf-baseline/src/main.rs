@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+mod cold_verified;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
@@ -6597,6 +6598,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(result) = run.cold_result {
             results.push(result);
         }
+        if let Some(result) = run.cold_verified_result {
+            results.push(result);
+        }
         filesystem_evidence.push(run.evidence);
     }
 
@@ -8107,11 +8111,9 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
                 warmup_iterations = value.parse()?;
             },
             "--filesystem-cache" => {
-                filesystem_cache = filesystem::CacheSelection::parse(
-                    &arguments
-                        .next()
-                        .ok_or("--filesystem-cache requires warm,cold-requested")?,
-                )?;
+                filesystem_cache = filesystem::CacheSelection::parse(&arguments.next().ok_or(
+                    "--filesystem-cache requires warm, cold-requested, or cold-verified",
+                )?)?;
             },
             "--filesystem-root" => {
                 filesystem_root = Some(PathBuf::from(
@@ -8822,7 +8824,7 @@ fn print_usage() {
          Options:\n\
            --samples N                 Samples per case (default: {DEFAULT_SAMPLES})\n\
            --warmup N                  Untimed iterations per case (default: {DEFAULT_WARMUP_ITERATIONS})\n\
-           --filesystem-cache LIST     Filesystem states: warm,cold-requested\n\
+           --filesystem-cache LIST     Filesystem states: warm,cold-requested,cold-verified\n\
            --filesystem-root PATH      Parent directory for filesystem samples\n\
            --case LIST                 zip_index,zip_read_one,opc_open,opc_open_owned,\n\
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
