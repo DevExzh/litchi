@@ -107,6 +107,7 @@ const XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR: &str =
 const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
 const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
+const ODF_MANIFEST_CORPUS_GENERATOR: &str = "litchi-odf-manifest-scan-v1";
 const ODF_REPAIR_LOCAL_EXTRA: &[u8] = &[0x55, 0x54, 0x05, 0x00, 0x01, 0, 0, 0, 0];
 const ODF_REPAIR_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
 const ODT_MEDIA_CORPUS_GENERATOR: &str = "litchi-odt-media-paragraph-publication-v1";
@@ -590,6 +591,43 @@ impl PayloadKind {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum OdfManifestParsePath {
+    Neutral,
+    Typed,
+}
+
+impl OdfManifestParsePath {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Neutral => "neutral",
+            Self::Typed => "typed",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct OdfManifestSpec {
+    path: OdfManifestParsePath,
+    encrypted: bool,
+    entry_count: usize,
+}
+
+impl OdfManifestSpec {
+    const fn shape(self) -> &'static str {
+        match (self.encrypted, self.entry_count) {
+            (false, 1) => "plain-1",
+            (false, 64) => "plain-64",
+            (false, 1024) => "plain-1024",
+            (false, 10_000) => "plain-10000",
+            (true, 1) => "encrypted-1",
+            (true, 64) => "encrypted-64",
+            (true, 1024) => "encrypted-1024",
+            _ => unreachable!("ODF manifest benchmark has an unsupported shape"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Case {
     ZipIndex,
@@ -873,6 +911,20 @@ enum Case {
     OdtMixedModelContentBatchEditSave,
     OdfValidationReport,
     OdfMimetypeRepairPlan,
+    OdfManifestNeutralPlain1,
+    OdfManifestNeutralPlain64,
+    OdfManifestNeutralPlain1024,
+    OdfManifestNeutralPlain10000,
+    OdfManifestTypedPlain1,
+    OdfManifestTypedPlain64,
+    OdfManifestTypedPlain1024,
+    OdfManifestTypedPlain10000,
+    OdfManifestNeutralEncrypted1,
+    OdfManifestNeutralEncrypted64,
+    OdfManifestNeutralEncrypted1024,
+    OdfManifestTypedEncrypted1,
+    OdfManifestTypedEncrypted64,
+    OdfManifestTypedEncrypted1024,
     OdtMediaParagraphEditSave,
     OdtMediaLineBreakEditSave,
     OdtMediaAppendRunEditSave,
@@ -1353,6 +1405,20 @@ impl Case {
             Self::OdtMixedModelContentBatchEditSave => "odt_mixed_model_content_batch_edit_save",
             Self::OdfValidationReport => "odf_validation_report",
             Self::OdfMimetypeRepairPlan => "odf_mimetype_repair_plan",
+            Self::OdfManifestNeutralPlain1 => "odf_manifest_neutral_plain_1",
+            Self::OdfManifestNeutralPlain64 => "odf_manifest_neutral_plain_64",
+            Self::OdfManifestNeutralPlain1024 => "odf_manifest_neutral_plain_1024",
+            Self::OdfManifestNeutralPlain10000 => "odf_manifest_neutral_plain_10000",
+            Self::OdfManifestTypedPlain1 => "odf_manifest_typed_plain_1",
+            Self::OdfManifestTypedPlain64 => "odf_manifest_typed_plain_64",
+            Self::OdfManifestTypedPlain1024 => "odf_manifest_typed_plain_1024",
+            Self::OdfManifestTypedPlain10000 => "odf_manifest_typed_plain_10000",
+            Self::OdfManifestNeutralEncrypted1 => "odf_manifest_neutral_encrypted_1",
+            Self::OdfManifestNeutralEncrypted64 => "odf_manifest_neutral_encrypted_64",
+            Self::OdfManifestNeutralEncrypted1024 => "odf_manifest_neutral_encrypted_1024",
+            Self::OdfManifestTypedEncrypted1 => "odf_manifest_typed_encrypted_1",
+            Self::OdfManifestTypedEncrypted64 => "odf_manifest_typed_encrypted_64",
+            Self::OdfManifestTypedEncrypted1024 => "odf_manifest_typed_encrypted_1024",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdtMediaLineBreakEditSave => "odt_media_line_break_edit_save",
             Self::OdtMediaAppendRunEditSave => "odt_media_append_run_edit_save",
@@ -1851,6 +1917,102 @@ impl Case {
 
     const fn uses_validation_odf(self) -> bool {
         matches!(self, Self::OdfValidationReport)
+    }
+
+    const fn odf_manifest_spec(self) -> Option<OdfManifestSpec> {
+        match self {
+            Self::OdfManifestNeutralPlain1 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Neutral,
+                encrypted: false,
+                entry_count: 1,
+            }),
+            Self::OdfManifestNeutralPlain64 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Neutral,
+                encrypted: false,
+                entry_count: 64,
+            }),
+            Self::OdfManifestNeutralPlain1024 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Neutral,
+                encrypted: false,
+                entry_count: 1024,
+            }),
+            Self::OdfManifestNeutralPlain10000 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Neutral,
+                encrypted: false,
+                entry_count: 10_000,
+            }),
+            Self::OdfManifestTypedPlain1 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Typed,
+                encrypted: false,
+                entry_count: 1,
+            }),
+            Self::OdfManifestTypedPlain64 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Typed,
+                encrypted: false,
+                entry_count: 64,
+            }),
+            Self::OdfManifestTypedPlain1024 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Typed,
+                encrypted: false,
+                entry_count: 1024,
+            }),
+            Self::OdfManifestTypedPlain10000 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Typed,
+                encrypted: false,
+                entry_count: 10_000,
+            }),
+            Self::OdfManifestNeutralEncrypted1 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Neutral,
+                encrypted: true,
+                entry_count: 1,
+            }),
+            Self::OdfManifestNeutralEncrypted64 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Neutral,
+                encrypted: true,
+                entry_count: 64,
+            }),
+            Self::OdfManifestNeutralEncrypted1024 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Neutral,
+                encrypted: true,
+                entry_count: 1024,
+            }),
+            Self::OdfManifestTypedEncrypted1 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Typed,
+                encrypted: true,
+                entry_count: 1,
+            }),
+            Self::OdfManifestTypedEncrypted64 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Typed,
+                encrypted: true,
+                entry_count: 64,
+            }),
+            Self::OdfManifestTypedEncrypted1024 => Some(OdfManifestSpec {
+                path: OdfManifestParsePath::Typed,
+                encrypted: true,
+                entry_count: 1024,
+            }),
+            _ => None,
+        }
+    }
+
+    const fn is_odf_manifest(self) -> bool {
+        matches!(
+            self,
+            Self::OdfManifestNeutralPlain1
+                | Self::OdfManifestNeutralPlain64
+                | Self::OdfManifestNeutralPlain1024
+                | Self::OdfManifestNeutralPlain10000
+                | Self::OdfManifestTypedPlain1
+                | Self::OdfManifestTypedPlain64
+                | Self::OdfManifestTypedPlain1024
+                | Self::OdfManifestTypedPlain10000
+                | Self::OdfManifestNeutralEncrypted1
+                | Self::OdfManifestNeutralEncrypted64
+                | Self::OdfManifestNeutralEncrypted1024
+                | Self::OdfManifestTypedEncrypted1
+                | Self::OdfManifestTypedEncrypted64
+                | Self::OdfManifestTypedEncrypted1024
+        )
     }
 
     const fn uses_odf_repair(self) -> bool {
@@ -2396,6 +2558,15 @@ struct Corpus {
     target_name: String,
     target_payload: Vec<u8>,
     xlsx: Option<XlsxCorpus>,
+}
+
+#[derive(Debug)]
+struct OdfManifestCorpus {
+    manifest: CorpusManifest,
+    xml: String,
+    expected_entry_count: usize,
+    encrypted_entry_count: usize,
+    xml_sha256: String,
 }
 
 #[derive(Debug)]
@@ -2967,6 +3138,18 @@ struct PptxCrossCopySummary {
     output_sha256: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct OdfManifestSummary {
+    implementation: &'static str,
+    encrypted_xml: bool,
+    expected_entry_count: usize,
+    expected_encrypted_entry_count: usize,
+    xml_bytes: usize,
+    xml_sha256: String,
+    timing_scope: &'static str,
+    oracle_prepared_outside_timing: bool,
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 struct SourceSummary {
     read_calls: Vec<u64>,
@@ -2998,6 +3181,8 @@ struct SourceSummary {
     validation: Option<ValidationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odf_repair: Option<OdfRepairSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    odf_manifest: Option<OdfManifestSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     cfb_selective: Option<CfbSelectiveEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -6604,6 +6789,44 @@ fn main() -> Result<(), Box<dyn Error>> {
         filesystem_evidence.push(run.evidence);
     }
 
+    if options.cases.iter().any(|case| case.is_odf_manifest()) {
+        let mut manifest_corpora = BTreeMap::new();
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_odf_manifest())
+        {
+            let spec = case
+                .odf_manifest_spec()
+                .ok_or("ODF manifest selector has no benchmark specification")?;
+            let corpus_key = (spec.encrypted, spec.entry_count);
+            if !manifest_corpora.contains_key(&corpus_key) {
+                manifest_corpora.insert(corpus_key, build_odf_manifest_corpus(spec)?);
+            }
+        }
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_odf_manifest())
+        {
+            let spec = case
+                .odf_manifest_spec()
+                .ok_or("ODF manifest selector has no benchmark specification")?;
+            let corpus_key = (spec.encrypted, spec.entry_count);
+            let corpus = manifest_corpora
+                .get(&corpus_key)
+                .ok_or("ODF manifest benchmark corpus was not prepared")?;
+            results.push(run_odf_manifest_scan(
+                case,
+                corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -6722,6 +6945,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_validation_pptx()
                     && !case.uses_validation_odf()
                     && !case.uses_odf_repair()
+                    && !case.is_odf_manifest()
                     && !case.is_cfb_selective()
                     && !case.is_cfb_open_stream_evidence()
             }) {
@@ -8674,6 +8898,20 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_mixed_model_content_batch_edit_save" => Some(Case::OdtMixedModelContentBatchEditSave),
         "odf_validation_report" => Some(Case::OdfValidationReport),
         "odf_mimetype_repair_plan" => Some(Case::OdfMimetypeRepairPlan),
+        "odf_manifest_neutral_plain_1" => Some(Case::OdfManifestNeutralPlain1),
+        "odf_manifest_neutral_plain_64" => Some(Case::OdfManifestNeutralPlain64),
+        "odf_manifest_neutral_plain_1024" => Some(Case::OdfManifestNeutralPlain1024),
+        "odf_manifest_neutral_plain_10000" => Some(Case::OdfManifestNeutralPlain10000),
+        "odf_manifest_typed_plain_1" => Some(Case::OdfManifestTypedPlain1),
+        "odf_manifest_typed_plain_64" => Some(Case::OdfManifestTypedPlain64),
+        "odf_manifest_typed_plain_1024" => Some(Case::OdfManifestTypedPlain1024),
+        "odf_manifest_typed_plain_10000" => Some(Case::OdfManifestTypedPlain10000),
+        "odf_manifest_neutral_encrypted_1" => Some(Case::OdfManifestNeutralEncrypted1),
+        "odf_manifest_neutral_encrypted_64" => Some(Case::OdfManifestNeutralEncrypted64),
+        "odf_manifest_neutral_encrypted_1024" => Some(Case::OdfManifestNeutralEncrypted1024),
+        "odf_manifest_typed_encrypted_1" => Some(Case::OdfManifestTypedEncrypted1),
+        "odf_manifest_typed_encrypted_64" => Some(Case::OdfManifestTypedEncrypted64),
+        "odf_manifest_typed_encrypted_1024" => Some(Case::OdfManifestTypedEncrypted1024),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "odt_media_line_break_edit_save" => Some(Case::OdtMediaLineBreakEditSave),
         "odt_media_append_run_edit_save" => Some(Case::OdtMediaAppendRunEditSave),
@@ -9031,6 +9269,16 @@ fn print_usage() {
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
                                        odt_mixed_model_content_scalar_edit_save,\n\
                                        odt_mixed_model_content_batch_edit_save,\n\
+                                       odf_manifest_neutral_plain_1,odf_manifest_neutral_plain_64,\n\
+                                       odf_manifest_neutral_plain_1024,odf_manifest_neutral_plain_10000,\n\
+                                       odf_manifest_typed_plain_1,odf_manifest_typed_plain_64,\n\
+                                       odf_manifest_typed_plain_1024,odf_manifest_typed_plain_10000,\n\
+                                       odf_manifest_neutral_encrypted_1,\n\
+                                       odf_manifest_neutral_encrypted_64,\n\
+                                       odf_manifest_neutral_encrypted_1024,\n\
+                                       odf_manifest_typed_encrypted_1,\n\
+                                       odf_manifest_typed_encrypted_64,\n\
+                                       odf_manifest_typed_encrypted_1024,\n\
                                        odt_media_paragraph_edit_save,odt_media_line_break_edit_save,\n\
                                        odt_media_append_run_edit_save,\n\
                                        odt_media_append_hyperlink_edit_save,\n\
@@ -13084,6 +13332,71 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
     })
 }
 
+fn build_odf_manifest_corpus(spec: OdfManifestSpec) -> Result<OdfManifestCorpus, Box<dyn Error>> {
+    use std::fmt::Write as _;
+
+    let mut xml = String::new();
+    xml.push_str(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+"#,
+    );
+    for index in 0..spec.entry_count {
+        if spec.encrypted {
+            let _ = writeln!(
+                xml,
+                r#"  <manifest:file-entry manifest:full-path="file-{index:05}.bin" manifest:media-type="application/octet-stream" manifest:size="1024">
+    <manifest:encryption-data manifest:checksum-type="SHA256/1K" manifest:checksum="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=">
+      <manifest:algorithm manifest:algorithm-name="http://www.w3.org/2001/04/xmlenc#aes256-cbc" manifest:initialisation-vector="AAAAAAAAAAAAAAAAAAAAAA=="/>
+      <manifest:key-derivation manifest:key-derivation-name="PBKDF2" manifest:salt="AQIDBAUGBwgJCgsM" manifest:iteration-count="1000" manifest:key-size="32"/>
+      <manifest:start-key-generation manifest:start-key-generation-name="http://www.w3.org/2001/04/xmlenc#sha256" manifest:key-size="32"/>
+    </manifest:encryption-data>
+  </manifest:file-entry>"#,
+            );
+        } else {
+            let _ = writeln!(
+                xml,
+                r#"  <manifest:file-entry manifest:full-path="file-{index:05}.bin" manifest:media-type="application/octet-stream" manifest:size="1024"/>"#,
+            );
+        }
+    }
+    xml.push_str("</manifest:manifest>\n");
+
+    let xml_sha256 = sha256_hex(xml.as_bytes());
+    let payload_kind = if spec.encrypted {
+        "encrypted-manifest"
+    } else {
+        "plain-manifest"
+    };
+    let name = format!("odf-manifest-{}", spec.shape());
+    let manifest = CorpusManifest {
+        name,
+        generator: ODF_MANIFEST_CORPUS_GENERATOR,
+        package_format: "ODF manifest XML",
+        shape: spec.shape(),
+        payload_kind,
+        compression: "none",
+        entry_count: spec.entry_count,
+        archive_member_count: 1,
+        entry_bytes: xml.len(),
+        uncompressed_payload_bytes: xml.len(),
+        archive_bytes: xml.len(),
+        archive_sha256: xml_sha256.clone(),
+        target_entry: "manifest.xml".to_owned(),
+        target_payload_bytes: xml.len(),
+        target_payload_sha256: xml_sha256.clone(),
+        rtf_variant: None,
+        xlsx: None,
+    };
+    Ok(OdfManifestCorpus {
+        manifest,
+        xml,
+        expected_entry_count: spec.entry_count,
+        encrypted_entry_count: if spec.encrypted { spec.entry_count } else { 0 },
+        xml_sha256,
+    })
+}
+
 fn build_odf_repair_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let canonical = build_semantic_odt_corpus(shape)?;
     let archive = inject_mimetype_local_timestamp_extra(canonical.archive.clone())?;
@@ -15489,6 +15802,22 @@ fn run_case_with_config(
         Case::OdfValidationReport => run_odf_validation_report(corpus, warmup_iterations, samples),
         Case::OdfMimetypeRepairPlan => {
             run_odf_mimetype_repair_plan(corpus, warmup_iterations, samples)
+        },
+        Case::OdfManifestNeutralPlain1
+        | Case::OdfManifestNeutralPlain64
+        | Case::OdfManifestNeutralPlain1024
+        | Case::OdfManifestNeutralPlain10000
+        | Case::OdfManifestTypedPlain1
+        | Case::OdfManifestTypedPlain64
+        | Case::OdfManifestTypedPlain1024
+        | Case::OdfManifestTypedPlain10000
+        | Case::OdfManifestNeutralEncrypted1
+        | Case::OdfManifestNeutralEncrypted64
+        | Case::OdfManifestNeutralEncrypted1024
+        | Case::OdfManifestTypedEncrypted1
+        | Case::OdfManifestTypedEncrypted64
+        | Case::OdfManifestTypedEncrypted1024 => {
+            Err("ODF manifest cases use their dedicated XML-only runner".into())
         },
         Case::OdtMediaParagraphEditSave => {
             run_odt_media_paragraph_edit_save(corpus, warmup_iterations, samples)
@@ -21981,6 +22310,78 @@ fn run_odf_validation_report(
         |bytes| Ok(litchi_odf_common::validate_package(bytes)?),
         |report, bytes| generic_validation_summary(report, bytes, None, None),
     )
+}
+
+fn run_odf_manifest_scan(
+    case: Case,
+    corpus: &OdfManifestCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = case
+        .odf_manifest_spec()
+        .ok_or("non-manifest case passed to ODF manifest runner")?;
+    let expected_encrypted_entry_count = match spec.path {
+        OdfManifestParsePath::Neutral => 0,
+        OdfManifestParsePath::Typed => corpus.encrypted_entry_count,
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (entry_count, encrypted_entry_count, duration) = match spec.path {
+            OdfManifestParsePath::Neutral => {
+                let started = Instant::now();
+                let parsed = litchi_odf_common::package::parse_manifest(&corpus.xml)?;
+                let duration = started.elapsed();
+                (parsed.entries.len(), 0, duration)
+            },
+            OdfManifestParsePath::Typed => {
+                let started = Instant::now();
+                let parsed = litchi_odf_common::core::Manifest::parse(&corpus.xml)?;
+                let duration = started.elapsed();
+                let encrypted_entry_count = parsed
+                    .entries
+                    .values()
+                    .filter(|entry| entry.encryption.is_some())
+                    .count();
+                (parsed.entries.len(), encrypted_entry_count, duration)
+            },
+        };
+        if entry_count != corpus.expected_entry_count
+            || encrypted_entry_count != expected_encrypted_entry_count
+        {
+            return Err(format!(
+                "{} parser oracle mismatch: entries {entry_count}, encrypted {encrypted_entry_count}",
+                case.name()
+            )
+            .into());
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let source = SourceSummary {
+        odf_manifest: Some(OdfManifestSummary {
+            implementation: spec.path.name(),
+            encrypted_xml: spec.encrypted,
+            expected_entry_count: corpus.expected_entry_count,
+            expected_encrypted_entry_count,
+            xml_bytes: corpus.xml.len(),
+            xml_sha256: corpus.xml_sha256.clone(),
+            timing_scope: "manifest XML parse only; corpus and parser oracle are pre-built",
+            oracle_prepared_outside_timing: true,
+        }),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: None,
+        source: Some(source),
+        execution: None,
+        output_sha256: None,
+        operation_metrics: None,
+    })
 }
 
 fn verify_odf_mimetype_repair(
@@ -40513,37 +40914,39 @@ mod tests {
         Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
         CountingSeekSink, CountingSink, HashingDiscardSink, InstrumentedSource,
         ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT,
-        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT,
-        PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT,
-        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
-        SourceBackedPackage, WindowedHashingSink, WriteSizeBuckets, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        ODT_RESOURCE_BATCH_COUNT, OdfManifestParsePath, OdfManifestSpec, OpcCacheMode,
+        PPT_PICTURE_BYTES, PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR,
+        PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT,
+        PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
+        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink,
+        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
-        build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
-        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
-        build_odt_repeated_text_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
-        build_opc_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
-        build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
-        build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
-        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
-        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
-        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
-        build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
-        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
-        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
-        cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
-        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        build_docx_source_edit_corpus, build_odf_manifest_corpus, build_odf_repair_corpus,
+        build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
+        build_odt_media_corpus, build_odt_repeated_text_corpus, build_odt_resource_batch_corpus,
+        build_ole_common_corpus, build_opc_corpus, build_ppt_pictures_corpus,
+        build_pptx_cross_copy_corpus, build_pptx_source_backed_cross_copy_corpus,
+        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_rtf_picture_corpus,
+        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
+        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
+        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
+        build_xls_visibility_edit_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
+        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
+        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
+        build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, build_xlsx_row_visibility_corpus,
+        build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
+        cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
+        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_one_edit_save, run_odf_content_cow, run_odf_manifest_scan,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -40954,7 +41357,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 342);
+        assert_eq!(selectable_count, 356);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -46379,6 +46782,156 @@ mod tests {
             summary.write_size_buckets.total(),
             Some(summary.write_calls)
         );
+    }
+
+    #[test]
+    fn odf_manifest_scan_selectors_are_opt_in_and_keep_paths_distinct() {
+        let cases = [
+            (
+                "odf_manifest_neutral_plain_1",
+                Case::OdfManifestNeutralPlain1,
+                OdfManifestParsePath::Neutral,
+                false,
+                1,
+            ),
+            (
+                "odf_manifest_neutral_plain_64",
+                Case::OdfManifestNeutralPlain64,
+                OdfManifestParsePath::Neutral,
+                false,
+                64,
+            ),
+            (
+                "odf_manifest_neutral_plain_1024",
+                Case::OdfManifestNeutralPlain1024,
+                OdfManifestParsePath::Neutral,
+                false,
+                1024,
+            ),
+            (
+                "odf_manifest_neutral_plain_10000",
+                Case::OdfManifestNeutralPlain10000,
+                OdfManifestParsePath::Neutral,
+                false,
+                10_000,
+            ),
+            (
+                "odf_manifest_typed_plain_1",
+                Case::OdfManifestTypedPlain1,
+                OdfManifestParsePath::Typed,
+                false,
+                1,
+            ),
+            (
+                "odf_manifest_typed_plain_64",
+                Case::OdfManifestTypedPlain64,
+                OdfManifestParsePath::Typed,
+                false,
+                64,
+            ),
+            (
+                "odf_manifest_typed_plain_1024",
+                Case::OdfManifestTypedPlain1024,
+                OdfManifestParsePath::Typed,
+                false,
+                1024,
+            ),
+            (
+                "odf_manifest_typed_plain_10000",
+                Case::OdfManifestTypedPlain10000,
+                OdfManifestParsePath::Typed,
+                false,
+                10_000,
+            ),
+            (
+                "odf_manifest_neutral_encrypted_1",
+                Case::OdfManifestNeutralEncrypted1,
+                OdfManifestParsePath::Neutral,
+                true,
+                1,
+            ),
+            (
+                "odf_manifest_neutral_encrypted_64",
+                Case::OdfManifestNeutralEncrypted64,
+                OdfManifestParsePath::Neutral,
+                true,
+                64,
+            ),
+            (
+                "odf_manifest_neutral_encrypted_1024",
+                Case::OdfManifestNeutralEncrypted1024,
+                OdfManifestParsePath::Neutral,
+                true,
+                1024,
+            ),
+            (
+                "odf_manifest_typed_encrypted_1",
+                Case::OdfManifestTypedEncrypted1,
+                OdfManifestParsePath::Typed,
+                true,
+                1,
+            ),
+            (
+                "odf_manifest_typed_encrypted_64",
+                Case::OdfManifestTypedEncrypted64,
+                OdfManifestParsePath::Typed,
+                true,
+                64,
+            ),
+            (
+                "odf_manifest_typed_encrypted_1024",
+                Case::OdfManifestTypedEncrypted1024,
+                OdfManifestParsePath::Typed,
+                true,
+                1024,
+            ),
+        ];
+        for (name, case, path, encrypted, entry_count) in cases {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert_eq!(
+                case.odf_manifest_spec(),
+                Some(OdfManifestSpec {
+                    path,
+                    encrypted,
+                    entry_count,
+                })
+            );
+            assert!(case.is_odf_manifest());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        let neutral_case = Case::OdfManifestNeutralPlain1;
+        let neutral_corpus =
+            build_odf_manifest_corpus(neutral_case.odf_manifest_spec().unwrap()).unwrap();
+        let neutral = run_odf_manifest_scan(neutral_case, &neutral_corpus, 0, 1).unwrap();
+        assert_eq!(neutral.elapsed_ns.samples.len(), 1);
+        assert_eq!(
+            neutral
+                .source
+                .as_ref()
+                .unwrap()
+                .odf_manifest
+                .as_ref()
+                .unwrap()
+                .implementation,
+            "neutral"
+        );
+        let typed_case = Case::OdfManifestTypedEncrypted1;
+        let typed_corpus =
+            build_odf_manifest_corpus(typed_case.odf_manifest_spec().unwrap()).unwrap();
+        let typed = run_odf_manifest_scan(typed_case, &typed_corpus, 0, 1).unwrap();
+        let typed_manifest = typed
+            .source
+            .as_ref()
+            .unwrap()
+            .odf_manifest
+            .as_ref()
+            .unwrap();
+        assert_eq!(typed_manifest.implementation, "typed");
+        assert_eq!(typed_manifest.expected_entry_count, 1);
+        assert_eq!(typed_manifest.expected_encrypted_entry_count, 1);
+        assert!(typed_manifest.oracle_prepared_outside_timing);
+        assert_eq!(Case::DEFAULT.len(), 36);
     }
 
     #[test]
