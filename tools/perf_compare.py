@@ -495,9 +495,30 @@ def _unwrap_metric_vector(value: Any, path: str) -> Any:
     out of numeric traversal while retaining strict validation of malformed
     wrappers.
     """
-    if not isinstance(value, dict) or not {"status", "scope"} <= set(value):
+    if not isinstance(value, dict):
         return _METRIC_VECTOR_MISSING
-    unknown = set(value) - _METRIC_VECTOR_KEYS
+    keys = set(value)
+    has_values_or_scope = bool(keys & {"values", "scope"})
+    if not has_values_or_scope:
+        # Aggregate metric groups also carry a status field, so status alone
+        # is not enough to identify a wrapper. A valid MetricStatus with no
+        # other field is nevertheless a malformed wrapper-shaped object.
+        if (
+            keys == {"status"}
+            and isinstance(value["status"], str)
+            and value["status"] in _METRIC_VECTOR_STATUSES
+        ):
+            raise ComparisonInputError(
+                f"{path} has a partial MetricVector wrapper; "
+                "status and scope are required"
+            )
+        return _METRIC_VECTOR_MISSING
+    if not {"status", "scope"} <= keys:
+        missing = ", ".join(sorted({"status", "scope"} - keys))
+        raise ComparisonInputError(
+            f"{path} has a partial MetricVector wrapper; missing {missing}"
+        )
+    unknown = keys - _METRIC_VECTOR_KEYS
     if unknown:
         names = ", ".join(sorted(unknown))
         raise ComparisonInputError(
@@ -645,7 +666,16 @@ def _compare_metric_vector_metadata(
     baseline: dict[str, tuple[str, str]],
     current: dict[str, tuple[str, str]],
 ) -> None:
-    for path in sorted(set(baseline) & set(current)):
+    baseline_paths = set(baseline)
+    current_paths = set(current)
+    if baseline_paths != current_paths:
+        missing = sorted(baseline_paths - current_paths)
+        extra = sorted(current_paths - baseline_paths)
+        raise ComparisonInputError(
+            f"MetricVector path mismatch for {case!r}: "
+            f"missing_current={missing}, extra_current={extra}"
+        )
+    for path in sorted(baseline_paths):
         baseline_status, baseline_scope = baseline[path]
         current_status, current_scope = current[path]
         if baseline_scope != current_scope:
