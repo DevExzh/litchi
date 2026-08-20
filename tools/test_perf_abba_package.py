@@ -8,7 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from tools import perf_abba_package
+from tools import perf_abba_package, perf_abba_summary
+from tools.test_perf_abba_summary import four_legs
 
 
 ZSTD = shutil.which("zstd")
@@ -19,92 +20,11 @@ def canonical(value):
 
 
 def make_fixture():
-    reports = {}
-    for role, revision in (
-        ("a1", "control-revision"),
-        ("b1", "candidate-revision"),
-        ("b2", "candidate-revision"),
-        ("a2", "control-revision"),
-    ):
-        reports[role] = {
-            "schema_version": 1,
-            "leg": role,
-            "tool": {
-                "name": "litchi-perf-baseline",
-                "version": "0.1.0",
-                "profile": "release",
-                "target_os": "linux",
-                "target_arch": "x86_64",
-            },
-            "environment": {
-                "rustc_version": "rustc 1.95.0 (test)",
-                "git_revision": revision,
-                "git_worktree_dirty": False,
-            },
-            "configuration": {"samples_per_case": 15, "cases": ["fixture"]},
-            "results": [
-                {
-                    "case": "fixture",
-                    "corpus": {"name": "fixture", "shape": "tiny"},
-                    "elapsed_ns": {"samples": [1]},
-                }
-            ],
-        }
-    report_identity = {
-        role: {"canonical_sha256": hashlib.sha256(canonical(report)).hexdigest()}
-        for role, report in reports.items()
-    }
-    configuration = reports["a1"]["configuration"]
-    harness_tool = reports["a1"]["tool"]
-    summary = {
-        "schema_version": 1,
-        "tool": {"name": "litchi-perf-abba-summary", "version": "0.1.0"},
-        "protocol": {
-            "order": ["a1_control", "b1_candidate", "b2_candidate", "a2_control"]
-        },
-        "harness_identity": {
-            "schema_version": 1,
-            "tool": harness_tool,
-            "configuration": configuration,
-        },
-        "environment": {
-            "stable": {
-                "rustc_version": "rustc 1.95.0 (test)",
-                "git_worktree_dirty": False,
-            },
-            "legs": {
-                role: report["environment"] for role, report in reports.items()
-            },
-        },
-        "implementation_identity": {
-            "control": {"git_revision": "control-revision", "legs": ["a1", "a2"]},
-            "candidate": {
-                "git_revision": "candidate-revision",
-                "legs": ["b1", "b2"],
-            },
-            "distinct": True,
-        },
-        "report_identity": report_identity,
-        "results": [
-            {
-                "case": "fixture",
-                "corpus": {"name": "fixture", "shape": "tiny"},
-                "shape": "tiny",
-                "identity": {
-                    "corpus": canonical({"name": "fixture", "shape": "tiny"}).decode()
-                },
-            }
-        ],
-        "verification": {
-            "result_count": 1,
-            "tool_identity_verified": True,
-            "configuration_identity_verified": True,
-            "environment_stable_identity_verified": True,
-            "environment_legs_recorded": True,
-            "case_corpus_identity_verified": True,
-            "statistics_recomputed_from_samples": True,
-        },
-    }
+    roles = ("a1", "b1", "b2", "a2")
+    reports = dict(zip(roles, four_legs()))
+    summary = perf_abba_summary.summarize_reports(
+        [reports[role] for role in roles]
+    )
     return reports, summary
 
 
@@ -230,7 +150,7 @@ class PerfAbbaPackageTests(unittest.TestCase):
         summary_path.write_text(json.dumps(malformed), encoding="utf-8")
         output = self.root / "package"
         with self.assertRaisesRegex(
-            perf_abba_package.ArtifactPackagingError, "canonical SHA-256"
+            perf_abba_package.ArtifactPackagingError, "summary"
         ):
             perf_abba_package.package_artifacts(
                 change_id="0238",
@@ -290,22 +210,22 @@ class PerfAbbaPackageTests(unittest.TestCase):
 
     def test_cross_checks_report_schema_tool_configuration_environment_and_results(self):
         mutations = (
-            ("schema_version", lambda report: report.update(schema_version=2), "schema_version"),
-            ("tool", lambda report: report["tool"].update(version="other"), "tool identity"),
+            ("schema_version", lambda report: report.update(schema_version=2), "canonical"),
+            ("tool", lambda report: report["tool"].update(version="other"), "canonical"),
             (
                 "configuration",
                 lambda report: report["configuration"].update(cases=["different"]),
-                "configuration",
+                "canonical",
             ),
             (
                 "environment",
                 lambda report: report["environment"].update(git_revision="wrong"),
-                "environment",
+                "canonical",
             ),
             (
                 "results",
                 lambda report: report["results"][0]["corpus"].update(name="different"),
-                "case/corpus/shape",
+                "canonical",
             ),
         )
         for label, mutate, message in mutations:
@@ -328,7 +248,7 @@ class PerfAbbaPackageTests(unittest.TestCase):
         self.summary["implementation_identity"]["control"]["git_revision"] = "wrong"
         self.write_summary()
         with self.assertRaisesRegex(
-            perf_abba_package.ArtifactPackagingError, "implementation leg"
+            perf_abba_package.ArtifactPackagingError, "canonical"
         ):
             perf_abba_package.package_artifacts(
                 change_id="0238",
@@ -336,6 +256,23 @@ class PerfAbbaPackageTests(unittest.TestCase):
                 summary=self.summary_path,
                 artifacts=self.specs(),
             )
+
+    def test_rejects_full_summary_tamper_not_covered_by_report_bindings(self):
+        self.summary["results"][0]["elapsed_ns"]["candidate_reduction_percent"]["a1_to_b1"][
+            "p50"
+        ] = 999.0
+        self.write_summary()
+        output = self.root / "tampered-summary"
+        with self.assertRaisesRegex(
+            perf_abba_package.ArtifactPackagingError, "canonical ABBA"
+        ):
+            perf_abba_package.package_artifacts(
+                change_id="0238",
+                output_dir=output,
+                summary=self.summary_path,
+                artifacts=self.specs(),
+            )
+        self.assertFalse(output.exists())
 
     def test_rejects_reusing_one_raw_report_for_two_roles(self):
         # Re-encode the same JSON object with different bytes to ensure the
@@ -346,7 +283,10 @@ class PerfAbbaPackageTests(unittest.TestCase):
             json.dumps(self.reports["a1"], sort_keys=True, separators=(",", ":")).encode()
         )
         self.report_paths["a2"] = reused_path
-        self.summary["report_identity"]["a2"] = dict(self.summary["report_identity"]["a1"])
+        self.reports["a2"] = copy.deepcopy(self.reports["a1"])
+        self.summary = perf_abba_summary.summarize_reports(
+            [self.reports[role] for role in ("a1", "b1", "b2", "a2")]
+        )
         self.write_summary()
         with self.assertRaisesRegex(
             perf_abba_package.ArtifactPackagingError, "reused"
@@ -387,13 +327,24 @@ class PerfAbbaPackageTests(unittest.TestCase):
         real_write = perf_abba_package._write_exclusive
         call_count = 0
 
-        def fail_on_second_write(path, data, location):
+        def fail_on_second_write(directory_fd, name, data, location):
             nonlocal call_count
             call_count += 1
             if call_count == 2:
-                path.write_bytes(data[:1])
+                file_descriptor = perf_abba_package.os.open(
+                    name,
+                    perf_abba_package.os.O_WRONLY
+                    | perf_abba_package.os.O_CREAT
+                    | perf_abba_package.os.O_EXCL,
+                    mode=0o600,
+                    dir_fd=directory_fd,
+                )
+                try:
+                    perf_abba_package.os.write(file_descriptor, data[:1])
+                finally:
+                    perf_abba_package.os.close(file_descriptor)
                 raise OSError("injected write failure")
-            return real_write(path, data, location)
+            return real_write(directory_fd, name, data, location)
 
         with mock.patch.object(
             perf_abba_package, "_write_exclusive", side_effect=fail_on_second_write
@@ -411,7 +362,7 @@ class PerfAbbaPackageTests(unittest.TestCase):
 
     def test_mkdir_failure_removes_directories_created_before_the_failure(self):
         output = self.root / "mkdir-failure" / "nested"
-        real_mkdir = Path.mkdir
+        real_mkdir = perf_abba_package.os.mkdir
         call_count = 0
 
         def fail_on_second_mkdir(path, *args, **kwargs):
@@ -421,9 +372,11 @@ class PerfAbbaPackageTests(unittest.TestCase):
                 raise OSError("injected mkdir failure")
             return real_mkdir(path, *args, **kwargs)
 
-        with mock.patch.object(Path, "mkdir", autospec=True, side_effect=fail_on_second_mkdir):
+        with mock.patch.object(
+            perf_abba_package.os, "mkdir", side_effect=fail_on_second_mkdir
+        ):
             with self.assertRaisesRegex(
-                perf_abba_package.ArtifactPackagingError, "cannot create output directory"
+                perf_abba_package.ArtifactPackagingError, "cannot open output directory"
             ):
                 perf_abba_package.package_artifacts(
                     change_id="0238",
@@ -450,6 +403,35 @@ class PerfAbbaPackageTests(unittest.TestCase):
                 zstd_executable=fake_zstd,
             )
         self.assertFalse(output.exists())
+
+    def test_publication_stays_on_held_directory_after_path_swap(self):
+        output = self.root / "directory-race"
+        moved = self.root / "directory-race-original"
+        real_link = perf_abba_package.os.link
+        swapped = False
+
+        def swap_before_first_publish(source, destination, *args, **kwargs):
+            nonlocal swapped
+            if not swapped:
+                swapped = True
+                output.rename(moved)
+                output.mkdir()
+            return real_link(source, destination, *args, **kwargs)
+
+        with mock.patch.object(
+            perf_abba_package.os, "link", side_effect=swap_before_first_publish
+        ):
+            manifest = perf_abba_package.package_artifacts(
+                change_id="0238",
+                output_dir=output,
+                summary=self.summary_path,
+                artifacts=self.specs(),
+            )
+        self.assertEqual(list(output.iterdir()), [])
+        self.assertEqual(
+            json.loads((moved / manifest["manifest_path"]).read_text()), manifest
+        )
+        self.assertFalse(any(path.name.startswith(".0238.staging-") for path in moved.iterdir()))
 
     def test_rejects_output_directory_symlink(self):
         real_output = self.root / "real-output"

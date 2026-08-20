@@ -77,9 +77,9 @@ claim from an accepted statistic.
 The four raw reports and their strict summary can be packaged for archival
 with the standard-library-only `tools/perf_abba_package.py` helper. It invokes
 the external `zstd` executable in a deterministic single-threaded mode,
-retains raw JSON bytes, and refuses malformed summary bindings, duplicate
-ABBA roles, output overwrites, and output paths that escape the selected
-directory:
+retains raw JSON bytes, recomputes the complete summary with the canonical
+summary implementation, and refuses any summary tamper, duplicate ABBA role,
+output overwrite, or path escape. Output names are flat basenames:
 
 ```sh
 python3 tools/perf_abba_package.py \
@@ -101,7 +101,10 @@ inside the output directory and then published with exclusive hard links; a
 write, directory, or publication failure removes the staging directory and
 every file published by that invocation. Existing files are never replaced;
 use a fresh output directory for a rerun. For safety, the selected output
-directory itself may not be a symlink, and output names must remain below it.
+directory itself may not be a symlink. The directory is held open with
+`O_DIRECTORY|O_NOFOLLOW` for the complete transaction, and all publication and
+cleanup use descriptor-relative operations, so swapping its pathname cannot
+redirect the package.
 
 The native OLE2, DOCX/PPTX, RTF, and ODF semantic matrices are deliberately
 opt-in. They measure only current public APIs and therefore do not change the

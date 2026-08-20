@@ -2,10 +2,12 @@
 """Package strict ABBA JSON evidence into deterministic zstd artifacts.
 
 The ABBA summarizer emits a small, strict schema whose ``report_identity``
-section binds the canonical JSON hash of each of the four reports.  This tool
-keeps the reports byte-for-byte unchanged, validates those bindings, and
-stores each raw report as a deterministic single-threaded zstd frame.  The
-summary is retained as ordinary JSON so it can be read without a decompressor.
+section binds the canonical JSON hash of each of the four reports. This tool
+keeps the reports byte-for-byte unchanged, recomputes the complete summary
+with that canonical implementation, and requires the supplied summary to
+match it exactly before storing each raw report as a deterministic
+single-threaded zstd frame. The summary is retained as ordinary JSON so it can
+be read without a decompressor.
 
 Typical use from a clean checkout::
 
@@ -21,9 +23,11 @@ Typical use from a clean checkout::
 The output directory receives ``summary.json`` (unless it is already the
 same file), four ``*.json.zst`` files, and
 ``0238-perf-package-manifest.json``.  Output names can be overridden with
-``--summary-name`` and ``--artifact-name ROLE=NAME``.  All output paths are
-checked after symlink resolution and must remain below ``--output-dir``;
-existing output files are never replaced.
+``--summary-name`` and ``--artifact-name ROLE=NAME``; every output name must
+be a flat basename. The output directory is opened once with
+``O_DIRECTORY|O_NOFOLLOW`` and all staging, publication, and cleanup use its
+held descriptor, so a later pathname swap cannot redirect the package.
+Existing output files are never replaced.
 
 Only the standard library is required.  The external ``zstd`` executable is
 required for packaging and is invoked without a shell, with one compression
@@ -40,23 +44,25 @@ import json
 import math
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any, Iterable, Mapping, Sequence
 
+if __package__:
+    from . import perf_abba_summary
+else:  # pragma: no cover - exercised by the direct CLI entry point
+    import perf_abba_summary
+
 
 MANIFEST_SCHEMA_VERSION = 1
 MANIFEST_KIND = "litchi-perf-abba-artifacts"
-SUMMARY_SCHEMA_VERSION = 1
-SUMMARY_TOOL_NAME = "litchi-perf-abba-summary"
 ABBA_ROLES = ("a1", "b1", "b2", "a2")
 ZSTD_FORMAT = "zstd"
 ZSTD_DEFAULT_LEVEL = 3
-SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 CHANGE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 ROLE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
@@ -93,24 +99,26 @@ class _CompressedArtifact:
 
 
 @dataclass(frozen=True)
-class _SummaryBindings:
-    report_hashes: dict[str, str]
-    harness_schema_version: int
-    harness_tool: dict[str, Any]
-    harness_configuration: dict[str, Any]
-    environment_stable: dict[str, Any]
-    environment_legs: dict[str, dict[str, Any]]
-    control_revision: str
-    candidate_revision: str
-    result_keys: dict[tuple[str, str], str]
-
-
-@dataclass(frozen=True)
 class _ZstdIdentity:
     path: str
     version: str
     sha256: str
     bytes: int
+
+
+@dataclass(frozen=True)
+class _CreatedDirectory:
+    parent_fd: int
+    name: str
+    fd: int
+
+
+@dataclass(frozen=True)
+class _OpenedDirectory:
+    path: Path
+    fd: int
+    open_fds: tuple[int, ...]
+    created: tuple[_CreatedDirectory, ...]
 
 
 def _reject_nonfinite(value: str) -> None:
@@ -200,6 +208,33 @@ def load_json(path: Path) -> _RawJson:
     return _load_json_bytes(raw, str(path))
 
 
+def _recompute_summary(raw_reports: Sequence[_RawJson]) -> dict[str, Any]:
+    """Recompute the complete summary with the canonical summary implementation."""
+
+    try:
+        return perf_abba_summary.summarize_reports(
+            [raw_report.value for raw_report in raw_reports]
+        )
+    except Exception as error:
+        raise ArtifactPackagingError(
+            f"cannot recompute canonical ABBA summary: {error}"
+        ) from error
+
+
+def _require_canonical_summary(
+    supplied: _RawJson, raw_reports: Sequence[_RawJson]
+) -> dict[str, Any]:
+    """Require the supplied summary to equal the canonical recomputation exactly."""
+
+    recomputed = _recompute_summary(raw_reports)
+    recomputed_canonical = canonical_json(recomputed, "recomputed summary")
+    if supplied.canonical != recomputed_canonical:
+        raise ArtifactPackagingError(
+            "supplied summary does not exactly match canonical ABBA recomputation"
+        )
+    return recomputed
+
+
 def _object(value: Any, location: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ArtifactPackagingError(f"{location} must be an object")
@@ -211,261 +246,6 @@ def _string(value: Any, location: str, *, nonempty: bool = False) -> str:
         requirement = " non-empty" if nonempty else ""
         raise ArtifactPackagingError(f"{location} must be a{requirement} string")
     return value
-
-
-def _positive_integer(value: Any, location: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise ArtifactPackagingError(f"{location} must be a positive integer")
-    return value
-
-
-def _sha256(value: Any, location: str) -> str:
-    result = _string(value, location)
-    if SHA256_RE.fullmatch(result) is None:
-        raise ArtifactPackagingError(f"{location} must be a lowercase SHA-256 digest")
-    return result
-
-
-def _summary_report_identities(summary: dict[str, Any]) -> _SummaryBindings:
-    """Validate the strict summary envelope and return its report bindings."""
-
-    if summary.get("schema_version") != SUMMARY_SCHEMA_VERSION:
-        raise ArtifactPackagingError(
-            f"summary.schema_version must be {SUMMARY_SCHEMA_VERSION}"
-        )
-
-    summary_tool = _object(summary.get("tool"), "summary.tool")
-    if summary_tool.get("name") != SUMMARY_TOOL_NAME:
-        raise ArtifactPackagingError(
-            f"summary.tool.name must be {SUMMARY_TOOL_NAME!r}"
-        )
-    _string(summary_tool.get("version"), "summary.tool.version", nonempty=True)
-
-    harness = _object(summary.get("harness_identity"), "summary.harness_identity")
-    _positive_integer(harness.get("schema_version"), "summary.harness_identity.schema_version")
-    harness_tool = _object(harness.get("tool"), "summary.harness_identity.tool")
-    _string(harness_tool.get("name"), "summary.harness_identity.tool.name", nonempty=True)
-    _string(
-        harness_tool.get("version"),
-        "summary.harness_identity.tool.version",
-        nonempty=True,
-    )
-    harness_configuration = _object(
-        harness.get("configuration"), "summary.harness_identity.configuration"
-    )
-
-    implementation = _object(
-        summary.get("implementation_identity"), "summary.implementation_identity"
-    )
-    control = _object(implementation.get("control"), "summary.implementation_identity.control")
-    candidate = _object(
-        implementation.get("candidate"), "summary.implementation_identity.candidate"
-    )
-    control_revision = _string(
-        control.get("git_revision"),
-        "summary.implementation_identity.control.git_revision",
-        nonempty=True,
-    )
-    candidate_revision = _string(
-        candidate.get("git_revision"),
-        "summary.implementation_identity.candidate.git_revision",
-        nonempty=True,
-    )
-    if control_revision == candidate_revision:
-        raise ArtifactPackagingError(
-            "summary control and candidate git revisions must be distinct"
-        )
-    if implementation.get("distinct") is not True:
-        raise ArtifactPackagingError("summary.implementation_identity.distinct must be true")
-    if control.get("legs") != ["a1", "a2"]:
-        raise ArtifactPackagingError(
-            "summary.implementation_identity.control.legs must be ['a1', 'a2']"
-        )
-    if candidate.get("legs") != ["b1", "b2"]:
-        raise ArtifactPackagingError(
-            "summary.implementation_identity.candidate.legs must be ['b1', 'b2']"
-        )
-
-    report_identity = _object(summary.get("report_identity"), "summary.report_identity")
-    if set(report_identity) != set(ABBA_ROLES):
-        raise ArtifactPackagingError(
-            "summary.report_identity must contain exactly a1, b1, b2, and a2"
-        )
-    identities: dict[str, str] = {}
-    for role in ABBA_ROLES:
-        item = _object(report_identity.get(role), f"summary.report_identity.{role}")
-        identities[role] = _sha256(
-            item.get("canonical_sha256"),
-            f"summary.report_identity.{role}.canonical_sha256",
-        )
-
-    results = summary.get("results")
-    if not isinstance(results, list) or not results:
-        raise ArtifactPackagingError("summary.results must be a non-empty array")
-    result_keys: dict[tuple[str, str], str] = {}
-    for index, result in enumerate(results):
-        result_object = _object(result, f"summary.results[{index}]")
-        case = _string(result_object.get("case"), f"summary.results[{index}].case", nonempty=True)
-        corpus = _object(result_object.get("corpus"), f"summary.results[{index}].corpus")
-        shape = _string(
-            result_object.get("shape"),
-            f"summary.results[{index}].shape",
-            nonempty=True,
-        )
-        corpus_identity = canonical_json(corpus, f"summary.results[{index}].corpus").decode(
-            "utf-8"
-        )
-        if corpus.get("shape") != shape:
-            raise ArtifactPackagingError(
-                f"summary.results[{index}].shape disagrees with its corpus shape"
-            )
-        identity = _object(result_object.get("identity"), f"summary.results[{index}].identity")
-        if identity.get("corpus") != corpus_identity:
-            raise ArtifactPackagingError(
-                f"summary.results[{index}].identity.corpus disagrees with corpus"
-            )
-        key = (case, corpus_identity)
-        if key in result_keys:
-            raise ArtifactPackagingError(
-                f"summary.results contains duplicate case/corpus identity for {case!r}"
-            )
-        result_keys[key] = shape
-    verification = _object(summary.get("verification"), "summary.verification")
-    result_count = _positive_integer(
-        verification.get("result_count"), "summary.verification.result_count"
-    )
-    if result_count != len(results):
-        raise ArtifactPackagingError(
-            "summary.verification.result_count disagrees with summary.results"
-        )
-    for field in (
-        "tool_identity_verified",
-        "configuration_identity_verified",
-        "environment_stable_identity_verified",
-        "environment_legs_recorded",
-        "case_corpus_identity_verified",
-        "statistics_recomputed_from_samples",
-    ):
-        if verification.get(field) is not True:
-            raise ArtifactPackagingError(f"summary.verification.{field} must be true")
-
-    environment = _object(summary.get("environment"), "summary.environment")
-    environment_stable = _object(environment.get("stable"), "summary.environment.stable")
-    legs = _object(environment.get("legs"), "summary.environment.legs")
-    if set(legs) != set(ABBA_ROLES):
-        raise ArtifactPackagingError("summary.environment.legs must contain all ABBA roles")
-    for role in ABBA_ROLES:
-        _object(legs[role], f"summary.environment.legs.{role}")
-
-    protocol = _object(summary.get("protocol"), "summary.protocol")
-    order = protocol.get("order")
-    if order != ["a1_control", "b1_candidate", "b2_candidate", "a2_control"]:
-        raise ArtifactPackagingError("summary.protocol.order is not the strict ABBA order")
-
-    environment_legs = {
-        role: dict(legs[role])
-        for role in ABBA_ROLES
-    }
-    return _SummaryBindings(
-        report_hashes=identities,
-        harness_schema_version=harness["schema_version"],
-        harness_tool=dict(harness_tool),
-        harness_configuration=dict(harness_configuration),
-        environment_stable=dict(environment_stable),
-        environment_legs=environment_legs,
-        control_revision=control_revision,
-        candidate_revision=candidate_revision,
-        result_keys=result_keys,
-    )
-
-
-def _validate_raw_report(
-    raw_report: _RawJson,
-    role: str,
-    bindings: _SummaryBindings,
-) -> None:
-    """Cross-check every report identity used by the strict summary."""
-
-    report = raw_report.value
-    schema_version = report.get("schema_version")
-    if schema_version != bindings.harness_schema_version:
-        raise ArtifactPackagingError(
-            f"{role} report schema_version disagrees with summary.harness_identity"
-        )
-    report_tool = _object(report.get("tool"), f"{role}.tool")
-    if canonical_json(report_tool, f"{role}.tool") != canonical_json(
-        bindings.harness_tool, "summary.harness_identity.tool"
-    ):
-        raise ArtifactPackagingError(
-            f"{role} report tool identity disagrees with summary.harness_identity.tool"
-        )
-    report_configuration = _object(report.get("configuration"), f"{role}.configuration")
-    if canonical_json(report_configuration, f"{role}.configuration") != canonical_json(
-        bindings.harness_configuration, "summary.harness_identity.configuration"
-    ):
-        raise ArtifactPackagingError(
-            f"{role} report configuration disagrees with summary.harness_identity.configuration"
-        )
-
-    report_environment = _object(report.get("environment"), f"{role}.environment")
-    expected_environment = bindings.environment_legs[role]
-    if canonical_json(report_environment, f"{role}.environment") != canonical_json(
-        expected_environment, f"summary.environment.legs.{role}"
-    ):
-        raise ArtifactPackagingError(
-            f"{role} report environment disagrees with summary.environment.legs"
-        )
-    expected_revision = (
-        bindings.control_revision if role in ("a1", "a2") else bindings.candidate_revision
-    )
-    if report_environment.get("git_revision") != expected_revision:
-        raise ArtifactPackagingError(
-            f"{role} report git_revision does not match its summary implementation leg"
-        )
-    if report_environment.get("git_worktree_dirty") is not False:
-        raise ArtifactPackagingError(f"{role} report git_worktree_dirty must be false")
-    stable_environment = {
-        key: value for key, value in report_environment.items() if key != "git_revision"
-    }
-    if canonical_json(stable_environment, f"{role}.environment") != canonical_json(
-        bindings.environment_stable, "summary.environment.stable"
-    ):
-        raise ArtifactPackagingError(
-            f"{role} report stable environment disagrees with summary.environment.stable"
-        )
-
-    report_results = report.get("results")
-    if not isinstance(report_results, list) or not report_results:
-        raise ArtifactPackagingError(f"{role}.results must be a non-empty array")
-    observed_keys: dict[tuple[str, str], str] = {}
-    for index, result in enumerate(report_results):
-        result_object = _object(result, f"{role}.results[{index}]")
-        case = _string(result_object.get("case"), f"{role}.results[{index}].case", nonempty=True)
-        corpus = _object(result_object.get("corpus"), f"{role}.results[{index}].corpus")
-        shape = _string(
-            corpus.get("shape"), f"{role}.results[{index}].corpus.shape", nonempty=True
-        )
-        corpus_identity = canonical_json(corpus, f"{role}.results[{index}].corpus").decode(
-            "utf-8"
-        )
-        key = (case, corpus_identity)
-        if key in observed_keys:
-            raise ArtifactPackagingError(
-                f"{role}.results contains duplicate case/corpus identity for {case!r}"
-            )
-        observed_keys[key] = shape
-    if observed_keys != bindings.result_keys:
-        missing = sorted(set(bindings.result_keys) - set(observed_keys))
-        extra = sorted(set(observed_keys) - set(bindings.result_keys))
-        raise ArtifactPackagingError(
-            f"{role}.results case/corpus/shape identity disagrees with summary "
-            f"(missing={missing!r}, extra={extra!r})"
-        )
-    for key, shape in observed_keys.items():
-        if bindings.result_keys[key] != shape:
-            raise ArtifactPackagingError(
-                f"{role}.results shape disagrees with summary for {key[0]!r}"
-            )
 
 
 def _normalize_role(role: str) -> str:
@@ -542,29 +322,23 @@ def _coerce_specs(
     return tuple(sorted(specs, key=lambda spec: ABBA_ROLES.index(spec.role)))
 
 
-def _path_exists(path: Path) -> bool:
-    # Path.exists() is false for a broken symlink.  A broken symlink is still
-    # an existing destination and must not be replaced by this tool.
-    return os.path.lexists(path)
+def _flat_basename(name: str, location: str) -> str:
+    """Validate an output name that can be used with a held directory fd."""
 
-
-def _resolved_output_path(root: Path, relative_name: str, location: str) -> tuple[Path, str]:
-    if not isinstance(relative_name, str) or not relative_name:
-        raise ArtifactPackagingError(f"{location} must be a non-empty relative path")
-    if "\\" in relative_name:
-        raise ArtifactPackagingError(f"{location} must use '/' path separators")
-    relative = PurePath(relative_name)
-    if relative.is_absolute():
-        raise ArtifactPackagingError(f"{location} must not be absolute")
-    candidate = (root / Path(relative_name)).resolve(strict=False)
-    try:
-        candidate.relative_to(root)
-    except ValueError as error:
-        raise ArtifactPackagingError(f"{location} escapes output directory") from error
-    normalized = candidate.relative_to(root).as_posix()
-    if normalized in ("", "."):
-        raise ArtifactPackagingError(f"{location} must identify a file")
-    return candidate, normalized
+    if not isinstance(name, str) or not name:
+        raise ArtifactPackagingError(f"{location} must be a non-empty basename")
+    path = PurePath(name)
+    if (
+        name in (".", "..")
+        or "/" in name
+        or "\\" in name
+        or path.is_absolute()
+        or path.name != name
+    ):
+        raise ArtifactPackagingError(
+            f"{location} escapes or nests below the output directory; use a flat basename"
+        )
+    return name
 
 
 def _default_artifact_name(source: Path) -> str:
@@ -667,71 +441,219 @@ def _resolve_zstd_identity(executable: str | os.PathLike[str]) -> _ZstdIdentity:
     )
 
 
-def _write_exclusive(path: Path, data: bytes, location: str) -> None:
+def _directory_open_flags() -> int:
+    required = ("O_DIRECTORY", "O_NOFOLLOW")
+    if any(not hasattr(os, name) for name in required):
+        raise ArtifactPackagingError(
+            "safe artifact publication requires O_DIRECTORY and O_NOFOLLOW"
+        )
+    return (
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+
+
+def _close_fd(file_descriptor: int) -> None:
+    if file_descriptor < 0:
+        return
     try:
-        with path.open("xb") as handle:
-            handle.write(data)
-    except FileExistsError as error:
-        raise ArtifactPackagingError(f"refusing to overwrite {location}: {path}") from error
-    except OSError as error:
-        raise ArtifactPackagingError(f"cannot write {location} {path}: {error}") from error
+        os.close(file_descriptor)
+    except OSError:
+        pass
 
 
-def _ensure_directory(path: Path) -> list[Path]:
-    """Create a directory and return only directories created by this call."""
+def _cleanup_created_directories(opened: _OpenedDirectory) -> None:
+    """Remove only directories created while opening the output path."""
 
-    path = Path(path)
-    if _path_exists(path):
-        if path.is_symlink() or not path.is_dir():
-            raise ArtifactPackagingError(f"output parent is not a directory: {path}")
-        return []
-    missing: list[Path] = []
-    current = path
-    while not _path_exists(current):
-        missing.append(current)
-        parent = current.parent
-        if parent == current:
-            raise ArtifactPackagingError(f"cannot find parent for output directory: {path}")
-        current = parent
-    if current.is_symlink() or not current.is_dir():
-        raise ArtifactPackagingError(f"output parent is not a directory: {current}")
-    created: list[Path] = []
+    for created in reversed(opened.created):
+        _close_fd(created.fd)
+        try:
+            os.rmdir(created.name, dir_fd=created.parent_fd)
+        except OSError:
+            pass
+    for file_descriptor in reversed(opened.open_fds):
+        _close_fd(file_descriptor)
+
+
+def _close_opened_directory(opened: _OpenedDirectory) -> None:
+    for file_descriptor in reversed(opened.open_fds):
+        _close_fd(file_descriptor)
+
+
+def _open_output_directory(path: Path) -> _OpenedDirectory:
+    """Open/create an output directory with every component no-followed."""
+
+    flags = _directory_open_flags()
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    file_descriptors: list[int] = []
+    created: list[_CreatedDirectory] = []
     try:
-        for directory in reversed(missing):
-            directory.mkdir()
-            created.append(directory)
-    except OSError as error:
-        for directory in reversed(created):
+        current_fd = os.open(os.sep, flags)
+        file_descriptors.append(current_fd)
+        for component in absolute.parts[1:]:
+            created_by_call = False
             try:
-                directory.rmdir()
+                child_fd = os.open(component, flags, dir_fd=current_fd)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(component, mode=0o700, dir_fd=current_fd)
+                    created_by_call = True
+                except FileExistsError:
+                    pass
+                try:
+                    child_fd = os.open(component, flags, dir_fd=current_fd)
+                except OSError:
+                    if created_by_call:
+                        try:
+                            os.rmdir(component, dir_fd=current_fd)
+                        except OSError:
+                            pass
+                    raise
+            if created_by_call:
+                created.append(_CreatedDirectory(current_fd, component, child_fd))
+            file_descriptors.append(child_fd)
+            current_fd = child_fd
+    except OSError as error:
+        partial = _OpenedDirectory(
+            absolute,
+            current_fd if file_descriptors else -1,
+            tuple(file_descriptors),
+            tuple(created),
+        )
+        _cleanup_created_directories(partial)
+        raise ArtifactPackagingError(
+            f"cannot open output directory {absolute}: {error}"
+        ) from error
+    return _OpenedDirectory(absolute, current_fd, tuple(file_descriptors), tuple(created))
+
+
+def _entry_exists(directory_fd: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    except OSError as error:
+        raise ArtifactPackagingError(f"cannot inspect output entry {name}: {error}") from error
+    return True
+
+
+def _write_exclusive(
+    directory_fd: int,
+    name: str,
+    data: bytes,
+    location: str,
+) -> None:
+    """Write one exclusive file relative to a held directory descriptor."""
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    file_descriptor = -1
+    created = False
+    success = False
+    try:
+        file_descriptor = os.open(name, flags, mode=0o600, dir_fd=directory_fd)
+        created = True
+        handle = os.fdopen(file_descriptor, "wb")
+        file_descriptor = -1
+        with handle:
+            handle.write(data)
+        success = True
+    except FileExistsError as error:
+        raise ArtifactPackagingError(f"refusing to overwrite {location}: {name}") from error
+    except OSError as error:
+        raise ArtifactPackagingError(f"cannot write {location} {name}: {error}") from error
+    finally:
+        _close_fd(file_descriptor)
+        if created and not success:
+            try:
+                os.unlink(name, dir_fd=directory_fd)
             except OSError:
                 pass
-        raise ArtifactPackagingError(f"cannot create output directory {path}: {error}") from error
-    return created
 
 
-def _publish_exclusive(staged: Path, destination: Path, location: str) -> None:
-    """Publish a staged file without replacing a destination.
+def _create_staging_directory(root_fd: int, change: str) -> tuple[str, int]:
+    flags = _directory_open_flags()
+    for _ in range(128):
+        name = f".{change}.staging-{secrets.token_hex(16)}"
+        try:
+            os.mkdir(name, mode=0o700, dir_fd=root_fd)
+        except FileExistsError:
+            continue
+        except OSError as error:
+            raise ArtifactPackagingError(
+                f"cannot create staging directory in output directory: {error}"
+            ) from error
+        try:
+            return name, os.open(name, flags, dir_fd=root_fd)
+        except OSError as error:
+            try:
+                os.rmdir(name, dir_fd=root_fd)
+            except OSError:
+                pass
+            raise ArtifactPackagingError(
+                f"cannot open staging directory in output directory: {error}"
+            ) from error
+    raise ArtifactPackagingError("cannot create a unique staging directory")
 
-    The staging hard link remains until the caller removes the whole private
-    staging directory.  Keeping that cleanup in one place means a successful
-    link is always tracked by the caller before any later cleanup can fail.
-    """
+
+def _publish_exclusive(
+    staged_fd: int,
+    staged_name: str,
+    root_fd: int,
+    destination_name: str,
+    location: str,
+) -> None:
+    """Publish one staged file using only held directory descriptors."""
 
     try:
-        os.link(os.fspath(staged), os.fspath(destination))
+        os.link(
+            staged_name,
+            destination_name,
+            src_dir_fd=staged_fd,
+            dst_dir_fd=root_fd,
+            follow_symlinks=False,
+        )
     except FileExistsError as error:
         raise ArtifactPackagingError(
-            f"refusing to overwrite {location}: {destination}"
+            f"refusing to overwrite {location}: {destination_name}"
         ) from error
     except OSError as error:
-        raise ArtifactPackagingError(f"cannot publish {location} {destination}: {error}") from error
+        raise ArtifactPackagingError(
+            f"cannot publish {location} {destination_name}: {error}"
+        ) from error
 
 
-def _remove_empty_directories(directories: Iterable[Path]) -> None:
-    for directory in reversed(tuple(directories)):
+def _remove_staging_directory(
+    root_fd: int,
+    stage_name: str,
+    stage_fd: int,
+    staged_names: Iterable[str],
+) -> None:
+    errors: list[OSError] = []
+    for name in reversed(tuple(staged_names)):
         try:
-            directory.rmdir()
+            os.unlink(name, dir_fd=stage_fd)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            errors.append(error)
+    try:
+        os.rmdir(stage_name, dir_fd=root_fd)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        errors.append(error)
+    if errors:
+        raise ArtifactPackagingError(
+            f"cannot remove staging directory {stage_name}: {errors[0]}"
+        ) from errors[0]
+
+
+def _remove_published(root_fd: int, names: Iterable[str]) -> None:
+    for name in reversed(tuple(names)):
+        try:
+            os.unlink(name, dir_fd=root_fd)
         except OSError:
             pass
 
@@ -832,31 +754,24 @@ def package_artifacts(
             f"artifact names contain unknown role(s): {', '.join(sorted(unknown_names))}"
         )
 
-    root = Path(output_dir).expanduser().resolve(strict=False)
-    if _path_exists(root) and not root.is_dir():
-        raise ArtifactPackagingError(f"output directory is not a directory: {root}")
     raw_output_dir = Path(output_dir).expanduser()
-    if _path_exists(raw_output_dir) and raw_output_dir.is_symlink():
+    root = Path(os.path.abspath(os.fspath(raw_output_dir)))
+    if os.path.lexists(raw_output_dir) and raw_output_dir.is_symlink():
         raise ArtifactPackagingError("output directory must not be a symlink")
 
     summary_path = Path(summary)
     summary_json = load_json(summary_path)
-    summary_bindings = _summary_report_identities(summary_json.value)
+    raw_reports = [load_json(spec.source) for spec in specs]
+    recomputed_summary = _require_canonical_summary(summary_json, raw_reports)
     zstd_identity = _resolve_zstd_identity(zstd_executable)
 
     compressed: list[_CompressedArtifact] = []
-    destination_names: list[tuple[str, Path, str]] = []
+    destination_names: list[tuple[str, str]] = []
     seen_raw_hashes: dict[str, str] = {}
     seen_canonical_hashes: dict[str, str] = {}
     seen_source_paths: dict[Path, str] = {}
-    for spec in specs:
-        raw_report = load_json(spec.source)
-        _validate_raw_report(raw_report, spec.role, summary_bindings)
-        expected = summary_bindings.report_hashes[spec.role]
-        if raw_report.canonical_sha256 != expected:
-            raise ArtifactPackagingError(
-                f"{spec.role} report canonical SHA-256 does not match summary.report_identity"
-            )
+    report_by_role = dict(zip((spec.role for spec in specs), raw_reports))
+    for spec, raw_report in zip(specs, raw_reports):
         previous_role = seen_raw_hashes.get(raw_report.raw_sha256)
         if previous_role is not None:
             raise ArtifactPackagingError(
@@ -885,15 +800,13 @@ def package_artifacts(
         )
         if not output_name.endswith(".zst"):
             output_name = f"{output_name}.zst"
-        destination, relative = _resolved_output_path(
-            root, output_name, f"artifact {spec.role} output name"
-        )
-        destination_names.append((spec.role, destination, relative))
+        destination_name = _flat_basename(output_name, f"artifact {spec.role} output name")
+        destination_names.append((spec.role, destination_name))
         compressed.append(
             _CompressedArtifact(
                 role=spec.role,
                 source=spec.source,
-                output_name=relative,
+                output_name=destination_name,
                 raw=raw_report,
                 compressed=compress_zstd(
                     raw_report.raw,
@@ -903,46 +816,34 @@ def package_artifacts(
             )
         )
 
-    if len({destination for _, destination, _ in destination_names}) != len(destination_names):
+    if len({destination for _, destination in destination_names}) != len(destination_names):
         raise ArtifactPackagingError("artifact output names must be unique")
 
     requested_summary_name = summary_path.name if summary_name is None else summary_name
-    summary_destination, summary_relative = _resolved_output_path(
-        root, requested_summary_name, "summary output name"
-    )
+    summary_name = _flat_basename(requested_summary_name, "summary output name")
     requested_manifest_name = (
         f"{change}-manifest.json" if manifest_name is None else manifest_name
     )
-    manifest_destination, manifest_relative = _resolved_output_path(
-        root, requested_manifest_name, "manifest output name"
-    )
+    manifest_name = _flat_basename(requested_manifest_name, "manifest output name")
 
-    all_destinations = [destination for _, destination, _ in destination_names]
-    all_destinations.extend((summary_destination, manifest_destination))
+    all_destinations = [destination for _, destination in destination_names]
+    all_destinations.extend((summary_name, manifest_name))
     if len(set(all_destinations)) != len(all_destinations):
         raise ArtifactPackagingError("artifact, summary, and manifest output names must be unique")
-    summary_source_resolved = summary_path.resolve(strict=False)
-    summary_copy_needed = summary_source_resolved != summary_destination
-    for role, destination, _ in destination_names:
-        if _path_exists(destination):
-            raise ArtifactPackagingError(
-                f"refusing to overwrite artifact {role} at {destination}"
-            )
-    if summary_copy_needed and _path_exists(summary_destination):
-        raise ArtifactPackagingError(f"refusing to overwrite summary at {summary_destination}")
-    if _path_exists(manifest_destination):
-        raise ArtifactPackagingError(f"refusing to overwrite manifest at {manifest_destination}")
 
     summary_identity = {
-        "path": summary_relative,
+        "path": summary_name,
         "bytes": len(summary_json.raw),
         "sha256": summary_json.raw_sha256,
         "canonical_bytes": len(summary_json.canonical),
         "canonical_sha256": summary_json.canonical_sha256,
-        "schema_version": summary_json.value["schema_version"],
-        "tool": dict(_object(summary_json.value["tool"], "summary.tool")),
-        "result_count": summary_json.value["verification"]["result_count"],
-        "report_identity": dict(summary_bindings.report_hashes),
+        "schema_version": recomputed_summary["schema_version"],
+        "tool": dict(_object(recomputed_summary["tool"], "summary.tool")),
+        "result_count": recomputed_summary["verification"]["result_count"],
+        "report_identity": {
+            role: {"canonical_sha256": report_by_role[role].canonical_sha256}
+            for role in ABBA_ROLES
+        },
     }
     artifact_entries: list[dict[str, Any]] = []
     for item in compressed:
@@ -970,64 +871,102 @@ def package_artifacts(
             "bytes": zstd_identity.bytes,
         },
     )
-    manifest["manifest_path"] = manifest_relative
+    manifest["manifest_path"] = manifest_name
 
-    created_directories: list[Path] = []
-    published: list[Path] = []
-    stage_directory: Path | None = None
+    opened: _OpenedDirectory | None = None
+    stage_name: str | None = None
+    stage_fd = -1
+    staged_names: list[str] = []
+    published: list[str] = []
     try:
-        created_directories.extend(_ensure_directory(root))
-        try:
-            stage_directory = Path(
-                tempfile.mkdtemp(prefix=f".{change}.staging-", dir=root)
-            )
-        except OSError as error:
-            raise ArtifactPackagingError(
-                f"cannot create staging directory in {root}: {error}"
-            ) from error
+        opened = _open_output_directory(root)
+        root_fd = opened.fd
+        for role, destination_name in destination_names:
+            if _entry_exists(root_fd, destination_name):
+                raise ArtifactPackagingError(
+                    f"refusing to overwrite artifact {role} at {destination_name}"
+                )
+        if _entry_exists(root_fd, manifest_name):
+            raise ArtifactPackagingError(f"refusing to overwrite manifest at {manifest_name}")
 
-        staged_artifacts: list[tuple[_CompressedArtifact, Path, Path]] = []
-        for index, item in enumerate(compressed):
-            staged = stage_directory / f"artifact-{index:02d}.json.zst"
-            _write_exclusive(staged, item.compressed, f"staged artifact {item.role}")
-            staged_artifacts.append((item, staged, destination_names[index][1]))
-        staged_summary: tuple[Path, Path] | None = None
-        if summary_copy_needed:
-            staged = stage_directory / "summary.json"
-            _write_exclusive(staged, summary_json.raw, "staged summary")
-            staged_summary = (staged, summary_destination)
-        staged_manifest = stage_directory / "manifest.json"
-        _write_exclusive(staged_manifest, _manifest_bytes(manifest), "staged manifest")
-
-        for item, staged, destination in staged_artifacts:
-            created_directories.extend(_ensure_directory(destination.parent))
-            _publish_exclusive(staged, destination, f"artifact {item.role}")
-            published.append(destination)
-        if staged_summary is not None:
-            staged, destination = staged_summary
-            created_directories.extend(_ensure_directory(destination.parent))
-            _publish_exclusive(staged, destination, "summary")
-            published.append(destination)
-        created_directories.extend(_ensure_directory(manifest_destination.parent))
-        _publish_exclusive(staged_manifest, manifest_destination, "manifest")
-        published.append(manifest_destination)
-    except BaseException as error:
-        for path in reversed(published):
+        summary_copy_needed = True
+        if _entry_exists(root_fd, summary_name):
             try:
-                path.unlink()
-            except OSError:
-                pass
-        if stage_directory is not None:
-            shutil.rmtree(stage_directory, ignore_errors=True)
-        _remove_empty_directories(created_directories)
+                summary_stat = os.stat(summary_path, follow_symlinks=True)
+                destination_stat = os.stat(
+                    summary_name, dir_fd=root_fd, follow_symlinks=False
+                )
+            except OSError as error:
+                raise ArtifactPackagingError(
+                    f"cannot compare existing summary destination {summary_name}: {error}"
+                ) from error
+            if (
+                summary_stat.st_dev == destination_stat.st_dev
+                and summary_stat.st_ino == destination_stat.st_ino
+            ):
+                summary_copy_needed = False
+            else:
+                raise ArtifactPackagingError(
+                    f"refusing to overwrite summary at {summary_name}"
+                )
+
+        stage_name, stage_fd = _create_staging_directory(root_fd, change)
+
+        for index, item in enumerate(compressed):
+            staged = f"artifact-{index:02d}.json.zst"
+            staged_names.append(staged)
+            _write_exclusive(stage_fd, staged, item.compressed, f"staged artifact {item.role}")
+        if summary_copy_needed:
+            staged = "summary.json"
+            staged_names.append(staged)
+            _write_exclusive(stage_fd, staged, summary_json.raw, "staged summary")
+        staged_manifest = "manifest.json"
+        staged_names.append(staged_manifest)
+        _write_exclusive(stage_fd, staged_manifest, _manifest_bytes(manifest), "staged manifest")
+
+        for index, (item, (_, destination_name)) in enumerate(
+            zip(compressed, destination_names)
+        ):
+            staged = f"artifact-{index:02d}.json.zst"
+            _publish_exclusive(
+                stage_fd, staged, root_fd, destination_name, f"artifact {item.role}"
+            )
+            published.append(destination_name)
+        if summary_copy_needed:
+            _publish_exclusive(stage_fd, "summary.json", root_fd, summary_name, "summary")
+            published.append(summary_name)
+        _publish_exclusive(stage_fd, staged_manifest, root_fd, manifest_name, "manifest")
+        published.append(manifest_name)
+
+        _remove_staging_directory(root_fd, stage_name, stage_fd, staged_names)
+        _close_fd(stage_fd)
+        stage_fd = -1
+        stage_name = None
+    except BaseException as error:
+        if opened is not None:
+            _remove_published(opened.fd, published)
+            if stage_name is not None and stage_fd >= 0:
+                try:
+                    _remove_staging_directory(
+                        opened.fd, stage_name, stage_fd, staged_names
+                    )
+                except ArtifactPackagingError:
+                    pass
+                finally:
+                    _close_fd(stage_fd)
+                stage_fd = -1
+            _cleanup_created_directories(opened)
+            opened = None
         if isinstance(error, ArtifactPackagingError):
             raise
         if isinstance(error, OSError):
             raise ArtifactPackagingError(f"artifact publication failed: {error}") from error
         raise
     finally:
-        if stage_directory is not None and stage_directory.exists():
-            shutil.rmtree(stage_directory, ignore_errors=True)
+        if stage_fd >= 0:
+            _close_fd(stage_fd)
+        if opened is not None:
+            _close_opened_directory(opened)
     return manifest
 
 
