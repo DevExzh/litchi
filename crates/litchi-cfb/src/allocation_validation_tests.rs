@@ -7,14 +7,22 @@
 use std::io::Cursor;
 
 use crate::consts::{
-    DIRENTRY_SIZE, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET, NUM_FAT_SECTORS_OFFSET,
-    SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3,
+    DIRENTRY_SIZE, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET, MAXREGSECT,
+    NUM_FAT_SECTORS_OFFSET, SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3,
 };
 use crate::{OleFile, writer::OleWriter};
 
 fn sample_file() -> Vec<u8> {
     let mut writer = OleWriter::new();
     writer.create_stream(&["Data"], b"payload").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn mini_stream_file() -> Vec<u8> {
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Data"], &[0u8; 128]).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.into_inner()
@@ -68,6 +76,35 @@ fn rejects_incorrect_minifat_sector_count() {
     assert!(count > 0, "sample must contain a MiniFAT");
     write_u32(&mut bytes, 0x40, count + 1);
     assert!(OleFile::open(Cursor::new(bytes)).is_err());
+}
+
+#[test]
+fn open_rejects_minifat_cycles_and_invalid_markers() {
+    fn corrupt_first_data_mini_sector(bytes: &mut [u8], next: u32) {
+        let directory_sector = read_u32(bytes, 0x30) as usize;
+        let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
+        let mini_start = read_u32(bytes, data_entry + 116) as usize;
+        let minifat_sector = read_u32(bytes, 0x3c) as usize;
+        let entry = (minifat_sector + 1) * SECTOR_SIZE_V3 + mini_start * 4;
+        write_u32(bytes, entry, next);
+    }
+
+    let mut cycle = mini_stream_file();
+    let directory_sector = read_u32(&cycle, 0x30) as usize;
+    let data_entry = (directory_sector + 1) * SECTOR_SIZE_V3 + DIRENTRY_SIZE;
+    let mini_start = read_u32(&cycle, data_entry + 116);
+    corrupt_first_data_mini_sector(&mut cycle, mini_start);
+    assert!(matches!(
+        OleFile::open(Cursor::new(cycle)),
+        Err(crate::OleError::CorruptedFile(message)) if message.contains("Cycle detected")
+    ));
+
+    let mut invalid_marker = mini_stream_file();
+    corrupt_first_data_mini_sector(&mut invalid_marker, MAXREGSECT);
+    assert!(matches!(
+        OleFile::open(Cursor::new(invalid_marker)),
+        Err(crate::OleError::CorruptedFile(message)) if message.contains("Invalid sector marker")
+    ));
 }
 
 #[test]
