@@ -133,8 +133,9 @@ Two additional high-level XLSX bytes selectors (`xlsx_bytes_open` and
 over the deterministic medium cell-CRUD corpus. The first times exactly the
 bytes facade construction; the lifecycle selector times that construction plus
 worksheet names, count, and full text. An untimed typed eager
-`litchi_xlsx::Workbook` semantic projection, archive SHA-256, and umbrella
-projection/metadata checks guard each case. These selectors bring the
+`litchi_xlsx::Workbook` semantic projection (including names, count, and full
+text), archive SHA-256, and independently opened eager OPC/property metadata
+digest guard each case. These selectors bring the
 selectable matrix to 343 names while leaving the default 36 cases / 198
 records unchanged.
 Eight additional
