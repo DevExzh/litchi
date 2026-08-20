@@ -5,6 +5,8 @@ Date: 2026-08-21
 Status: LANDED on the listed cells after the strict allocator/resource
 guardrail accepted both ABBA pairings; no broad XLSX claim is made
 
+Claim registry ID: `claim-0251-xlsx-xml-borrowed`
+
 ## Evidence-package identity
 
 The independently audited package is retained outside the repository at

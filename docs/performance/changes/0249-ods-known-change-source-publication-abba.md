@@ -5,6 +5,8 @@ Date: 2026-08-21
 Status: rejected on latency evidence; the production candidate is retained for
 future study only, with no broad ODS claim
 
+Claim registry ID: `claim-0249-ods-known-change`
+
 ## Evidence-package identity
 
 The independently audited package is retained outside the repository at
