@@ -23,6 +23,11 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+try:
+    from . import perf_compare
+except ImportError:  # pragma: no cover - exercised by direct script execution
+    import perf_compare
+
 
 SCHEMA_VERSION = 1
 HARNESS_SCHEMA_VERSION = 1
@@ -91,6 +96,57 @@ DEFAULT_DRIFT_CEILINGS: dict[str, float] = {
     "p95": 10.0,
     "p99": 15.0,
 }
+
+_MISSING = object()
+_FILESYSTEM_EVIDENCE_KEYS = frozenset(
+    {
+        "case",
+        "corpus",
+        "warmup_iterations",
+        "sample_count",
+        "cache_states",
+        "fresh_child_per_sample",
+        "samples",
+        "cfb_owned",
+        "tool",
+        "configuration",
+        "config",
+    }
+)
+_FILESYSTEM_SAMPLE_KEYS = frozenset(
+    {
+        "sample_index",
+        "cache_state",
+        "elapsed_ns",
+        "parent_wall_ns",
+        "cold_advice",
+        "logical_read_counter_scope",
+        "logical_read_calls",
+        "logical_read_requested_bytes",
+        "logical_read_bytes",
+        "max_concurrent_reads",
+        "logical_read_request_sizes",
+        "logical_read_request_size_buckets",
+        "process_metrics",
+        "output_sha256",
+        "output_bytes",
+        "opc_materialized_parts",
+        "cfb_changed_spans",
+        "cfb_published_bytes",
+        "cfb_phases",
+        "pptx_source_replay",
+        "docx_source_replay",
+    }
+)
+_FILESYSTEM_SAMPLE_IDENTITY_KEYS = frozenset(
+    {
+        "sample_index",
+        "cache_state",
+        "cold_advice",
+        "logical_read_counter_scope",
+        "output_sha256",
+    }
+)
 
 
 class AbbaSummaryInputError(ValueError):
@@ -444,6 +500,396 @@ def _validate_configuration(configuration: dict[str, Any], label: str) -> None:
         )
 
 
+def _operation_metrics_identity_projection(value: Any) -> Any:
+    """Remove candidate-sensitive vector values while retaining their shape."""
+
+    if isinstance(value, dict):
+        keys = set(value)
+        if {"status", "scope"} <= keys <= {"status", "scope", "values"}:
+            return {
+                "status": value["status"],
+                "scope": value["scope"],
+                "values": (
+                    "null"
+                    if "values" in value and value["values"] is None
+                    else "present"
+                    if "values" in value
+                    else "absent"
+                ),
+            }
+        return {
+            key: _operation_metrics_identity_projection(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_operation_metrics_identity_projection(item) for item in value]
+    return value
+
+
+def _operation_metrics_identity(
+    row: dict[str, Any], location: str, report_schema: int
+) -> str | None:
+    if "operation_metrics" not in row:
+        return None
+    operation_metrics = row["operation_metrics"]
+    if operation_metrics is None:
+        raise AbbaSummaryInputError(f"{location}.operation_metrics must be omitted or an object")
+    elapsed = _require_object(row.get("elapsed_ns"), f"{location}.elapsed_ns")
+    samples = elapsed.get("samples")
+    if not isinstance(samples, list):
+        raise AbbaSummaryInputError(f"{location}.elapsed_ns.samples must be a list")
+    try:
+        # Keep the comparator's exact schema validator as the single source of
+        # truth for operation-metrics keys, statuses, scopes, and vectors.
+        perf_compare._validate_operation_metrics(
+            operation_metrics,
+            f"{location}.operation_metrics",
+            len(samples),
+            report_schema,
+        )
+    except perf_compare.ComparisonInputError as error:
+        raise AbbaSummaryInputError(str(error)) from error
+    projected = _operation_metrics_identity_projection(operation_metrics)
+    return _canonical_json(projected, f"{location}.operation_metrics.identity")
+
+
+def _compare_operation_metrics_identity(
+    rows: Mapping[str, dict[str, Any]], location: str, report_schema: int
+) -> tuple[str, str | None]:
+    identities = {
+        label: _operation_metrics_identity(rows[label], f"{label}.{location}", report_schema)
+        for label in LEG_ORDER
+    }
+    present = {identity is not None for identity in identities.values()}
+    if len(present) != 1:
+        raise AbbaSummaryInputError(
+            f"{location} operation_metrics presence differs between ABBA legs"
+        )
+    expected = identities["a1"]
+    if expected is None:
+        return "consistently_absent", None
+    if any(identity != expected for identity in identities.values()):
+        raise AbbaSummaryInputError(
+            f"{location} operation_metrics identity differs between ABBA legs"
+        )
+    return "verified_equal", expected
+
+
+def _filesystem_measurement_shape(value: Any) -> Any:
+    """Retain non-numeric identity fields while eliding measured values."""
+
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "<boolean>"
+    if isinstance(value, (int, float)):
+        return "<number>"
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        # Request-size and replay vectors are candidate-sensitive measurements;
+        # their numeric contents and cardinality are not identity.
+        return "<array>"
+    if isinstance(value, dict):
+        return {
+            key: _filesystem_measurement_shape(item) for key, item in value.items()
+        }
+    raise AbbaSummaryInputError(
+        "filesystem evidence contains unsupported value "
+        f"{type(value).__name__}"
+    )
+
+
+def _validate_filesystem_sample(
+    sample: Any, location: str, sample_count: int, cache_states: Sequence[str]
+) -> dict[str, Any]:
+    sample_object = _require_object(sample, location)
+    unknown = set(sample_object) - _FILESYSTEM_SAMPLE_KEYS
+    if unknown:
+        raise AbbaSummaryInputError(
+            f"{location} has unknown keys: {sorted(unknown)}"
+        )
+    sample_index = _u64(sample_object.get("sample_index"), f"{location}.sample_index")
+    if sample_index >= sample_count:
+        raise AbbaSummaryInputError(
+            f"{location}.sample_index={sample_index} is outside sample_count={sample_count}"
+        )
+    cache_state = _required_nonempty_string(
+        sample_object.get("cache_state"), location, "cache_state"
+    )
+    if cache_state not in cache_states:
+        raise AbbaSummaryInputError(
+            f"{location}.cache_state={cache_state!r} is absent from cache_states"
+        )
+    cold_advice = _required_nonempty_string(
+        sample_object.get("cold_advice"), location, "cold_advice"
+    )
+    if cold_advice not in {"not_requested", "requested", "unsupported", "failed"}:
+        raise AbbaSummaryInputError(
+            f"{location}.cold_advice has unknown value {cold_advice!r}"
+        )
+    if "logical_read_counter_scope" in sample_object:
+        _required_nonempty_string(
+            sample_object["logical_read_counter_scope"],
+            location,
+            "logical_read_counter_scope",
+        )
+    if "output_sha256" in sample_object and sample_object["output_sha256"] is not None:
+        _validate_output_sha256(sample_object["output_sha256"], f"{location}.output_sha256")
+    for field in (
+        "elapsed_ns",
+        "parent_wall_ns",
+        "logical_read_calls",
+        "logical_read_requested_bytes",
+        "logical_read_bytes",
+        "max_concurrent_reads",
+    ):
+        if field in sample_object:
+            _u64(sample_object[field], f"{location}.{field}")
+    for field in (
+        "output_bytes",
+        "opc_materialized_parts",
+        "cfb_changed_spans",
+        "cfb_published_bytes",
+    ):
+        if field in sample_object and sample_object[field] is not None:
+            _u64(sample_object[field], f"{location}.{field}")
+    if "logical_read_request_sizes" in sample_object:
+        request_sizes = sample_object["logical_read_request_sizes"]
+        if not isinstance(request_sizes, list):
+            raise AbbaSummaryInputError(
+                f"{location}.logical_read_request_sizes must be a list"
+            )
+        for index, value in enumerate(request_sizes):
+            _u64(value, f"{location}.logical_read_request_sizes[{index}]")
+    if "logical_read_request_size_buckets" in sample_object:
+        buckets = _require_object(
+            sample_object["logical_read_request_size_buckets"],
+            f"{location}.logical_read_request_size_buckets",
+        )
+        expected_buckets = {
+            "bytes_0",
+            "bytes_1_to_512",
+            "bytes_513_to_4096",
+            "bytes_4097_to_16384",
+            "bytes_16385_to_65536",
+            "bytes_over_65536",
+        }
+        if set(buckets) != expected_buckets:
+            raise AbbaSummaryInputError(
+                f"{location}.logical_read_request_size_buckets keys mismatch"
+            )
+        for field, value in buckets.items():
+            _u64(value, f"{location}.logical_read_request_size_buckets.{field}")
+    if "process_metrics" in sample_object and sample_object["process_metrics"] is not None:
+        _require_object(sample_object["process_metrics"], f"{location}.process_metrics")
+    for field in ("cfb_phases", "pptx_source_replay", "docx_source_replay"):
+        if field in sample_object and sample_object[field] is not None:
+            _require_object(sample_object[field], f"{location}.{field}")
+    return sample_object
+
+
+def _filesystem_evidence_identity_projection(evidence: dict[str, Any]) -> str:
+    projected: dict[str, Any] = {
+        key: evidence[key]
+        for key in (
+            "case",
+            "corpus",
+            "warmup_iterations",
+            "sample_count",
+            "cache_states",
+            "fresh_child_per_sample",
+        )
+    }
+    for field in ("tool", "configuration", "config"):
+        if field in evidence:
+            projected[field] = evidence[field]
+    projected["samples"] = [
+        {
+            key: (
+                sample[key]
+                if key in _FILESYSTEM_SAMPLE_IDENTITY_KEYS
+                else _filesystem_measurement_shape(sample[key])
+            )
+            for key in sorted(sample)
+        }
+        for sample in evidence["samples"]
+    ]
+    if "cfb_owned" in evidence:
+        projected["cfb_owned"] = _filesystem_measurement_shape(evidence["cfb_owned"])
+    return _canonical_json(projected, "filesystem_evidence.identity")
+
+
+def _validate_filesystem_evidence(
+    root: dict[str, Any],
+    configuration: dict[str, Any],
+    tool: dict[str, Any],
+    indexed: Mapping[tuple[str, str], dict[str, Any]],
+    label: str,
+) -> tuple[bool, frozenset[str], dict[tuple[str, str], str]]:
+    raw = root.get("filesystem_evidence", _MISSING)
+    if raw is _MISSING:
+        return False, frozenset(), {}
+    if not isinstance(raw, list):
+        raise AbbaSummaryInputError(f"{label}.filesystem_evidence must be a list")
+    evidence_index: dict[tuple[str, str], str] = {}
+    filesystem_shapes: set[str] = set()
+    configured_cache_states = configuration.get("filesystem_cache_states")
+    if configured_cache_states is not None:
+        configured_cache_states = _required_string_list(
+            configured_cache_states,
+            f"{label}.configuration",
+            "filesystem_cache_states",
+        )
+    configured_fresh_child = configuration.get("filesystem_fresh_child_per_sample")
+    if configured_fresh_child is not None:
+        _required_bool(
+            configured_fresh_child,
+            f"{label}.configuration",
+            "filesystem_fresh_child_per_sample",
+        )
+    for index, evidence in enumerate(raw):
+        location = f"{label}.filesystem_evidence[{index}]"
+        evidence_object = _require_object(evidence, location)
+        unknown = set(evidence_object) - _FILESYSTEM_EVIDENCE_KEYS
+        if unknown:
+            raise AbbaSummaryInputError(
+                f"{location} has unknown keys: {sorted(unknown)}"
+            )
+        case = _required_nonempty_string(evidence_object.get("case"), location, "case")
+        corpus = _require_object(evidence_object.get("corpus"), f"{location}.corpus")
+        corpus_identity = _canonical_json(corpus, f"{location}.corpus")
+        shape = corpus.get("shape")
+        if not isinstance(shape, str) or not shape:
+            raise AbbaSummaryInputError(
+                f"{location}.corpus.shape must be a non-empty string"
+            )
+        key = (case, corpus_identity)
+        if key in evidence_index:
+            raise AbbaSummaryInputError(
+                f"{label}.filesystem_evidence contains duplicate case/corpus identity"
+            )
+        result = indexed.get(key)
+        if result is None:
+            raise AbbaSummaryInputError(
+                f"{location}.case/corpus identity does not match a result row"
+            )
+        if "tool" in evidence_object:
+            evidence_tool = _require_object(evidence_object["tool"], f"{location}.tool")
+            if _canonical_json(evidence_tool, f"{location}.tool") != _canonical_json(
+                tool, f"{label}.tool"
+            ):
+                raise AbbaSummaryInputError(
+                    f"{location}.tool identity differs from report tool"
+                )
+        for config_field in ("configuration", "config"):
+            if config_field in evidence_object:
+                evidence_configuration = _require_object(
+                    evidence_object[config_field], f"{location}.{config_field}"
+                )
+                if _canonical_json(
+                    evidence_configuration, f"{location}.{config_field}"
+                ) != _canonical_json(configuration, f"{label}.configuration"):
+                    raise AbbaSummaryInputError(
+                        f"{location}.{config_field} identity differs from report configuration"
+                    )
+        warmup_iterations = _required_positive_integer(
+            evidence_object.get("warmup_iterations"), location, "warmup_iterations"
+        )
+        if warmup_iterations != configuration["warmup_iterations_per_case"]:
+            raise AbbaSummaryInputError(
+                f"{location}.warmup_iterations does not match configuration"
+            )
+        sample_count = _required_positive_integer(
+            evidence_object.get("sample_count"), location, "sample_count"
+        )
+        if sample_count != configuration["samples_per_case"]:
+            raise AbbaSummaryInputError(
+                f"{location}.sample_count does not match configuration"
+            )
+        cache_states = _required_string_list(
+            evidence_object.get("cache_states"), location, "cache_states"
+        )
+        if configured_cache_states is not None and cache_states != configured_cache_states:
+            raise AbbaSummaryInputError(
+                f"{location}.cache_states does not match configuration"
+            )
+        fresh_child = _required_bool(
+            evidence_object.get("fresh_child_per_sample"),
+            location,
+            "fresh_child_per_sample",
+        )
+        if configured_fresh_child is not None and fresh_child != configured_fresh_child:
+            raise AbbaSummaryInputError(
+                f"{location}.fresh_child_per_sample does not match configuration"
+            )
+        samples = evidence_object.get("samples")
+        if not isinstance(samples, list):
+            raise AbbaSummaryInputError(f"{location}.samples must be a list")
+        expected_sample_total = sample_count * len(cache_states)
+        if len(samples) != expected_sample_total:
+            raise AbbaSummaryInputError(
+                f"{location}.samples has {len(samples)} entries; expected "
+                f"{expected_sample_total}"
+            )
+        pairs: list[tuple[int, str]] = []
+        validated_samples = []
+        for sample_index, sample in enumerate(samples):
+            validated_sample = _validate_filesystem_sample(
+                sample,
+                f"{location}.samples[{sample_index}]",
+                sample_count,
+                cache_states,
+            )
+            pairs.append(
+                (validated_sample["sample_index"], validated_sample["cache_state"])
+            )
+            validated_samples.append(validated_sample)
+        expected_pairs = [
+            (sample_index, cache_state)
+            for sample_index in range(sample_count)
+            for cache_state in cache_states
+        ]
+        if pairs != expected_pairs:
+            raise AbbaSummaryInputError(
+                f"{location}.samples must contain each sample index/cache state exactly once"
+            )
+        if "cfb_owned" in evidence_object:
+            owned = evidence_object["cfb_owned"]
+            if not isinstance(owned, list):
+                raise AbbaSummaryInputError(f"{location}.cfb_owned must be a list")
+            for owned_index, item in enumerate(owned):
+                owned_location = f"{location}.cfb_owned[{owned_index}]"
+                owned_object = _require_object(item, owned_location)
+                if set(owned_object) != {"sample_index", "cache_state", "evidence"}:
+                    raise AbbaSummaryInputError(
+                        f"{owned_location} keys mismatch"
+                    )
+                owned_sample_index = _u64(
+                    owned_object["sample_index"], f"{owned_location}.sample_index"
+                )
+                if owned_sample_index >= sample_count:
+                    raise AbbaSummaryInputError(
+                        f"{owned_location}.sample_index is outside sample_count"
+                    )
+                owned_cache_state = _required_nonempty_string(
+                    owned_object["cache_state"], owned_location, "cache_state"
+                )
+                if owned_cache_state not in cache_states:
+                    raise AbbaSummaryInputError(
+                        f"{owned_location}.cache_state is absent from cache_states"
+                    )
+                _require_object(owned_object["evidence"], f"{owned_location}.evidence")
+        filesystem_shapes.add(shape)
+        evidence_index[key] = _filesystem_evidence_identity_projection(
+            {
+                **evidence_object,
+                "samples": validated_samples,
+            }
+        )
+    return True, frozenset(filesystem_shapes), evidence_index
+
+
 def _validate_report(
     report: Any, label: str
 ) -> tuple[
@@ -454,6 +900,8 @@ def _validate_report(
     dict[tuple[str, str], dict[str, Any]],
     str,
     frozenset[str],
+    bool,
+    dict[tuple[str, str], str],
 ]:
     root = _require_object(report, label)
     canonical_report = _canonical_json(root, f"{label}.report")
@@ -477,34 +925,20 @@ def _validate_report(
     if not configuration:
         raise AbbaSummaryInputError(f"{label}.configuration must not be empty")
     _validate_configuration(configuration, label)
-    filesystem_evidence = root.get("filesystem_evidence")
-    filesystem_shapes: set[str] = set()
-    if filesystem_evidence is not None and not isinstance(filesystem_evidence, list):
-        raise AbbaSummaryInputError(f"{label}.filesystem_evidence must be a list")
-    if isinstance(filesystem_evidence, list):
-        for index, evidence in enumerate(filesystem_evidence):
-            evidence_object = _require_object(
-                evidence, f"{label}.filesystem_evidence[{index}]"
-            )
-            corpus = _require_object(
-                evidence_object.get("corpus"),
-                f"{label}.filesystem_evidence[{index}].corpus",
-            )
-            shape = corpus.get("shape")
-            if not isinstance(shape, str) or not shape:
-                raise AbbaSummaryInputError(
-                    f"{label}.filesystem_evidence[{index}].corpus.shape "
-                    "must be a non-empty string"
-                )
-            filesystem_shapes.add(shape)
+    indexed = _index_results(root, label)
+    filesystem_present, filesystem_shapes, filesystem_identity = (
+        _validate_filesystem_evidence(root, configuration, tool, indexed, label)
+    )
     return (
         schema_version,
         tool,
         environment,
         configuration,
-        _index_results(root, label),
+        indexed,
         report_sha256,
-        frozenset(filesystem_shapes),
+        filesystem_shapes,
+        filesystem_present,
+        filesystem_identity,
     )
 
 
@@ -686,7 +1120,15 @@ def _result_summary(
     case: str,
     corpus_identity: str,
     drift_ceilings: Mapping[str, float],
+    report_schema: int = HARNESS_SCHEMA_VERSION,
 ) -> dict[str, Any]:
+    operation_metrics_status, operation_metrics_identity = (
+        _compare_operation_metrics_identity(
+            rows,
+            f"{case}[{corpus_identity}]",
+            report_schema,
+        )
+    )
     source_status, source_present, source_identity, source_value = _compare_row_identity(
         rows, "source", f"{case}[{corpus_identity}]"
     )
@@ -778,6 +1220,8 @@ def _result_summary(
         "output_sha256": output_value,
         "identity": {
             "corpus": corpus_identity,
+            "operation_metrics_canonical_json": operation_metrics_identity,
+            "operation_metrics_status": operation_metrics_status,
             "source_present": source_present,
             "source_canonical_json": source_identity,
             "source_status": source_status,
@@ -873,7 +1317,17 @@ def summarize_reports(
     if len(configurations) != 1:
         raise AbbaSummaryInputError("harness configuration differs between ABBA legs")
 
-    for label, (_, _, _, configuration, indexed, _, filesystem_shapes) in validated.items():
+    for label, (
+        _,
+        _,
+        _,
+        configuration,
+        indexed,
+        _,
+        filesystem_shapes,
+        _,
+        _,
+    ) in validated.items():
         _validate_configuration_rows(
             configuration,
             indexed,
@@ -884,6 +1338,29 @@ def summarize_reports(
     result_sets = {frozenset(item[4]) for item in validated.values()}
     if len(result_sets) != 1:
         raise AbbaSummaryInputError("case/corpus result identities differ between ABBA legs")
+    filesystem_presence = {item[7] for item in validated.values()}
+    if len(filesystem_presence) != 1:
+        raise AbbaSummaryInputError(
+            "filesystem_evidence presence differs between ABBA legs"
+        )
+    filesystem_identity_sets = {
+        frozenset(item[8]) for item in validated.values()
+    }
+    if len(filesystem_identity_sets) != 1:
+        raise AbbaSummaryInputError(
+            "filesystem_evidence case/corpus identities differ between ABBA legs"
+        )
+    first_filesystem_identity = validated["a1"][8]
+    for key in sorted(first_filesystem_identity):
+        identities = {
+            label: validated[label][8][key] for label in LEG_ORDER
+        }
+        expected_identity = identities["a1"]
+        if any(identity != expected_identity for identity in identities.values()):
+            raise AbbaSummaryInputError(
+                "filesystem_evidence identity differs between ABBA legs for "
+                f"{key[0]}[{key[1]}]"
+            )
     selected_cases = _parse_selectors(cases)
     selected_shapes = _parse_selectors(shapes)
     first_index = validated["a1"][4]
@@ -913,6 +1390,7 @@ def summarize_reports(
             case=case,
             corpus_identity=corpus_identity,
             drift_ceilings=ceiling_values,
+            report_schema=next(iter(schema_versions)),
         )
 
     results = [all_summaries[key] for key in selected_keys]
@@ -938,6 +1416,13 @@ def summarize_reports(
     output_status_counts = {
         status: sum(
             result["identity"]["output_sha256_status"] == status for result in results
+        )
+        for status in ("verified_equal", "consistently_absent")
+    }
+    operation_metrics_status_counts = {
+        status: sum(
+            result["identity"]["operation_metrics_status"] == status
+            for result in results
         )
         for status in ("verified_equal", "consistently_absent")
     }
@@ -985,6 +1470,8 @@ def summarize_reports(
             "source_identity": status_counts["source"],
             "sink_identity": status_counts["sink"],
             "output_sha256_identity": output_status_counts,
+            "operation_metrics_identity": operation_metrics_status_counts,
+            "filesystem_evidence_identity_verified": True,
             "source_identity_verified": status_counts["source"]["verified_equal"] == len(results),
             "sink_identity_verified": status_counts["sink"]["verified_equal"] == len(results),
             "output_sha256_identity_verified": output_status_counts["verified_equal"]

@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from tools import perf_abba_package, perf_abba_summary
-from tools.test_perf_abba_summary import four_legs
+from tools.test_perf_abba_summary import four_legs, with_filesystem_evidence, with_operation_metrics
 
 
 ZSTD = shutil.which("zstd")
@@ -241,6 +241,75 @@ class PerfAbbaPackageTests(unittest.TestCase):
                         artifacts=self.specs(),
                     )
                 # Restore a clean fixture for the next mutation.
+                self.tearDown()
+                self.setUp()
+
+    def test_rejects_nested_operation_and_filesystem_identity_tamper(self):
+        mutations = (
+            (
+                "operation_metrics.sample_count",
+                with_operation_metrics,
+                lambda report: report["results"][0]["operation_metrics"].update(
+                    sample_count=14
+                ),
+            ),
+            (
+                "operation_metrics.schema",
+                with_operation_metrics,
+                lambda report: report["results"][0]["operation_metrics"].update(
+                    schema=2
+                ),
+            ),
+            (
+                "operation_metrics.scope",
+                with_operation_metrics,
+                lambda report: report["results"][0]["operation_metrics"]["source"].update(
+                    counter_scope="changed_scope"
+                ),
+            ),
+            (
+                "filesystem_evidence.corpus",
+                with_filesystem_evidence,
+                lambda report: report["filesystem_evidence"][0]["corpus"].update(
+                    name="changed-corpus"
+                ),
+            ),
+            (
+                "filesystem_evidence.tool",
+                with_filesystem_evidence,
+                lambda report: report["filesystem_evidence"][0]["tool"].update(
+                    version="changed-tool"
+                ),
+            ),
+            (
+                "filesystem_evidence.configuration",
+                with_filesystem_evidence,
+                lambda report: report["filesystem_evidence"][0]["configuration"].update(
+                    warmup_iterations_per_case=2
+                ),
+            ),
+        )
+        for name, prepare, mutate in mutations:
+            with self.subTest(name=name):
+                prepared = prepare(four_legs())
+                self.reports = dict(zip(("a1", "b1", "b2", "a2"), prepared))
+                for role, report in self.reports.items():
+                    self.report_paths[role].write_bytes(
+                        (json.dumps(report, sort_keys=True, indent=2) + "\n").encode()
+                    )
+                self.summary = perf_abba_summary.summarize_reports(prepared)
+                self.write_summary()
+                self.replace_report("a1", mutate)
+                with self.assertRaisesRegex(
+                    perf_abba_package.ArtifactPackagingError,
+                    "recompute canonical ABBA summary|canonical ABBA",
+                ):
+                    perf_abba_package.package_artifacts(
+                        change_id="0238",
+                        output_dir=self.root / f"nested-{name.replace('.', '-')}",
+                        summary=self.summary_path,
+                        artifacts=self.specs(),
+                    )
                 self.tearDown()
                 self.setUp()
 
