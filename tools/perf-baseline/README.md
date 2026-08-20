@@ -2757,8 +2757,14 @@ vectors. The tool identity records `tool.instrumentation` as
 `system_allocator_operation_scoped`; allocator-instrumented elapsed samples
 are never used for latency claims. `perf_abba_summary.py` rejects that identity
 for latency ABBA, while `perf_compare.py` with a matching policy identity
-withholds elapsed comparisons and can compare the allocation vectors. The
-existing raw `filesystem_evidence` samples remain unchanged.
+withholds elapsed comparisons. The checked allocator policy selects only the
+`opc_file_eager_open` warm/cold filesystem rows and requires every measured
+allocation vector; its case/corpus/cache manifest is
+`docs/performance/results/perf-regression-allocator-manifest-v1.json`. Use
+`docs/performance/perf-regression-policy-allocator-v1.json` for that
+allocator-only comparator; the checked normal policy continues to reject this
+binary identity. The existing raw `filesystem_evidence` samples remain
+unchanged.
 
 In-process sink-only envelopes use `latency_claim: comparable_timed_operation`;
 filesystem envelopes use `evidence_only_filesystem_selector`. The Python
@@ -3114,6 +3120,21 @@ cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml
 perf stat -d tools/perf-baseline/target/release/litchi-perf-baseline \
   --warmup 3 --samples 15 --case cfb_read_one --shape wide-root \
   --payload incompressible --json target/perf/perf-cfb-read.json
+```
+
+Allocation evidence uses the separate benchmark-only target. Build it with
+the feature and invoke `litchi-perf-baseline-alloc`; its report identity is
+distinct from the normal binary, and its elapsed samples are not latency
+evidence:
+
+```sh
+cargo build --release --locked --features allocator-metrics \
+  --bin litchi-perf-baseline-alloc \
+  --manifest-path tools/perf-baseline/Cargo.toml
+tools/perf-baseline/target/release/litchi-perf-baseline-alloc \
+  --warmup 3 --samples 15 --case opc_file_eager_open \
+  --filesystem-cache warm,cold-requested \
+  --json target/perf/perf-opc-file-alloc.json
 ```
 
 For a sampled profile, use whichever installed tool is appropriate:

@@ -426,7 +426,9 @@ fn difference(before: u64, after: u64) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Sample, Scope, Status};
+    use std::sync::{Arc, Barrier};
+
+    use super::{Counters, Sample, Scope, Status};
 
     static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -475,6 +477,21 @@ mod tests {
     }
 
     #[test]
+    fn counter_arithmetic_overflow_and_live_underflow_are_sticky() {
+        let overflow = Counters::default();
+        overflow
+            .allocation_calls
+            .store(u64::MAX, std::sync::atomic::Ordering::Relaxed);
+        overflow.allocation(1);
+        assert!(overflow.snapshot().overflowed);
+
+        let underflow = Counters::default();
+        underflow.live_sub(1);
+        assert!(underflow.snapshot().overflowed);
+        assert_eq!(underflow.snapshot().live_bytes, 0);
+    }
+
+    #[test]
     fn region_counts_cross_thread_totals_without_resetting_absolute_counters() {
         let _lock = TEST_LOCK.lock().unwrap();
         let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
@@ -505,6 +522,47 @@ mod tests {
         assert_eq!(inner.finish().unwrap().status, Status::Unavailable);
         assert_eq!(super::COUNTERS.snapshot(), before);
         assert_eq!(outer.finish().unwrap().status, Status::Measured);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn concurrent_begin_race_grants_one_region_and_marks_others_unavailable() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
+        let was_active = super::REGION_ACTIVE.swap(false, std::sync::atomic::Ordering::SeqCst);
+        assert!(!was_active, "test region must not already be active");
+        let barrier = Arc::new(Barrier::new(8));
+        let handles = (0..8)
+            .map(|_| {
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    let region = super::begin();
+                    barrier.wait();
+                    region.finish().map(|sample| sample.status)
+                })
+            })
+            .collect::<Vec<_>>();
+        let statuses = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|status| **status == Some(Status::Measured))
+                .count(),
+            1
+        );
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|status| **status == Some(Status::Unavailable))
+                .count(),
+            7
+        );
+        assert!(!super::REGION_ACTIVE.load(std::sync::atomic::Ordering::SeqCst));
+        super::REGION_ACTIVE.store(was_active, std::sync::atomic::Ordering::SeqCst);
         super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
     }
 }

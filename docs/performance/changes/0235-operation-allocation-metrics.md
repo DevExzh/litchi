@@ -43,11 +43,14 @@ the companion target; the existing raw filesystem evidence and normal latency
 binary remain unchanged.
 
 Focused Rust unit tests cover disabled-mode omission, status serialization,
-cross-thread totals, non-overlapping regions, elapsed-vector alignment,
-absolute live counters, overflow omission, strict schema cardinality, child
-output, and actual allocator success/failure/reallocation paths. The latter
-tests live only on the allocator target. Standard-library-only Python tests
-cover comparator metric vectors, both normal/allocator policy identities,
-refusal to use instrumented elapsed samples for latency ABBA, and the
-source-level unsafe target boundary. No Cargo build or test is run as part of
-the active benchmark change.
+cross-thread totals, non-overlapping regions, concurrent begin races,
+underflow/overflow omission, elapsed-vector alignment, absolute live counters,
+strict schema cardinality, an executing failing child, and actual allocator
+success, zeroed-allocation, failed-allocation, failed-reallocation, and
+grow/shrink paths. The latter tests live only on the allocator target.
+Standard-library-only Python tests cover comparator metric vectors, the pinned
+filesystem allocator policy/manifest, measured status/scope/cardinality and
+non-empty vector requirements, metadata-only RSS walking, both normal/allocator
+policy identities, refusal to use instrumented elapsed samples for latency
+ABBA, and the source-level unsafe target boundary. No Cargo build or test is
+run as part of the active benchmark change.
