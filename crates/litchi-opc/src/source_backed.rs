@@ -2404,10 +2404,7 @@ impl SourceBackedPackage {
             self.finish_stage(result)?;
         }
         package.set_non_part_members(non_part_members);
-        package.source_ingress = true;
-        package.signature_graph_tracked = package.is_signed();
-        package.signature_policy_authorized = false;
-        package.signature_api_authored = false;
+        package.mark_source_ingress_signature_policy();
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         Ok(package)

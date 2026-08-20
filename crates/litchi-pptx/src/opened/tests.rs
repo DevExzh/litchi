@@ -38,6 +38,11 @@ fn opened_plain_slide_package() -> Result<Package> {
     Package::from_vec(bytes)
 }
 
+fn borrowed_plain_slide_package() -> Result<Package> {
+    let mut package = opened_plain_slide_package()?;
+    Package::from_bytes(&package.to_bytes()?)
+}
+
 fn opened_plain_slides_package(count: usize) -> Result<Package> {
     let mut package = Package::new()?;
     for index in 0..count {
@@ -46,6 +51,11 @@ fn opened_plain_slides_package(count: usize) -> Result<Package> {
     }
     let bytes = package.to_bytes()?;
     Package::from_vec(bytes)
+}
+
+fn borrowed_plain_slides_package(count: usize) -> Result<Package> {
+    let mut package = opened_plain_slides_package(count)?;
+    Package::from_bytes(&package.to_bytes()?)
 }
 
 #[test]
@@ -541,7 +551,7 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
 #[test]
 fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directions() -> Result<()> {
     let transitional_source = opened_plain_slide_package()?;
-    let mut strict_source = opened_plain_slide_package()?;
+    let mut strict_source = borrowed_plain_slide_package()?;
     make_package_strict(&mut strict_source)?;
     let mut strict_source = Package::from_vec(strict_source.to_bytes()?)?;
 
@@ -560,7 +570,7 @@ fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directio
         .set_blob(mixed_xml);
 
     let transitional_destination = opened_plain_slides_package(2)?;
-    let mut strict_destination = opened_plain_slides_package(2)?;
+    let mut strict_destination = borrowed_plain_slides_package(2)?;
     make_package_strict(&mut strict_destination)?;
     let strict_destination = Package::from_vec(strict_destination.to_bytes()?)?;
 
@@ -1753,7 +1763,7 @@ fn slide_copy_plan_reuses_only_a_registered_layout() -> Result<()> {
 
 #[test]
 fn slide_copy_plan_accepts_the_strict_shared_layout_boundary() -> Result<()> {
-    let mut strict = opened_plain_slide_package()?;
+    let mut strict = borrowed_plain_slide_package()?;
     make_package_strict(&mut strict)?;
     let plan = strict.opened_presentation()?.plan_slide_copy(0_usize, 1)?;
     assert_eq!(plan.source().id(), 256);
@@ -1937,7 +1947,7 @@ fn slide_copy_application_refuses_result_limit_and_nonempty_slide_id() -> Result
 #[test]
 fn slide_removal_plan_handles_first_middle_and_last_durably() -> Result<()> {
     for position in [0_usize, 1, 3] {
-        let mut package = opened_plain_slides_package(4)?;
+        let mut package = borrowed_plain_slides_package(4)?;
         let source_bytes = package.to_bytes()?;
         let before = part_states(&package);
         let snapshot = package.opened_presentation()?;
