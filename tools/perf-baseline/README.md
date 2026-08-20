@@ -104,8 +104,8 @@ cold all-images query, repeated all-images query, and fresh open-plus-all-images
 phases on a deterministic picture-heavy corpus. Source-backed elapsed samples
 for those native-PPT `Pictures` selectors use an uninstrumented
 `litchi_core::OwnedSource`; independent untimed `InstrumentedSource` replays
-provide their source-read counters. The current `Case` matrix exposes 340
-selectable case names in total, including two opt-in RTF standalone-picture
+provide their source-read counters. Before the repeated-edit selector described
+below, the `Case` matrix exposed 340 selectable case names, including two opt-in RTF standalone-picture
 CRUD selectors, two opt-in RTF ordinary-paragraph split/adjacent-merge
 selectors, four opt-in XLSX scalar-cell clear/remove lifecycle selectors, and
 four opt-in XLSX existing-row visibility lifecycle selectors, four opt-in ODS
