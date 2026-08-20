@@ -742,6 +742,7 @@ enum Case {
     DocSemanticOpen,
     DocSemanticListParagraphs,
     DocSemanticOneParagraph,
+    DocSemanticOneParagraphAt,
     DocSemanticFullText,
     DocSemanticNoopEditSave,
     DocSemanticOneEditSave,
@@ -1210,6 +1211,7 @@ impl Case {
             Self::DocSemanticOpen => "doc_semantic_open",
             Self::DocSemanticListParagraphs => "doc_semantic_list_paragraphs",
             Self::DocSemanticOneParagraph => "doc_semantic_one_paragraph",
+            Self::DocSemanticOneParagraphAt => "doc_semantic_one_paragraph_at",
             Self::DocSemanticFullText => "doc_semantic_full_text",
             Self::DocSemanticNoopEditSave => "doc_semantic_noop_edit_save",
             Self::DocSemanticOneEditSave => "doc_semantic_one_edit_save",
@@ -1504,6 +1506,7 @@ impl Case {
             Self::DocSemanticOpen
                 | Self::DocSemanticListParagraphs
                 | Self::DocSemanticOneParagraph
+                | Self::DocSemanticOneParagraphAt
                 | Self::DocSemanticFullText
                 | Self::DocSemanticNoopEditSave
                 | Self::DocSemanticOneEditSave
@@ -8556,6 +8559,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "doc_semantic_open" => Some(Case::DocSemanticOpen),
         "doc_semantic_list_paragraphs" => Some(Case::DocSemanticListParagraphs),
         "doc_semantic_one_paragraph" => Some(Case::DocSemanticOneParagraph),
+        "doc_semantic_one_paragraph_at" => Some(Case::DocSemanticOneParagraphAt),
         "doc_semantic_full_text" => Some(Case::DocSemanticFullText),
         "doc_semantic_noop_edit_save" => Some(Case::DocSemanticNoopEditSave),
         "doc_semantic_one_edit_save" => Some(Case::DocSemanticOneEditSave),
@@ -8964,7 +8968,8 @@ fn print_usage() {
                                        cfb_open_stream_simulated_mini_4095_shared_repeat8,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
                                        doc_semantic_open,doc_semantic_list_paragraphs,\n\
-                                       doc_semantic_one_paragraph,doc_semantic_full_text,\n\
+                                       doc_semantic_one_paragraph,doc_semantic_one_paragraph_at,\n\
+                                       doc_semantic_full_text,\n\
                                        doc_semantic_noop_edit_save,doc_semantic_one_edit_save,\n\
                                        doc_body_snapshot_list_paragraphs,\n\
                                        doc_owner_public_phases,\n\
@@ -15340,6 +15345,7 @@ fn run_case_with_config(
         Case::DocSemanticOpen
         | Case::DocSemanticListParagraphs
         | Case::DocSemanticOneParagraph
+        | Case::DocSemanticOneParagraphAt
         | Case::DocSemanticFullText
         | Case::DocSemanticNoopEditSave
         | Case::DocSemanticOneEditSave => {
@@ -17616,6 +17622,24 @@ fn run_semantic_doc(
                     .paragraphs()?
                     .into_iter()
                     .nth(selected)
+                    .ok_or("semantic DOC selected paragraph is missing")?;
+                let duration = started.elapsed();
+                if paragraph.text()? != writer_text("doc", 0, selected, 0) {
+                    return Err(
+                        "semantic DOC selected paragraph differs from writer specification".into(),
+                    );
+                }
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(paragraph);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticOneParagraphAt => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let paragraph = document
+                    .paragraph_at(Position::new(selected))?
                     .ok_or("semantic DOC selected paragraph is missing")?;
                 let duration = started.elapsed();
                 if paragraph.text()? != writer_text("doc", 0, selected, 0) {
@@ -41129,7 +41153,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 344);
+        assert_eq!(selectable_count, 345);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -41146,6 +41170,22 @@ mod tests {
         assert!(text.uses_semantic_docx());
         assert!(!Case::DEFAULT.contains(&scanner));
         assert!(!Case::DEFAULT.contains(&text));
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn native_doc_paragraph_selectors_have_distinct_opt_in_mappings() {
+        let materializing = Case::DocSemanticOneParagraph;
+        let direct = Case::DocSemanticOneParagraphAt;
+        assert_eq!(parse_case(materializing.name()), Some(materializing));
+        assert_eq!(parse_case(direct.name()), Some(direct));
+        assert_eq!(materializing.name(), "doc_semantic_one_paragraph");
+        assert_eq!(direct.name(), "doc_semantic_one_paragraph_at");
+        assert_ne!(materializing, direct);
+        assert!(materializing.uses_semantic_doc());
+        assert!(direct.uses_semantic_doc());
+        assert!(!Case::DEFAULT.contains(&materializing));
+        assert!(!Case::DEFAULT.contains(&direct));
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -42977,6 +43017,7 @@ mod tests {
                     Case::DocSemanticOpen,
                     Case::DocSemanticListParagraphs,
                     Case::DocSemanticOneParagraph,
+                    Case::DocSemanticOneParagraphAt,
                     Case::DocSemanticFullText,
                     Case::DocSemanticNoopEditSave,
                     Case::DocSemanticOneEditSave,
