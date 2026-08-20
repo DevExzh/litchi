@@ -15026,10 +15026,7 @@ fn verify_xlsx_cells(
     Ok(())
 }
 
-fn xlsx_typed_full_text(
-    workbook: &Workbook,
-    spec: &XlsxCorpus,
-) -> Result<String, Box<dyn Error>> {
+fn xlsx_typed_full_text(workbook: &Workbook, spec: &XlsxCorpus) -> Result<String, Box<dyn Error>> {
     let mut output = String::new();
     for sheet_index in 0..spec.sheet_count {
         let name = xlsx_sheet_name(sheet_index);
@@ -29670,9 +29667,7 @@ fn run_xlsx_bytes_root_access(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
     if corpus.manifest.generator != XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR {
-        return Err(
-            "XLSX bytes root cases require the deterministic cell-CRUD XLSX corpus".into(),
-        );
+        return Err("XLSX bytes root cases require the deterministic cell-CRUD XLSX corpus".into());
     }
     let lifecycle = xlsx_bytes_root_case_parameters(case)?;
 
@@ -29712,8 +29707,7 @@ fn run_xlsx_bytes_root_access(
         // Keep Vec ownership preparation outside the measurement interval.
         let owned = corpus.archive.clone();
         let started = Instant::now();
-        let workbook =
-            litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
+        let workbook = litchi::Workbook::from_bytes(owned).map_err(|error| error.to_string())?;
         let measured_projection = if lifecycle {
             Some((
                 workbook
