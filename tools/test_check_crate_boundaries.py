@@ -9051,6 +9051,142 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_extractor_no_eager_tile_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::TableDataList::decode(bytes);\n"
+                "    let _ = tst::TileStorage::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tst;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tst::Tile::decode(bytes);\n"
+                "        let _ = tst::TileRowInfo::decode(bytes);\n"
+                "        let _ = Tile::decode(bytes);\n"
+                "        let _ = tst::Tile::default();\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_tile_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "unqualified Tile": (
+                "let _ = Tile::decode(bytes);\n",
+                "Tile::decode",
+            ),
+            "tst namespace Tile": (
+                "let _ = tst::Tile::decode(bytes);\n",
+                "Tile::decode",
+            ),
+            "fully qualified namespace Tile": (
+                "let _ = litchi_iwa_protos::tst::Tile::decode(bytes);\n",
+                "Tile::decode",
+            ),
+            "unqualified TileRowInfo": (
+                "let _ = TileRowInfo::decode(bytes);\n",
+                "TileRowInfo::decode",
+            ),
+            "tst namespace TileRowInfo": (
+                "let _ = tst::TileRowInfo::decode(bytes);\n",
+                "TileRowInfo::decode",
+            ),
+            "fully qualified namespace TileRowInfo": (
+                "let _ = litchi_iwa_protos::tst::TileRowInfo::decode(bytes);\n",
+                "TileRowInfo::decode",
+            ),
+        }
+        for label, (marker, expected_label) in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers extractor production source uses "
+                        f"{expected_label}: "
+                        "crates/litchi-numbers/src/package/extractor.rs:2",
+                        violations,
+                    )
+
+    def test_focused_numbers_extractor_no_eager_tile_allows_unrelated_decodes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::TableDataList::decode(bytes);\n"
+                "    let _ = tst::TileStorage::decode(bytes);\n"
+                "    let _ = decode_tile_with_visitor(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_tile_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tst::Tile::decode\n"
+                'const NOTE: &str = "Tile::decode";\n'
+                "/* litchi_iwa_protos::tst::Tile::decode */\n"
+                'const RAW: &str = r###"tst::Tile::decode"###;\n'
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_focused_numbers_names_package_no_eager_prost_allows_test_only_usage(
         self,
     ) -> None:

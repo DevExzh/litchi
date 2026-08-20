@@ -88,10 +88,17 @@ fn map_table_cell_codec_error_with_reference_offset(
     error: numbers_table_cell_storage_codec::DecodeError,
     reference_offset: usize,
 ) -> Error {
-    use numbers_table_cell_storage_codec::DecodeLimit;
     let Some(limit) = error.resource_limit() else {
         return Error::InvalidFormat("Numbers table storage projection is invalid".to_owned());
     };
+    map_table_cell_decode_limit_with_reference_offset(limit, reference_offset)
+}
+
+fn map_table_cell_decode_limit_with_reference_offset(
+    limit: numbers_table_cell_storage_codec::DecodeLimit,
+    reference_offset: usize,
+) -> Error {
+    use numbers_table_cell_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
         DecodeLimit::Bytes { observed, maximum } => {
             (SemanticLimitKind::FormulaWireBytes, observed, maximum)
@@ -115,6 +122,12 @@ fn map_table_cell_codec_error_with_reference_offset(
             observed as usize,
             maximum as usize,
         ),
+        DecodeLimit::Allocation { requested } => {
+            return Error::Common(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table storage projection",
+                amount: requested,
+            });
+        },
         _ => {
             return Error::InvalidFormat("Numbers table storage projection is invalid".to_owned());
         },
@@ -174,25 +187,6 @@ impl numbers_table_cell_storage_codec::StorageVisitor for ListPreflight {
         _reference: numbers_table_cell_storage_codec::ReferenceRecord<'_>,
     ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
         self.segments = self.segments.saturating_add(1);
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-struct TilePreflight {
-    cells: usize,
-    rows: usize,
-}
-
-impl numbers_table_cell_storage_codec::StorageVisitor for TilePreflight {
-    fn visit_tile_row(
-        &mut self,
-        row: numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
-    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
-        self.rows = self.rows.saturating_add(1);
-        self.cells = self
-            .cells
-            .saturating_add(usize::try_from(row.cell_count()).unwrap_or(usize::MAX));
         Ok(())
     }
 }
@@ -265,6 +259,16 @@ impl ProjectionBudget {
 
     fn charge_materialized_cells(&mut self, amount: usize) -> Result<()> {
         self.materialized_cells = projection_charge(
+            self.materialized_cells,
+            amount,
+            self.max_materialized_cells,
+            SemanticLimitKind::MaterializedCells,
+        )?;
+        Ok(())
+    }
+
+    fn check_materialized_cells(&self, amount: usize) -> Result<()> {
+        projection_charge(
             self.materialized_cells,
             amount,
             self.max_materialized_cells,
@@ -441,6 +445,54 @@ impl ProjectionBudget {
     }
 }
 
+struct TileRowVisitor<'a, 'tables> {
+    row_origin: usize,
+    tile_size: usize,
+    row_count: usize,
+    column_count: usize,
+    budget: &'a mut CellBudget,
+    cell_tables: &'a CellTables<'tables>,
+    projection_budget: &'a mut ProjectionBudget,
+    table: &'a mut Table,
+    materialized_cells: usize,
+    semantic_error: Option<Error>,
+}
+
+impl<'a, 'tables> numbers_table_cell_storage_codec::StorageVisitor for TileRowVisitor<'a, 'tables> {
+    fn visit_tile_row(
+        &mut self,
+        row: numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        self.materialized_cells = self
+            .materialized_cells
+            .saturating_add(usize::try_from(row.cell_count()).unwrap_or(usize::MAX));
+        if self.semantic_error.is_some() {
+            return Ok(());
+        }
+        if let Err(error) = self
+            .projection_budget
+            .check_materialized_cells(self.materialized_cells)
+        {
+            self.semantic_error = Some(error);
+            return Ok(());
+        }
+        if let Err(error) = TableDataExtractor::parse_tile_row(
+            &row,
+            self.row_origin,
+            self.tile_size,
+            self.row_count,
+            self.column_count,
+            self.budget,
+            self.cell_tables,
+            self.projection_budget,
+            self.table,
+        ) {
+            self.semantic_error = Some(error);
+        }
+        Ok(())
+    }
+}
+
 fn projection_charge(
     current: usize,
     amount: usize,
@@ -479,6 +531,7 @@ fn table_limit_error(observed: usize, maximum: usize) -> Error {
 
 fn decode_legacy_table_candidate<T>(
     data: &[u8],
+    admit: impl FnOnce() -> Result<()>,
     parse: impl FnOnce(tst::TableModelArchive) -> Result<T>,
 ) -> Result<Option<T>> {
     match has_legacy_table_model_wire_shape(data) {
@@ -486,6 +539,7 @@ fn decode_legacy_table_candidate<T>(
         Ok(false) => return Ok(None),
         Err(error) => return Err(error),
     }
+    admit()?;
     let table_model = tst::TableModelArchive::decode(data).map_err(Error::protobuf)?;
     parse(table_model).map(Some)
 }
@@ -832,7 +886,14 @@ impl<'a> TableDataExtractor<'a> {
                     return Err(table_limit_error(table_count.saturating_add(1), max_tables));
                 }
                 if let Some(resolved) = self.object_index.resolve_ref(self.bundle, entry.id())?
-                    && let Some(table) = self.extract_table_candidate(&resolved, message_type)?
+                    && let Some(table) =
+                        self.extract_table_candidate(&resolved, message_type, || {
+                            if table_count >= max_tables {
+                                Err(table_limit_error(table_count.saturating_add(1), max_tables))
+                            } else {
+                                Ok(())
+                            }
+                        })?
                 {
                     table_count = table_count
                         .checked_add(1)
@@ -852,6 +913,7 @@ impl<'a> TableDataExtractor<'a> {
         &self,
         object: &Resolved<'_>,
         candidate_type: u32,
+        legacy_admit: impl FnOnce() -> Result<()>,
     ) -> Result<Option<Table>> {
         if candidate_type == TABLE_MODEL_MESSAGE_TYPE {
             let mut messages = object
@@ -900,7 +962,7 @@ impl<'a> TableDataExtractor<'a> {
                 "Numbers legacy table candidate has duplicate legacy payloads".to_owned(),
             ));
         }
-        decode_legacy_table_candidate(&message.data, |table_model| {
+        decode_legacy_table_candidate(&message.data, legacy_admit, |table_model| {
             self.parse_table_model(table_model, false, None)
         })
     }
@@ -1632,46 +1694,39 @@ impl<'a> TableDataExtractor<'a> {
                 projection_budget.remaining_payload_fields(),
                 projection_budget.remaining_payload_work(),
             );
-            let mut projected_rows = TilePreflight::default();
-            let (projected, report) = numbers_table_cell_storage_codec::decode_tile_with_visitor(
-                &msg.data,
-                options,
-                &mut projected_rows,
-            )
-            .map_err(|error| {
-                map_table_cell_codec_error_with_reference_offset(
-                    error,
-                    projection_budget.references,
+            let reference_offset = projection_budget.references;
+            let (materialized_cells, semantic_error, report) = {
+                let mut visitor = TileRowVisitor {
+                    row_origin,
+                    tile_size,
+                    row_count,
+                    column_count,
+                    budget,
+                    cell_tables,
+                    projection_budget,
+                    table,
+                    materialized_cells: 0,
+                    semantic_error: None,
+                };
+                let (_, report) = numbers_table_cell_storage_codec::decode_tile_with_visitor(
+                    &msg.data,
+                    options,
+                    &mut visitor,
                 )
-            })?;
+                .map_err(|error| {
+                    map_table_cell_codec_error_with_reference_offset(error, reference_offset)
+                })?;
+                (
+                    visitor.materialized_cells,
+                    visitor.semantic_error.take(),
+                    report,
+                )
+            };
             projection_budget.charge_decode_report(report)?;
-            projection_budget.charge_materialized_cells(projected_rows.cells)?;
-            let tile = tst::Tile::decode(&*msg.data).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Numbers tile object {tile_id} has a malformed tile payload: {error}"
-                ))
-            })?;
-            if tile.num_cells != projected.num_cells()
-                || tile.numrows != projected.num_rows()
-                || tile.row_infos.len() != projected_rows.rows
-                || tile.max_column != projected.max_column()
-                || tile.max_row != projected.max_row()
-            {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers tile object {tile_id} failed strict projection parity"
-                )));
+            projection_budget.charge_materialized_cells(materialized_cells)?;
+            if let Some(error) = semantic_error {
+                return Err(error);
             }
-            self.parse_tile_rows(
-                &tile,
-                row_origin,
-                tile_size,
-                row_count,
-                column_count,
-                budget,
-                cell_tables,
-                projection_budget,
-                table,
-            )?;
             decoded = true;
         }
 
@@ -1684,40 +1739,9 @@ impl<'a> TableDataExtractor<'a> {
         Ok(())
     }
 
-    /// Parse rows within a tile
-    fn parse_tile_rows(
-        &self,
-        tile: &tst::Tile,
-        row_origin: usize,
-        tile_size: usize,
-        row_count: usize,
-        column_count: usize,
-        budget: &mut CellBudget,
-        cell_tables: &CellTables<'_>,
-        projection_budget: &mut ProjectionBudget,
-        table: &mut Table,
-    ) -> Result<()> {
-        for row_info in &tile.row_infos {
-            self.parse_tile_row(
-                row_info,
-                row_origin,
-                tile_size,
-                row_count,
-                column_count,
-                budget,
-                cell_tables,
-                projection_budget,
-                table,
-            )?;
-        }
-
-        Ok(())
-    }
-
     /// Parse a single tile row
     fn parse_tile_row(
-        &self,
-        row_info: &tst::TileRowInfo,
+        row_info: &numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
         row_origin: usize,
         tile_size: usize,
         row_count: usize,
@@ -1727,13 +1751,13 @@ impl<'a> TableDataExtractor<'a> {
         projection_budget: &mut ProjectionBudget,
         table: &mut Table,
     ) -> Result<()> {
-        let tile_row_index = usize::try_from(row_info.tile_row_index).map_err(|_| {
+        let tile_row_index = usize::try_from(row_info.tile_row_index()).map_err(|_| {
             Error::InvalidFormat("Numbers tile row index does not fit the host usize".to_owned())
         })?;
         if tile_row_index >= tile_size {
             return Err(Error::InvalidFormat(format!(
                 "Numbers tile row {} is outside tile size {tile_size}",
-                row_info.tile_row_index
+                row_info.tile_row_index()
             )));
         }
         let row_index = row_origin
@@ -1744,27 +1768,25 @@ impl<'a> TableDataExtractor<'a> {
         // The cell_storage_buffer contains serialized Cell messages
         // The cell_offsets buffer contains the byte offsets for each cell
 
-        let (cell_storage, cell_offsets) = match (
-            row_info.cell_storage_buffer.as_deref(),
-            row_info.cell_offsets.as_deref(),
-        ) {
-            (Some(storage), Some(offsets)) => (storage, offsets),
-            _ => (
-                row_info.cell_storage_buffer_pre_bnc.as_slice(),
-                row_info.cell_offsets_pre_bnc.as_slice(),
-            ),
-        };
+        let (cell_storage, cell_offsets) =
+            match (row_info.cell_storage_buffer(), row_info.cell_offsets()) {
+                (Some(storage), Some(offsets)) => (storage, offsets),
+                _ => (
+                    row_info.cell_storage_buffer_pre_bnc(),
+                    row_info.cell_offsets_pre_bnc(),
+                ),
+            };
 
-        let expected_cells = usize::try_from(row_info.cell_count).map_err(|_| {
+        let expected_cells = usize::try_from(row_info.cell_count()).map_err(|_| {
             Error::InvalidFormat("Numbers cell count does not fit the host usize".to_owned())
         })?;
         budget.check(expected_cells)?;
-        // The strict tile projection admitted the aggregate declared cell
-        // count before generated tile decoding.
+        // The strict borrowed-row projection charged the aggregate declared
+        // cell count before row-level cell decoding.
         let cells = Self::parse_cell_offsets(
             cell_offsets,
             cell_storage.len(),
-            row_info.has_wide_offsets.unwrap_or(false),
+            row_info.has_wide_offsets().unwrap_or(false),
             expected_cells,
             column_count,
         )?;
@@ -4957,10 +4979,12 @@ fn finite_zero() -> Result<FiniteF64> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CellTables, Error, FormulaReferenceBudget, FormulaReferenceMaps, FormulaRenderer,
-        MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK, ProjectionBudget,
-        TableDataExtractor, collect_formula_category_payload, decode_legacy_table_candidate,
-        has_legacy_table_model_wire_shape, render_formula, render_formula_ast_array,
+        CellBudget, CellTables, Error, FormulaReferenceBudget, FormulaReferenceMaps,
+        FormulaRenderer, MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK,
+        ProjectionBudget, Table, TableDataExtractor, TileRowVisitor,
+        collect_formula_category_payload, decode_legacy_table_candidate,
+        has_legacy_table_model_wire_shape, map_table_cell_decode_limit_with_reference_offset,
+        render_formula, render_formula_ast_array,
     };
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
@@ -4975,7 +4999,7 @@ mod tests {
     use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
-    use litchi_iwa_protos::{tn, tsce, tsp, tst};
+    use litchi_iwa_protos::{numbers_table_cell_storage_codec, tn, tsce, tsp, tst};
     use prost::Message as _;
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -5058,29 +5082,327 @@ mod tests {
         }
     }
 
+    fn tile_row(
+        tile_row_index: u32,
+        cell_count: u32,
+        pre_bnc_storage: Vec<u8>,
+        pre_bnc_offsets: Vec<u8>,
+        modern_storage: Option<Vec<u8>>,
+        modern_offsets: Option<Vec<u8>>,
+        has_wide_offsets: Option<bool>,
+    ) -> tst::TileRowInfo {
+        tst::TileRowInfo {
+            tile_row_index,
+            cell_count,
+            cell_storage_buffer_pre_bnc: pre_bnc_storage,
+            cell_offsets_pre_bnc: pre_bnc_offsets,
+            cell_storage_buffer: modern_storage,
+            cell_offsets: modern_offsets,
+            has_wide_offsets,
+            ..Default::default()
+        }
+    }
+
+    fn tile_source(rows: Vec<tst::TileRowInfo>, num_cells: u32, num_rows: u32) -> Vec<u8> {
+        tst::Tile {
+            max_column: 1,
+            max_row: 1,
+            num_cells,
+            numrows: num_rows,
+            row_infos: rows,
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn decode_tile_scalars(source: &[u8]) -> numbers_table_cell_storage_codec::TileSnapshot {
+        let options = numbers_table_cell_storage_codec::DecodeOptions::new(
+            source.len().max(1),
+            usize::MAX,
+            usize::MAX,
+            16,
+            usize::MAX,
+            usize::MAX,
+        );
+        numbers_table_cell_storage_codec::decode_tile_with_visitor(source, options, &mut ())
+            .unwrap_or_else(|error| panic!("tile projection failed: {error:?}"))
+            .0
+    }
+
+    fn run_tile_visitor(
+        source: &[u8],
+        column_count: usize,
+        limits: SemanticLimits,
+    ) -> super::Result<(
+        Result<
+            numbers_table_cell_storage_codec::DecodeReport,
+            numbers_table_cell_storage_codec::DecodeError,
+        >,
+        Table,
+        ProjectionBudget,
+        Option<Error>,
+        usize,
+    )> {
+        let mut table = Table::with_dimensions("tile", 2, column_count)?;
+        let strings: Box<[(u32, String)]> = Box::default();
+        let formulas: Box<[(u32, tsce::FormulaArchive)]> = Box::default();
+        let formula_errors: Box<[(u32, String)]> = Box::default();
+        let rich_text: Box<[(u32, String)]> = Box::default();
+        let comments: Box<[(u32, Comment)]> = Box::default();
+        let formula_references = FormulaReferenceMaps::default();
+        let cell_tables = CellTables {
+            strings: &strings,
+            formulas: &formulas,
+            formula_errors: &formula_errors,
+            rich_text: &rich_text,
+            comments: &comments,
+            formula_references: &formula_references,
+        };
+        let mut cell_budget = CellBudget::new();
+        let mut projection_budget = ProjectionBudget::new(limits);
+        let options = numbers_table_cell_storage_codec::DecodeOptions::new(
+            source.len().max(1),
+            usize::MAX,
+            usize::MAX,
+            16,
+            usize::MAX,
+            usize::MAX,
+        );
+        let (materialized_cells, semantic_error, report) = {
+            let mut visitor = TileRowVisitor {
+                row_origin: 0,
+                tile_size: 2,
+                row_count: table.row_count(),
+                column_count: table.column_count(),
+                budget: &mut cell_budget,
+                cell_tables: &cell_tables,
+                projection_budget: &mut projection_budget,
+                table: &mut table,
+                materialized_cells: 0,
+                semantic_error: None,
+            };
+            let decode_result = numbers_table_cell_storage_codec::decode_tile_with_visitor(
+                source,
+                options,
+                &mut visitor,
+            )
+            .map(|(_, report)| report);
+            (
+                visitor.materialized_cells,
+                visitor.semantic_error.take(),
+                decode_result,
+            )
+        };
+        Ok((
+            report,
+            table,
+            projection_budget,
+            semantic_error,
+            materialized_cells,
+        ))
+    }
+
+    fn parse_projected_rows(source: &[u8], column_count: usize) -> super::Result<Table> {
+        let (report, table, mut projection_budget, semantic_error, materialized_cells) =
+            run_tile_visitor(source, column_count, SemanticLimits::default())?;
+        let report = report
+            .map_err(|error| Error::InvalidFormat(format!("tile projection failed: {error:?}")))?;
+        projection_budget.charge_decode_report(report)?;
+        projection_budget.charge_materialized_cells(materialized_cells)?;
+        if let Some(error) = semantic_error {
+            return Err(error);
+        }
+        Ok(table)
+    }
+
     #[test]
     fn table_info_wire_is_a_legacy_classification_miss() -> super::Result<()> {
         let table_info = tst::TableInfoArchive::default().encode_to_vec();
         assert!(!has_legacy_table_model_wire_shape(&table_info)?);
         assert!(
-            decode_legacy_table_candidate(&table_info, |_model| -> super::Result<()> {
-                panic!("table-info false positive reached model extraction")
-            })?
+            decode_legacy_table_candidate(
+                &table_info,
+                || panic!("table-info false positive invoked admission"),
+                |_model| -> super::Result<()> {
+                    panic!("table-info false positive reached model extraction")
+                },
+            )?
             .is_none()
         );
         Ok(())
     }
 
     #[test]
+    fn legacy_table_info_false_positive_is_ignored_when_table_budget_is_full() {
+        let bytes = compatibility_package(vec![
+            archive_object(
+                1,
+                vec![RawMessage {
+                    type_: 1,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                }],
+            )
+            .expect("document archive"),
+            archive_object(
+                10,
+                vec![RawMessage {
+                    type_: 6_000,
+                    data: tst::TableInfoArchive::default().encode_to_vec(),
+                }],
+            )
+            .expect("table-info archive"),
+        ])
+        .expect("compatibility package");
+        let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
+        let index =
+            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
+
+        let tables = extractor
+            .extract_all_semantic_tables(0)
+            .expect("table-info false positive is not a table");
+        assert!(tables.is_empty());
+        let budget = *extractor.projection_budget.borrow();
+        assert_eq!(budget.references, 0);
+        assert_eq!(budget.payload_fields, 0);
+        assert_eq!(budget.payload_work, 0);
+        assert_eq!(budget.staging_text_bytes, 0);
+        assert_eq!(budget.materialized_cells, 0);
+        assert_eq!(budget.output_text_bytes, 0);
+        assert_eq!(budget.formula_render_work, 0);
+    }
+
+    #[test]
+    fn legacy_candidate_admission_happens_before_decode_or_parse() {
+        let encoded = legacy_model("over-budget", 90).encode_to_vec();
+        let mut admission_called = false;
+        let mut parse_called = false;
+        let result = decode_legacy_table_candidate(
+            &encoded,
+            || {
+                admission_called = true;
+                Err(super::table_limit_error(1, 0))
+            },
+            |_model| {
+                parse_called = true;
+                Ok(())
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Tables,
+                observed: 1,
+                maximum: 0,
+                path: SemanticPath::StructuredTables,
+            })
+        ));
+        assert!(admission_called);
+        assert!(!parse_called);
+    }
+
+    #[test]
+    fn legacy_model_at_full_table_budget_leaves_projection_budget_unchanged() {
+        let bytes = compatibility_package(vec![
+            archive_object(
+                1,
+                vec![RawMessage {
+                    type_: 1,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                }],
+            )
+            .expect("document archive"),
+            archive_object(
+                10,
+                vec![RawMessage {
+                    type_: 6_000,
+                    data: legacy_model("over-budget", 90).encode_to_vec(),
+                }],
+            )
+            .expect("legacy table archive"),
+        ])
+        .expect("compatibility package");
+        let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
+        let index =
+            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
+        let before = *extractor.projection_budget.borrow();
+
+        let error = extractor
+            .extract_all_semantic_tables(0)
+            .expect_err("over-budget legacy model");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::Tables,
+                observed: 1,
+                maximum: 0,
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        let after = *extractor.projection_budget.borrow();
+        assert_eq!(before.references, after.references);
+        assert_eq!(before.payload_fields, after.payload_fields);
+        assert_eq!(before.payload_work, after.payload_work);
+        assert_eq!(before.staging_text_bytes, after.staging_text_bytes);
+        assert_eq!(before.materialized_cells, after.materialized_cells);
+        assert_eq!(before.output_text_bytes, after.output_text_bytes);
+        assert_eq!(before.formula_render_work, after.formula_render_work);
+    }
+
+    #[test]
+    fn malformed_schema_shaped_legacy_candidate_wins_when_table_budget_is_available() {
+        let malformed = [0x22, 0x01, 0xff, 0x30, 0x01, 0x38, 0x01, 0x42, 0x01, b'x'];
+        let bytes = compatibility_package(vec![
+            archive_object(
+                1,
+                vec![RawMessage {
+                    type_: 1,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                }],
+            )
+            .expect("document archive"),
+            archive_object(
+                10,
+                vec![RawMessage {
+                    type_: 6_000,
+                    data: malformed.to_vec(),
+                }],
+            )
+            .expect("malformed legacy archive"),
+        ])
+        .expect("compatibility package");
+        let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
+        let index =
+            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
+
+        let error = extractor
+            .extract_all_semantic_tables(1)
+            .expect_err("malformed schema-shaped legacy payload");
+        assert!(matches!(
+            error,
+            Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+    }
+
+    #[test]
     fn admitted_legacy_candidate_preserves_common_allocation_error() -> super::Result<()> {
         let encoded = legacy_model("model", 90).encode_to_vec();
         assert!(has_legacy_table_model_wire_shape(&encoded)?);
-        let result: super::Result<Option<()>> = decode_legacy_table_candidate(&encoded, |_model| {
-            Err(Error::Common(litchi_iwa_common::Error::Allocation {
-                resource: "Numbers retained semantic text",
-                amount: 5,
-            }))
-        });
+        let result: super::Result<Option<()>> = decode_legacy_table_candidate(
+            &encoded,
+            || Ok(()),
+            |_model| {
+                Err(Error::Common(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers retained semantic text",
+                    amount: 5,
+                }))
+            },
+        );
         let error = result
             .err()
             .ok_or_else(|| Error::InvalidFormat("allocation error was swallowed".to_owned()))?;
@@ -5099,14 +5421,33 @@ mod tests {
     }
 
     #[test]
+    fn table_cell_codec_allocation_limit_maps_to_typed_common_error() {
+        let error = map_table_cell_decode_limit_with_reference_offset(
+            numbers_table_cell_storage_codec::DecodeLimit::Allocation { requested: 17 },
+            0,
+        );
+        assert!(matches!(
+            error,
+            Error::Common(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table storage projection",
+                amount: 17,
+            })
+        ));
+    }
+
+    #[test]
     fn admitted_legacy_decode_failure_reports_exact_content_free_path() -> super::Result<()> {
         // Required model fields 4, 6, 7, and 8 are present with their schema
         // wire types, but the nested DataStore payload is malformed.
         let encoded = [0x22, 0x01, 0xff, 0x30, 0x01, 0x38, 0x01, 0x42, 0x01, b'x'];
         assert!(has_legacy_table_model_wire_shape(&encoded)?);
-        let result = decode_legacy_table_candidate(&encoded, |_model| -> super::Result<()> {
-            panic!("malformed admitted model reached semantic extraction")
-        });
+        let result = decode_legacy_table_candidate(
+            &encoded,
+            || Ok(()),
+            |_model| -> super::Result<()> {
+                panic!("malformed admitted model reached semantic extraction")
+            },
+        );
         let error = result.err().ok_or_else(|| {
             Error::InvalidFormat("admitted model decode error was swallowed".to_owned())
         })?;
@@ -5127,9 +5468,13 @@ mod tests {
     fn admitted_legacy_duplicate_required_field_fails_closed() -> super::Result<()> {
         let mut encoded = legacy_model("model", 90).encode_to_vec();
         encoded.extend_from_slice(&[0x30, 0x01]);
-        let result = decode_legacy_table_candidate(&encoded, |_model| -> super::Result<()> {
-            panic!("ambiguous admitted model reached semantic extraction")
-        });
+        let result = decode_legacy_table_candidate(
+            &encoded,
+            || Ok(()),
+            |_model| -> super::Result<()> {
+                panic!("ambiguous admitted model reached semantic extraction")
+            },
+        );
         assert!(matches!(
             result,
             Err(Error::MalformedPayload {
@@ -5144,9 +5489,13 @@ mod tests {
         let mut encoded = legacy_model("model", 90).encode_to_vec();
         encoded.push(0xff);
         assert!(matches!(
-            decode_legacy_table_candidate(&encoded, |_model| -> super::Result<()> {
-                panic!("malformed admitted model reached semantic extraction")
-            }),
+            decode_legacy_table_candidate(
+                &encoded,
+                || Ok(()),
+                |_model| -> super::Result<()> {
+                    panic!("malformed admitted model reached semantic extraction")
+                },
+            ),
             Err(Error::MalformedPayload {
                 path: SemanticPath::StructuredTables,
             })
@@ -5240,6 +5589,198 @@ mod tests {
             error,
             Error::InvalidFormat(message) if message.contains("outside the declared table width")
         ));
+    }
+
+    #[test]
+    fn tile_rows_use_pre_bnc_buffers_when_modern_buffers_are_absent() -> super::Result<()> {
+        let source = tile_source(
+            vec![tile_row(0, 1, vec![0; 8], vec![0, 0], None, None, None)],
+            1,
+            1,
+        );
+        let table = parse_projected_rows(&source, 1)?;
+        assert_eq!(table.get_cell(0, 0), Some(&CellValue::Empty));
+        Ok(())
+    }
+
+    #[test]
+    fn tile_rows_use_modern_buffers_only_when_both_are_present() -> super::Result<()> {
+        let modern = BncCell::minimal().encode();
+        let source = tile_source(
+            vec![tile_row(
+                0,
+                1,
+                vec![0xff],
+                vec![0xff],
+                Some(modern),
+                Some(vec![0, 0]),
+                None,
+            )],
+            1,
+            1,
+        );
+        let table = parse_projected_rows(&source, 1)?;
+        assert_eq!(table.get_cell(0, 0), Some(&CellValue::Empty));
+        Ok(())
+    }
+
+    #[test]
+    fn tile_rows_fall_back_to_both_pre_bnc_buffers_for_partial_modern_storage() -> super::Result<()>
+    {
+        let source = tile_source(
+            vec![tile_row(
+                0,
+                1,
+                vec![0; 8],
+                vec![0, 0],
+                Some(vec![0xff]),
+                None,
+                None,
+            )],
+            1,
+            1,
+        );
+        let table = parse_projected_rows(&source, 1)?;
+        assert_eq!(table.get_cell(0, 0), Some(&CellValue::Empty));
+        Ok(())
+    }
+
+    #[test]
+    fn tile_rows_honor_wide_offset_units() -> super::Result<()> {
+        let cell = BncCell::minimal().encode();
+        let mut storage = cell.clone();
+        storage.extend_from_slice(&cell);
+        let source = tile_source(
+            vec![tile_row(
+                0,
+                2,
+                Vec::new(),
+                vec![0xff, 0xff, 0xff, 0xff],
+                Some(storage),
+                Some(vec![0, 0, 3, 0]),
+                Some(true),
+            )],
+            2,
+            1,
+        );
+        let table = parse_projected_rows(&source, 2)?;
+        assert_eq!(table.get_cell(0, 0), Some(&CellValue::Empty));
+        assert_eq!(table.get_cell(0, 1), Some(&CellValue::Empty));
+        Ok(())
+    }
+
+    #[test]
+    fn tile_row_projection_is_atomic_when_a_later_row_is_malformed() -> super::Result<()> {
+        let valid = tile_row(0, 1, vec![0; 8], vec![0, 0], None, None, None).encode_to_vec();
+        let mut malformed =
+            tile_row(1, 1, vec![0; 8], vec![0, 0], None, None, None).encode_to_vec();
+        malformed.pop();
+        let mut source = Vec::new();
+        append_varint_field(&mut source, 1, 1)?;
+        append_varint_field(&mut source, 2, 1)?;
+        append_varint_field(&mut source, 3, 2)?;
+        append_varint_field(&mut source, 4, 2)?;
+        append_length_delimited_field(&mut source, 5, &valid)?;
+        append_length_delimited_field(&mut source, 5, &malformed)?;
+
+        let options = numbers_table_cell_storage_codec::DecodeOptions::new(
+            source.len().max(1),
+            usize::MAX,
+            usize::MAX,
+            16,
+            usize::MAX,
+            usize::MAX,
+        );
+        assert!(
+            numbers_table_cell_storage_codec::decode_tile_with_visitor(&source, options, &mut ())
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn later_malformed_wire_overrides_prior_semantic_tile_error() -> super::Result<()> {
+        let mut invalid_cell = vec![0; 8];
+        invalid_cell[2] = 99;
+        let first = tile_row(0, 1, invalid_cell, vec![0, 0], None, None, None).encode_to_vec();
+        let mut malformed =
+            tile_row(1, 1, vec![0; 8], vec![0, 0], None, None, None).encode_to_vec();
+        malformed.pop();
+        let mut source = Vec::new();
+        append_varint_field(&mut source, 1, 1)?;
+        append_varint_field(&mut source, 2, 1)?;
+        append_varint_field(&mut source, 3, 2)?;
+        append_varint_field(&mut source, 4, 2)?;
+        append_length_delimited_field(&mut source, 5, &first)?;
+        append_length_delimited_field(&mut source, 5, &malformed)?;
+
+        let (decode_result, table, _budget, semantic_error, materialized_cells) =
+            run_tile_visitor(&source, 1, SemanticLimits::default())?;
+        assert!(decode_result.is_err());
+        assert!(
+            matches!(semantic_error, Some(Error::ParseError(message)) if message.contains("Unsupported Numbers pre-BNC cell type 99"))
+        );
+        assert_eq!(materialized_cells, 1);
+        assert_eq!(table.cell_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_cell_limit_precedes_retained_semantic_error_without_row_growth()
+    -> super::Result<()> {
+        let mut invalid_cell = vec![0; 8];
+        invalid_cell[2] = 99;
+        let first = tile_row(0, 1, invalid_cell, vec![0, 0], None, None, None).encode_to_vec();
+        let second = tile_row(1, 3, vec![0; 8], vec![0, 0], None, None, None).encode_to_vec();
+        let source = tile_source(
+            vec![
+                tst::TileRowInfo::decode(first.as_slice()).map_err(Error::protobuf)?,
+                tst::TileRowInfo::decode(second.as_slice()).map_err(Error::protobuf)?,
+            ],
+            4,
+            2,
+        );
+        let limits = SemanticLimits::default()
+            .with_projection_limits(1, SemanticLimits::MAX_OUTPUT_TEXT_BYTES)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let (decode_result, table, mut budget, semantic_error, materialized_cells) =
+            run_tile_visitor(&source, 1, limits)?;
+        let report = decode_result.map_err(|error| Error::InvalidFormat(format!("{error:?}")))?;
+        assert!(matches!(semantic_error, Some(Error::ParseError(_))));
+        assert_eq!(materialized_cells, 4);
+        assert_eq!(table.cell_count(), 0);
+        budget.charge_decode_report(report)?;
+        let error = budget
+            .charge_materialized_cells(materialized_cells)
+            .err()
+            .ok_or_else(|| {
+                Error::InvalidFormat("aggregate cell limit was not enforced".to_owned())
+            })?;
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::MaterializedCells,
+                observed: 4,
+                maximum: 1,
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn tile_rows_ignore_declared_counts_when_records_are_valid() -> super::Result<()> {
+        let source = tile_source(
+            vec![tile_row(0, 1, vec![0; 8], vec![0, 0], None, None, None)],
+            99,
+            77,
+        );
+        let projected = decode_tile_scalars(&source);
+        assert_eq!(projected.num_cells(), 99);
+        assert_eq!(projected.num_rows(), 77);
+        let table = parse_projected_rows(&source, 1)?;
+        assert_eq!(table.get_cell(0, 0), Some(&CellValue::Empty));
+        Ok(())
     }
 
     #[test]

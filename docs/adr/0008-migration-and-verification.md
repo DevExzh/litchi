@@ -10832,10 +10832,57 @@ formula, comment, and AST paths, and no host API or manifest edge is retired.
 The focused Numbers all-feature library run is 298 passing with four ignored,
 including nine focused rich-text projection tests; the document-reader
 integration run is 16/16, and the boundary unit suite is 267/267. The live
-boundary audit accepts 64 packages, 239 internal
+boundary audit accepts 64 packages, 240 internal
 declarations, and the unchanged 14-item ordered migration debt. The existing
 Numbers basic and formula/rich-text native gates remain authoritative: Apple
 Numbers 14.4 accepted the locked/read-only fixtures without repair or
 conversion UI and retained the recorded sheet, table, formula, and rich-text
 semantics. No native save, rendering, performance, or full-graph Buffa claim
 is inferred from this duplicate-decode removal.
+
+## 2026-08-20 Numbers type-6002 Tile production-decode exit gate
+
+The focused Numbers extractor now admits type-6002 `TST.Tile` through the
+no-`Vec` transactional
+`numbers_table_cell_storage_codec::decode_tile_with_visitor` design. The
+handwritten canonical router is authoritative for root and row framing,
+proto2-required and duplicate fields, canonical scalar/Boolean values,
+unknown/group forms, and aggregate resource accounting. A private Buffa lazy
+view is forced only for strict-parity checking after that route; production
+does not construct `tst::Tile`. The boundary gate rejects both generated
+`Tile::decode` and `TileRowInfo::decode` (including `tst::Tile::decode` and
+`tst::TileRowInfo::decode`) in production, while test-only Prost code remains
+the differential oracle and fixture builder. Tile row callbacks borrow their
+storage and offset payloads directly from the source component.
+
+The production visitor checks the prefix materialized-cell total before
+materializing a row. If cell semantics fail, it records the first semantic
+error and lets the strict decoder finish later rows, so the result still has a
+full decode report without further semantic table growth. Report accounting is
+merged first, aggregate materialized cells are charged second, and the stored
+semantic error is exposed third. Thus a later malformed wire failure overrides
+an earlier semantic cell failure, and an aggregate materialized-cell limit
+overrides a stored semantic failure. A table candidate uses a local table and
+budget and publishes neither on rejection; bounded decode work is retained as
+package admission cost.
+
+This turn also hardens legacy type-6000 admission: strict shape classification
+still ignores TableInfo false positives, while schema-shaped legacy models hit
+the table budget before Prost decode/materialization and cannot commit rejected
+candidate budgets.
+
+The cut removes the duplicate Tile parse and row-buffer copies from production,
+but source-borrowed callbacks do not establish end-to-end zero-copy behavior.
+Verification on 2026-08-20 records 221 `litchi-iwa-protos` tests, 311 passed
+and four ignored Numbers unit tests, and all 14 integration binaries passed
+(120 tests total), including `document_reader` 16/16 and
+`tile_reader_integration` 2/2. Boundary is 271; the live graph is 64 packages,
+240 internal declarations, and 14 unchanged debts. The final temp-corpus
+nightly ASan smoke ran 100 runs with eight seeds; the read-only native Numbers
+ZIP/directory hash and UI gate passed its known hashes.
+
+This gate makes no measured performance, latency, or RSS claim and no native
+save or mutation claim. It is not a complete extractor, Numbers, or monolith
+exit: eight production generated decodes remain in the extractor, old
+`litchi-iwa` Tile paths remain, and debt 015 and all 14 ordered migration debts
+are unchanged.
