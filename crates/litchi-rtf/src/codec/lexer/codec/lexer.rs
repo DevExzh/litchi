@@ -135,18 +135,26 @@ impl<'a> Lexer<'a> {
                     limit: self.limits.max_tokens(),
                 });
             }
-            tokens
-                .try_reserve(1)
-                .map_err(|_err| RtfError::AllocationFailed {
-                    resource: "lexer tokens",
-                    requested: observed.saturating_mul(size_of::<Token<'a>>()),
-                })?;
-            spans
-                .try_reserve(1)
-                .map_err(|_err| RtfError::AllocationFailed {
-                    resource: "lexer token spans",
-                    requested: observed.saturating_mul(size_of::<Range<usize>>()),
-                })?;
+            // `Vec::try_reserve` grows geometrically, so calling it for every
+            // token only repeats the capacity check on the hot path. Keep the
+            // same fallible growth and diagnostics, but ask for capacity only
+            // when the next push would actually need it.
+            if tokens.len() == tokens.capacity() {
+                tokens
+                    .try_reserve(1)
+                    .map_err(|_err| RtfError::AllocationFailed {
+                        resource: "lexer tokens",
+                        requested: observed.saturating_mul(size_of::<Token<'a>>()),
+                    })?;
+            }
+            if spans.len() == spans.capacity() {
+                spans
+                    .try_reserve(1)
+                    .map_err(|_err| RtfError::AllocationFailed {
+                        resource: "lexer token spans",
+                        requested: observed.saturating_mul(size_of::<Range<usize>>()),
+                    })?;
+            }
             let start = self.pos;
             let token = self.next_token()?;
             self.observe_group_token(&token)?;

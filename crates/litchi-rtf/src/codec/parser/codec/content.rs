@@ -1,8 +1,8 @@
 use super::{
-    ControlWord, Cow, Destination, FontCharset, MAX_REVISIONS, MAX_TEXT_INTERMEDIATE_BYTES,
-    ParsedBodyStoryEvent, Parser, RtfEncoding, RtfError, RtfResult, SmallVec, State, StyleBlock,
-    Token, append_transport_bytes, control_symbol_text, parser_classification_error,
-    require_parameterless,
+    ControlWord, Cow, Destination, FontCharset, FontRef, MAX_REVISIONS,
+    MAX_TEXT_INTERMEDIATE_BYTES, ParsedBodyStoryEvent, Parser, RtfEncoding, RtfError, RtfResult,
+    SmallVec, State, StyleBlock, Token, append_transport_bytes, control_symbol_text,
+    parser_classification_error, require_parameterless,
 };
 
 impl<'a> Parser<'a> {
@@ -382,14 +382,19 @@ impl<'a> Parser<'a> {
                         s.destination == Destination::DocumentBody
                             && (s.in_table || s.table_nesting_level >= 2)
                     }) {
-                        let state = self.current_state()?.clone();
-                        let encoding = self.effective_text_encoding(&state)?;
+                        let (font_ref, fallback_encoding, table_level) = {
+                            let state = self.current_state()?;
+                            (
+                                state.formatting.font_ref,
+                                state.encoding,
+                                state.table_nesting_level,
+                            )
+                        };
+                        let encoding =
+                            self.effective_text_encoding_for(font_ref, fallback_encoding)?;
                         let mut bytes = SmallVec::<[u8; 64]>::new();
                         append_transport_bytes(&mut bytes, text)?;
-                        self.append_table_text(
-                            encoding.decode(&bytes).as_bytes(),
-                            state.table_nesting_level,
-                        )?;
+                        self.append_table_text(encoding.decode(&bytes).as_bytes(), table_level)?;
                     } else if self
                         .current_state()
                         .is_ok_and(|s| s.destination == Destination::DocumentBody)
@@ -462,18 +467,26 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn effective_text_encoding(&self, state: &State) -> RtfResult<RtfEncoding> {
+        self.effective_text_encoding_for(state.formatting.font_ref, state.encoding)
+    }
+
+    fn effective_text_encoding_for(
+        &self,
+        font_ref: FontRef,
+        fallback_encoding: RtfEncoding,
+    ) -> RtfResult<RtfEncoding> {
         let fonts = self.font_table.borrow();
-        let Some(font) = fonts.get(state.formatting.font_ref) else {
-            return Ok(state.encoding);
+        let Some(font) = fonts.get(font_ref) else {
+            return Ok(fallback_encoding);
         };
         if let Some(page) = font.code_page {
             return Ok(RtfEncoding::from_font_page(page));
         }
         let Some(charset) = font.charset else {
-            return Ok(state.encoding);
+            return Ok(fallback_encoding);
         };
         if charset == FontCharset::Default {
-            return Ok(state.encoding);
+            return Ok(fallback_encoding);
         }
         charset
             .page()
@@ -482,7 +495,7 @@ impl<'a> Parser<'a> {
                 RtfError::MalformedDocument(format!(
                     "unsupported RTF font charset {} for font {}",
                     charset.id(),
-                    state.formatting.font_ref
+                    font_ref
                 ))
             })
     }
@@ -621,20 +634,23 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn record_body_page_break(&mut self) -> RtfResult<()> {
-        let state = self.current_state()?.clone();
-        if state.destination != Destination::DocumentBody {
+        let (destination, table_nesting_level, in_table) = {
+            let state = self.current_state()?;
+            (state.destination, state.table_nesting_level, state.in_table)
+        };
+        if destination != Destination::DocumentBody {
             return Err(RtfError::MalformedDocument(
                 "RTF page is not permitted in this destination".to_string(),
             ));
         }
-        if state.table_nesting_level >= 2 {
-            let builder = self.ensure_nested_builder(state.table_nesting_level)?;
+        if table_nesting_level >= 2 {
+            let builder = self.ensure_nested_builder(table_nesting_level)?;
             builder
                 .cell_story_events
                 .push(crate::CellStoryEvent::PageBreak(crate::PageBreak::new(
                     builder.cell_text.len(),
                 )));
-        } else if state.in_table {
+        } else if in_table {
             self.current_cell_story_events
                 .push(crate::CellStoryEvent::PageBreak(crate::PageBreak::new(
                     self.current_cell_text.len(),
@@ -651,20 +667,23 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn record_body_column_break(&mut self) -> RtfResult<()> {
-        let state = self.current_state()?.clone();
-        if state.destination != Destination::DocumentBody {
+        let (destination, table_nesting_level, in_table) = {
+            let state = self.current_state()?;
+            (state.destination, state.table_nesting_level, state.in_table)
+        };
+        if destination != Destination::DocumentBody {
             return Err(RtfError::MalformedDocument(
                 "RTF column is not permitted in this destination".to_string(),
             ));
         }
-        if state.table_nesting_level >= 2 {
-            let builder = self.ensure_nested_builder(state.table_nesting_level)?;
+        if table_nesting_level >= 2 {
+            let builder = self.ensure_nested_builder(table_nesting_level)?;
             builder
                 .cell_story_events
                 .push(crate::CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
                     builder.cell_text.len(),
                 )));
-        } else if state.in_table {
+        } else if in_table {
             self.current_cell_story_events
                 .push(crate::CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
                     self.current_cell_text.len(),
@@ -834,13 +853,16 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn current_story_position(&mut self) -> RtfResult<usize> {
-        let state = self.current_state()?.clone();
-        if state.table_nesting_level >= 2 {
+        let (table_nesting_level, in_table) = {
+            let state = self.current_state()?;
+            (state.table_nesting_level, state.in_table)
+        };
+        if table_nesting_level >= 2 {
             Ok(self
-                .ensure_nested_builder(state.table_nesting_level)?
+                .ensure_nested_builder(table_nesting_level)?
                 .cell_text
                 .len())
-        } else if state.in_table {
+        } else if in_table {
             Ok(self.current_cell_text.len())
         } else {
             Ok(self.body_text_len)
@@ -863,8 +885,11 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn record_revision_end(&mut self, id: usize) -> RtfResult<()> {
-        let state = self.current_state()?.clone();
-        if state.in_table || state.table_nesting_level >= 2 {
+        let (in_table, table_nesting_level) = {
+            let state = self.current_state()?;
+            (state.in_table, state.table_nesting_level)
+        };
+        if in_table || table_nesting_level >= 2 {
             let index = self
                 .revision_event_indices
                 .get(id)
@@ -877,7 +902,7 @@ impl<'a> Parser<'a> {
                 })?;
             let position = self.current_story_position()?;
             self.push_cell_story_event(
-                state.table_nesting_level,
+                table_nesting_level,
                 crate::CellStoryEvent::RevisionEnd(crate::CellStoryReference { index, position }),
             )
         } else {
@@ -888,9 +913,17 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn close_revision_at_cell_boundary(&mut self, level: u8) -> RtfResult<()> {
-        let state = self.current_state()?.clone();
-        if state.revision_type == Some(super::super::super::annotation::RevisionType::Insertion)
-            && let Some(id) = state.revision_event_id
+        let (revision_type, revision_event_id, in_table, table_nesting_level) = {
+            let state = self.current_state()?;
+            (
+                state.revision_type,
+                state.revision_event_id,
+                state.in_table,
+                state.table_nesting_level,
+            )
+        };
+        if revision_type == Some(super::super::super::annotation::RevisionType::Insertion)
+            && let Some(id) = revision_event_id
             && self
                 .revision_event_indices
                 .get(id)
@@ -898,7 +931,7 @@ impl<'a> Parser<'a> {
         {
             self.record_revision_end(id)?;
         }
-        if (state.in_table || state.table_nesting_level >= level) && state.revision_type.is_some() {
+        if (in_table || table_nesting_level >= level) && revision_type.is_some() {
             self.current_state_mut()?.revision_event_id = None;
         }
         Ok(())
