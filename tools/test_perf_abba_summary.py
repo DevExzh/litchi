@@ -14,6 +14,7 @@ from tools import perf_abba_summary
 TOOL = {
     "name": "litchi-perf-baseline",
     "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
     "profile": "release",
     "target_os": "linux",
     "target_arch": "x86_64",
@@ -818,6 +819,16 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         with self.assertRaisesRegex(
             perf_abba_summary.AbbaSummaryInputError,
             "instrumentation.*latency ABBA",
+        ):
+            perf_abba_summary.summarize_reports(legs)
+
+    def test_allocator_binary_identity_is_not_accepted_for_latency_abba(self):
+        legs = four_legs()
+        for leg in legs:
+            leg["tool"]["binary"] = "litchi-perf-baseline-alloc"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "binary.*latency ABBA",
         ):
             perf_abba_summary.summarize_reports(legs)
 

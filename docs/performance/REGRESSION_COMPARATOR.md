@@ -18,6 +18,14 @@ upper regression thresholds:
 - p99 latency: 15%
 - allocation, RSS, and work counters when present: 5%
 
+Allocator-only evidence uses the separate
+[`perf-regression-policy-allocator-v1.json`](perf-regression-policy-allocator-v1.json).
+That policy requires the `litchi-perf-baseline-alloc` binary identity and
+`system_allocator_operation_scoped` instrumentation identity. The comparator
+validates and compares allocation vectors under that policy while withholding
+all elapsed-latency comparisons; the normal policy's `binary` and
+`instrumentation` identity still rejects allocator reports.
+
 The schema-2 metric-class `presence` field distinguishes required and optional
 counters and is mandatory for every class. Required classes must match at least
 one metric in every result, and every required path must be present and valid in

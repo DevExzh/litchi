@@ -44,6 +44,7 @@ ENVIRONMENT_VARIANTS = frozenset(("git_revision",))
 REQUIRED_TOOL_FIELDS = (
     "name",
     "version",
+    "binary",
     "profile",
     "target_os",
     "target_arch",
@@ -612,6 +613,10 @@ def _validate_tool(tool: dict[str, Any], label: str) -> None:
     if tool["name"] != HARNESS_TOOL_NAME:
         raise AbbaSummaryInputError(
             f"{label}.tool.name must be {HARNESS_TOOL_NAME!r}"
+        )
+    if tool["binary"] != HARNESS_TOOL_NAME:
+        raise AbbaSummaryInputError(
+            f"{label}.tool.binary must be {HARNESS_TOOL_NAME!r} for latency ABBA"
         )
     if tool["instrumentation"] != "none":
         raise AbbaSummaryInputError(

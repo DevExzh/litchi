@@ -1,50 +1,136 @@
-//! Opt-in operation-scoped allocation counters for the benchmark binary.
+//! Forbid-safe operation-scoped allocation counters shared by the two targets.
 //!
-//! The normal `litchi-perf-baseline` target does not install the wrapper and
-//! therefore pays no allocator instrumentation cost.  The companion
-//! `litchi-perf-baseline-alloc` target enables the feature that installs one
-//! process-global wrapper around `std::alloc::System`.
+//! The normal binary never installs a global allocator wrapper and never calls
+//! [`enable`]. The allocator binary owns the only `GlobalAlloc` implementation
+//! and calls the record functions below after each successful or failed system
+//! allocation. Keeping this state and all arithmetic safe lets the shared
+//! harness library retain `#![forbid(unsafe_code)]`.
 //!
-//! Counters are absolute process counters.  A region records two snapshots and
-//! publishes checked differences; it never resets a counter.  The region
-//! guard is deliberately non-reentrant so a nested operation cannot publish a
-//! misleading partial interval.  Atomics make totals include allocations made
+//! Counters are absolute process counters. A region records two snapshots and
+//! publishes checked differences; it never resets a counter. The region guard
+//! is deliberately non-reentrant so a nested operation cannot publish a
+//! misleading partial interval. Atomics make totals include allocations made
 //! by worker threads while the operation is active.
+
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 
-pub(crate) const INSTRUMENTATION_IDENTITY: &str = if cfg!(feature = "allocator-metrics") {
-    "system_allocator_operation_scoped"
-} else {
-    "none"
-};
+const SCOPE: Scope = Scope::OperationGlobalSystemAllocator;
 
-pub(crate) const ALLOCATOR_IDENTITY: &str = if cfg!(feature = "allocator-metrics") {
-    "CountingSystemAllocator(std::alloc::System)"
-} else {
-    "Rust system allocator"
-};
+static ENABLED: AtomicBool = AtomicBool::new(false);
+static REGION_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-#[cfg(feature = "allocator-metrics")]
-const SCOPE: &str = "operation_global_system_allocator";
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Scope {
+    OperationGlobalSystemAllocator,
+}
+
+/// Returns the report identity selected by the executable wrapper.
+pub(crate) fn instrumentation_identity() -> &'static str {
+    if ENABLED.load(Ordering::Acquire) {
+        "system_allocator_operation_scoped"
+    } else {
+        "none"
+    }
+}
+
+/// Returns the allocator identity selected by the executable wrapper.
+pub(crate) fn allocator_identity() -> &'static str {
+    if ENABLED.load(Ordering::Acquire) {
+        "CountingSystemAllocator(std::alloc::System)"
+    } else {
+        "Rust system allocator"
+    }
+}
+
+/// Returns the executable identity included in every report.
+pub(crate) fn binary_identity() -> &'static str {
+    if ENABLED.load(Ordering::Acquire) {
+        "litchi-perf-baseline-alloc"
+    } else {
+        "litchi-perf-baseline"
+    }
+}
+
+/// Enables publication of allocation regions for the allocator-only target.
+///
+/// The normal binary has no call site for this function and no global wrapper,
+/// so compiling all package targets/features cannot instrument it.
+pub fn enable() {
+    ENABLED.store(true, Ordering::Release);
+}
+
+/// Records a successful `alloc` or `alloc_zeroed` call.
+pub fn record_allocation(size: usize) {
+    COUNTERS.allocation(size);
+}
+
+/// Records a successful `dealloc` call.
+pub fn record_deallocation(size: usize) {
+    COUNTERS.deallocation(size);
+}
+
+/// Records a successful `realloc` call.
+pub fn record_reallocation(old_size: usize, new_size: usize) {
+    COUNTERS.reallocation(old_size, new_size);
+}
+
+/// Records a failed allocation or reallocation call.
+pub fn record_failed_allocation() {
+    COUNTERS.failed_allocation();
+}
+
+/// A raw absolute counter snapshot used by the allocator target's unit tests.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Snapshot {
+    pub allocation_calls: u64,
+    pub deallocation_calls: u64,
+    pub reallocation_calls: u64,
+    pub failed_allocation_calls: u64,
+    pub allocated_bytes: u64,
+    pub deallocated_bytes: u64,
+    pub live_bytes: u64,
+    pub peak_live_bytes: u64,
+    pub overflowed: bool,
+}
+
+/// Returns absolute counters without resetting them.
+#[doc(hidden)]
+pub fn snapshot() -> Snapshot {
+    let snapshot = COUNTERS.snapshot();
+    Snapshot {
+        allocation_calls: snapshot.allocation_calls,
+        deallocation_calls: snapshot.deallocation_calls,
+        reallocation_calls: snapshot.reallocation_calls,
+        failed_allocation_calls: snapshot.failed_allocation_calls,
+        allocated_bytes: snapshot.allocated_bytes,
+        deallocated_bytes: snapshot.deallocated_bytes,
+        live_bytes: snapshot.live_bytes,
+        peak_live_bytes: snapshot.peak_live_bytes,
+        overflowed: snapshot.overflowed,
+    }
+}
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Status {
     /// Every absolute counter difference was checked successfully.
     Measured,
-    /// The region could not be acquired, or the feature is not active.
+    /// The region could not be acquired.
     Unavailable,
     /// An absolute counter or checked difference overflowed.
     Overflow,
 }
 
-/// One operation's allocation observation.  Numeric fields are omitted unless
+/// One operation's allocation observation. Numeric fields are omitted unless
 /// the complete observation is measured; callers must not mix partial vectors.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct Sample {
     pub status: Status,
-    pub scope: String,
+    pub scope: Scope,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allocation_calls: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -72,11 +158,10 @@ pub(crate) struct Sample {
 }
 
 impl Sample {
-    #[cfg(feature = "allocator-metrics")]
     fn unavailable() -> Self {
         Self {
             status: Status::Unavailable,
-            scope: SCOPE.to_owned(),
+            scope: SCOPE,
             allocation_calls: None,
             deallocation_calls: None,
             reallocation_calls: None,
@@ -90,7 +175,6 @@ impl Sample {
         }
     }
 
-    #[cfg(feature = "allocator-metrics")]
     fn measured(before: CountersSnapshot, after: CountersSnapshot) -> Self {
         let values = [
             difference(before.allocation_calls, after.allocation_calls),
@@ -115,7 +199,7 @@ impl Sample {
         }
         Self {
             status: Status::Measured,
-            scope: SCOPE.to_owned(),
+            scope: SCOPE,
             allocation_calls: values[0],
             deallocation_calls: values[1],
             reallocation_calls: values[2],
@@ -130,78 +214,65 @@ impl Sample {
     }
 }
 
+enum RegionState {
+    Disabled,
+    Unavailable,
+    Active(CountersSnapshot),
+}
+
 /// A region that owns the non-overlap token until it is finished or dropped.
 pub(crate) struct Region {
-    #[cfg(feature = "allocator-metrics")]
-    before: CountersSnapshot,
-    #[cfg(feature = "allocator-metrics")]
-    active: bool,
-    status: Status,
+    state: RegionState,
 }
 
 impl Region {
-    /// Ends the region and releases its token.  No allocator counters are
+    /// Ends the region and releases its token. No allocator counters are
     /// reset, and this method performs no heap allocation itself.
     pub(crate) fn finish(mut self) -> Option<Sample> {
-        let _ = self.status;
-        #[cfg(feature = "allocator-metrics")]
-        {
-            if !self.active {
-                return Some(Sample::unavailable());
-            }
-            let after = COUNTERS.snapshot();
-            self.active = false;
-            REGION_ACTIVE.store(false, Ordering::SeqCst);
-            return Some(Sample::measured(self.before, after));
+        match self.state {
+            RegionState::Disabled => None,
+            RegionState::Unavailable => Some(Sample::unavailable()),
+            RegionState::Active(before) => {
+                let after = COUNTERS.snapshot();
+                self.state = RegionState::Disabled;
+                REGION_ACTIVE.store(false, Ordering::Release);
+                Some(Sample::measured(before, after))
+            },
         }
-        None
     }
 }
 
 impl Drop for Region {
     fn drop(&mut self) {
-        #[cfg(feature = "allocator-metrics")]
-        if self.active {
-            REGION_ACTIVE.store(false, Ordering::SeqCst);
-            self.active = false;
+        if matches!(self.state, RegionState::Active(_)) {
+            REGION_ACTIVE.store(false, Ordering::Release);
+            self.state = RegionState::Disabled;
         }
     }
 }
 
-/// Starts a region when operation instrumentation is enabled.  A failed
+/// Starts a region when operation instrumentation is enabled. A failed
 /// acquisition returns a region which publishes `unavailable` and leaves the
 /// operation itself untouched.
 pub(crate) fn begin() -> Region {
-    #[cfg(feature = "allocator-metrics")]
-    {
-        if REGION_ACTIVE
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_err()
-        {
-            return Region {
-                before: CountersSnapshot::default(),
-                active: false,
-                status: Status::Unavailable,
-            };
-        }
+    if !ENABLED.load(Ordering::Acquire) {
         return Region {
-            before: COUNTERS.snapshot(),
-            active: true,
-            status: Status::Measured,
+            state: RegionState::Disabled,
+        };
+    }
+    if REGION_ACTIVE
+        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+        .is_err()
+    {
+        return Region {
+            state: RegionState::Unavailable,
         };
     }
     Region {
-        status: Status::Unavailable,
+        state: RegionState::Active(COUNTERS.snapshot()),
     }
 }
 
-#[cfg(feature = "allocator-metrics")]
-use std::{
-    alloc::{GlobalAlloc, Layout, System},
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
-};
-
-#[cfg(feature = "allocator-metrics")]
 #[derive(Default)]
 struct Counters {
     allocation_calls: AtomicU64,
@@ -215,8 +286,7 @@ struct Counters {
     overflowed: AtomicBool,
 }
 
-#[cfg(feature = "allocator-metrics")]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct CountersSnapshot {
     allocation_calls: u64,
     deallocation_calls: u64,
@@ -229,25 +299,24 @@ struct CountersSnapshot {
     overflowed: bool,
 }
 
-#[cfg(feature = "allocator-metrics")]
 impl Counters {
     fn snapshot(&self) -> CountersSnapshot {
         CountersSnapshot {
-            allocation_calls: self.allocation_calls.load(Ordering::SeqCst),
-            deallocation_calls: self.deallocation_calls.load(Ordering::SeqCst),
-            reallocation_calls: self.reallocation_calls.load(Ordering::SeqCst),
-            failed_allocation_calls: self.failed_allocation_calls.load(Ordering::SeqCst),
-            allocated_bytes: self.allocated_bytes.load(Ordering::SeqCst),
-            deallocated_bytes: self.deallocated_bytes.load(Ordering::SeqCst),
-            live_bytes: self.live_bytes.load(Ordering::SeqCst),
-            peak_live_bytes: self.peak_live_bytes.load(Ordering::SeqCst),
-            overflowed: self.overflowed.load(Ordering::SeqCst),
+            allocation_calls: self.allocation_calls.load(Ordering::Acquire),
+            deallocation_calls: self.deallocation_calls.load(Ordering::Acquire),
+            reallocation_calls: self.reallocation_calls.load(Ordering::Acquire),
+            failed_allocation_calls: self.failed_allocation_calls.load(Ordering::Acquire),
+            allocated_bytes: self.allocated_bytes.load(Ordering::Acquire),
+            deallocated_bytes: self.deallocated_bytes.load(Ordering::Acquire),
+            live_bytes: self.live_bytes.load(Ordering::Acquire),
+            peak_live_bytes: self.peak_live_bytes.load(Ordering::Acquire),
+            overflowed: self.overflowed.load(Ordering::Acquire),
         }
     }
 
     fn add(&self, counter: &AtomicU64, value: u64) {
         if checked_add(counter, value).is_none() {
-            self.overflowed.store(true, Ordering::SeqCst);
+            self.overflowed.store(true, Ordering::Release);
         }
     }
 
@@ -255,24 +324,24 @@ impl Counters {
         if let Some(live) = checked_add(&self.live_bytes, value) {
             self.update_peak(live);
         } else {
-            self.overflowed.store(true, Ordering::SeqCst);
+            self.overflowed.store(true, Ordering::Release);
         }
     }
 
     fn live_sub(&self, value: u64) {
         if checked_sub(&self.live_bytes, value).is_none() {
-            self.overflowed.store(true, Ordering::SeqCst);
+            self.overflowed.store(true, Ordering::Release);
         }
     }
 
     fn update_peak(&self, live: u64) {
-        let mut peak = self.peak_live_bytes.load(Ordering::SeqCst);
+        let mut peak = self.peak_live_bytes.load(Ordering::Acquire);
         while live > peak {
             match self.peak_live_bytes.compare_exchange(
                 peak,
                 live,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
+                Ordering::AcqRel,
+                Ordering::Acquire,
             ) {
                 Ok(_) => break,
                 Err(observed) => peak = observed,
@@ -280,20 +349,19 @@ impl Counters {
         }
     }
 
-    fn allocation(&self, size: usize, zeroed: bool) {
+    fn allocation(&self, size: usize) {
         let Some(size) = u64::try_from(size).ok() else {
-            self.overflowed.store(true, Ordering::SeqCst);
+            self.overflowed.store(true, Ordering::Release);
             return;
         };
         self.add(&self.allocation_calls, 1);
         self.add(&self.allocated_bytes, size);
         self.live_add(size);
-        let _ = zeroed;
     }
 
     fn deallocation(&self, size: usize) {
         let Some(size) = u64::try_from(size).ok() else {
-            self.overflowed.store(true, Ordering::SeqCst);
+            self.overflowed.store(true, Ordering::Release);
             return;
         };
         self.add(&self.deallocation_calls, 1);
@@ -305,7 +373,7 @@ impl Counters {
         let (Some(old_size), Some(new_size)) =
             (u64::try_from(old_size).ok(), u64::try_from(new_size).ok())
         else {
-            self.overflowed.store(true, Ordering::SeqCst);
+            self.overflowed.store(true, Ordering::Release);
             return;
         };
         self.add(&self.allocation_calls, 1);
@@ -324,25 +392,22 @@ impl Counters {
     }
 }
 
-#[cfg(feature = "allocator-metrics")]
 fn checked_add(counter: &AtomicU64, value: u64) -> Option<u64> {
     counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
             current.checked_add(value)
         })
         .ok()
 }
 
-#[cfg(feature = "allocator-metrics")]
 fn checked_sub(counter: &AtomicU64, value: u64) -> Option<u64> {
     counter
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+        .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
             current.checked_sub(value)
         })
         .ok()
 }
 
-#[cfg(feature = "allocator-metrics")]
 static COUNTERS: Counters = Counters {
     allocation_calls: AtomicU64::new(0),
     deallocation_calls: AtomicU64::new(0),
@@ -355,84 +420,29 @@ static COUNTERS: Counters = Counters {
     overflowed: AtomicBool::new(false),
 };
 
-#[cfg(feature = "allocator-metrics")]
-static REGION_ACTIVE: AtomicBool = AtomicBool::new(false);
-
-#[cfg(feature = "allocator-metrics")]
-struct CountingSystemAllocator;
-
-#[cfg(feature = "allocator-metrics")]
-// SAFETY: Every method delegates to `std::alloc::System`; the atomic updates
-// are side-effect-only and do not change the pointer, layout, or ownership
-// contract required by `GlobalAlloc`.
-unsafe impl GlobalAlloc for CountingSystemAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: The caller upholds the `GlobalAlloc` layout contract.
-        let pointer = unsafe { System.alloc(layout) };
-        if pointer.is_null() {
-            COUNTERS.failed_allocation();
-        } else {
-            COUNTERS.allocation(layout.size(), false);
-        }
-        pointer
-    }
-
-    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        // SAFETY: The caller upholds the `GlobalAlloc` layout contract.
-        let pointer = unsafe { System.alloc_zeroed(layout) };
-        if pointer.is_null() {
-            COUNTERS.failed_allocation();
-        } else {
-            COUNTERS.allocation(layout.size(), true);
-        }
-        pointer
-    }
-
-    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-        // SAFETY: The caller upholds the `GlobalAlloc` pointer/layout contract.
-        unsafe { System.dealloc(pointer, layout) };
-        COUNTERS.deallocation(layout.size());
-    }
-
-    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        // SAFETY: The caller upholds the `GlobalAlloc` pointer/layout contract.
-        let result = unsafe { System.realloc(pointer, layout, new_size) };
-        if result.is_null() {
-            COUNTERS.failed_allocation();
-        } else {
-            COUNTERS.reallocation(layout.size(), new_size);
-        }
-        result
-    }
-}
-
-#[cfg(feature = "allocator-metrics")]
-#[global_allocator]
-static GLOBAL_ALLOCATOR: CountingSystemAllocator = CountingSystemAllocator;
-
-#[cfg(feature = "allocator-metrics")]
 fn difference(before: u64, after: u64) -> Option<u64> {
     after.checked_sub(before)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Sample, Status};
+    use super::{Sample, Scope, Status};
 
-    #[cfg(feature = "allocator-metrics")]
     static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
-    fn disabled_build_publishes_no_sample() {
-        #[cfg(not(feature = "allocator-metrics"))]
+    fn disabled_region_publishes_no_sample() {
+        let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(false, std::sync::atomic::Ordering::SeqCst);
         assert!(super::begin().finish().is_none());
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[test]
     fn sample_status_serialization_is_explicit() {
         let sample = Sample {
             status: Status::Overflow,
-            scope: "operation_global_system_allocator".to_owned(),
+            scope: Scope::OperationGlobalSystemAllocator,
             allocation_calls: None,
             deallocation_calls: None,
             reallocation_calls: None,
@@ -450,7 +460,6 @@ mod tests {
         assert!(value.get("allocation_calls").is_none());
     }
 
-    #[cfg(feature = "allocator-metrics")]
     #[test]
     fn checked_difference_turns_counter_wrap_into_overflow_status() {
         let _lock = TEST_LOCK.lock().unwrap();
@@ -465,17 +474,17 @@ mod tests {
         assert_eq!(super::difference(u64::MAX, 0), None);
     }
 
-    #[cfg(feature = "allocator-metrics")]
     #[test]
     fn region_counts_cross_thread_totals_without_resetting_absolute_counters() {
         let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
         let before = super::COUNTERS.snapshot();
         let region = super::begin();
         let handles = (0..2)
-            .map(|_| std::thread::spawn(|| vec![0_u8; 128]))
+            .map(|_| std::thread::spawn(|| super::record_allocation(128)))
             .collect::<Vec<_>>();
         for handle in handles {
-            drop(handle.join().unwrap());
+            handle.join().unwrap();
         }
         let sample = region.finish().unwrap();
         let after = super::COUNTERS.snapshot();
@@ -483,15 +492,19 @@ mod tests {
         assert!(sample.allocation_calls.unwrap() >= 2);
         assert_eq!(sample.live_bytes_before, Some(before.live_bytes));
         assert!(after.allocation_calls >= before.allocation_calls);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
     }
 
-    #[cfg(feature = "allocator-metrics")]
     #[test]
-    fn region_guard_rejects_overlap() {
+    fn region_guard_rejects_overlap_without_heap_scope_state() {
         let _lock = TEST_LOCK.lock().unwrap();
+        let was_enabled = super::ENABLED.swap(true, std::sync::atomic::Ordering::SeqCst);
         let outer = super::begin();
+        let before = super::COUNTERS.snapshot();
         let inner = super::begin();
         assert_eq!(inner.finish().unwrap().status, Status::Unavailable);
+        assert_eq!(super::COUNTERS.snapshot(), before);
         assert_eq!(outer.finish().unwrap().status, Status::Measured);
+        super::ENABLED.store(was_enabled, std::sync::atomic::Ordering::SeqCst);
     }
 }
