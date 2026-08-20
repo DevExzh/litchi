@@ -97,6 +97,28 @@ pub struct OpcPackage {
     /// Clone-local authorization for exact whole-source publication.
     exact_source_authorized: bool,
 
+    /// Whether the package was unmarshaled from an external source. This is
+    /// retained even for borrowed ingress, which has no exact-source bytes.
+    source_ingress: bool,
+
+    /// Whether this package has had a signature graph established at ingress
+    /// or by an explicit authoring operation. New packages may author a
+    /// signature graph directly; this marker keeps that case distinct from an
+    /// untracked unsigned package while still catching later mutations.
+    signature_graph_tracked: bool,
+
+    /// Whether the current signature graph was explicitly handled by a
+    /// strip-or-sign operation. Ordinary mutations revoke this policy while a
+    /// package remains signed; an explicit unsign remains authorized for later
+    /// publication.
+    signature_policy_authorized: bool,
+
+    /// Whether the current signature graph was authored through the explicit
+    /// signing API. This lets newly authored packages retain the historical
+    /// inert-signature construction path while still rejecting later edits to
+    /// a graph produced by `sign` or `resign`.
+    signature_api_authored: bool,
+
     /// Source identity used to prove safe targeted publication.
     preservation: Option<Arc<PreservationProvenance>>,
 
@@ -115,6 +137,13 @@ impl std::fmt::Debug for OpcPackage {
             .field("source_xml_parts_count", &self.source_xml_parts.len())
             .field("has_owned_source", &self.source_archive.is_some())
             .field("exact_source_authorized", &self.exact_source_authorized)
+            .field("source_ingress", &self.source_ingress)
+            .field("signature_graph_tracked", &self.signature_graph_tracked)
+            .field(
+                "signature_policy_authorized",
+                &self.signature_policy_authorized,
+            )
+            .field("signature_api_authored", &self.signature_api_authored)
             .field("has_preservation_provenance", &self.preservation.is_some())
             .field("non_part_members", &self.non_part_members)
             .field("save_options", &self.save_options)
@@ -132,6 +161,10 @@ impl OpcPackage {
             source_xml_parts: HashMap::new(),
             source_archive: None,
             exact_source_authorized: false,
+            source_ingress: false,
+            signature_graph_tracked: false,
+            signature_policy_authorized: false,
+            signature_api_authored: false,
             preservation: None,
             non_part_members: Vec::new(),
             save_options: SaveOptions::default(),
@@ -366,6 +399,8 @@ impl OpcPackage {
 
         package.parts = parts_map;
         package.source_xml_parts = source_xml_parts;
+        package.source_ingress = true;
+        package.signature_graph_tracked = package.is_signed();
         Ok(package)
     }
 
@@ -633,8 +668,23 @@ impl OpcPackage {
     /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn sign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
+        let exact_source_authorized = self.exact_source_authorized;
+        let signature_graph_tracked = self.signature_graph_tracked;
+        let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
-        crate::sign::sign(self, signer, &litchi_sign::Limits::standard())
+        let result = crate::sign::sign(self, signer, &litchi_sign::Limits::standard());
+        if result.is_ok() {
+            self.signature_graph_tracked = true;
+            self.signature_policy_authorized = true;
+            self.signature_api_authored = true;
+        } else {
+            self.exact_source_authorized = exact_source_authorized;
+            self.signature_graph_tracked = signature_graph_tracked;
+            self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_api_authored = signature_api_authored;
+        }
+        result
     }
 
     /// Adds a signature with explicit authoring resource bounds.
@@ -648,8 +698,23 @@ impl OpcPackage {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> crate::sign::Result<PackURI> {
+        let exact_source_authorized = self.exact_source_authorized;
+        let signature_graph_tracked = self.signature_graph_tracked;
+        let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
-        crate::sign::sign(self, signer, limits)
+        let result = crate::sign::sign(self, signer, limits);
+        if result.is_ok() {
+            self.signature_graph_tracked = true;
+            self.signature_policy_authorized = true;
+            self.signature_api_authored = true;
+        } else {
+            self.exact_source_authorized = exact_source_authorized;
+            self.signature_graph_tracked = signature_graph_tracked;
+            self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_api_authored = signature_api_authored;
+        }
+        result
     }
 
     /// Atomically replaces the validated signature graph with one signature.
@@ -659,8 +724,23 @@ impl OpcPackage {
     /// signature cannot be created or staged into the package.
     #[cfg(feature = "sign")]
     pub fn resign(&mut self, signer: &litchi_sign::Signer) -> crate::sign::Result<PackURI> {
+        let exact_source_authorized = self.exact_source_authorized;
+        let signature_graph_tracked = self.signature_graph_tracked;
+        let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
-        crate::sign::resign(self, signer, &litchi_sign::Limits::standard())
+        let result = crate::sign::resign(self, signer, &litchi_sign::Limits::standard());
+        if result.is_ok() {
+            self.signature_graph_tracked = true;
+            self.signature_policy_authorized = true;
+            self.signature_api_authored = true;
+        } else {
+            self.exact_source_authorized = exact_source_authorized;
+            self.signature_graph_tracked = signature_graph_tracked;
+            self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_api_authored = signature_api_authored;
+        }
+        result
     }
 
     /// Atomically replaces signatures with explicit authoring resource bounds.
@@ -674,8 +754,23 @@ impl OpcPackage {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> crate::sign::Result<PackURI> {
+        let exact_source_authorized = self.exact_source_authorized;
+        let signature_graph_tracked = self.signature_graph_tracked;
+        let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
-        crate::sign::resign(self, signer, limits)
+        let result = crate::sign::resign(self, signer, limits);
+        if result.is_ok() {
+            self.signature_graph_tracked = true;
+            self.signature_policy_authorized = true;
+            self.signature_api_authored = true;
+        } else {
+            self.exact_source_authorized = exact_source_authorized;
+            self.signature_graph_tracked = signature_graph_tracked;
+            self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_api_authored = signature_api_authored;
+        }
+        result
     }
 
     /// Removes all signature relationships and infrastructure parts.
@@ -684,6 +779,8 @@ impl OpcPackage {
     pub fn unsign(&mut self) {
         self.revoke_exact_source();
         self.strip_signature_graph();
+        self.signature_policy_authorized = true;
+        self.signature_api_authored = false;
     }
 
     /// Relate the package to a part.
@@ -697,9 +794,14 @@ impl OpcPackage {
     /// # Returns
     /// The relationship ID (rId)
     pub fn relate_to(&mut self, partname: &str, reltype: &str) -> String {
+        let was_signed = self.is_signed();
         self.revoke_exact_source();
-        let rel = self.rels.get_or_add(reltype, partname);
-        rel.r_id().to_string()
+        let r_id = self.rels.get_or_add(reltype, partname).r_id().to_string();
+        if !was_signed && reltype == relationship_type::DIGITAL_SIGNATURE_ORIGIN {
+            self.signature_graph_tracked = true;
+            self.signature_policy_authorized = true;
+        }
+        r_id
     }
 
     /// Add an external relationship (e.g., for hyperlinks).
@@ -719,7 +821,12 @@ impl OpcPackage {
     ///
     /// Useful for advanced relationship management.
     pub fn relationships_mut(&mut self) -> &mut Relationships {
+        let was_signed = self.is_signed();
         self.revoke_exact_source();
+        if !was_signed {
+            self.signature_graph_tracked = true;
+            self.signature_policy_authorized = true;
+        }
         &mut self.rels
     }
 
@@ -874,8 +981,23 @@ impl OpcPackage {
             .zip(self.preservation.as_deref())
     }
 
+    pub(crate) fn requires_signature_edit_policy(&self) -> bool {
+        !self.exact_source_authorized
+            && self.signature_graph_tracked
+            && self.is_signed()
+            && (self.source_ingress || self.signature_api_authored)
+            && !self.signature_policy_authorized
+    }
+
+    pub(crate) fn requires_owned_source_preservation(&self) -> bool {
+        self.source_archive.is_some() && !self.exact_source_authorized
+    }
+
     fn revoke_exact_source(&mut self) {
         self.exact_source_authorized = false;
+        if self.is_signed() && (self.source_ingress || self.signature_api_authored) {
+            self.signature_policy_authorized = false;
+        }
     }
 
     fn from_owned_phys_reader(owned_reader: OwnedPhysPkgReader) -> Result<Self> {
