@@ -241,6 +241,7 @@ pub(crate) struct OperationMetrics {
 
 const ALIGNMENT: &str = "elapsed_ns.samples_by_elapsed_then_sample_index";
 const LATENCY_CLAIM: &str = "evidence_only_filesystem_selector";
+const COMPARABLE_LATENCY_CLAIM: &str = "comparable_timed_operation";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
 const SOURCE_PATTERN_SCOPE: &str = "operation_logical_read_at_range_order_not_physical_io";
 const SOURCE_COMPRESSED_SCOPE: &str = "unavailable_read_at_has_no_compressed_member_boundary";
@@ -341,7 +342,8 @@ pub(crate) fn aggregate(
         "untimed_source_replay_only"
         | "not_applicable_eager_opc"
         | "not_applicable_eager_pptx"
-        | "not_applicable_eager_docx" => MetricStatus::NotApplicable,
+        | "not_applicable_eager_docx"
+        | "not_applicable_immutable_owned_slice" => MetricStatus::NotApplicable,
         _ => MetricStatus::Unavailable,
     };
     let source_values = |value: fn(&SampleEvidence) -> u64| {
@@ -483,7 +485,9 @@ pub(crate) fn from_sink_observation(
     }
     Ok(OperationMetrics {
         sample_count,
+        sample_indices: (0..sample_count).collect(),
         alignment: ALIGNMENT,
+        latency_claim: COMPARABLE_LATENCY_CLAIM,
         source: SourceMetrics {
             status: MetricStatus::NotApplicable,
             counter_scope: SINK_SOURCE_SCOPE.to_owned(),
@@ -495,6 +499,30 @@ pub(crate) fn from_sink_observation(
             logical_read_returned_bytes: MetricVector::absent(
                 MetricStatus::NotApplicable,
                 SOURCE_SCOPE,
+            ),
+            logical_read_largest_requested_bytes: MetricVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_SCOPE,
+            ),
+            logical_read_largest_returned_bytes: MetricVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_SCOPE,
+            ),
+            logical_read_pattern: PatternVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_PATTERN_SCOPE,
+            ),
+            compressed_bytes: MetricVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_COMPRESSED_SCOPE,
+            ),
+            decompressed_bytes: MetricVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_DECOMPRESSED_SCOPE,
+            ),
+            recompressed_bytes: MetricVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_RECOMPRESSED_SCOPE,
             ),
             max_concurrent_reads: MetricVector::absent(MetricStatus::NotApplicable, SOURCE_SCOPE),
         },
@@ -1110,6 +1138,23 @@ mod tests {
     }
 
     #[test]
+    fn immutable_owned_slice_scope_is_not_applicable() {
+        let mut sample = sample(0, "warm", 10, Some(metrics()));
+        sample.logical_read_counter_scope = "not_applicable_immutable_owned_slice".to_owned();
+        sample.logical_read_calls = 0;
+        sample.logical_read_requested_bytes = 0;
+        sample.logical_read_bytes = 0;
+        let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
+        assert_eq!(envelope.source.status, MetricStatus::NotApplicable);
+        assert!(envelope.source.logical_read_calls.values.is_none());
+        assert!(envelope.source.logical_read_pattern.values.is_none());
+        assert_eq!(
+            envelope.source.compressed_bytes.status,
+            MetricStatus::NotApplicable
+        );
+    }
+
+    #[test]
     fn sink_observation_is_accepted_boundary_and_aligned() {
         let observation = SinkObservation {
             accepted_bytes: 70_000,
@@ -1124,6 +1169,8 @@ mod tests {
         };
         let envelope = from_sink_observation(2, observation).unwrap();
         assert_eq!(envelope.sample_count, 2);
+        assert_eq!(envelope.sample_indices, vec![0, 1]);
+        assert_eq!(envelope.latency_claim, "comparable_timed_operation");
         assert_eq!(envelope.sink.write_status, MetricStatus::Measured);
         assert_eq!(
             envelope.sink.accepted_bytes.values,

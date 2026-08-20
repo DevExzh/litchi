@@ -2628,6 +2628,11 @@ bytes before delegation; an underlying error leaves returned bytes unchanged,
 and a source that returns more than the requested buffer is rejected before
 returned-byte accounting. Counter overflow, invalid range arithmetic, and
 poisoned metric state fail the sample rather than emitting fabricated values.
+The generic operation envelope publishes returned-byte totals and the largest
+returned range only; it does not fabricate a per-call returned-size
+distribution from the requested-size vector. The untimed PPTX/DOCX replay
+vectors are the exception: their `*_return_sizes` fields are exact completed
+return lengths from the replay source.
 The timed generic `ReadAt` and atomic-save callbacks expose no exact compressed
 member, decompressed-byte, or recompressed-byte boundary, so the corresponding
 `operation_metrics.source` vectors are explicitly `unavailable` (or
@@ -2660,6 +2665,12 @@ copied-byte, decompressed-byte, or recompressed-byte claim because the
 filesystem child does not instrument those quantities. The existing raw
 `filesystem_evidence` fields retain their prior semantics; the new counters are
 additive.
+
+In-process sink-only envelopes use `latency_claim: comparable_timed_operation`;
+filesystem envelopes use `evidence_only_filesystem_selector`. The Python
+comparator validates the claim on both reports, excludes evidence-only elapsed
+vectors from latency comparisons, and includes `cache_state` in the result key
+when present so warm and cold-requested rows cannot be paired accidentally.
 
 Cases with a top-level `sink` summary also carry the same envelope. Their
 `sink.accepted_bytes`, `sink.write_calls`, `sink.largest_write`, and

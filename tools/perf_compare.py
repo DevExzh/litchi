@@ -22,9 +22,12 @@ from typing import Any, Iterable
 
 
 COMPARATOR_NAME = "litchi-perf-compare"
-COMPARATOR_VERSION = "1.3.1"
+COMPARATOR_VERSION = "1.3.2"
 SUPPORTED_POLICY_SCHEMA = 2
 SUPPORTED_REPORT_SCHEMA = 1
+EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_filesystem_selector"
+COMPARABLE_LATENCY_CLAIM = "comparable_timed_operation"
+OPERATION_ALIGNMENT = "elapsed_ns.samples_by_elapsed_then_sample_index"
 
 
 class ComparisonInputError(ValueError):
@@ -254,7 +257,7 @@ def validate_policy(raw: Any) -> dict[str, Any]:
     return policy
 
 
-def _result_key(result: dict[str, Any], location: str) -> tuple[str, str]:
+def _result_key(result: dict[str, Any], location: str) -> tuple[str, str, str]:
     case = result.get("case")
     corpus = result.get("corpus")
     if not isinstance(case, str) or not case:
@@ -267,12 +270,22 @@ def _result_key(result: dict[str, Any], location: str) -> tuple[str, str]:
         )
     except (TypeError, ValueError) as error:
         raise ComparisonInputError(f"{location}.corpus is not canonical JSON: {error}")
-    return case, corpus_identity
+    has_cache_state = "cache_state" in result
+    cache_state = result.get("cache_state", "")
+    if not isinstance(cache_state, str) or (has_cache_state and not cache_state):
+        raise ComparisonInputError(
+            f"{location}.cache_state must be a non-empty string when present"
+        )
+    if cache_state and cache_state not in {"warm", "cold-requested"}:
+        raise ComparisonInputError(
+            f"{location}.cache_state must be 'warm' or 'cold-requested'"
+        )
+    return case, corpus_identity, cache_state
 
 
 def _index_results(
     report: dict[str, Any], label: str, expected_count: int
-) -> dict[tuple[str, str], dict[str, Any]]:
+) -> dict[tuple[str, str, str], dict[str, Any]]:
     results = report.get("results")
     if not isinstance(results, list):
         raise ComparisonInputError(f"{label}.results must be a list")
@@ -280,7 +293,7 @@ def _index_results(
         raise ComparisonInputError(
             f"{label}.results has {len(results)} entries; expected {expected_count}"
         )
-    indexed: dict[tuple[str, str], dict[str, Any]] = {}
+    indexed: dict[tuple[str, str, str], dict[str, Any]] = {}
     for index, raw_result in enumerate(results):
         result = _require_object(raw_result, f"{label}.results[{index}]")
         if "elapsed_ns" not in result:
@@ -294,12 +307,22 @@ def _index_results(
     return indexed
 
 
-def result_key_manifest_sha256(keys: Iterable[tuple[str, str]]) -> str:
+def result_key_manifest_sha256(
+    keys: Iterable[tuple[str, str] | tuple[str, str, str]]
+) -> str:
     digest = hashlib.sha256()
-    for case, corpus_identity in sorted(keys):
+    for key in sorted(keys):
+        if len(key) == 2:
+            case, corpus_identity = key
+            cache_state = ""
+        else:
+            case, corpus_identity, cache_state = key
         digest.update(case.encode("utf-8"))
         digest.update(b"\0")
         digest.update(corpus_identity.encode("utf-8"))
+        if cache_state:
+            digest.update(b"\0")
+            digest.update(cache_state.encode("utf-8"))
         digest.update(b"\n")
     return digest.hexdigest()
 
@@ -485,7 +508,9 @@ _METRIC_VECTOR_STATUSES = {"measured", "not_applicable", "unavailable"}
 
 _OPERATION_METRICS_KEYS = {
     "sample_count",
+    "sample_indices",
     "alignment",
+    "latency_claim",
     "source",
     "process",
     "sink",
@@ -499,8 +524,28 @@ _SOURCE_METRICS_KEYS = {
     "logical_read_calls",
     "logical_read_requested_bytes",
     "logical_read_returned_bytes",
+    "logical_read_largest_requested_bytes",
+    "logical_read_largest_returned_bytes",
+    "logical_read_pattern",
+    "compressed_bytes",
+    "decompressed_bytes",
+    "recompressed_bytes",
     "max_concurrent_reads",
 }
+_SOURCE_NUMERIC_VECTOR_KEYS = (
+    "logical_read_calls",
+    "logical_read_requested_bytes",
+    "logical_read_returned_bytes",
+    "logical_read_largest_requested_bytes",
+    "logical_read_largest_returned_bytes",
+    "max_concurrent_reads",
+)
+_SOURCE_BOUNDARY_VECTOR_KEYS = (
+    "compressed_bytes",
+    "decompressed_bytes",
+    "recompressed_bytes",
+)
+_PATTERN_VALUES = {"sequential", "random", "unknown"}
 _PROCESS_METRICS_KEYS = {
     "status",
     "user_cpu_ticks",
@@ -617,6 +662,53 @@ def _validate_metric_vector(
     return status
 
 
+def _validate_pattern_vector(
+    value: Any, path: str, sample_count: int
+) -> str:
+    obj = _require_object(value, path)
+    actual = set(obj)
+    allowed = {"status", "scope", "values"}
+    if not {"status", "scope"} <= actual:
+        missing = sorted({"status", "scope"} - actual)
+        raise ComparisonInputError(
+            f"{path} has a partial PatternVector wrapper; "
+            f"missing required keys: {missing}"
+        )
+    unknown = sorted(actual - allowed)
+    if unknown:
+        raise ComparisonInputError(
+            f"{path} PatternVector wrapper has unknown keys: {unknown}"
+        )
+    status = _validate_metric_status(obj["status"], f"{path}.status")
+    scope = obj["scope"]
+    if not isinstance(scope, str) or not scope:
+        raise ComparisonInputError(f"{path}.scope must be a non-empty string")
+    has_values = "values" in obj
+    if status == "measured":
+        if not has_values:
+            raise ComparisonInputError(
+                f"{path}.values is required for a measured PatternVector"
+            )
+        values = obj["values"]
+        if not isinstance(values, list):
+            raise ComparisonInputError(f"{path}.values must be a sample vector")
+        if len(values) != sample_count:
+            raise ComparisonInputError(
+                f"{path}.values has {len(values)} samples; expected {sample_count}"
+            )
+        for index, item in enumerate(values):
+            if not isinstance(item, str) or item not in _PATTERN_VALUES:
+                raise ComparisonInputError(
+                    f"{path}.values[{index}] must be one of "
+                    f"{sorted(_PATTERN_VALUES)}"
+                )
+    elif has_values:
+        raise ComparisonInputError(
+            f"{path}.values must be omitted for a {status} PatternVector"
+        )
+    return status
+
+
 def _validate_status_group(
     value: Any,
     path: str,
@@ -650,7 +742,7 @@ def _validate_phase_set(value: Any, path: str, status: str, sample_count: int) -
 
 
 def _validate_operation_metrics(
-    value: Any, path: str, sample_count: int, report_schema: int
+    value: Any, path: str, elapsed_samples: list[Any], report_schema: int
 ) -> None:
     """Validate the exact operation-metrics envelope for report schema 1."""
     # `_validate_report_identity` rejects future report schemas before this
@@ -661,6 +753,7 @@ def _validate_operation_metrics(
             f"{SUPPORTED_REPORT_SCHEMA}, got {report_schema}"
         )
     obj = _require_exact_keys(value, path, _OPERATION_METRICS_KEYS)
+    sample_count = len(elapsed_samples)
     declared_sample_count = obj["sample_count"]
     if (
         isinstance(declared_sample_count, bool)
@@ -675,23 +768,95 @@ def _validate_operation_metrics(
             f"{path}.sample_count={declared_sample_count} does not match "
             f"elapsed_ns.samples length {sample_count}"
         )
-    if obj["alignment"] != "elapsed_ns.samples":
+    sample_indices = obj["sample_indices"]
+    if not isinstance(sample_indices, list):
+        raise ComparisonInputError(f"{path}.sample_indices must be a list")
+    if len(sample_indices) != sample_count:
         raise ComparisonInputError(
-            f"{path}.alignment must be 'elapsed_ns.samples'"
+            f"{path}.sample_indices has {len(sample_indices)} samples; "
+            f"expected {sample_count}"
         )
+    if any(
+        isinstance(index, bool) or not isinstance(index, int) or index < 0
+        for index in sample_indices
+    ):
+        raise ComparisonInputError(
+            f"{path}.sample_indices must contain non-negative integers"
+        )
+    if len(set(sample_indices)) != len(sample_indices):
+        raise ComparisonInputError(f"{path}.sample_indices must be unique")
+    alignment = obj["alignment"]
+    if alignment != OPERATION_ALIGNMENT:
+        raise ComparisonInputError(
+            f"{path}.alignment must be {OPERATION_ALIGNMENT!r}"
+        )
+    latency_claim = obj["latency_claim"]
+    if not isinstance(latency_claim, str) or latency_claim not in {
+        EVIDENCE_ONLY_LATENCY_CLAIM,
+        COMPARABLE_LATENCY_CLAIM,
+    }:
+        raise ComparisonInputError(
+            f"{path}.latency_claim must be one of "
+            f"{[COMPARABLE_LATENCY_CLAIM, EVIDENCE_ONLY_LATENCY_CLAIM]}"
+        )
+    elapsed_values = [
+        _finite_number(
+            value,
+            f"elapsed_ns.samples[{index}]",
+            positive=True,
+        )
+        for index, value in enumerate(elapsed_samples)
+    ]
+    if elapsed_values != sorted(elapsed_values):
+        raise ComparisonInputError(
+            f"{path}.alignment requires elapsed_ns.samples sorted by elapsed time"
+        )
+    for index in range(1, sample_count):
+        if (
+            elapsed_values[index] == elapsed_values[index - 1]
+            and sample_indices[index] <= sample_indices[index - 1]
+        ):
+            raise ComparisonInputError(
+                f"{path}.sample_indices must increase across tied elapsed samples"
+            )
 
-    _validate_status_group(
-        obj["source"],
-        f"{path}.source",
-        _SOURCE_METRICS_KEYS,
-        (
-            "logical_read_calls",
-            "logical_read_requested_bytes",
-            "logical_read_returned_bytes",
-            "max_concurrent_reads",
-        ),
+    source = _require_exact_keys(obj["source"], f"{path}.source", _SOURCE_METRICS_KEYS)
+    source_status = _validate_metric_status(
+        source["status"], f"{path}.source.status"
+    )
+    if source_status == "measured" and latency_claim != EVIDENCE_ONLY_LATENCY_CLAIM:
+        raise ComparisonInputError(
+            f"{path}.measured source metrics require "
+            f"latency_claim={EVIDENCE_ONLY_LATENCY_CLAIM!r}"
+        )
+    for key in _SOURCE_NUMERIC_VECTOR_KEYS:
+        vector_status = _validate_metric_vector(
+            source[key], f"{path}.source.{key}", sample_count
+        )
+        if vector_status != source_status:
+            raise ComparisonInputError(
+                f"{path}.source.status does not match {path}.source.{key}.status"
+            )
+    pattern_status = _validate_pattern_vector(
+        source["logical_read_pattern"],
+        f"{path}.source.logical_read_pattern",
         sample_count,
     )
+    if pattern_status != source_status:
+        raise ComparisonInputError(
+            f"{path}.source.status does not match "
+            f"{path}.source.logical_read_pattern.status"
+        )
+    boundary_status = "unavailable" if source_status == "measured" else source_status
+    for key in _SOURCE_BOUNDARY_VECTOR_KEYS:
+        vector_status = _validate_metric_vector(
+            source[key], f"{path}.source.{key}", sample_count
+        )
+        if vector_status != boundary_status:
+            raise ComparisonInputError(
+                f"{path}.source.{key}.status must be {boundary_status!r} "
+                f"for source status {source_status!r}"
+            )
     source = obj["source"]
     if not isinstance(source["counter_scope"], str) or not source["counter_scope"]:
         raise ComparisonInputError(
@@ -945,7 +1110,7 @@ def _collect_metrics(
             _validate_operation_metrics(
                 value,
                 root,
-                len(elapsed_samples),
+                elapsed_samples,
                 report_schema,
             )
         _walk_metrics(
@@ -957,6 +1122,13 @@ def _collect_metrics(
             metric_vector_context,
         )
     return selected, vector_metadata
+
+
+def _latency_claim(result: dict[str, Any]) -> str:
+    operation_metrics = result.get("operation_metrics")
+    if operation_metrics is None:
+        return COMPARABLE_LATENCY_CLAIM
+    return _require_object(operation_metrics, "operation_metrics")["latency_claim"]
 
 
 def _optional_metrics_from_selected(
@@ -1049,10 +1221,11 @@ def _comparison_record(
     baseline: float,
     current: float,
     threshold: float,
+    cache_state: str = "",
 ) -> dict[str, Any]:
     delta = _delta_percent(baseline, current)
     regression = delta > threshold
-    return {
+    record = {
         "case": case,
         "corpus": {
             key: corpus[key]
@@ -1075,6 +1248,9 @@ def _comparison_record(
         "max_regression_percent": threshold,
         "regression": regression,
     }
+    if cache_state:
+        record["cache_state"] = cache_state
+    return record
 
 
 def compare_reports(
@@ -1118,29 +1294,43 @@ def compare_reports(
     comparisons: list[dict[str, Any]] = []
     minimum_samples = policy["minimum_samples"]
     latency_thresholds = policy["latency_thresholds_percent"]
+    latency_compared_results = 0
+    latency_excluded_results = 0
     for key in sorted(baseline_keys):
         case = key[0]
         before_result = baseline_results[key]
         after_result = current_results[key]
         before_latency = _latencies(before_result, f"baseline.{case}", minimum_samples)
         after_latency = _latencies(after_result, f"current.{case}", minimum_samples)
-        corpus = before_result["corpus"]
-        for percentile in ("p50", "p95", "p99"):
-            comparisons.append(
-                _comparison_record(
-                    case=case,
-                    corpus=corpus,
-                    metric=f"elapsed_ns.{percentile}",
-                    metric_class="latency",
-                    baseline=before_latency[percentile],
-                    current=after_latency[percentile],
-                    threshold=float(latency_thresholds[percentile]),
-                )
-            )
         before_selected, before_vector_metadata = _collect_metrics(
             before_result, policy
         )
         after_selected, after_vector_metadata = _collect_metrics(after_result, policy)
+        before_latency_claim = _latency_claim(before_result)
+        after_latency_claim = _latency_claim(after_result)
+        if before_latency_claim != after_latency_claim:
+            raise ComparisonInputError(
+                f"latency claim mismatch for {case!r}: "
+                f"baseline={before_latency_claim!r}, current={after_latency_claim!r}"
+            )
+        corpus = before_result["corpus"]
+        if before_latency_claim == EVIDENCE_ONLY_LATENCY_CLAIM:
+            latency_excluded_results += 1
+        else:
+            latency_compared_results += 1
+            for percentile in ("p50", "p95", "p99"):
+                comparisons.append(
+                    _comparison_record(
+                        case=case,
+                        corpus=corpus,
+                        metric=f"elapsed_ns.{percentile}",
+                        metric_class="latency",
+                        baseline=before_latency[percentile],
+                        current=after_latency[percentile],
+                        threshold=float(latency_thresholds[percentile]),
+                        cache_state=key[2],
+                    )
+                )
         _compare_metric_vector_metadata(
             case, before_vector_metadata, after_vector_metadata
         )
@@ -1184,6 +1374,7 @@ def compare_reports(
                     baseline=before_value,
                     current=after_value,
                     threshold=before_threshold,
+                    cache_state=key[2],
                 )
             )
         for path in sorted(before_optional):
@@ -1208,6 +1399,7 @@ def compare_reports(
                     baseline=before_value,
                     current=after_value,
                     threshold=before_threshold,
+                    cache_state=key[2],
                 )
             )
 
@@ -1225,6 +1417,8 @@ def compare_reports(
             "matched_results": len(baseline_keys),
             "compared_metrics": len(comparisons),
             "regressions": len(regressions),
+            "latency_compared_results": latency_compared_results,
+            "latency_excluded_results": latency_excluded_results,
         },
         "baseline_revision": baseline["environment"].get("git_revision"),
         "current_revision": current["environment"].get("git_revision"),
@@ -1239,7 +1433,13 @@ def invalid_report(error: Exception) -> dict[str, Any]:
         "schema_version": 1,
         "tool": {"name": COMPARATOR_NAME, "version": COMPARATOR_VERSION},
         "status": "invalid",
-        "summary": {"matched_results": 0, "compared_metrics": 0, "regressions": 0},
+        "summary": {
+            "matched_results": 0,
+            "compared_metrics": 0,
+            "regressions": 0,
+            "latency_compared_results": 0,
+            "latency_excluded_results": 0,
+        },
         "comparisons": [],
         "regressions": [],
         "errors": [str(error)],
@@ -1253,6 +1453,12 @@ def human_summary(report: dict[str, Any]) -> str:
         f"{status}: {summary['matched_results']} matched results, "
         f"{summary['compared_metrics']} metrics, {summary['regressions']} regressions"
     ]
+    latency_excluded = summary.get("latency_excluded_results", 0)
+    if latency_excluded:
+        lines.append(
+            "Latency comparison excluded for "
+            f"{latency_excluded} evidence-only result(s)"
+        )
     if report["status"] == "invalid":
         lines.extend(f"ERROR: {error}" for error in report["errors"])
         return "\n".join(lines) + "\n"
@@ -1260,8 +1466,10 @@ def human_summary(report: dict[str, Any]) -> str:
         for item in report["regressions"]:
             delta = "infinite" if item["delta_is_infinite"] else f"{item['delta_percent']:+.2f}%"
             shape = item["corpus"].get("shape", item["corpus"].get("name", "unknown"))
+            cache_state = item.get("cache_state")
+            state_label = f"/{cache_state}" if cache_state else ""
             lines.append(
-                f"REGRESSION {item['case']}[{shape}] {item['metric']}: "
+                f"REGRESSION {item['case']}[{shape}{state_label}] {item['metric']}: "
                 f"{item['baseline']:.6g} -> {item['current']:.6g} ({delta}; "
                 f"limit +{item['max_regression_percent']:.2f}%)"
             )
@@ -1279,8 +1487,9 @@ def human_summary(report: dict[str, Any]) -> str:
                 else item["delta_percent"],
             )
             delta = "infinite" if worst["delta_is_infinite"] else f"{worst['delta_percent']:+.2f}%"
+            state_label = f"/{worst['cache_state']}" if worst.get("cache_state") else ""
             lines.append(
-                f"Worst latency movement: {worst['case']} {worst['metric']} {delta} "
+                f"Worst latency movement: {worst['case']}{state_label} {worst['metric']} {delta} "
                 f"(limit +{worst['max_regression_percent']:.2f}%)"
             )
     return "\n".join(lines) + "\n"
