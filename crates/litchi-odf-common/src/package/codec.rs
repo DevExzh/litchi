@@ -138,30 +138,46 @@ pub fn read_manifest(archive: &Archive<'_>) -> Result<Manifest> {
     parse_manifest(&archive.read_manifest_xml()?)
 }
 
-/// Read the neutral file-entry model from an archive reader.
+/// Observe a manifest while the neutral parser validates and indexes it.
 ///
-/// # Errors
-///
-/// Returns an error when the XML is malformed or contains invalid manifest
-/// entries.
-pub fn parse_manifest(xml: &str) -> Result<Manifest> {
+/// The callback is deliberately crate-private: it is the sharing seam between
+/// the neutral package owner and the typed encryption owner.  Keeping the
+/// event loop here means callers that need both views do not have to parse the
+/// manifest XML twice.  Callback failures are retained until the neutral scan
+/// completes so a neutral validation error keeps its historical precedence.
+pub(crate) trait ManifestScanObserver {
+    fn event<'namespace, 'event>(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        namespace: &ResolveResult<'namespace>,
+        event: &Event<'event>,
+        file_entry_path: Option<&str>,
+        file_entry_size: Option<u64>,
+    ) -> Result<()>;
+}
+
+pub(crate) fn parse_manifest_with_observer<O: ManifestScanObserver>(
+    xml: &str,
+    observer: &mut O,
+) -> Result<(Manifest, Option<Error>)> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut entries = HashMap::new();
     let mut current_path: Option<String> = None;
+    let mut observer_error = None;
 
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("Invalid manifest XML: {error}")))?;
-        match event {
-            Event::Start(element) if is_manifest_element(&namespace, &element, b"file-entry") => {
+        let file_entry_path = match &event {
+            Event::Start(element) if is_manifest_element(&namespace, element, b"file-entry") => {
                 if current_path.is_some() {
                     return Err(Error::InvalidFormat(
                         "Nested manifest file entries are invalid".to_string(),
                     ));
                 }
-                let (path, entry) = parse_entry(&reader, &element)?.ok_or_else(|| {
+                let (path, entry) = parse_entry(&reader, element)?.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
                 validate_manifest_path(&path)?;
@@ -175,10 +191,18 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
                     source,
                 })?;
                 current_path = Some(try_copy_string(&path, "ODF manifest current path")?);
+                let callback_path = path.as_str();
+                if observer_error.is_none()
+                    && let Err(error) =
+                        observer.event(&reader, &namespace, &event, Some(callback_path), entry.size)
+                {
+                    observer_error = Some(error);
+                }
                 entries.insert(path, entry);
+                None
             },
-            Event::Empty(element) if is_manifest_element(&namespace, &element, b"file-entry") => {
-                let (path, entry) = parse_entry(&reader, &element)?.ok_or_else(|| {
+            Event::Empty(element) if is_manifest_element(&namespace, element, b"file-entry") => {
+                let (path, entry) = parse_entry(&reader, element)?.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
                 validate_manifest_path(&path)?;
@@ -192,24 +216,33 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
                     source,
                 })?;
                 entries.insert(path, entry);
+                None
             },
+            _ => None,
+        };
+
+        if observer_error.is_none()
+            && !matches!(
+                &event,
+                Event::Start(element)
+                    if is_manifest_element(&namespace, element, b"file-entry")
+            )
+        {
+            if let Err(error) = observer.event(&reader, &namespace, &event, file_entry_path, None) {
+                observer_error = Some(error);
+            }
+        }
+
+        if matches!(
+            &event,
             Event::End(element)
                 if namespace_is_manifest(&namespace)
-                    && element.local_name().as_ref() == b"file-entry" =>
-            {
-                current_path = None;
-            },
-            Event::Eof => break,
-            Event::Start(_)
-            | Event::Empty(_)
-            | Event::End(_)
-            | Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+                    && element.local_name().as_ref() == b"file-entry"
+        ) {
+            current_path = None;
+        }
+        if matches!(&event, Event::Eof) {
+            break;
         }
         buffer.clear();
     }
@@ -224,7 +257,32 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
         .map(|entry| try_copy_string(&entry.media_type, "ODF manifest mimetype"))
         .transpose()?
         .unwrap_or_default();
-    Ok(Manifest { mimetype, entries })
+    Ok((Manifest { mimetype, entries }, observer_error))
+}
+
+/// Read the neutral file-entry model from an archive reader.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed or contains invalid manifest
+/// entries.
+pub fn parse_manifest(xml: &str) -> Result<Manifest> {
+    struct NoopObserver;
+    impl ManifestScanObserver for NoopObserver {
+        fn event<'namespace, 'event>(
+            &mut self,
+            _reader: &NsReader<&[u8]>,
+            _namespace: &ResolveResult<'namespace>,
+            _event: &Event<'event>,
+            _file_entry_path: Option<&str>,
+            _file_entry_size: Option<u64>,
+        ) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    let (manifest, _) = parse_manifest_with_observer(xml, &mut NoopObserver)?;
+    Ok(manifest)
 }
 
 /// Return whether a package path is a likely embedded media resource.
