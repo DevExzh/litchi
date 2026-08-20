@@ -36604,7 +36604,7 @@ where
 }
 
 fn xlsx_page_break_oracle_validate_root(attributes: &[u8]) -> Result<(), Box<dyn Error>> {
-    let mut namespace = None;
+    let mut namespace = None::<Vec<u8>>;
     xlsx_page_break_oracle_each_attribute(attributes, |name, value| {
         if name == b"xmlns" {
             if namespace.is_some() {
@@ -36612,11 +36612,11 @@ fn xlsx_page_break_oracle_validate_root(attributes: &[u8]) -> Result<(), Box<dyn
                     "XLSX page-break oracle found duplicate worksheet namespaces",
                 ));
             }
-            namespace = Some(value);
+            namespace = Some(value.to_vec());
         }
         Ok(())
     })?;
-    if !namespace.is_some_and(|value| {
+    if !namespace.as_deref().is_some_and(|value| {
         value == XLSX_PAGE_BREAK_ORACLE_CORE_NAMESPACE
             || value == XLSX_PAGE_BREAK_ORACLE_STRICT_NAMESPACE
     }) {
