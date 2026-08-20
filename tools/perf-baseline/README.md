@@ -192,8 +192,16 @@ worksheet names, count, and full text. An untimed typed eager
 `litchi_xlsx::Workbook` semantic projection (including names, count, and full
 text), archive SHA-256, and independently opened eager OPC/property metadata
 digest guard each case. These selectors bring the
-selectable matrix to 343 names while leaving the default 36 cases / 198
+selectable matrix to 344 names while leaving the default 36 cases / 198
 records unchanged.
+Three additional opt-in OOXML wire selectors (`omml_formula_range_scan`,
+`pptx_drawingml_extract`, and `pptx_drawingml_range_scan`) use one fixed,
+namespace-adversarial XML corpus. Their independent `quick_xml::NsReader`
+projections are prepared and checked before timing; each timed iteration only
+executes the selected production scanner and verifies its exact ranges or text
+after the clock stops. These selectors bring the
+selectable matrix to 347 names while leaving the default 36 cases / 198 records
+unchanged.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -2477,6 +2485,14 @@ native-Office claim is made.
 - `docx_semantic_one_paragraph_text`: locate the middle paragraph before timing
   and time only its `Paragraph::text()` call; exact text/error checks and the
   complete semantic verification remain outside the timed interval.
+- `omml_formula_range_scan`: scan the fixed OMML fragment corpus through
+  `litchi_ooxml_common::xml::scan_omml_formula_ranges`; exact byte ranges are
+  checked against an untimed `NsReader` oracle.
+- `pptx_drawingml_extract`: extract text from the fixed DrawingML fragment
+  corpus; exact text is checked against an untimed `NsReader` oracle.
+- `pptx_drawingml_range_scan`: scan `p` element ranges from the same fixed
+  DrawingML corpus; exact ranges are checked against an untimed `NsReader`
+  oracle.
 - `docx_semantic_create_small`: author and serialize the tiny corpus entirely
   through public DOCX APIs, then reopen and fully verify it.
 - `docx_semantic_noop_edit_save`, `docx_semantic_one_edit_save`, and
