@@ -12,6 +12,7 @@ mod path;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::{ManifestScanObserver, parse_manifest_with_observer};
 pub use codec::{is_media_path, parse_manifest, read_manifest};
 #[allow(
     clippy::module_name_repetitions,
