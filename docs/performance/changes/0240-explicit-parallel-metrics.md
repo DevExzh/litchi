@@ -25,5 +25,8 @@ threads in the benchmark process.
 
 Focused Rust-module and Python-comparator tests cover valid scaling and
 worker-team records, malformed worker budgets, sample alignment, metadata
-shape, and the absence of lock/chunk inference. No Cargo command was needed
-for this instrumentation review; formatting is checked with rustfmt.
+shape, result cross-checks, and the absence of lock/chunk inference. The
+comparator, ABBA summary, and ABBA package validator reject malformed
+`parallel_metrics` when a schema-v1 report emits it; none compares this
+descriptive envelope as a speedup or regression metric. No Cargo command was
+needed for this instrumentation review; formatting is checked with rustfmt.

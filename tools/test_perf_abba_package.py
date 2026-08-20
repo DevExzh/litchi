@@ -160,6 +160,21 @@ class PerfAbbaPackageTests(unittest.TestCase):
             )
         self.assertFalse(output.exists())
 
+    def test_rejects_malformed_parallel_metrics_before_publication(self):
+        self.replace_report("a1", lambda report: report.update(parallel_metrics={}))
+        output = self.root / "parallel-metrics-invalid"
+        with self.assertRaisesRegex(
+            perf_abba_package.ArtifactPackagingError,
+            "parallel_metrics validation failed",
+        ):
+            perf_abba_package.package_artifacts(
+                change_id="0238",
+                output_dir=output,
+                summary=self.summary_path,
+                artifacts=self.specs(),
+            )
+        self.assertFalse(output.exists())
+
     def test_refuses_overwrite_and_path_escape(self):
         output = self.root / "package"
         perf_abba_package.package_artifacts(

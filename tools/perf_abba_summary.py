@@ -23,6 +23,11 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+if __package__:
+    from . import perf_compare
+else:  # pragma: no cover - exercised by the direct CLI entry point
+    import perf_compare
+
 
 SCHEMA_VERSION = 1
 HARNESS_SCHEMA_VERSION = 1
@@ -444,6 +449,15 @@ def _validate_configuration(configuration: dict[str, Any], label: str) -> None:
         )
 
 
+def validate_parallel_metrics(report: Any, label: str = "report") -> None:
+    """Validate an emitted descriptive parallel-metrics envelope."""
+
+    try:
+        perf_compare.validate_parallel_metrics(report, label)
+    except perf_compare.ComparisonInputError as error:
+        raise AbbaSummaryInputError(str(error)) from error
+
+
 def _validate_report(
     report: Any, label: str
 ) -> tuple[
@@ -465,6 +479,7 @@ def _validate_report(
         raise AbbaSummaryInputError(
             f"{label}.schema_version must be {HARNESS_SCHEMA_VERSION!r}"
         )
+    validate_parallel_metrics(root, label)
     tool = _require_object(root.get("tool"), f"{label}.tool")
     if not tool:
         raise AbbaSummaryInputError(f"{label}.tool must not be empty")

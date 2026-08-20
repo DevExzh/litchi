@@ -211,6 +211,15 @@ def load_json(path: Path) -> _RawJson:
 def _recompute_summary(raw_reports: Sequence[_RawJson]) -> dict[str, Any]:
     """Recompute the complete summary with the canonical summary implementation."""
 
+    for index, raw_report in enumerate(raw_reports):
+        try:
+            perf_abba_summary.validate_parallel_metrics(
+                raw_report.value, f"report[{index}]"
+            )
+        except Exception as error:
+            raise ArtifactPackagingError(
+                f"parallel_metrics validation failed for report[{index}]: {error}"
+            ) from error
     try:
         return perf_abba_summary.summarize_reports(
             [raw_report.value for raw_report in raw_reports]

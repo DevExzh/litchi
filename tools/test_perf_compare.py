@@ -273,6 +273,14 @@ def operation_metrics_report_fields():
 def descriptive_parallel_report(value=100, revision="baseline"):
     measured = report(value, revision)
     result = measured["results"][0]
+    result["elapsed_ns"].update(
+        samples=[100, 101, 102, 103, 104],
+        min=100,
+        p50=102,
+        p95=104,
+        p99=104,
+        max=104,
+    )
     result["elapsed_ns"]["sample_order"] = [1, 0, 2, 4, 3]
     result["execution"] = {"worker_count": 2, "logical_tasks": 5}
     result["source"] = {
@@ -469,6 +477,91 @@ class PerfCompareTests(unittest.TestCase):
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError,
             "configured_worker_budget.value must match",
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["parallel_metrics"]["cases"][0]["configured_worker_count"][
+            "value"
+        ] = 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "configured_worker_count.value does not match",
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["parallel_metrics"]["cases"][0]["configured_worker_count"][
+            "value"
+        ] = [2]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "must be a non-negative unsigned 64-bit integer scalar",
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["results"][0]["execution"]["logical_tasks"] = 6
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "deterministic_task_count.value does not match"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["results"][0]["source"]["simulation"]["physical_request_count"][
+            0
+        ] = 99
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "deterministic_chunk_count.value does not match",
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["parallel_metrics"]["cases"][0]["cache_state"] = "warm"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "cache_state is present"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["results"][0]["source"]["opc_cache"] = {
+            "worker_count": 2,
+            "persistent_worker_teams_created": 1,
+        }
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "observed_local_worker_count.status",
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["results"][0]["elapsed_ns"]["samples"] = [200, 100, 100, 100, 100]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "samples must be sorted"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["results"][0]["elapsed_ns"]["samples"] = [100, 100, 102, 103, 104]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "sample_order.*sorted sample identity"
         ):
             perf_compare.compare_reports(
                 descriptive_parallel_report(), current, policy()
