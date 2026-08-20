@@ -9,7 +9,9 @@ third-party dependencies so that it can be used from a clean checkout.
 The summary is descriptive evidence.  A statistic is marked accepted only
 when both candidate directions are lower and both same-implementation drift
 values are within the configured ceilings.  No speedup claim is inferred from
-an accepted statistic.
+an accepted statistic.  Allocator-instrumented reports are intentionally
+rejected here because their elapsed samples include instrumentation overhead;
+use the operation-metric comparator for allocation-only evidence.
 """
 
 from __future__ import annotations
@@ -39,7 +41,14 @@ STATISTICS = ("p50", "mean", "p95", "p99")
 U64_MAX = (1 << 64) - 1
 MIN_RETAINED_SAMPLES = 15
 ENVIRONMENT_VARIANTS = frozenset(("git_revision",))
-REQUIRED_TOOL_FIELDS = ("name", "version", "profile", "target_os", "target_arch")
+REQUIRED_TOOL_FIELDS = (
+    "name",
+    "version",
+    "profile",
+    "target_os",
+    "target_arch",
+    "instrumentation",
+)
 REQUIRED_CONFIGURATION_FIELDS = (
     "samples_per_case",
     "warmup_iterations_per_case",
@@ -603,6 +612,10 @@ def _validate_tool(tool: dict[str, Any], label: str) -> None:
     if tool["name"] != HARNESS_TOOL_NAME:
         raise AbbaSummaryInputError(
             f"{label}.tool.name must be {HARNESS_TOOL_NAME!r}"
+        )
+    if tool["instrumentation"] != "none":
+        raise AbbaSummaryInputError(
+            f"{label}.tool.instrumentation must be 'none' for latency ABBA"
         )
 
 
