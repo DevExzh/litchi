@@ -168,6 +168,68 @@ pub(crate) fn detect_prepared_ods(
     }
 }
 
+/// Result of the private source-backed XLSX bytes probe.
+#[cfg(feature = "xlsx")]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the valid XLSX handoff moves the existing source-backed package without an extra allocation"
+)]
+pub(crate) enum WorkbookSourceBytesDetection {
+    /// A validated source-retaining OPC owner whose catalog identifies XLSX.
+    Xlsx(crate::opc::SourceBackedPackage),
+    /// The original bytes for the established byte-backed detector.
+    Fallback(Vec<u8>),
+}
+
+/// Probe owned bytes through the source-backed OPC catalog, retaining the
+/// original allocation for every non-XLSX fallback.
+///
+/// This is deliberately narrower than [`detect_format_smart`]: the public
+/// smart-detector result remains source-compatible and eager, while the
+/// unified workbook facade can adopt the existing read-only XLSX catalog
+/// owner. ODS precedence is resolved by the caller before this probe.
+#[cfg(feature = "xlsx")]
+pub(crate) fn detect_workbook_source_bytes(bytes: Vec<u8>) -> WorkbookSourceBytesDetection {
+    use litchi_core::ReadAt;
+    use std::sync::Arc;
+
+    if bytes.len() < 4
+        || !litchi_core::detection::simd_utils::signature_matches(
+            &bytes,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        )
+    {
+        return WorkbookSourceBytesDetection::Fallback(bytes);
+    }
+
+    // Keep a reclaimable shared owner so a non-XLSX package can continue
+    // through the historical detector without copying its input. The source
+    // package is dropped before the reclaim attempt in both fallback paths.
+    let shared = Arc::new(bytes);
+    let package_result = {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
+        crate::opc::SourceBackedPackage::from_read_at(source)
+    };
+    let Ok(package) = package_result else {
+        return WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared));
+    };
+
+    if crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
+        == Some(litchi_core::detection::FileFormat::Xlsx)
+    {
+        return WorkbookSourceBytesDetection::Xlsx(package);
+    }
+
+    drop(package);
+    WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared))
+}
+
+#[cfg(feature = "xlsx")]
+fn reclaim_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
+    std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
+}
+
 #[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
 const UNIFIED_WORKBOOK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
@@ -1407,6 +1469,17 @@ mod short_signature_tests {
     #[test]
     fn short_zip_candidate_is_rejected_without_short_read_failure() {
         assert!(detect_format_smart(b"PK\x03\x04".to_vec()).is_none());
+    }
+
+    #[cfg(feature = "xlsx")]
+    #[test]
+    fn source_xlsx_probe_preserves_non_xlsx_bytes_for_fallback() {
+        let bytes = b"not an XLSX package".to_vec();
+        let detected = super::detect_workbook_source_bytes(bytes.clone());
+        let super::WorkbookSourceBytesDetection::Fallback(retained) = detected else {
+            panic!("non-XLSX bytes unexpectedly selected the source owner");
+        };
+        assert_eq!(retained, bytes);
     }
 
     #[cfg(feature = "rtf")]
