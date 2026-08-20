@@ -245,10 +245,8 @@ const COMPARABLE_LATENCY_CLAIM: &str = "comparable_timed_operation";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
 const SOURCE_PATTERN_SCOPE: &str = "operation_logical_read_at_range_order_not_physical_io";
 const SOURCE_COMPRESSED_SCOPE: &str = "unavailable_read_at_has_no_compressed_member_boundary";
-const SOURCE_DECOMPRESSED_SCOPE: &str =
-    "unavailable_read_at_has_no_decompressed_byte_boundary";
-const SOURCE_RECOMPRESSED_SCOPE: &str =
-    "unavailable_atomic_save_has_no_recompressed_byte_boundary";
+const SOURCE_DECOMPRESSED_SCOPE: &str = "unavailable_read_at_has_no_decompressed_byte_boundary";
+const SOURCE_RECOMPRESSED_SCOPE: &str = "unavailable_atomic_save_has_no_recompressed_byte_boundary";
 const PROCESS_SCOPE: &str = "procfs_operation_delta";
 const PROC_IO_SCOPE: &str = "child_process_interval_delta_including_procfs_probe_overhead";
 const CLOCK_SCOPE: &str = "procfs_after_sample_unit_factor";
@@ -317,11 +315,13 @@ pub(crate) fn aggregate(
         .collect::<Vec<_>>();
     let mut sorted_sample_indices = sample_indices.clone();
     sorted_sample_indices.sort_unstable();
-    if sorted_sample_indices.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(format!(
-            "operation metrics {cache_state} sample identity is not unique"
-        )
-        .into());
+    if sorted_sample_indices
+        .windows(2)
+        .any(|pair| pair[0] == pair[1])
+    {
+        return Err(
+            format!("operation metrics {cache_state} sample identity is not unique").into(),
+        );
     }
     let first_scope = selected
         .first()
@@ -912,8 +912,7 @@ mod tests {
 
     use super::{MetricStatus, MetricVector, SinkObservation, aggregate, from_sink_observation};
     use crate::filesystem::{
-        CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadPattern, ReadSizeBuckets,
-        SampleEvidence,
+        CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadPattern, ReadSizeBuckets, SampleEvidence,
     };
 
     fn sample(
