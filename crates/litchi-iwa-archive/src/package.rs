@@ -744,6 +744,7 @@ pub struct LogicalEntryLimits {
 enum LogicalEntryLimitProfile {
     SemanticComponents,
     SemanticMetadata,
+    SemanticProperties,
 }
 
 impl LogicalEntryLimits {
@@ -756,6 +757,13 @@ impl LogicalEntryLimits {
     /// 64 KiB and required to use a supported ZIP compression method.
     pub const SEMANTIC_METADATA: Self = Self {
         profile: LogicalEntryLimitProfile::SemanticMetadata,
+    };
+
+    /// Keynote's archive-free metadata authority, capped at 64 KiB and
+    /// required to use a supported ZIP compression method. Build history and
+    /// document identifier members remain outside this profile.
+    pub const SEMANTIC_PROPERTIES: Self = Self {
+        profile: LogicalEntryLimitProfile::SemanticProperties,
     };
 
     /// Compatibility alias for the original Pages-specific spelling.
@@ -772,11 +780,31 @@ impl LogicalEntryLimits {
                 | b"Metadata/DocumentIdentifier" => Some(Self::MAX_SEMANTIC_METADATA_BYTES),
                 _ => None,
             },
+            LogicalEntryLimitProfile::SemanticProperties => match logical_name {
+                b"Metadata/Properties.plist" => Some(Self::MAX_SEMANTIC_METADATA_BYTES),
+                _ => None,
+            },
         }
     }
 
     const fn includes_metadata(self) -> bool {
-        matches!(self.profile, LogicalEntryLimitProfile::SemanticMetadata)
+        matches!(
+            self.profile,
+            LogicalEntryLimitProfile::SemanticMetadata
+                | LogicalEntryLimitProfile::SemanticProperties
+        )
+    }
+
+    const fn selects_metadata_authority(self, logical_name: &[u8]) -> bool {
+        match self.profile {
+            LogicalEntryLimitProfile::SemanticComponents => false,
+            LogicalEntryLimitProfile::SemanticMetadata => {
+                is_semantic_metadata_authority(logical_name)
+            },
+            LogicalEntryLimitProfile::SemanticProperties => {
+                matches!(logical_name, b"Metadata/Properties.plist")
+            },
+        }
     }
 }
 
@@ -1152,11 +1180,9 @@ impl Catalog {
                 preflight_flat_logical_entries(&archive, logical_entry_limits)?;
             }
         }
-        let include_semantic_metadata =
-            logical_entry_limits.is_some_and(LogicalEntryLimits::includes_metadata);
         let (entries, source_is_exact, legacy_outer_prefix) = if has_direct_iwa {
             let entries = if semantic_profile.is_some() {
-                collect_semantic_flat(&archive, &source, include_semantic_metadata)?
+                collect_semantic_flat(&archive, &source, logical_entry_limits)?
             } else {
                 collect_flat(&archive, &source)?
             };
@@ -1170,7 +1196,7 @@ impl Catalog {
                     checked_limits,
                     &source,
                     &prefix,
-                    include_semantic_metadata,
+                    logical_entry_limits,
                 )?
             } else {
                 collect_legacy(&archive, &index_name, checked_limits, &source)?
@@ -1178,7 +1204,7 @@ impl Catalog {
             (entries, false, Some(prefix))
         } else {
             let entries = if semantic_profile.is_some() {
-                collect_semantic_flat(&archive, &source, include_semantic_metadata)?
+                collect_semantic_flat(&archive, &source, logical_entry_limits)?
             } else {
                 collect_flat(&archive, &source)?
             };
@@ -2346,7 +2372,7 @@ fn preflight_flat_logical_entries(
         .filter(|entry| !entry.is_directory())
     {
         if limits.includes_metadata() {
-            preflight_semantic_metadata_authority(physical, b"", &mut seen_metadata)?;
+            preflight_semantic_metadata_authority(physical, b"", limits, &mut seen_metadata)?;
         }
         preflight_logical_entry(physical, physical.raw_name(), limits)?;
     }
@@ -2617,7 +2643,12 @@ fn preflight_legacy_outer_logical_entries(
         .filter(|entry| !entry.is_directory() && entry.name() != index_name)
     {
         if limits.includes_metadata() {
-            preflight_semantic_metadata_authority(physical, raw_prefix, &mut seen_metadata)?;
+            preflight_semantic_metadata_authority(
+                physical,
+                raw_prefix,
+                limits,
+                &mut seen_metadata,
+            )?;
         }
         let raw_name = physical.raw_name();
         if let Some(logical_name) = raw_name.strip_prefix(raw_prefix) {
@@ -2630,11 +2661,12 @@ fn preflight_legacy_outer_logical_entries(
 fn preflight_semantic_metadata_authority(
     physical: &PhysicalEntry,
     raw_prefix: &[u8],
+    limits: LogicalEntryLimits,
     seen: &mut HashSet<&'static [u8]>,
 ) -> Result<()> {
     let central = physical.raw_name().strip_prefix(raw_prefix);
     let local = physical.local_header().name.strip_prefix(raw_prefix);
-    let Some(authority) = semantic_metadata_authority_collision(central, local)? else {
+    let Some(authority) = semantic_metadata_authority_collision(central, local, limits)? else {
         return Ok(());
     };
     if !seen.insert(authority) {
@@ -2649,6 +2681,7 @@ fn preflight_semantic_metadata_authority(
 fn semantic_metadata_authority_collision(
     central: Option<&[u8]>,
     local: Option<&[u8]>,
+    limits: LogicalEntryLimits,
 ) -> Result<Option<&'static [u8]>> {
     for &authority in [
         b"Metadata/Properties.plist".as_slice(),
@@ -2657,6 +2690,9 @@ fn semantic_metadata_authority_collision(
     ]
     .as_slice()
     {
+        if !limits.selects_metadata_authority(authority) {
+            continue;
+        }
         let central_exact = central == Some(authority);
         let local_exact = local == Some(authority);
         let central_alias = central
@@ -2666,11 +2702,13 @@ fn semantic_metadata_authority_collision(
 
         // Keep Catalog's established selected-entry diagnostics for the
         // ordinary central-authority case: the existing logical preflight
-        // reports a local/central header mismatch. The inverse case (a local
-        // exact authority hidden behind a non-exact central name) would not
-        // otherwise be visited by that preflight, so reject it here before
-        // collection can read or silently skip the payload.
-        if (local_exact && !central_exact) || central_alias || (local_alias && !central_exact) {
+        // reports a local/central header mismatch. An exact authority paired
+        // with an alias would not otherwise be visited as that authority, so
+        // reject it here before collection can read or silently skip payload.
+        // Paired aliases are decoys, not authorities. Reject only an exact
+        // authority paired with an alias; ordinary central-exact mismatches
+        // still flow through the existing logical-entry diagnostics below.
+        if (local_exact && central_alias) || (central_exact && local_alias) {
             return Err(Error::InvalidBundle(format!(
                 "semantic metadata authority has non-canonical or one-sided ZIP names: {}",
                 String::from_utf8_lossy(authority)
@@ -2761,7 +2799,7 @@ fn collect_flat(archive: &ZipArchive<'_>, source: &SharedBytes) -> Result<Vec<En
 fn collect_semantic_flat(
     archive: &ZipArchive<'_>,
     source: &SharedBytes,
-    include_metadata: bool,
+    logical_entry_limits: Option<LogicalEntryLimits>,
 ) -> Result<Vec<Entry>> {
     preflight_semantic_iwa_entries(archive, false)?;
     let mut entries = Vec::new();
@@ -2772,7 +2810,8 @@ fn collect_semantic_flat(
     {
         let semantic_iwa = semantic_iwa_name(entry);
         if semantic_iwa.is_none()
-            && !(include_metadata && is_semantic_metadata_authority(entry.raw_name()))
+            && !logical_entry_limits
+                .is_some_and(|limits| limits.selects_metadata_authority(entry.raw_name()))
         {
             continue;
         }
@@ -2883,7 +2922,7 @@ fn collect_semantic_legacy(
     limits: Limits,
     source: &SharedBytes,
     raw_prefix: &[u8],
-    include_metadata: bool,
+    logical_entry_limits: Option<LogicalEntryLimits>,
 ) -> Result<Vec<Entry>> {
     let index_entry = archive
         .physical_entries()
@@ -2942,13 +2981,13 @@ fn collect_semantic_legacy(
         .physical_entries()
         .filter(|entry| !entry.is_directory() && entry.name() != index_name)
     {
-        if !include_metadata {
+        let Some(logical_entry_limits) = logical_entry_limits else {
             continue;
-        }
+        };
         let Some(logical_raw_name) = entry.raw_name().strip_prefix(raw_prefix) else {
             continue;
         };
-        if !is_semantic_metadata_authority(logical_raw_name) {
+        if !logical_entry_limits.selects_metadata_authority(logical_raw_name) {
             continue;
         }
         let normalized_name = std::str::from_utf8(logical_raw_name).map_err(|_error| {
@@ -3551,11 +3590,12 @@ mod tests {
         ));
         assert_eq!(crate::zip::test_entry_read_count(), 0);
 
-        let central_near_name = raw_named_zip(authority, local_near_name, 0, 0, b"properties");
+        let central_alias_name = b"Metadata\\Properties.plist";
+        let central_alias = raw_named_zip(authority, central_alias_name, 0, 0, b"properties");
         crate::zip::reset_test_entry_read_count();
         assert!(matches!(
             Catalog::__from_bytes_with_logical_entry_limits(
-                &central_near_name,
+                &central_alias,
                 Limits::default(),
                 LogicalEntryLimits::PAGES_METADATA,
             ),
@@ -3658,6 +3698,34 @@ mod tests {
                 .__semantic_metadata_sidecars()?
                 .properties_plist()
                 .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn keynote_properties_profile_reads_only_iwa_and_properties() -> Result<()> {
+        let document = semantic_iwa(1)?;
+        let entries: [(&str, &[u8]); 7] = [
+            ("Index/Document.iwa", &document),
+            ("Metadata/Properties.plist", b"properties"),
+            ("Metadata/BuildVersionHistory.plist", b"ignored history"),
+            ("Metadata/DocumentIdentifier", b"ignored identifier"),
+            ("Data/asset.bin", b"asset"),
+            ("Data/not-a-component.iwa", &document),
+            ("Preview/preview.jpg", b"preview"),
+        ];
+        let bytes = zip(&entries)?;
+
+        crate::zip::reset_test_entry_read_count();
+        let catalog = Catalog::__from_bytes_with_logical_entry_limits(
+            &bytes,
+            Limits::default(),
+            LogicalEntryLimits::SEMANTIC_PROPERTIES,
+        )?;
+        assert_eq!(crate::zip::test_entry_read_count(), 2);
+        assert_eq!(
+            catalog.iter().map(Entry::name).collect::<Vec<_>>(),
+            ["Index/Document.iwa", "Metadata/Properties.plist"]
         );
         Ok(())
     }
