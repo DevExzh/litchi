@@ -50,7 +50,10 @@ pub(super) struct SourceSlideData {
     position: usize,
     pub(super) slide_id: u32,
     pub(super) part_uri: PackURI,
-    pub(super) binding: SlideBinding,
+    // Every source-backed edit against this slide uses the same validated
+    // relationship closure. Keep it behind an Arc so a broad batch or an
+    // inverse patch does not clone all relationship IDs and targets again.
+    pub(super) binding: Arc<SlideBinding>,
 }
 
 pub(super) struct SourceInner {
@@ -148,10 +151,10 @@ pub(super) struct SlideBinding {
 
 #[derive(Clone)]
 struct SlideClosure {
-    package_relationships: Box<[RelationshipBinding]>,
-    presentation: PartBinding,
+    package_relationships: Arc<[RelationshipBinding]>,
+    presentation: Arc<PartBinding>,
     presentation_xml: PartData,
-    slide: SlideBinding,
+    slide: Arc<SlideBinding>,
 }
 
 /// A selected-slide payload either remains attached to the source-backed OPC
@@ -395,8 +398,8 @@ pub struct SourceBackedPresentationEditor {
     // the exact source version before publishing anything.
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
-    package_relationships: Box<[RelationshipBinding]>,
-    presentation_binding: PartBinding,
+    package_relationships: Arc<[RelationshipBinding]>,
+    presentation_binding: Arc<PartBinding>,
     pub(super) limits: ReadLimits,
 }
 
@@ -1035,12 +1038,14 @@ impl SourceBackedPresentationEditor {
         package.check_execution()?;
         let catalog = source_catalog(&package)?;
         package.check_execution()?;
+        let package_relationships = Arc::from(catalog.package_relationships);
+        let presentation_binding = Arc::new(catalog.presentation_binding);
         Ok(Self {
             package,
             _presentation: catalog.presentation,
             slides: catalog.slides,
-            package_relationships: catalog.package_relationships,
-            presentation_binding: catalog.presentation_binding,
+            package_relationships,
+            presentation_binding,
             limits,
         })
     }
@@ -2428,11 +2433,11 @@ fn validate_slide_graph(
             position,
             slide_id: reference.id(),
             part_uri: part_uri.clone(),
-            binding: SlideBinding {
+            binding: Arc::new(SlideBinding {
                 slide_reference_id: reference.relationship_id().to_string(),
                 presentation_relationship: relationship_binding(relationship),
                 slide: part_binding(&slide),
-            },
+            }),
         }));
     }
     package.check_execution()?;
@@ -3053,6 +3058,34 @@ mod tests {
             .unwrap();
         assert_eq!(source_catalog_builds(), 1);
         assert_eq!(output, archive);
+    }
+
+    #[test]
+    fn editor_reuses_validated_relationship_closures_across_snapshots() {
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let first = editor.slide_snapshot(0).unwrap();
+        let second = editor.slide_snapshot(0).unwrap();
+
+        // Capturing a second snapshot must reuse the editor's immutable
+        // relationship/dependency index rather than cloning its strings.
+        assert!(Arc::ptr_eq(
+            &first.closure.package_relationships,
+            &second.closure.package_relationships
+        ));
+        assert!(Arc::ptr_eq(
+            &first.closure.presentation,
+            &second.closure.presentation
+        ));
+        assert!(Arc::ptr_eq(&first.closure.slide, &second.closure.slide));
+
+        let mut edit = first.edit();
+        assert!(!edit.clear_transition().unwrap());
+        let commit = edit.commit();
+        assert!(!commit.is_changed());
+        assert!(commit.patch().apply(&second).is_ok());
     }
 
     #[test]
