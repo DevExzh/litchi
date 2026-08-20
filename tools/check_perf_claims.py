@@ -679,6 +679,8 @@ def verify_abba_package(
     manifest = load_json(manifest_path, location=str(manifest_path))
     if not isinstance(manifest, dict) or manifest.get("schema_version") != 1 or manifest.get("manifest_kind") != "litchi-perf-abba-artifacts":
         raise ClaimInputError(f"ABBA manifest {evidence['id']} has unsupported schema")
+    if manifest.get("manifest_path") != manifest_path.name:
+        raise ClaimInputError(f"ABBA manifest {evidence['id']} manifest_path mismatch")
     if manifest.get("change_id") != claim["change_id"] or manifest.get("change") != claim["change_id"]:
         raise ClaimPolicyError(f"ABBA manifest {evidence['id']} change id does not match claim")
     if manifest.get("self_excluded") is not True:
@@ -702,6 +704,8 @@ def verify_abba_package(
         raise ClaimInputError(f"ABBA manifest {evidence['id']} canonical byte count mismatch")
     if manifest.get("summary_identity") != manifest_summary:
         raise ClaimInputError(f"ABBA manifest {evidence['id']} summary identity mismatch")
+    if summary.get("schema_version") != 1:
+        raise ClaimInputError(f"ABBA summary {evidence['id']} schema must be version 1")
     tool = _require_object(summary.get("tool"), f"{evidence['id']}.summary.tool")
     if tool != {"name": "litchi-perf-abba-summary", "version": "0.1.0"}:
         raise ClaimInputError(f"ABBA summary {evidence['id']} tool identity mismatch")
@@ -727,8 +731,15 @@ def verify_abba_package(
     if [item.get("role") for item in artifacts if isinstance(item, dict)] != list(ABBA_ROLES) or len(artifacts) != 4:
         raise ClaimInputError(f"ABBA manifest {evidence['id']} must contain exactly a1,b1,b2,a2")
     artifact_by_role: dict[str, dict[str, Any]] = {}
+    reports_by_role: dict[str, dict[str, Any]] = {}
     for index, raw in enumerate(artifacts):
         item = _require_object(raw, f"{evidence['id']}.manifest.artifacts[{index}]")
+        _require_keys(
+            item,
+            {"bytes", "canonical_sha256", "compression", "path", "role", "sha256", "uncompressed_bytes", "uncompressed_sha256"},
+            {"bytes", "canonical_sha256", "compression", "path", "role", "sha256", "uncompressed_bytes", "uncompressed_sha256"},
+            f"{evidence['id']}.manifest.artifacts[{index}]",
+        )
         role = item.get("role")
         if role not in ABBA_ROLES or role in artifact_by_role:
             raise ClaimInputError(f"ABBA manifest {evidence['id']} has invalid/duplicate artifact role")
@@ -748,6 +759,31 @@ def verify_abba_package(
         if summary_report_identity.get("canonical_sha256") != report_canonical:
             raise ClaimInputError(f"ABBA summary report identity mismatch for {evidence['id']}/{role}")
         _validate_report_identity(report, role=role, expected_revision=expected_revision, minimum_samples=policy["minimum_samples"], location=f"{evidence['id']}/{role}")
+        # Retain only the small identity projection.  The decompressed report
+        # can be hundreds of MiB (the 0248 package); retaining all four full
+        # JSON trees would needlessly multiply strict-mode memory use.
+        reports_by_role[role] = {
+            "environment": report.get("environment"),
+            "configuration": report.get("configuration"),
+        }
+    environment = _require_object(summary.get("environment"), f"{evidence['id']}.summary.environment")
+    environment_legs = _require_object(environment.get("legs"), f"{evidence['id']}.summary.environment.legs")
+    if set(environment_legs) != set(ABBA_ROLES):
+        raise ClaimInputError(f"ABBA summary {evidence['id']} environment leg set mismatch")
+    for role in ABBA_ROLES:
+        raw_environment = _require_object(reports_by_role[role].get("environment"), f"{evidence['id']}/{role}.environment")
+        if environment_legs[role] != raw_environment:
+            raise ClaimInputError(f"ABBA summary {evidence['id']} environment identity mismatch for {role}")
+    stable_environment = dict(_require_object(reports_by_role["a1"].get("environment"), f"{evidence['id']}/a1.environment"))
+    stable_environment.pop("git_revision", None)
+    if environment.get("stable") != stable_environment:
+        raise ClaimInputError(f"ABBA summary {evidence['id']} stable environment identity mismatch")
+    harness_identity = _require_object(summary.get("harness_identity"), f"{evidence['id']}.summary.harness_identity")
+    harness_configuration = harness_identity.get("configuration")
+    if harness_configuration is not None:
+        first_configuration = reports_by_role["a1"].get("configuration")
+        if harness_configuration != first_configuration:
+            raise ClaimInputError(f"ABBA summary {evidence['id']} harness configuration identity mismatch")
     if verification.get("result_count") != len(result_list):
         raise ClaimInputError(f"ABBA summary {evidence['id']} result count mismatch")
     _verify_scope_and_cells(summary, claim, package_change_id=manifest["change_id"], policy=policy)
