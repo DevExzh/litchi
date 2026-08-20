@@ -3963,6 +3963,27 @@ mod tests {
     }
 
     #[test]
+    fn source_range_resolver_matches_owned_oracle_for_every_shape() {
+        let bytes = generated_fixture(6, 4);
+        let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+        let presentation = package.presentation().unwrap();
+
+        for (slide_index, slide) in presentation.slides().unwrap().iter().enumerate() {
+            for (shape_index, shape) in slide.shapes().unwrap().iter().enumerate() {
+                let target = Target::new(Position::new(slide_index), Position::new(shape_index));
+                let (owned, ranged, _metrics) = resolve_owned_and_range(bytes.clone(), target);
+                assert_eq!(ranged.target, target);
+                assert_eq!(ranged.slide_persist_id, owned.slide_persist_id);
+                assert_eq!(ranged.atom_offset, owned.atom_offset);
+                assert_eq!(ranged.kind, owned.kind);
+                assert_eq!(ranged.payload, owned.payload);
+                assert_eq!(ranged.text, owned.text);
+                assert_eq!(ranged.text, shape.text().unwrap());
+            }
+        }
+    }
+
+    #[test]
     fn source_backed_read_text_matches_eager_shape_text() {
         let bytes = generated_fixture(6, 4);
         let source =
