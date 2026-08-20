@@ -50,6 +50,14 @@ impl Snapshot {
             .and_then(Self::validated)
     }
 
+    pub(crate) fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODB")
+            .and_then(Self::validated)
+    }
+
     fn validated(package: Package) -> Result<Self> {
         crate::codec::validate(package.content_xml())?;
         Ok(Self(Arc::new(State { package })))

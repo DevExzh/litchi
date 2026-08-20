@@ -47,9 +47,10 @@ pub struct OwnedPackage {
     data: Arc<Vec<u8>>,
     index: PreparedArchive,
     password: Option<Zeroizing<String>>,
+    limits: SourcePackageLimits,
 }
 
-/// Resource limits for a positional ODF package.
+/// Resource limits for ODF package ingress.
 ///
 /// `max_source_bytes` bounds the physical source before ZIP indexing starts;
 /// [`Self::archive`] bounds the central-directory and declared member sizes.
@@ -59,7 +60,8 @@ pub struct OwnedPackage {
 /// cannot turn package opening into an unbounded metadata allocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourcePackageLimits {
-    /// Maximum physical source length accepted by the positional owner.
+    /// Maximum physical source length accepted by an owned or positional
+    /// package owner.
     pub max_source_bytes: u64,
     /// ZIP index and declared member limits.
     pub archive: SourceArchiveLimits,
@@ -1099,6 +1101,38 @@ fn validate_limit(name: &str, actual: u64, maximum: u64) -> Result<()> {
     Ok(())
 }
 
+fn resource_limit_error(observed: u64, limit: u64, scope: &'static str) -> Error {
+    Error::ResourceLimit(ResourceLimit {
+        resource: Resource::InputBytes,
+        observed,
+        limit,
+        scope: Arc::from(scope),
+    })
+}
+
+fn read_owned_input<R: Read>(reader: R, maximum: u64, scope: &'static str) -> Result<Vec<u8>> {
+    let read_limit = maximum.checked_add(1).ok_or_else(|| {
+        Error::InvalidFormat("ODF owned package input limit overflows".to_string())
+    })?;
+    let reserve = usize::try_from(read_limit.min(64 * 1024)).map_err(|_| {
+        Error::InvalidFormat("ODF owned package input limit exceeds platform limits".to_string())
+    })?;
+    let mut data = Vec::new();
+    data.try_reserve_exact(reserve)
+        .map_err(|source| Error::Allocation {
+            resource: scope,
+            source,
+        })?;
+    reader.take(read_limit).read_to_end(&mut data)?;
+    let observed = u64::try_from(data.len()).map_err(|_| {
+        Error::InvalidFormat("ODF owned package input exceeds platform limits".to_string())
+    })?;
+    if observed > maximum {
+        return Err(resource_limit_error(observed, maximum, scope));
+    }
+    Ok(data)
+}
+
 fn prefer_current<T>(source: &dyn ReadAt, expected: SourceVersion, result: Result<T>) -> Result<T> {
     // The adapter checks the version before and after each physical read, but
     // a high-level operation can still return an arbitrary ZIP/parser error
@@ -1194,16 +1228,45 @@ fn map_owned_zip_error(error: soapberry_zip::Error) -> Error {
 }
 
 impl OwnedPackage {
-    /// Open an ODF package from a reader.
+    /// Open an ODF package from a reader with the default finite limits.
     ///
-    /// # Errors
-    ///
-    /// Returns an error when reading the input or parsing the ZIP archive
-    /// fails.
-    pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
-        let mut data = Vec::new();
-        reader.read_to_end(&mut data)?;
-        Self::from_bytes(data)
+    /// The reader is consumed through a `max_source_bytes + 1` guard so an
+    /// oversized stream is rejected before the ZIP index is built.  The
+    /// existing convenience method remains source-compatible while gaining
+    /// the same bounded ingress contract as positional packages.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_reader_with_limits(reader, SourcePackageLimits::default())
+    }
+
+    /// Open an ODF package from a reader under explicit finite limits.
+    pub fn from_reader_with_limits<R: Read>(
+        reader: R,
+        limits: SourcePackageLimits,
+    ) -> Result<Self> {
+        validate_source_limits(limits)?;
+        let data = read_owned_input(reader, limits.max_source_bytes, "ODF owned package input")?;
+        Self::from_bytes_with_limits(data, limits)
+    }
+
+    /// Open an ODF package from a reader and retain a password for lazy entry
+    /// decryption, using the default finite limits.
+    pub fn from_reader_with_password<R: Read>(
+        reader: R,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_reader_with_limits_and_password(reader, SourcePackageLimits::default(), password)
+    }
+
+    /// Open an ODF package from a reader with explicit finite limits and a
+    /// retained password for lazy entry decryption.
+    pub fn from_reader_with_limits_and_password<R: Read>(
+        reader: R,
+        limits: SourcePackageLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        validate_source_limits(limits)?;
+        let data = read_owned_input(reader, limits.max_source_bytes, "ODF owned package input")?;
+        Self::from_bytes_with_limits_and_password(data, limits, password)
     }
 
     /// Create an ODF package from bytes.
@@ -1212,7 +1275,12 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
-        Self::from_shared_bytes(Arc::new(data))
+        Self::from_bytes_with_limits(data, SourcePackageLimits::default())
+    }
+
+    /// Create an ODF package from bytes under explicit finite limits.
+    pub fn from_bytes_with_limits(data: Vec<u8>, limits: SourcePackageLimits) -> Result<Self> {
+        Self::from_shared_bytes_with_limits(Arc::new(data), limits)
     }
 
     /// Adopt shared ODF package bytes without copying the archive buffer.
@@ -1223,6 +1291,19 @@ impl OwnedPackage {
     pub fn from_shared_bytes(data: Arc<Vec<u8>>) -> Result<Self> {
         Self::from_shared_bytes_with_policy(
             data,
+            soapberry_zip::office::ArchiveValidationPolicy::Normalized,
+        )
+    }
+
+    /// Adopt shared ODF package bytes under explicit finite limits without
+    /// copying the archive buffer.
+    pub fn from_shared_bytes_with_limits(
+        data: Arc<Vec<u8>>,
+        limits: SourcePackageLimits,
+    ) -> Result<Self> {
+        Self::from_shared_bytes_with_policy_and_limits(
+            data,
+            limits,
             soapberry_zip::office::ArchiveValidationPolicy::Normalized,
         )
     }
@@ -1246,15 +1327,32 @@ impl OwnedPackage {
         data: Arc<Vec<u8>>,
         policy: soapberry_zip::office::ArchiveValidationPolicy,
     ) -> Result<Self> {
+        Self::from_shared_bytes_with_policy_and_limits(data, SourcePackageLimits::default(), policy)
+    }
+
+    fn from_shared_bytes_with_policy_and_limits(
+        data: Arc<Vec<u8>>,
+        limits: SourcePackageLimits,
+        policy: soapberry_zip::office::ArchiveValidationPolicy,
+    ) -> Result<Self> {
+        validate_source_limits(limits)?;
+        let data_length = u64::try_from(data.len()).map_err(|_| {
+            Error::InvalidFormat("ODF package length exceeds ZIP reader limits".to_string())
+        })?;
+        if data_length > limits.max_source_bytes {
+            return Err(resource_limit_error(
+                data_length,
+                limits.max_source_bytes,
+                "ODF owned package input",
+            ));
+        }
         #[cfg(test)]
         package::note_index_build();
         let index = Arc::new(
             soapberry_zip::office::IndexedArchive::from_reader_with_limits_and_policy(
                 Arc::clone(&data),
-                u64::try_from(data.len()).map_err(|_| {
-                    Error::InvalidFormat("ODF package length exceeds ZIP reader limits".to_string())
-                })?,
-                soapberry_zip::office::ArchiveLimits::default(),
+                data_length,
+                limits.archive,
                 policy,
             )
             .map_err(map_owned_zip_error)?,
@@ -1263,6 +1361,7 @@ impl OwnedPackage {
             data,
             index,
             password: None,
+            limits,
         })
     }
 
@@ -1272,26 +1371,11 @@ impl OwnedPackage {
     /// strict package policy and structured resource-limit errors are retained
     /// at the transition to the owning representation.
     pub(crate) fn from_shared_bytes_with_strict_policy(data: Arc<Vec<u8>>) -> Result<Self> {
-        Self::from_shared_bytes_with_policy(
+        Self::from_shared_bytes_with_policy_and_limits(
             data,
+            SourcePackageLimits::default(),
             soapberry_zip::office::ArchiveValidationPolicy::StrictPackage,
         )
-    }
-
-    /// Open an ODF package and retain a password for lazy entry decryption.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when reading the input or parsing the ZIP archive
-    /// fails.
-    pub fn from_reader_with_password<R: Read>(
-        mut reader: R,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let password = Zeroizing::new(password.into());
-        let mut data = Vec::new();
-        reader.read_to_end(&mut data)?;
-        Self::from_bytes_with_zeroizing_password(data, password)
     }
 
     /// Open ODF bytes and retain a password for lazy entry decryption.
@@ -1300,17 +1384,27 @@ impl OwnedPackage {
     ///
     /// Returns an error when the bytes do not form a valid ZIP archive.
     pub fn from_bytes_with_password(data: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        let password = Zeroizing::new(password.into());
-        Self::from_bytes_with_zeroizing_password(data, password)
+        Self::from_bytes_with_limits_and_password(data, SourcePackageLimits::default(), password)
     }
 
-    fn from_bytes_with_zeroizing_password(
+    /// Open ODF bytes with explicit finite limits and retain a password for
+    /// lazy entry decryption.
+    pub fn from_bytes_with_limits_and_password(
         data: Vec<u8>,
-        password: Zeroizing<String>,
+        limits: SourcePackageLimits,
+        password: impl Into<String>,
     ) -> Result<Self> {
-        let mut package = Self::from_shared_bytes(Arc::new(data))?;
-        package.password = Some(password);
-        Ok(package)
+        let password = Zeroizing::new(password.into());
+        validate_source_limits(limits)?;
+        Self::from_shared_bytes_with_policy_and_limits(
+            Arc::new(data),
+            limits,
+            soapberry_zip::office::ArchiveValidationPolicy::Normalized,
+        )
+        .map(|mut package| {
+            package.password = Some(password);
+            package
+        })
     }
 
     /// Get a borrowed [`Package`] for accessing archive contents.
@@ -1323,6 +1417,7 @@ impl OwnedPackage {
         Package::new_with_prepared(
             Arc::clone(&self.index),
             self.password.as_ref().map(|password| password.as_str()),
+            self.limits,
         )
     }
 
@@ -1333,6 +1428,7 @@ impl OwnedPackage {
             data,
             index,
             password: _,
+            limits: _,
         } = self;
         match Arc::try_unwrap(index) {
             Ok(index) => {
@@ -1371,6 +1467,7 @@ impl OwnedPackage {
             data: Arc::clone(&self.data),
             index: Arc::clone(&self.index),
             password: None,
+            limits: self.limits,
         }
     }
 
@@ -1480,27 +1577,41 @@ impl<'data> Package<'data> {
     fn new_with_password(data: &'data [u8], password: Option<&'data str>) -> Result<Self> {
         let archive = Archive::new(data)?;
 
-        Self::from_archive(archive, password)
+        Self::from_archive(archive, password, SourcePackageLimits::default())
     }
 
-    fn new_with_prepared(index: PreparedArchive, password: Option<&'data str>) -> Result<Self> {
+    fn new_with_prepared(
+        index: PreparedArchive,
+        password: Option<&'data str>,
+        limits: SourcePackageLimits,
+    ) -> Result<Self> {
         let archive = Archive::from_prepared(index);
 
-        Self::from_archive(archive, password)
+        Self::from_archive(archive, password, limits)
     }
 
-    fn from_archive(archive: Archive<'data>, password: Option<&'data str>) -> Result<Self> {
+    fn from_archive(
+        archive: Archive<'data>,
+        password: Option<&'data str>,
+        limits: SourcePackageLimits,
+    ) -> Result<Self> {
         // Read MIME type from mimetype file
         let mimetype = archive
-            .read_string("mimetype")
-            .map_err(|error| {
-                Error::InvalidFormat(format!("No mimetype file found in ODF package: {error}"))
+            .read_string_with_limit("mimetype", limits.max_mimetype_bytes, "ODF mimetype bytes")
+            .map_err(|error| match error {
+                limit @ Error::ResourceLimit(_) => limit,
+                error => {
+                    Error::InvalidFormat(format!("No mimetype file found in ODF package: {error}"))
+                },
             })?
             .trim()
             .to_string();
 
         // Parse the manifest
-        let manifest = super::manifest::Manifest::parse(&archive.read_manifest_xml()?)?;
+        let manifest = super::manifest::Manifest::parse(
+            &archive
+                .read_manifest_xml_with_limit(limits.max_manifest_bytes, "ODF manifest bytes")?,
+        )?;
 
         Ok(Self {
             archive,
@@ -1954,6 +2065,24 @@ mod tests {
         let package = SourceBackedPackage::from_read_at(source).unwrap();
         let materialized = package.materialize().unwrap();
         assert_eq!(materialized.as_bytes(), data.as_slice());
+    }
+
+    #[test]
+    fn owned_reader_limits_apply_before_zip_indexing_and_match_password_path() {
+        let limits = SourcePackageLimits::new(8, SourceArchiveLimits::default());
+        assert!(matches!(
+            OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 9]), limits),
+            Err(Error::ResourceLimit(_))
+        ));
+
+        assert!(matches!(
+            OwnedPackage::from_reader_with_limits_and_password(
+                Cursor::new(vec![0_u8; 9]),
+                limits,
+                "password",
+            ),
+            Err(Error::ResourceLimit(_))
+        ));
     }
 
     #[test]

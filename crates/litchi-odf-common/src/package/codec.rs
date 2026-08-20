@@ -2,7 +2,7 @@
 
 use super::model::{Archive, ArchiveNames, ArchiveReaderKind, Entry, Manifest, PreparedArchive};
 use super::path::validate_manifest_path;
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 const MANIFEST_PATHS: [&str; 2] = ["META-INF/manifest.xml", "manifest.xml"];
+const DEFAULT_MAX_MANIFEST_BYTES: u64 = 16 * 1024 * 1024;
 
 fn try_copy_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     let mut output = Vec::new();
@@ -69,6 +70,26 @@ impl<'data> Archive<'data> {
         result.map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 
+    /// Read one archive member after checking its declared uncompressed size
+    /// against a caller-selected finite limit.
+    pub fn read_with_limit(
+        &self,
+        path: &str,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<Vec<u8>> {
+        let metadata = self.metadata(path)?;
+        if metadata.uncompressed_size() > maximum {
+            return Err(Error::ResourceLimit(ResourceLimit {
+                resource: Resource::InputBytes,
+                observed: metadata.uncompressed_size(),
+                limit: maximum,
+                scope: scope.into(),
+            }));
+        }
+        self.read(path)
+    }
+
     /// Read one UTF-8 archive member.
     ///
     /// # Errors
@@ -80,6 +101,28 @@ impl<'data> Archive<'data> {
             .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8 in '{path}': {error}")))
     }
 
+    /// Read one UTF-8 archive member under a declared-size limit.
+    pub fn read_string_with_limit(
+        &self,
+        path: &str,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<String> {
+        let bytes = self.read_with_limit(path, maximum, scope)?;
+        String::from_utf8(bytes)
+            .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8 in '{path}': {error}")))
+    }
+
+    /// Return declared ZIP metadata for one archive member without reading
+    /// or decompressing its payload.
+    pub(crate) fn metadata(&self, path: &str) -> Result<soapberry_zip::office::Metadata> {
+        let result = match &self.reader {
+            ArchiveReaderKind::Borrowed(reader) => reader.metadata(path),
+            ArchiveReaderKind::Prepared(reader) => reader.metadata(path),
+        };
+        result.map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
     /// Read the package manifest, accepting both common ODF locations.
     ///
     /// # Errors
@@ -87,11 +130,21 @@ impl<'data> Archive<'data> {
     /// Returns an error when neither conventional manifest location can be
     /// read as UTF-8.
     pub fn read_manifest_xml(&self) -> Result<String> {
+        self.read_manifest_xml_with_limit(DEFAULT_MAX_MANIFEST_BYTES, "ODF manifest bytes")
+    }
+
+    /// Read the package manifest while checking its declared size before
+    /// materialization.
+    pub fn read_manifest_xml_with_limit(
+        &self,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<String> {
         if self.contains(MANIFEST_PATHS[0]) {
-            return self.read_string(MANIFEST_PATHS[0]);
+            return self.read_string_with_limit(MANIFEST_PATHS[0], maximum, scope);
         }
         if self.contains(MANIFEST_PATHS[1]) {
-            return self.read_string(MANIFEST_PATHS[1]);
+            return self.read_string_with_limit(MANIFEST_PATHS[1], maximum, scope);
         }
         Err(Error::InvalidFormat(
             "No manifest.xml found in ODF package".to_string(),

@@ -72,6 +72,19 @@ impl Snapshot {
         )?)
     }
 
+    pub(crate) fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        Self::from_package(Package::open_with_password(
+            path,
+            password,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODI",
+        )?)
+    }
+
     fn from_package(package: Package) -> Result<Self> {
         let content = FlatImage::from_content_xml(package.content_xml().as_bytes().to_vec())?;
         let resources = scan_resources(&package)?;
