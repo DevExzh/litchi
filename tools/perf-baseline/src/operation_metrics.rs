@@ -1,10 +1,12 @@
-//! Additive, operation-scoped metrics for the isolated filesystem selectors.
+//! Additive, operation-scoped metrics for timed harness operations.
 //!
 //! The filesystem child already records the counters that can be collected
 //! without changing the timed operation.  This module only aligns those
 //! per-child records with the sorted `elapsed_ns.samples` vector.  It does
-//! not infer allocations, copies, decompression, recompression, or a peak
-//! from a process-wide measurement that cannot provide one.
+//! not infer allocations, copies, decompression, recompression, or a peak from
+//! a process-wide measurement that cannot provide one.  In-process sink
+//! summaries are promoted separately when the harness has already proved that
+//! the summary is deterministic across the retained samples.
 
 use std::error::Error;
 
@@ -73,14 +75,73 @@ pub(crate) struct ProcessMetrics {
     pub nonvoluntary_context_switches: MetricVector,
     pub rss_delta_bytes: MetricVector,
     pub peak_rss_bytes: MetricVector,
+    /// `/proc/self/io` bytes returned through read-like calls.
+    pub rchar: MetricVector,
+    /// `/proc/self/io` bytes accepted by write-like calls.
+    pub wchar: MetricVector,
+    /// `/proc/self/io` storage bytes read.
+    pub read_bytes: MetricVector,
+    /// `/proc/self/io` storage bytes written.
+    pub write_bytes: MetricVector,
+    /// `/proc/self/io` writes cancelled before storage.
+    pub cancelled_write_bytes: MetricVector,
+    /// `/proc/self/io` read-like syscall count.
+    pub syscr: MetricVector,
+    /// `/proc/self/io` write-like syscall count.
+    pub syscw: MetricVector,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct SinkMetrics {
+    /// Applicability status for `output_bytes`; retained for compatibility
+    /// with the original filesystem envelope.
     pub status: MetricStatus,
     /// Final output length observed after a save.  This is not a write-call or
     /// memory-copy count; the scope says explicitly that it is post-operation.
     pub output_bytes: MetricVector,
+    /// Applicability status for the logical accepted-write vectors below.
+    /// These vectors are independent of `output_bytes` because a seekable sink
+    /// can accept rewrites and therefore does not expose final output length.
+    pub write_status: MetricStatus,
+    /// Total bytes accepted by the instrumented sink's logical write calls.
+    /// Requested lengths are not available in this summary and are not
+    /// inferred.
+    pub accepted_bytes: MetricVector,
+    /// Number of logical write calls that accepted their reported length.
+    pub write_calls: MetricVector,
+    /// Largest accepted logical write length.
+    pub largest_write: MetricVector,
+    pub write_size_buckets: WriteSizeBucketMetrics,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct WriteSizeBucketMetrics {
+    pub status: MetricStatus,
+    pub bytes_0: MetricVector,
+    pub bytes_1_to_512: MetricVector,
+    pub bytes_513_to_4096: MetricVector,
+    pub bytes_4097_to_16384: MetricVector,
+    pub bytes_16385_to_65536: MetricVector,
+    pub bytes_over_65536: MetricVector,
+}
+
+/// A per-case logical sink summary that has already been checked for
+/// determinism across the retained samples.
+///
+/// All fields describe accepted lengths at the harness sink boundary.  The
+/// sink summary does not retain requested lengths for short writes, rejected
+/// calls, or operating-system syscall and storage-I/O counters.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SinkObservation {
+    pub accepted_bytes: u64,
+    pub write_calls: u64,
+    pub largest_write: u64,
+    pub bytes_0: u64,
+    pub bytes_1_to_512: u64,
+    pub bytes_513_to_4096: u64,
+    pub bytes_4097_to_16384: u64,
+    pub bytes_16385_to_65536: u64,
+    pub bytes_over_65536: u64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -134,6 +195,11 @@ const CLOCK_SCOPE: &str = "procfs_after_sample_unit_factor";
 const RSS_SCOPE: &str = "procfs_operation_delta_not_peak";
 const HWM_SCOPE: &str = "process_lifetime_high_water_after_not_operation_peak";
 const OUTPUT_SCOPE: &str = "post_operation_output_length_not_sink_write_volume";
+const SINK_ACCEPTED_BYTES_SCOPE: &str = "logical_sink_accepted_write_bytes";
+const SINK_WRITE_CALLS_SCOPE: &str = "logical_sink_accepted_write_calls";
+const SINK_LARGEST_WRITE_SCOPE: &str = "logical_sink_largest_accepted_write";
+const SINK_BUCKET_SCOPE: &str = "logical_sink_accepted_write_size_bucket_counts";
+const SINK_SOURCE_SCOPE: &str = "not_applicable_in_process_sink";
 const PUBLICATION_SCOPE: &str = "logical_publication_counter";
 const MATERIALIZATION_SCOPE: &str = "logical_materialization_counter";
 const CFB_PHASE_ELAPSED_SCOPE: &str = "timed_cfb_phase_elapsed_ns";
@@ -227,12 +293,13 @@ pub(crate) fn aggregate(
     };
 
     let process = process_metrics(&selected)?;
+    let output_status = optional_status(
+        &selected,
+        |sample| sample.output_bytes.is_some(),
+        "output_bytes",
+    )?;
     let sink = SinkMetrics {
-        status: optional_status(
-            &selected,
-            |sample| sample.output_bytes.is_some(),
-            "output_bytes",
-        )?,
+        status: output_status,
         output_bytes: optional_values(
             &selected,
             |sample| sample.output_bytes,
@@ -240,6 +307,17 @@ pub(crate) fn aggregate(
             MetricStatus::NotApplicable,
             OUTPUT_SCOPE,
         )?,
+        write_status: MetricStatus::NotApplicable,
+        accepted_bytes: MetricVector::absent(
+            MetricStatus::NotApplicable,
+            SINK_ACCEPTED_BYTES_SCOPE,
+        ),
+        write_calls: MetricVector::absent(MetricStatus::NotApplicable, SINK_WRITE_CALLS_SCOPE),
+        largest_write: MetricVector::absent(MetricStatus::NotApplicable, SINK_LARGEST_WRITE_SCOPE),
+        write_size_buckets: WriteSizeBucketMetrics::absent(
+            MetricStatus::NotApplicable,
+            SINK_BUCKET_SCOPE,
+        ),
     };
     let publication = PublicationMetrics {
         status: publication_status(&selected)?,
@@ -284,6 +362,196 @@ pub(crate) fn aggregate(
         materialization,
         cfb_phases,
     })
+}
+
+/// Builds operation metrics for an in-process case whose sink summary was
+/// already checked to be identical for every retained elapsed sample.
+pub(crate) fn from_sink_observation(
+    sample_count: usize,
+    observation: SinkObservation,
+) -> Result<OperationMetrics, Box<dyn Error>> {
+    if sample_count == 0 {
+        return Err("operation metrics sink observation cannot have zero samples".into());
+    }
+    Ok(OperationMetrics {
+        sample_count,
+        alignment: ALIGNMENT,
+        source: SourceMetrics {
+            status: MetricStatus::NotApplicable,
+            counter_scope: SINK_SOURCE_SCOPE.to_owned(),
+            logical_read_calls: MetricVector::absent(MetricStatus::NotApplicable, SOURCE_SCOPE),
+            logical_read_requested_bytes: MetricVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_SCOPE,
+            ),
+            logical_read_returned_bytes: MetricVector::absent(
+                MetricStatus::NotApplicable,
+                SOURCE_SCOPE,
+            ),
+            max_concurrent_reads: MetricVector::absent(MetricStatus::NotApplicable, SOURCE_SCOPE),
+        },
+        process: absent_process_metrics(MetricStatus::NotApplicable),
+        sink: sink_metrics_for_observation(sample_count, observation),
+        publication: PublicationMetrics {
+            status: MetricStatus::NotApplicable,
+            changed_spans: MetricVector::absent(MetricStatus::NotApplicable, PUBLICATION_SCOPE),
+            published_bytes: MetricVector::absent(MetricStatus::NotApplicable, PUBLICATION_SCOPE),
+        },
+        materialization: MaterializationMetrics {
+            status: MetricStatus::NotApplicable,
+            opc_parts: MetricVector::absent(MetricStatus::NotApplicable, MATERIALIZATION_SCOPE),
+        },
+        cfb_phases: absent_cfb_phase_metrics(),
+    })
+}
+
+impl OperationMetrics {
+    /// Adds an already-proven deterministic sink summary without changing the
+    /// operation's measured elapsed samples or any existing metric vectors.
+    pub(crate) fn set_sink_observation(
+        &mut self,
+        sample_count: usize,
+        observation: SinkObservation,
+    ) -> Result<(), Box<dyn Error>> {
+        if sample_count == 0 {
+            return Err("operation metrics sink observation cannot have zero samples".into());
+        }
+        if self.sample_count != sample_count {
+            return Err(format!(
+                "operation metrics sink observation sample count {sample_count} does not match envelope sample count {}",
+                self.sample_count
+            )
+            .into());
+        }
+        let observed = sink_metrics_for_observation(sample_count, observation);
+        self.sink.write_status = observed.write_status;
+        self.sink.accepted_bytes = observed.accepted_bytes;
+        self.sink.write_calls = observed.write_calls;
+        self.sink.largest_write = observed.largest_write;
+        self.sink.write_size_buckets = observed.write_size_buckets;
+        Ok(())
+    }
+}
+
+fn sink_metrics_for_observation(sample_count: usize, observation: SinkObservation) -> SinkMetrics {
+    SinkMetrics {
+        status: MetricStatus::NotApplicable,
+        output_bytes: MetricVector::absent(MetricStatus::NotApplicable, OUTPUT_SCOPE),
+        write_status: MetricStatus::Measured,
+        accepted_bytes: repeated_metric(
+            observation.accepted_bytes,
+            sample_count,
+            SINK_ACCEPTED_BYTES_SCOPE,
+        ),
+        write_calls: repeated_metric(
+            observation.write_calls,
+            sample_count,
+            SINK_WRITE_CALLS_SCOPE,
+        ),
+        largest_write: repeated_metric(
+            observation.largest_write,
+            sample_count,
+            SINK_LARGEST_WRITE_SCOPE,
+        ),
+        write_size_buckets: WriteSizeBucketMetrics::measured(sample_count, observation),
+    }
+}
+
+fn repeated_metric(value: u64, sample_count: usize, scope: &'static str) -> MetricVector {
+    MetricVector::measured(vec![value; sample_count], scope)
+}
+
+impl WriteSizeBucketMetrics {
+    fn absent(status: MetricStatus, scope: &'static str) -> Self {
+        Self {
+            status,
+            bytes_0: MetricVector::absent(status, scope),
+            bytes_1_to_512: MetricVector::absent(status, scope),
+            bytes_513_to_4096: MetricVector::absent(status, scope),
+            bytes_4097_to_16384: MetricVector::absent(status, scope),
+            bytes_16385_to_65536: MetricVector::absent(status, scope),
+            bytes_over_65536: MetricVector::absent(status, scope),
+        }
+    }
+
+    fn measured(sample_count: usize, observation: SinkObservation) -> Self {
+        Self {
+            status: MetricStatus::Measured,
+            bytes_0: repeated_metric(observation.bytes_0, sample_count, SINK_BUCKET_SCOPE),
+            bytes_1_to_512: repeated_metric(
+                observation.bytes_1_to_512,
+                sample_count,
+                SINK_BUCKET_SCOPE,
+            ),
+            bytes_513_to_4096: repeated_metric(
+                observation.bytes_513_to_4096,
+                sample_count,
+                SINK_BUCKET_SCOPE,
+            ),
+            bytes_4097_to_16384: repeated_metric(
+                observation.bytes_4097_to_16384,
+                sample_count,
+                SINK_BUCKET_SCOPE,
+            ),
+            bytes_16385_to_65536: repeated_metric(
+                observation.bytes_16385_to_65536,
+                sample_count,
+                SINK_BUCKET_SCOPE,
+            ),
+            bytes_over_65536: repeated_metric(
+                observation.bytes_over_65536,
+                sample_count,
+                SINK_BUCKET_SCOPE,
+            ),
+        }
+    }
+}
+
+fn absent_process_metrics(status: MetricStatus) -> ProcessMetrics {
+    let process = || MetricVector::absent(status, PROCESS_SCOPE);
+    ProcessMetrics {
+        status,
+        rchar: process(),
+        wchar: process(),
+        read_bytes: process(),
+        write_bytes: process(),
+        cancelled_write_bytes: process(),
+        syscr: process(),
+        syscw: process(),
+        user_cpu_ticks: process(),
+        system_cpu_ticks: process(),
+        clock_ticks_per_second: process(),
+        minor_faults: process(),
+        major_faults: process(),
+        voluntary_context_switches: process(),
+        nonvoluntary_context_switches: process(),
+        rss_delta_bytes: MetricVector::absent(status, RSS_SCOPE),
+        peak_rss_bytes: MetricVector::absent(status, HWM_SCOPE),
+    }
+}
+
+fn absent_cfb_phase_metrics() -> CfbPhaseMetrics {
+    let metric_set = || CfbPhaseMetricSet {
+        elapsed_ns: MetricVector::absent(MetricStatus::NotApplicable, CFB_PHASE_ELAPSED_SCOPE),
+        logical_read_calls: MetricVector::absent(
+            MetricStatus::NotApplicable,
+            CFB_PHASE_SOURCE_SCOPE,
+        ),
+        logical_read_requested_bytes: MetricVector::absent(
+            MetricStatus::NotApplicable,
+            CFB_PHASE_SOURCE_SCOPE,
+        ),
+        logical_read_returned_bytes: MetricVector::absent(
+            MetricStatus::NotApplicable,
+            CFB_PHASE_SOURCE_SCOPE,
+        ),
+    };
+    CfbPhaseMetrics {
+        status: MetricStatus::NotApplicable,
+        open: metric_set(),
+        plan: metric_set(),
+        atomic_publication: metric_set(),
+    }
 }
 
 fn cfb_phase_metrics(samples: &[&SampleEvidence]) -> Result<CfbPhaseMetrics, Box<dyn Error>> {
@@ -356,6 +624,13 @@ fn process_metrics(samples: &[&SampleEvidence]) -> Result<ProcessMetrics, Box<dy
         let unavailable = || MetricVector::absent(MetricStatus::Unavailable, PROCESS_SCOPE);
         return Ok(ProcessMetrics {
             status: MetricStatus::Unavailable,
+            rchar: unavailable(),
+            wchar: unavailable(),
+            read_bytes: unavailable(),
+            write_bytes: unavailable(),
+            cancelled_write_bytes: unavailable(),
+            syscr: unavailable(),
+            syscw: unavailable(),
             user_cpu_ticks: unavailable(),
             system_cpu_ticks: unavailable(),
             clock_ticks_per_second: unavailable(),
@@ -385,6 +660,13 @@ fn process_metrics(samples: &[&SampleEvidence]) -> Result<ProcessMetrics, Box<dy
     };
     Ok(ProcessMetrics {
         status: MetricStatus::Measured,
+        rchar: measured(|metrics| metrics.rchar),
+        wchar: measured(|metrics| metrics.wchar),
+        read_bytes: measured(|metrics| metrics.read_bytes),
+        write_bytes: measured(|metrics| metrics.write_bytes),
+        cancelled_write_bytes: measured(|metrics| metrics.cancelled_write_bytes),
+        syscr: measured(|metrics| metrics.syscr),
+        syscw: measured(|metrics| metrics.syscw),
         user_cpu_ticks: measured(|metrics| metrics.user_cpu_ticks),
         system_cpu_ticks: measured(|metrics| metrics.system_cpu_ticks),
         clock_ticks_per_second: MetricVector::measured(
@@ -484,7 +766,7 @@ fn optional_values(
 mod tests {
     use serde_json::Value;
 
-    use super::{MetricStatus, MetricVector, aggregate};
+    use super::{MetricStatus, MetricVector, SinkObservation, aggregate, from_sink_observation};
     use crate::filesystem::{
         CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadSizeBuckets, SampleEvidence,
     };
@@ -522,6 +804,13 @@ mod tests {
 
     fn metrics() -> crate::process_metrics::Delta {
         crate::process_metrics::Delta {
+            rchar: 11,
+            wchar: 12,
+            read_bytes: 13,
+            write_bytes: 14,
+            cancelled_write_bytes: 15,
+            syscr: 16,
+            syscw: 17,
             user_cpu_ticks: 2,
             system_cpu_ticks: 3,
             clock_ticks_per_second: 100,
@@ -568,6 +857,16 @@ mod tests {
         );
         assert_eq!(envelope.source.logical_read_calls.values, Some(vec![0]));
         assert_eq!(envelope.process.status, MetricStatus::Measured);
+        assert_eq!(envelope.process.rchar.values, Some(vec![11]));
+        assert_eq!(envelope.process.wchar.values, Some(vec![12]));
+        assert_eq!(envelope.process.read_bytes.values, Some(vec![13]));
+        assert_eq!(envelope.process.write_bytes.values, Some(vec![14]));
+        assert_eq!(
+            envelope.process.cancelled_write_bytes.values,
+            Some(vec![15])
+        );
+        assert_eq!(envelope.process.syscr.values, Some(vec![16]));
+        assert_eq!(envelope.process.syscw.values, Some(vec![17]));
         let json = serde_json::to_value(envelope).unwrap();
         assert_eq!(
             json["source"]["logical_read_calls"]["values"],
@@ -580,6 +879,13 @@ mod tests {
         let envelope = aggregate(&[sample(0, "warm", 10, None)], "warm", &[10]).unwrap();
         assert_eq!(envelope.process.status, MetricStatus::Unavailable);
         assert!(envelope.process.user_cpu_ticks.values.is_none());
+        assert!(envelope.process.rchar.values.is_none());
+        assert!(envelope.process.wchar.values.is_none());
+        assert!(envelope.process.read_bytes.values.is_none());
+        assert!(envelope.process.write_bytes.values.is_none());
+        assert!(envelope.process.cancelled_write_bytes.values.is_none());
+        assert!(envelope.process.syscr.values.is_none());
+        assert!(envelope.process.syscw.values.is_none());
         let json = serde_json::to_value(envelope).unwrap();
         assert_eq!(json["process"]["status"], "unavailable");
         assert!(json["process"]["user_cpu_ticks"].get("values").is_none());
@@ -613,6 +919,66 @@ mod tests {
         let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
         assert_eq!(envelope.source.status, MetricStatus::NotApplicable);
         assert!(envelope.source.logical_read_calls.values.is_none());
+    }
+
+    #[test]
+    fn sink_observation_is_accepted_boundary_and_aligned() {
+        let observation = SinkObservation {
+            accepted_bytes: 70_000,
+            write_calls: 6,
+            largest_write: 65_537,
+            bytes_0: 1,
+            bytes_1_to_512: 1,
+            bytes_513_to_4096: 1,
+            bytes_4097_to_16384: 1,
+            bytes_16385_to_65536: 1,
+            bytes_over_65536: 1,
+        };
+        let envelope = from_sink_observation(2, observation).unwrap();
+        assert_eq!(envelope.sample_count, 2);
+        assert_eq!(envelope.sink.write_status, MetricStatus::Measured);
+        assert_eq!(
+            envelope.sink.accepted_bytes.values,
+            Some(vec![70_000, 70_000])
+        );
+        assert_eq!(envelope.sink.write_calls.values, Some(vec![6, 6]));
+        assert_eq!(
+            envelope.sink.largest_write.values,
+            Some(vec![65_537, 65_537])
+        );
+        assert_eq!(
+            envelope.sink.write_size_buckets.bytes_over_65536.values,
+            Some(vec![1, 1])
+        );
+        assert_eq!(
+            envelope.sink.output_bytes.status,
+            MetricStatus::NotApplicable
+        );
+        let json = serde_json::to_value(envelope).unwrap();
+        assert!(
+            json["sink"]["accepted_bytes"]["scope"]
+                .as_str()
+                .is_some_and(|scope| scope.contains("accepted"))
+        );
+        assert!(json["sink"].get("requested_bytes").is_none());
+        assert!(json["sink"]["output_bytes"].get("values").is_none());
+    }
+
+    #[test]
+    fn sink_observation_requires_nonempty_samples() {
+        let observation = SinkObservation {
+            accepted_bytes: 1,
+            write_calls: 1,
+            largest_write: 1,
+            bytes_0: 0,
+            bytes_1_to_512: 1,
+            bytes_513_to_4096: 0,
+            bytes_4097_to_16384: 0,
+            bytes_16385_to_65536: 0,
+            bytes_over_65536: 0,
+        };
+        let error = from_sink_observation(0, observation).unwrap_err();
+        assert!(error.to_string().contains("zero samples"));
     }
 
     #[test]

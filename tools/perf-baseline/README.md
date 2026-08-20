@@ -2588,12 +2588,29 @@ vectors, procfs process vectors, post-operation output length, publication
 counters, and OPC materialization counts. A vector with a measured zero is
 serialized as a numeric zero; unsupported or unavailable values omit the
 numeric vector and retain an explicit `status` (`not_applicable` or
-`unavailable`). Procfs CPU/fault/context-switch/RSS values are operation
-deltas. `peak_rss_bytes` is the process-lifetime after-sample `VmHWM`, not an
-operation peak, and `rss_delta_bytes` is not a peak. The envelope makes no
-allocation, copied-byte, decompressed-byte, or recompressed-byte claim because
-the filesystem child does not instrument those quantities. The existing raw
+`unavailable`). Procfs process vectors include operation deltas for `rchar`,
+`wchar`, `read_bytes`, `write_bytes`, `cancelled_write_bytes`, `syscr`,
+`syscw`, faults, context switches, and RSS. `peak_rss_bytes` is the
+process-lifetime after-sample `VmHWM`, not an operation peak, and
+`rss_delta_bytes` is not a peak. The envelope makes no allocation,
+copied-byte, decompressed-byte, or recompressed-byte claim because the
+filesystem child does not instrument those quantities. The existing raw
 `filesystem_evidence` samples remain unchanged.
+
+Cases with a top-level `sink` summary also carry the same envelope. Their
+`sink.accepted_bytes`, `sink.write_calls`, `sink.largest_write`, and
+`sink.write_size_buckets` vectors are aligned views of the already-validated
+deterministic summary, repeated once per retained elapsed sample. These are
+logical lengths accepted by the harness sink's `Write::write` boundary; they
+are not requested lengths, rejected calls, operating-system syscalls, disk
+I/O, memory-copy counts, or writer-internal buffering. Requested-versus-accepted
+lengths are therefore not inferred, especially for short-write sinks.
+`sink.output_bytes` remains a separate final-output-length metric and is never
+derived from accepted sink bytes. `sink.write_status` reports applicability for
+the write vectors
+independently of the existing `sink.status` for `output_bytes`. Filesystem
+selectors do not expose a logical sink summary, so their sink-write vectors
+remain explicitly `not_applicable`.
 
 ODP media-rich selectors additionally record `source.odp_media`: the exact
 phase/timing scope, selected middle slide and media member, canonical full
@@ -2644,7 +2661,10 @@ Every serialized `sink` summary also contains the fixed
 `Write::write` calls, including accepted zero-length calls; rejected calls do
 not increment any counter. The six bucket counts always sum to `write_calls`,
 including at the exact boundary values. They do not measure syscalls, disk
-I/O, memory copies, compression, or performance.
+I/O, memory copies, compression, or performance. When the summary is promoted
+into `operation_metrics`, each scalar and bucket count uses the same accepted
+boundary and is repeated only because the harness proved the retained sink
+summary deterministic; no per-sample requested length is fabricated.
 
 Logical-tail RTF cases also emit `output_sha256`. Their `sink.rtf_tail_append`
 object records the implementation, operation (`append` or `exact_noop`),
