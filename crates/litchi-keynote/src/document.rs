@@ -83,11 +83,13 @@ impl Document {
         path: impl AsRef<Path>,
         options: DocumentReadOptions,
     ) -> Result<Self, ReadError> {
-        let source =
-            litchi_iwa_detect::PreparedSource::__from_path_with_properties(path, options.source())?
-                .ok_or_else(|| {
-                    ReadError::InvalidFormat("source is not a recognized iWork document".to_owned())
-                })?;
+        let source = litchi_iwa_detect::PreparedSource::__from_path_with_semantic_metadata(
+            path,
+            options.source(),
+        )?
+        .ok_or_else(|| {
+            ReadError::InvalidFormat("source is not a recognized iWork document".to_owned())
+        })?;
         if source.format() != litchi_iwa_detect::Format::Keynote {
             return Err(ReadError::NotKeynote);
         }

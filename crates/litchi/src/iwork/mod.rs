@@ -88,9 +88,10 @@ impl Document {
     /// Returns the same errors as [`Self::open`].
     pub fn open_with_options(path: impl AsRef<Path>, options: Options) -> Result<Self> {
         let physical = options.source().detector()?;
-        let prepared = litchi_iwa_detect::PreparedSource::from_path_with_limits(path, physical)
-            .map_err(map_detection)?
-            .ok_or_else(Error::unrecognized)?;
+        let prepared =
+            litchi_iwa_detect::PreparedSource::__from_path_with_semantic_metadata(path, physical)
+                .map_err(map_detection)?
+                .ok_or_else(Error::unrecognized)?;
         decode(prepared, options.snapshot())
     }
 
@@ -117,9 +118,10 @@ impl Document {
     pub fn from_bytes_with_options(value: &[u8], options: Options) -> Result<Self> {
         admit_input(value.len(), options.source())?;
         let physical = options.source().detector()?;
-        let prepared = litchi_iwa_detect::PreparedSource::from_bytes_with_limits(value, physical)
-            .map_err(map_detection)?
-            .ok_or_else(Error::unrecognized)?;
+        let prepared =
+            litchi_iwa_detect::PreparedSource::__from_bytes_with_semantic_metadata(value, physical)
+                .map_err(map_detection)?
+                .ok_or_else(Error::unrecognized)?;
         decode(prepared, options.snapshot())
     }
 
@@ -143,9 +145,11 @@ impl Document {
         admit_input(value.len(), options.source())?;
         let physical = options.source().detector()?;
         let prepared =
-            litchi_iwa_detect::PreparedSource::from_shared_bytes_with_limits(value, physical)
-                .map_err(map_detection)?
-                .ok_or_else(Error::unrecognized)?;
+            litchi_iwa_detect::PreparedSource::__from_shared_bytes_with_semantic_metadata(
+                value, physical,
+            )
+            .map_err(map_detection)?
+            .ok_or_else(Error::unrecognized)?;
         decode(prepared, options.snapshot())
     }
 }
