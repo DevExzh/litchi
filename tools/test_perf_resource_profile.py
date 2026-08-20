@@ -1128,6 +1128,14 @@ peak RSS (including heaptrack overhead): 4.00M
                 result["source"] = {
                     "read_calls": [2] * samples,
                     "read_bytes": [64] * samples,
+                    "xlsx_cell_values": {
+                        "open_ns": [10] * samples,
+                        "plan_ns": [20] * samples,
+                        "commit_ns": [30] * samples,
+                        "publication_ns": [40] * samples,
+                        "reopen_ns": [50] * samples,
+                        "source_read_bytes": [64] * samples,
+                    },
                 }
                 result["sink"] = {
                     "accepted_bytes": 120,
@@ -1847,6 +1855,41 @@ Minor (reclaiming a frame) page faults: 34
                         ),
                     )
 
+    def test_xlsx_xml_borrowed_source_phase_timing_is_not_process_identity(self):
+        timed = self._xlsx_xml_borrowed_report()
+        heaptrack = self._xlsx_xml_borrowed_report()
+        source = heaptrack["results"][3]["source"]["xlsx_cell_values"]
+        for offset, key in enumerate(
+            perf_resource_profile.XLSX_XML_BORROWED_SOURCE_TIMING_FIELDS, start=1
+        ):
+            source[key] = [offset * 1_000] * 3
+
+        timed_identity = perf_resource_profile._xlsx_xml_borrowed_harness_identity(
+            timed, "timed"
+        )
+        heaptrack_identity = perf_resource_profile._xlsx_xml_borrowed_harness_identity(
+            heaptrack, "heaptrack"
+        )
+
+        self.assertEqual(timed_identity, heaptrack_identity)
+        result_identity = timed_identity["result_identities"][3]
+        self.assertEqual(len(result_identity["excluded_source_observations"]), 5)
+        self.assertNotIn("commit_ns", result_identity["source"]["xlsx_cell_values"])
+        self.assertEqual(
+            result_identity["source"]["xlsx_cell_values"]["source_read_bytes"],
+            [64, 64, 64],
+        )
+
+    def test_xlsx_xml_borrowed_unknown_source_timing_is_rejected(self):
+        report = self._xlsx_xml_borrowed_report()
+        report["results"][3]["source"]["xlsx_cell_values"]["mystery_ns"] = [1, 1, 1]
+
+        with self.assertRaisesRegex(
+            perf_resource_profile.ResourceProfileInputError,
+            "unrecognized source timing observation",
+        ):
+            perf_resource_profile._xlsx_xml_borrowed_harness_identity(report, "report")
+
     def test_xlsx_xml_borrowed_abba_orchestration_publishes_identity_and_scope(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1908,7 +1951,7 @@ Minor (reclaiming a frame) page faults: 34
         )
         self.assertEqual(published["scope"]["xlsx_shape"], "tiny")
         self.assertEqual(published["scope"]["xlsx_cell_crud_shape"], "medium")
-        self.assertEqual(published["tool"]["version"], "0.1.4")
+        self.assertEqual(published["tool"]["version"], "0.1.5")
         self.assertEqual(published["latency_evidence"]["status"], "not_measured")
         self.assertEqual(len(published["corpus_identities"]), 4)
         self.assertEqual(len(published["result_identities"]), 4)

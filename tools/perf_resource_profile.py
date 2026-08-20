@@ -45,7 +45,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 SCHEMA_VERSION = 1
 TOOL_NAME = "litchi-resource-profile"
-TOOL_VERSION = "0.1.4"
+TOOL_VERSION = "0.1.5"
 ABBA_SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_MANIFEST = REPO_ROOT / "tools" / "perf-baseline" / "Cargo.toml"
@@ -1838,6 +1838,74 @@ XLSX_XML_BORROWED_RESULT_IDENTITY: dict[str, tuple[bool, bool, bool]] = {
     "xlsx_source_backed_cell_values_one_edit_save": (True, True, True),
 }
 
+# The XLSX edit/save harness reports these per-iteration timing observations
+# inside its otherwise semantic ``source`` channel.  A heaptrack process is
+# expected to change them, so they cannot participate in cross-process
+# identity.  Keep the allow-list and path exact: all other source values,
+# including logical I/O/resource counters, remain identity-bearing.
+XLSX_XML_BORROWED_SOURCE_TIMING_PATH = ("xlsx_cell_values",)
+XLSX_XML_BORROWED_SOURCE_TIMING_FIELDS = frozenset(
+    {
+        "open_ns",
+        "plan_ns",
+        "commit_ns",
+        "publication_ns",
+        "reopen_ns",
+    }
+)
+
+
+def _xlsx_xml_borrowed_source_identity(
+    source: dict[str, Any], *, sample_count: int, location: str
+) -> tuple[dict[str, Any], list[str]]:
+    """Copy a source identity while removing only known timing observations."""
+
+    excluded: list[str] = []
+
+    def copy_identity(value: Any, path: tuple[str, ...]) -> Any:
+        if isinstance(value, dict):
+            copied: dict[str, Any] = {}
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise ResourceProfileInputError(
+                        f"{location} source identity keys must be strings"
+                    )
+                item_path = (*path, key)
+                if key.endswith("_ns"):
+                    if (
+                        path != XLSX_XML_BORROWED_SOURCE_TIMING_PATH
+                        or key not in XLSX_XML_BORROWED_SOURCE_TIMING_FIELDS
+                    ):
+                        raise ResourceProfileInputError(
+                            f"{location}.{'.'.join(item_path)} is an unrecognized "
+                            "source timing observation"
+                        )
+                    if (
+                        not isinstance(item, list)
+                        or len(item) != sample_count
+                        or any(
+                            isinstance(sample, bool)
+                            or not isinstance(sample, int)
+                            or sample < 0
+                            for sample in item
+                        )
+                    ):
+                        raise ResourceProfileInputError(
+                            f"{location}.{'.'.join(item_path)} must contain exactly "
+                            f"{sample_count} non-negative integer observations"
+                        )
+                    excluded.append("source." + ".".join(item_path))
+                    continue
+                copied[key] = copy_identity(item, item_path)
+            return copied
+        if isinstance(value, list):
+            return [copy_identity(item, path) for item in value]
+        return value
+
+    identity = copy_identity(source, ())
+    _canonical_json(identity, f"{location} semantic source identity")
+    return identity, sorted(excluded)
+
 # These are the complete deterministic manifests from retained 0251 evidence.
 # The existing harness schema has no stable ``corpus_id`` field, so the
 # identity contract is the exact pinned manifest plus its archive SHA-256 and
@@ -2127,6 +2195,16 @@ def _xlsx_xml_borrowed_harness_results(
                     f"{result_location}.source must be a non-empty object"
                 )
             _canonical_json(source, f"{result_location}.source")
+            source_identity, excluded_source_observations = (
+                _xlsx_xml_borrowed_source_identity(
+                    source,
+                    sample_count=sample_count,
+                    location=f"{result_location}.source",
+                )
+            )
+        else:
+            source_identity = None
+            excluded_source_observations = []
         if sink is not None:
             if not isinstance(sink, dict) or not sink:
                 raise ResourceProfileInputError(
@@ -2139,7 +2217,8 @@ def _xlsx_xml_borrowed_harness_results(
             "case": case,
             "source_key_present": source_key_present,
             "source_present": source is not None,
-            "source": source,
+            "source": source_identity,
+            "excluded_source_observations": excluded_source_observations,
             "sink_key_present": sink_key_present,
             "sink_present": sink is not None,
             "sink": sink,
@@ -2177,10 +2256,11 @@ def _xlsx_xml_borrowed_harness_identity(
 ) -> dict[str, Any]:
     """Return the identity channels shared by timed and heaptrack harnesses.
 
-    Elapsed samples are deliberately excluded: the second process is
-    instrumented and therefore has different resource-observation timing.
-    Configuration, corpus rows, source/sink/output channels, revision, tool,
-    and stable environment remain exact identity requirements.
+    Elapsed samples and the five explicitly named source edit-phase timing
+    vectors are deliberately excluded: the second process is instrumented and
+    therefore has different resource-observation timing.  Configuration,
+    corpus rows, every non-timing source value, sink/output channels, revision,
+    tool, and stable environment remain exact identity requirements.
     """
     configuration, results, result_identities = _xlsx_xml_borrowed_harness_results(
         report, location, cases=cases
