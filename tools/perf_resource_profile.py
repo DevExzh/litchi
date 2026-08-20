@@ -44,7 +44,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 SCHEMA_VERSION = 1
 TOOL_NAME = "litchi-resource-profile"
-TOOL_VERSION = "0.1.2"
+TOOL_VERSION = "0.1.3"
 ABBA_SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_MANIFEST = REPO_ROOT / "tools" / "perf-baseline" / "Cargo.toml"
@@ -334,6 +334,15 @@ def xlsx_xml_borrowed_args(
 XLSX_XML_BORROWED_RESOURCE_METRIC_SPECS: tuple[tuple[str, str], ...] = (
     _docx_resource_metric_specs(XLSX_XML_BORROWED_CASES)
 )
+XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS: tuple[str, ...] = (
+    "heaptrack.allocation_calls",
+    "heaptrack.allocated_bytes",
+    "heaptrack.temporary_allocations",
+    "heaptrack.peak_heap_bytes",
+    "heaptrack.peak_rss_bytes",
+    "time.max_rss_kib",
+)
+XLSX_XML_BORROWED_ACCEPTANCE_THRESHOLD_PERCENT = 5.0
 
 
 def _normalize_docx_cases(cases: Sequence[str] | None) -> tuple[str, ...]:
@@ -1809,6 +1818,87 @@ XLSX_XML_BORROWED_RESULT_IDENTITY: dict[str, tuple[bool, bool, bool]] = {
     "xlsx_source_backed_cell_values_one_edit_save": (True, True, True),
 }
 
+# These are the complete deterministic manifests from retained 0251 evidence.
+# A cross-leg match alone is insufficient: a newly generated but consistently
+# altered corpus must not become a valid comparison input.
+XLSX_XML_BORROWED_TINY_CORPUS_MANIFEST: dict[str, Any] = {
+    "name": "xlsx-tiny",
+    "generator": "litchi-xlsx-synthetic-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "tiny",
+    "payload_kind": "deterministic-integer-grid",
+    "compression": "deflate",
+    "entry_count": 192,
+    "archive_member_count": 8,
+    "entry_bytes": 4,
+    "uncompressed_payload_bytes": 768,
+    "archive_bytes": 3561,
+    "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "xlsx": {
+        "sheet_count": 3,
+        "rows_per_sheet": 8,
+        "columns_per_sheet": 8,
+        "one_percent_update_count": 2,
+        "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+            ],
+            "shared_strings": None,
+            "styles": "xl/styles.xml",
+        },
+    },
+}
+XLSX_XML_BORROWED_MEDIUM_CORPUS_MANIFEST: dict[str, Any] = {
+    "name": "xlsx-cell-values-medium",
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "medium",
+    "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+    "compression": "deflate",
+    "entry_count": 9216,
+    "archive_member_count": 17,
+    "entry_bytes": 4,
+    "uncompressed_payload_bytes": 4231168,
+    "archive_bytes": 4226429,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "xlsx": {
+        "sheet_count": 4,
+        "rows_per_sheet": 48,
+        "columns_per_sheet": 48,
+        "one_percent_update_count": 93,
+        "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml",
+            ],
+            "shared_strings": None,
+            "styles": "xl/styles.xml",
+        },
+    },
+}
+XLSX_XML_BORROWED_CORPUS_MANIFESTS: dict[str, dict[str, Any]] = {
+    "xlsx_first_cell": XLSX_XML_BORROWED_TINY_CORPUS_MANIFEST,
+    "xlsx_source_first_cell": XLSX_XML_BORROWED_TINY_CORPUS_MANIFEST,
+    "xlsx_eager_cell_values_one_edit_save": XLSX_XML_BORROWED_MEDIUM_CORPUS_MANIFEST,
+    "xlsx_source_backed_cell_values_one_edit_save": XLSX_XML_BORROWED_MEDIUM_CORPUS_MANIFEST,
+}
+XLSX_XML_BORROWED_CORPUS_CANONICAL_SHA256: dict[str, str] = {
+    "tiny": "0f521b922f4c4a408a5cdaf87dd2dc84eefb28589fd38955c54ae99000351aed",
+    "medium": "4cdb4fc4199a0604ea1431c044f3fe86c04e9822d1121044110ba44356f43efc",
+}
+
 
 def _xlsx_xml_borrowed_harness_results(
     report: Any,
@@ -1877,32 +1967,6 @@ def _xlsx_xml_borrowed_harness_results(
         "target_payload_sha256",
         "xlsx",
     )
-    expected_corpus = {
-        "xlsx_first_cell": {
-            "name": "xlsx-tiny",
-            "generator": "litchi-xlsx-synthetic-v1",
-            "shape": XLSX_XML_BORROWED_SHAPE,
-            "payload_kind": "deterministic-integer-grid",
-        },
-        "xlsx_source_first_cell": {
-            "name": "xlsx-tiny",
-            "generator": "litchi-xlsx-synthetic-v1",
-            "shape": XLSX_XML_BORROWED_SHAPE,
-            "payload_kind": "deterministic-integer-grid",
-        },
-        "xlsx_eager_cell_values_one_edit_save": {
-            "name": "xlsx-cell-values-medium",
-            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
-            "shape": XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
-            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
-        },
-        "xlsx_source_backed_cell_values_one_edit_save": {
-            "name": "xlsx-cell-values-medium",
-            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
-            "shape": XLSX_XML_BORROWED_CELL_CRUD_SHAPE,
-            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
-        },
-    }
     validated: list[dict[str, Any]] = []
     result_identities: list[dict[str, Any]] = []
     for index, result in enumerate(results):
@@ -1925,23 +1989,20 @@ def _xlsx_xml_borrowed_harness_results(
                 raise ResourceProfileInputError(
                     f"{result_location}.corpus.{key} is required for XLSX identity"
                 )
-        expected = expected_corpus[case]
-        for key, expected_value in expected.items():
-            if corpus.get(key) != expected_value:
-                raise ResourceProfileInputError(
-                    f"{result_location}.corpus.{key} must be {expected_value!r}"
-                )
-        if corpus.get("package_format") != "XLSX/OPC/ZIP":
+        expected = XLSX_XML_BORROWED_CORPUS_MANIFESTS[case]
+        if corpus != expected:
             raise ResourceProfileInputError(
-                f"{result_location}.corpus.package_format must be 'XLSX/OPC/ZIP'"
+                f"{result_location}.corpus does not match the pinned {expected['shape']} "
+                "XLSX corpus manifest"
             )
-        if corpus.get("compression") != "deflate":
+        corpus_digest = sha256_bytes(
+            _canonical_json(corpus, f"{result_location}.corpus").encode("utf-8")
+        )
+        expected_digest = XLSX_XML_BORROWED_CORPUS_CANONICAL_SHA256[expected["shape"]]
+        if corpus_digest != expected_digest:
             raise ResourceProfileInputError(
-                f"{result_location}.corpus.compression must be 'deflate'"
-            )
-        if corpus.get("target_entry") != "Sheet1!A1":
-            raise ResourceProfileInputError(
-                f"{result_location}.corpus.target_entry must be 'Sheet1!A1'"
+                f"{result_location}.corpus canonical manifest digest does not match "
+                f"pinned {expected_digest}"
             )
         for key in (
             "entry_count",
@@ -2008,20 +2069,35 @@ def _xlsx_xml_borrowed_harness_results(
             )
 
         expected_source, expected_sink, expected_output = XLSX_XML_BORROWED_RESULT_IDENTITY[case]
+        source_key_present = "source" in result
+        sink_key_present = "sink" in result
+        output_key_present = "output_sha256" in result
         source = result.get("source")
         sink = result.get("sink")
         output = result.get("output_sha256")
+        if source_key_present != expected_source:
+            raise ResourceProfileInputError(
+                f"{result_location}.source key presence does not match fixed {case} identity"
+            )
         if (source is not None) != expected_source:
             raise ResourceProfileInputError(
-                f"{result_location}.source presence does not match fixed {case} identity"
+                f"{result_location}.source value presence does not match fixed {case} identity"
+            )
+        if not sink_key_present:
+            raise ResourceProfileInputError(
+                f"{result_location}.sink key is required by the fixed {case} identity"
             )
         if (sink is not None) != expected_sink:
             raise ResourceProfileInputError(
-                f"{result_location}.sink presence does not match fixed {case} identity"
+                f"{result_location}.sink value presence does not match fixed {case} identity"
+            )
+        if output_key_present != expected_output:
+            raise ResourceProfileInputError(
+                f"{result_location}.output_sha256 key presence does not match fixed {case} identity"
             )
         if (output is not None) != expected_output:
             raise ResourceProfileInputError(
-                f"{result_location}.output_sha256 presence does not match fixed {case} identity"
+                f"{result_location}.output_sha256 value presence does not match fixed {case} identity"
             )
         if source is not None:
             if not isinstance(source, dict) or not source:
@@ -2039,10 +2115,13 @@ def _xlsx_xml_borrowed_harness_results(
             _validate_sha256(output, f"{result_location}.output_sha256")
         result_identity = {
             "case": case,
+            "source_key_present": source_key_present,
             "source_present": source is not None,
             "source": source,
+            "sink_key_present": sink_key_present,
             "sink_present": sink is not None,
             "sink": sink,
+            "output_key_present": output_key_present,
             "output_present": output is not None,
             "output_sha256": output,
         }
@@ -2424,6 +2503,211 @@ def _leg_resource_metric(leg: dict[str, Any], metric: str) -> float | int | None
         if isinstance(parsed, dict):
             return _finite_resource_value(parsed.get(metric.split(".", 1)[1]))
     return None
+
+
+def _require_retained_resource_artifact(value: Any, location: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ResourceProfileInputError(f"{location} must be an artifact object")
+    if value.get("present") is not True or value.get("retained") is not True:
+        raise ResourceProfileInputError(
+            f"{location} must be present and retained for strict XLSX resource evidence"
+        )
+    bytes_value = value.get("bytes")
+    if isinstance(bytes_value, bool) or not isinstance(bytes_value, int) or bytes_value < 0:
+        raise ResourceProfileInputError(f"{location}.bytes must be a non-negative integer")
+    _validate_sha256(value.get("sha256"), f"{location}.sha256")
+    return value
+
+
+def _require_successful_retained_run(value: Any, location: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ResourceProfileInputError(f"{location} must be a completed run object")
+    returncode = value.get("returncode")
+    if (
+        isinstance(returncode, bool)
+        or not isinstance(returncode, int)
+        or returncode != 0
+        or value.get("timed_out") is not False
+    ):
+        raise ResourceProfileInputError(
+            f"{location} must complete successfully in strict XLSX resource mode"
+        )
+    _require_retained_resource_artifact(value.get("stdout"), f"{location}.stdout")
+    _require_retained_resource_artifact(value.get("stderr"), f"{location}.stderr")
+    return value
+
+
+def validate_xlsx_xml_borrowed_resource_legs(
+    legs: Sequence[dict[str, Any]],
+) -> dict[str, Any]:
+    """Require complete process-total evidence for every strict XLSX leg."""
+    if len(legs) != len(ABBA_LEG_ORDER):
+        raise ResourceProfileInputError(
+            f"strict XLSX resource evidence requires exactly {len(ABBA_LEG_ORDER)} legs"
+        )
+    if any(not isinstance(leg, dict) for leg in legs):
+        raise ResourceProfileInputError("strict XLSX resource evidence legs must be objects")
+    validate_abba_order([leg.get("leg") for leg in legs])
+    observed: list[dict[str, Any]] = []
+    heaptrack_metrics = tuple(
+        metric.split(".", 1)[1]
+        for metric in XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS
+        if metric.startswith("heaptrack.")
+    )
+    for index, leg in enumerate(legs):
+        location = f"legs[{index}]"
+        if not isinstance(leg, dict):
+            raise ResourceProfileInputError(f"{location} must be an object")
+        timed = leg.get("time")
+        if not isinstance(timed, dict) or timed.get("status") != "ok":
+            raise ResourceProfileInputError(
+                f"{location}.time must have status 'ok' in strict XLSX resource mode"
+            )
+        _require_successful_retained_run(timed.get("run"), f"{location}.time.run")
+        parsed_time = timed.get("parsed")
+        if not isinstance(parsed_time, dict) or parsed_time.get("status") != "ok":
+            raise ResourceProfileInputError(
+                f"{location}.time.parsed must have status 'ok'"
+            )
+        _require_retained_resource_artifact(
+            parsed_time.get("artifact"), f"{location}.time.parsed.artifact"
+        )
+        for field in TIME_EXPECTED_FIELDS:
+            if _finite_resource_value(parsed_time.get(field)) is None:
+                raise ResourceProfileInputError(
+                    f"{location}.time.parsed.{field} is missing or non-finite"
+                )
+
+        heaptrack = leg.get("heaptrack")
+        if not isinstance(heaptrack, dict) or heaptrack.get("status") != "ok":
+            raise ResourceProfileInputError(
+                f"{location}.heaptrack must have status 'ok' in strict XLSX resource mode"
+            )
+        harness_identity = heaptrack.get("harness_identity")
+        if (
+            not isinstance(harness_identity, dict)
+            or harness_identity.get("status") != "validated"
+        ):
+            raise ResourceProfileInputError(
+                f"{location}.heaptrack.harness_identity must be validated"
+            )
+        _require_retained_resource_artifact(
+            heaptrack.get("harness"), f"{location}.heaptrack.harness"
+        )
+        _require_retained_resource_artifact(
+            heaptrack.get("capture"), f"{location}.heaptrack.capture"
+        )
+        _require_successful_retained_run(heaptrack.get("run"), f"{location}.heaptrack.run")
+        printed = heaptrack.get("print")
+        if not isinstance(printed, dict) or printed.get("status") != "ok":
+            raise ResourceProfileInputError(
+                f"{location}.heaptrack.print must have status 'ok'"
+            )
+        _require_retained_resource_artifact(
+            printed.get("artifact"), f"{location}.heaptrack.print.artifact"
+        )
+        _require_successful_retained_run(
+            printed.get("run"), f"{location}.heaptrack.print.run"
+        )
+        parsed_heaptrack = printed.get("parsed")
+        if not isinstance(parsed_heaptrack, dict) or parsed_heaptrack.get("status") != "ok":
+            raise ResourceProfileInputError(
+                f"{location}.heaptrack.print.parsed must have status 'ok'"
+            )
+        _require_retained_resource_artifact(
+            parsed_heaptrack.get("histogram_artifact"),
+            f"{location}.heaptrack.print.parsed.histogram_artifact",
+        )
+        for field in heaptrack_metrics:
+            if _finite_resource_value(parsed_heaptrack.get(field)) is None:
+                raise ResourceProfileInputError(
+                    f"{location}.heaptrack.print.parsed.{field} is missing or non-finite"
+                )
+        values = {
+            metric: _leg_resource_metric(leg, metric)
+            for metric in XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS
+        }
+        for metric, value in values.items():
+            if _finite_resource_value(value) is None:
+                raise ResourceProfileInputError(
+                    f"{location}.{metric} is missing or non-finite"
+                )
+        observed.append({"leg": leg["leg"], "metrics": values})
+    return {
+        "status": "validated",
+        "required_metrics": list(XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS),
+        "legs": observed,
+    }
+
+
+def validate_xlsx_xml_borrowed_acceptance(
+    legs: Sequence[dict[str, Any]],
+    *,
+    threshold_percent: float = XLSX_XML_BORROWED_ACCEPTANCE_THRESHOLD_PERCENT,
+) -> dict[str, Any]:
+    """Apply the predeclared paired resource-delta acceptance policy."""
+    if not math.isfinite(threshold_percent) or threshold_percent < 0:
+        raise ResourceProfileInputError("XLSX acceptance threshold must be finite and non-negative")
+    if len(legs) != len(ABBA_LEG_ORDER):
+        raise ResourceProfileInputError("XLSX acceptance requires exactly four ABBA legs")
+    if any(not isinstance(leg, dict) for leg in legs):
+        raise ResourceProfileInputError("XLSX acceptance legs must be objects")
+    validate_abba_order([leg.get("leg") for leg in legs])
+    by_label = {leg["leg"]: leg for leg in legs}
+    pairs = (("A1", "B1", "A1_to_B1"), ("A2", "B2", "A2_to_B2"))
+    metric_results: dict[str, Any] = {}
+    for metric in XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS:
+        pair_results: dict[str, Any] = {}
+        for control_label, candidate_label, pair_label in pairs:
+            control = _finite_resource_value(_leg_resource_metric(by_label[control_label], metric))
+            candidate = _finite_resource_value(
+                _leg_resource_metric(by_label[candidate_label], metric)
+            )
+            if control is None or candidate is None:
+                raise ResourceProfileInputError(
+                    f"XLSX acceptance {metric} {pair_label} is missing or non-finite"
+                )
+            control_number = float(control)
+            candidate_number = float(candidate)
+            if control_number == 0.0:
+                if candidate_number == 0.0:
+                    delta_percent = 0.0
+                else:
+                    raise ResourceProfileInputError(
+                        f"XLSX acceptance {metric} {pair_label} has a positive delta from zero control"
+                    )
+            else:
+                try:
+                    delta_percent = (candidate_number - control_number) / control_number * 100.0
+                except (OverflowError, ZeroDivisionError) as error:
+                    raise ResourceProfileInputError(
+                        f"XLSX acceptance {metric} {pair_label} delta is non-finite"
+                    ) from error
+            if not math.isfinite(delta_percent):
+                raise ResourceProfileInputError(
+                    f"XLSX acceptance {metric} {pair_label} delta is non-finite"
+                )
+            if delta_percent > threshold_percent:
+                raise ResourceProfileInputError(
+                    f"XLSX acceptance {metric} {pair_label} positive delta "
+                    f"{delta_percent:.6f}% exceeds {threshold_percent:.6f}%"
+                )
+            pair_results[pair_label] = {
+                "control_leg": control_label,
+                "candidate_leg": candidate_label,
+                "control": control,
+                "candidate": candidate,
+                "delta_percent": delta_percent,
+                "status": "accepted",
+            }
+        metric_results[metric] = pair_results
+    return {
+        "status": "accepted",
+        "threshold_percent": threshold_percent,
+        "metrics": metric_results,
+        "instrumented_elapsed_included": False,
+        "claim": "predeclared resource acceptance gate; not a latency or speedup claim",
+    }
 
 
 def _value_summary(values: Sequence[float | int | None]) -> dict[str, Any]:
@@ -3415,6 +3699,22 @@ def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
     candidate = binary_identity(Path(arguments.candidate_binary), label="candidate")
     if control["binary_sha256"] == candidate["binary_sha256"]:
         raise ResourceProfileInputError("control and candidate binary hashes are identical")
+    tools = {
+        "time": probe_tool("/usr/bin/time", ("--version",)),
+        "heaptrack": probe_tool("heaptrack", ("--version",)),
+        "heaptrack_print": probe_tool("heaptrack_print", ("--version",)),
+    }
+    for tool_name in ("time", "heaptrack", "heaptrack_print"):
+        tool = tools[tool_name]
+        if (
+            not isinstance(tool, dict)
+            or tool.get("available") is not True
+            or not isinstance(tool.get("path"), str)
+            or not tool["path"]
+        ):
+            raise ResourceProfileInputError(
+                f"strict XLSX resource mode requires {tool_name}"
+            )
     output_path = Path(arguments.output).expanduser().resolve()
     artifact_root = (
         Path(arguments.artifact_dir).expanduser().resolve()
@@ -3422,11 +3722,6 @@ def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
         else output_path.with_name(output_path.stem + "-artifacts")
     )
     output_path, artifact_root = reserve_abba_paths(output_path, artifact_root)
-    tools = {
-        "time": probe_tool("/usr/bin/time", ("--version",)),
-        "heaptrack": probe_tool("heaptrack", ("--version",)),
-        "heaptrack_print": probe_tool("heaptrack_print", ("--version",)),
-    }
     legs: list[dict[str, Any]] = []
     for leg in ABBA_LEG_ORDER:
         variant = ABBA_LEG_VARIANTS[leg]
@@ -3470,6 +3765,8 @@ def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
         expected_configuration=fixed_configuration["harness_expected"],
         workload=XLSX_XML_BORROWED_ID,
     )
+    resource_evidence = validate_xlsx_xml_borrowed_resource_legs(legs)
+    predeclared_acceptance = validate_xlsx_xml_borrowed_acceptance(legs)
     statistics_report = abba_statistics(
         legs,
         metric_specs=XLSX_XML_BORROWED_RESOURCE_METRIC_SPECS,
@@ -3513,7 +3810,7 @@ def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
             ),
             "resource_scope": (
                 "instrumented harness summaries plus whole-process /usr/bin/time and "
-                "optional heaptrack allocation/peak-heap/peak-RSS observations"
+                "required heaptrack allocation/peak-heap/peak-RSS observations"
             ),
             "instrumented_elapsed": "retained for resource-leg alignment only; not latency evidence",
             "physical_io": (
@@ -3530,6 +3827,8 @@ def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
         "canonical_harness_identity": canonical_harness_identity,
         "tools": tools,
         "validation": validation,
+        "resource_evidence": resource_evidence,
+        "predeclared_acceptance": predeclared_acceptance,
         "legs": published_legs,
         "statistics": statistics_report,
         "perf_counters": {
@@ -3546,7 +3845,9 @@ def run_xlsx_xml_borrowed_abba(arguments: argparse.Namespace) -> int:
         "limitations": [
             "Control and candidate revisions must come from clean release harness worktrees.",
             "The four case names, order, tiny/medium shapes, and identity channels are fixed.",
-            "Missing optional tools remain unsupported/null; no zero is substituted.",
+            "The strict mode requires /usr/bin/time, heaptrack, and heaptrack_print.",
+            "Every required process-total and histogram metric is required and finite; partial or null output is invalid.",
+            "Each A1-to-B1 and A2-to-B2 required resource delta must be at most +5.0%; instrumented elapsed is excluded.",
             "Instrumented harness elapsed values are not latency evidence.",
             "Allocation and RSS values are whole-process observations, including profiler overhead.",
             "Source, sink, and output identities are compared exactly per case; absent values remain absent.",
