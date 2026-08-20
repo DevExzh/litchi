@@ -964,68 +964,12 @@ peak RSS (including heaptrack overhead): 4.00M
             "xlsx_shapes": ["tiny"],
             "xlsx_cell_crud_shapes": ["medium"],
         }
-        tiny_corpus = {
-            "name": "xlsx-tiny",
-            "generator": "litchi-xlsx-synthetic-v1",
-            "package_format": "XLSX/OPC/ZIP",
-            "shape": "tiny",
-            "payload_kind": "deterministic-integer-grid",
-            "compression": "deflate",
-            "entry_count": 192,
-            "archive_member_count": 8,
-            "entry_bytes": 4,
-            "uncompressed_payload_bytes": 768,
-            "archive_bytes": 3561,
-            "archive_sha256": "a" * 64,
-            "target_entry": "Sheet1!A1",
-            "target_payload_bytes": 1,
-            "target_payload_sha256": "b" * 64,
-            "xlsx": {
-                "sheet_count": 3,
-                "rows_per_sheet": 8,
-                "columns_per_sheet": 8,
-                "one_percent_update_count": 2,
-                "source_members": {
-                    "workbook": "xl/workbook.xml",
-                    "worksheets": [
-                        "xl/worksheets/sheet1.xml",
-                        "xl/worksheets/sheet2.xml",
-                        "xl/worksheets/sheet3.xml",
-                    ],
-                    "shared_strings": None,
-                    "styles": "xl/styles.xml",
-                },
-            },
-        }
-        medium_corpus = {
-            **tiny_corpus,
-            "name": "xlsx-cell-values-medium",
-            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
-            "shape": "medium",
-            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
-            "entry_count": 9216,
-            "archive_member_count": 17,
-            "uncompressed_payload_bytes": 4_231_168,
-            "archive_bytes": 4_226_429,
-            "archive_sha256": "c" * 64,
-            "xlsx": {
-                "sheet_count": 4,
-                "rows_per_sheet": 48,
-                "columns_per_sheet": 48,
-                "one_percent_update_count": 93,
-                "source_members": {
-                    "workbook": "xl/workbook.xml",
-                    "worksheets": [
-                        "xl/worksheets/sheet1.xml",
-                        "xl/worksheets/sheet2.xml",
-                        "xl/worksheets/sheet3.xml",
-                        "xl/worksheets/sheet4.xml",
-                    ],
-                    "shared_strings": None,
-                    "styles": "xl/styles.xml",
-                },
-            },
-        }
+        tiny_corpus = json.loads(
+            json.dumps(perf_resource_profile.XLSX_XML_BORROWED_TINY_CORPUS_MANIFEST)
+        )
+        medium_corpus = json.loads(
+            json.dumps(perf_resource_profile.XLSX_XML_BORROWED_MEDIUM_CORPUS_MANIFEST)
+        )
         results = []
         for offset, case in enumerate(cases):
             result = {
@@ -1055,6 +999,7 @@ peak RSS (including heaptrack overhead): 4.00M
                         "upper": 120 + offset,
                     },
                 },
+                "sink": None,
             }
             if case == "xlsx_source_first_cell":
                 result["source"] = {"read_calls": [1] * samples, "read_bytes": [32] * samples}
@@ -1106,6 +1051,66 @@ peak RSS (including heaptrack overhead): 4.00M
                 }
             )
         return legs
+
+    @staticmethod
+    def _strict_xlsx_resource_fields(value=100):
+        retained = {
+            "present": True,
+            "retained": True,
+            "sha256": "a" * 64,
+            "bytes": 1,
+        }
+        parsed_time = {
+            "status": "ok",
+            "max_rss_kib": value,
+            "user_seconds": 1.0,
+            "system_seconds": 1.0,
+            "elapsed_wall_seconds": 1.0,
+            "voluntary_context_switches": value,
+            "involuntary_context_switches": value,
+            "major_page_faults": value,
+            "minor_page_faults": value,
+            "artifact": dict(retained),
+        }
+        parsed_heaptrack = {
+            "status": "ok",
+            "allocation_calls": value,
+            "allocated_bytes": value,
+            "temporary_allocations": value,
+            "peak_heap_bytes": value,
+            "peak_rss_bytes": value,
+            "histogram_artifact": dict(retained),
+        }
+        successful_run = {
+            "returncode": 0,
+            "timed_out": False,
+            "stdout": dict(retained),
+            "stderr": dict(retained),
+        }
+        return {
+            "time": {
+                "status": "ok",
+                "run": dict(successful_run),
+                "parsed": parsed_time,
+            },
+            "heaptrack": {
+                "status": "ok",
+                "harness_identity": {"status": "validated"},
+                "run": dict(successful_run),
+                "harness": dict(retained),
+                "capture": dict(retained),
+                "print": {
+                    "status": "ok",
+                    "run": dict(successful_run),
+                    "artifact": dict(retained),
+                    "parsed": parsed_heaptrack,
+                },
+            },
+            "resource_metrics": {
+                metric: value
+                for metric in perf_resource_profile.XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS
+            },
+        }
 
     def test_docx_parser_exposes_explicit_comparison_cli(self):
         parsed = perf_resource_profile.build_parser().parse_args(
@@ -1283,10 +1288,64 @@ peak RSS (including heaptrack overhead): 4.00M
             ] = "9" * 64
             with self.assertRaisesRegex(
                 perf_resource_profile.ResourceProfileInputError,
-                "corpus identities",
+                "pinned",
             ):
                 perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
                     corpus_mismatch
+                )
+
+            altered_everywhere = self._xlsx_xml_borrowed_legs(directory)
+            for leg in altered_everywhere:
+                for result in leg["harness_report"]["results"]:
+                    result["corpus"]["archive_sha256"] = "9" * 64
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "pinned",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    altered_everywhere
+                )
+
+            present_null_source = self._xlsx_xml_borrowed_legs(directory)
+            present_null_source[0]["harness_report"]["results"][0]["source"] = None
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "source key presence",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    present_null_source
+                )
+
+            absent_source = self._xlsx_xml_borrowed_legs(directory)
+            absent_source[0]["harness_report"]["results"][1].pop("source")
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "source key presence",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    absent_source
+                )
+
+            absent_sink = self._xlsx_xml_borrowed_legs(directory)
+            absent_sink[0]["harness_report"]["results"][0].pop("sink")
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "sink key is required",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    absent_sink
+                )
+
+            present_null_output = self._xlsx_xml_borrowed_legs(directory)
+            present_null_output[0]["harness_report"]["results"][2][
+                "output_sha256"
+            ] = None
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "output_sha256 value presence",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_abba_inputs(
+                    present_null_output
                 )
 
     def test_xlsx_xml_borrowed_metrics_are_case_specific_and_resource_only(self):
@@ -1340,6 +1399,119 @@ peak RSS (including heaptrack overhead): 4.00M
             stats["metrics"]["time.max_rss_kib"]["description"],
         )
         json.dumps(stats, allow_nan=False)
+
+    def test_xlsx_xml_borrowed_resource_evidence_requires_complete_retained_process_totals(self):
+        with tempfile.TemporaryDirectory() as directory:
+            legs = self._xlsx_xml_borrowed_legs(directory)
+            for leg in legs:
+                leg.update(self._strict_xlsx_resource_fields())
+            evidence = perf_resource_profile.validate_xlsx_xml_borrowed_resource_legs(legs)
+            self.assertEqual(evidence["status"], "validated")
+            self.assertEqual(len(evidence["legs"]), 4)
+
+            failed_time = self._xlsx_xml_borrowed_legs(directory)
+            for leg in failed_time:
+                leg.update(self._strict_xlsx_resource_fields())
+            failed_time[0]["time"]["run"]["returncode"] = 1
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "time.run must complete successfully",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_resource_legs(failed_time)
+
+            missing_time = self._xlsx_xml_borrowed_legs(directory)
+            for leg in missing_time:
+                leg.update(self._strict_xlsx_resource_fields())
+            missing_time[0]["time"]["parsed"].pop("user_seconds")
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "user_seconds is missing or non-finite",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_resource_legs(missing_time)
+
+            null_heaptrack_total = self._xlsx_xml_borrowed_legs(directory)
+            for leg in null_heaptrack_total:
+                leg.update(self._strict_xlsx_resource_fields())
+            null_heaptrack_total[1]["heaptrack"]["print"]["parsed"][
+                "temporary_allocations"
+            ] = None
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "temporary_allocations is missing or non-finite",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_resource_legs(
+                    null_heaptrack_total
+                )
+
+            unretained_histogram = self._xlsx_xml_borrowed_legs(directory)
+            for leg in unretained_histogram:
+                leg.update(self._strict_xlsx_resource_fields())
+            unretained_histogram[2]["heaptrack"]["print"]["parsed"][
+                "histogram_artifact"
+            ]["retained"] = False
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "histogram_artifact must be present and retained",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_resource_legs(
+                    unretained_histogram
+                )
+
+    def test_xlsx_xml_borrowed_acceptance_enforces_paired_five_percent_boundary(self):
+        required = perf_resource_profile.XLSX_XML_BORROWED_REQUIRED_RESOURCE_METRICS
+        with tempfile.TemporaryDirectory() as directory:
+            at_boundary = self._xlsx_xml_borrowed_legs(directory)
+            for leg in at_boundary:
+                leg.update(self._strict_xlsx_resource_fields(100))
+            for index in (1, 2):
+                for metric in required:
+                    at_boundary[index]["resource_metrics"][metric] = 105
+            at_boundary[0]["resource_metrics"][
+                "harness.xlsx_first_cell.elapsed_ns.p50"
+            ] = 10**12
+            accepted = perf_resource_profile.validate_xlsx_xml_borrowed_acceptance(
+                at_boundary
+            )
+            self.assertEqual(accepted["status"], "accepted")
+            self.assertFalse(accepted["instrumented_elapsed_included"])
+            self.assertEqual(
+                accepted["metrics"][required[0]]["A1_to_B1"]["delta_percent"],
+                5.0,
+            )
+
+            over_boundary = self._xlsx_xml_borrowed_legs(directory)
+            for leg in over_boundary:
+                leg.update(self._strict_xlsx_resource_fields(100))
+            over_boundary[1]["resource_metrics"][required[0]] = 105.1
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "exceeds 5.000000%",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_acceptance(over_boundary)
+
+            missing = self._xlsx_xml_borrowed_legs(directory)
+            for leg in missing:
+                leg.update(self._strict_xlsx_resource_fields(100))
+            missing[0]["resource_metrics"].pop(required[0])
+            missing[0]["heaptrack"]["print"]["parsed"]["allocation_calls"] = None
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "missing or non-finite",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_acceptance(missing)
+
+            nonfinite = self._xlsx_xml_borrowed_legs(directory)
+            for leg in nonfinite:
+                leg.update(self._strict_xlsx_resource_fields(100))
+            nonfinite[2]["resource_metrics"][required[1]] = float("nan")
+            nonfinite[2]["heaptrack"]["print"]["parsed"]["allocated_bytes"] = float(
+                "nan"
+            )
+            with self.assertRaisesRegex(
+                perf_resource_profile.ResourceProfileInputError,
+                "missing or non-finite",
+            ):
+                perf_resource_profile.validate_xlsx_xml_borrowed_acceptance(nonfinite)
 
     def test_xlsx_xml_borrowed_leg_retains_time_heaptrack_and_harness_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1537,20 +1709,18 @@ Minor (reclaiming a frame) page faults: 34
                 leg = next(item for item in legs if item["leg"] == kwargs["leg"])
                 return {
                     **leg,
+                    **self._strict_xlsx_resource_fields(100),
                     "harness": {"logical_measurements": []},
-                    "time": {"status": "unsupported"},
-                    "heaptrack": {"status": "unsupported"},
                     "latency_evidence": dict(perf_resource_profile.LATENCY_SEPARATION),
-                    "resource_metrics": {},
                     "artifact_directory": str(artifacts / kwargs["leg"].lower()),
                 }
 
-            unavailable = {
-                "available": False,
-                "path": None,
-                "version": None,
-                "binary_sha256": None,
-                "returncode": None,
+            available = {
+                "available": True,
+                "path": "/fake/resource-tool",
+                "version": "fake-resource-tool",
+                "binary_sha256": "f" * 64,
+                "returncode": 0,
             }
             arguments = argparse.Namespace(
                 control_binary=root / "control-xlsx-borrowed-binary",
@@ -1566,7 +1736,7 @@ Minor (reclaiming a frame) page faults: 34
                 "profile_xlsx_xml_borrowed_abba_leg",
                 side_effect=fake_leg,
             ), mock.patch.object(
-                perf_resource_profile, "probe_tool", return_value=unavailable
+                perf_resource_profile, "probe_tool", return_value=available
             ):
                 self.assertEqual(
                     perf_resource_profile.run_xlsx_xml_borrowed_abba(arguments), 0
@@ -1581,14 +1751,60 @@ Minor (reclaiming a frame) page faults: 34
         )
         self.assertEqual(published["scope"]["xlsx_shape"], "tiny")
         self.assertEqual(published["scope"]["xlsx_cell_crud_shape"], "medium")
+        self.assertEqual(published["tool"]["version"], "0.1.3")
         self.assertEqual(published["latency_evidence"]["status"], "not_measured")
         self.assertEqual(len(published["corpus_identities"]), 4)
         self.assertEqual(len(published["result_identities"]), 4)
-        self.assertEqual(published["tools"]["heaptrack"]["available"], False)
+        self.assertEqual(published["tools"]["heaptrack"]["available"], True)
+        self.assertEqual(published["resource_evidence"]["status"], "validated")
+        self.assertEqual(published["predeclared_acceptance"]["status"], "accepted")
         for leg in published["legs"]:
             self.assertNotIn("harness_report", leg)
             self.assertIn("harness_identity", leg)
             self.assertIn("result_identities", leg["harness_identity"])
+
+    def test_xlsx_xml_borrowed_requires_each_external_resource_tool(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._xlsx_xml_borrowed_legs(root)
+            arguments = argparse.Namespace(
+                control_binary=root / "control-xlsx-borrowed-binary",
+                candidate_binary=root / "candidate-xlsx-borrowed-binary",
+                output=root / "strict.json",
+                artifact_dir=root / "strict-artifacts",
+                warmup=1,
+                samples=3,
+                timeout=1,
+            )
+
+            def fake_probe(path, args):
+                del args
+                name = Path(path).name
+                if name == missing:
+                    return {
+                        "available": False,
+                        "path": None,
+                        "version": None,
+                        "binary_sha256": None,
+                        "returncode": None,
+                    }
+                return {
+                    "available": True,
+                    "path": f"/fake/{name}",
+                    "version": "fake",
+                    "binary_sha256": "f" * 64,
+                    "returncode": 0,
+                }
+
+            for missing in ("time", "heaptrack", "heaptrack_print"):
+                with self.subTest(missing=missing), mock.patch.object(
+                    perf_resource_profile, "probe_tool", side_effect=fake_probe
+                ):
+                    with self.assertRaisesRegex(
+                        perf_resource_profile.ResourceProfileInputError,
+                        rf"requires {missing}",
+                    ):
+                        perf_resource_profile.run_xlsx_xml_borrowed_abba(arguments)
 
     def test_docx_optional_flag_requires_explicit_docx_abba_dispatch(self):
         generic = perf_resource_profile.build_parser().parse_args(
