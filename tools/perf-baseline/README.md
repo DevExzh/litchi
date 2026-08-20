@@ -39,6 +39,23 @@ packaged output.
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
+Balanced A1/B1/B2/A2 captures can be validated and summarized with the
+standard-library-only helper at `tools/perf_abba_summary.py`:
+
+```sh
+python3 tools/perf_abba_summary.py \
+  control-a.json candidate-a.json candidate-b.json control-b.json \
+  --json-out summary.json
+```
+
+The helper recomputes p50, mean, p95, and p99 from retained samples and fails
+closed when harness configuration, stable environment facts, corpus identity,
+source metrics, sink metrics, or result coverage differ between legs. Its
+default same-implementation drift ceilings are 5% for p50 and mean, 10% for
+p95, and 15% for p99; use `--drift-ceilings` only when a recorded calibration
+justifies different values. It never infers a speedup claim from an accepted
+statistic.
+
 The native OLE2, DOCX/PPTX, RTF, and ODF semantic matrices are deliberately
 opt-in. They measure only current public APIs and therefore do not change the
 default 36 cases / 198 records.
