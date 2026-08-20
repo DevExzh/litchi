@@ -18,6 +18,7 @@ use super::model::{
 use crate::error::{Result, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
 use crate::raw::worksheet::edit::model::SelectionRange;
+use crate::raw::worksheet::model::MAX_XML_DEPTH;
 use crate::raw::worksheet::{
     merge_successor, optional_bool, optional_u32, parse_a1, parse_one_based_row, x14ac,
 };
@@ -197,6 +198,11 @@ pub(crate) fn scan(content: &[u8]) -> Result<Layout> {
         let resolver = reader.resolver();
         match event {
             Event::Start(element) => {
+                if stack.len() >= MAX_XML_DEPTH {
+                    return Err(invalid(format!(
+                        "worksheet XML exceeds {MAX_XML_DEPTH} levels"
+                    )));
+                }
                 let parent = stack.last().map(|frame| frame.kind);
                 let kind = scanner.start(
                     parent,

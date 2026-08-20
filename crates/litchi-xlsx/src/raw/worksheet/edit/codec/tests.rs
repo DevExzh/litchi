@@ -1,6 +1,7 @@
 //! Focused regression tests for the worksheet codec seams.
 
 use super::{Attribute, Tag, scan, sibling_name, write_tag};
+use crate::raw::worksheet::model::MAX_XML_DEPTH;
 
 const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
@@ -51,4 +52,34 @@ fn snapshot_scan_restores_namespace_scope_after_a_rebinding() {
             .collect::<Vec<_>>(),
         [1, 3]
     );
+}
+
+#[test]
+fn snapshot_scan_rejects_nesting_beyond_worksheet_depth_limit() {
+    let mut source = format!(r#"<worksheet xmlns="{MAIN}">"#);
+    for _ in 0..MAX_XML_DEPTH {
+        source.push_str("<future>");
+    }
+    for _ in 0..MAX_XML_DEPTH {
+        source.push_str("</future>");
+    }
+    source.push_str("</worksheet>");
+
+    let error = scan(source.as_bytes()).expect_err("deep worksheet should be rejected");
+    assert_eq!(
+        error.to_string(),
+        format!("invalid XLSX structure: worksheet XML exceeds {MAX_XML_DEPTH} levels")
+    );
+}
+
+#[test]
+fn snapshot_scan_handles_large_flat_event_stream_within_depth_limit() {
+    let mut source = format!(r#"<worksheet xmlns="{MAIN}"><sheetData/>"#);
+    for _ in 0..(MAX_XML_DEPTH * 16) {
+        source.push_str("<future/>");
+    }
+    source.push_str("</worksheet>");
+
+    let layout = scan(source.as_bytes()).expect("flat worksheet events should be scanned");
+    assert!(layout.sheet_data.empty);
 }
