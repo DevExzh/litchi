@@ -1,6 +1,7 @@
 //! Concise user-facing ODS entry points.
 
 mod cell_locator;
+mod selective;
 mod source;
 mod source_edit;
 
@@ -16,6 +17,7 @@ use std::{
 pub use crate::authoring::{Builder, MutableSpreadsheet};
 use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
+pub use selective::{SheetCatalogEntry, SourceBackedSpreadsheetCatalog, SourceReadMetrics};
 pub use source::{ReadLimits, SourceBackedSpreadsheet};
 pub use source_edit::{
     SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,

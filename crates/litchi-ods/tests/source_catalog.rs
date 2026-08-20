@@ -1,0 +1,212 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
+
+use litchi_core::{Error, OwnedSource, ReadAt, SourceVersion};
+use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
+use litchi_ods::{ReadLimits, SourceBackedSpreadsheetCatalog, Spreadsheet};
+
+const MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
+const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const RSA_KEY: &[u8] =
+    include_bytes!("../../litchi-odf-common/tests/fixtures/signatures/rsa-key.pk8");
+const RSA_CERT: &[u8] =
+    include_bytes!("../../litchi-odf-common/tests/fixtures/signatures/rsa-cert.der");
+
+fn package() -> Vec<u8> {
+    let content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="First"><table:table-row><table:table-cell office:value-type="string"><text:p>first</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Selected"><table:table-row><table:table-cell office:value-type="string"><text:p>middle</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="42"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
+    );
+    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    writer.set_mimetype(MIME).expect("ODS MIME");
+    writer
+        .set_document_signer(
+            DocumentSigner::from_pkcs8_der(
+                SignatureAlgorithm::RsaSha256,
+                RSA_KEY,
+                vec![RSA_CERT.to_vec()],
+                "2026-08-21T12:00:00Z",
+            )
+            .expect("document signer"),
+        )
+        .expect("configure document signer");
+    writer
+        .add_file("content.xml", content.as_bytes())
+        .expect("content.xml");
+    // These members deliberately contain bytes that the catalog lifecycle
+    // never decodes. Their presence proves that catalog open is not the
+    // existing all-members semantic owner.
+    writer
+        .add_file("styles.xml", b"<styles/>")
+        .expect("styles member");
+    let mut media = Vec::with_capacity(512 * 1024);
+    media.extend((0..(512 * 1024)).map(|index| (index as u8).wrapping_mul(31)));
+    writer
+        .add_file_with_media_type("Pictures/opaque.bin", &media, "application/octet-stream")
+        .expect("opaque media");
+    writer.finish_to_bytes().expect("package bytes")
+}
+
+fn aliased_package() -> Vec<u8> {
+    let content = format!(
+        r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}" xmlns:x="{TEXT}"><o:body><o:spreadsheet><t:table t:name="Alias"><t:table-row><t:table-cell o:value-type="string"><x:p>alias</x:p></t:table-cell></t:table-row></t:table><t:table t:name="Empty"/></o:spreadsheet></o:body></o:document-content>"#
+    );
+    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    writer.set_mimetype(MIME).expect("ODS MIME");
+    writer
+        .add_file("content.xml", content.as_bytes())
+        .expect("content.xml");
+    writer.finish_to_bytes().expect("aliased package bytes")
+}
+
+struct ProbeSource {
+    source: OwnedSource,
+    revision: AtomicU64,
+}
+
+impl ProbeSource {
+    fn new(bytes: Vec<u8>) -> Arc<Self> {
+        Arc::new(Self {
+            source: OwnedSource::new(bytes),
+            revision: AtomicU64::new(0),
+        })
+    }
+
+    fn bump(&self) {
+        self.revision.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+impl ReadAt for ProbeSource {
+    fn len(&self) -> std::io::Result<u64> {
+        self.source.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+        self.source.read_at(offset, output)
+    }
+
+    fn version(&self) -> std::io::Result<SourceVersion> {
+        Ok(SourceVersion::new(
+            0x4f44_5301,
+            self.revision.load(Ordering::Relaxed),
+        ))
+    }
+}
+
+#[test]
+fn catalog_open_and_selected_sheet_are_lazy_and_semantically_equal() {
+    let bytes = package();
+    let source = ProbeSource::new(bytes.clone());
+    let catalog =
+        SourceBackedSpreadsheetCatalog::from_read_at(source.clone()).expect("catalog open");
+
+    assert_eq!(catalog.sheet_names().expect("names"), ["First", "Selected"]);
+    assert_eq!(catalog.sheet_count().expect("count"), 2);
+    assert_eq!(catalog.catalog().expect("catalog")[1].name(), "Selected");
+    assert_eq!(catalog.catalog().expect("catalog")[1].index(), 1);
+
+    let opened = catalog.source_read_metrics().expect("open metrics");
+    assert!(opened.read_calls > 0);
+    assert!(opened.read_bytes < bytes.len() as u64 / 2);
+
+    catalog.reset_source_read_metrics().expect("reset metrics");
+    assert!(catalog.sheet_at(99).expect("missing sheet").is_none());
+    assert_eq!(
+        catalog.source_read_metrics().expect("missing metrics"),
+        Default::default()
+    );
+
+    let selected = catalog
+        .sheet("Selected")
+        .expect("selected sheet read")
+        .expect("selected sheet exists");
+    assert_eq!(selected.name, "Selected");
+    assert_eq!(selected.rows[0].cells[0].text, "middle");
+    assert!(
+        catalog
+            .source_read_metrics()
+            .expect("query metrics")
+            .read_bytes
+            > 0
+    );
+
+    let eager = Spreadsheet::from_bytes(bytes).expect("eager owner");
+    let expected = eager.sheets().get(1).expect("eager selected sheet").clone();
+    assert_eq!(selected, expected);
+}
+
+#[test]
+fn catalog_keeps_opaque_members_and_signatures_deferred_until_selected() {
+    let bytes = package();
+    let catalog =
+        SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
+            .expect("catalog open with opaque members");
+
+    let before = catalog.source_read_metrics().expect("open metrics");
+    assert!(
+        catalog
+            .media_files()
+            .expect("media list")
+            .iter()
+            .any(|path| path == "Pictures/opaque.bin")
+    );
+    assert_eq!(catalog.source_read_metrics().expect("list metrics"), before);
+
+    let signatures = catalog.digital_signatures().expect("signature read");
+    assert_eq!(signatures.document_signatures.len(), 1);
+    let media = catalog
+        .media_data("Pictures/opaque.bin")
+        .expect("media read")
+        .expect("media member");
+    assert_eq!(media.len(), 512 * 1024);
+
+    let materialized = catalog.materialize().expect("explicit materialization");
+    let snapshot = materialized.document_snapshot().expect("snapshot");
+    assert_eq!(snapshot.as_bytes(), bytes.as_slice());
+}
+
+#[test]
+fn catalog_preserves_limits_and_source_version_lifecycle() {
+    let bytes = package();
+    let limited = ReadLimits::default().with_max_manifest_bytes(1);
+    let error = SourceBackedSpreadsheetCatalog::from_read_at_with_limits(
+        Arc::new(OwnedSource::new(bytes.clone())),
+        limited,
+    )
+    .expect_err("manifest limit must be enforced during catalog open");
+    assert!(matches!(error, Error::ResourceLimit(_)));
+
+    let source = ProbeSource::new(bytes);
+    let catalog =
+        SourceBackedSpreadsheetCatalog::from_read_at(source.clone()).expect("catalog open");
+    source.bump();
+    assert!(matches!(
+        catalog.sheet_count(),
+        Err(Error::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        catalog.sheet_at(0),
+        Err(Error::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn catalog_handles_namespace_aliases_and_empty_selected_worksheets() {
+    let catalog =
+        SourceBackedSpreadsheetCatalog::from_read_at(Arc::new(OwnedSource::new(aliased_package())))
+            .expect("aliased catalog open");
+    assert_eq!(
+        catalog.sheet_names().expect("aliased names"),
+        ["Alias", "Empty"]
+    );
+    let selected = catalog
+        .sheet_at(1)
+        .expect("empty selected worksheet")
+        .expect("empty worksheet exists");
+    assert_eq!(selected.name, "Empty");
+    assert!(selected.rows.is_empty());
+}
