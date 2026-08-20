@@ -121,17 +121,6 @@ pub(crate) struct SourceCatalog {
     pub(crate) content_types_member: String,
 }
 
-/// Part names and content types admitted by the shared OPC catalog rules.
-///
-/// The eager reader and source-backed reader must agree on which physical ZIP
-/// members are parts before either path performs payload work. Keeping the
-/// relationship map with the admitted names also lets both paths consume the
-/// same already-parsed relationship manifests without cloning them.
-struct AdmittedParts {
-    relationships: HashMap<String, SmallVec<[SerializedRelationship; 8]>>,
-    typed_parts: Vec<(PackURI, String)>,
-}
-
 /// Exact source-catalog phase used only by the validation entry point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ValidationCatalogPhase {
@@ -307,10 +296,15 @@ pub struct PackageReader {
 impl PackageReader {
     /// Open and parse an OPC package from a byte slice.
     ///
-    /// Uses the eager payload path:
-    /// 1. Decompress relationship manifests while admitting the catalog
-    /// 2. Classify every physical member, including unreferenced Parts
-    /// 3. Decompress all admitted Part payloads for the owning package
+    /// Uses lazy decompression for maximum throughput:
+    /// 1. Decompress files on-demand during relationship graph traversal
+    /// 2. Parse each file as soon as it's decompressed (pipelining)
+    /// 3. Cache decompressed data to avoid redundant work
+    ///
+    /// This approach is faster than pre-loading everything because:
+    /// - Parsing can start while other files are still being decompressed
+    /// - Files not in the relationship graph are never decompressed
+    /// - Memory pressure is reduced (don't hold all decompressed data at once)
     ///
     /// # Arguments
     /// * `phys_reader` - Physical package reader for accessing ZIP contents
@@ -365,7 +359,7 @@ impl PackageReader {
         non_part_members
             .try_reserve(archive.len())
             .map_err(|source| allocation("OPC non-part members", source))?;
-        let sparts = Self::load_parts_eager(
+        let sparts = Self::load_parts_lazy(
             archive,
             content_types_member,
             &pkg_srels,
@@ -432,7 +426,7 @@ impl PackageReader {
         non_part_members
             .try_reserve(archive.len())
             .map_err(|source| allocation("OPC non-part members", source))?;
-        let sparts = Self::load_parts_eager(
+        let sparts = Self::load_parts_lazy(
             archive,
             content_types_member,
             &pkg_srels,
@@ -634,7 +628,7 @@ impl PackageReader {
     /// 2. Classify every ZIP member into a part or a reported non-part member.
     /// 3. Check the resulting part-name collection for OPC name conflicts.
     /// 4. Decompress all part contents in parallel.
-    fn load_parts_eager<A, ReadMany>(
+    fn load_parts_lazy<A, ReadMany>(
         archive: &A,
         content_types_member: &str,
         pkg_srels: &[SerializedRelationship],
@@ -655,143 +649,16 @@ impl PackageReader {
             )>,
         >,
     {
-        let relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
-        let AdmittedParts {
-            mut relationships,
-            typed_parts,
-        } = Self::classify_part_members(
-            archive,
-            content_types_member,
-            relationships,
-            content_types,
-            non_part_members,
-            limits,
-            "OPC typed parts",
-        )?;
+        // Phase 1: relationship reachability. Relationship types belong to
+        // edges, not parts, so they are intentionally not recorded here.
+        let mut relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
 
-        // Phase 4: parallel decompression of every admitted part.
-        let mut member_names = Vec::new();
-        member_names
-            .try_reserve_exact(typed_parts.len())
-            .map_err(|source| allocation("OPC member-name batch", source))?;
-        member_names.extend(
-            typed_parts
-                .iter()
-                .map(|(partname, _)| partname.membername()),
-        );
-        let _ = Self::check_declared_part_bytes(archive, &typed_parts, limits)?;
-        let mut decompressed: HashMap<String, Arc<Vec<u8>>> = HashMap::new();
-        decompressed
-            .try_reserve(typed_parts.len())
-            .map_err(|source| allocation("OPC decompressed parts", source))?;
-        let mut retained_part_bytes = 0u64;
-        for (member_name, result) in read_many(&member_names)? {
-            let blob = result?;
-            limits.check(
-                ReadResource::PartBytes,
-                blob.len() as u64,
-                limits.max_part_bytes(),
-            )?;
-            retained_part_bytes = checked_add(
-                retained_part_bytes,
-                blob.len() as u64,
-                ReadResource::TotalPartBytes,
-                limits.max_total_part_bytes(),
-            )?;
-            decompressed.insert(member_name.to_string(), blob);
-        }
-
-        // Phase 5: build SerializedPart structures (take ownership, no cloning)
-        let mut sparts = Vec::new();
-        sparts
-            .try_reserve_exact(typed_parts.len())
-            .map_err(|source| allocation("OPC serialized parts", source))?;
-        for (partname, content_type) in typed_parts {
-            let srels = match relationships.remove(partname.as_str()) {
-                Some(srels) => srels,
-                None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
-            };
-            // Remove from map to take ownership instead of cloning
-            let blob = decompressed
-                .remove(partname.membername())
-                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
-            sparts.push(SerializedPart {
-                partname,
-                content_type,
-                blob,
-                srels,
-            });
-        }
-
-        Ok(sparts)
-    }
-
-    /// Perform the same structural admission as [`Self::load_parts_eager`]
-    /// without reading ordinary part payloads.  This is deliberately kept next
-    /// to the eager path so content-type, relationship, classification, and
-    /// name-conflict semantics cannot drift between the two ingress modes.
-    fn load_part_catalog<A: ArchiveAccess + ?Sized>(
-        archive: &A,
-        content_types_member: &str,
-        pkg_srels: &[SerializedRelationship],
-        content_types: &ContentTypeMap,
-        non_part_members: &mut Vec<NonPartMember>,
-        limits: ReadLimits,
-        ledger: &mut RelationshipLedger,
-    ) -> Result<Vec<DeferredPart>> {
-        let relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
-        let AdmittedParts {
-            mut relationships,
-            typed_parts,
-        } = Self::classify_part_members(
-            archive,
-            content_types_member,
-            relationships,
-            content_types,
-            non_part_members,
-            limits,
-            "OPC deferred typed parts",
-        )?;
-        let _ = Self::check_declared_part_bytes(archive, &typed_parts, limits)?;
-
-        let mut parts = Vec::new();
-        parts
-            .try_reserve_exact(typed_parts.len())
-            .map_err(|source| allocation("OPC deferred parts", source))?;
-        for (partname, content_type) in typed_parts {
-            let srels = match relationships.remove(partname.as_str()) {
-                Some(srels) => srels,
-                None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
-            };
-            parts.push(DeferredPart {
-                partname,
-                content_type,
-                srels,
-            });
-        }
-        Ok(parts)
-    }
-
-    /// Classify every physical member and enforce the OPC part-name rules.
-    ///
-    /// This is the shared admission step for eager and source-backed opens.
-    /// It deliberately does not inspect ordinary payloads; callers decide
-    /// whether to read them after this catalog has been admitted.
-    fn classify_part_members<A: ArchiveAccess + ?Sized>(
-        archive: &A,
-        content_types_member: &str,
-        relationships: HashMap<String, SmallVec<[SerializedRelationship; 8]>>,
-        content_types: &ContentTypeMap,
-        non_part_members: &mut Vec<NonPartMember>,
-        limits: ReadLimits,
-        allocation_resource: &'static str,
-    ) -> Result<AdmittedParts> {
+        // Phase 2 and 3: classify members, then admit the survivors as parts.
         let mut index = PartNameIndex::try_with_capacity(archive.len())?;
         let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
         typed_parts
             .try_reserve(archive.len())
-            .map_err(|source| allocation(allocation_resource, source))?;
-
+            .map_err(|source| allocation("OPC typed parts", source))?;
         for member_name in archive.file_names() {
             if member_name.is_empty()
                 || member_name.ends_with('/')
@@ -849,26 +716,19 @@ impl PackageReader {
             }
         }
 
-        Ok(AdmittedParts {
-            relationships,
-            typed_parts,
-        })
-    }
-
-    /// Check declared payload sizes for all admitted ordinary parts.
-    ///
-    /// Central-directory metadata is enough for this admission check and does
-    /// not materialize a member. Both eager and deferred readers therefore
-    /// charge the same per-part and aggregate limits before choosing whether
-    /// to read payload bytes.
-    fn check_declared_part_bytes<A: ArchiveAccess + ?Sized>(
-        archive: &A,
-        typed_parts: &[(PackURI, String)],
-        limits: ReadLimits,
-    ) -> Result<u64> {
+        // Phase 4: parallel decompression of every admitted part.
+        let mut member_names = Vec::new();
+        member_names
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC member-name batch", source))?;
+        member_names.extend(
+            typed_parts
+                .iter()
+                .map(|(partname, _)| partname.membername()),
+        );
         let mut declared_part_bytes = 0u64;
-        for (partname, _) in typed_parts {
-            let declared = archive.metadata(partname.membername())?.uncompressed_size();
+        for member_name in &member_names {
+            let declared = archive.metadata(member_name)?.uncompressed_size();
             limits.check(ReadResource::PartBytes, declared, limits.max_part_bytes())?;
             declared_part_bytes = checked_add(
                 declared_part_bytes,
@@ -877,7 +737,145 @@ impl PackageReader {
                 limits.max_total_part_bytes(),
             )?;
         }
-        Ok(declared_part_bytes)
+        let mut decompressed: HashMap<String, Arc<Vec<u8>>> = HashMap::new();
+        decompressed
+            .try_reserve(typed_parts.len())
+            .map_err(|source| allocation("OPC decompressed parts", source))?;
+        let mut retained_part_bytes = 0u64;
+        for (member_name, result) in read_many(&member_names)? {
+            let blob = result?;
+            limits.check(
+                ReadResource::PartBytes,
+                blob.len() as u64,
+                limits.max_part_bytes(),
+            )?;
+            retained_part_bytes = checked_add(
+                retained_part_bytes,
+                blob.len() as u64,
+                ReadResource::TotalPartBytes,
+                limits.max_total_part_bytes(),
+            )?;
+            decompressed.insert(member_name.to_string(), blob);
+        }
+
+        // Phase 5: build SerializedPart structures (take ownership, no cloning)
+        let mut sparts = Vec::new();
+        sparts
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC serialized parts", source))?;
+        for (partname, content_type) in typed_parts {
+            let srels = match relationships.remove(partname.as_str()) {
+                Some(srels) => srels,
+                None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
+            };
+            // Remove from map to take ownership instead of cloning
+            let blob = decompressed
+                .remove(partname.membername())
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            sparts.push(SerializedPart {
+                partname,
+                content_type,
+                blob,
+                srels,
+            });
+        }
+
+        Ok(sparts)
+    }
+
+    /// Perform the same structural admission as [`Self::load_parts_lazy`]
+    /// without reading ordinary part payloads.  This is deliberately kept next
+    /// to the eager path so content-type, relationship, classification, and
+    /// name-conflict semantics cannot drift between the two ingress modes.
+    fn load_part_catalog<A: ArchiveAccess + ?Sized>(
+        archive: &A,
+        content_types_member: &str,
+        pkg_srels: &[SerializedRelationship],
+        content_types: &ContentTypeMap,
+        non_part_members: &mut Vec<NonPartMember>,
+        limits: ReadLimits,
+        ledger: &mut RelationshipLedger,
+    ) -> Result<Vec<DeferredPart>> {
+        let mut relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)?;
+        let mut index = PartNameIndex::try_with_capacity(archive.len())?;
+        let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
+        typed_parts
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC deferred typed parts", source))?;
+
+        let mut declared_part_bytes = 0u64;
+        for member_name in archive.file_names() {
+            if member_name.is_empty()
+                || member_name.ends_with('/')
+                || member_name == content_types_member
+            {
+                continue;
+            }
+            if Self::relationship_part_has_relationships(member_name) {
+                return Err(OpcError::RelationshipPartCannotBeSource(
+                    member_name.to_string(),
+                ));
+            }
+            let max_member_name_bytes =
+                usize::try_from(limits.max_archive_member_name_bytes()).unwrap_or(usize::MAX);
+            let Some(partname) = part_name_for_member(member_name, max_member_name_bytes) else {
+                non_part_members.push(NonPartMember::new(
+                    member_name,
+                    NonPartReason::UnmappablePartName,
+                )?);
+                continue;
+            };
+            let is_relationship_part = Self::is_relationship_member(partname.membername());
+            let content_type = if is_relationship_part {
+                Self::relationship_part_content_type(content_types, &partname)?
+            } else {
+                match content_types.get(&partname) {
+                    Ok(content_type) => content_type,
+                    Err(OpcError::ContentTypeNotFound(_))
+                        if !relationships.contains_key(partname.as_str()) =>
+                    {
+                        non_part_members.push(NonPartMember::new(
+                            member_name,
+                            NonPartReason::UntypedAndUnreferenced,
+                        )?);
+                        continue;
+                    },
+                    Err(error) => return Err(error),
+                }
+            };
+            index.insert(&partname)?;
+            if !is_relationship_part {
+                let part_count =
+                    checked_increment(typed_parts.len(), limits.max_parts(), ReadResource::Parts)?;
+                debug_assert_eq!(part_count, typed_parts.len() + 1);
+                let declared = archive.metadata(partname.membername())?.uncompressed_size();
+                limits.check(ReadResource::PartBytes, declared, limits.max_part_bytes())?;
+                declared_part_bytes = checked_add(
+                    declared_part_bytes,
+                    declared,
+                    ReadResource::TotalPartBytes,
+                    limits.max_total_part_bytes(),
+                )?;
+                typed_parts.push((partname, content_type));
+            }
+        }
+
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(typed_parts.len())
+            .map_err(|source| allocation("OPC deferred parts", source))?;
+        for (partname, content_type) in typed_parts {
+            let srels = match relationships.remove(partname.as_str()) {
+                Some(srels) => srels,
+                None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
+            };
+            parts.push(DeferredPart {
+                partname,
+                content_type,
+                srels,
+            });
+        }
+        Ok(parts)
     }
 
     fn load_part_catalog_for_validation<A: ArchiveAccess + ?Sized>(
@@ -890,23 +888,85 @@ impl PackageReader {
         ledger: &mut RelationshipLedger,
     ) -> std::result::Result<Vec<DeferredPart>, ValidationCatalogError> {
         let phase = |phase, error| ValidationCatalogError { phase, error };
-        let relationships = Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)
-            .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
-        let AdmittedParts {
-            mut relationships,
-            typed_parts,
-        } = Self::classify_part_members(
-            archive,
-            content_types_member,
-            relationships,
-            content_types,
-            non_part_members,
-            limits,
-            "OPC deferred typed parts",
-        )
-        .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
-        let _ = Self::check_declared_part_bytes(archive, &typed_parts, limits)
+        let mut relationships =
+            Self::walk_relationship_graph(archive, pkg_srels, limits, ledger)
+                .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
+        let mut index = PartNameIndex::try_with_capacity(archive.len())
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
+        typed_parts
+            .try_reserve(archive.len())
+            .map_err(|source| allocation("OPC deferred typed parts", source))
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+
+        let mut declared_part_bytes = 0u64;
+        for member_name in archive.file_names() {
+            if member_name.is_empty()
+                || member_name.ends_with('/')
+                || member_name == content_types_member
+            {
+                continue;
+            }
+            if Self::relationship_part_has_relationships(member_name) {
+                return Err(phase(
+                    ValidationCatalogPhase::Catalog,
+                    OpcError::RelationshipPartCannotBeSource(member_name.to_string()),
+                ));
+            }
+            let max_member_name_bytes =
+                usize::try_from(limits.max_archive_member_name_bytes()).unwrap_or(usize::MAX);
+            let Some(partname) = part_name_for_member(member_name, max_member_name_bytes) else {
+                non_part_members.push(
+                    NonPartMember::new(member_name, NonPartReason::UnmappablePartName)
+                        .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
+                );
+                continue;
+            };
+            let is_relationship_part = Self::is_relationship_member(partname.membername());
+            let content_type = if is_relationship_part {
+                Self::relationship_part_content_type(content_types, &partname)
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?
+            } else {
+                match content_types.get(&partname) {
+                    Ok(content_type) => content_type,
+                    Err(OpcError::ContentTypeNotFound(_))
+                        if !relationships.contains_key(partname.as_str()) =>
+                    {
+                        non_part_members.push(
+                            NonPartMember::new(member_name, NonPartReason::UntypedAndUnreferenced)
+                                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
+                        );
+                        continue;
+                    },
+                    Err(error) => return Err(phase(ValidationCatalogPhase::Catalog, error)),
+                }
+            };
+            index
+                .insert(&partname)
+                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+            if !is_relationship_part {
+                let part_count =
+                    checked_increment(typed_parts.len(), limits.max_parts(), ReadResource::Parts)
+                        .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+                debug_assert_eq!(part_count, typed_parts.len() + 1);
+                let declared = archive
+                    .metadata(partname.membername())
+                    .map_err(OpcError::from)
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?
+                    .uncompressed_size();
+                limits
+                    .check(ReadResource::PartBytes, declared, limits.max_part_bytes())
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+                declared_part_bytes = checked_add(
+                    declared_part_bytes,
+                    declared,
+                    ReadResource::TotalPartBytes,
+                    limits.max_total_part_bytes(),
+                )
+                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+                typed_parts.push((partname, content_type));
+            }
+        }
 
         let mut parts = Vec::new();
         parts

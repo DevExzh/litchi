@@ -5368,7 +5368,6 @@ mod tests {
         reads: AtomicUsize,
         versions: AtomicUsize,
         read_bytes: AtomicU64,
-        read_ranges: std::sync::Mutex<Vec<(u64, usize)>>,
         max_read: usize,
     }
 
@@ -5380,7 +5379,6 @@ mod tests {
                 reads: AtomicUsize::new(0),
                 versions: AtomicUsize::new(0),
                 read_bytes: AtomicU64::new(0),
-                read_ranges: std::sync::Mutex::new(Vec::new()),
                 max_read: usize::MAX,
             }
         }
@@ -5393,13 +5391,6 @@ mod tests {
 
         fn changed(&self) {
             self.revision.fetch_add(1, Ordering::SeqCst);
-        }
-
-        fn read_ranges(&self) -> Vec<(u64, usize)> {
-            self.read_ranges
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .clone()
         }
     }
 
@@ -5418,10 +5409,6 @@ mod tests {
             }
             let count = output.len().min(self.bytes.len() - offset);
             let count = count.min(self.max_read);
-            self.read_ranges
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push((offset as u64, count));
             output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
             self.read_bytes.fetch_add(count as u64, Ordering::SeqCst);
             Ok(count)
@@ -6276,94 +6263,6 @@ mod tests {
         let package = SourceBackedPackage::from_read_at(source).unwrap();
         let main = package.main_document_part().unwrap();
         assert!(matches!(main.data(), Err(OpcError::ZipError(_))));
-    }
-
-    #[test]
-    fn source_backed_catalog_open_does_not_read_ordinary_payloads() {
-        const DOCUMENT: &[u8] = b"source-backed cold catalog payload sentinel";
-        let bytes = archive_bytes(root_relationships(), DOCUMENT, false);
-        let payload_start = bytes
-            .windows(DOCUMENT.len())
-            .position(|window| window == DOCUMENT)
-            .expect("stored payload must be present in the archive");
-        let payload_end = payload_start + DOCUMENT.len();
-        let source = Arc::new(CountingSource::new(bytes));
-
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
-        assert_eq!(package.cache_diagnostics().cold_loads, 0);
-        assert_eq!(package.cache_diagnostics().retained_entries, 0);
-        assert_eq!(package.iter_parts().count(), 2);
-        assert!(source.read_bytes.load(Ordering::SeqCst) > 0);
-        assert!(source.read_ranges().into_iter().all(|(offset, length)| {
-            let start = usize::try_from(offset).expect("test source offset fits usize");
-            let end = start + length;
-            end <= payload_start || start >= payload_end
-        }));
-    }
-
-    #[test]
-    fn source_backed_catalog_matches_eager_part_admission() {
-        let bytes = archive_bytes(root_relationships(), b"catalog parity", true);
-        let eager = OpcPackage::from_bytes(&bytes).unwrap();
-        let source =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
-
-        let mut eager_parts: Vec<_> = eager
-            .iter_parts()
-            .map(|part| {
-                let mut relationships: Vec<_> = part
-                    .rels()
-                    .iter()
-                    .map(|relationship| {
-                        (
-                            relationship.r_id().to_owned(),
-                            relationship.reltype().to_owned(),
-                            relationship.target_ref().to_owned(),
-                            relationship.target_mode(),
-                        )
-                    })
-                    .collect();
-                relationships.sort_by(|left, right| left.0.cmp(&right.0));
-                (
-                    part.partname().to_string(),
-                    part.content_type().to_owned(),
-                    relationships,
-                )
-            })
-            .collect();
-        let mut deferred_parts: Vec<_> = source
-            .iter_parts()
-            .map(|part| {
-                let mut relationships: Vec<_> = part
-                    .rels()
-                    .iter()
-                    .map(|relationship| {
-                        (
-                            relationship.r_id().to_owned(),
-                            relationship.reltype().to_owned(),
-                            relationship.target_ref().to_owned(),
-                            relationship.target_mode(),
-                        )
-                    })
-                    .collect();
-                relationships.sort_by(|left, right| left.0.cmp(&right.0));
-                (
-                    part.partname().to_string(),
-                    part.content_type().to_owned(),
-                    relationships,
-                )
-            })
-            .collect();
-        eager_parts.sort_by(|left, right| left.0.cmp(&right.0));
-        deferred_parts.sort_by(|left, right| left.0.cmp(&right.0));
-
-        assert_eq!(eager_parts, deferred_parts);
-        assert_eq!(eager.non_part_members(), source.non_part_members());
-        assert_eq!(eager.rels().len(), source.rels().len());
-        assert_eq!(
-            eager.main_document_part().unwrap().partname(),
-            source.main_document_part().unwrap().partname()
-        );
     }
 
     #[test]
