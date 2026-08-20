@@ -2607,6 +2607,39 @@ struct CaseResult {
     operation_metrics: Option<operation_metrics::OperationMetrics>,
 }
 
+/// Promotes the deterministic logical sink summary into the aligned
+/// operation-metrics envelope.  The summary is retained at the top level for
+/// compatibility; this pass only adds a normalized per-sample view and does
+/// not enter or alter any timed workload.
+fn promote_sink_operation_metrics(results: &mut [CaseResult]) -> Result<(), Box<dyn Error>> {
+    for result in results {
+        let Some(summary) = result.sink else {
+            continue;
+        };
+        let sample_count = result.elapsed_ns.samples.len();
+        let observation = operation_metrics::SinkObservation {
+            accepted_bytes: summary.accepted_bytes,
+            write_calls: summary.write_calls,
+            largest_write: summary.largest_write,
+            bytes_0: summary.write_size_buckets.bytes_0,
+            bytes_1_to_512: summary.write_size_buckets.bytes_1_to_512,
+            bytes_513_to_4096: summary.write_size_buckets.bytes_513_to_4096,
+            bytes_4097_to_16384: summary.write_size_buckets.bytes_4097_to_16384,
+            bytes_16385_to_65536: summary.write_size_buckets.bytes_16385_to_65536,
+            bytes_over_65536: summary.write_size_buckets.bytes_over_65536,
+        };
+        if let Some(metrics) = result.operation_metrics.as_mut() {
+            metrics.set_sink_observation(sample_count, observation)?;
+        } else {
+            result.operation_metrics = Some(operation_metrics::from_sink_observation(
+                sample_count,
+                observation,
+            )?);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 struct XlsxEditCompositionSummary {
     implementation: &'static str,
@@ -7958,6 +7991,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+
+    promote_sink_operation_metrics(&mut results)?;
 
     let report = Report {
         schema_version: SCHEMA_VERSION,
