@@ -467,16 +467,6 @@ impl ExactArtifacts {
         Arc::ptr_eq(candidate, &self.source) || candidate.as_ref() == self.source.as_ref()
     }
 
-    /// Return whether `candidate` exactly matches the retained source bytes.
-    ///
-    /// This borrowed form is used by the low-level physical patch API. It
-    /// avoids allocating a temporary shared owner merely to perform the
-    /// exact source check; compact fingerprints remain diagnostics only.
-    #[must_use]
-    fn authorizes_bytes(&self, candidate: &[u8]) -> bool {
-        candidate == self.source.as_ref()
-    }
-
     /// Return the exact target-to-source inverse pair.
     #[must_use]
     pub fn is_byte_noop(&self) -> bool {
@@ -613,7 +603,7 @@ impl ReassemblyPatch {
         if !self.artifacts.authorizes_bytes(source) {
             return Err(ReassemblyPatchError::Conflict);
         }
-        let target = self.artifacts.target();
+        let target = self.artifacts.target_owner();
         let mut copy = Vec::new();
         copy.try_reserve_exact(target.len()).map_err(|_error| {
             ReassemblyPatchError::Allocation {
