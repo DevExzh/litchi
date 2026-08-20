@@ -15,9 +15,10 @@ an accepted statistic.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
-import statistics
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -25,11 +26,65 @@ from typing import Any, Iterable, Mapping, Sequence
 
 SCHEMA_VERSION = 1
 HARNESS_SCHEMA_VERSION = 1
+HARNESS_TOOL_NAME = "litchi-perf-baseline"
 TOOL_NAME = "litchi-perf-abba-summary"
 TOOL_VERSION = "0.1.0"
 LEG_ORDER = ("a1", "b1", "b2", "a2")
 STATISTICS = ("p50", "mean", "p95", "p99")
-ENVIRONMENT_VARIANTS = frozenset(("git_revision", "git_worktree_dirty"))
+U64_MAX = (1 << 64) - 1
+MIN_RETAINED_SAMPLES = 15
+ENVIRONMENT_VARIANTS = frozenset(("git_revision",))
+REQUIRED_TOOL_FIELDS = ("name", "version", "profile", "target_os", "target_arch")
+REQUIRED_CONFIGURATION_FIELDS = (
+    "samples_per_case",
+    "warmup_iterations_per_case",
+    "cases",
+    "corpus_shapes",
+)
+REQUIRED_ENVIRONMENT_FIELDS = (
+    "rustc_version",
+    "git_revision",
+    "git_worktree_dirty",
+    "logical_cpus_available",
+    "allocator",
+    "rustflags",
+    "cargo_build_target",
+    "perf_event_paranoid",
+)
+SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
+STUDENT_T_CRITICAL_95 = (
+    12.706,
+    4.303,
+    3.182,
+    2.776,
+    2.571,
+    2.447,
+    2.365,
+    2.306,
+    2.262,
+    2.228,
+    2.201,
+    2.179,
+    2.160,
+    2.145,
+    2.131,
+    2.120,
+    2.110,
+    2.101,
+    2.093,
+    2.086,
+    2.080,
+    2.074,
+    2.069,
+    2.064,
+    2.060,
+    2.056,
+    2.052,
+    2.048,
+    2.045,
+    2.042,
+)
+STUDENT_T_Z_975 = 1.959_963_984_540_054
 DEFAULT_DRIFT_CEILINGS: dict[str, float] = {
     "p50": 5.0,
     "mean": 5.0,
@@ -42,9 +97,34 @@ class AbbaSummaryInputError(ValueError):
     """Raised when ABBA reports are not safely comparable."""
 
 
+def _validate_json_tree(value: Any, location: str) -> None:
+    """Reject values that cannot be represented by strict JSON."""
+
+    if value is None or isinstance(value, (bool, str, int)):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise AbbaSummaryInputError(f"{location} contains a non-finite number")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _validate_json_tree(item, f"{location}[{index}]")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise AbbaSummaryInputError(f"{location} has a non-string object key")
+            _validate_json_tree(item, f"{location}.{key}")
+        return
+    raise AbbaSummaryInputError(
+        f"{location} contains unsupported JSON value {type(value).__name__}"
+    )
+
+
 def _canonical_json(value: Any, location: str) -> str:
     """Return compact canonical JSON, rejecting values JSON cannot preserve."""
 
+    _validate_json_tree(value, location)
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
     except (TypeError, ValueError, OverflowError) as error:
@@ -71,64 +151,147 @@ def _finite_number(value: Any, location: str, *, positive: bool = False) -> floa
     return number
 
 
-def _percentile(samples: Sequence[float], percentile: int) -> float:
-    ordered = sorted(samples)
-    if percentile == 50:
-        return float(statistics.median(ordered))
-    rank = max(1, math.ceil((percentile / 100.0) * len(ordered)))
-    return float(ordered[rank - 1])
+def _u64(value: Any, location: str, *, positive: bool = False) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise AbbaSummaryInputError(f"{location} must be an unsigned 64-bit integer")
+    if value < (1 if positive else 0) or value > U64_MAX:
+        requirement = "positive " if positive else ""
+        raise AbbaSummaryInputError(
+            f"{location} must be a {requirement}unsigned 64-bit integer"
+        )
+    return value
+
+
+def _student_t_critical_95(degrees_of_freedom: int) -> float:
+    if degrees_of_freedom == 0:
+        return 0.0
+    if degrees_of_freedom <= len(STUDENT_T_CRITICAL_95):
+        return STUDENT_T_CRITICAL_95[degrees_of_freedom - 1]
+    degrees = float(degrees_of_freedom)
+    z = STUDENT_T_Z_975
+    z2 = z * z
+    z3 = z2 * z
+    z5 = z3 * z2
+    z7 = z5 * z2
+    return (
+        z
+        + (z3 + z) / (4.0 * degrees)
+        + (5.0 * z5 + 16.0 * z3 + 3.0 * z) / (96.0 * degrees * degrees)
+        + (3.0 * z7 + 19.0 * z5 + 17.0 * z3 - 15.0 * z)
+        / (384.0 * degrees * degrees * degrees)
+    )
+
+
+def _float_close(reported: float, expected: float, location: str) -> None:
+    tolerance = max(1e-12, abs(expected) * 1e-12)
+    if not math.isfinite(reported) or abs(reported - expected) > tolerance:
+        raise AbbaSummaryInputError(
+            f"{location}={reported} disagrees with samples ({expected})"
+        )
 
 
 def recompute_statistics(elapsed: Any, location: str) -> dict[str, Any]:
-    """Validate an ``elapsed_ns`` object and recompute its four statistics."""
+    """Validate an ``elapsed_ns`` object using the Rust harness formula."""
 
     elapsed_object = _require_object(elapsed, location)
     if elapsed_object.get("unit") != "ns":
         raise AbbaSummaryInputError(f"{location}.unit must be 'ns'")
     samples_raw = elapsed_object.get("samples")
-    if not isinstance(samples_raw, list) or not samples_raw:
-        raise AbbaSummaryInputError(f"{location}.samples must be a non-empty list")
+    if not isinstance(samples_raw, list) or len(samples_raw) < MIN_RETAINED_SAMPLES:
+        raise AbbaSummaryInputError(
+            f"{location}.samples must retain at least {MIN_RETAINED_SAMPLES} samples"
+        )
     samples = [
-        _finite_number(value, f"{location}.samples[{index}]", positive=True)
+        _u64(value, f"{location}.samples[{index}]")
         for index, value in enumerate(samples_raw)
     ]
-    try:
-        mean = float(statistics.fmean(samples))
-    except (OverflowError, ValueError) as error:
-        raise AbbaSummaryInputError(f"{location}.mean cannot be represented finitely") from error
-    if not math.isfinite(mean):
-        raise AbbaSummaryInputError(f"{location}.mean must be finite")
-    computed = {
-        "p50": _percentile(samples, 50),
-        "mean": mean,
-        "p95": _percentile(samples, 95),
-        "p99": _percentile(samples, 99),
+    if samples != sorted(samples):
+        raise AbbaSummaryInputError(f"{location}.samples must be sorted ascending")
+
+    mean = 0.0
+    squared_deviation_sum = 0.0
+    for index, value in enumerate(samples):
+        value_as_float = float(value)
+        next_count = float(index + 1)
+        delta = value_as_float - mean
+        next_mean = mean + delta / next_count
+        squared_deviation_sum += delta * (value_as_float - next_mean)
+        mean = next_mean
+    standard_deviation = (
+        math.sqrt(squared_deviation_sum / float(len(samples) - 1))
+        if len(samples) > 1
+        else 0.0
+    )
+    margin = (
+        _student_t_critical_95(len(samples) - 1)
+        * standard_deviation
+        / math.sqrt(float(len(samples)))
+        if len(samples) > 1
+        else 0.0
+    )
+    left = samples[(len(samples) - 1) // 2]
+    right = samples[len(samples) // 2]
+    p50 = left // 2 + right // 2 + (left % 2 + right % 2) // 2
+
+    def nearest_rank(percentile: int) -> int:
+        index = ((percentile * len(samples) + 99) // 100) - 1
+        return samples[min(index, len(samples) - 1)]
+
+    computed_u64 = {
+        "min": samples[0],
+        "p50": p50,
+        "p95": nearest_rank(95),
+        "p99": nearest_rank(99),
+        "max": samples[-1],
     }
-    for name, expected in computed.items():
+    computed_float = {
+        "mean": mean,
+        "standard_deviation": standard_deviation,
+        "confidence_interval_95.lower": max(mean - margin, 0.0),
+        "confidence_interval_95.upper": mean + margin,
+    }
+    for name, expected in computed_u64.items():
         if name not in elapsed_object:
             raise AbbaSummaryInputError(f"{location}.{name} is required")
-        reported = _finite_number(elapsed_object[name], f"{location}.{name}", positive=True)
-        # Integer nanosecond percentiles are commonly serialized as floats;
-        # permit only insignificant serialization/rounding noise.  A changed
-        # reported statistic still fails closed.
-        tolerance = max(0.5, abs(expected) * 1e-12)
-        if abs(reported - expected) > tolerance:
+        reported = _u64(elapsed_object[name], f"{location}.{name}")
+        if reported != expected:
             raise AbbaSummaryInputError(
                 f"{location}.{name}={reported} disagrees with samples ({expected})"
             )
-    if not computed["p50"] <= computed["p95"] <= computed["p99"]:
-        raise AbbaSummaryInputError(f"{location} percentiles are not non-decreasing")
-    reported_values = {name: float(elapsed_object[name]) for name in STATISTICS}
-    if not reported_values["p50"] <= reported_values["p95"] <= reported_values["p99"]:
+    for name, expected in computed_float.items():
+        field = name.split(".")[-1] if "." in name else name
+        if "." in name:
+            confidence = _require_object(
+                elapsed_object.get("confidence_interval_95"),
+                f"{location}.confidence_interval_95",
+            )
+            value = confidence.get(field)
+        else:
+            if name not in elapsed_object:
+                raise AbbaSummaryInputError(f"{location}.{name} is required")
+            value = elapsed_object[name]
+        reported = _finite_number(value, f"{location}.{name}")
+        _float_close(reported, expected, f"{location}.{name}")
+    confidence = _require_object(
+        elapsed_object.get("confidence_interval_95"),
+        f"{location}.confidence_interval_95",
+    )
+    if confidence.get("method") != "two-sided Student's t interval for the mean":
         raise AbbaSummaryInputError(
-            f"{location} reported percentiles are not non-decreasing"
+            f"{location}.confidence_interval_95.method does not match the harness"
         )
     return {
         "sample_count": len(samples),
-        "p50": computed["p50"],
-        "mean": computed["mean"],
-        "p95": computed["p95"],
-        "p99": computed["p99"],
+        **computed_u64,
+        **{
+            "mean": mean,
+            "standard_deviation": standard_deviation,
+            "confidence_interval_95": {
+                "method": confidence["method"],
+                "lower": computed_float["confidence_interval_95.lower"],
+                "upper": computed_float["confidence_interval_95.upper"],
+            },
+        },
     }
 
 
@@ -160,6 +323,127 @@ def _index_results(report: dict[str, Any], label: str) -> dict[tuple[str, str], 
     return indexed
 
 
+def _required_nonempty_string(
+    value: Any, location: str, field: str, *, allow_none: bool = False
+) -> str | None:
+    if allow_none and value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        suffix = " or null" if allow_none else ""
+        raise AbbaSummaryInputError(f"{location}.{field} must be a non-empty string{suffix}")
+    return value
+
+
+def _optional_string(value: Any, location: str, field: str) -> str | None:
+    if value is not None and not isinstance(value, str):
+        raise AbbaSummaryInputError(f"{location}.{field} must be a string or null")
+    return value
+
+
+def _required_bool(value: Any, location: str, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise AbbaSummaryInputError(f"{location}.{field} must be a boolean")
+    return value
+
+
+def _required_positive_integer(value: Any, location: str, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise AbbaSummaryInputError(f"{location}.{field} must be a positive integer")
+    return value
+
+
+def _required_string_list(value: Any, location: str, field: str) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(item, str) or not item for item in value)
+        or len(value) != len(set(value))
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.{field} must be a non-empty list of unique strings"
+        )
+    return value
+
+
+def _validate_tool(tool: dict[str, Any], label: str) -> None:
+    for field in REQUIRED_TOOL_FIELDS:
+        _required_nonempty_string(tool.get(field), f"{label}.tool", field)
+    if tool["name"] != HARNESS_TOOL_NAME:
+        raise AbbaSummaryInputError(
+            f"{label}.tool.name must be {HARNESS_TOOL_NAME!r}"
+        )
+
+
+def _validate_environment(environment: dict[str, Any], label: str) -> None:
+    location = f"{label}.environment"
+    for field in REQUIRED_ENVIRONMENT_FIELDS:
+        if field not in environment:
+            raise AbbaSummaryInputError(f"{location}.{field} is required")
+    _required_nonempty_string(environment["rustc_version"], location, "rustc_version")
+    revision = _required_nonempty_string(environment["git_revision"], location, "git_revision")
+    if revision is None:
+        raise AbbaSummaryInputError(f"{location}.git_revision must not be null")
+    if _required_bool(environment["git_worktree_dirty"], location, "git_worktree_dirty"):
+        raise AbbaSummaryInputError(f"{location}.git_worktree_dirty must be false")
+    _required_positive_integer(
+        environment["logical_cpus_available"], location, "logical_cpus_available"
+    )
+    _required_nonempty_string(environment["allocator"], location, "allocator")
+    for field in ("rustflags", "cargo_build_target", "perf_event_paranoid"):
+        _optional_string(environment[field], location, field)
+    for field in (
+        "os",
+        "kernel",
+        "cpu_model",
+        "filesystem_type",
+        "cpu_affinity",
+        "storage_identifier",
+    ):
+        if field in environment:
+            _optional_string(environment[field], location, field)
+    for field in ("total_memory_bytes", "page_size_bytes"):
+        if field in environment and environment[field] is not None:
+            _u64(environment[field], f"{location}.{field}")
+    if "source_destination_same_device" in environment and environment[
+        "source_destination_same_device"
+    ] is not None:
+        _required_bool(
+            environment["source_destination_same_device"],
+            location,
+            "source_destination_same_device",
+        )
+
+
+def _validate_configuration(configuration: dict[str, Any], label: str) -> None:
+    location = f"{label}.configuration"
+    for field in REQUIRED_CONFIGURATION_FIELDS:
+        if field not in configuration:
+            raise AbbaSummaryInputError(f"{location}.{field} is required")
+    samples = _required_positive_integer(
+        configuration["samples_per_case"], location, "samples_per_case"
+    )
+    if samples < MIN_RETAINED_SAMPLES:
+        raise AbbaSummaryInputError(
+            f"{location}.samples_per_case must be at least {MIN_RETAINED_SAMPLES}"
+        )
+    _required_positive_integer(
+        configuration["warmup_iterations_per_case"],
+        location,
+        "warmup_iterations_per_case",
+    )
+    _required_string_list(configuration["cases"], location, "cases")
+    _required_string_list(configuration["corpus_shapes"], location, "corpus_shapes")
+    for field, value in configuration.items():
+        if field.endswith("_shapes") and field != "corpus_shapes":
+            _required_string_list(value, location, field)
+    if "filesystem_root_selected" in configuration:
+        _required_bool(
+            configuration["filesystem_root_selected"],
+            location,
+            "filesystem_root_selected",
+        )
+
+
 def _validate_report(
     report: Any, label: str
 ) -> tuple[
@@ -168,8 +452,12 @@ def _validate_report(
     dict[str, Any],
     dict[str, Any],
     dict[tuple[str, str], dict[str, Any]],
+    str,
+    frozenset[str],
 ]:
     root = _require_object(report, label)
+    canonical_report = _canonical_json(root, f"{label}.report")
+    report_sha256 = hashlib.sha256(canonical_report.encode("utf-8")).hexdigest()
     schema_version = root.get("schema_version")
     if isinstance(schema_version, bool) or not isinstance(schema_version, int):
         raise AbbaSummaryInputError(f"{label}.schema_version must be an integer")
@@ -180,30 +468,44 @@ def _validate_report(
     tool = _require_object(root.get("tool"), f"{label}.tool")
     if not tool:
         raise AbbaSummaryInputError(f"{label}.tool must not be empty")
+    _validate_tool(tool, label)
     environment = _require_object(root.get("environment"), f"{label}.environment")
     if not environment:
         raise AbbaSummaryInputError(f"{label}.environment must not be empty")
-    if "git_revision" in environment and environment["git_revision"] is not None and (
-        not isinstance(environment["git_revision"], str) or not environment["git_revision"]
-    ):
-        raise AbbaSummaryInputError(
-            f"{label}.environment.git_revision must be null or a non-empty string"
-        )
-    if (
-        "git_worktree_dirty" in environment
-        and environment["git_worktree_dirty"] is not None
-        and not isinstance(environment["git_worktree_dirty"], bool)
-    ):
-        raise AbbaSummaryInputError(
-            f"{label}.environment.git_worktree_dirty must be null or a boolean"
-        )
+    _validate_environment(environment, label)
     configuration = _require_object(root.get("configuration"), f"{label}.configuration")
     if not configuration:
         raise AbbaSummaryInputError(f"{label}.configuration must not be empty")
-    _canonical_json(tool, f"{label}.tool")
-    _canonical_json(environment, f"{label}.environment")
-    _canonical_json(configuration, f"{label}.configuration")
-    return schema_version, tool, environment, configuration, _index_results(root, label)
+    _validate_configuration(configuration, label)
+    filesystem_evidence = root.get("filesystem_evidence")
+    filesystem_shapes: set[str] = set()
+    if filesystem_evidence is not None and not isinstance(filesystem_evidence, list):
+        raise AbbaSummaryInputError(f"{label}.filesystem_evidence must be a list")
+    if isinstance(filesystem_evidence, list):
+        for index, evidence in enumerate(filesystem_evidence):
+            evidence_object = _require_object(
+                evidence, f"{label}.filesystem_evidence[{index}]"
+            )
+            corpus = _require_object(
+                evidence_object.get("corpus"),
+                f"{label}.filesystem_evidence[{index}].corpus",
+            )
+            shape = corpus.get("shape")
+            if not isinstance(shape, str) or not shape:
+                raise AbbaSummaryInputError(
+                    f"{label}.filesystem_evidence[{index}].corpus.shape "
+                    "must be a non-empty string"
+                )
+            filesystem_shapes.add(shape)
+    return (
+        schema_version,
+        tool,
+        environment,
+        configuration,
+        _index_results(root, label),
+        report_sha256,
+        frozenset(filesystem_shapes),
+    )
 
 
 def _stable_environment(environment: dict[str, Any]) -> dict[str, Any]:
@@ -218,51 +520,49 @@ def _validate_configuration_rows(
     configuration: dict[str, Any],
     indexed: Mapping[tuple[str, str], dict[str, Any]],
     label: str,
+    *,
+    filesystem_shapes: Iterable[str] = (),
 ) -> None:
     """Check optional harness cardinality/selector declarations when present."""
 
-    cases = configuration.get("cases")
-    if cases is not None:
-        if (
-            not isinstance(cases, list)
-            or not cases
-            or any(not isinstance(case, str) or not case for case in cases)
-            or len(cases) != len(set(cases))
-        ):
-            raise AbbaSummaryInputError(f"{label}.configuration.cases must be unique strings")
-        actual_cases = {case for case, _ in indexed}
-        if actual_cases != set(cases):
+    cases = configuration["cases"]
+    actual_cases = {case for case, _ in indexed}
+    if actual_cases != set(cases):
+        raise AbbaSummaryInputError(
+            f"{label}.configuration.cases does not match result cases"
+        )
+    declared_shapes = {
+        shape
+        for field, values in configuration.items()
+        if field.endswith("_shapes")
+        for shape in values
+    }
+    actual_shapes: set[str] = set()
+    for case, corpus_identity in indexed:
+        corpus = json.loads(corpus_identity)
+        shape = corpus.get("shape")
+        if not isinstance(shape, str) or not shape:
             raise AbbaSummaryInputError(
-                f"{label}.configuration.cases does not match result cases"
+                f"{label}.results case {case!r} corpus.shape must be a non-empty string"
             )
-    shapes = configuration.get("corpus_shapes")
-    if shapes is not None:
-        if (
-            not isinstance(shapes, list)
-            or any(not isinstance(shape, str) or not shape for shape in shapes)
-            or len(shapes) != len(set(shapes))
-        ):
-            raise AbbaSummaryInputError(
-                f"{label}.configuration.corpus_shapes must be unique strings"
-            )
+        actual_shapes.add(shape)
+    filesystem_shape_set = set(filesystem_shapes)
+    filesystem_exception = bool(filesystem_shape_set) and actual_shapes.issubset(
+        filesystem_shape_set
+    )
+    if not actual_shapes.issubset(declared_shapes) and not filesystem_exception:
+        raise AbbaSummaryInputError(
+            f"{label}.configuration shape declarations do not cover result shapes"
+        )
     samples_per_case = configuration.get("samples_per_case")
-    if samples_per_case is not None:
-        if (
-            isinstance(samples_per_case, bool)
-            or not isinstance(samples_per_case, int)
-            or samples_per_case < 1
-        ):
+    for key, row in indexed.items():
+        case = key[0]
+        elapsed = _require_object(row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns")
+        samples = elapsed.get("samples")
+        if not isinstance(samples, list) or len(samples) != samples_per_case:
             raise AbbaSummaryInputError(
-                f"{label}.configuration.samples_per_case must be a positive integer"
+                f"{label}.{case}.elapsed_ns.samples does not match samples_per_case"
             )
-        for key, row in indexed.items():
-            case = key[0]
-            elapsed = _require_object(row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns")
-            samples = elapsed.get("samples")
-            if not isinstance(samples, list) or len(samples) != samples_per_case:
-                raise AbbaSummaryInputError(
-                    f"{label}.{case}.elapsed_ns.samples does not match samples_per_case"
-                )
 
 
 def _validate_drift_ceilings(value: Mapping[str, Any] | None) -> dict[str, float]:
@@ -284,9 +584,42 @@ def _validate_drift_ceilings(value: Mapping[str, Any] | None) -> dict[str, float
 
 
 def _identity_value(row: dict[str, Any], field: str, location: str) -> tuple[bool, str]:
-    present = field in row
+    # Harness Option fields may be serialized as explicit null.  Null carries
+    # no identity, so it is absence rather than a verified-equal payload.
+    present = field in row and row[field] is not None
     value = row[field] if present else None
     return present, _canonical_json(value, f"{location}.{field}")
+
+
+def _compare_row_identity(
+    rows: Mapping[str, dict[str, Any]],
+    field: str,
+    location: str,
+) -> tuple[str, bool, str | None, Any]:
+    identities = {
+        label: _identity_value(rows[label], field, f"{label}.{location}")
+        for label in LEG_ORDER
+    }
+    expected_presence = identities["a1"][0]
+    if any(identity[0] != expected_presence for identity in identities.values()):
+        raise AbbaSummaryInputError(
+            f"{location} {field} presence differs between ABBA legs"
+        )
+    if not expected_presence:
+        return "consistently_absent", False, None, None
+    expected_identity = identities["a1"][1]
+    if any(identity[1] != expected_identity for identity in identities.values()):
+        raise AbbaSummaryInputError(
+            f"{location} {field} identity differs between ABBA legs"
+        )
+    value = rows["a1"][field]
+    return "verified_equal", True, expected_identity, value
+
+
+def _validate_output_sha256(value: Any, location: str) -> str:
+    if not isinstance(value, str) or SHA256_RE.fullmatch(value) is None:
+        raise AbbaSummaryInputError(f"{location} must be a lowercase SHA-256 hex string")
+    return value
 
 
 def _coerce_reports(
@@ -318,6 +651,8 @@ def _parse_selectors(values: Iterable[str] | None) -> set[str] | None:
         values = (values,)
     selectors: set[str] = set()
     for value in values:
+        if not isinstance(value, str):
+            raise AbbaSummaryInputError("selectors must contain only strings")
         for selector in value.split(","):
             selector = selector.strip()
             if selector:
@@ -352,18 +687,20 @@ def _result_summary(
     corpus_identity: str,
     drift_ceilings: Mapping[str, float],
 ) -> dict[str, Any]:
-    source_identities = {
-        label: _identity_value(rows[label], "source", f"{label}.{case}") for label in LEG_ORDER
-    }
-    sink_identities = {
-        label: _identity_value(rows[label], "sink", f"{label}.{case}") for label in LEG_ORDER
-    }
-    for field, identities in (("source", source_identities), ("sink", sink_identities)):
-        expected = identities["a1"]
-        if any(identity != expected for identity in identities.values()):
-            raise AbbaSummaryInputError(
-                f"{case}[{corpus_identity}] {field} identity differs between ABBA legs"
+    source_status, source_present, source_identity, source_value = _compare_row_identity(
+        rows, "source", f"{case}[{corpus_identity}]"
+    )
+    sink_status, sink_present, sink_identity, sink_value = _compare_row_identity(
+        rows, "sink", f"{case}[{corpus_identity}]"
+    )
+    for label in LEG_ORDER:
+        if "output_sha256" in rows[label] and rows[label]["output_sha256"] is not None:
+            _validate_output_sha256(
+                rows[label]["output_sha256"], f"{label}.{case}.output_sha256"
             )
+    output_status, output_present, output_identity, output_value = _compare_row_identity(
+        rows, "output_sha256", f"{case}[{corpus_identity}]"
+    )
 
     elapsed: dict[str, dict[str, Any]] = {}
     for label in LEG_ORDER:
@@ -414,7 +751,9 @@ def _result_summary(
             adverse_both.append(name)
             reasons.append("candidate is not lower in both paired directions")
         elif first_reduction <= 0 or second_reduction <= 0:
-            if (first_reduction < 0) != (second_reduction < 0):
+            if (first_reduction < 0 < second_reduction) or (
+                second_reduction < 0 < first_reduction
+            ):
                 reasons.append("paired directions disagree")
             else:
                 reasons.append("candidate is not lower in both paired directions")
@@ -429,22 +768,24 @@ def _result_summary(
         else:
             accepted.append(name)
 
-    a1_row = rows["a1"]
-    source_present, source_identity = source_identities["a1"]
-    sink_present, sink_identity = sink_identities["a1"]
     corpus = json.loads(corpus_identity)
     return {
         "case": case,
         "shape": corpus.get("shape"),
         "corpus": corpus,
-        "source": a1_row.get("source") if source_present else None,
-        "sink": a1_row.get("sink") if sink_present else None,
+        "source": source_value,
+        "sink": sink_value,
+        "output_sha256": output_value,
         "identity": {
             "corpus": corpus_identity,
             "source_present": source_present,
             "source_canonical_json": source_identity,
+            "source_status": source_status,
             "sink_present": sink_present,
             "sink_canonical_json": sink_identity,
+            "sink_status": sink_status,
+            "output_sha256_status": output_status,
+            "output_sha256_canonical_json": output_identity,
         },
         "elapsed_ns": {
             "sample_count": next(iter(sample_counts)),
@@ -503,6 +844,17 @@ def summarize_reports(
     }
     if len(tool_identities) != 1:
         raise AbbaSummaryInputError("harness tool identity differs between ABBA legs")
+    environments_by_leg = {label: item[2] for label, item in validated.items()}
+    control_revision = environments_by_leg["a1"]["git_revision"]
+    if control_revision != environments_by_leg["a2"]["git_revision"]:
+        raise AbbaSummaryInputError("control A1/A2 git_revision differs")
+    candidate_revision = environments_by_leg["b1"]["git_revision"]
+    if candidate_revision != environments_by_leg["b2"]["git_revision"]:
+        raise AbbaSummaryInputError("candidate B1/B2 git_revision differs")
+    if control_revision == candidate_revision:
+        raise AbbaSummaryInputError(
+            "control and candidate git_revision must be distinct"
+        )
     environment_identities = {
         label: _canonical_json(item[2], f"{label}.environment")
         for label, item in validated.items()
@@ -521,8 +873,13 @@ def summarize_reports(
     if len(configurations) != 1:
         raise AbbaSummaryInputError("harness configuration differs between ABBA legs")
 
-    for label, (_, _, _, configuration, indexed) in validated.items():
-        _validate_configuration_rows(configuration, indexed, label)
+    for label, (_, _, _, configuration, indexed, _, filesystem_shapes) in validated.items():
+        _validate_configuration_rows(
+            configuration,
+            indexed,
+            label,
+            filesystem_shapes=filesystem_shapes,
+        )
 
     result_sets = {frozenset(item[4]) for item in validated.values()}
     if len(result_sets) != 1:
@@ -566,6 +923,24 @@ def summarize_reports(
         label: json.loads(environment_identities[label]) for label in LEG_ORDER
     }
     stable_environment = json.loads(stable_environment_identities["a1"])
+    report_identities = {
+        label: {"canonical_sha256": validated[label][5]} for label in LEG_ORDER
+    }
+    status_counts = {
+        field: {
+            status: sum(
+                result["identity"][f"{field}_status"] == status for result in results
+            )
+            for status in ("verified_equal", "consistently_absent")
+        }
+        for field in ("source", "sink")
+    }
+    output_status_counts = {
+        status: sum(
+            result["identity"]["output_sha256_status"] == status for result in results
+        )
+        for status in ("verified_equal", "consistently_absent")
+    }
     return {
         "schema_version": SCHEMA_VERSION,
         "tool": {"name": TOOL_NAME, "version": TOOL_VERSION},
@@ -573,7 +948,14 @@ def summarize_reports(
             "order": ["a1_control", "b1_candidate", "b2_candidate", "a2_control"],
             "statistics": list(STATISTICS),
             "drift_ceiling_percent": ceiling_values,
-            "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank",
+            "percentiles": (
+                "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank"
+            ),
+            "dispersion": "sample standard deviation via Rust Welford update",
+            "uncertainty": (
+                "95% two-sided Student's t interval for the mean; embedded harness "
+                "critical-value table with Cornish-Fisher tail"
+            ),
         },
         "harness_identity": {
             "schema_version": next(iter(schema_versions)),
@@ -584,6 +966,15 @@ def summarize_reports(
             "stable": stable_environment,
             "legs": environments,
         },
+        "implementation_identity": {
+            "control": {"git_revision": control_revision, "legs": ["a1", "a2"]},
+            "candidate": {
+                "git_revision": candidate_revision,
+                "legs": ["b1", "b2"],
+            },
+            "distinct": True,
+        },
+        "report_identity": report_identities,
         "results": results,
         "verification": {
             "result_count": len(results),
@@ -591,9 +982,14 @@ def summarize_reports(
             "configuration_identity_verified": True,
             "environment_stable_identity_verified": True,
             "environment_legs_recorded": True,
+            "source_identity": status_counts["source"],
+            "sink_identity": status_counts["sink"],
+            "output_sha256_identity": output_status_counts,
+            "source_identity_verified": status_counts["source"]["verified_equal"] == len(results),
+            "sink_identity_verified": status_counts["sink"]["verified_equal"] == len(results),
+            "output_sha256_identity_verified": output_status_counts["verified_equal"]
+            == len(results),
             "case_corpus_identity_verified": True,
-            "source_identity_verified": True,
-            "sink_identity_verified": True,
             "statistics_recomputed_from_samples": True,
         },
     }
@@ -604,10 +1000,25 @@ summarize_abba = summarize_reports
 
 
 def load_report(path: Path) -> dict[str, Any]:
+    def reject_nonfinite(value: str) -> None:
+        raise ValueError(f"non-finite JSON value {value!r}")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError(f"duplicate JSON object key {key!r}")
+            value[key] = item
+        return value
+
     try:
         with path.open(encoding="utf-8") as handle:
-            value = json.load(handle)
-    except (OSError, json.JSONDecodeError) as error:
+            value = json.load(
+                handle,
+                object_pairs_hook=reject_duplicate_keys,
+                parse_constant=reject_nonfinite,
+            )
+    except (OSError, ValueError) as error:
         raise AbbaSummaryInputError(f"cannot read {path}: {error}") from error
     return _require_object(value, str(path))
 
