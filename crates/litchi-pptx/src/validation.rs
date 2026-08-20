@@ -1788,6 +1788,7 @@ fn is_structural_rejection(error: &OpcError) -> bool {
             OpcError::ManagedPartDataArcEscape
                 | OpcError::SignedSourceRequiresExplicitPolicy
                 | OpcError::SourceBackedOverlayUnavailable { .. }
+                | OpcError::PreservationUnavailable { .. }
                 | OpcError::UnsupportedExecutionAffinity
         )
 }

@@ -146,6 +146,15 @@ pub enum OpcError {
     #[error("signed OPC source requires an explicit signature edit policy")]
     SignedSourceRequiresExplicitPolicy,
 
+    /// An owned source package cannot preserve its physical ZIP layout after
+    /// an exact-source authorization was revoked. Falling back to the normal
+    /// writer would silently discard opaque source members or framing bytes.
+    #[error("owned OPC source preservation is unavailable: {reason}")]
+    PreservationUnavailable {
+        /// Content-free reason the source-preserving writer refused.
+        reason: String,
+    },
+
     /// A managed source-backed payload cannot be detached from the cache's
     /// hierarchical memory reservation. Keep the returned [`crate::PartData`] handle
     /// (or borrow it with `as_bytes`) until the operation is complete.
@@ -276,6 +285,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::UnsupportedExecutionAffinity
             | OpcError::SourceBackedOverlayUnavailable { .. }
             | OpcError::SignedSourceRequiresExplicitPolicy
+            | OpcError::PreservationUnavailable { .. }
             | OpcError::ManagedPartDataArcEscape
             | OpcError::ManagedPackageMaterialization
             | OpcError::PackageNotFound(_)

@@ -310,8 +310,9 @@ fn try_write_preserved<W: Write>(
         })
     {
         // Appending generated entries after a source member whose identity is
-        // not modeled would silently change an opaque archive topology. Keep
-        // the existing full-writer fallback for unknown/non-UTF-8 members.
+        // not modeled would silently change an opaque archive topology. The
+        // caller turns this fallback into a typed capability error for owned
+        // sources; only new or borrowed packages may use the full writer.
         return Ok(PreservationWrite::Fallback(writer));
     }
     if topology_add {
@@ -776,10 +777,16 @@ impl PackageWriter {
             writer.flush()?;
             return Ok(());
         }
+        Self::validate_source_publication(package)?;
         let plan = PublicationPlan::from_package(package)?;
         let writer = match try_write_preserved(writer, package, &plan)? {
             PreservationWrite::Written(_writer) => return Ok(()),
-            PreservationWrite::Fallback(writer) => writer,
+            PreservationWrite::Fallback(writer) => {
+                if package.requires_owned_source_preservation() {
+                    return Err(owned_source_preservation_error());
+                }
+                writer
+            },
         };
         let mut physical = PhysPkgWriter::with_writer(writer);
         plan.write(&mut physical)?;
@@ -811,10 +818,16 @@ impl PackageWriter {
             bytes.extend_from_slice(source);
             return Ok(bytes);
         }
+        Self::validate_source_publication(package)?;
         let plan = PublicationPlan::from_package(package)?;
         match try_write_preserved(Vec::new(), package, &plan)? {
             PreservationWrite::Written(bytes) => return Ok(bytes),
-            PreservationWrite::Fallback(bytes) => debug_assert!(bytes.is_empty()),
+            PreservationWrite::Fallback(bytes) => {
+                if package.requires_owned_source_preservation() {
+                    return Err(owned_source_preservation_error());
+                }
+                debug_assert!(bytes.is_empty());
+            },
         }
         let mut physical = PhysPkgWriter::new();
         plan.write(&mut physical)?;
@@ -828,6 +841,20 @@ impl PackageWriter {
                 part: name.to_string(),
                 source,
             })
+    }
+
+    fn validate_source_publication(package: &OpcPackage) -> Result<()> {
+        if package.requires_signature_edit_policy() {
+            return Err(crate::OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        Ok(())
+    }
+}
+
+fn owned_source_preservation_error() -> crate::OpcError {
+    crate::OpcError::PreservationUnavailable {
+        reason: "source ZIP framing or opaque members cannot be preserved after this mutation"
+            .to_owned(),
     }
 }
 
@@ -1140,6 +1167,30 @@ mod tests {
         )
     }
 
+    fn signed_source() -> (Vec<u8>, PackURI) {
+        let first = PackURI::new("/custom/first.bin").expect("first URI");
+        let origin = PackURI::new("/_xmlsignatures/origin.sigs").expect("origin URI");
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(crate::BlobPart::new(
+            first.clone(),
+            "application/octet-stream".to_owned(),
+            b"signed payload".to_vec(),
+        )));
+        package.add_part(Box::new(crate::BlobPart::new(
+            origin,
+            crate::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            b"<origin/>".to_vec(),
+        )));
+        package.relate_to(
+            "_xmlsignatures/origin.sigs",
+            crate::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        );
+        (
+            PackageWriter::to_bytes(&package).expect("serialize signed source"),
+            first,
+        )
+    }
+
     fn read_u16(bytes: &[u8], offset: usize) -> u16 {
         u16::from_le_bytes(bytes[offset..offset + 2].try_into().expect("u16 field"))
     }
@@ -1317,6 +1368,32 @@ mod tests {
             .to_stream(&mut streamed)
             .expect("stream exact source");
         assert_eq!(streamed, source);
+    }
+
+    #[test]
+    fn changed_owned_signed_source_refuses_before_output() {
+        let (source, first) = signed_source();
+        let mut package = OpcPackage::from_vec(source.clone()).expect("open signed source");
+        assert!(package.is_signed());
+        assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
+
+        package
+            .get_part_mut(&first)
+            .expect("signed payload")
+            .set_blob(b"changed signed payload".to_vec());
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("changed signed source must be rejected");
+        assert!(matches!(
+            error,
+            crate::OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
     }
 
     #[test]
@@ -1729,13 +1806,16 @@ mod tests {
     }
 
     #[test]
-    fn non_suffix_part_and_relationship_removals_fall_back_to_full_rewrite() {
+    fn non_suffix_part_and_relationship_removals_refuse_normalization() {
         let (source, first, second) = two_part_source(b"topology fallback");
 
         let mut removed = OpcPackage::from_vec(source.clone()).expect("open remove source");
         assert!(removed.remove_part(&first));
-        let removed_output = PackageWriter::to_bytes(&removed).expect("publish removed part");
-        assert!(raw_archive(&removed_output).comment.is_empty());
+        let removed_error = PackageWriter::to_bytes(&removed).expect_err("reject removed part");
+        assert!(matches!(
+            removed_error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
         assert!(removed.get_part(&second).is_ok());
 
         let mut removed_relationship =
@@ -1748,9 +1828,12 @@ mod tests {
                 .remove("rId1")
                 .is_some()
         );
-        let removed_relationship_output =
-            PackageWriter::to_bytes(&removed_relationship).expect("publish relationship removal");
-        assert!(raw_archive(&removed_relationship_output).comment.is_empty());
+        let removed_relationship_error = PackageWriter::to_bytes(&removed_relationship)
+            .expect_err("reject relationship removal");
+        assert!(matches!(
+            removed_relationship_error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
     }
 
     #[test]
@@ -1802,7 +1885,7 @@ mod tests {
     }
 
     #[test]
-    fn topology_add_with_unknown_non_part_falls_back() {
+    fn topology_add_with_unknown_non_part_refuses_normalization() {
         let (source, _first) = source_with_non_part_framing();
         let mut package = OpcPackage::from_vec(source).expect("open unknown-member source");
         package.add_part(Box::new(crate::BlobPart::new(
@@ -1810,14 +1893,14 @@ mod tests {
             "application/octet-stream".to_owned(),
             b"third".to_vec(),
         )));
-        let output = PackageWriter::to_bytes(&package).expect("publish topology addition");
-        let raw = raw_archive(&output);
-        assert!(raw.comment.is_empty());
-        assert!(!raw.local_members.contains_key("junk.dat"));
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
     }
 
     #[test]
-    fn unsupported_prefixed_source_falls_back_before_output() {
+    fn unsupported_prefixed_source_refuses_normalization_before_output() {
         let (source, first, _second) = two_part_source(b"prefixed fallback");
         let mut prefixed = b"unsupported ZIP prelude".to_vec();
         prefixed.extend_from_slice(&source);
@@ -1832,22 +1915,36 @@ mod tests {
             .set_blob(b"changed".to_vec());
 
         let mut output = Vec::new();
-        PackageWriter::write_to_stream(&mut output, &package)
-            .expect("fallback writes one complete archive");
-
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen fallback output");
-        assert_eq!(reopened.get_part(&first).unwrap().blob(), b"changed");
-        assert!(
-            soapberry_zip::ZipArchive::from_slice(&output)
-                .unwrap()
-                .comment()
-                .as_bytes()
-                .is_empty()
-        );
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("unsupported source framing must be rejected");
+        assert!(matches!(
+            error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
+        assert!(output.is_empty());
     }
 
     #[test]
-    fn trailing_source_bytes_fall_back_before_targeted_preservation() {
+    fn unsupported_owned_source_revoked_noop_refuses_before_output() {
+        let (source, _first, _second) = two_part_source(b"prefixed no-op");
+        let mut prefixed = b"unsupported ZIP prelude".to_vec();
+        prefixed.extend_from_slice(&source);
+        let mut package = OpcPackage::from_vec(prefixed).expect("open prefixed OPC");
+        let options = package.save_options().clone();
+        package.set_save_options(options);
+
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("unsupported source framing must be rejected");
+        assert!(matches!(
+            error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn trailing_source_bytes_refuse_normalization_before_targeted_preservation() {
         let (source, first, _second) = two_part_source(b"trailing fallback");
         let mut suffixed = source;
         suffixed.extend_from_slice(b"trailing bytes outside EOCD");
@@ -1857,12 +1954,14 @@ mod tests {
             .expect("first part")
             .set_blob(b"changed payload".to_vec());
 
-        let output = PackageWriter::to_bytes(&package).expect("publish suffixed source");
-        assert!(raw_archive(&output).comment.is_empty());
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
     }
 
     #[test]
-    fn zip64_source_falls_back_after_mutation() {
+    fn zip64_source_refuses_normalization_after_mutation() {
         let (source, first, _second) = two_part_source(b"ZIP64 fallback");
         let source = promote_to_zip64(source);
         assert!(
@@ -1877,13 +1976,10 @@ mod tests {
             .unwrap()
             .set_blob(b"ZIP64 changed".to_vec());
 
-        let output = PackageWriter::to_bytes(&package).expect("fallback ZIP64 publication");
-
-        let archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
-        assert!(!archive.is_zip64());
-        assert!(archive.comment().as_bytes().is_empty());
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
-        assert_eq!(reopened.get_part(&first).unwrap().blob(), b"ZIP64 changed");
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
     }
 
     #[test]
