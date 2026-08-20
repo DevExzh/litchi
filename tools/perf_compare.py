@@ -450,6 +450,12 @@ def report_result_key_manifest_sha256(
     *,
     result_key_fields: Iterable[str] = _DEFAULT_RESULT_KEY_FIELDS,
 ) -> str:
+    """Returns the report key digest for the selected public key fields.
+
+    Normal reports use ``(case, corpus)``. Filesystem allocator reports must
+    pass ``("case", "corpus", "cache_state")`` so warm and cold rows remain
+    distinct even when they share one corpus.
+    """
     report_object = _require_object(report, "report")
     fields = tuple(result_key_fields)
     if fields not in (_DEFAULT_RESULT_KEY_FIELDS, _CACHE_RESULT_KEY_FIELDS):
