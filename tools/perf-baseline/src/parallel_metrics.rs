@@ -285,6 +285,7 @@ fn source_chunk_evidence(source: Option<&SourceSummary>) -> Result<ChunkEvidence
     })
 }
 
+#[cfg(test)]
 fn configured_worker_budget(workers: &[usize]) -> Result<Metric, InputError> {
     let values = configured_worker_values(workers)?;
     Ok(Metric::measured_u64s(values, CONFIGURED_WORKER_SCOPE))
