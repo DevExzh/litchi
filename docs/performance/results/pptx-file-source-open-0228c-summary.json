@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "change": "0228-docx-family-layout-floor-calibration",
+  "decision": "calibration-complete",
+  "claim_scope": "none (probe executes zero changed code; every reading is layout noise)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "1d503363657f7badb0d2c321ca208dbe9e9cbf22765745fc8ccd1a1a7ab1e1cd",
+      "candidate_sha256": "f191a309af97cd1fad059ef82015afab762f574ce7edf8d52a02d28d46c8b2ca",
+      "note": "control is the banked post-0227 binary; probe c adds never-executed parser-shaped padding in litchi-docx (+7,824 B .text; DOCX-family layout-noise floor calibration, the 0223/0226 analog)"
+    }
+  },
+  "provenance": {
+    "source_revision": "3ab0bbd1b5dda6da72deabb8f7ec707df7fb8aaf",
+    "source_state": "HEAD 3ab0bbd1b banked through 0227 (both binaries); the probe additionally carries never-executed padding in litchi-docx",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "pptx-source-backed-media",
+    "archive_sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "archive_bytes": 17017139,
+    "archive_member_count": 445
+  },
+  "selector": "pptx_file_source_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 2846105.5,
+          "mean": 2878936.616,
+          "p95": 3082368.0,
+          "p99": 3481438.0
+        },
+        "b1": {
+          "p50": 2856259.0,
+          "mean": 2884827.686,
+          "p95": 3115476.0,
+          "p99": 3283016.0
+        },
+        "b2": {
+          "p50": 2869182.5,
+          "mean": 2897622.102,
+          "p95": 3093867.0,
+          "p99": 3356361.0
+        },
+        "a2": {
+          "p50": 2886665.5,
+          "mean": 2924008.114,
+          "p95": 3178390.0,
+          "p99": 3554960.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": -0.356751,
+          "mean": -0.204627,
+          "p95": -1.074109,
+          "p99": 5.699427
+        },
+        "a2_to_b2": {
+          "p50": 0.605647,
+          "mean": 0.902392,
+          "p95": 2.659302,
+          "p99": 5.586533
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 1.425105,
+          "mean": 1.565561,
+          "p95": 3.115202,
+          "p99": 2.111829
+        },
+        "candidate": {
+          "p50": 0.452462,
+          "mean": 0.443507,
+          "p95": -0.693602,
+          "p99": 2.234074
+        }
+      },
+      "accepted_statistics": [
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p95": "paired directions disagree"
+      },
+      "adverse_both_statistics": []
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "change": "0228-docx-family-layout-floor-calibration",
+  "decision": "calibration-complete",
+  "claim_scope": "none (probe executes zero changed code; every reading is layout noise)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "1d503363657f7badb0d2c321ca208dbe9e9cbf22765745fc8ccd1a1a7ab1e1cd",
+      "candidate_sha256": "4a0afd55b75f2c8c286cfe41973c2ce430185509fc6534455c4f3a190ae8459e",
+      "note": "control is the banked post-0227 binary; probe b adds never-executed parser-shaped padding in litchi-docx (+5,984 B .text; DOCX-family layout-noise floor calibration, the 0223/0226 analog)"
+    }
+  },
+  "provenance": {
+    "source_revision": "3ab0bbd1b5dda6da72deabb8f7ec707df7fb8aaf",
+    "source_state": "HEAD 3ab0bbd1b banked through 0227 (both binaries); the probe additionally carries never-executed padding in litchi-docx",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "docx-source-backed-media",
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "archive_bytes": 16793036,
+    "archive_member_count": 20
+  },
+  "selector": "docx_file_eager_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 13556165.5,
+          "mean": 13618333.386,
+          "p95": 14321651.0,
+          "p99": 14685423.0
+        },
+        "b1": {
+          "p50": 13532628.5,
+          "mean": 13597389.808,
+          "p95": 14285688.0,
+          "p99": 14892814.0
+        },
+        "b2": {
+          "p50": 13491239.0,
+          "mean": 13535348.526,
+          "p95": 14182850.0,
+          "p99": 14805366.0
+        },
+        "a2": {
+          "p50": 13429819.5,
+          "mean": 13517609.238,
+          "p95": 14309314.0,
+          "p99": 15283909.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 0.173626,
+          "mean": 0.15379,
+          "p95": 0.251109,
+          "p99": -1.412224
+        },
+        "a2_to_b2": {
+          "p50": -0.457337,
+          "mean": -0.131231,
+          "p95": 0.883788,
+          "p99": 3.131025
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -0.932019,
+          "mean": -0.739622,
+          "p95": -0.086142,
+          "p99": 4.075375
+        },
+        "candidate": {
+          "p50": -0.30585,
+          "mean": -0.456273,
+          "p95": -0.719867,
+          "p99": -0.587183
+        }
+      },
+      "accepted_statistics": [
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p50": "paired directions disagree",
+        "mean": "paired directions disagree",
+        "p99": "paired directions disagree"
+      },
+      "adverse_both_statistics": []
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

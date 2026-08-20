@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "change": "0228-docx-family-layout-floor-calibration",
+  "decision": "drift-rejected-excluded: control-leg drift exceeded ceilings and the ONE permitted rerun failed drift again \u2014 pair excluded from floor consolidation, all stats uncalibrated. Evidence: rerun r1 vs r4: cold-requested p50 +75.1% (ceil 5%), mean +27.8%; warm rows within ceilings. Cause: cold-requested page-cache bimodality (the original rejection was also cold-requested, p99 +23.4%).",
+  "claim_scope": "none (probe executes zero changed code; every reading is layout noise)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "1d503363657f7badb0d2c321ca208dbe9e9cbf22765745fc8ccd1a1a7ab1e1cd",
+      "candidate_sha256": "4a0afd55b75f2c8c286cfe41973c2ce430185509fc6534455c4f3a190ae8459e",
+      "note": "control is the banked post-0227 binary; probe b adds never-executed parser-shaped padding in litchi-docx (+5,984 B .text; DOCX-family layout-noise floor calibration, the 0223/0226 analog)"
+    }
+  },
+  "provenance": {
+    "source_revision": "3ab0bbd1b5dda6da72deabb8f7ec707df7fb8aaf",
+    "source_state": "HEAD 3ab0bbd1b banked through 0227 (both binaries); the probe additionally carries never-executed padding in litchi-docx",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "docx-source-backed-media",
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "archive_bytes": 16793036,
+    "archive_member_count": 20
+  },
+  "selector": "docx_file_source_open_full_text_lifecycle",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 568703.0,
+          "mean": 574654.534,
+          "p95": 624196.0,
+          "p99": 703791.0
+        },
+        "b1": {
+          "p50": 560965.0,
+          "mean": 571145.618,
+          "p95": 606304.0,
+          "p99": 743812.0
+        },
+        "b2": {
+          "p50": 555409.0,
+          "mean": 561814.11,
+          "p95": 613755.0,
+          "p99": 686735.0
+        },
+        "a2": {
+          "p50": 560948.5,
+          "mean": 565496.318,
+          "p95": 614682.0,
+          "p99": 690581.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 1.36064,
+          "mean": 0.610613,
+          "p95": 2.866407,
+          "p99": -5.686489
+        },
+        "a2_to_b2": {
+          "p50": 0.987524,
+          "mean": 0.651146,
+          "p95": 0.15081,
+          "p99": 0.556922
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": -1.363541,
+          "mean": -1.593691,
+          "p95": -1.524201,
+          "p99": -1.876978
+        },
+        "candidate": {
+          "p50": -0.990436,
+          "mean": -1.633823,
+          "p95": 1.228921,
+          "p99": -7.673579
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95"
+      ],
+      "rejected_statistics": {
+        "p99": "paired directions disagree"
+      },
+      "adverse_both_statistics": []
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

@@ -3,6 +3,26 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[`change 0228`](changes/0228-docx-floor-calibration.md)
+(0228 is a methodology calibration, not a code change — the DOCX-family
+analog of 0223/0226, calibrating the likely guardrail phases BEFORE the
+first DOCX optimization. Three probe binaries (banked post-0227 tree plus
+never-executed parser-shaped padding of +3,872/+5,984/+7,824 B text in
+litchi-docx, seeds 2281-2283) measured pure layout noise over 72 legs
+(6 phases × 3 probes × A1/B1/B2/A2): the four docx open/lifecycle
+guardrails plus the `xlsx_file_open` / `pptx_file_source_open`
+cross-guardrails. Five phase/probe pairs failed control-leg drift AND
+failed again on their one permitted rerun — four with a cold-requested
+page-cache bimodality signature (whole-distribution 2-7x shifts when the
+eviction request genuinely misses; pptx cold p50 6.1-6.4 ms vs 41.0 ms),
+xlsx with persistent machine noise — and are drift-rejected-excluded,
+contributing nothing. Effective floors from the 13 accepted pairs:
+`docx_file_eager_open` p99 **3.5%**,
+`docx_file_eager_open_full_text_lifecycle` p99 **2.7%**; every other
+statistic on the six phases stays uncalibrated (pre-floor rule).
+Implication recorded: cold-requested rows are currently uncalibratable
+at the 5/5/10/15% ceilings on this machine. The 0229 text-path change is
+the first consumer of these floors.)
 [`change 0227`](changes/0227-odt-text-binding-tracker.md)
 (0227 removes `NsReader`'s per-event `process_event` binding maintenance
 (profiled at 9.1%-18.1% of timed on the text-path phases) from the 0217
@@ -24,8 +44,8 @@ primary's anomalous b1 leg) **18.79%-20.32% / 18.45%-20.37% /
 17.43%-21.68% / 8.65%-18.10%**,
 `odt_file_source_open_full_text_lifecycle` p50/mean
 **10.37%-13.34% / 9.10%-13.15%**; guardrails clean, within-floor, or
-cleared-by-rerun. The ODT open/text paths are now floor-fighting; next
-is the calibration-first DOCX pivot (0228 floor calibration staged).
+cleared-by-rerun. The ODT open/text paths are now floor-fighting; the
+calibration-first DOCX pivot ran as 0228 (above).
 Candidate `1d503363…` is the control for the next change.)
 [`change 0226`](changes/0226-odt-source-open-floor-calibration.md)
 (0226 is a methodology calibration, not a code change — the 0223 analog

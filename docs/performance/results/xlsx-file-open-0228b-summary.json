@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "change": "0228-docx-family-layout-floor-calibration",
+  "decision": "calibration-complete",
+  "claim_scope": "none (probe executes zero changed code; every reading is layout noise)",
+  "protocol": {
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "cpu_affinity": "2",
+    "warmups_per_case": 30,
+    "samples_per_case": 500,
+    "profile": "release",
+    "processes": "one fresh process per A/B/B/A leg; samples within each leg run in-process",
+    "page_cache": "not controlled; no cold-cache claim",
+    "stability_threshold_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "acceptance": "a statistic is accepted only when candidate elapsed time is lower in both paired directions and control/candidate same-implementation drift stays within that statistic's threshold",
+    "percentiles": "p50 = statistics.median; p95/p99 = nearest-rank (tools/perf_compare.py method); drift = (second_leg - first_leg) / first_leg",
+    "binaries": {
+      "control_sha256": "1d503363657f7badb0d2c321ca208dbe9e9cbf22765745fc8ccd1a1a7ab1e1cd",
+      "candidate_sha256": "4a0afd55b75f2c8c286cfe41973c2ce430185509fc6534455c4f3a190ae8459e",
+      "note": "control is the banked post-0227 binary; probe b adds never-executed parser-shaped padding in litchi-docx (+5,984 B .text; DOCX-family layout-noise floor calibration, the 0223/0226 analog)"
+    }
+  },
+  "provenance": {
+    "source_revision": "3ab0bbd1b5dda6da72deabb8f7ec707df7fb8aaf",
+    "source_state": "HEAD 3ab0bbd1b banked through 0227 (both binaries); the probe additionally carries never-executed padding in litchi-docx",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "allocator": "Rust system allocator",
+    "cpu": "AMD EPYC 9575F 64-Core Processor",
+    "kernel": "Linux 6.8.0-101-generic",
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "corpus": {
+    "name": "xlsx-cell-values-medium",
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "archive_bytes": 4226429,
+    "archive_member_count": 17
+  },
+  "selector": "xlsx_file_open",
+  "timing_scope": null,
+  "cases": {
+    "elapsed_ns": {
+      "legs_ns": {
+        "a1": {
+          "p50": 138615.5,
+          "mean": 141539.434,
+          "p95": 175621.0,
+          "p99": 208247.0
+        },
+        "b1": {
+          "p50": 129789.0,
+          "mean": 129946.94,
+          "p95": 144679.0,
+          "p99": 156525.0
+        },
+        "b2": {
+          "p50": 131450.5,
+          "mean": 133985.03,
+          "p95": 159090.0,
+          "p99": 175602.0
+        },
+        "a2": {
+          "p50": 144138.0,
+          "mean": 145785.802,
+          "p95": 176394.0,
+          "p99": 194568.0
+        }
+      },
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "p50": 6.367614,
+          "mean": 8.190293,
+          "p95": 17.618622,
+          "p99": 24.836852
+        },
+        "a2_to_b2": {
+          "p50": 8.802328,
+          "mean": 8.094596,
+          "p95": 9.809857,
+          "p99": 9.747749
+        }
+      },
+      "same_implementation_drift_percent": {
+        "control": {
+          "p50": 3.984042,
+          "mean": 3.000131,
+          "p95": 0.440152,
+          "p99": -6.568642
+        },
+        "candidate": {
+          "p50": 1.280155,
+          "mean": 3.107491,
+          "p95": 9.960672,
+          "p99": 12.187829
+        }
+      },
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {},
+      "adverse_both_statistics": []
+    }
+  },
+  "verification": "harness-embedded corpus hash identical across legs; in-harness semantic/read-evidence gates passed on every leg (a failed gate aborts the leg with a non-zero exit)"
+}

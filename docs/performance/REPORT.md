@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-18
+Date: 2026-08-20
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -10,6 +10,30 @@ claim that the end-to-end performance program or CRUD scenario matrix is
 complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
+
+## DOCX-family layout noise floor calibration (change 0228)
+
+[Change 0228](changes/0228-docx-floor-calibration.md) is a
+measurement-methodology calibration, not a code change — the DOCX-family
+analog of 0223/0226, run calibration-first so the first DOCX
+optimization's guardrail verdict is not blocked by the pre-floor rule.
+Three probe binaries (banked post-0227 tree + never-executed
+parser-shaped padding in litchi-docx, .text +3,872/+5,984/+7,824 B)
+measured pure layout noise over 72 legs (6 phases × 3 probes ×
+A1/B1/B2/A2): the four docx open/lifecycle guardrails plus the
+`xlsx_file_open` / `pptx_file_source_open` cross-guardrails. Five
+phase/probe pairs failed control-leg drift AND failed again on their one
+permitted rerun — four with a cold-requested page-cache bimodality
+signature (the eviction request sometimes genuinely misses, shifting the
+whole distribution 2-7x; pptx cold p50 6.1-6.4 ms vs 41.0 ms), xlsx with
+persistent single-row machine noise — and are drift-rejected-excluded.
+Effective floors from the 13 accepted pairs (0223 rule: worst observed
+adverse-both magnitude, no margin): `docx_file_eager_open` p99 **3.5%**
+and `docx_file_eager_open_full_text_lifecycle` p99 **2.7%**; every other
+statistic on the six phases stays uncalibrated under the pre-floor rule.
+The calibration also records that cold-requested rows are currently
+uncalibratable at the 5/5/10/15% drift ceilings on this machine. Raw
+artifacts: `results/{docx-file-source-open,docx-file-eager-open,docx-file-source-lifecycle,docx-file-eager-lifecycle,xlsx-file-open,pptx-file-source-open}-0228{a,b,c}-*`.
 
 ## ODT text-path hand-rolled binding tracker — banked (change 0227)
 
@@ -41,8 +65,8 @@ direction did not reproduce in rerun). The measured claim minimums
 process_event removal. With the ODT open/text paths now floor-fighting,
 the program pivots calibration-first to DOCX: change 0228 (DOCX-family
 layout-noise floor calibration, including the `xlsx_file_open` /
-`pptx_file_source_open` cross-guardrails) is staged to run before the
-first DOCX optimization. Raw artifacts: `results/*-0227-*` and
+`pptx_file_source_open` cross-guardrails) has completed (above) ahead of
+the first DOCX optimization. Raw artifacts: `results/*-0227-*` and
 `results/*-0227r-*`.
 
 ## ODT file-source-open layout noise floor calibration (change 0226)
