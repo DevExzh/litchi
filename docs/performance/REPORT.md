@@ -29,6 +29,17 @@ heaptrack print/histogram hashes verified; temporary allocations are
 effectively neutral. RSS remains mixed within <2.4% heaptrack and <0.4%
 `/usr/bin/time`; no broad DOCX claim is made.
 
+## CFB streaming release ABBA evidence (change 0248)
+
+[Change 0248](changes/0248-cfb-streaming-abba.md) records the independently
+audited 24-row CFB MiniFAT streaming package. Accepted cells total only
+p50=1, mean=2, p95=2, and p99=2, while adverse-both cells total
+p50=14, mean=10, p95=7, and p99=4. The decision is not to land the
+production CFB optimization on latency evidence; its candidate is retained
+only for allocation follow-up. The independent actual-output oracle landed
+as `66bb83abb`, and source-identity measurement projection was fixed by
+`cd21f7670`. This is generic CFB/OLE2 evidence, not a broad performance claim.
+
 ## XLSX bytes-facade ABBA evidence (documentation change 0247; 0230 package)
 
 [Change 0247](changes/0247-xlsx-bytes-abba-evidence.md) records the XLSX half
