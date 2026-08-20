@@ -161,6 +161,56 @@ fn archive_round_trip_preserves_order_and_payloads() -> Result<(), Error> {
 }
 
 #[test]
+fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frames()
+-> Result<(), Error> {
+    let archive = Archive {
+        objects: vec![
+            ArchiveObject::new(
+                9,
+                vec![RawMessage {
+                    type_: 100,
+                    data: vec![0x11; 1024],
+                }],
+            )?,
+            ArchiveObject::new(
+                1,
+                vec![RawMessage {
+                    type_: 200,
+                    data: b"selected".to_vec(),
+                }],
+            )?,
+        ],
+    };
+    let encoded = archive.to_bytes()?;
+
+    let selected = Archive::parse_objects_with_identifier(&encoded, 1)?;
+    assert_eq!(selected.objects.len(), 1);
+    assert_eq!(selected.objects[0].archive_info.identifier, Some(1));
+    assert_eq!(selected.objects[0].messages[0].data, b"selected");
+
+    let mut truncated = encoded;
+    truncated.pop();
+    assert!(matches!(
+        Archive::parse_objects_with_identifier(&truncated, 1),
+        Err(Error::InvalidArchive {
+            reason: "truncated message payload",
+            ..
+        })
+    ));
+
+    let limited = ArchiveLimits::default().with_objects(1)?;
+    assert!(matches!(
+        Archive::parse_objects_with_identifier_with_limits(&archive.to_bytes()?, 1, limited),
+        Err(Error::Limit {
+            kind: LimitKind::Objects,
+            observed: 2,
+            maximum: 1,
+        })
+    ));
+    Ok(())
+}
+
+#[test]
 fn archive_rejects_malformed_lengths_and_truncated_payloads() -> Result<(), Error> {
     let error = Archive::parse(&[0x80]).err();
     assert!(matches!(
