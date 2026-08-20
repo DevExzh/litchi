@@ -372,6 +372,56 @@ class PerfCompareTests(unittest.TestCase):
                 baseline, current, self.operation_metrics_policy()
             )
 
+        baseline, current = reports()
+        del current["results"][0]["operation_metrics"]["sink"]["output_bytes"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "path mismatch.*operation_metrics.sink.output_bytes",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline, current = reports()
+        del current["results"][0]["operation_metrics"]["process"]["rchar"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "path mismatch.*operation_metrics.process.rchar",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+    def test_partial_metric_vector_wrappers_fail_but_ordinary_dicts_pass(self):
+        partial_wrappers = (
+            {"values": [1] * 5},
+            {"scope": "test_scope"},
+            {"status": "measured"},
+            {"status": "measured", "values": [1] * 5},
+        )
+        for partial in partial_wrappers:
+            with self.subTest(partial=partial):
+                current = report(revision="current")
+                current["results"][0]["partial_metric"] = partial
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "partial MetricVector wrapper",
+                ):
+                    perf_compare.compare_reports(
+                        report(), current, self.operation_metrics_policy()
+                    )
+
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["ordinary_metadata"] = {
+                "status": "measured",
+                "message": "ordinary dictionary",
+            }
+        result = perf_compare.compare_reports(baseline, current, policy())
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["compared_metrics"], 7)
+
     def test_p50_and_p95_regressions_are_reported(self):
         result = perf_compare.compare_reports(report(), report(120, "current"), policy())
         self.assertEqual(result["status"], "regression")
