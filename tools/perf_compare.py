@@ -1837,6 +1837,8 @@ def _unwrap_metric_vector(value: Any, path: str) -> Any:
     if not isinstance(value, dict):
         return _METRIC_VECTOR_MISSING
     keys = set(value)
+    if keys == _ALLOCATION_METRICS_KEYS:
+        return _METRIC_VECTOR_MISSING
     has_values_or_scope = bool(keys & {"values", "scope"})
     if not has_values_or_scope:
         # Aggregate metric groups also carry a status field, so status alone

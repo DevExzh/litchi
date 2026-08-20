@@ -1884,64 +1884,64 @@ where
     let started = Instant::now();
     let mut details = OperationDetails::default();
     let mut deferred_source_open_package = None;
-    let counter_result = (|| -> Result<Option<ReadMetrics>, Box<dyn Error>> {
+    let counter_result = (|| -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
         Ok(match operation {
-        Operation::OpcEagerOpen => run_opc_eager_open(&source, &mut details)?,
-        Operation::OpcSourceOpen => {
-            let (counter, package) = run_opc_source_open(&source)?;
-            deferred_source_open_package = Some(package);
-            counter
-        },
-        Operation::OpcEagerSave => run_opc_eager_save(
-            &source,
-            &destination,
-            opc_replacement
-                .as_deref()
-                .ok_or("missing OPC replacement")?,
-            &mut details,
-        )?,
-        Operation::OpcSourceSave => run_opc_source_save(
-            &source,
-            &destination,
-            opc_replacement
-                .as_deref()
-                .ok_or("missing OPC replacement")?,
-            &mut details,
-        )?,
-        Operation::CfbOverlaySave => run_cfb_overlay_save(&source, &destination, &mut details)?,
-        Operation::CfbOwnedOverlaySave => {
-            run_cfb_owned_overlay_save(&source, &destination, &mut details)?
-        },
-        Operation::PptxEagerOpen
-        | Operation::PptxSourceOpen
-        | Operation::PptxEagerListSlides
-        | Operation::PptxSourceListSlides
-        | Operation::PptxEagerSlideCount
-        | Operation::PptxSourceSlideCount
-        | Operation::PptxEagerSelectedSlide
-        | Operation::PptxSourceSelectedSlide
-        | Operation::PptxEagerOpenSlideCountLifecycle
-        | Operation::PptxSourceOpenSlideCountLifecycle
-        | Operation::PptxEagerOpenSelectedSlideLifecycle
-        | Operation::PptxSourceOpenSelectedSlideLifecycle => {
-            run_pptx_operation(operation, &source, prepared_pptx.as_ref())?;
-            None
-        },
-        Operation::DocxEagerOpen
-        | Operation::DocxSourceOpen
-        | Operation::DocxEagerParagraphCount
-        | Operation::DocxSourceParagraphCount
-        | Operation::DocxEagerListParagraphs
-        | Operation::DocxSourceListParagraphs
-        | Operation::DocxEagerFullText
-        | Operation::DocxSourceFullText
-        | Operation::DocxEagerOpenParagraphCountLifecycle
-        | Operation::DocxSourceOpenParagraphCountLifecycle
-        | Operation::DocxEagerOpenFullTextLifecycle
-        | Operation::DocxSourceOpenFullTextLifecycle => {
-            run_docx_operation(operation, &source, prepared_docx.as_ref())?;
-            None
-        },
+            Operation::OpcEagerOpen => run_opc_eager_open(&source, &mut details)?,
+            Operation::OpcSourceOpen => {
+                let (counter, package) = run_opc_source_open(&source)?;
+                deferred_source_open_package = Some(package);
+                counter
+            },
+            Operation::OpcEagerSave => run_opc_eager_save(
+                &source,
+                &destination,
+                opc_replacement
+                    .as_deref()
+                    .ok_or("missing OPC replacement")?,
+                &mut details,
+            )?,
+            Operation::OpcSourceSave => run_opc_source_save(
+                &source,
+                &destination,
+                opc_replacement
+                    .as_deref()
+                    .ok_or("missing OPC replacement")?,
+                &mut details,
+            )?,
+            Operation::CfbOverlaySave => run_cfb_overlay_save(&source, &destination, &mut details)?,
+            Operation::CfbOwnedOverlaySave => {
+                run_cfb_owned_overlay_save(&source, &destination, &mut details)?
+            },
+            Operation::PptxEagerOpen
+            | Operation::PptxSourceOpen
+            | Operation::PptxEagerListSlides
+            | Operation::PptxSourceListSlides
+            | Operation::PptxEagerSlideCount
+            | Operation::PptxSourceSlideCount
+            | Operation::PptxEagerSelectedSlide
+            | Operation::PptxSourceSelectedSlide
+            | Operation::PptxEagerOpenSlideCountLifecycle
+            | Operation::PptxSourceOpenSlideCountLifecycle
+            | Operation::PptxEagerOpenSelectedSlideLifecycle
+            | Operation::PptxSourceOpenSelectedSlideLifecycle => {
+                run_pptx_operation(operation, &source, prepared_pptx.as_ref())?;
+                None
+            },
+            Operation::DocxEagerOpen
+            | Operation::DocxSourceOpen
+            | Operation::DocxEagerParagraphCount
+            | Operation::DocxSourceParagraphCount
+            | Operation::DocxEagerListParagraphs
+            | Operation::DocxSourceListParagraphs
+            | Operation::DocxEagerFullText
+            | Operation::DocxSourceFullText
+            | Operation::DocxEagerOpenParagraphCountLifecycle
+            | Operation::DocxSourceOpenParagraphCountLifecycle
+            | Operation::DocxEagerOpenFullTextLifecycle
+            | Operation::DocxSourceOpenFullTextLifecycle => {
+                run_docx_operation(operation, &source, prepared_docx.as_ref())?;
+                None
+            },
         })
     })();
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
