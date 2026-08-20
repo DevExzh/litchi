@@ -13786,6 +13786,7 @@ fn build_semantic_pptx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
 }
 
 type XlsbCellRecord = (usize, usize, usize, u64);
+const XLSB_CELL_DIGEST_DOMAIN: &[u8] = b"litchi-xlsb-cell-projection-v1";
 
 fn xlsb_shape(corpus: &Corpus) -> Result<XlsbShape, Box<dyn Error>> {
     if corpus.manifest.generator != XLSB_CORPUS_GENERATOR {
@@ -13856,14 +13857,26 @@ fn xlsb_expected_cells(shape: XlsbShape) -> Result<Vec<XlsbCellRecord>, Box<dyn 
 
 fn xlsb_cells_digest(cells: &[XlsbCellRecord]) -> Result<String, Box<dyn Error>> {
     let mut digest = Sha256::new();
-    digest.update(b"litchi-xlsb-cell-projection-v1");
+    digest.update(XLSB_CELL_DIGEST_DOMAIN);
     for &(sheet, row, column, value_bits) in cells {
-        digest.update(u64::try_from(sheet)?.to_le_bytes());
-        digest.update(u64::try_from(row)?.to_le_bytes());
-        digest.update(u64::try_from(column)?.to_le_bytes());
-        digest.update(value_bits.to_le_bytes());
+        xlsb_update_cell_digest(&mut digest, sheet, row, column, value_bits)?;
     }
     Ok(fingerprint_hex(&digest.finalize().into()))
+}
+
+#[inline]
+fn xlsb_update_cell_digest(
+    digest: &mut Sha256,
+    sheet: usize,
+    row: usize,
+    column: usize,
+    value_bits: u64,
+) -> Result<(), Box<dyn Error>> {
+    digest.update(u64::try_from(sheet)?.to_le_bytes());
+    digest.update(u64::try_from(row)?.to_le_bytes());
+    digest.update(u64::try_from(column)?.to_le_bytes());
+    digest.update(value_bits.to_le_bytes());
+    Ok(())
 }
 
 fn xlsb_names_digest(names: &[String]) -> Result<String, Box<dyn Error>> {
@@ -13903,6 +13916,43 @@ fn xlsb_collect_cells_in_order(
         }
     }
     Ok(cells)
+}
+
+/// Stream worksheet cells in their native row/column order.
+///
+/// This is the timed full-scan path: it retains only a deterministic digest
+/// state and a checked count. The exact emitted-order vector oracle remains in
+/// [`xlsb_collect_cells_in_order`] and is used by corpus verification outside
+/// the timer.
+fn xlsb_scan_cells_in_order(
+    worksheets: &[litchi_xlsb::Worksheet],
+) -> Result<(usize, [u8; 32]), Box<dyn Error>> {
+    use litchi_core::sheet::{Cell as _, CellIterator as _, Worksheet as _};
+
+    let mut digest = Sha256::new();
+    digest.update(XLSB_CELL_DIGEST_DOMAIN);
+    let mut count = 0usize;
+    for (sheet, worksheet) in worksheets.iter().enumerate() {
+        let mut iterator = worksheet.cells();
+        while let Some(cell) = iterator.next() {
+            let cell = cell.map_err(|error| io::Error::other(error.to_string()))?;
+            let value = cell
+                .value()
+                .as_float()
+                .ok_or("XLSB cell projection contains a non-numeric value")?;
+            count = count
+                .checked_add(1)
+                .ok_or("XLSB cell scan count overflows usize")?;
+            xlsb_update_cell_digest(
+                &mut digest,
+                sheet,
+                usize::try_from(cell.row())?,
+                usize::try_from(cell.column())?,
+                value.to_bits(),
+            )?;
+        }
+    }
+    Ok((count, digest.finalize().into()))
 }
 
 fn verify_xlsb_corpus(corpus: &Corpus, shape: XlsbShape) -> Result<(), Box<dyn Error>> {
@@ -19443,7 +19493,9 @@ fn run_semantic_xlsb(
                 // Prepare the archive clone, workbook, and worksheet values
                 // outside the timer. The timed region deliberately includes
                 // only worksheet.cells() creation and consumption, including
-                // its boxed iterator and boxed cell values.
+                // its boxed iterator and boxed cell values. The scan retains
+                // only a deterministic digest and count; exact emitted-order
+                // vector verification belongs to verify_xlsb_corpus().
                 let owned = corpus.archive.clone();
                 let workbook = litchi_xlsb::Workbook::new(Cursor::new(owned))?;
                 let mut worksheets = Vec::with_capacity(shape.sheet_count());
@@ -19451,13 +19503,15 @@ fn run_semantic_xlsb(
                     worksheets.push(workbook.worksheet(sheet)?);
                 }
                 let started = Instant::now();
-                let cells = xlsb_collect_cells_in_order(&worksheets)?;
+                let scan = xlsb_scan_cells_in_order(&worksheets)?;
                 let duration = started.elapsed();
-                if cells != expected_cells {
-                    return Err("XLSB full cell scan differs from corpus specification".into());
+                if scan.0 != expected_cells.len() {
+                    return Err(
+                        "XLSB full cell scan count differs from corpus specification".into(),
+                    );
                 }
-                let digest = xlsb_cells_digest(&cells)?;
-                std::hint::black_box(cells);
+                let digest = fingerprint_hex(&scan.1);
+                std::hint::black_box(scan);
                 (duration, digest)
             },
             _ => return Err("non-XLSB semantic case passed to XLSB runner".into()),
