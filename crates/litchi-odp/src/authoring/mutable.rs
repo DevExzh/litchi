@@ -9,7 +9,7 @@ use crate::model::animation::validate_animation_roots;
 use crate::model::legacy_animation::validate_legacy_animation_root;
 use crate::model::media::{EmbeddedMedia, embed_media, validate_package_media_path};
 use crate::{Presentation, Reference, Shape, Slide};
-use litchi_core::{Result, xml::escape_xml};
+use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     Decoder, Reader, XmlVersion,
     events::{BytesStart, Event},
@@ -35,6 +35,7 @@ const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 const XMLNS_DEFAULT: &[u8] = b"xmlns";
 const XMLNS_PREFIX: &[u8] = b"xmlns:";
 const MAX_NAMESPACE_BINDINGS: usize = 512;
+const MAX_MEDIA_CHANGE_PAYLOAD_BYTES: usize = 32 * 1024 * 1024;
 
 pub(super) struct DependencyFreeBlankSlideCopy {
     slide: Slide,
@@ -104,6 +105,8 @@ pub(super) struct MutablePresentation {
     source_package: Option<OwnedPackage>,
     /// Newly embedded package media, keyed by package path.
     media_files: BTreeMap<String, EmbeddedMedia>,
+    /// Existing source media members explicitly removed by the transaction.
+    removed_media_paths: BTreeSet<String>,
     /// Inert slide-show settings and custom shows.
     settings: Option<crate::Settings>,
     /// Inert header/footer/date-time declarations and page bindings.
@@ -208,6 +211,7 @@ impl MutablePresentation {
             styles_xml,
             source_package,
             media_files: BTreeMap::new(),
+            removed_media_paths: BTreeSet::new(),
             settings,
             source_declarations: declarations.clone(),
             declarations,
@@ -764,6 +768,160 @@ impl MutablePresentation {
         embed_media(&mut self.media_files, path, bytes, media_type)
     }
 
+    /// Apply a fully preflighted package-media batch without touching slide XML.
+    pub(super) fn apply_media_changes(
+        &mut self,
+        changes: &[super::edit::MediaChange],
+    ) -> Result<usize> {
+        let Some(source_package) = &self.source_package else {
+            return Err(Error::Unsupported(
+                "ODP media changes require a retained source package".to_string(),
+            ));
+        };
+        let archive = source_package.package()?;
+        let mut files = self.media_files.clone();
+        let mut removed = self.removed_media_paths.clone();
+        let mut touched = BTreeSet::new();
+        let mut changed = 0usize;
+
+        for change in changes {
+            let path = change.path();
+            if !touched.insert(path.to_string()) {
+                return Err(Error::InvalidFormat(format!(
+                    "ODP media change batch selects '{path}' more than once"
+                )));
+            }
+            match change {
+                super::edit::MediaChange::Add {
+                    payload,
+                    media_type,
+                    ..
+                } => {
+                    validate_package_media_path(path)?;
+                    validate_media_payload(payload, media_type)?;
+                    if archive.has_file(path) || files.contains_key(path) {
+                        return Err(Error::InvalidFormat(format!(
+                            "ODP media add path '{path}' already exists"
+                        )));
+                    }
+                    files.insert(
+                        path.to_string(),
+                        EmbeddedMedia {
+                            bytes: payload.clone(),
+                            media_type: media_type.clone(),
+                        },
+                    );
+                    removed.remove(path);
+                    changed = changed.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODP media change count overflow".to_string())
+                    })?;
+                },
+                super::edit::MediaChange::Replace {
+                    payload,
+                    media_type,
+                    ..
+                } => {
+                    validate_package_media_path(path)?;
+                    validate_media_payload(payload, media_type)?;
+                    let source_exists = archive.has_file(path);
+                    let existing_type = archive.manifest().get_media_type(path);
+                    if source_exists && !files.contains_key(path) && existing_type.is_none() {
+                        return Err(Error::Unsupported(format!(
+                            "ODP media replacement refuses member '{path}' without manifest metadata"
+                        )));
+                    }
+                    if let Some(existing_type) = existing_type
+                        && existing_type != media_type.as_str()
+                    {
+                        return Err(Error::Unsupported(format!(
+                            "ODP media replacement cannot change manifest type for '{path}'"
+                        )));
+                    }
+                    if let Some(previous) = files.get(path) {
+                        if previous.bytes.as_slice() == payload.as_slice()
+                            && previous.media_type == media_type.as_str()
+                        {
+                            continue;
+                        }
+                    } else {
+                        if !source_exists {
+                            return Err(Error::InvalidFormat(format!(
+                                "ODP media replacement path '{path}' does not exist"
+                            )));
+                        }
+                        if removed.contains(path) {
+                            return Err(Error::InvalidFormat(format!(
+                                "ODP media replacement path '{path}' was already removed"
+                            )));
+                        }
+                        if archive.get_file(path)?.as_slice() == payload.as_slice()
+                            && existing_type == Some(media_type.as_str())
+                        {
+                            continue;
+                        }
+                    }
+                    files.insert(
+                        path.to_string(),
+                        EmbeddedMedia {
+                            bytes: payload.clone(),
+                            media_type: media_type.clone(),
+                        },
+                    );
+                    removed.remove(path);
+                    changed = changed.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODP media change count overflow".to_string())
+                    })?;
+                },
+                super::edit::MediaChange::Remove { .. } => {
+                    validate_package_media_path(path)?;
+                    let source_exists = archive.has_file(path);
+                    if source_exists && references_media(source_package, path)? {
+                        return Err(Error::Unsupported(format!(
+                            "ODP media removal refuses referenced member '{path}'"
+                        )));
+                    }
+                    if files.remove(path).is_some() {
+                        removed.remove(path);
+                    } else if source_exists {
+                        if !removed.insert(path.to_string()) {
+                            return Err(Error::InvalidFormat(format!(
+                                "ODP media member '{path}' is already removed"
+                            )));
+                        }
+                    } else {
+                        return Err(Error::InvalidFormat(format!(
+                            "ODP media removal path '{path}' does not exist"
+                        )));
+                    }
+                    changed = changed.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODP media change count overflow".to_string())
+                    })?;
+                },
+            }
+        }
+
+        self.media_files = files;
+        self.removed_media_paths = removed;
+        Ok(changed)
+    }
+
+    pub(super) fn staged_media_bytes(&self) -> Result<usize> {
+        self.media_files
+            .iter()
+            .try_fold(0usize, |total, (path, media)| {
+                let size = path
+                    .len()
+                    .checked_add(media.media_type.len())
+                    .and_then(|value| value.checked_add(media.bytes.len()))
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("ODP staged media size overflow".to_string())
+                    })?;
+                total.checked_add(size).ok_or_else(|| {
+                    Error::InvalidFormat("ODP staged media total overflow".to_string())
+                })
+            })
+    }
+
     /// Verify that every media part staged by this transaction survived package publication.
     ///
     /// This deliberately verifies package bytes and manifest metadata independently of slide
@@ -790,6 +948,22 @@ impl MutablePresentation {
             if entry.media_type != expected.media_type {
                 return Err(litchi_core::Error::InvalidFormat(format!(
                     "published ODP media type differs for '{path}'"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn verify_removed_media(&self, reopened: &OwnedPackage) -> Result<()> {
+        for path in &self.removed_media_paths {
+            if reopened.has_file(path)? {
+                return Err(Error::InvalidFormat(format!(
+                    "published ODP package retained removed media path '{path}'"
+                )));
+            }
+            if references_media(reopened, path)? {
+                return Err(Error::InvalidFormat(format!(
+                    "published ODP package retained a reference to removed media path '{path}'"
                 )));
             }
         }
@@ -1423,7 +1597,9 @@ impl MutablePresentation {
         }
 
         if let Some(package) = &self.source_package {
-            writer.copy_auxiliary_files_from(package)?;
+            let mut excluded = self.media_files.keys().cloned().collect::<Vec<_>>();
+            excluded.extend(self.removed_media_paths.iter().cloned());
+            writer.copy_auxiliary_files_from_except(package, &excluded, &[])?;
         }
 
         writer.finish_to_bounded_bytes()
@@ -1841,6 +2017,52 @@ fn is_xml_owner_part(path: &str, media_type: Option<&str>) -> bool {
         || path.eq_ignore_ascii_case("styles.xml")
         || xml_extension
         || xml_media_type
+}
+
+fn validate_media_payload(payload: &[u8], media_type: &str) -> Result<()> {
+    crate::model::media::validate_media_type(media_type)?;
+    if payload.len() > MAX_MEDIA_CHANGE_PAYLOAD_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODP media change payload exceeds {MAX_MEDIA_CHANGE_PAYLOAD_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+/// Conservatively detect a package-local media reference in retained XML.
+///
+/// The operation intentionally errs on the side of retaining a member when a
+/// producer XML part contains its path as text.  It does not inspect binary
+/// payloads and excludes the manifest, whose own metadata necessarily names
+/// every package member.
+fn references_media(package: &OwnedPackage, media_path: &str) -> Result<bool> {
+    let archive = package.package()?;
+    let relative = media_path.as_bytes();
+    let explicit = format!("./{media_path}");
+    let escaped = escape_xml(media_path);
+    let escaped_explicit = escape_xml(&explicit);
+    let needles = [
+        relative,
+        explicit.as_bytes(),
+        escaped.as_bytes(),
+        escaped_explicit.as_bytes(),
+    ];
+    for path in archive.files()? {
+        if path.eq_ignore_ascii_case("META-INF/manifest.xml")
+            || path.eq_ignore_ascii_case("manifest.xml")
+            || path.ends_with('/')
+            || !is_xml_owner_part(&path, archive.manifest().get_media_type(&path))
+        {
+            continue;
+        }
+        let bytes = archive.get_file(&path)?;
+        if needles.iter().any(|needle| {
+            !needle.is_empty() && bytes.windows(needle.len()).any(|window| window == *needle)
+        }) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn dependency_free_copy_name(old_name: &str, names: &[String]) -> Result<String> {
