@@ -703,10 +703,10 @@ mod tests {
 
     #[test]
     fn rejects_result_worker_width_outside_configured_budget() {
-        let mut input = input();
-        input.execution_worker_count = Some(8);
-        input.logical_tasks = Some(1);
-        assert!(case_metrics(input, 0, &[1, 2, 4]).is_err());
+        let mut result_input = input();
+        result_input.execution_worker_count = Some(8);
+        result_input.logical_tasks = Some(1);
+        assert!(case_metrics(result_input, 0, &[1, 2, 4]).is_err());
 
         let mut cache_input = input();
         cache_input.opc_cache_worker_count = Some(8);
