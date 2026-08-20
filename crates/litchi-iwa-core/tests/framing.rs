@@ -188,6 +188,39 @@ fn selected_archive_parse_retains_only_requested_objects_but_validates_all_frame
     assert_eq!(selected.objects[0].archive_info.identifier, Some(1));
     assert_eq!(selected.objects[0].messages[0].data, b"selected");
 
+    let discarded = Archive {
+        objects: vec![archive.objects[0].clone()],
+    }
+    .to_bytes()?;
+    let selected_only = Archive {
+        objects: vec![archive.objects[1].clone()],
+    }
+    .to_bytes()?;
+    let duplicate_discarded = [
+        discarded.as_slice(),
+        discarded.as_slice(),
+        selected_only.as_slice(),
+    ]
+    .concat();
+    assert!(matches!(
+        Archive::parse_objects_with_identifier(&duplicate_discarded, 1),
+        Err(Error::InvalidArchive {
+            reason: "duplicate object identifier",
+            ..
+        })
+    ));
+
+    let mut malformed_discarded = discarded;
+    malformed_discarded.extend_from_slice(&[0x01, 0xff]);
+    assert!(matches!(
+        Archive::parse_objects_with_identifier(&malformed_discarded, 1),
+        Err(Error::HeaderCodec {
+            header: HeaderKind::ArchiveInfo,
+            operation: HeaderOperation::Decode,
+            ..
+        })
+    ));
+
     let mut truncated = encoded;
     truncated.pop();
     assert!(matches!(
@@ -664,6 +697,8 @@ fn unknown_and_noncanonical_header_bytes_round_trip_byte_for_byte() -> Result<()
     let parsed = Archive::parse(&modified)?;
     assert_eq!(parsed.objects[0].messages[0].data, vec![0, 1, 2, 255]);
     assert_eq!(parsed.to_bytes()?, modified);
+    let selected = Archive::parse_objects_with_identifier(&modified, 71)?;
+    assert_eq!(selected.to_bytes()?, modified);
     Ok(())
 }
 
