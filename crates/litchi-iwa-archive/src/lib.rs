@@ -318,8 +318,9 @@ fn inspect_direct_zip(archive: &ArchiveReader<'_>, limits: Limits) -> Result<Det
 fn parse_document(archive: &ArchiveReader<'_>, name: &str, limits: Limits) -> Result<Archive> {
     let compressed = archive.read(name)?;
     let stream = SnappyStream::decompress_with_limits(&compressed, limits.snappy_limits()?)?;
-    Ok(Archive::parse_with_limits(
+    Ok(Archive::parse_objects_with_identifier_with_limits(
         stream.as_bytes(),
+        1,
         limits.effective_archive_limits()?,
     )?)
 }
