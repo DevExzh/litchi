@@ -495,4 +495,29 @@ mod tests {
         );
         assert!(cells.next().is_none());
     }
+
+    #[test]
+    fn empty_cells_iterator_is_exhausted() {
+        let worksheet = Worksheet::new("Empty".to_string());
+
+        assert!(worksheet.cells().next().is_none());
+    }
+
+    #[test]
+    fn cells_iterator_returns_clones_and_observes_replacement() {
+        let mut worksheet = Worksheet::new("Sheet1".to_string());
+        worksheet.add_cell(Cell::new(0, 0, CellValue::Int(1)));
+
+        let original_value = {
+            let mut cells = worksheet.cells();
+            cells.next().unwrap().unwrap().value().clone()
+        };
+        worksheet.add_cell(Cell::new(0, 0, CellValue::Int(2)));
+
+        assert_eq!(original_value, CellValue::Int(1));
+        let mut cells = worksheet.cells();
+        let replacement = cells.next().unwrap().unwrap();
+        assert_eq!(replacement.value(), &CellValue::Int(2));
+        assert!(cells.next().is_none());
+    }
 }
