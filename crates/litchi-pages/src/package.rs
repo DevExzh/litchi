@@ -12,6 +12,7 @@ mod section_pagination;
 pub(crate) mod section_settings;
 mod section_text;
 mod section_transaction;
+mod selective;
 
 use std::fmt;
 use std::fs::{Metadata as FileMetadata, OpenOptions};
@@ -52,6 +53,9 @@ pub use section_pagination::{
 pub use section_text::{
     SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, SectionTextError,
     SectionTextLimitKind, SectionTextPatch,
+};
+pub use selective::{
+    SelectedSectionText, SelectiveTextOptions, SelectiveTextSelector, SourceMetrics,
 };
 
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
@@ -105,6 +109,12 @@ pub enum PackageError {
     /// A bounded semantic allocation failed before publication.
     #[error("Pages semantic allocation failed for {amount} units")]
     Allocation { amount: usize },
+    /// A selective text lifecycle requested a section outside the body.
+    #[error("Pages selective section position {index} does not exist")]
+    SelectiveSectionNotFound {
+        /// Zero-based section position requested by the lifecycle selector.
+        index: usize,
+    },
 }
 
 /// Result type returned by [`Package`] operations.
@@ -432,6 +442,45 @@ impl Package {
             total_objects: self.state.object_count,
             section_count: self.state.document.section_count(),
         }
+    }
+
+    /// Select one section's text through the bounded native lifecycle path.
+    ///
+    /// This opt-in reader is intentionally narrower than [`Self::from_bytes`]:
+    /// ZIP and IWA framing still validate the complete source, but only the
+    /// Pages root, one body storage, and section-boundary records are
+    /// interpreted as application payloads. It does not construct a semantic
+    /// document, decode section names, or inspect unrelated section objects.
+    /// A neutral IWA object index is built from validated framing and header
+    /// metadata; it stores locations and graph edges only, while the adapter's
+    /// private sidecar resolves the selected body payload.
+    /// The returned handle retains the original source catalog so opaque ZIP
+    /// members and unknown IWA payload bytes remain available through the exact
+    /// source view.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError`] when the source is malformed, the selected
+    /// section is absent, or a configured physical/text ceiling is exceeded.
+    pub fn select_section_text(
+        bytes: &[u8],
+        selector: impl Into<SelectiveTextSelector>,
+    ) -> PackageResult<SelectedSectionText> {
+        Self::select_section_text_with_options(bytes, selector, SelectiveTextOptions::default())
+    }
+
+    /// Select one section's text under an explicit lifecycle profile.
+    ///
+    /// [`SelectiveTextOptions::with_source_metrics`] enables content-free
+    /// source counters on the returned handle. Metrics are deliberately
+    /// absent by default so the normal selective path does not retain an
+    /// instrumentation record or perform its optional accounting pass.
+    pub fn select_section_text_with_options(
+        bytes: &[u8],
+        selector: impl Into<SelectiveTextSelector>,
+        options: SelectiveTextOptions,
+    ) -> PackageResult<SelectedSectionText> {
+        selective::select_section_text(bytes, selector.into(), options)
     }
 }
 
