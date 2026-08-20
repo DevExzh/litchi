@@ -13956,7 +13956,11 @@ fn xlsb_names_digest(names: &[String]) -> Result<String, Box<dyn Error>> {
     Ok(fingerprint_hex(&digest.finalize().into()))
 }
 
-fn xlsb_collect_cells(
+/// Consume worksheet cells in their native row/column order.
+///
+/// The XLSB worksheet stores cells in a `BTreeMap`; preserving the emitted
+/// order here makes the post-timer oracle reject iterator-order regressions.
+fn xlsb_collect_cells_in_order(
     worksheets: &[litchi_xlsb::Worksheet],
 ) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
     use litchi_core::sheet::{Cell as _, CellIterator as _, Worksheet as _};
@@ -13978,7 +13982,6 @@ fn xlsb_collect_cells(
             ));
         }
     }
-    cells.sort_unstable();
     Ok(cells)
 }
 
@@ -14009,7 +14012,7 @@ fn verify_xlsb_corpus(corpus: &Corpus, shape: XlsbShape) -> Result<(), Box<dyn E
     for sheet in 0..shape.sheet_count() {
         worksheets.push(workbook.worksheet(sheet)?);
     }
-    let actual = xlsb_collect_cells(&worksheets)?;
+    let actual = xlsb_collect_cells_in_order(&worksheets)?;
     if actual != expected || xlsb_cells_digest(&actual)? != xlsb_cells_digest(&expected)? {
         return Err("XLSB corpus cell projection differs from deterministic specification".into());
     }
@@ -19569,7 +19572,7 @@ fn run_semantic_xlsb(
                     worksheets.push(workbook.worksheet(sheet)?);
                 }
                 let started = Instant::now();
-                let cells = xlsb_collect_cells(&worksheets)?;
+                let cells = xlsb_collect_cells_in_order(&worksheets)?;
                 let duration = started.elapsed();
                 if cells != expected_cells {
                     return Err("XLSB full cell scan differs from corpus specification".into());
