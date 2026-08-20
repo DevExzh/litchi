@@ -145,10 +145,11 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
 /// second ODF semantic index scan. Other formats return their original bytes
 /// for the ordinary detector. In builds with any OOXML probe feature enabled,
 /// a cheap central-directory catalog check gates the same bounded OOXML probe
-/// as smart detection. This preserves OOXML-first precedence for valid
-/// OOXML/ODF polyglots while avoiding an unrelated OPC scan for ordinary ODF
-/// packages; the probe is an independent OPC scan and is not counted as an
-/// ODF index.
+/// as smart detection: only a proven canonical catalog without the reserved
+/// member skips it; uncertain catalogs continue through the probe. This
+/// preserves OOXML-first precedence for valid OOXML/ODF polyglots while
+/// avoiding an unrelated OPC scan for ordinary ODF packages; the probe is an
+/// independent OPC scan and is not counted as an ODF index.
 #[cfg(feature = "ods")]
 pub(crate) fn detect_prepared_ods(
     bytes: Vec<u8>,
@@ -159,12 +160,12 @@ pub(crate) fn detect_prepared_ods(
         return Err(bytes);
     }
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    if litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
+    let catalog = litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
         &bytes,
         super::catalog_probe_limits(crate::opc::ReadLimits::default()),
-    ) == Some(true)
-        && ooxml_probe_wins(&bytes)
-    {
+    );
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    if catalog != Some(false) && ooxml_probe_wins(&bytes) {
         return Err(bytes);
     }
     let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
@@ -498,8 +499,10 @@ fn read_path_source_bytes(
 /// central-directory catalog check gates the bounded OOXML probe when any
 /// OOXML probe feature is enabled, so OOXML-first polyglot precedence remains
 /// unchanged, including for a recognized OOXML leaf whose own facade feature
-/// is disabled. When ODF wins, the prepared ODF index transfers to the typed
-/// ODP owner without a second ODF semantic index scan.
+/// is disabled. Only a proven canonical catalog without the reserved member
+/// skips that probe; uncertain catalogs still reach it. When ODF wins, the
+/// prepared ODF index transfers to the typed ODP owner without a second ODF
+/// semantic index scan.
 #[cfg(feature = "odp")]
 pub(crate) fn detect_prepared_odp(
     bytes: Vec<u8>,
@@ -510,12 +513,12 @@ pub(crate) fn detect_prepared_odp(
         return Err(bytes);
     }
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    if litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
+    let catalog = litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
         &bytes,
         super::catalog_probe_limits(crate::opc::ReadLimits::default()),
-    ) == Some(true)
-        && ooxml_probe_wins(&bytes)
-    {
+    );
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    if catalog != Some(false) && ooxml_probe_wins(&bytes) {
         return Err(bytes);
     }
     let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
@@ -1463,6 +1466,57 @@ fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedForma
 mod short_signature_tests {
     use super::{detect_format_smart, detect_format_smart_with_limits};
 
+    #[cfg(all(
+        any(feature = "ods", feature = "odp"),
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[allow(
+        dead_code,
+        reason = "the shared polyglot fixture is used by whichever ODF owner features are enabled"
+    )]
+    fn uncertain_ooxml_odf_polyglot(mimetype: &str) -> Vec<u8> {
+        use std::io::Write;
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+
+        writer.start_file("mimetype", options).unwrap();
+        writer.write_all(mimetype.as_bytes()).unwrap();
+        writer.start_file("content.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body/></office:document-content>"#,
+            )
+            .unwrap();
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("word/document.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#,
+            )
+            .unwrap();
+        // An otherwise harmless alias makes the cheap catalog probe return
+        // `None`; the full OPC reader normalizes it and still sees a valid
+        // OOXML package.
+        writer.start_file("./custom.xml", options).unwrap();
+        writer.write_all(b"alias").unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
     #[cfg(feature = "odt")]
     #[test]
     fn odt_smart_detection_transfers_the_prepared_index_to_semantic_open() {
@@ -1583,6 +1637,24 @@ mod short_signature_tests {
     }
 
     #[cfg(all(
+        feature = "ods",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[test]
+    fn ods_handoff_keeps_ooxml_precedence_for_an_uncertain_alias_catalog() {
+        let bytes = uncertain_ooxml_odf_polyglot(litchi_odf_common::constants::ODF_SPREADSHEET);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes),
+            None
+        );
+
+        super::super::reset_opc_probe_count();
+        let retained = super::detect_prepared_ods(bytes.clone()).unwrap_err();
+        assert_eq!(retained, bytes);
+        assert_eq!(super::super::opc_probe_count(), 1);
+    }
+
+    #[cfg(all(
         feature = "odp",
         not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
     ))]
@@ -1610,6 +1682,24 @@ mod short_signature_tests {
 
         assert_eq!(presentation.prepared_index_identity(), index_identity);
         assert!(presentation.content_xml().contains("office:presentation"));
+    }
+
+    #[cfg(all(
+        feature = "odp",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[test]
+    fn odp_handoff_keeps_ooxml_precedence_for_an_uncertain_alias_catalog() {
+        let bytes = uncertain_ooxml_odf_polyglot(litchi_odf_common::constants::ODF_PRESENTATION);
+        assert_eq!(
+            litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes),
+            None
+        );
+
+        super::super::reset_opc_probe_count();
+        let retained = super::detect_prepared_odp(bytes.clone()).unwrap_err();
+        assert_eq!(retained, bytes);
+        assert_eq!(super::super::opc_probe_count(), 1);
     }
 
     #[test]
