@@ -413,7 +413,7 @@ impl<'a> RtfDocument<'a> {
                 RtfError::InvalidUnicode(format!("ASCII RTF transport conversion failed: {error}"))
             })?)
         } else {
-            Cow::Owned(decode_latin1_transport(input_bytes.as_ref())?)
+            Cow::Owned(Self::decode_latin1_transport(input_bytes.as_ref())?)
         };
 
         let retain_ordinary_body_source_span = !is_compressed && bytes.is_ascii();

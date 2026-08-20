@@ -526,7 +526,17 @@ impl<'a> Parser<'a> {
         self.parse_group()?;
         while let Some(token) = self.tokens.get(self.pos) {
             match token {
-                Token::Text(text) if text.chars().all(char::is_whitespace) => self.pos += 1,
+                // Some producer fixtures terminate the transport with NUL
+                // padding after the root group. Treat only whitespace and
+                // NUL as inert transport padding; any other trailing token
+                // remains a typed malformed-document error.
+                Token::Text(text)
+                    if text
+                        .chars()
+                        .all(|character| character == '\0' || character.is_whitespace()) =>
+                {
+                    self.pos += 1;
+                },
                 _ => {
                     return Err(RtfError::MalformedDocument(
                         "RTF document contains trailing non-whitespace tokens".to_string(),
