@@ -1001,8 +1001,9 @@ where
     /// Build a raw-member preservation index from this already located ZIP.
     ///
     /// This borrows the positional archive held by this index and does not run
-    /// another EOCD search. `scratch` is used to scan the existing central
-    /// directory and must be large enough for its records.
+    /// another EOCD search. `scratch` is used as the fast path while scanning
+    /// the existing central directory; valid records larger than that
+    /// recommendation use a bounded fallible spill buffer.
     pub fn preservation_index<'archive>(
         &'archive self,
         scratch: &mut [u8],
@@ -1093,7 +1094,8 @@ where
         let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
 
         {
-            let mut central_entries = archive.entries(&mut buffer);
+            let mut central_entries =
+                archive.entries_with_metadata_limit(&mut buffer, limits.max_metadata_bytes);
             while let Some(entry) = central_entries.next_entry()? {
                 has_encrypted_entries |= entry.flags() & 1 != 0;
                 let path = entry.file_path();
@@ -4709,6 +4711,50 @@ mod tests {
             LimitResource::MetadataBytes,
             5,
             4,
+        );
+    }
+
+    #[test]
+    fn positional_index_handles_central_records_larger_than_recommended_scratch() {
+        let name = vec![b'n'; 4 * 1024];
+        let extra = vec![b'e'; 40 * 1024];
+        let comment = vec![b'c'; 40 * 1024];
+        let metadata_bytes = (name.len() + extra.len() + comment.len()) as u64;
+        let bytes = fixture(&[FixtureEntry {
+            name: &name,
+            extra: &extra,
+            comment: &comment,
+            compressed_size: 7,
+            uncompressed_size: 7,
+            data: b"payload",
+        }]);
+
+        // The central record is valid but its variable fields exceed the
+        // public 64 KiB recommendation. The positional iterator must spill
+        // only this record and continue to expose its borrowed metadata.
+        let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
+        let archive = ZipArchive::from_seekable(Cursor::new(bytes.clone()), &mut scratch)
+            .expect("locate archive with the recommended scratch size");
+        let mut entries = archive.entries(&mut scratch);
+        let entry = entries
+            .next_entry()
+            .expect("read oversized central record")
+            .expect("record exists");
+        assert_eq!(entry.file_path().as_ref().len(), name.len());
+        assert_eq!(entry.metadata_size_hint(), metadata_bytes);
+        assert!(entries.next_entry().expect("finish directory").is_none());
+
+        let indexed = indexed_archive_result(bytes.clone(), ArchiveLimits::default())
+            .expect("high-level positional index accepts valid metadata");
+        assert_eq!(indexed.len(), 1);
+
+        let mut constrained = ArchiveLimits::UNBOUNDED;
+        constrained.max_metadata_bytes = metadata_bytes - 1;
+        assert_limit(
+            indexed_archive_result(bytes, constrained).unwrap_err(),
+            LimitResource::MetadataBytes,
+            metadata_bytes,
+            metadata_bytes - 1,
         );
     }
 

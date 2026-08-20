@@ -468,14 +468,35 @@ impl<R> ZipArchive<R> {
         &'archive self,
         buffer: &'buf mut [u8],
     ) -> ZipEntries<'archive, 'buf, R> {
+        self.entries_with_metadata_limit(buffer, u64::MAX)
+    }
+
+    /// Returns a lending iterator over the central-directory records with an
+    /// aggregate metadata ceiling.
+    ///
+    /// The caller-provided buffer remains the hot path for ordinary records.
+    /// A valid record whose name, extra fields, and comment do not fit in that
+    /// buffer is read into a fallible, per-record spill buffer instead. The
+    /// spill buffer is bounded by the ZIP `u16` variable-field widths and is
+    /// released for reuse on the next oversized record. The supplied limit is
+    /// checked before reserving that buffer, so a rejected record cannot cause
+    /// an allocation beyond the caller's metadata policy.
+    pub fn entries_with_metadata_limit<'archive, 'buf>(
+        &'archive self,
+        buffer: &'buf mut [u8],
+        max_metadata_bytes: u64,
+    ) -> ZipEntries<'archive, 'buf, R> {
         ZipEntries {
             buffer,
+            metadata_buffer: Vec::new(),
             archive: self,
             pos: 0,
             end: 0,
             offset: self.eocd.directory_offset(),
             base_offset: self.eocd.base_offset(),
             central_dir_end_pos: self.eocd.head_eocd_offset(),
+            metadata_bytes: 0,
+            max_metadata_bytes,
         }
     }
 
@@ -1012,12 +1033,15 @@ impl DataDescriptor {
 #[derive(Debug)]
 pub struct ZipEntries<'archive, 'buf, R> {
     buffer: &'buf mut [u8],
+    metadata_buffer: Vec<u8>,
     archive: &'archive ZipArchive<R>,
     pos: usize,
     end: usize,
     offset: u64,
     base_offset: u64,
     central_dir_end_pos: u64,
+    metadata_bytes: u64,
+    max_metadata_bytes: u64,
 }
 
 impl<R> ZipEntries<'_, '_, R>
@@ -1055,6 +1079,79 @@ where
         self.pos += ZipFileHeaderFixed::SIZE;
 
         let variable_length = file_header.variable_length();
+        let metadata_length = u64::try_from(variable_length).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "ZIP central-directory metadata length does not fit u64".to_string(),
+            })
+        })?;
+        let next_metadata_bytes = self
+            .metadata_bytes
+            .checked_add(metadata_length)
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "ZIP central-directory metadata total overflows u64".to_string(),
+                })
+            })?;
+        if next_metadata_bytes > self.max_metadata_bytes {
+            return Err(ErrorKind::LimitExceeded {
+                resource: crate::LimitResource::MetadataBytes,
+                actual: next_metadata_bytes,
+                maximum: self.max_metadata_bytes,
+            }
+            .into());
+        }
+        self.metadata_bytes = next_metadata_bytes;
+
+        // A ZIP32 central record can contain three independent u16-sized
+        // variable fields. The ordinary scratch buffer is intentionally only
+        // a recommended size, not a validity requirement. Read an oversized
+        // record into an owned spill buffer so valid metadata is not rejected
+        // merely because it crosses that recommendation.
+        if variable_length > self.buffer.len() {
+            let variable_data_offset = central_directory_offset
+                .checked_add(ZipFileHeaderFixed::SIZE as u64)
+                .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+            let variable_data_end = variable_data_offset
+                .checked_add(metadata_length)
+                .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+            if variable_data_end > self.central_dir_end_pos {
+                return Err(Error::from(ErrorKind::Eof));
+            }
+
+            if self.metadata_buffer.len() < variable_length {
+                self.metadata_buffer
+                    .try_reserve_exact(variable_length - self.metadata_buffer.len())
+                    .map_err(|source| ErrorKind::Allocation {
+                        resource: "ZIP central-directory metadata buffer",
+                        source,
+                    })?;
+                self.metadata_buffer.resize(variable_length, 0);
+            }
+            self.archive.reader.read_exact_at(
+                &mut self.metadata_buffer[..variable_length],
+                variable_data_offset,
+            )?;
+
+            // Discard any prefetched bytes. The spill read starts at the
+            // logical record boundary and makes the next read begin exactly
+            // after the record, avoiding stale-buffer arithmetic.
+            self.offset = variable_data_end;
+            self.pos = self.end;
+            let data = &self.metadata_buffer[..variable_length];
+            let (file_name, extra_field, file_comment, _) = file_header
+                .parse_variable_length(data)
+                .expect("variable length spill read precheck failed");
+            let mut file_header = ZipFileHeaderRecord::from_parts(
+                file_header,
+                file_name,
+                extra_field,
+                file_comment,
+                central_directory_offset,
+            );
+            file_header.local_header_offset += self.base_offset;
+            return Ok(Some(file_header));
+        }
+
         if self.pos + variable_length > self.end {
             // Need to read more data
             let remaining = self.end - self.pos;
