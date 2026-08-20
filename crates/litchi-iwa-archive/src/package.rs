@@ -506,12 +506,24 @@ impl ExactArtifacts {
     }
 }
 
-/// An error applying a process-local physical iWork package patch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+/// An error constructing or applying a process-local physical iWork package
+/// patch.
+#[derive(Debug, thiserror::Error)]
 pub enum ReassemblyPatchError {
+    /// The bounded physical reassembler rejected the source or requested
+    /// mutation before a patch artifact was constructed.
+    #[error(transparent)]
+    Archive(#[from] Error),
+
     /// The candidate source does not exactly match the retained source.
     #[error("iWork archive patch source does not match its exact source artifact")]
     Conflict,
+
+    /// The changed patch cannot assume that an iWork source is unsigned.
+    #[error(
+        "iWork changed physical patches require an explicit signature policy for signed or opaque source provenance"
+    )]
+    SignedSourceRequiresExplicitPolicy,
 
     /// The exact target copy could not be reserved.
     #[error("iWork archive patch allocation failed for {amount} bytes")]
@@ -527,12 +539,19 @@ pub enum ReassemblyPatchError {
 /// semantic claims about their members. It is therefore suitable for the
 /// bounded low-level reassembly boundary, while semantic format owners remain
 /// responsible for validating their own projected state before publication.
+/// Changed patches are intentionally unsigned-only: this crate does not own a
+/// complete iWork signature grammar, so signature-like member names and any
+/// opaque member provenance are refused with
+/// [`ReassemblyPatchError::SignedSourceRequiresExplicitPolicy`]. The exact
+/// no-op path remains allowed and retains one shared source owner for both
+/// patch directions. Changed targets retain the bounded reassembler's owned
+/// `Vec` through [`SharedBytes`] without a package-sized `Arc` conversion.
 /// Fingerprints are compact diagnostics only; [`Self::apply`] authorizes a
 /// source with a complete byte comparison. The patch is not a durable or
 /// serialized interchange format.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ReassemblyPatch {
-    artifacts: ExactArtifacts,
+    artifacts: OwnedExactArtifacts,
 }
 
 impl fmt::Debug for ReassemblyPatch {
@@ -546,9 +565,9 @@ impl fmt::Debug for ReassemblyPatch {
 }
 
 impl ReassemblyPatch {
-    fn new(source: Arc<[u8]>, target: Arc<[u8]>) -> Self {
+    fn new(source: SharedBytes, target: SharedBytes) -> Self {
         Self {
-            artifacts: ExactArtifacts::new(source, target),
+            artifacts: OwnedExactArtifacts::new(source, target),
         }
     }
 
@@ -693,6 +712,16 @@ impl OwnedExactArtifacts {
     #[must_use]
     pub fn authorizes_owner(&self, candidate: &SharedBytes) -> bool {
         SharedBytes::ptr_eq(candidate, &self.source) || candidate.as_ref() == self.source.as_ref()
+    }
+
+    /// Return whether `candidate` exactly matches the retained source bytes.
+    ///
+    /// This borrowed form avoids allocating a temporary owner merely to
+    /// perform the exact source check; compact fingerprints remain
+    /// diagnostics only.
+    #[must_use]
+    fn authorizes_bytes(&self, candidate: &[u8]) -> bool {
+        candidate == self.source.as_ref()
     }
 
     /// Return whether source and target are byte-for-byte identical.
@@ -1396,6 +1425,14 @@ impl Catalog {
         self.entries.iter()
     }
 
+    fn requires_explicit_patch_policy(&self) -> bool {
+        self.entries.iter().any(|entry| {
+            entry.is_opaque()
+                || is_signature_like_name(entry.name().as_bytes())
+                || is_signature_like_name(entry.raw_name())
+        })
+    }
+
     /// Write the original ZIP bytes without rebuilding or normalizing any
     /// member, central record, archive comment, or opaque entry.
     ///
@@ -1464,13 +1501,15 @@ impl Catalog {
     ///
     /// # Errors
     ///
-    /// Returns the same bounded reassembly and allocation errors as
-    /// [`Self::reassemble_to_bytes`].
+    /// Returns [`ReassemblyPatchError::Archive`] for bounded reassembly and
+    /// allocation failures, or
+    /// [`ReassemblyPatchError::SignedSourceRequiresExplicitPolicy`] when the
+    /// source has signature-like or opaque provenance.
     pub fn reassemble_to_patch(
         &self,
         edits: &[EntryEdit<'_>],
         limits: Limits,
-    ) -> Result<ReassemblyPatch> {
+    ) -> std::result::Result<ReassemblyPatch, ReassemblyPatchError> {
         self.reassemble_with_deletions_to_patch(edits, &[], limits)
     }
 
@@ -1485,16 +1524,39 @@ impl Catalog {
     ///
     /// # Errors
     ///
-    /// Returns the same bounded reassembly and allocation errors as
-    /// [`Self::reassemble_with_deletions_to_bytes`].
+    /// Returns [`ReassemblyPatchError::Archive`] for bounded reassembly and
+    /// allocation failures, or
+    /// [`ReassemblyPatchError::SignedSourceRequiresExplicitPolicy`] when the
+    /// source has signature-like or opaque provenance.
     pub fn reassemble_with_deletions_to_patch(
         &self,
         edits: &[EntryEdit<'_>],
         deleted_names: &[&str],
         limits: Limits,
-    ) -> Result<ReassemblyPatch> {
-        let target = self.reassemble_with_deletions_to_bytes(edits, deleted_names, limits)?;
-        Ok(ReassemblyPatch::new(self.shared_source(), target.into()))
+    ) -> std::result::Result<ReassemblyPatch, ReassemblyPatchError> {
+        if edits.is_empty() && deleted_names.is_empty() {
+            let checked_limits = limits.validate()?;
+            let source_size = u64::try_from(self.source.len()).map_err(|_error| {
+                Error::InvalidBundle("catalog source length does not fit u64".to_owned())
+            })?;
+            checked_limits.check_input_size(source_size, "catalog source")?;
+            checked_limits.check_output_size(source_size)?;
+            let source = self.source.clone();
+            return Ok(ReassemblyPatch::new(source.clone(), source));
+        }
+        if self.requires_explicit_patch_policy() {
+            return Err(ReassemblyPatchError::SignedSourceRequiresExplicitPolicy);
+        }
+        let target = self
+            .reassemble_with_deletions_to_bytes(edits, deleted_names, limits)
+            .map_err(ReassemblyPatchError::Archive)?;
+        // The bounded reassembler already owns this complete target `Vec`.
+        // Keep that payload allocation behind `SharedBytes` instead of using
+        // an infallible `Vec`-to-`Arc<[u8]>` conversion that would copy it.
+        Ok(ReassemblyPatch::new(
+            self.source.clone(),
+            SharedBytes::from_owned_vec(target),
+        ))
     }
 
     /// Reassemble a flat package after replacing and deleting existing
@@ -3167,6 +3229,35 @@ const fn is_semantic_metadata_authority(raw_name: &[u8]) -> bool {
     )
 }
 
+// No complete iWork signature grammar is owned by this crate. Keep physical
+// changed patches unsigned-only by conservatively treating common signature
+// member/path markers as provenance that needs an explicit policy.
+const SIGNATURE_LIKE_NAME_MARKERS: &[&[u8]] = &[
+    b"signature",
+    b"signatures",
+    b"signed",
+    b"codesign",
+    b"meta-inf/",
+    b".sig",
+    b".p7s",
+    b".p7m",
+    b".p7c",
+    b".cms",
+];
+
+fn is_signature_like_name(name: &[u8]) -> bool {
+    SIGNATURE_LIKE_NAME_MARKERS
+        .iter()
+        .any(|marker| contains_ascii_case_insensitive(name, marker))
+}
+
+fn contains_ascii_case_insensitive(value: &[u8], needle: &[u8]) -> bool {
+    !needle.is_empty()
+        && value
+            .windows(needle.len())
+            .any(|window| window.eq_ignore_ascii_case(needle))
+}
+
 fn is_semantic_irrelevant_payload(raw_name: &[u8]) -> bool {
     is_exact_portable_raw_name(raw_name)
         && (raw_name.starts_with(b"Data/") || raw_name.starts_with(b"Preview/"))
@@ -3641,7 +3732,8 @@ mod tests {
     }
 
     #[test]
-    fn reassembly_patch_applies_inverts_and_rejects_foreign_sources() -> Result<()> {
+    fn reassembly_patch_applies_inverts_and_rejects_foreign_sources()
+    -> std::result::Result<(), ReassemblyPatchError> {
         let bytes = physical_two_entry_zip();
         let catalog = Catalog::from_bytes(&bytes)?;
         let patch = catalog.reassemble_to_patch(
@@ -3657,6 +3749,7 @@ mod tests {
         let target_catalog = Catalog::from_bytes(&target)?;
         let source_entries = catalog.iter().collect::<Vec<_>>();
         let target_entries = target_catalog.iter().collect::<Vec<_>>();
+        assert_eq!(target_entries.len(), source_entries.len());
         assert_eq!(target_entries[0].data(), source_entries[0].data());
         assert_eq!(
             target_entries[0].raw_record().local_record(),
@@ -3679,11 +3772,32 @@ mod tests {
         let no_op = catalog.reassemble_to_patch(&[], Limits::default())?;
         assert!(no_op.is_noop());
         assert_eq!(no_op.apply(&bytes)?, bytes);
+        let catalog_owner = catalog.source_owner();
+        let no_op_source = no_op.artifacts.source_owner();
+        let no_op_target = no_op.artifacts.target_owner();
+        assert!(SharedBytes::ptr_eq(&catalog_owner, &no_op_source));
+        assert!(SharedBytes::ptr_eq(&no_op_source, &no_op_target));
+        assert_eq!(no_op_source.as_ref(), bytes.as_slice());
+        assert_eq!(no_op_target.as_ref(), bytes.as_slice());
+        assert_eq!(
+            no_op_source.as_ref().as_ptr(),
+            catalog_owner.as_ref().as_ptr()
+        );
+        let no_op_inverse = no_op.inverse();
+        assert!(SharedBytes::ptr_eq(
+            &no_op_inverse.artifacts.source_owner(),
+            &no_op_source
+        ));
+        assert!(SharedBytes::ptr_eq(
+            &no_op_inverse.artifacts.target_owner(),
+            &no_op_target
+        ));
         Ok(())
     }
 
     #[test]
-    fn reassembly_patch_preserves_typed_refusals() -> Result<()> {
+    fn reassembly_patch_preserves_typed_refusals() -> std::result::Result<(), ReassemblyPatchError>
+    {
         let (opaque_bytes, _, _) = physical_zip(99);
         let opaque_catalog = Catalog::from_bytes(&opaque_bytes)?;
         assert!(matches!(
@@ -3691,8 +3805,11 @@ mod tests {
                 &[EntryEdit::new("Opaque/entry.bin", b"cannot edit")],
                 Limits::default()
             ),
-            Err(Error::Reassembly(_))
+            Err(ReassemblyPatchError::SignedSourceRequiresExplicitPolicy)
         ));
+        let opaque_no_op = opaque_catalog.reassemble_to_patch(&[], Limits::default())?;
+        assert!(opaque_no_op.is_noop());
+        assert_eq!(opaque_no_op.apply(&opaque_bytes)?, opaque_bytes);
 
         let index = zip(&[("Index/Document.iwa", b"iwa")])?;
         let legacy = zip(&[
@@ -3706,7 +3823,25 @@ mod tests {
                 &["Data/a"],
                 Limits::default()
             ),
-            Err(Error::Reassembly(message)) if message.contains("legacy nested Index.zip")
+            Err(ReassemblyPatchError::Archive(Error::Reassembly(message)))
+                if message.contains("legacy nested Index.zip")
+        ));
+
+        let signature_like = zip(&[
+            ("Index/Document.iwa", b"iwa"),
+            ("Metadata/signature.sig", b"signature bytes"),
+            ("Data/plain", b"plain"),
+        ])?;
+        let signature_catalog = Catalog::from_bytes(&signature_like)?;
+        let signature_no_op = signature_catalog.reassemble_to_patch(&[], Limits::default())?;
+        assert!(signature_no_op.is_noop());
+        assert_eq!(signature_no_op.apply(&signature_like)?, signature_like);
+        assert!(matches!(
+            signature_catalog.reassemble_to_patch(
+                &[EntryEdit::new("Data/plain", b"changed")],
+                Limits::default()
+            ),
+            Err(ReassemblyPatchError::SignedSourceRequiresExplicitPolicy)
         ));
         Ok(())
     }
@@ -4673,6 +4808,67 @@ mod tests {
             after.metadata().crc32(),
             soapberry_zip::crc32(b"replacement deflate payload with more bytes")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn deflate_patch_preserves_untouched_count_and_central_record()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("Compressed/data", b"old deflate payload")?;
+        writer.write_stored("Untouched/data", b"untouched payload")?;
+        let source = writer.finish_to_bytes()?;
+        let catalog = Catalog::from_bytes(&source)?;
+        let source_untouched = catalog
+            .iter()
+            .find(|entry| entry.name() == "Untouched/data")
+            .ok_or_else(|| {
+                Error::InvalidBundle("deflate patch fixture lost untouched entry".to_owned())
+            })?;
+
+        let patch = catalog.reassemble_to_patch(
+            &[EntryEdit::new(
+                "Compressed/data",
+                b"replacement deflate payload with more bytes",
+            )],
+            Limits::default(),
+        )?;
+        let target = patch.apply(&source)?;
+        let target_catalog = Catalog::from_bytes(&target)?;
+        let target_untouched = target_catalog
+            .iter()
+            .find(|entry| entry.name() == "Untouched/data")
+            .ok_or_else(|| {
+                Error::InvalidBundle("reassembled deflate patch lost untouched entry".to_owned())
+            })?;
+
+        assert_eq!(target_catalog.len(), catalog.len());
+        assert_eq!(target_catalog.len(), 2);
+        assert_eq!(raw_u16(&source[source.len() - 22..], 10), Some(2));
+        assert_eq!(raw_u16(&target[target.len() - 22..], 10), Some(2));
+        assert_eq!(target_untouched.data(), source_untouched.data());
+        assert_eq!(
+            target_untouched.raw_record().compressed_data(),
+            source_untouched.raw_record().compressed_data()
+        );
+        assert_eq!(
+            target_untouched.raw_record().local_record(),
+            source_untouched.raw_record().local_record()
+        );
+        let source_central = source_untouched.raw_record().central_directory_record();
+        let target_central = target_untouched.raw_record().central_directory_record();
+        assert_eq!(&target_central[..42], &source_central[..42]);
+        assert_eq!(&target_central[46..], &source_central[46..]);
+        assert_ne!(&target_central[42..46], &source_central[42..46]);
+        assert_eq!(
+            target_untouched.metadata().local(),
+            source_untouched.metadata().local()
+        );
+        assert_eq!(
+            target_untouched.metadata().central(),
+            source_untouched.metadata().central()
+        );
+        assert_eq!(patch.inverse().apply(&target)?, source);
         Ok(())
     }
 

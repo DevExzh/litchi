@@ -154,6 +154,10 @@ fn verify_native_reassembly_patch(name: &str) -> Result<(), Box<dyn Error>> {
     )?;
     let target = patch.apply(&source)?;
     let target_catalog = Catalog::from_bytes(&target)?;
+    assert_eq!(target_catalog.len(), catalog.len());
+    let source_archive = soapberry_zip::ZipArchive::from_slice(&source)?;
+    let target_archive = soapberry_zip::ZipArchive::from_slice(&target)?;
+    assert_eq!(target_archive.entries_hint(), source_archive.entries_hint());
 
     let target_selected = target_catalog
         .iter()
@@ -175,6 +179,10 @@ fn verify_native_reassembly_patch(name: &str) -> Result<(), Box<dyn Error>> {
             target_entry.raw_record().compressed_data(),
             source_entry.raw_record().compressed_data()
         );
+        let source_central = source_entry.raw_record().central_directory_record();
+        let target_central = target_entry.raw_record().central_directory_record();
+        assert_eq!(&target_central[..42], &source_central[..42]);
+        assert_eq!(&target_central[46..], &source_central[46..]);
         assert_eq!(
             target_entry.metadata().local(),
             source_entry.metadata().local()
