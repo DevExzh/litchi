@@ -626,6 +626,24 @@ fn media_range(bytes: &[u8]) -> Range<u64> {
         .unwrap()
 }
 
+fn content_range(bytes: &[u8]) -> Range<u64> {
+    let archive = ZipArchive::from_slice(bytes).unwrap();
+    archive
+        .entries()
+        .find_map(|entry| {
+            let entry = entry.ok()?;
+            if entry.file_path().as_ref() != b"content.xml" {
+                return None;
+            }
+            let (start, end) = archive
+                .get_entry(entry.wayfinder())
+                .unwrap()
+                .compressed_data_range();
+            Some(start..end)
+        })
+        .unwrap()
+}
+
 fn raw_members(bytes: &[u8]) -> BTreeMap<Vec<u8>, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
@@ -1576,6 +1594,100 @@ fn changed_publication_does_not_read_opaque_payload_before_output_begins() {
     assert_eq!(report.bytes(), sink.bytes.len() as u64);
     assert!(source.bytes_read() > before);
     assert!(source.has_read_range(media));
+}
+
+#[test]
+fn known_change_skips_content_probe_and_roundtrips_changed_member() {
+    let bytes = zip_package(
+        ZipCompressionMethod::Deflated,
+        ZipCompressionMethod::Deflated,
+        false,
+        false,
+        false,
+        true,
+    );
+    let content = content_range(&bytes);
+    let source = ProbeSource::new(bytes);
+    let package = SourceBackedPackage::from_read_at(source_reader(&source)).unwrap();
+    source.forbid_range_until_output(content);
+    let mut sink = MutatingSink {
+        bytes: Vec::new(),
+        source: Arc::clone(&source),
+        mutate_after_first_write: false,
+        mutate_on_flush: false,
+    };
+    let report = package
+        .write_content_xml_to_stream_with_known_change(
+            &mut sink,
+            TARGET_CONTENT,
+            SourceContentPublicationOptions::default(),
+        )
+        .expect("known changed publication should not probe content before output");
+    assert!(!report.is_no_op());
+    assert_eq!(report.bytes(), sink.bytes.len() as u64);
+    let reopened = litchi_odf_common::core::OwnedPackage::from_bytes(sink.bytes).unwrap();
+    assert_eq!(reopened.get_file("content.xml").unwrap(), TARGET_CONTENT);
+}
+
+#[test]
+fn known_change_keeps_signed_refusal_before_output() {
+    let source = Arc::new(OwnedSource::new(zip_package(
+        ZipCompressionMethod::Deflated,
+        ZipCompressionMethod::Stored,
+        false,
+        false,
+        true,
+        false,
+    )));
+    let package = SourceBackedPackage::from_read_at(source).unwrap();
+    let mut output = Vec::new();
+    let error = package
+        .write_content_xml_to_stream_with_known_change(
+            &mut output,
+            TARGET_CONTENT,
+            SourceContentPublicationOptions::default(),
+        )
+        .expect_err("changed signed source must be refused");
+    assert!(matches!(
+        error,
+        SourceContentPublicationError::Unsupported { .. }
+    ));
+    assert_eq!(
+        error.progress(),
+        SourceContentPublicationProgress::Untouched
+    );
+    assert!(output.is_empty());
+}
+
+#[test]
+fn known_change_keeps_unsupported_manifest_refusal_before_output() {
+    let source = Arc::new(OwnedSource::new(zip_package(
+        ZipCompressionMethod::Deflated,
+        ZipCompressionMethod::Stored,
+        true,
+        false,
+        false,
+        false,
+    )));
+    let package = SourceBackedPackage::from_read_at(source).unwrap();
+    let mut output = Vec::new();
+    let error = package
+        .write_content_xml_to_stream_with_known_change(
+            &mut output,
+            TARGET_CONTENT,
+            SourceContentPublicationOptions::default(),
+        )
+        .expect_err("sized content manifest remains outside raw replacement");
+    assert!(matches!(
+        error,
+        SourceContentPublicationError::Unsupported { ref reason }
+            if reason.contains("manifest:size")
+    ));
+    assert_eq!(
+        error.progress(),
+        SourceContentPublicationProgress::Untouched
+    );
+    assert!(output.is_empty());
 }
 
 #[test]
