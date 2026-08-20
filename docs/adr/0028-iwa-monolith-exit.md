@@ -3140,58 +3140,68 @@ implementation change introduces no native save/reopen or performance claim.
 ## 2026-08-20 amendment: selective iWork semantic package ingress (scoped follow-up)
 
 This scoped follow-up refines and supersedes the broad ingress wording added
-earlier on 2026-08-20. The read-only facade coordinator (`litchi::iwork::Document`)
-uses the three-authority `SEMANTIC_METADATA` profile for byte, shared-byte,
-and supported directory ingress. Its non-Windows packaged-file path first
-classifies the canonical `Document.iwa` root, then selects only canonical IWA
-members plus `Metadata/Properties.plist`,
-`Metadata/BuildVersionHistory.plist`, and `Metadata/DocumentIdentifier`.
-The archive-free Keynote `Document` has a narrower, format-specific
-`SEMANTIC_PROPERTIES` profile: only `Metadata/Properties.plist` is selected;
-BuildVersionHistory and DocumentIdentifier payloads are deliberately outside
-that profile. Pages keeps the three-authority profile. The ordinary full
-`SourceCatalog` and `litchi_keynote::Package` paths remain eager preserve/edit
-paths.
+earlier on 2026-08-20. The following matrix is the normative boundary for
+packaged and directory ingress; a semantic `Document` is never an exact-package
+writer.
 
-The platform limitation is explicit. Windows `SemanticMetadataAny` packaged
-file ingress falls back to the generic full catalog because its path adapter
-cannot provide the selective capture invariant; the Keynote properties path
-likewise keeps that generic Windows fallback. Byte and shared-byte semantic
-profiles remain selective on all platforms. Keynote directory ingress uses
-the existing Properties-only frozen profile, while the facade's generic
-semantic directory ingress selects its three authorities. Neither a semantic
-Document nor a directory-backed snapshot retains an exact ZIP allocation.
+| Caller and path | Platform | Profile and selected members | Source lifetime and writer boundary |
+| --- | --- | --- | --- |
+| `litchi::iwork::Document::from_bytes` / `from_shared_bytes` | all | `SEMANTIC_METADATA`: canonical IWA members plus `Metadata/Properties.plist`, `Metadata/BuildVersionHistory.plist`, and `Metadata/DocumentIdentifier` | The `PreparedSource`/`SourceCatalog` retains the borrowed or shared source only through validation and handoff; the semantic Document drops it and has no writer |
+| `litchi::iwork::Document::open` regular file | non-Windows | `SemanticMetadataAny` with the same three authorities after root inspection | The prepared package/catalog may retain exact bytes until semantic handoff; the published Document does not |
+| `litchi::iwork::Document::open` regular file | Windows | `SemanticMetadataAny` falls back to the generic full `SourceCatalog` because the path adapter cannot provide the selective capture invariant | Media may be materialized during this fallback; the semantic Document still drops source bytes and has no writer |
+| `litchi::iwork::Document::open` directory | all | Frozen directory semantic profile with the same three authorities | No exact ZIP allocation exists; the directory bundle is released before the semantic Document is published |
+| `litchi_keynote::Document::open` regular file | non-Windows | `KeynoteProperties` / `SEMANTIC_PROPERTIES`: canonical IWA members plus only `Metadata/Properties.plist` | `PreparedSource`/`SourceCatalog` can preserve the exact source until the semantic handoff; the Keynote Document has no writer |
+| `litchi_keynote::Document::open` regular file | Windows | The Keynote properties path retains its generic full-catalog fallback | Media may be materialized by the fallback; the published Keynote Document has no writer |
+| `litchi_keynote::Document::open` directory | all | Existing frozen Properties-only directory profile | No exact ZIP source is retained and no writer is exposed |
+| Full `SourceCatalog` / format-owned `litchi_keynote::Package` preserve path | all | Full catalog materialization, including untouched media and opaque members | `SourceCatalog::write_to`/`to_bytes` is the low-level exact byte-copy path while the catalog lives; the format-owned exact writer is limited to the full Package path |
 
-Exact source identity is retained only while the `PreparedSource`/`SourceCatalog`
-preserve handoff remains alive. `SourceCatalog::write_to`/`to_bytes` and the
-full Package preserve paths can therefore emit untouched members, including
-opaque media; the semantic handoffs copy the selected component/metadata
-state and release that source before publishing a Document. The selected
-IWA graph and metadata sidecars still use the existing bounded component and
-semantic handoffs, but this amendment does not claim that all limits or error
-categories are unchanged: container-level ZIP checks remain in force, and
-the selected logical profile applies its 64 KiB and supported-compression
-checks before payload materialization. Those selected failures retain the
-existing typed archive `InvalidBundle`/`Limit` categories (and their facade
-mapping). In the Keynote Properties-only profile, malformed, opaque, or
-oversized BuildVersionHistory/DocumentIdentifier payloads are ignored; the
-same conditions on selected authorities remain errors. Paired alias-only
-metadata names remain ignored, one-sided exact/alias authority collisions are
-rejected, and ordinary exact local/central mismatches retain their existing
-diagnostic.
+The facade and Pages semantic profiles use the three bounded metadata
+authorities; Keynote's archive-free profile intentionally selects only
+Properties. Byte and shared-byte semantic preparation is selective on every
+platform. Windows `SemanticMetadataAny` and the Windows Keynote properties
+path are the documented full-catalog exceptions. Directory preparation is
+selective but cannot claim exact ZIP source identity. Exact source retention
+therefore belongs only to the live `PreparedSource`/`SourceCatalog` preserve
+handoff; semantic Documents and directory-backed snapshots do not retain it.
 
-The evidence below is instrumentation, not a wall-clock or memory benchmark:
+Container-level ZIP checks remain in force. A selected logical profile applies
+its 64 KiB and supported-compression checks before selected payload
+materialization, with the existing typed archive `InvalidBundle`/`Limit`
+categories and facade mapping. In the selective Keynote Properties profile,
+malformed, opaque, or oversized BuildVersionHistory/DocumentIdentifier
+payloads are outside the profile and are ignored; the same conditions on
+selected authorities remain errors. Paired alias-only metadata names remain
+ignored, one-sided exact/alias authority collisions are rejected, and
+ordinary exact local/central mismatches retain their existing diagnostic.
 
-| Instrumented scope | Selected archive-entry reads | Full-catalog reads | Preservation state |
-| --- | ---: | ---: | --- |
-| Modern synthetic `SEMANTIC_METADATA` catalog (8 members) | 5 | 8 | `SourceCatalog` retains the source allocation; logical provenance is projected |
-| Modern synthetic `SEMANTIC_PROPERTIES` catalog (7 members) | 2 | 7 | `SourceCatalog` retains the source allocation until semantic handoff |
-| Shared `PreparedSource` using `SEMANTIC_METADATA` | 1 root inspection + 5 selected-catalog reads = 6 | — | The semantic handoff releases the source before Document publication |
+### Evidence and pending performance-matrix entries
 
-No performance gain is claimed from these counts. A future performance
-record may add wall-clock, allocation, and resident-memory measurements after
-the benchmark harness has evidence for the same profiles. The earlier
-Pages/materialization wording is therefore narrowed here: Pages remains the
-three-authority case, Keynote is Properties-only, and “retained exact source”
-and exact-writing claims apply only to the live `PreparedSource`/`SourceCatalog`
-or full Package preserve paths, not to semantic Documents or directories.
+The completed evidence is archive-entry instrumentation only. It proves the
+selection/read shape but is not latency, allocation, resident-memory, or
+throughput evidence:
+
+| Profile/path evidence | Selected reads | Full reads | Latency | Allocation/RSS |
+| --- | ---: | ---: | --- | --- |
+| Modern synthetic `SEMANTIC_METADATA` catalog (8 members) | 5 | 8 | `PENDING — no benchmark run` | `PENDING — no benchmark run` |
+| Modern synthetic `SEMANTIC_PROPERTIES` catalog (7 members) | 2 | 7 | `PENDING — no benchmark run` | `PENDING — no benchmark run` |
+| Shared `PreparedSource` with `SEMANTIC_METADATA` | 1 root inspection + 5 selected-catalog reads = 6 | — | `PENDING — no benchmark run` | `PENDING — no benchmark run` |
+| Windows `SemanticMetadataAny` packaged-file fallback | `PENDING — full-catalog path` | `PENDING — no benchmark run` | `PENDING — no benchmark run` | `PENDING — no benchmark run` |
+
+These are change-record placeholders, not fabricated performance results. A
+future perf-baseline entry may replace the pending cells only after measuring
+the same profiles with representative wall-clock, copied-byte/allocation,
+and resident-memory evidence.
+
+### Reconciliation with the earlier 2026-08-20 wording
+
+The earlier statement that read-only iWork ingress and archive-free Keynote
+used one three-authority profile is superseded by the matrix: generic facade
+and Pages paths use three authorities, while Keynote is Properties-only. The
+earlier statement that media and unknown members remain in a retained exact
+source is narrowed to the live `PreparedSource`/`SourceCatalog` preserve
+handoff; semantic Documents and directories do not retain a ZIP source. The
+earlier exact-writer statement is narrowed to the low-level live
+`SourceCatalog` byte-copy and the full format-owned Package path. Finally, the
+earlier instrumentation counts are read-count evidence only; no latency or
+memory improvement is claimed until the pending performance entries are
+measured.
