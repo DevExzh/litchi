@@ -8,6 +8,7 @@
 
 mod filesystem;
 mod operation_metrics;
+mod parallel_metrics;
 mod process_metrics;
 mod xls_numeric;
 
@@ -2494,6 +2495,7 @@ struct Report {
     tool: Tool,
     environment: Environment,
     configuration: Configuration,
+    parallel_metrics: parallel_metrics::ReportMetrics,
     results: Vec<CaseResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
     filesystem_evidence: Option<Vec<filesystem::Evidence>>,
@@ -7994,6 +7996,50 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     promote_sink_operation_metrics(&mut results)?;
 
+    let configuration = Configuration {
+        samples_per_case: options.samples,
+        warmup_iterations_per_case: options.warmup_iterations,
+        filesystem_cache_states: options.filesystem_cache.names(),
+        filesystem_fresh_child_per_sample: true,
+        filesystem_process_isolated: true,
+        filesystem_root_selected: options.filesystem_root.is_some(),
+        cases: options.cases.iter().map(|case| case.name()).collect(),
+        corpus_shapes: options.shapes.iter().map(|shape| shape.name()).collect(),
+        payload_kinds: options.payloads.iter().map(|kind| kind.name()).collect(),
+        writer_shapes: options
+            .writer_shapes
+            .iter()
+            .map(|shape| shape.name())
+            .collect(),
+        xlsx_shapes: options
+            .xlsx_shapes
+            .iter()
+            .map(|shape| shape.name())
+            .collect(),
+        xlsx_cell_crud_shapes: options
+            .xlsx_cell_crud_shapes
+            .iter()
+            .map(|shape| shape.name())
+            .collect(),
+        xlsx_row_visibility_shapes: options
+            .xlsx_row_visibility_shapes
+            .iter()
+            .map(|shape| shape.name())
+            .collect(),
+        semantic_shapes: options
+            .semantic_shapes
+            .iter()
+            .map(|shape| shape.name())
+            .collect(),
+        rtf_variants: options
+            .rtf_variants
+            .iter()
+            .map(|variant| variant.name())
+            .collect(),
+        range_simulation: options.range_simulation,
+        execution_workers: options.execution_workers,
+    };
+    let parallel_metrics = parallel_metrics::collect(&configuration, &results)?;
     let report = Report {
         schema_version: SCHEMA_VERSION,
         tool: Tool {
@@ -8011,49 +8057,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             options.filesystem_root.as_deref(),
             !filesystem_evidence.is_empty(),
         )),
-        configuration: Configuration {
-            samples_per_case: options.samples,
-            warmup_iterations_per_case: options.warmup_iterations,
-            filesystem_cache_states: options.filesystem_cache.names(),
-            filesystem_fresh_child_per_sample: true,
-            filesystem_process_isolated: true,
-            filesystem_root_selected: options.filesystem_root.is_some(),
-            cases: options.cases.iter().map(|case| case.name()).collect(),
-            corpus_shapes: options.shapes.iter().map(|shape| shape.name()).collect(),
-            payload_kinds: options.payloads.iter().map(|kind| kind.name()).collect(),
-            writer_shapes: options
-                .writer_shapes
-                .iter()
-                .map(|shape| shape.name())
-                .collect(),
-            xlsx_shapes: options
-                .xlsx_shapes
-                .iter()
-                .map(|shape| shape.name())
-                .collect(),
-            xlsx_cell_crud_shapes: options
-                .xlsx_cell_crud_shapes
-                .iter()
-                .map(|shape| shape.name())
-                .collect(),
-            xlsx_row_visibility_shapes: options
-                .xlsx_row_visibility_shapes
-                .iter()
-                .map(|shape| shape.name())
-                .collect(),
-            semantic_shapes: options
-                .semantic_shapes
-                .iter()
-                .map(|shape| shape.name())
-                .collect(),
-            rtf_variants: options
-                .rtf_variants
-                .iter()
-                .map(|variant| variant.name())
-                .collect(),
-            range_simulation: options.range_simulation,
-            execution_workers: options.execution_workers,
-        },
+        configuration,
+        parallel_metrics,
         results,
         filesystem_evidence: (!filesystem_evidence.is_empty()).then_some(filesystem_evidence),
     };

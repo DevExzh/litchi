@@ -2717,6 +2717,25 @@ order. Those fields and the elapsed samples are sufficient to compute
 throughput, speedup, scaling efficiency, and an Amdahl serial-fraction estimate
 outside the harness.
 
+The top-level `parallel_metrics` envelope repeats only sound parallelism
+evidence. `configured_worker_budget` is the sorted
+`configuration.execution_workers` selection, and each scaling result reports
+its configured `execution.worker_count` and deterministic
+`execution.logical_tasks`. OPC cache contention results additionally report
+`observed_local_worker_count` only when one explicitly created worker team is
+present; this is a harness-created local team width, not a process thread
+count. `deterministic_chunk_count` is unavailable until a producer exposes an
+exact chunk counter. Range-simulation results may additionally report their
+exact per-sample `source.simulation.physical_request_count` vector as
+deterministic request/chunk evidence. The CFB selective and `open_stream`
+simulation paths use their exact nested `physical_request_count` vectors for
+the same purpose; other results leave `deterministic_chunk_count` unavailable
+rather than infer it from bytes.
+`lock_wait_ns` is unavailable because waiter counts are not lock-time
+measurements. The envelope never reads process-global thread lists, converts
+CPU utilization or waiter counts into worker/lock metrics, or infers chunks
+from bytes. Every unavailable value carries a scope and reason.
+
 Publication cases may additionally emit `output_sha256`, independently
 identifying the deterministic changed archive without changing schema v1. For
 `opc_source_overlay_one_part_save`, its
