@@ -184,6 +184,15 @@ the lifecycle selector times that call plus worksheet names, count, and text.
 Both selectors compare those projections and metadata with an untimed
 `litchi::Workbook::from_bytes(Vec<u8>)` oracle and verify the source archive
 SHA-256. They leave the default 36 cases / 198 records unchanged.
+Two additional high-level XLSX bytes selectors (`xlsx_bytes_open` and
+`xlsx_bytes_open_lifecycle`) exercise `litchi::Workbook::from_bytes(Vec<u8>)`
+over the deterministic medium cell-CRUD corpus. The first times exactly the
+bytes facade construction; the lifecycle selector times that construction plus
+worksheet names, count, and full text. An untimed typed eager
+`litchi_xlsx::Workbook` semantic projection, archive SHA-256, and umbrella
+projection/metadata checks guard each case. These selectors bring the
+selectable matrix to 343 names while leaving the default 36 cases / 198
+records unchanged.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -2434,6 +2443,14 @@ native-Office claim is made.
   but time the high-level path open followed by worksheet names, worksheet
   count, and full text. The selector is opt-in and does not claim a source
   speedup or physical-I/O result.
+- `xlsx_bytes_open`: move a prepared owned XLSX allocation into
+  `litchi::Workbook::from_bytes(Vec<u8>)`; the input clone and typed eager
+  semantic/hash guards are outside timing, so the measured scope is exactly
+  the facade bytes construction.
+- `xlsx_bytes_open_lifecycle`: use the same owned bytes path and guards, but
+  time facade construction followed by worksheet names, worksheet count, and
+  full text. These selectors are opt-in and do not claim a source-backed or
+  physical-I/O result.
 - `opc_range_source_open` / `opc_range_source_open_main_read`: repeat the OPC
   structural-open and open-plus-main-Part flows through the deterministic
   latency/bandwidth/range simulator. The structural case requires a fresh main
