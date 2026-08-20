@@ -411,6 +411,7 @@ enum PathProfile {
     IndexOnly,
     Properties,
     SemanticMetadata(Format),
+    SemanticMetadataAny,
 }
 
 impl fmt::Debug for PreparedSource {
@@ -466,7 +467,30 @@ impl PreparedSource {
     /// profile.
     #[doc(hidden)]
     pub fn __from_bytes_with_pages_metadata(value: &[u8], limits: Limits) -> Result<Option<Self>> {
-        Self::from_bytes_with_catalog_metadata(value, limits, Format::Pages)
+        Self::from_bytes_with_catalog_metadata(value, limits, Some(Format::Pages))
+    }
+
+    /// Prepare borrowed package bytes for an archive-free semantic reader.
+    ///
+    /// The detector first classifies the canonical application root and then
+    /// retains only the IWA components and the three bounded semantic metadata
+    /// authorities. Unrelated `Data/`, `Preview/`, and unknown members remain
+    /// in the exact source allocation but are not materialized as package
+    /// entries. This route is intended for read-only metadata, list, and
+    /// one-query workflows; preserve-mode owners continue to use
+    /// [`Self::from_bytes_with_limits`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// refusal when a selected semantic metadata authority violates its
+    /// physical profile.
+    #[doc(hidden)]
+    pub fn __from_bytes_with_semantic_metadata(
+        value: &[u8],
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_bytes_with_catalog_metadata(value, limits, None)
     }
 
     /// Prepare borrowed package bytes for Numbers' archive-free semantic
@@ -488,7 +512,7 @@ impl PreparedSource {
     fn from_bytes_with_catalog_metadata(
         value: &[u8],
         limits: Limits,
-        expected: Format,
+        expected: Option<Format>,
     ) -> Result<Option<Self>> {
         if !check_prepared_candidate(value, limits)? {
             return Ok(None);
@@ -499,7 +523,7 @@ impl PreparedSource {
         let Some(format) = classify_root(&root)? else {
             return Ok(None);
         };
-        if format != expected {
+        if expected.is_some_and(|expected| format != expected) {
             return Ok(Some(Self::format_only(format, limits, archive_limits)));
         }
         let catalog = SourceCatalog::__from_bytes_with_logical_entry_limits(
@@ -590,7 +614,28 @@ impl PreparedSource {
         value: Arc<[u8]>,
         limits: Limits,
     ) -> Result<Option<Self>> {
-        Self::from_shared_bytes_with_catalog_metadata(value, limits, Format::Pages)
+        Self::from_shared_bytes_with_catalog_metadata(value, limits, Some(Format::Pages))
+    }
+
+    /// Prepare shared package bytes for an archive-free semantic reader.
+    ///
+    /// The exact shared source allocation remains authoritative while the
+    /// selected format consumes only IWA components and the three bounded
+    /// semantic metadata authorities. Unrelated media and opaque members are
+    /// therefore preserved for a later exact write but are not materialized
+    /// during this read-only preparation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// plus a refusal when a selected semantic metadata authority violates
+    /// its physical profile.
+    #[doc(hidden)]
+    pub fn __from_shared_bytes_with_semantic_metadata(
+        value: Arc<[u8]>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_shared_bytes_with_catalog_metadata(value, limits, None)
     }
 
     /// Prepare shared package bytes for Numbers' archive-free semantic reader
@@ -612,7 +657,7 @@ impl PreparedSource {
     fn from_shared_bytes_with_catalog_metadata(
         value: Arc<[u8]>,
         limits: Limits,
-        expected: Format,
+        expected: Option<Format>,
     ) -> Result<Option<Self>> {
         if !check_prepared_candidate(&value, limits)? {
             return Ok(None);
@@ -623,7 +668,7 @@ impl PreparedSource {
         let Some(format) = classify_root(&root)? else {
             return Ok(None);
         };
-        if format != expected {
+        if expected.is_some_and(|expected| format != expected) {
             return Ok(Some(Self::format_only(format, limits, archive_limits)));
         }
         let catalog = SourceCatalog::__from_shared_bytes_with_logical_entry_limits(
@@ -731,6 +776,29 @@ impl PreparedSource {
         Self::from_path_with_profile(value.as_ref(), limits, PathProfile::Properties)
     }
 
+    /// Prepare a packaged file or app-authored directory for an archive-free
+    /// semantic reader.
+    ///
+    /// Regular-file ingress retains the exact source allocation while
+    /// materializing only canonical IWA components and the three bounded
+    /// semantic metadata authorities. Directory ingress uses the same frozen
+    /// semantic metadata profile. Unrelated media, previews, and opaque
+    /// members remain outside the semantic snapshot. On Windows, the
+    /// packaged-file adapter retains its existing generic capture capability;
+    /// byte and shared-byte ingress remain selective on every platform.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// refusal when a selected semantic metadata authority is unsafe.
+    #[doc(hidden)]
+    pub fn __from_path_with_semantic_metadata(
+        value: impl AsRef<Path>,
+        limits: Limits,
+    ) -> Result<Option<Self>> {
+        Self::from_path_with_profile(value.as_ref(), limits, PathProfile::SemanticMetadataAny)
+    }
+
     /// Prepare a path while retaining exactly Pages' three canonical metadata
     /// diagnostics for its archive-free semantic reader.
     ///
@@ -806,8 +874,17 @@ impl PreparedSource {
                         Self::from_shared_bytes_with_catalog_metadata(
                             source.into(),
                             limits,
-                            expected,
+                            Some(expected),
                         )
+                    },
+                    PathProfile::SemanticMetadataAny => {
+                        // Preserve the existing packaged-file capability on
+                        // Windows, whose path adapter cannot promise the
+                        // semantic profile's no-reparse capture invariant.
+                        #[cfg(windows)]
+                        return Self::from_shared_bytes_with_limits(source.into(), limits);
+                        #[cfg(not(windows))]
+                        Self::from_shared_bytes_with_catalog_metadata(source.into(), limits, None)
                     },
                     PathProfile::IndexOnly | PathProfile::Properties => {
                         Self::from_shared_bytes_with_limits(source.into(), limits)
@@ -837,12 +914,26 @@ impl PreparedSource {
                             },
                         )
                     },
+                    PathProfile::SemanticMetadataAny => {
+                        FrozenDirectoryBundle::open_with_semantic_metadata_when(
+                            path,
+                            archive,
+                            |components, markers| {
+                                component_catalog(components).is_ok_and(|format| format.is_some())
+                                    && (marker_outcome(markers) == Outcome::None
+                                        || matches!(marker_outcome(markers), Outcome::Found(_)))
+                            },
+                        )
+                    },
                 }
                 .map_err(map_archive_error)?;
                 Self::from_directory(
                     directory,
                     limits,
-                    matches!(profile, PathProfile::SemanticMetadata(_)),
+                    matches!(
+                        profile,
+                        PathProfile::SemanticMetadata(_) | PathProfile::SemanticMetadataAny
+                    ),
                 )
             },
             Kind::Missing => Err(Error::Io(std::io::Error::new(
@@ -2643,6 +2734,60 @@ mod tests {
         assert_eq!(
             catalog.limits().max_iwa_stream_bytes(),
             limits.max_iwa_stream_size()
+        );
+    }
+
+    #[test]
+    fn semantic_prepared_source_skips_keynote_media_and_retains_exact_source() {
+        let mut bytes = document_package_with_members(
+            Format::Keynote,
+            &[
+                ("Metadata/Properties.plist", b"properties"),
+                ("Data/image.png", b"opaque media"),
+            ],
+        );
+        patch_zip_member_compression_to_opaque(&mut bytes, "Data/image.png");
+        let source: Arc<[u8]> = bytes.into();
+
+        let prepared = PreparedSource::__from_shared_bytes_with_semantic_metadata(
+            Arc::clone(&source),
+            Limits::default(),
+        )
+        .expect("Keynote semantic source should admit opaque unrelated media")
+        .expect("synthetic Keynote source should classify");
+        assert_eq!(prepared.format(), Format::Keynote);
+
+        let catalog = prepared
+            .__into_source_catalog()
+            .expect("semantic ZIP preparation retains exact source ownership");
+        assert!(Arc::ptr_eq(&source, &catalog.shared_source()));
+        assert_eq!(
+            catalog
+                .package()
+                .iter()
+                .map(litchi_iwa_archive::package::Entry::name)
+                .collect::<Vec<_>>(),
+            ["Index/Document.iwa", "Metadata/Properties.plist"]
+        );
+        let mut exact = Vec::new();
+        catalog
+            .package()
+            .write_to(&mut exact)
+            .expect("selective preparation must preserve exact source bytes");
+        assert_eq!(exact, source.as_ref());
+
+        let full = SourceCatalog::from_shared_bytes(catalog.shared_source())
+            .expect("an explicit full package request should materialize media");
+        assert!(
+            full.package()
+                .iter()
+                .any(|entry| entry.name() == "Data/image.png")
+        );
+        assert!(
+            full.package()
+                .iter()
+                .find(|entry| entry.name() == "Data/image.png")
+                .is_some_and(litchi_iwa_archive::package::Entry::is_opaque)
         );
     }
 

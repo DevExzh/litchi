@@ -3136,3 +3136,25 @@ graph remains 64 packages and 239 internal
 declarations. Existing native Numbers basic and formula/rich-text fixtures
 continue to provide application semantic acceptance; this read-only
 implementation change introduces no native save/reopen or performance claim.
+
+## 2026-08-20 amendment: selective iWork semantic package ingress
+
+Read-only iWork coordinator paths and the archive-free Keynote `Document` now
+use `PreparedSource`'s semantic metadata catalog profile for packaged files.
+After the canonical `Document.iwa` root classifies the application, the
+profile preflights and materializes only canonical IWA members plus the three
+bounded semantic metadata authorities. `Data/`, `Preview/`, unknown sidecars,
+and unsupported opaque media remain in the retained exact source allocation
+but are not inflated or copied into the logical catalog. Directory-backed
+semantic ingress uses the same existing selective shape.
+
+The shared-byte path retains allocation identity through `SourceCatalog`, and
+the exact source writer still emits every untouched member, including opaque
+media. The selected IWA graph and metadata sidecars use the existing
+component/semantic handoffs, so object indexing, graph validation, physical
+limits, and selected-authority error categories are unchanged. Full
+`litchi_keynote::Package` constructors remain the preserve/edit capability and
+continue to materialize their complete logical catalog; this amendment makes
+no lazy-media claim for those mutation paths. Archive instrumentation covers
+the Keynote-shaped profile: media-free preparation reads only the selected
+five members, while an explicit full-catalog request reads all members.
