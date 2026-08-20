@@ -1007,6 +1007,26 @@ readback, calculation-metadata stability, package topology, relationships,
 media payloads, output hash, and sequential-sink bounds are verified outside
 timing.
 
+Measure repeated page-break projections on the concrete immutable worksheet
+handle and the public package control:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_worksheet_repeated_page_breaks,xlsx_package_repeated_page_breaks \
+  --json target/perf/xlsx-page-break-projection.json
+```
+
+Both selectors prepare the package, exact raw-XML oracle, and first projection
+outside the timed interval. `xlsx_worksheet_repeated_page_breaks` retains one
+concrete `Workbook::sheet(...).page_breaks()` handle and times eight repeated
+calls, exercising the worksheet projection cache. The
+`xlsx_package_repeated_page_breaks` control calls the public
+`Package::page_breaks(...)` path separately; that path intentionally rebuilds
+its source snapshot and bypasses the workbook worksheet cache. Every output is
+checked against the exact raw-XML `PageBreaks` oracle and the defaults remain
+unchanged.
+
 Measure the matched XLSX page-margin publication controls on the same fixed
 media-rich archive:
 
@@ -2217,6 +2237,12 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   while materializing only `xl/workbook.xml` and
   `xl/worksheets/sheet1.xml`. The other ten ordinary Parts remain deferred and
   are physically raw-copied during one-Part overlay publication.
+- `xlsx_worksheet_repeated_page_breaks`: prepare one immutable workbook and
+  worksheet handle outside timing, warm its exact page-break projection, then
+  time eight repeated concrete `Worksheet::page_breaks()` calls.
+- `xlsx_package_repeated_page_breaks`: run the same eight-query oracle through
+  public `Package::page_breaks(...)` as a separate bypass guardrail; it does
+  not claim to use the workbook worksheet cache.
 - `xlsx_eager_merge_commit_save` / `xlsx_eager_unmerge_commit_save`: on the
   deterministic sparse A1:B2 fixture, prepare the merge or unmerge transaction
   outside timing, then time only eager semantic commit plus bounded sequential

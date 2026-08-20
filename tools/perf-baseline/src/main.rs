@@ -88,6 +88,8 @@ const XLSX_DEFINED_NAMES_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-defined-names-source-edit-media-v1";
 const XLSX_PAGE_BREAK_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-break-source-edit-media-v1";
+const XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-page-break-projection-media-v1";
 const XLSX_PAGE_MARGIN_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-margin-source-edit-media-v1";
 const XLSX_PAGE_SETUP_SOURCE_EDIT_CORPUS_GENERATOR: &str =
@@ -176,6 +178,7 @@ const ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_C
     [2, 2, 2, 2];
 const ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_CALLS] =
     [2, 4, 2, 2];
+const XLSX_REPEATED_PAGE_BREAK_CALLS: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT: usize = 8;
@@ -657,6 +660,8 @@ enum Case {
     XlsxSourceBackedDefinedNamesEditSave,
     XlsxEagerPageBreakEditSave,
     XlsxSourceBackedPageBreakEditSave,
+    XlsxWorksheetRepeatedPageBreaks,
+    XlsxPackageRepeatedPageBreaks,
     XlsxEagerPageMarginEditSave,
     XlsxSourceBackedPageMarginEditSave,
     XlsxEagerPageSetupEditSave,
@@ -1069,6 +1074,8 @@ impl Case {
             },
             Self::XlsxEagerPageBreakEditSave => "xlsx_eager_page_break_edit_save",
             Self::XlsxSourceBackedPageBreakEditSave => "xlsx_source_backed_page_break_edit_save",
+            Self::XlsxWorksheetRepeatedPageBreaks => "xlsx_worksheet_repeated_page_breaks",
+            Self::XlsxPackageRepeatedPageBreaks => "xlsx_package_repeated_page_breaks",
             Self::XlsxEagerPageMarginEditSave => "xlsx_eager_page_margin_edit_save",
             Self::XlsxSourceBackedPageMarginEditSave => "xlsx_source_backed_page_margin_edit_save",
             Self::XlsxEagerPageSetupEditSave => "xlsx_eager_page_setup_edit_save",
@@ -2198,6 +2205,13 @@ impl Case {
         matches!(
             self,
             Self::XlsxEagerPageBreakEditSave | Self::XlsxSourceBackedPageBreakEditSave
+        )
+    }
+
+    const fn is_xlsx_page_break_projection(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxWorksheetRepeatedPageBreaks | Self::XlsxPackageRepeatedPageBreaks
         )
     }
 
@@ -6620,6 +6634,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_xlsx_page_break_projection())
+    {
+        let corpus = build_xlsx_page_break_projection_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_xlsx_page_break_projection())
+        {
+            results.push(run_xlsx_page_break_projection(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.is_opc_source_cache_evidence())
     {
         let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible)?;
@@ -6718,6 +6753,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_calculation_metadata_edit_save()
                     && !case.is_xlsx_defined_names_edit_save()
                     && !case.is_xlsx_page_break_edit_save()
+                    && !case.is_xlsx_page_break_projection()
                     && !case.is_xlsx_page_margin_edit_save()
                     && !case.is_xlsx_page_setup_edit_save()
                     && !case.is_xlsx_print_options_edit_save()
@@ -8502,6 +8538,8 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_eager_page_break_edit_save" => Some(Case::XlsxEagerPageBreakEditSave),
         "xlsx_source_backed_page_break_edit_save" => Some(Case::XlsxSourceBackedPageBreakEditSave),
+        "xlsx_worksheet_repeated_page_breaks" => Some(Case::XlsxWorksheetRepeatedPageBreaks),
+        "xlsx_package_repeated_page_breaks" => Some(Case::XlsxPackageRepeatedPageBreaks),
         "xlsx_eager_page_margin_edit_save" => Some(Case::XlsxEagerPageMarginEditSave),
         "xlsx_source_backed_page_margin_edit_save" => {
             Some(Case::XlsxSourceBackedPageMarginEditSave)
@@ -8948,6 +8986,8 @@ fn print_usage() {
                                        xlsx_source_backed_defined_names_edit_save,\n\
                                        xlsx_eager_page_break_edit_save,\n\
                                        xlsx_source_backed_page_break_edit_save,\n\
+                                       xlsx_worksheet_repeated_page_breaks,\n\
+                                       xlsx_package_repeated_page_breaks,\n\
                                        xlsx_eager_page_margin_edit_save,\n\
                                        xlsx_source_backed_page_margin_edit_save,\n\
                                        xlsx_eager_page_setup_edit_save,\n\
@@ -12401,6 +12441,37 @@ fn build_xlsx_page_break_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     Ok(corpus)
 }
 
+fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut corpus = build_xlsx_page_break_edit_corpus()?;
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut expected = litchi_xlsx::page_breaks::PageBreaks::new();
+    expected.set_horizontal(xlsx_page_break_target()?)?;
+    let replaced = litchi_xlsx::page_breaks::replace(opc.get_part(&target_uri)?.blob(), &expected)?;
+    opc.get_part_mut(&target_uri)?.set_blob(replaced);
+    let archive = PackageWriter::to_bytes(&opc)?;
+    let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
+    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("XLSX page-break projection logical byte count overflows usize")
+    })?;
+    corpus.manifest.name = "xlsx-page-break-projection-media".to_owned();
+    corpus.manifest.generator = XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR;
+    corpus.manifest.entry_count = opc.part_count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    corpus.manifest.uncompressed_payload_bytes = uncompressed_payload_bytes;
+    corpus.manifest.archive_bytes = archive.len();
+    corpus.manifest.archive_sha256 = sha256_hex(&archive);
+    corpus.manifest.target_entry = "worksheet:Sheet1:rowBreaks".to_owned();
+    corpus.manifest.target_payload_bytes = target_payload.len();
+    corpus.manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    corpus.archive = archive;
+    corpus.target_name = "xl/worksheets/sheet1.xml".to_owned();
+    corpus.target_payload = target_payload;
+    Ok(corpus)
+}
+
 fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -15281,6 +15352,9 @@ fn run_case_with_config(
         },
         Case::XlsxEagerPageBreakEditSave | Case::XlsxSourceBackedPageBreakEditSave => {
             run_xlsx_page_break_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxWorksheetRepeatedPageBreaks | Case::XlsxPackageRepeatedPageBreaks => {
+            Err("XLSX page-break projection cases use their dedicated corpus runner".into())
         },
         Case::XlsxEagerPageMarginEditSave | Case::XlsxSourceBackedPageMarginEditSave => {
             run_xlsx_page_margin_edit_save(case, corpus, warmup_iterations, samples)
@@ -35971,6 +36045,31 @@ fn xlsx_page_break_target() -> Result<litchi_xlsx::page_breaks::Collection, Box<
     ])?)
 }
 
+fn xlsx_repeated_page_break_digest(
+    value: &litchi_xlsx::page_breaks::PageBreaks,
+) -> Result<String, Box<dyn Error>> {
+    let encoded = litchi_xlsx::page_breaks::write(value)?;
+    let capacity = encoded
+        .len()
+        .checked_mul(XLSX_REPEATED_PAGE_BREAK_CALLS)
+        .ok_or("XLSX repeated page-break digest size overflows usize")?;
+    let mut repeated = Vec::with_capacity(capacity);
+    for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+        repeated.extend_from_slice(&encoded);
+    }
+    Ok(sha256_hex(&repeated))
+}
+
+fn xlsx_page_break_outputs_digest(
+    values: &[litchi_xlsx::page_breaks::PageBreaks],
+) -> Result<String, Box<dyn Error>> {
+    let mut encoded = Vec::new();
+    for value in values {
+        encoded.extend_from_slice(&litchi_xlsx::page_breaks::write(value)?);
+    }
+    Ok(sha256_hex(&encoded))
+}
+
 fn verify_xlsx_page_break_edit_output(
     corpus: &Corpus,
     output: &[u8],
@@ -36158,6 +36257,92 @@ fn run_xlsx_page_break_edit_save(
         output_sha256: Some(expected_digest),
         operation_metrics: None,
     })
+}
+
+/// Measure repeated page-break reads on the concrete immutable `Worksheet`
+/// handle, alongside the public `Package::page_breaks` control. Package and
+/// workbook setup, the exact raw-XML oracle, and the first projection/warm-up
+/// call all stay outside the timed repeated-query interval.
+fn run_xlsx_page_break_projection(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR
+        || !case.is_xlsx_page_break_projection()
+    {
+        return Err("XLSX page-break projection case requires its fixed projection corpus".into());
+    }
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let expected = litchi_xlsx::page_breaks::parse(opc.get_part(&target_uri)?.blob())?;
+    let expected_digest = xlsx_repeated_page_break_digest(&expected)?;
+
+    // Verify both public entry points against the independent raw-XML oracle
+    // before any timed work. This makes the Package path an explicit control
+    // and ensures the direct Worksheet selector cannot hide a semantic drift.
+    let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+    let package_projection = package.page_breaks("Sheet1")?;
+    if package_projection.page_breaks() != &expected {
+        return Err("XLSX Package page-break projection differs from raw oracle".into());
+    }
+    let workbook = package.workbook()?;
+    let worksheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX worksheet page-break oracle has no Sheet1")?;
+    let worksheet_projection = worksheet.page_breaks()?;
+    if worksheet_projection != expected {
+        return Err("XLSX Worksheet page-break projection differs from raw oracle".into());
+    }
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+        let mut outputs = Vec::with_capacity(XLSX_REPEATED_PAGE_BREAK_CALLS);
+        let started = match case {
+            Case::XlsxWorksheetRepeatedPageBreaks => {
+                let workbook = package.workbook()?;
+                let worksheet = workbook
+                    .sheet("Sheet1")?
+                    .ok_or("XLSX Worksheet repeated-query setup has no Sheet1")?;
+                let warmed = worksheet.page_breaks()?;
+                if warmed != expected {
+                    return Err("XLSX Worksheet warm projection differs from raw oracle".into());
+                }
+                let started = Instant::now();
+                for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+                    outputs.push(worksheet.page_breaks()?);
+                }
+                started
+            },
+            Case::XlsxPackageRepeatedPageBreaks => {
+                let warmed = package.page_breaks("Sheet1")?;
+                if warmed.page_breaks() != &expected {
+                    return Err("XLSX Package warm projection differs from raw oracle".into());
+                }
+                let started = Instant::now();
+                for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+                    outputs.push(package.page_breaks("Sheet1")?.page_breaks().clone());
+                }
+                started
+            },
+            _ => unreachable!("filtered XLSX page-break projection case"),
+        };
+        let duration = started.elapsed();
+        if outputs.len() != XLSX_REPEATED_PAGE_BREAK_CALLS
+            || outputs.iter().any(|value| value != &expected)
+            || xlsx_page_break_outputs_digest(&outputs)? != expected_digest
+        {
+            return Err("XLSX repeated page-break projections differ from raw oracle".into());
+        }
+        std::hint::black_box(outputs);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let mut result = result(case, corpus, elapsed, None);
+    result.output_sha256 = Some(expected_digest);
+    Ok(result)
 }
 
 fn xlsx_page_margin_target() -> Result<litchi_xlsx::page_margins::Margins, Box<dyn Error>> {
@@ -40708,6 +40893,7 @@ mod tests {
         SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
         SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
         XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
@@ -40723,15 +40909,16 @@ mod tests {
         build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
         build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
-        cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
-        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        build_xlsx_page_break_edit_corpus, build_xlsx_page_break_projection_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, build_xlsx_row_visibility_corpus,
+        build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
+        cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
+        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_one_edit_save, run_odf_content_cow,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -40739,10 +40926,11 @@ mod tests {
         run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
-        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
-        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
-        run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
-        updated_writer_text, verify_xlsx_cells, writer_shape, xlsx_cell_count, xlsx_spec,
+        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_break_projection,
+        run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
+        run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
+        simulated_request_delay, statistics, updated_writer_text, verify_xlsx_cells, writer_shape,
+        xlsx_cell_count, xlsx_spec,
     };
 
     #[test]
@@ -41963,6 +42151,8 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedDefinedNamesEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageBreakEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageBreakEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxWorksheetRepeatedPageBreaks));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxPackageRepeatedPageBreaks));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageMarginEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageMarginEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageSetupEditSave));
@@ -42762,6 +42952,45 @@ mod tests {
                 .ordinary_payload_materializations,
             Some(vec![2])
         );
+    }
+
+    #[test]
+    fn xlsx_repeated_page_break_selectors_match_the_exact_oracle() {
+        for (name, case) in [
+            (
+                "xlsx_worksheet_repeated_page_breaks",
+                Case::XlsxWorksheetRepeatedPageBreaks,
+            ),
+            (
+                "xlsx_package_repeated_page_breaks",
+                Case::XlsxPackageRepeatedPageBreaks,
+            ),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(!case.uses_xlsx());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        let corpus = build_xlsx_page_break_projection_corpus().unwrap();
+        let again = build_xlsx_page_break_projection_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(
+            corpus.manifest.generator,
+            XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR
+        );
+        assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
+
+        let worksheet =
+            run_xlsx_page_break_projection(Case::XlsxWorksheetRepeatedPageBreaks, &corpus, 0, 1)
+                .unwrap();
+        let package =
+            run_xlsx_page_break_projection(Case::XlsxPackageRepeatedPageBreaks, &corpus, 0, 1)
+                .unwrap();
+        assert_eq!(worksheet.case, "xlsx_worksheet_repeated_page_breaks");
+        assert_eq!(package.case, "xlsx_package_repeated_page_breaks");
+        assert_eq!(worksheet.output_sha256, package.output_sha256);
+        assert_eq!(worksheet.elapsed_ns.samples.len(), 1);
+        assert_eq!(package.elapsed_ns.samples.len(), 1);
     }
 
     #[test]
