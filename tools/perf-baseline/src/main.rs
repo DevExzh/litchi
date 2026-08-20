@@ -34,6 +34,7 @@ use std::{
 use litchi_cfb::{
     OleError, OleFile, OleWriter, SharedOleBulkError, SharedOleFile, SharedOleFileLimits,
 };
+use litchi_core::detection::FileFormat;
 use litchi_core::{
     Budget, CancellationSource, CancellationToken, CheckStatus, ExecutionContext, ExecutionError,
     ExecutionLimits, Limits, ReadAt, SourceVersion, ValidateReport,
@@ -106,6 +107,7 @@ const XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1";
 const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
+const DETECTION_ODF_CORPUS_GENERATOR: &str = "litchi-detection-odf-catalog-v1";
 const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
 const ODF_REPAIR_LOCAL_EXTRA: &[u8] = &[0x55, 0x54, 0x05, 0x00, 0x01, 0, 0, 0, 0];
 const ODF_REPAIR_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
@@ -307,6 +309,109 @@ enum SemanticShape {
     Tiny,
     Medium,
     Large,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DetectionOdfFamily {
+    Odt,
+    Ods,
+    Odp,
+}
+
+impl DetectionOdfFamily {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Odt => "odt",
+            Self::Ods => "ods",
+            Self::Odp => "odp",
+        }
+    }
+
+    const fn odf_format(self) -> FileFormat {
+        match self {
+            Self::Odt => FileFormat::Odt,
+            Self::Ods => FileFormat::Ods,
+            Self::Odp => FileFormat::Odp,
+        }
+    }
+
+    const fn ooxml_format(self) -> FileFormat {
+        match self {
+            Self::Odt => FileFormat::Docx,
+            Self::Ods => FileFormat::Xlsx,
+            Self::Odp => FileFormat::Pptx,
+        }
+    }
+
+    const fn odf_mimetype(self) -> &'static str {
+        match self {
+            Self::Odt => "application/vnd.oasis.opendocument.text",
+            Self::Ods => "application/vnd.oasis.opendocument.spreadsheet",
+            Self::Odp => "application/vnd.oasis.opendocument.presentation",
+        }
+    }
+
+    const fn ooxml_part(self) -> &'static str {
+        match self {
+            Self::Odt => "word/document.xml",
+            Self::Ods => "xl/workbook.xml",
+            Self::Odp => "ppt/presentation.xml",
+        }
+    }
+
+    const fn ooxml_content_type(self) -> &'static str {
+        match self {
+            Self::Odt => {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+            },
+            Self::Ods => {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+            },
+            Self::Odp => {
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+            },
+        }
+    }
+
+    const fn ooxml_payload(self) -> &'static [u8] {
+        match self {
+            Self::Odt => {
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+            },
+            Self::Ods => {
+                br#"<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+            },
+            Self::Odp => {
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DetectionMode {
+    Bytes,
+    Reader,
+    Polyglot,
+    CatalogAlias,
+}
+
+impl DetectionMode {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Bytes => "bytes",
+            Self::Reader => "reader",
+            Self::Polyglot => "polyglot",
+            Self::CatalogAlias => "catalog-alias",
+        }
+    }
+
+    const fn expected_format(self, family: DetectionOdfFamily) -> FileFormat {
+        match self {
+            Self::Bytes | Self::Reader => family.odf_format(),
+            Self::Polyglot | Self::CatalogAlias => family.ooxml_format(),
+        }
+    }
 }
 
 /// Transport and producer variants for the opt-in semantic RTF matrix.
@@ -875,6 +980,10 @@ enum Case {
     OdtMixedModelContentBatchEditSave,
     OdfValidationReport,
     OdfMimetypeRepairPlan,
+    DetectOdtBytes,
+    DetectOdtReader,
+    DetectOdtPolyglot,
+    DetectOdtCatalogAlias,
     OdtMediaParagraphEditSave,
     OdtMediaLineBreakEditSave,
     OdtMediaAppendRunEditSave,
@@ -904,6 +1013,10 @@ enum Case {
     OdsMediaOneEditSave,
     OdsContentCowOwnedRebuild,
     OdsContentCowPositional,
+    DetectOdsBytes,
+    DetectOdsReader,
+    DetectOdsPolyglot,
+    DetectOdsCatalogAlias,
     OdpSemanticOpen,
     OdpSemanticListSlides,
     OdpSemanticOneSlide,
@@ -920,6 +1033,10 @@ enum Case {
     OdpMediaSourceBackedOpen,
     OdpMediaEagerOneSlide,
     OdpMediaSourceBackedOneSlide,
+    DetectOdpBytes,
+    DetectOdpReader,
+    DetectOdpPolyglot,
+    DetectOdpCatalogAlias,
     OdpFileEagerOpen,
     OdpFileSourceOpen,
     OdpFileEagerSelectedSlide,
@@ -1357,6 +1474,10 @@ impl Case {
             Self::OdtMixedModelContentBatchEditSave => "odt_mixed_model_content_batch_edit_save",
             Self::OdfValidationReport => "odf_validation_report",
             Self::OdfMimetypeRepairPlan => "odf_mimetype_repair_plan",
+            Self::DetectOdtBytes => "detect_odt_bytes",
+            Self::DetectOdtReader => "detect_odt_reader",
+            Self::DetectOdtPolyglot => "detect_odt_polyglot",
+            Self::DetectOdtCatalogAlias => "detect_odt_catalog_alias",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdtMediaLineBreakEditSave => "odt_media_line_break_edit_save",
             Self::OdtMediaAppendRunEditSave => "odt_media_append_run_edit_save",
@@ -1388,6 +1509,10 @@ impl Case {
             Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
             Self::OdsContentCowOwnedRebuild => "ods_content_cow_owned_rebuild",
             Self::OdsContentCowPositional => "ods_content_cow_positional",
+            Self::DetectOdsBytes => "detect_ods_bytes",
+            Self::DetectOdsReader => "detect_ods_reader",
+            Self::DetectOdsPolyglot => "detect_ods_polyglot",
+            Self::DetectOdsCatalogAlias => "detect_ods_catalog_alias",
             Self::OdpSemanticOpen => "odp_semantic_open",
             Self::OdpSemanticListSlides => "odp_semantic_list_slides",
             Self::OdpSemanticOneSlide => "odp_semantic_one_slide",
@@ -1404,6 +1529,10 @@ impl Case {
             Self::OdpMediaSourceBackedOpen => "odp_media_source_backed_open",
             Self::OdpMediaEagerOneSlide => "odp_media_eager_one_slide",
             Self::OdpMediaSourceBackedOneSlide => "odp_media_source_backed_one_slide",
+            Self::DetectOdpBytes => "detect_odp_bytes",
+            Self::DetectOdpReader => "detect_odp_reader",
+            Self::DetectOdpPolyglot => "detect_odp_polyglot",
+            Self::DetectOdpCatalogAlias => "detect_odp_catalog_alias",
             Self::OdpFileEagerOpen => "odp_file_eager_open",
             Self::OdpFileSourceOpen => "odp_file_source_open",
             Self::OdpFileEagerSelectedSlide => "odp_file_eager_selected_slide",
@@ -1859,6 +1988,48 @@ impl Case {
 
     const fn uses_odf_repair(self) -> bool {
         matches!(self, Self::OdfMimetypeRepairPlan)
+    }
+
+    const fn is_detection(self) -> bool {
+        matches!(
+            self,
+            Self::DetectOdtBytes
+                | Self::DetectOdtReader
+                | Self::DetectOdtPolyglot
+                | Self::DetectOdtCatalogAlias
+                | Self::DetectOdsBytes
+                | Self::DetectOdsReader
+                | Self::DetectOdsPolyglot
+                | Self::DetectOdsCatalogAlias
+                | Self::DetectOdpBytes
+                | Self::DetectOdpReader
+                | Self::DetectOdpPolyglot
+                | Self::DetectOdpCatalogAlias
+        )
+    }
+
+    fn detection_spec(self) -> Option<(DetectionOdfFamily, DetectionMode)> {
+        match self {
+            Self::DetectOdtBytes => Some((DetectionOdfFamily::Odt, DetectionMode::Bytes)),
+            Self::DetectOdtReader => Some((DetectionOdfFamily::Odt, DetectionMode::Reader)),
+            Self::DetectOdtPolyglot => Some((DetectionOdfFamily::Odt, DetectionMode::Polyglot)),
+            Self::DetectOdtCatalogAlias => {
+                Some((DetectionOdfFamily::Odt, DetectionMode::CatalogAlias))
+            },
+            Self::DetectOdsBytes => Some((DetectionOdfFamily::Ods, DetectionMode::Bytes)),
+            Self::DetectOdsReader => Some((DetectionOdfFamily::Ods, DetectionMode::Reader)),
+            Self::DetectOdsPolyglot => Some((DetectionOdfFamily::Ods, DetectionMode::Polyglot)),
+            Self::DetectOdsCatalogAlias => {
+                Some((DetectionOdfFamily::Ods, DetectionMode::CatalogAlias))
+            },
+            Self::DetectOdpBytes => Some((DetectionOdfFamily::Odp, DetectionMode::Bytes)),
+            Self::DetectOdpReader => Some((DetectionOdfFamily::Odp, DetectionMode::Reader)),
+            Self::DetectOdpPolyglot => Some((DetectionOdfFamily::Odp, DetectionMode::Polyglot)),
+            Self::DetectOdpCatalogAlias => {
+                Some((DetectionOdfFamily::Odp, DetectionMode::CatalogAlias))
+            },
+            _ => None,
+        }
     }
 
     const fn uses_ods_media(self) -> bool {
@@ -6731,6 +6902,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && !case.uses_validation_pptx()
                     && !case.uses_validation_odf()
                     && !case.uses_odf_repair()
+                    && !case.is_detection()
                     && !case.is_cfb_selective()
                     && !case.is_cfb_open_stream_evidence()
             }) {
@@ -7539,6 +7711,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                     options.warmup_iterations,
                     options.samples,
                     options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_detection()) {
+        for shape in &options.semantic_shapes {
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.is_detection())
+            {
+                let corpus = build_detection_corpus(case, *shape)?;
+                results.push(run_detection_case(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
                 )?);
             }
         }
@@ -8707,6 +8898,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_mixed_model_content_batch_edit_save" => Some(Case::OdtMixedModelContentBatchEditSave),
         "odf_validation_report" => Some(Case::OdfValidationReport),
         "odf_mimetype_repair_plan" => Some(Case::OdfMimetypeRepairPlan),
+        "detect_odt_bytes" => Some(Case::DetectOdtBytes),
+        "detect_odt_reader" => Some(Case::DetectOdtReader),
+        "detect_odt_polyglot" => Some(Case::DetectOdtPolyglot),
+        "detect_odt_catalog_alias" => Some(Case::DetectOdtCatalogAlias),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "odt_media_line_break_edit_save" => Some(Case::OdtMediaLineBreakEditSave),
         "odt_media_append_run_edit_save" => Some(Case::OdtMediaAppendRunEditSave),
@@ -8742,6 +8937,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
         "ods_content_cow_owned_rebuild" => Some(Case::OdsContentCowOwnedRebuild),
         "ods_content_cow_positional" => Some(Case::OdsContentCowPositional),
+        "detect_ods_bytes" => Some(Case::DetectOdsBytes),
+        "detect_ods_reader" => Some(Case::DetectOdsReader),
+        "detect_ods_polyglot" => Some(Case::DetectOdsPolyglot),
+        "detect_ods_catalog_alias" => Some(Case::DetectOdsCatalogAlias),
         "odp_semantic_open" => Some(Case::OdpSemanticOpen),
         "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
         "odp_semantic_one_slide" => Some(Case::OdpSemanticOneSlide),
@@ -8758,6 +8957,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_media_source_backed_open" => Some(Case::OdpMediaSourceBackedOpen),
         "odp_media_eager_one_slide" => Some(Case::OdpMediaEagerOneSlide),
         "odp_media_source_backed_one_slide" => Some(Case::OdpMediaSourceBackedOneSlide),
+        "detect_odp_bytes" => Some(Case::DetectOdpBytes),
+        "detect_odp_reader" => Some(Case::DetectOdpReader),
+        "detect_odp_polyglot" => Some(Case::DetectOdpPolyglot),
+        "detect_odp_catalog_alias" => Some(Case::DetectOdpCatalogAlias),
         "odp_file_eager_open" => Some(Case::OdpFileEagerOpen),
         "odp_file_source_open" => Some(Case::OdpFileSourceOpen),
         "odp_file_eager_selected_slide" => Some(Case::OdpFileEagerSelectedSlide),
@@ -9065,6 +9268,8 @@ fn print_usage() {
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
                                        odt_mixed_model_content_scalar_edit_save,\n\
                                        odt_mixed_model_content_batch_edit_save,\n\
+                                       detect_odt_bytes,detect_odt_reader,\n\
+                                       detect_odt_polyglot,detect_odt_catalog_alias,\n\
                                        odt_media_paragraph_edit_save,odt_media_line_break_edit_save,\n\
                                        odt_media_append_run_edit_save,\n\
                                        odt_media_append_hyperlink_edit_save,\n\
@@ -9088,6 +9293,8 @@ fn print_usage() {
                                        ods_source_backed_repeated_edit,\n\
                                        ods_media_one_edit_save,\n\
                                        ods_content_cow_owned_rebuild,ods_content_cow_positional,\n\
+                                       detect_ods_bytes,detect_ods_reader,\n\
+                                       detect_ods_polyglot,detect_ods_catalog_alias,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
@@ -9097,6 +9304,8 @@ fn print_usage() {
                                        odp_content_cow_owned_rebuild,odp_content_cow_positional,\n\
                                        odp_media_eager_open,odp_media_source_backed_open,\n\
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
+                                       detect_odp_bytes,detect_odp_reader,\n\
+                                       detect_odp_polyglot,detect_odp_catalog_alias,\n\
                                        odp_file_eager_open,odp_file_source_open,\n\
                                        odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
                                        odp_source_backed_repeated_text_uncached,\n\
@@ -13507,6 +13716,296 @@ fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
     })
 }
 
+fn detection_format_name(format: FileFormat) -> &'static str {
+    match format {
+        FileFormat::Docx => "docx",
+        FileFormat::Xlsx => "xlsx",
+        FileFormat::Pptx => "pptx",
+        FileFormat::Odt => "odt",
+        FileFormat::Ods => "ods",
+        FileFormat::Odp => "odp",
+        _ => "other",
+    }
+}
+
+fn build_detection_corpus(case: Case, shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let (family, mode) = case
+        .detection_spec()
+        .ok_or("non-detection case passed to detection corpus builder")?;
+    let base = match family {
+        DetectionOdfFamily::Odt => build_semantic_odt_corpus(shape)?,
+        DetectionOdfFamily::Ods => build_semantic_ods_corpus(shape)?,
+        DetectionOdfFamily::Odp => build_semantic_odp_corpus(shape)?,
+    };
+    let archive = match mode {
+        DetectionMode::Bytes | DetectionMode::Reader => base.archive.clone(),
+        DetectionMode::Polyglot => detection_polyglot_archive(family, &base.archive)?,
+        DetectionMode::CatalogAlias => detection_catalog_alias_archive(family, &base.archive)?,
+    };
+    let expected = mode.expected_format(family);
+    let observed = litchi::common::detection::detect_file_format_from_bytes(&archive);
+    if observed != Some(expected) {
+        return Err(format!(
+            "{} detection corpus oracle differs: expected {}, observed {}",
+            case.name(),
+            detection_format_name(expected),
+            observed.map_or("none", detection_format_name),
+        )
+        .into());
+    }
+    let (archive_member_count, logical_bytes) = zip_logical_work(&archive)?;
+    let target_payload = detection_format_name(expected).as_bytes().to_vec();
+    let mut manifest = base.manifest;
+    manifest.name = format!("{}-{}-{}", family.name(), mode.name(), shape.name());
+    manifest.generator = DETECTION_ODF_CORPUS_GENERATOR;
+    manifest.package_format = "ODF/OOXML/ZIP";
+    manifest.shape = shape.name();
+    manifest.payload_kind = mode.payload_kind();
+    manifest.compression = "deflate-and-stored";
+    manifest.entry_count = archive_member_count;
+    manifest.archive_member_count = archive_member_count;
+    manifest.entry_bytes = target_payload.len();
+    manifest.uncompressed_payload_bytes = usize::try_from(logical_bytes)?;
+    manifest.archive_bytes = archive.len();
+    manifest.archive_sha256 = sha256_hex(&archive);
+    manifest.target_entry = format!("detected-format:{}", detection_format_name(expected));
+    manifest.target_payload_bytes = target_payload.len();
+    manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    Ok(Corpus {
+        manifest,
+        archive,
+        target_name: "detected-format".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+impl DetectionMode {
+    const fn payload_kind(self) -> &'static str {
+        match self {
+            Self::Bytes => "canonical-odf",
+            Self::Reader => "canonical-odf-reader",
+            Self::Polyglot => "ooxml-odf-polyglot",
+            Self::CatalogAlias => "ooxml-odf-catalog-alias",
+        }
+    }
+}
+
+fn detection_polyglot_archive(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    detection_merge_ooxml_members(family, odf_archive, true)
+}
+
+fn detection_catalog_alias_archive(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    // A leading slash is a ZIP/OPC alias. The conservative ODF catalog probe
+    // must classify this layout as unknown so the OOXML fallback gets a turn.
+    detection_merge_ooxml_members(family, odf_archive, false)
+}
+
+fn detection_merge_ooxml_members(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+    include_catalog: bool,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let odf = ArchiveReader::new(odf_archive)?;
+    let ooxml_archive = detection_ooxml_archive(family)?;
+    let ooxml = ArchiveReader::new(&ooxml_archive)?;
+    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    writer.set_mimetype(family.odf_mimetype())?;
+    for path in odf.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer.add_file(path, &odf.read(path)?)?;
+    }
+    for path in ooxml.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml")
+            || path.ends_with('/')
+            || (!include_catalog && path == "[Content_Types].xml")
+        {
+            continue;
+        }
+        writer.add_file(path, &ooxml.read(path)?)?;
+    }
+    let merged = writer.finish_to_bytes()?;
+    if include_catalog {
+        Ok(merged)
+    } else {
+        let catalog = ooxml.read("[Content_Types].xml")?;
+        append_stored_zip_member(&merged, "/[Content_Types].xml", &catalog)
+    }
+}
+
+fn detection_ooxml_archive(family: DetectionOdfFamily) -> Result<Vec<u8>, Box<dyn Error>> {
+    let part_name = family.ooxml_part();
+    let mut package = OpcPackage::new();
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new(format!("/{part_name}"))?,
+        family.ooxml_content_type().to_owned(),
+        family.ooxml_payload().to_vec(),
+    )))?;
+    package.rels_mut().try_add_relationship(
+        relationship_type::OFFICE_DOCUMENT.to_owned(),
+        part_name.to_owned(),
+        "rIdDetectionMain".to_owned(),
+        TargetMode::Internal,
+    )?;
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn append_stored_zip_member(
+    source: &[u8],
+    name: &str,
+    data: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    const EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
+    const LOCAL_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x03, 0x04];
+    const CENTRAL_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
+    const EOCD_BYTES: usize = 22;
+    const LOCAL_FIXED_BYTES: usize = 30;
+    const CENTRAL_FIXED_BYTES: usize = 46;
+
+    if source.len() < EOCD_BYTES {
+        return Err("ZIP alias source has no end-of-central-directory record".into());
+    }
+    let minimum_eocd = source.len().saturating_sub(EOCD_BYTES + u16::MAX as usize);
+    let last_candidate = source.len() - EOCD_BYTES;
+    let eocd_offset = (minimum_eocd..=last_candidate)
+        .rev()
+        .find(|offset| {
+            source.get(*offset..*offset + 4) == Some(EOCD_SIGNATURE.as_slice())
+                && read_zip_u16(source, *offset + 20).is_some_and(|comment| {
+                    *offset + EOCD_BYTES + usize::from(comment) == source.len()
+                })
+        })
+        .ok_or("ZIP alias source has no bounded end-of-central-directory record")?;
+    let central_size = usize::try_from(
+        read_zip_u32(source, eocd_offset + 12).ok_or("ZIP alias central size is truncated")?,
+    )?;
+    let central_offset = usize::try_from(
+        read_zip_u32(source, eocd_offset + 16).ok_or("ZIP alias central offset is truncated")?,
+    )?;
+    let entry_count =
+        read_zip_u16(source, eocd_offset + 10).ok_or("ZIP alias entry count is truncated")?;
+    if central_offset.checked_add(central_size) != Some(eocd_offset)
+        || entry_count == u16::MAX
+        || central_offset > u32::MAX as usize
+    {
+        return Err("ZIP alias source is not a classic single-disk archive".into());
+    }
+    let name_bytes = name.as_bytes();
+    let name_len = u16::try_from(name_bytes.len())?;
+    let data_len = u32::try_from(data.len())?;
+    let crc = soapberry_zip::crc32(data);
+    let local_len = LOCAL_FIXED_BYTES
+        .checked_add(name_bytes.len())
+        .and_then(|length| length.checked_add(data.len()))
+        .ok_or("ZIP alias local entry length overflows usize")?;
+    let central_len = CENTRAL_FIXED_BYTES
+        .checked_add(name_bytes.len())
+        .ok_or("ZIP alias central entry length overflows usize")?;
+
+    let mut local = Vec::with_capacity(local_len);
+    local.extend_from_slice(&LOCAL_SIGNATURE);
+    push_zip_u16(&mut local, 20);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u32(&mut local, crc);
+    push_zip_u32(&mut local, data_len);
+    push_zip_u32(&mut local, data_len);
+    push_zip_u16(&mut local, name_len);
+    push_zip_u16(&mut local, 0);
+    local.extend_from_slice(name_bytes);
+    local.extend_from_slice(data);
+
+    let mut central = Vec::with_capacity(central_len);
+    central.extend_from_slice(&CENTRAL_SIGNATURE);
+    push_zip_u16(&mut central, 20);
+    push_zip_u16(&mut central, 20);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u32(&mut central, crc);
+    push_zip_u32(&mut central, data_len);
+    push_zip_u32(&mut central, data_len);
+    push_zip_u16(&mut central, name_len);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u32(&mut central, 0);
+    push_zip_u32(&mut central, u32::try_from(central_offset)?);
+    central.extend_from_slice(name_bytes);
+
+    let new_central_offset = central_offset
+        .checked_add(local.len())
+        .ok_or("ZIP alias central offset overflows usize")?;
+    let new_central_size = central_size
+        .checked_add(central.len())
+        .ok_or("ZIP alias central size overflows usize")?;
+    let mut eocd = source[eocd_offset..].to_vec();
+    let next_entry_count = entry_count + 1;
+    write_zip_u16(&mut eocd, 8, next_entry_count)?;
+    write_zip_u16(&mut eocd, 10, next_entry_count)?;
+    write_zip_u32(&mut eocd, 12, u32::try_from(new_central_size)?)?;
+    write_zip_u32(&mut eocd, 16, u32::try_from(new_central_offset)?)?;
+
+    let output_len = source
+        .len()
+        .checked_add(local.len())
+        .and_then(|length| length.checked_add(central.len()))
+        .ok_or("ZIP alias output length overflows usize")?;
+    let mut output = Vec::with_capacity(output_len);
+    output.extend_from_slice(&source[..central_offset]);
+    output.extend_from_slice(&local);
+    output.extend_from_slice(&source[central_offset..eocd_offset]);
+    output.extend_from_slice(&central);
+    output.extend_from_slice(&eocd);
+    Ok(output)
+}
+
+fn read_zip_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+    let bytes = bytes.get(offset..offset.checked_add(2)?)?;
+    Some(u16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn read_zip_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    let bytes = bytes.get(offset..offset.checked_add(4)?)?;
+    Some(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn push_zip_u16(bytes: &mut Vec<u8>, value: u16) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_zip_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_zip_u16(bytes: &mut [u8], offset: usize, value: u16) -> Result<(), Box<dyn Error>> {
+    let target = bytes
+        .get_mut(offset..offset.checked_add(2).ok_or("ZIP field offset overflow")?)
+        .ok_or("ZIP field is truncated")?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_zip_u32(bytes: &mut [u8], offset: usize, value: u32) -> Result<(), Box<dyn Error>> {
+    let target = bytes
+        .get_mut(offset..offset.checked_add(4).ok_or("ZIP field offset overflow")?)
+        .ok_or("ZIP field is truncated")?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
 fn build_odp_media_corpus() -> Result<Corpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let archive = odp_media_archive()?;
@@ -15564,6 +16063,20 @@ fn run_case_with_config(
         Case::OdfValidationReport => run_odf_validation_report(corpus, warmup_iterations, samples),
         Case::OdfMimetypeRepairPlan => {
             run_odf_mimetype_repair_plan(corpus, warmup_iterations, samples)
+        },
+        Case::DetectOdtBytes
+        | Case::DetectOdtReader
+        | Case::DetectOdtPolyglot
+        | Case::DetectOdtCatalogAlias
+        | Case::DetectOdsBytes
+        | Case::DetectOdsReader
+        | Case::DetectOdsPolyglot
+        | Case::DetectOdsCatalogAlias
+        | Case::DetectOdpBytes
+        | Case::DetectOdpReader
+        | Case::DetectOdpPolyglot
+        | Case::DetectOdpCatalogAlias => {
+            run_detection_case(case, corpus, warmup_iterations, samples)
         },
         Case::OdtMediaParagraphEditSave => {
             run_odt_media_paragraph_edit_save(corpus, warmup_iterations, samples)
@@ -32212,6 +32725,78 @@ fn run_zip_index(
     Ok(result(Case::ZipIndex, corpus, elapsed, None))
 }
 
+fn run_detection_case(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let (family, mode) = case
+        .detection_spec()
+        .ok_or("non-detection case passed to detection runner")?;
+    let expected = mode.expected_format(family);
+    let preflight = litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+    if preflight != Some(expected) {
+        return Err(format!(
+            "{} detection preflight differs from expected {}: {:?}",
+            case.name(),
+            detection_format_name(expected),
+            preflight,
+        )
+        .into());
+    }
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Corpus setup, the exact-format oracle, and reader-contract checks are
+        // deliberately outside the timed detector call. This keeps optional
+        // test-only probe instrumentation from becoming benchmark work.
+        let (observed, duration, cursor_position) = match mode {
+            DetectionMode::Reader => {
+                let original_position = 7_u64;
+                let mut reader = Cursor::new(corpus.archive.as_slice());
+                reader.set_position(original_position);
+                let started = Instant::now();
+                let observed = litchi::common::detection::detect_format_from_reader(&mut reader);
+                let duration = started.elapsed();
+                (
+                    observed,
+                    duration,
+                    Some((reader.position(), original_position)),
+                )
+            },
+            DetectionMode::Bytes | DetectionMode::Polyglot | DetectionMode::CatalogAlias => {
+                let started = Instant::now();
+                let observed =
+                    litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+                let duration = started.elapsed();
+                (observed, duration, None)
+            },
+        };
+        if observed != Some(expected) {
+            return Err(format!(
+                "{} detection sample differs from expected {}: {:?}",
+                case.name(),
+                detection_format_name(expected),
+                observed,
+            )
+            .into());
+        }
+        if let Some((observed_position, original_position)) = cursor_position
+            && observed_position != original_position
+        {
+            return Err(format!(
+                "{} detection changed reader cursor from {original_position} to {observed_position}",
+                case.name(),
+            )
+            .into());
+        }
+        std::hint::black_box(observed);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result(case, corpus, elapsed, None))
+}
+
 fn run_zip_read_one(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -40697,28 +41282,29 @@ mod tests {
         XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
-        build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
-        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
-        build_odt_repeated_text_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
-        build_opc_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
-        build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
-        build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
-        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
-        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
-        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
-        build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
-        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
-        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
-        cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
-        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        build_detection_corpus, build_docx_source_edit_corpus, build_odf_repair_corpus,
+        build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
+        build_odt_media_corpus, build_odt_repeated_text_corpus, build_odt_resource_batch_corpus,
+        build_ole_common_corpus, build_opc_corpus, build_ppt_pictures_corpus,
+        build_pptx_cross_copy_corpus, build_pptx_source_backed_cross_copy_corpus,
+        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_rtf_picture_corpus,
+        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
+        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
+        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
+        build_xls_visibility_edit_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
+        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
+        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
+        build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, build_xlsx_row_visibility_corpus,
+        build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
+        cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
+        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_one_edit_save, run_odf_content_cow,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -40731,6 +41317,47 @@ mod tests {
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
         updated_writer_text, verify_xlsx_cells, writer_shape, xlsx_cell_count, xlsx_spec,
     };
+
+    #[test]
+    fn detection_selectors_are_opt_in_with_exact_oracles() {
+        let cases = [
+            Case::DetectOdtBytes,
+            Case::DetectOdtReader,
+            Case::DetectOdtPolyglot,
+            Case::DetectOdtCatalogAlias,
+            Case::DetectOdsBytes,
+            Case::DetectOdsReader,
+            Case::DetectOdsPolyglot,
+            Case::DetectOdsCatalogAlias,
+            Case::DetectOdpBytes,
+            Case::DetectOdpReader,
+            Case::DetectOdpPolyglot,
+            Case::DetectOdpCatalogAlias,
+        ];
+        for case in cases {
+            assert!(!Case::DEFAULT.contains(&case));
+            assert_eq!(parse_case(case.name()), Some(case));
+            let (family, mode) = case
+                .detection_spec()
+                .expect("detection selector has a family and mode");
+            let expected = mode.expected_format(family);
+            let corpus = build_detection_corpus(case, SemanticShape::Tiny)
+                .expect("detection corpus has a deterministic oracle");
+            assert_eq!(
+                litchi::common::detection::detect_file_format_from_bytes(&corpus.archive),
+                Some(expected)
+            );
+            if mode == super::DetectionMode::Reader {
+                let mut reader = std::io::Cursor::new(corpus.archive.as_slice());
+                reader.set_position(7);
+                assert_eq!(
+                    litchi::common::detection::detect_format_from_reader(&mut reader),
+                    Some(expected)
+                );
+                assert_eq!(reader.position(), 7);
+            }
+        }
+    }
 
     #[test]
     fn ppt_picture_selectors_preserve_semantics_and_phase_read_evidence() {
