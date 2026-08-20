@@ -539,6 +539,25 @@ impl SourceSnapshot {
                 observed: shared.source_version()?,
             }));
         }
+        Self::finish_open(source, version, length, opening_fingerprint, shared, limits)
+    }
+
+    /// Completes the semantic DOC checks after the immutable CFB index has
+    /// been opened and its source identity has been captured.
+    ///
+    /// The ordinary `ReadAt` path intentionally opens a second index after
+    /// the first fingerprint.  That protects callers whose adapter exposes a
+    /// stable token while its bytes can still change.  The owned-byte path
+    /// below can safely call this helper with its first index because the
+    /// adapter is created here and cannot be mutated by a caller.
+    fn finish_open(
+        source: Arc<dyn ReadAt>,
+        version: SourceVersion,
+        length: u64,
+        opening_fingerprint: ArtifactFingerprint,
+        shared: Arc<SharedOleFile>,
+        limits: SourceLimits,
+    ) -> Result<Self> {
         reject_container_components(&shared)?;
         let (table_name, fib) = read_fib(&shared, limits)?;
         reject_fib_policy(&shared, &table_name, &fib, limits)?;
@@ -606,7 +625,41 @@ impl SourceSnapshot {
 
     /// Opens an owned byte vector after validating its CFB/DOC structure.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::open(Arc::new(OwnedSource::new(bytes)))
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
+        Self::open_owned_source(source, SourceBackedOptions::default())
+    }
+
+    /// Opens a source whose immutable ownership was established by this
+    /// module.  Unlike the general `ReadAt` entry point, this path does not
+    /// parse the same CFB index twice: the source bytes are held by the
+    /// private `OwnedSource` adapter, so the opening fingerprint and the
+    /// validated index necessarily describe the same immutable bytes.
+    fn open_owned_source(source: Arc<dyn ReadAt>, options: SourceBackedOptions) -> Result<Self> {
+        let limits = options.limits;
+        limits.validate()?;
+        let length = source.len()?;
+        if length > limits.max_input_bytes {
+            return Err(Error::Limit(format!(
+                "source length {length} exceeds {}",
+                limits.max_input_bytes
+            )));
+        }
+        let shared_limits = SharedOleFileLimits::new(limits.max_input_bytes)?;
+        let version = source.version()?;
+        let shared = Arc::new(SharedOleFile::open_with_limits(
+            Arc::clone(&source),
+            shared_limits,
+        )?);
+        ensure_source_identity(&source, version, length)?;
+        if shared.source_version()? != version {
+            return Err(Error::Overlay(OverlayError::SourceChanged {
+                expected: version,
+                observed: shared.source_version()?,
+            }));
+        }
+        let opening_fingerprint = identity_fingerprint(&shared, limits)?;
+        ensure_source_identity(&source, version, length)?;
+        Self::finish_open(source, version, length, opening_fingerprint, shared, limits)
     }
 
     /// Parses and validates a borrowed byte slice by taking one owned copy.
@@ -2250,6 +2303,37 @@ mod tests {
         let source = SourceSnapshot::from_bytes(bytes).expect("source-backed DOC fixture");
         let paragraph = source.paragraph(Position::new(0)).expect("first paragraph");
         assert!(!paragraph.text().is_empty());
+    }
+
+    #[test]
+    fn owned_bytes_open_reuses_the_validated_cfb_index() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/doc/documentProperties.doc");
+        let bytes = std::fs::read(path).expect("DOC fixture");
+
+        let generic_counter = Arc::new(CountingSource {
+            bytes: Arc::from(bytes.clone()),
+            total_bytes: AtomicU64::new(0),
+            max_read: AtomicUsize::new(0),
+        });
+        let generic_source: Arc<dyn ReadAt> = generic_counter.clone();
+        SourceSnapshot::open(generic_source).expect("generic source-backed DOC fixture");
+        let generic_reads = generic_counter.total_bytes.load(Ordering::SeqCst);
+
+        let owned_counter = Arc::new(CountingSource {
+            bytes: Arc::from(bytes),
+            total_bytes: AtomicU64::new(0),
+            max_read: AtomicUsize::new(0),
+        });
+        let owned_source: Arc<dyn ReadAt> = owned_counter.clone();
+        SourceSnapshot::open_owned_source(owned_source, SourceBackedOptions::default())
+            .expect("owned source-backed DOC fixture");
+        let owned_reads = owned_counter.total_bytes.load(Ordering::SeqCst);
+
+        assert!(
+            owned_reads < generic_reads,
+            "owned opening should avoid the second CFB parse: owned={owned_reads}, generic={generic_reads}"
+        );
     }
 
     #[test]
