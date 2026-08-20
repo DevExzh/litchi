@@ -1455,6 +1455,43 @@ impl Archive {
 
     /// Parse a decompressed IWA stream under explicit resource limits.
     pub fn parse_with_limits(data: &[u8], limits: Limits) -> Result<Self> {
+        Self::parse_internal_with_limits(data, limits, None)
+    }
+
+    /// Parse only objects with one archive identifier from a decompressed IWA
+    /// stream under explicit resource limits.
+    ///
+    /// Every object in the source is still walked: its length framing,
+    /// `ArchiveInfo`, message lengths, aggregate message count, and payload
+    /// extent are validated against `limits`. Only payload bytes belonging to
+    /// objects whose identifier equals `identifier` are copied into the
+    /// returned archive. This is intended for bounded structural probes such
+    /// as application detection, where unrelated objects must remain opaque.
+    ///
+    /// The returned archive is a selected view, not a lossless replacement for
+    /// the source stream. Callers that may edit or serialize a component must
+    /// use [`Self::parse`] so every payload remains available for preservation.
+    pub fn parse_objects_with_identifier_with_limits(
+        data: &[u8],
+        identifier: u64,
+        limits: Limits,
+    ) -> Result<Self> {
+        Self::parse_internal_with_limits(data, limits, Some(identifier))
+    }
+
+    /// Parse only objects with one archive identifier using default limits.
+    ///
+    /// See [`Self::parse_objects_with_identifier_with_limits`] for the
+    /// selected-view and validation semantics.
+    pub fn parse_objects_with_identifier(data: &[u8], identifier: u64) -> Result<Self> {
+        Self::parse_objects_with_identifier_with_limits(data, identifier, Limits::default())
+    }
+
+    fn parse_internal_with_limits(
+        data: &[u8],
+        limits: Limits,
+        selected_identifier: Option<u64>,
+    ) -> Result<Self> {
         let limits = limits.validate()?;
         if data.len() > limits.max_archive_bytes() {
             return Err(limit(
@@ -1470,16 +1507,18 @@ impl Archive {
         // spike. Grow the object list only as validated objects are found.
         let mut objects = Vec::new();
         let mut cursor = 0usize;
+        let mut object_count = 0usize;
         let mut total_messages = 0usize;
         while cursor < data.len() {
             let object_start = cursor;
-            if objects.len() >= limits.max_objects() {
+            if object_count >= limits.max_objects() {
                 return Err(limit(
                     LimitKind::Objects,
-                    objects.len() + 1,
+                    object_count + 1,
                     limits.max_objects(),
                 ));
             }
+            object_count += 1;
             let (header_length_u64, prefix_length) = decode_varint(&data[cursor..])?;
             cursor = cursor
                 .checked_add(prefix_length)
@@ -1494,13 +1533,18 @@ impl Archive {
                 Error::invalid_archive(object_start, "truncated ArchiveInfo header")
             })?;
             let archive_info = ArchiveInfo::decode_with_limits(header, limits)?;
-            let canonical_header = encode_archive_info(&archive_info, limits)?;
-            let (original_header, original_canonical_header) =
+            let selected = selected_identifier
+                .is_none_or(|identifier| archive_info.identifier == Some(identifier));
+            let (original_header, original_canonical_header) = if selected {
+                let canonical_header = encode_archive_info(&archive_info, limits)?;
                 if header == canonical_header.as_slice() {
                     (None, None)
                 } else {
                     (Some(header.into()), Some(canonical_header.into()))
-                };
+                }
+            } else {
+                (None, None)
+            };
             cursor = header_end;
             add_limited(
                 &mut total_messages,
@@ -1537,47 +1581,53 @@ impl Archive {
                 return Err(Error::invalid_archive(cursor, "truncated message payload"));
             }
 
-            let mut messages = Vec::new();
-            messages
-                .try_reserve_exact(archive_info.message_infos.len())
-                .map_err(|_| {
-                    Error::allocation("IWA object messages", archive_info.message_infos.len())
-                })?;
             let payload_start = cursor;
-            for message_info in &archive_info.message_infos {
-                let length = usize::try_from(message_info.length)
-                    .map_err(|_| Error::invalid_archive(cursor, "message length exceeds usize"))?;
-                let end = cursor
-                    .checked_add(length)
-                    .ok_or_else(|| Error::invalid_archive(cursor, "message range overflow"))?;
-                let message_data = data
-                    .get(cursor..end)
-                    .ok_or_else(|| Error::invalid_archive(cursor, "truncated message payload"))?;
-                let mut owned = Vec::new();
-                owned
-                    .try_reserve_exact(length)
-                    .map_err(|_| Error::allocation("IWA message payload", length))?;
-                owned.extend_from_slice(message_data);
-                messages.push(RawMessage {
-                    type_: message_info.type_,
-                    data: owned,
+            if selected {
+                let mut messages = Vec::new();
+                messages
+                    .try_reserve_exact(archive_info.message_infos.len())
+                    .map_err(|_| {
+                        Error::allocation("IWA object messages", archive_info.message_infos.len())
+                    })?;
+                for message_info in &archive_info.message_infos {
+                    let length = usize::try_from(message_info.length).map_err(|_| {
+                        Error::invalid_archive(cursor, "message length exceeds usize")
+                    })?;
+                    let end = cursor
+                        .checked_add(length)
+                        .ok_or_else(|| Error::invalid_archive(cursor, "message range overflow"))?;
+                    let message_data = data.get(cursor..end).ok_or_else(|| {
+                        Error::invalid_archive(cursor, "truncated message payload")
+                    })?;
+                    let mut owned = Vec::new();
+                    owned
+                        .try_reserve_exact(length)
+                        .map_err(|_| Error::allocation("IWA message payload", length))?;
+                    owned.extend_from_slice(message_data);
+                    messages.push(RawMessage {
+                        type_: message_info.type_,
+                        data: owned,
+                    });
+                    cursor = end;
+                }
+                objects.push(ArchiveObject {
+                    archive_info,
+                    messages,
+                    header_offset: u64::try_from(object_start)
+                        .map_err(|_| Error::invalid_archive(object_start, "offset exceeds u64"))?,
+                    header_length: u64::try_from(prefix_length + header_length)
+                        .map_err(|_| Error::invalid_archive(object_start, "header exceeds u64"))?,
+                    data_offset: u64::try_from(payload_start)
+                        .map_err(|_| Error::invalid_archive(payload_start, "offset exceeds u64"))?,
+                    data_length: u64::try_from(payload_length).map_err(|_| {
+                        Error::invalid_archive(payload_start, "payload exceeds u64")
+                    })?,
+                    original_header,
+                    original_canonical_header,
                 });
-                cursor = end;
+            } else {
+                cursor = payload_end;
             }
-            objects.push(ArchiveObject {
-                archive_info,
-                messages,
-                header_offset: u64::try_from(object_start)
-                    .map_err(|_| Error::invalid_archive(object_start, "offset exceeds u64"))?,
-                header_length: u64::try_from(prefix_length + header_length)
-                    .map_err(|_| Error::invalid_archive(object_start, "header exceeds u64"))?,
-                data_offset: u64::try_from(payload_start)
-                    .map_err(|_| Error::invalid_archive(payload_start, "offset exceeds u64"))?,
-                data_length: u64::try_from(payload_length)
-                    .map_err(|_| Error::invalid_archive(payload_start, "payload exceeds u64"))?,
-                original_header,
-                original_canonical_header,
-            });
         }
         let archive = Self { objects };
         archive.validate_with_limits(limits)?;
