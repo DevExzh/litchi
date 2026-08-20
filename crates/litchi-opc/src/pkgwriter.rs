@@ -274,9 +274,6 @@ fn try_write_preserved<W: Write>(
             omitted_ids.insert(indexed_entry.id());
         }
     }
-    if !omitted_ids.is_empty() && !omitted_members_form_suffix(&index, &omitted_ids)? {
-        return Ok(PreservationWrite::Fallback(writer));
-    }
     let topology_add = !additions.is_empty() || !relationship_additions.is_empty();
     let append_capacity = additions
         .len()
@@ -638,37 +635,6 @@ fn normalized_member_name(name: &str, resource: &'static str) -> Result<String> 
     String::from_utf8(bytes).map_err(|_| {
         crate::OpcError::ZipError("OPC preservation member name normalization failed".into())
     })
-}
-
-fn omitted_members_form_suffix<R: soapberry_zip::ReaderAt>(
-    index: &soapberry_zip::PreservationIndex<'_, R>,
-    omitted: &HashSet<soapberry_zip::PreservationEntryId>,
-) -> Result<bool> {
-    let entries = index.entries();
-    let Some(suffix_start) = entries.len().checked_sub(omitted.len()) else {
-        return Ok(false);
-    };
-    for (position, entry) in entries.iter().enumerate() {
-        if omitted.contains(&entry.id()) != (position >= suffix_start) {
-            return Ok(false);
-        }
-    }
-
-    let mut local_order = Vec::new();
-    local_order
-        .try_reserve_exact(entries.len())
-        .map_err(|source| crate::OpcError::Allocation {
-            resource: "OPC preservation local omission order",
-            source,
-        })?;
-    local_order.extend(0..entries.len());
-    local_order.sort_unstable_by_key(|&position| entries[position].local_span().start);
-    for (position, entry_position) in local_order.iter().enumerate() {
-        if omitted.contains(&entries[*entry_position].id()) != (position >= suffix_start) {
-            return Ok(false);
-        }
-    }
-    Ok(true)
 }
 
 fn output_entry_count_is_zip32_safe(
@@ -1854,17 +1820,27 @@ mod tests {
     }
 
     #[test]
-    fn non_suffix_part_and_relationship_removals_refuse_normalization() {
-        let (source, first, second) = two_part_source(b"topology fallback");
+    fn non_suffix_part_and_relationship_removals_preserve_retained_members() {
+        let (source, first, second) = two_part_source(b"topology removal");
+        let source_raw = raw_archive(&source);
 
         let mut removed = OpcPackage::from_vec(source.clone()).expect("open remove source");
         assert!(removed.remove_part(&first));
-        let removed_error = PackageWriter::to_bytes(&removed).expect_err("reject removed part");
-        assert!(matches!(
-            removed_error,
-            crate::OpcError::PreservationUnavailable { .. }
-        ));
-        assert!(removed.get_part(&second).is_ok());
+        let removed_output = PackageWriter::to_bytes(&removed).expect("publish removed part");
+        let removed_raw = raw_archive(&removed_output);
+        assert_eq!(removed_raw.comment, source_raw.comment);
+        assert_eq!(
+            removed_raw.local_members[second.membername()],
+            source_raw.local_members[second.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&removed_raw.central_records[second.membername()]),
+            central_without_local_offset(&source_raw.central_records[second.membername()])
+        );
+        let reopened_removed =
+            OpcPackage::from_bytes(&removed_output).expect("reopen removed part output");
+        assert!(!reopened_removed.contains_part(&first));
+        assert!(reopened_removed.contains_part(&second));
 
         let mut removed_relationship =
             OpcPackage::from_vec(source).expect("open relationship removal source");
@@ -1876,12 +1852,27 @@ mod tests {
                 .remove("rId1")
                 .is_some()
         );
-        let removed_relationship_error = PackageWriter::to_bytes(&removed_relationship)
-            .expect_err("reject relationship removal");
-        assert!(matches!(
-            removed_relationship_error,
-            crate::OpcError::PreservationUnavailable { .. }
-        ));
+        let relationship_output =
+            PackageWriter::to_bytes(&removed_relationship).expect("publish relationship removal");
+        let relationship_raw = raw_archive(&relationship_output);
+        assert_eq!(relationship_raw.comment, source_raw.comment);
+        assert_eq!(
+            relationship_raw.local_members[first.membername()],
+            source_raw.local_members[first.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&relationship_raw.central_records[first.membername()]),
+            central_without_local_offset(&source_raw.central_records[first.membername()])
+        );
+        let reopened_relationship =
+            OpcPackage::from_bytes(&relationship_output).expect("reopen relationship output");
+        assert!(
+            reopened_relationship
+                .get_part(&first)
+                .expect("retained first part")
+                .rels()
+                .is_empty()
+        );
     }
 
     #[test]
