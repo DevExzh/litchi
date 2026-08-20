@@ -177,8 +177,6 @@ _FILESYSTEM_SAMPLE_REQUIRED_KEYS = frozenset(
         "logical_read_calls",
         "logical_read_requested_bytes",
         "logical_read_bytes",
-        "logical_read_largest_requested_bytes",
-        "logical_read_largest_returned_bytes",
         "max_concurrent_reads",
         "logical_read_request_sizes",
         "logical_read_request_size_buckets",
@@ -190,6 +188,58 @@ _FILESYSTEM_SAMPLE_REQUIRED_KEYS = frozenset(
         "cfb_published_bytes",
     }
 )
+# These counters were added to schema 1 after the first filesystem reports
+# were emitted.  Schema 1 deliberately permits additive evidence, so an old
+# sample may omit the pair.  A sample may never provide only one member: a
+# partial pair would make the evidence ambiguous and is rejected below.
+_FILESYSTEM_RANGE_SIZE_KEYS = frozenset(
+    {
+        "logical_read_largest_requested_bytes",
+        "logical_read_largest_returned_bytes",
+    }
+)
+# The operation-metrics envelope also grew additively while report
+# ``schema_version`` remained 1.  These are the exact keys emitted before the
+# aligned sample-index, latency-claim, range-shape, procfs, and sink-write
+# additions.  They are kept separate from the current validator so accepting
+# this historical envelope cannot weaken validation of a current envelope.
+_LEGACY_OPERATION_METRICS_KEYS = frozenset(
+    {
+        "sample_count",
+        "alignment",
+        "source",
+        "process",
+        "sink",
+        "publication",
+        "materialization",
+        "cfb_phases",
+    }
+)
+_LEGACY_SOURCE_METRICS_KEYS = frozenset(
+    {
+        "status",
+        "counter_scope",
+        "logical_read_calls",
+        "logical_read_requested_bytes",
+        "logical_read_returned_bytes",
+        "max_concurrent_reads",
+    }
+)
+_LEGACY_PROCESS_METRICS_KEYS = frozenset(
+    {
+        "status",
+        "user_cpu_ticks",
+        "system_cpu_ticks",
+        "clock_ticks_per_second",
+        "minor_faults",
+        "major_faults",
+        "voluntary_context_switches",
+        "nonvoluntary_context_switches",
+        "rss_delta_bytes",
+        "peak_rss_bytes",
+    }
+)
+_LEGACY_SINK_METRICS_KEYS = frozenset({"status", "output_bytes"})
 _COLD_ADVICE_VALUES = frozenset(
     ("not_requested", "requested", "unsupported", "failed")
 )
@@ -635,6 +685,125 @@ def _operation_metrics_identity_projection(value: Any) -> Any:
     return value
 
 
+def _validate_legacy_operation_metrics(
+    value: Any, path: str, elapsed_samples: list[Any], report_schema: int
+) -> None:
+    """Validate the pre-additive schema-1 operation-metrics envelope.
+
+    This path is selected only for the exact historical key shape above.  It
+    deliberately does not synthesize any of the newer vectors or alignment
+    metadata from old observations.
+    """
+
+    if report_schema != HARNESS_SCHEMA_VERSION:
+        raise AbbaSummaryInputError(
+            f"{path} legacy validation requires report schema "
+            f"{HARNESS_SCHEMA_VERSION}, got {report_schema}"
+        )
+    try:
+        obj = perf_compare._require_exact_keys(
+            value, path, set(_LEGACY_OPERATION_METRICS_KEYS)
+        )
+        sample_count = len(elapsed_samples)
+        declared_sample_count = obj["sample_count"]
+        if (
+            isinstance(declared_sample_count, bool)
+            or not isinstance(declared_sample_count, int)
+            or declared_sample_count <= 0
+        ):
+            raise perf_compare.ComparisonInputError(
+                f"{path}.sample_count must be a positive integer"
+            )
+        if declared_sample_count != sample_count:
+            raise perf_compare.ComparisonInputError(
+                f"{path}.sample_count={declared_sample_count} does not match "
+                f"elapsed_ns.samples length {sample_count}"
+            )
+        if obj["alignment"] != "elapsed_ns.samples":
+            raise perf_compare.ComparisonInputError(
+                f"{path}.alignment must be 'elapsed_ns.samples'"
+            )
+
+        perf_compare._validate_status_group(
+            obj["source"],
+            f"{path}.source",
+            set(_LEGACY_SOURCE_METRICS_KEYS),
+            (
+                "logical_read_calls",
+                "logical_read_requested_bytes",
+                "logical_read_returned_bytes",
+                "max_concurrent_reads",
+            ),
+            sample_count,
+        )
+        source = obj["source"]
+        if not isinstance(source["counter_scope"], str) or not source["counter_scope"]:
+            raise perf_compare.ComparisonInputError(
+                f"{path}.source.counter_scope must be a non-empty string"
+            )
+
+        perf_compare._validate_status_group(
+            obj["process"],
+            f"{path}.process",
+            set(_LEGACY_PROCESS_METRICS_KEYS),
+            (
+                "user_cpu_ticks",
+                "system_cpu_ticks",
+                "clock_ticks_per_second",
+                "minor_faults",
+                "major_faults",
+                "voluntary_context_switches",
+                "nonvoluntary_context_switches",
+                "rss_delta_bytes",
+                "peak_rss_bytes",
+            ),
+            sample_count,
+        )
+
+        sink = perf_compare._require_exact_keys(
+            obj["sink"], f"{path}.sink", set(_LEGACY_SINK_METRICS_KEYS)
+        )
+        sink_status = perf_compare._validate_metric_status(
+            sink["status"], f"{path}.sink.status"
+        )
+        output_status = perf_compare._validate_metric_vector(
+            sink["output_bytes"], f"{path}.sink.output_bytes", sample_count
+        )
+        if output_status != sink_status:
+            raise perf_compare.ComparisonInputError(
+                f"{path}.sink.status does not match {path}.sink.output_bytes.status"
+            )
+
+        perf_compare._validate_status_group(
+            obj["publication"],
+            f"{path}.publication",
+            {"status", "changed_spans", "published_bytes"},
+            ("changed_spans", "published_bytes"),
+            sample_count,
+        )
+        perf_compare._validate_status_group(
+            obj["materialization"],
+            f"{path}.materialization",
+            {"status", "opc_parts"},
+            ("opc_parts",),
+            sample_count,
+        )
+        phases = perf_compare._require_exact_keys(
+            obj["cfb_phases"],
+            f"{path}.cfb_phases",
+            {"status", "open", "plan", "atomic_publication"},
+        )
+        phase_status = perf_compare._validate_metric_status(
+            phases["status"], f"{path}.cfb_phases.status"
+        )
+        for phase in ("open", "plan", "atomic_publication"):
+            perf_compare._validate_phase_set(
+                phases[phase], f"{path}.cfb_phases.{phase}", phase_status, sample_count
+            )
+    except perf_compare.ComparisonInputError as error:
+        raise AbbaSummaryInputError(str(error)) from error
+
+
 def _operation_metrics_identity(
     row: dict[str, Any], location: str, report_schema: int
 ) -> str | None:
@@ -649,19 +818,25 @@ def _operation_metrics_identity(
     samples = elapsed.get("samples")
     if not isinstance(samples, list):
         raise AbbaSummaryInputError(f"{location}.elapsed_ns.samples must be a list")
-    try:
-        # The comparator owns the exact operation-metrics schema, including
-        # current nested vector and alignment rules.  Keep this call in sync
-        # with perf_compare._collect_metrics: it takes the sample list, not a
-        # precomputed count.
-        perf_compare._validate_operation_metrics(
-            operation_metrics,
-            f"{location}.operation_metrics",
-            samples,
-            report_schema,
+    operation_location = f"{location}.operation_metrics"
+    if set(operation_metrics) == set(_LEGACY_OPERATION_METRICS_KEYS):
+        _validate_legacy_operation_metrics(
+            operation_metrics, operation_location, samples, report_schema
         )
-    except perf_compare.ComparisonInputError as error:
-        raise AbbaSummaryInputError(str(error)) from error
+    else:
+        try:
+            # The comparator owns the exact operation-metrics schema, including
+            # current nested vector and alignment rules.  Keep this call in
+            # sync with perf_compare._collect_metrics: it takes the sample
+            # list, not a precomputed count.
+            perf_compare._validate_operation_metrics(
+                operation_metrics,
+                operation_location,
+                samples,
+                report_schema,
+            )
+        except perf_compare.ComparisonInputError as error:
+            raise AbbaSummaryInputError(str(error)) from error
     projected = _operation_metrics_identity_projection(operation_metrics)
     return _canonical_json(projected, f"{location}.operation_metrics.identity")
 
@@ -769,6 +944,11 @@ def _validate_filesystem_sample(
     if unknown:
         raise AbbaSummaryInputError(
             f"{location} has unknown keys: {sorted(unknown)}"
+        )
+    range_size_keys = _FILESYSTEM_RANGE_SIZE_KEYS & set(sample_object)
+    if range_size_keys and range_size_keys != _FILESYSTEM_RANGE_SIZE_KEYS:
+        raise AbbaSummaryInputError(
+            f"{location} must contain both logical read range-size counters or neither"
         )
     sample_index = _u64(sample_object.get("sample_index"), f"{location}.sample_index")
     if sample_index >= sample_count:
@@ -1028,6 +1208,7 @@ def _validate_filesystem_evidence(
             )
         pairs: list[tuple[int, str]] = []
         validated_samples = []
+        range_size_presence: frozenset[str] | None = None
         for sample_position, sample in enumerate(samples):
             validated_sample = _validate_filesystem_sample(
                 sample,
@@ -1035,6 +1216,16 @@ def _validate_filesystem_evidence(
                 sample_count,
                 cache_states,
             )
+            sample_range_size_presence = frozenset(
+                _FILESYSTEM_RANGE_SIZE_KEYS & set(validated_sample)
+            )
+            if range_size_presence is None:
+                range_size_presence = sample_range_size_presence
+            elif sample_range_size_presence != range_size_presence:
+                raise AbbaSummaryInputError(
+                    f"{location}.samples must use one logical read range-size "
+                    "counter schema consistently"
+                )
             pairs.append(
                 (validated_sample["sample_index"], validated_sample["cache_state"])
             )
