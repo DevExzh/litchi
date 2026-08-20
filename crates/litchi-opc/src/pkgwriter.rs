@@ -1397,6 +1397,33 @@ mod tests {
     }
 
     #[test]
+    fn generic_signature_infrastructure_removal_stays_policy_gated() {
+        let (source, _first) = signed_source();
+        let origin = PackURI::new("/_xmlsignatures/origin.sigs").expect("origin URI");
+        let mut package = OpcPackage::from_vec(source).expect("open signed source");
+
+        package
+            .rels_mut()
+            .remove("rId1")
+            .expect("signature-origin relationship");
+        assert!(
+            package.is_signed(),
+            "origin part remains signature infrastructure"
+        );
+        assert!(package.remove_part(&origin));
+        assert!(!package.is_signed(), "generic removal emptied the graph");
+
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("generic removal must not authorize signature stripping");
+        assert!(matches!(
+            error,
+            crate::OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
     fn untouched_borrowed_signed_source_refuses_without_exact_bytes() {
         let (source, _first) = signed_source();
         let package = OpcPackage::from_bytes(&source).expect("open borrowed signed source");

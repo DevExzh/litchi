@@ -113,6 +113,12 @@ pub struct OpcPackage {
     /// publication.
     signature_policy_authorized: bool,
 
+    /// Whether a signed source or an API-authored signature graph still needs
+    /// an explicit signature edit policy. This remains set after generic
+    /// low-level removal empties the graph, so removal cannot masquerade as
+    /// signature stripping. Explicit `unsign` clears the requirement.
+    signature_policy_required: bool,
+
     /// Whether the current signature graph was authored through the explicit
     /// signing API. This lets newly authored packages retain the historical
     /// inert-signature construction path while still rejecting later edits to
@@ -143,6 +149,7 @@ impl std::fmt::Debug for OpcPackage {
                 "signature_policy_authorized",
                 &self.signature_policy_authorized,
             )
+            .field("signature_policy_required", &self.signature_policy_required)
             .field("signature_api_authored", &self.signature_api_authored)
             .field("has_preservation_provenance", &self.preservation.is_some())
             .field("non_part_members", &self.non_part_members)
@@ -164,6 +171,7 @@ impl OpcPackage {
             source_ingress: false,
             signature_graph_tracked: false,
             signature_policy_authorized: false,
+            signature_policy_required: false,
             signature_api_authored: false,
             preservation: None,
             non_part_members: Vec::new(),
@@ -401,6 +409,7 @@ impl OpcPackage {
         package.source_xml_parts = source_xml_parts;
         package.source_ingress = true;
         package.signature_graph_tracked = package.is_signed();
+        package.signature_policy_required = package.signature_graph_tracked;
         Ok(package)
     }
 
@@ -688,17 +697,20 @@ impl OpcPackage {
         let exact_source_authorized = self.exact_source_authorized;
         let signature_graph_tracked = self.signature_graph_tracked;
         let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
         let result = crate::sign::sign(self, signer, &litchi_sign::Limits::standard());
         if result.is_ok() {
             self.signature_graph_tracked = true;
             self.signature_policy_authorized = true;
+            self.signature_policy_required = true;
             self.signature_api_authored = true;
         } else {
             self.exact_source_authorized = exact_source_authorized;
             self.signature_graph_tracked = signature_graph_tracked;
             self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_policy_required = signature_policy_required;
             self.signature_api_authored = signature_api_authored;
         }
         result
@@ -718,17 +730,20 @@ impl OpcPackage {
         let exact_source_authorized = self.exact_source_authorized;
         let signature_graph_tracked = self.signature_graph_tracked;
         let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
         let result = crate::sign::sign(self, signer, limits);
         if result.is_ok() {
             self.signature_graph_tracked = true;
             self.signature_policy_authorized = true;
+            self.signature_policy_required = true;
             self.signature_api_authored = true;
         } else {
             self.exact_source_authorized = exact_source_authorized;
             self.signature_graph_tracked = signature_graph_tracked;
             self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_policy_required = signature_policy_required;
             self.signature_api_authored = signature_api_authored;
         }
         result
@@ -744,17 +759,20 @@ impl OpcPackage {
         let exact_source_authorized = self.exact_source_authorized;
         let signature_graph_tracked = self.signature_graph_tracked;
         let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
         let result = crate::sign::resign(self, signer, &litchi_sign::Limits::standard());
         if result.is_ok() {
             self.signature_graph_tracked = true;
             self.signature_policy_authorized = true;
+            self.signature_policy_required = true;
             self.signature_api_authored = true;
         } else {
             self.exact_source_authorized = exact_source_authorized;
             self.signature_graph_tracked = signature_graph_tracked;
             self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_policy_required = signature_policy_required;
             self.signature_api_authored = signature_api_authored;
         }
         result
@@ -774,17 +792,20 @@ impl OpcPackage {
         let exact_source_authorized = self.exact_source_authorized;
         let signature_graph_tracked = self.signature_graph_tracked;
         let signature_policy_authorized = self.signature_policy_authorized;
+        let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
         let result = crate::sign::resign(self, signer, limits);
         if result.is_ok() {
             self.signature_graph_tracked = true;
             self.signature_policy_authorized = true;
+            self.signature_policy_required = true;
             self.signature_api_authored = true;
         } else {
             self.exact_source_authorized = exact_source_authorized;
             self.signature_graph_tracked = signature_graph_tracked;
             self.signature_policy_authorized = signature_policy_authorized;
+            self.signature_policy_required = signature_policy_required;
             self.signature_api_authored = signature_api_authored;
         }
         result
@@ -797,6 +818,7 @@ impl OpcPackage {
         self.revoke_exact_source();
         self.strip_signature_graph();
         self.signature_policy_authorized = true;
+        self.signature_policy_required = false;
         self.signature_api_authored = false;
     }
 
@@ -1004,12 +1026,21 @@ impl OpcPackage {
             .zip(self.preservation.as_deref())
     }
 
+    pub(crate) fn mark_source_ingress_signature_policy(&mut self) {
+        self.source_ingress = true;
+        self.signature_graph_tracked = self.is_signed();
+        self.signature_policy_required = self.signature_graph_tracked;
+        self.signature_policy_authorized = false;
+        self.signature_api_authored = false;
+    }
+
     pub(crate) fn requires_signature_edit_policy(&self) -> bool {
         !self.exact_source_authorized
             && self.signature_graph_tracked
-            && self.is_signed()
-            && (self.source_ingress || self.signature_api_authored)
-            && !self.signature_policy_authorized
+            && ((self.signature_policy_required && !self.signature_policy_authorized)
+                || (self.is_signed()
+                    && (self.source_ingress || self.signature_api_authored)
+                    && !self.signature_policy_authorized))
     }
 
     pub(crate) fn requires_owned_source_preservation(&self) -> bool {
@@ -1018,8 +1049,11 @@ impl OpcPackage {
 
     fn revoke_exact_source(&mut self) {
         self.exact_source_authorized = false;
-        if self.is_signed() && (self.source_ingress || self.signature_api_authored) {
+        if self.source_ingress || self.signature_api_authored {
             self.signature_policy_authorized = false;
+            if self.is_signed() {
+                self.signature_policy_required = true;
+            }
         }
     }
 
@@ -1500,7 +1534,7 @@ mod tests {
             "application/octet-stream".to_owned(),
             Vec::new(),
         );
-        crate::Part::relate_to(
+        Part::relate_to(
             &mut owner,
             "../_xmlsignatures/orphan.xml",
             "urn:vendor:signature-reference",

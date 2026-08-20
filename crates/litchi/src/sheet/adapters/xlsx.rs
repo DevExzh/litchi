@@ -581,6 +581,7 @@ impl CoreCell for XlsxCell {
 mod tests {
     use std::io::{Cursor, Write};
 
+    use super::{boxed_xlsx_error, xlsx};
     use crate::sheet::{CellValue, WorkbookTrait};
 
     #[test]

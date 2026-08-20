@@ -1590,8 +1590,10 @@ mod tests {
     use super::*;
     #[cfg(any(feature = "docx", feature = "odt"))]
     use crate::document::DocumentElement;
+    #[cfg(feature = "odt")]
+    use std::io::Read;
     #[cfg(any(feature = "docx", feature = "odt"))]
-    use std::io::{Cursor, Read, Write};
+    use std::io::{Cursor, Write};
     use std::path::PathBuf;
 
     #[cfg(feature = "markdown")]

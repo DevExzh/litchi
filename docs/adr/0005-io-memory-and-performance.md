@@ -329,3 +329,14 @@ fixtures remain the native semantic oracles; this read-path-only change does
 not alter their bytes or require a new native mutation claim. This is a bounded
 allocation-shape improvement, not a measured latency/RSS result or a complete
 table, tile, formula, comment, or host-editor migration.
+
+## 2026-08-21 amendment: OPC exact-source authorization
+
+For OPC, direct byte-identical no-op publication has one authority: the owning
+package or source-backed object must retain its exact source artifact and an
+unrevoked exact-source authorization. Preservation provenance, ZIP indexes,
+and reconstructed graph equality are planning evidence only; none of them can
+authorize exact passthrough or a normalizing full-writer fallback. Any mutable
+OPC seam revokes that authorization. A changed owned source is publishable only
+through a proven preservation plan; if physical framing or opaque members cannot
+be preserved, publication returns a typed capability refusal before output.

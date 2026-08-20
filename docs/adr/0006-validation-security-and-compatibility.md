@@ -81,7 +81,13 @@ distinct planned transformations.
   Credentials are non-clone, redacted, zeroized, and non-serializable.
 - Signed input is `Signed<T>`. Editing requires consuming it through explicit
   signature stripping or edit-and-resign. Integrity, coverage, cryptographic
-  validity, trust, revocation, and time are distinct statuses.
+  validity, trust, revocation, and time are distinct statuses. At the OPC
+  boundary, generic low-level removal of signature parts or relationships is
+  not signature stripping for an ingressed signed source or an explicitly
+  API-authored signature graph: once such a graph has been observed, its policy
+  requirement remains until an explicit `unsign`, `sign`, or `resign` operation
+  authorizes the resulting graph. A missing graph after generic removal cannot
+  authorize publication.
 - Office protection is enforced by default. Unlock and audited bypass are
   explicit capabilities and are not confused with encryption.
 - Weak legacy encryption is decode-only by default. Authoring it requires an
