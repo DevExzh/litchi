@@ -11,6 +11,18 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## XLSX borrowed XML worksheet parsing ABBA evidence (change 0251)
+
+[Change 0251](changes/0251-xlsx-xml-borrowed-abba.md) records the matched
+`quick-xml` borrowed-event worksheet parsing change over four selectors. Three
+selectors accept all p50/mean/p95/p99 cells; `xlsx_first_cell` accepts p50,
+mean, and p99, with p95 rejected solely by candidate drift of 10.941931% above
+the 10% ceiling. No adverse-both cell is present. Latency supports the listed
+cells, but production is HELD pending the allocator/resource guardrail; the
+candidate is not landed and no broad XLSX claim is made. The durable baseline
+failure reproduces on the unmodified base and is unrelated; targeted suites
+passed.
+
 ## ZIP ordering/index ABBA evidence (change 0250)
 
 [Change 0250](changes/0250-zip-ordering-abba.md) records the eight-row
