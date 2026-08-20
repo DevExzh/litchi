@@ -945,16 +945,24 @@ def parse_heaptrack_print(path: Path, *, retained: bool = False) -> dict[str, An
             "artifact": artifact(path, retained=retained),
         }
     patterns: tuple[tuple[str, str, Any], ...] = (
-        ("allocation_calls", r"calls to allocation functions:\s*([0-9,]+)", _numeric_token),
         (
-            "temporary_allocations",
-            r"([0-9,]+) temporary allocations of [0-9,]+ allocations in total",
+            "allocation_calls",
+            r"^calls to allocation functions:\s*([0-9,]+)",
             _numeric_token,
         ),
-        ("peak_heap_bytes", r"peak heap memory consumption:\s*([0-9.,]+\s*[KMGT]?(?:i?B)?)", _bytes_token),
+        (
+            "temporary_allocations",
+            r"^temporary memory allocations:\s*([0-9,]+)(?:\s|$)",
+            _numeric_token,
+        ),
+        (
+            "peak_heap_bytes",
+            r"^peak heap memory consumption:\s*([0-9.,]+\s*[KMGT]?(?:i?B)?)",
+            _bytes_token,
+        ),
         (
             "peak_rss_bytes",
-            r"peak RSS(?:\s*\([^)]*\))?:\s*([0-9.,]+\s*[KMGT]?(?:i?B)?)",
+            r"^peak RSS(?:\s*\([^)]*\))?:\s*([0-9.,]+\s*[KMGT]?(?:i?B)?)",
             _bytes_token,
         ),
     )
@@ -963,7 +971,7 @@ def parse_heaptrack_print(path: Path, *, retained: bool = False) -> dict[str, An
         "artifact": artifact(path, retained=retained),
     }
     for key, pattern, converter in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
+        match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
         parsed[key] = converter(match.group(1)) if match else None
     if all(parsed[key] is None for key, _, _ in patterns):
         parsed["status"] = "unparsed"
@@ -989,6 +997,100 @@ def parse_heaptrack_histogram(path: Path) -> int | None:
         total += size * count
         found = True
     return total if found else None
+
+
+def _require_retained_artifact_identity(
+    expected: Any,
+    path: Path,
+    *,
+    location: str,
+) -> dict[str, Any]:
+    """Require retained bytes to match the identity published by an earlier report."""
+    if not isinstance(expected, dict):
+        raise ResourceProfileInputError(f"{location} must be an artifact object")
+    observed = artifact(path, retained=True)
+    for key in ("present", "bytes", "sha256"):
+        if expected.get(key) != observed.get(key):
+            raise ResourceProfileInputError(
+                f"{location}.{key} does not match retained artifact {path}"
+            )
+    if observed["present"] is not True:
+        raise ResourceProfileInputError(f"{location} retained artifact is missing: {path}")
+    return observed
+
+
+def run_reprocess_docx_heaptrack(arguments: argparse.Namespace) -> int:
+    """Reparse hash-verified DOCX heaptrack text and refresh derived statistics."""
+    input_path = Path(arguments.input).expanduser().resolve()
+    output_path = Path(arguments.output).expanduser().resolve()
+    if input_path == output_path:
+        raise ResourceProfileInputError("reprocessed output must differ from the input report")
+    if os.path.lexists(output_path):
+        raise ResourceProfileInputError(f"reprocessed output already exists: {output_path}")
+    report = load_json(input_path)
+    if not isinstance(report, dict):
+        raise ResourceProfileInputError("input report must be an object")
+    tool = report.get("tool")
+    if not isinstance(tool, dict) or tool.get("mode") != "docx-semantic-abba-resource-profile":
+        raise ResourceProfileInputError("input is not a DOCX semantic ABBA resource report")
+    scope = report.get("scope")
+    if not isinstance(scope, dict):
+        raise ResourceProfileInputError("input report scope must be an object")
+    cases = _normalize_docx_cases(scope.get("cases"))
+    legs = report.get("legs")
+    if not isinstance(legs, list):
+        raise ResourceProfileInputError("input report legs must be an array")
+    validate_abba_order([leg.get("leg") if isinstance(leg, dict) else None for leg in legs])
+    artifact_root_value = report.get("artifact_directory")
+    if not isinstance(artifact_root_value, str) or not artifact_root_value:
+        raise ResourceProfileInputError("input report artifact_directory must be a path")
+    artifact_root = Path(artifact_root_value).expanduser().resolve()
+
+    for leg in legs:
+        label = leg["leg"]
+        leg_dir = artifact_root / label.lower()
+        declared_leg_dir = leg.get("artifact_directory")
+        if not isinstance(declared_leg_dir, str) or Path(declared_leg_dir).expanduser().resolve() != leg_dir:
+            raise ResourceProfileInputError(
+                f"legs.{label}.artifact_directory does not match the canonical artifact path"
+            )
+        heaptrack = leg.get("heaptrack")
+        printed = heaptrack.get("print") if isinstance(heaptrack, dict) else None
+        parsed_before = printed.get("parsed") if isinstance(printed, dict) else None
+        if not isinstance(parsed_before, dict):
+            raise ResourceProfileInputError(f"legs.{label}.heaptrack.print.parsed is required")
+        summary_path = leg_dir / "heaptrack-print.txt"
+        histogram_path = leg_dir / "heaptrack-histogram.tsv"
+        _require_retained_artifact_identity(
+            printed.get("artifact"),
+            summary_path,
+            location=f"legs.{label}.heaptrack.print.artifact",
+        )
+        _require_retained_artifact_identity(
+            parsed_before.get("histogram_artifact"),
+            histogram_path,
+            location=f"legs.{label}.heaptrack.print.parsed.histogram_artifact",
+        )
+        parsed = parse_heaptrack_print(summary_path, retained=True)
+        parsed["allocated_bytes"] = parse_heaptrack_histogram(histogram_path)
+        parsed["histogram_artifact"] = artifact(histogram_path, retained=True)
+        parsed["scope"] = "whole process; heaptrack instrumentation overhead is included"
+        printed["parsed"] = parsed
+
+    report["statistics"] = abba_statistics(
+        legs,
+        metric_specs=docx_resource_metric_specs(cases),
+    )
+    report["reprocessing"] = {
+        "source_report": artifact(input_path, retained=True),
+        "raw_heaptrack_artifacts_verified": True,
+        "operation": "reparse process-total heaptrack fields and refresh derived statistics",
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("x", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2, sort_keys=True, allow_nan=False)
+        handle.write("\n")
+    return 0
 
 
 def parse_perf_stat(path: Path, returncode: int | None, stderr_path: Path) -> dict[str, Any]:
@@ -3342,6 +3444,13 @@ def build_parser() -> argparse.ArgumentParser:
     docx.add_argument("--samples", type=int, default=30)
     docx.add_argument("--timeout", type=float, default=600.0)
     docx.set_defaults(function=run_docx_semantic_abba)
+    reprocess_docx = subparsers.add_parser(
+        "reprocess-docx-heaptrack",
+        help="reparse hash-verified heaptrack artifacts from a retained DOCX report",
+    )
+    reprocess_docx.add_argument("--input", type=Path, required=True)
+    reprocess_docx.add_argument("--output", type=Path, required=True)
+    reprocess_docx.set_defaults(function=run_reprocess_docx_heaptrack)
     return parser
 
 

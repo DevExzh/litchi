@@ -278,7 +278,9 @@ User time (seconds): nope
             summary.write_text(
                 """\
 calls to allocation functions: 12 (3/s)
+MOST TEMPORARY ALLOCATIONS
 34 temporary allocations of 56 allocations in total (60.7%)
+temporary memory allocations: 57 (4/s)
 peak heap memory consumption: 2.50M
 peak RSS (including heaptrack overhead): 4.00M
 """,
@@ -288,10 +290,74 @@ peak RSS (including heaptrack overhead): 4.00M
             parsed = perf_resource_profile.parse_heaptrack_print(summary)
             allocated = perf_resource_profile.parse_heaptrack_histogram(histogram)
         self.assertEqual(parsed["allocation_calls"], 12)
-        self.assertEqual(parsed["temporary_allocations"], 34)
+        self.assertEqual(parsed["temporary_allocations"], 57)
         self.assertEqual(parsed["peak_heap_bytes"], int(2.5 * 1024 * 1024))
         self.assertEqual(parsed["peak_rss_bytes"], 4 * 1024 * 1024)
         self.assertEqual(allocated, 28)
+
+    def test_retained_docx_heaptrack_report_is_reprocessed_from_verified_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifacts = root / "artifacts"
+            legs = []
+            totals = {"A1": 101, "B1": 99, "B2": 97, "A2": 103}
+            for label in perf_resource_profile.ABBA_LEG_ORDER:
+                leg_dir = artifacts / label.lower()
+                leg_dir.mkdir(parents=True)
+                summary = leg_dir / "heaptrack-print.txt"
+                histogram = leg_dir / "heaptrack-histogram.tsv"
+                summary.write_text(
+                    "7 temporary allocations of 8 allocations in total (87.5%)\n"
+                    f"temporary memory allocations: {totals[label]} (4/s)\n",
+                    encoding="utf-8",
+                )
+                histogram.write_text("4\t3\n", encoding="utf-8")
+                legs.append(
+                    {
+                        "leg": label,
+                        "artifact_directory": str(leg_dir),
+                        "heaptrack": {
+                            "print": {
+                                "artifact": perf_resource_profile.artifact(
+                                    summary, retained=True
+                                ),
+                                "parsed": {
+                                    "histogram_artifact": perf_resource_profile.artifact(
+                                        histogram, retained=True
+                                    )
+                                },
+                            }
+                        },
+                    }
+                )
+            source = root / "source.json"
+            output = root / "reprocessed.json"
+            source.write_text(
+                json.dumps(
+                    {
+                        "tool": {"mode": "docx-semantic-abba-resource-profile"},
+                        "scope": {
+                            "cases": list(perf_resource_profile.DOCX_SEMANTIC_CASES)
+                        },
+                        "artifact_directory": str(artifacts),
+                        "legs": legs,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = perf_resource_profile.run_reprocess_docx_heaptrack(
+                argparse.Namespace(input=source, output=output)
+            )
+            published = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(result, 0)
+        observed = {
+            leg["leg"]: leg["heaptrack"]["print"]["parsed"]["temporary_allocations"]
+            for leg in published["legs"]
+        }
+        self.assertEqual(observed, totals)
+        metric = published["statistics"]["metrics"]["heaptrack.temporary_allocations"]
+        self.assertEqual(metric["values_by_leg"], totals)
+        self.assertTrue(published["reprocessing"]["raw_heaptrack_artifacts_verified"])
 
     def test_filesystem_evidence_omits_raw_request_arrays(self):
         compact = perf_resource_profile.compact_filesystem_evidence(
