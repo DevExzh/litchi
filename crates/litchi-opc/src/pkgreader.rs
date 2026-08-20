@@ -132,6 +132,25 @@ struct AdmittedParts {
     typed_parts: Vec<(PackURI, String)>,
 }
 
+#[derive(Clone, Copy)]
+enum PartClassificationMode {
+    Eager,
+    Deferred,
+}
+
+impl PartClassificationMode {
+    fn allocation_resource(self) -> &'static str {
+        match self {
+            Self::Eager => "OPC typed parts",
+            Self::Deferred => "OPC deferred typed parts",
+        }
+    }
+
+    const fn checks_declared_part_bytes(self) -> bool {
+        matches!(self, Self::Deferred)
+    }
+}
+
 /// Exact source-catalog phase used only by the validation entry point.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ValidationCatalogPhase {
@@ -666,7 +685,7 @@ impl PackageReader {
             content_types,
             non_part_members,
             limits,
-            "OPC typed parts",
+            PartClassificationMode::Eager,
         )?;
 
         // Phase 4: parallel decompression of every admitted part.
@@ -750,9 +769,8 @@ impl PackageReader {
             content_types,
             non_part_members,
             limits,
-            "OPC deferred typed parts",
+            PartClassificationMode::Deferred,
         )?;
-        let _ = Self::check_declared_part_bytes(archive, &typed_parts, limits)?;
 
         let mut parts = Vec::new();
         parts
@@ -784,13 +802,14 @@ impl PackageReader {
         content_types: &ContentTypeMap,
         non_part_members: &mut Vec<NonPartMember>,
         limits: ReadLimits,
-        allocation_resource: &'static str,
+        mode: PartClassificationMode,
     ) -> Result<AdmittedParts> {
         let mut index = PartNameIndex::try_with_capacity(archive.len())?;
         let mut typed_parts: Vec<(PackURI, String)> = Vec::new();
         typed_parts
             .try_reserve(archive.len())
-            .map_err(|source| allocation(allocation_resource, source))?;
+            .map_err(|source| allocation(mode.allocation_resource(), source))?;
+        let mut declared_part_bytes = 0u64;
 
         for member_name in archive.file_names() {
             if member_name.is_empty()
@@ -845,6 +864,14 @@ impl PackageReader {
                 let part_count =
                     checked_increment(typed_parts.len(), limits.max_parts(), ReadResource::Parts)?;
                 debug_assert_eq!(part_count, typed_parts.len() + 1);
+                if mode.checks_declared_part_bytes() {
+                    Self::check_declared_part_bytes_for_member(
+                        archive,
+                        &partname,
+                        &mut declared_part_bytes,
+                        limits,
+                    )?;
+                }
                 typed_parts.push((partname, content_type));
             }
         }
@@ -868,16 +895,31 @@ impl PackageReader {
     ) -> Result<u64> {
         let mut declared_part_bytes = 0u64;
         for (partname, _) in typed_parts {
-            let declared = archive.metadata(partname.membername())?.uncompressed_size();
-            limits.check(ReadResource::PartBytes, declared, limits.max_part_bytes())?;
-            declared_part_bytes = checked_add(
-                declared_part_bytes,
-                declared,
-                ReadResource::TotalPartBytes,
-                limits.max_total_part_bytes(),
+            Self::check_declared_part_bytes_for_member(
+                archive,
+                partname,
+                &mut declared_part_bytes,
+                limits,
             )?;
         }
         Ok(declared_part_bytes)
+    }
+
+    fn check_declared_part_bytes_for_member<A: ArchiveAccess + ?Sized>(
+        archive: &A,
+        partname: &PackURI,
+        declared_part_bytes: &mut u64,
+        limits: ReadLimits,
+    ) -> Result<()> {
+        let declared = archive.metadata(partname.membername())?.uncompressed_size();
+        limits.check(ReadResource::PartBytes, declared, limits.max_part_bytes())?;
+        *declared_part_bytes = checked_add(
+            *declared_part_bytes,
+            declared,
+            ReadResource::TotalPartBytes,
+            limits.max_total_part_bytes(),
+        )?;
+        Ok(())
     }
 
     fn load_part_catalog_for_validation<A: ArchiveAccess + ?Sized>(
@@ -902,11 +944,9 @@ impl PackageReader {
             content_types,
             non_part_members,
             limits,
-            "OPC deferred typed parts",
+            PartClassificationMode::Deferred,
         )
         .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
-        let _ = Self::check_declared_part_bytes(archive, &typed_parts, limits)
-            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
 
         let mut parts = Vec::new();
         parts

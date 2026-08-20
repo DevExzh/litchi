@@ -5368,7 +5368,7 @@ mod tests {
         reads: AtomicUsize,
         versions: AtomicUsize,
         read_bytes: AtomicU64,
-        read_ranges: std::sync::Mutex<Vec<(u64, usize)>>,
+        read_ranges: Mutex<Vec<(u64, usize)>>,
         max_read: usize,
     }
 
@@ -5380,7 +5380,7 @@ mod tests {
                 reads: AtomicUsize::new(0),
                 versions: AtomicUsize::new(0),
                 read_bytes: AtomicU64::new(0),
-                read_ranges: std::sync::Mutex::new(Vec::new()),
+                read_ranges: Mutex::new(Vec::new()),
                 max_read: usize::MAX,
             }
         }
@@ -5958,6 +5958,28 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn archive_with_ordered_xml_parts(parts: &[(&str, &[u8])]) -> Vec<u8> {
+        assert!(!parts.is_empty());
+        let root_relationships = format!(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{}"/></Relationships>"#,
+            parts[0].0
+        );
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships.as_bytes())
+            .unwrap();
+        for (name, payload) in parts {
+            writer.write_stored(name, payload).unwrap();
+        }
+        writer.finish_to_bytes().unwrap()
+    }
+
     fn archive_with_document_relationships(document_relationships: &[u8]) -> Vec<u8> {
         let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
         writer
@@ -6364,6 +6386,177 @@ mod tests {
             eager.main_document_part().unwrap().partname(),
             source.main_document_part().unwrap().partname()
         );
+    }
+
+    #[test]
+    fn source_backed_catalog_matches_eager_relationship_typing_and_non_parts() {
+        let bytes = archive_with_document_relationships(document_relationships());
+        let eager = OpcPackage::from_bytes(&bytes).unwrap();
+        let source =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+
+        assert_eq!(eager.non_part_members(), source.non_part_members());
+        assert_eq!(source.non_part_members().len(), 1);
+        assert_eq!(source.non_part_members()[0].name(), "scratch.bin");
+        assert!(
+            source
+                .physical_member_names()
+                .any(|name| name == "word/_rels/document.xml.rels")
+        );
+        assert!(
+            source
+                .iter_parts()
+                .all(|part| part.partname().as_str() != "/word/_rels/document.xml.rels")
+        );
+        assert_eq!(
+            source
+                .part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .rels()
+                .len(),
+            eager
+                .get_part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .rels()
+                .len()
+        );
+    }
+
+    #[test]
+    fn source_backed_catalog_enforces_part_limits_during_ordered_admission() {
+        let bytes = archive_with_ordered_xml_parts(&[
+            ("word/document.xml", b"document"),
+            ("custom/orphan.xml", b"orphan"),
+        ]);
+
+        let per_part = ReadLimits::builder()
+            .max_part_bytes(b"document".len() as u64 - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedPackage::from_read_at_with_limits(
+                Arc::new(CountingSource::new(bytes.clone())),
+                per_part,
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                ..
+            })
+        ));
+
+        let aggregate = ReadLimits::builder()
+            .max_total_part_bytes((b"document".len() + b"orphan".len() - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedPackage::from_read_at_with_limits(
+                Arc::new(CountingSource::new(bytes.clone())),
+                aggregate,
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalPartBytes,
+                ..
+            })
+        ));
+
+        let part_count = ReadLimits::builder().max_parts(1).unwrap().build().unwrap();
+        assert!(matches!(
+            SourceBackedPackage::from_read_at_with_limits(
+                Arc::new(CountingSource::new(bytes)),
+                part_count,
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn source_backed_part_limit_precedes_later_derived_or_equivalent_conflicts() {
+        let oversized = b"oversized first part";
+        let cases = [
+            (
+                [
+                    ("word/oversized.xml", &oversized[..]),
+                    ("word/container.xml", &b"container"[..]),
+                    ("word/container.xml/child.xml", &b"child"[..]),
+                ],
+                true,
+            ),
+            (
+                [
+                    ("word/oversized.xml", &oversized[..]),
+                    ("word/equivalent.xml", &b"first"[..]),
+                    ("WORD/EQUIVALENT.XML", &b"second"[..]),
+                ],
+                false,
+            ),
+        ];
+        let limits = ReadLimits::builder()
+            .max_part_bytes(oversized.len() as u64 - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        for (parts, derived) in cases {
+            let bytes = archive_with_ordered_xml_parts(&parts);
+            assert!(matches!(
+                SourceBackedPackage::from_read_at_with_limits(
+                    Arc::new(CountingSource::new(bytes.clone())),
+                    limits,
+                ),
+                Err(OpcError::ReadLimit {
+                    resource: ReadResource::PartBytes,
+                    ..
+                })
+            ));
+            let eager_error = match OpcPackage::from_bytes_with_limits(&bytes, limits) {
+                Ok(_) => panic!("eager package unexpectedly accepted a name conflict"),
+                Err(error) => error,
+            };
+            if derived {
+                assert!(matches!(eager_error, OpcError::DerivedPartNames { .. }));
+            } else {
+                assert!(matches!(eager_error, OpcError::EquivalentPartNames { .. }));
+            }
+        }
+    }
+
+    #[test]
+    fn source_backed_part_limit_precedes_later_max_parts_error() {
+        let oversized = b"oversized first part";
+        let bytes = archive_with_ordered_xml_parts(&[
+            ("word/oversized.xml", oversized),
+            ("word/later.xml", b"later"),
+        ]);
+        let limits = ReadLimits::builder()
+            .max_parts(1)
+            .unwrap()
+            .max_part_bytes(oversized.len() as u64 - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(matches!(
+            SourceBackedPackage::from_read_at_with_limits(
+                Arc::new(CountingSource::new(bytes.clone())),
+                limits,
+            ),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            OpcPackage::from_bytes_with_limits(&bytes, limits),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::Parts,
+                ..
+            })
+        ));
     }
 
     #[test]
