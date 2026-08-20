@@ -70,8 +70,8 @@ impl Presentation {
         path: P,
         password: impl Into<String>,
     ) -> Result<Self> {
-        let bytes = std::fs::read(path.as_ref())?;
-        Self::from_bytes_with_password(bytes, password)
+        Package::open_with_password(path, password, ODF_PRESENTATION, BODY_MARKER, "ODP")
+            .map(|package| Self { package })
     }
 
     /// Create a Presentation from a byte buffer.
