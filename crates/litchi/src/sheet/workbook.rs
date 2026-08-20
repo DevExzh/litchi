@@ -742,7 +742,10 @@ mod source_xlsx_path_tests {
             bytes_workbook.worksheet_count().unwrap()
         );
         assert_eq!(
-            eager.sheets().map(|sheet| sheet.name()).collect::<Vec<_>>(),
+            eager
+                .sheets()
+                .map(|sheet| sheet.name().to_owned())
+                .collect::<Vec<_>>(),
             ["First", "Second"]
         );
         assert_eq!(source.text().unwrap(), bytes_workbook.text().unwrap());
