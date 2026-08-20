@@ -46,8 +46,28 @@ impl<'a> Parser<'a> {
     }
 
     pub(super) fn append_table_text(&mut self, text: &[u8], raw_level: u8) -> RtfResult<()> {
-        let state = self.prepare_revision_event()?;
         let level = if raw_level >= 2 { raw_level } else { 1 };
+        // Ordinary table text has no revision side effects. Avoid cloning the
+        // complete formatting/table state for every text token in that common
+        // path; retain the full snapshot only when revision metadata needs it.
+        if self.current_state()?.revision_type.is_none() {
+            self.drain_nested_to(level)?;
+            if level == 1 {
+                self.current_cell_text.extend_from_slice(text);
+            } else {
+                self.ensure_nested_builder(level)?
+                    .cell_text
+                    .extend_from_slice(text);
+            }
+            // Keep the established validation order: the cell buffer is
+            // updated before the parser validates the transport slice.
+            std::str::from_utf8(text).map_err(|_err| {
+                RtfError::MalformedDocument("invalid UTF-8 in table revision".to_string())
+            })?;
+            return Ok(());
+        }
+
+        let state = self.prepare_revision_event()?;
         self.drain_nested_to(level)?;
         let start = if level == 1 {
             self.current_cell_text.len()
