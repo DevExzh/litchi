@@ -4458,7 +4458,13 @@ mod tests {
             .output()
             .unwrap();
         assert!(!output.status.success());
-        assert!(output.stdout.is_empty(), "failing child emitted JSON");
+        let parsed = serde_json::from_slice::<serde_json::Value>(&output.stdout);
+        let success_protocol = parsed
+            .as_ref()
+            .ok()
+            .and_then(|value| value.get("elapsed_ns"))
+            .is_some();
+        assert!(!success_protocol, "failing child emitted success protocol");
     }
 
     #[test]

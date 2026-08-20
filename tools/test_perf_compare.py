@@ -599,6 +599,14 @@ class PerfCompareTests(unittest.TestCase):
                 ]
             ),
         )
+        self.assertEqual(
+            allocator_policy["result_key_fields"], ["case", "corpus", "cache_state"]
+        )
+        self.assertEqual(
+            [item["name"] for item in allocator_policy["metric_classes"]],
+            ["allocation"],
+        )
+        self.assertEqual(allocator_policy["metric_classes"][0]["presence"], "required")
         invalid_identity = copy.deepcopy(allocator_policy)
         invalid_identity["tool_identity"]["binary"] = "litchi-perf-baseline"
         with self.assertRaisesRegex(
