@@ -13,6 +13,9 @@ binaries. Its default fixed case tuple remains
 `--include-one-paragraph-text` (or
 `--include-docx-one-paragraph-text`) flag adds
 `docx_semantic_one_paragraph_text` to that tuple for all four legs.
+The additive `configuration.include_one_paragraph_text` boolean records this
+selection while the existing schema version and default case fields remain
+stable.
 
 Each selected case must appear exactly once and in the fixed order. Every leg
 still requires the same deterministic large DOCX corpus manifest, including

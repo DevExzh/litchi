@@ -890,6 +890,34 @@ peak RSS (including heaptrack overhead): 4.00M
         )
         self.assertEqual(alias.workload, "docx-semantic-full-text")
 
+    def test_docx_optional_flag_requires_explicit_docx_abba_dispatch(self):
+        generic = perf_resource_profile.build_parser().parse_args(
+            ["run", "--include-one-paragraph-text"]
+        )
+        with self.assertRaisesRegex(
+            perf_resource_profile.ResourceProfileInputError,
+            "explicit control and candidate binaries",
+        ):
+            generic.function(generic)
+
+        xlsx = perf_resource_profile.build_parser().parse_args(
+            [
+                "run",
+                "--workload",
+                perf_resource_profile.XLSX_MANAGED_BATCH_ID,
+                "--control-binary",
+                "/tmp/control",
+                "--candidate-binary",
+                "/tmp/candidate",
+                "--include-one-paragraph-text",
+            ]
+        )
+        with self.assertRaisesRegex(
+            perf_resource_profile.ResourceProfileInputError,
+            "requires the DOCX semantic ABBA workload",
+        ):
+            xlsx.function(xlsx)
+
     def test_docx_validation_requires_matching_rows_and_full_corpus_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             legs = self._docx_legs(directory)
