@@ -29,6 +29,16 @@ heaptrack print/histogram hashes verified; temporary allocations are
 effectively neutral. RSS remains mixed within <2.4% heaptrack and <0.4%
 `/usr/bin/time`; no broad DOCX claim is made.
 
+## ODS known-change source publication ABBA (change 0249)
+
+[Change 0249](changes/0249-ods-known-change-source-publication-abba.md)
+records the fixed media-rich ODS source-publication package. Neither selector
+has an accepted statistic: `one_edit` is adverse-both at p95/p99, while
+`one_percent` has paired direction disagreement at all four statistics. All
+drift and identity gates pass. The production candidate is not landed on this
+latency evidence and is retained for future study only; untimed logical
+replay counters are explicitly not physical-I/O evidence. No broad ODS claim.
+
 ## CFB streaming release ABBA evidence (change 0248)
 
 [Change 0248](changes/0248-cfb-streaming-abba.md) records the independently

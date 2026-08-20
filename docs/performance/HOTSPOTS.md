@@ -3,6 +3,12 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0249 — ODS known-change source publication ABBA](changes/0249-ods-known-change-source-publication-abba.md)
+(neither selector has an accepted statistic: `one_edit` is adverse-both at
+p95/p99, and `one_percent` disagrees in paired direction at all four. Drift
+and identity gates pass; the production candidate is not landed on latency
+evidence, and the logical replay counters are not physical-I/O evidence. No
+broad ODS claim.)
 [change 0248 — CFB streaming release ABBA evidence](changes/0248-cfb-streaming-abba.md)
 (the independently audited 24-row package accepts only p50=1, mean=2,
 p95=2, and p99=2 cells; adverse-both counts are p50=14, mean=10, p95=7,
