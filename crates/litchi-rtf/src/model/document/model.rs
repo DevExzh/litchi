@@ -413,7 +413,7 @@ impl<'a> RtfDocument<'a> {
                 RtfError::InvalidUnicode(format!("ASCII RTF transport conversion failed: {error}"))
             })?)
         } else {
-            Cow::Owned(input_bytes.iter().map(|byte| char::from(*byte)).collect())
+            Cow::Owned(decode_latin1_transport(input_bytes.as_ref())?)
         };
 
         let retain_ordinary_body_source_span = !is_compressed && bytes.is_ascii();
@@ -429,6 +429,36 @@ impl<'a> RtfDocument<'a> {
         source.extend_from_slice(bytes);
         document.preserved_source = Some(source);
         Ok(document)
+    }
+
+    /// Convert non-UTF-8 transport bytes to the one-byte-per-character view
+    /// consumed by the lexer without exposing an infallible `String` growth
+    /// path to untrusted input.
+    ///
+    /// The parser applies the declared RTF code page after tokenization.  A
+    /// Latin-1 view keeps that phase lossless, but high bytes can expand to
+    /// two UTF-8 bytes in the temporary string.  Reserve before every push
+    /// that could exhaust the current capacity so allocation failure becomes
+    /// a typed parser error instead of an abort.
+    fn decode_latin1_transport(bytes: &[u8]) -> RtfResult<String> {
+        let mut text = String::new();
+        text.try_reserve(bytes.len())
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "RTF transport text",
+                requested: bytes.len(),
+            })?;
+        for &byte in bytes {
+            let encoded_width = if byte.is_ascii() { 1 } else { 2 };
+            if text.capacity().saturating_sub(text.len()) < encoded_width {
+                text.try_reserve(encoded_width)
+                    .map_err(|_error| RtfError::AllocationFailed {
+                        resource: "RTF transport text",
+                        requested: text.len().saturating_add(encoded_width),
+                    })?;
+            }
+            text.push(char::from(byte));
+        }
+        Ok(text)
     }
 
     /// Parse an RTF document from a UTF-8 string (internal)

@@ -138,6 +138,31 @@ fn token_storage_growth_preserves_every_source_span() {
 }
 
 #[test]
+fn group_depth_is_rejected_before_destination_stack_growth() {
+    let mut input = String::from(r"{\rtf1");
+    for _ in 1..crate::codec::parser::MAX_GROUP_NESTING_DEPTH {
+        input.push('{');
+    }
+    input.push_str("text");
+    for _ in 0..crate::codec::parser::MAX_GROUP_NESTING_DEPTH {
+        input.push('}');
+    }
+
+    let arena = Bump::new();
+    let mut lexer = Lexer::new(&input, &arena);
+    assert!(lexer.tokenize().is_ok());
+
+    input.insert(0, '{');
+    let arena = Bump::new();
+    let mut lexer = Lexer::new(&input, &arena);
+    assert!(matches!(
+        lexer.tokenize(),
+        Err(RtfError::MalformedDocument(message))
+            if message == "RTF group nesting depth exceeds the safety limit"
+    ));
+}
+
+#[test]
 fn test_tokenize_multiple_control_words() {
     let arena = Bump::new();
     let input = r"{\rtf1\ansi\deff0}";
