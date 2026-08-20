@@ -29,6 +29,18 @@ heaptrack print/histogram hashes verified; temporary allocations are
 effectively neutral. RSS remains mixed within <2.4% heaptrack and <0.4%
 `/usr/bin/time`; no broad DOCX claim is made.
 
+## XLSX bytes-facade ABBA evidence (documentation change 0247; 0230 package)
+
+[Change 0247](changes/0247-xlsx-bytes-abba-evidence.md) records the XLSX half
+of the 0229/0230 evidence tranche under the retained package identity
+`0230-xlsx-bytes-20260821`. The measured candidate tree is exactly the tree of
+landed commit `9aaf9d136`; `xlsx_bytes_open` accepts p95/p99 only because
+candidate p50/mean drift exceeds the 5% ceiling, while
+`xlsx_bytes_open_lifecycle` accepts all four statistics. This is limited to
+the in-memory `Workbook::from_bytes(Vec<u8>)` construction and named lifecycle;
+it makes no source-file, filesystem/cold-cache, physical-I/O, preservation,
+output-byte, allocation/RSS, or broad XLSX claim.
+
 ## DOCX-family layout noise floor calibration (change 0228)
 
 [Change 0228](changes/0228-docx-floor-calibration.md) is a
