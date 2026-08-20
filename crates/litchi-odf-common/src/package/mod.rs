@@ -13,8 +13,8 @@ mod path;
 mod tests;
 
 pub(crate) use codec::{
-    ManifestScanAttributes, ManifestScanElement, ManifestScanEvent, ManifestScanObserver,
-    parse_manifest_with_observer,
+    MAX_MANIFEST_ENTRIES, ManifestScanAttributes, ManifestScanElement, ManifestScanEvent,
+    ManifestScanObserver, parse_manifest_with_observer,
 };
 pub use codec::{is_media_path, parse_manifest, read_manifest};
 #[allow(

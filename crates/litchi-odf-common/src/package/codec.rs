@@ -15,7 +15,11 @@ const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manife
 const LOEXT_NAMESPACE: &[u8] =
     b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 const MANIFEST_PATHS: [&str; 2] = ["META-INF/manifest.xml", "manifest.xml"];
-const MAX_MANIFEST_ENTRIES: usize = 100_000;
+/// Hard parser ceiling shared with the default validation policy.
+///
+/// Configured validation limits may tighten this value, but the typed and
+/// neutral manifest parsers remain bounded by this hard ceiling.
+pub(crate) const MAX_MANIFEST_ENTRIES: usize = 100_000;
 
 #[derive(Clone, Copy)]
 pub(crate) enum ManifestScanElement {
