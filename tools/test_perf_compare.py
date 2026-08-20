@@ -119,6 +119,65 @@ def report(value=100, revision="baseline", corpus_sha="abc"):
     }
 
 
+def descriptive_parallel_report(value=100, revision="baseline"):
+    measured = report(value, revision)
+    result = measured["results"][0]
+    result["elapsed_ns"]["sample_order"] = [1, 0, 2, 4, 3]
+    result["execution"] = {"worker_count": 2, "logical_tasks": 5}
+    result["source"] = {
+        "read_calls": [10] * 5,
+        "simulation": {"physical_request_count": [10, 20, 30, 40, 50]},
+    }
+    measured["parallel_metrics"] = {
+        "schema_version": 1,
+        "scope": "explicit_local_execution_only",
+        "claim": "descriptive",
+        "configured_worker_budget": {
+            "status": "measured",
+            "value": [1, 2],
+            "scope": "configuration.execution_workers",
+        },
+        "observed_process_thread_count": {
+            "status": "unavailable",
+            "scope": "process_thread_count",
+            "reason": "no process-global thread counter is collected",
+        },
+        "cases": [
+            {
+                "case": "opc_open",
+                "corpus_sha256": "abc",
+                "configured_worker_count": {
+                    "status": "measured",
+                    "value": 2,
+                    "scope": "result.execution.worker_count",
+                },
+                "observed_local_worker_count": {
+                    "status": "not_applicable",
+                    "scope": "result.source.opc_cache.worker_count_with_one_"
+                    "created_local_worker_team",
+                    "reason": "result does not create an explicit local worker team",
+                },
+                "deterministic_task_count": {
+                    "status": "measured",
+                    "value": 5,
+                    "scope": "result.execution.logical_tasks",
+                },
+                "deterministic_chunk_count": {
+                    "status": "measured",
+                    "value": [20, 10, 30, 50, 40],
+                    "scope": "result.source.simulation.physical_request_count",
+                },
+                "lock_wait_ns": {
+                    "status": "unavailable",
+                    "scope": "lock_wait_ns",
+                    "reason": "no exact instrumented lock boundary is present",
+                },
+            }
+        ],
+    }
+    return measured
+
+
 class PerfCompareTests(unittest.TestCase):
     def test_checked_policy_pins_identity_only_default_manifest(self):
         repository = Path(__file__).resolve().parents[1]
@@ -196,6 +255,73 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(result["summary"]["matched_results"], 1)
         self.assertEqual(result["summary"]["compared_metrics"], 7)
         self.assertFalse(result["regressions"])
+
+    def test_descriptive_parallel_envelope_is_shape_checked_but_not_compared(self):
+        result = perf_compare.compare_reports(
+            descriptive_parallel_report(),
+            descriptive_parallel_report(revision="current"),
+            policy(),
+        )
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["compared_metrics"], 7)
+
+    def test_parallel_envelope_metadata_and_sample_order_fail_closed(self):
+        current = descriptive_parallel_report(revision="current")
+        current["parallel_metrics"]["claim"] = "latency"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "parallel_metrics.claim"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["results"][0]["execution"]["worker_count"] = 8
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "worker_count=8.*execution_workers"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["parallel_metrics"]["configured_worker_budget"]["value"] = [1, 4]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "configured_worker_budget.value must match",
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        del current["parallel_metrics"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "both emit parallel_metrics"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["results"][0]["elapsed_ns"]["sample_order"] = [0, 0, 1, 2, 3]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "sample_order.*permutation"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
+
+        current = descriptive_parallel_report(revision="current")
+        current["parallel_metrics"]["cases"][0]["deterministic_chunk_count"][
+            "value"
+        ] = [1]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "deterministic_chunk_count.value"
+        ):
+            perf_compare.compare_reports(
+                descriptive_parallel_report(), current, policy()
+            )
 
     def test_additive_sink_histogram_field_is_comparator_compatible(self):
         current = report(revision="current")
