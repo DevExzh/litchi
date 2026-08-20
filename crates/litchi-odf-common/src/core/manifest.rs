@@ -278,6 +278,9 @@ impl common_package::ManifestScanObserver for TypedManifestObserver {
             ManifestScanEvent::Start(ManifestScanElement::Other)
             | ManifestScanEvent::Empty(ManifestScanElement::Other)
             | ManifestScanEvent::End(ManifestScanElement::Other)
+            | ManifestScanEvent::End(ManifestScanElement::Algorithm)
+            | ManifestScanEvent::End(ManifestScanElement::StartKeyGeneration)
+            | ManifestScanEvent::End(ManifestScanElement::KeyDerivation)
             | ManifestScanEvent::Other => {},
         }
         Ok(())
