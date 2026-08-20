@@ -76,6 +76,28 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertRegex(self.workflow, r"cargo check[\s\S]+allocator-metrics")
         self.assertRegex(self.workflow, r"cargo test[\s\S]+allocator-metrics")
 
+    def test_allocator_target_is_executed_and_compared_by_ci(self):
+        self.assertRegex(
+            self.workflow,
+            r"cargo run --release[\s\S]+--features allocator-metrics[\s\S]+"
+            r"--bin litchi-perf-baseline-alloc",
+        )
+        for argument in (
+            "--warmup 3",
+            "--samples 15",
+            "--case opc_file_eager_open",
+            "--filesystem-cache warm,cold-requested",
+            "--json target/perf/allocator-smoke/current.json",
+        ):
+            self.assertIn(argument, self.workflow)
+        self.assertIn("tools/perf_compare.py", self.workflow)
+        self.assertIn(
+            "docs/performance/perf-regression-policy-allocator-v1.json",
+            self.workflow,
+        )
+        self.assertIn('"withheld_instrumentation"', self.workflow)
+        self.assertIn('"compared_metrics"] == 20', self.workflow)
+
     def test_allocator_manifest_selects_filesystem_case_and_pinned_corpus(self):
         import json
 

@@ -2008,7 +2008,10 @@ def _allocator_policy(policy: dict[str, Any]) -> bool:
 
 
 def _validate_allocator_evidence(
-    result: dict[str, Any], location: str, minimum_samples: int
+    result: dict[str, Any],
+    location: str,
+    minimum_samples: int,
+    raw_samples: dict[tuple[str, str, int], dict[str, int]],
 ) -> None:
     case = result.get("case")
     if not isinstance(case, str) or not case.startswith(_FILESYSTEM_CASE_PREFIXES):
@@ -2079,20 +2082,56 @@ def _validate_allocator_evidence(
                 f"{len(values)} does not match sample_count {sample_count}"
             )
         for index, item in enumerate(values):
-            _finite_number(
-                item,
-                f"{location}.operation_metrics.allocation.{field}.values[{index}]",
-            )
+            if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+                raise ComparisonInputError(
+                    f"{location}.operation_metrics.allocation.{field}.values[{index}] "
+                    "must be a non-negative integer"
+                )
         vector_lengths.add(len(values))
     if vector_lengths != {sample_count}:
         raise ComparisonInputError(
             f"{location}.operation_metrics.allocation vectors have mismatched cardinality"
         )
+    sample_indices = operation_metrics.get("sample_indices")
+    if (
+        not isinstance(sample_indices, list)
+        or len(sample_indices) != sample_count
+        or any(
+            isinstance(sample_index, bool) or not isinstance(sample_index, int)
+            for sample_index in sample_indices
+        )
+        or set(sample_indices) != set(range(sample_count))
+    ):
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.sample_indices must be a permutation "
+            "of the raw allocator sample indices"
+        )
+    cache_state = result.get("cache_state")
+    if not isinstance(cache_state, str) or not cache_state:
+        raise ComparisonInputError(
+            f"{location}.cache_state is required for raw allocator alignment"
+        )
+    for position, sample_index in enumerate(sample_indices):
+        raw = raw_samples.get((case, cache_state, sample_index))
+        if raw is None:
+            raise ComparisonInputError(
+                f"{location}.filesystem_evidence has no raw allocator sample "
+                f"for sample_index {sample_index}"
+            )
+        for field in _ALLOCATOR_VECTOR_FIELDS:
+            expected = allocation[field]["values"][position]
+            observed = raw[field]
+            if observed != expected:
+                raise ComparisonInputError(
+                    f"{location}.filesystem_evidence raw allocator {field} at "
+                    f"sample_index {sample_index} does not match "
+                    f"operation_metrics.allocation.{field}.values[{position}]"
+                )
 
 
 def _validate_allocator_filesystem_evidence(
     report: dict[str, Any], policy: dict[str, Any], label: str
-) -> None:
+) -> dict[tuple[str, str, int], dict[str, int]]:
     evidence = report.get("filesystem_evidence")
     if not isinstance(evidence, list) or not evidence:
         raise ComparisonInputError(
@@ -2121,6 +2160,7 @@ def _validate_allocator_filesystem_evidence(
         )
     expected_sample_total = expected_sample_count * len(expected_cache_states)
     observed_cases: set[str] = set()
+    raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
     for index, raw_item in enumerate(evidence):
         item = _require_object(raw_item, f"{label}.filesystem_evidence[{index}]")
         case = item.get("case")
@@ -2172,6 +2212,22 @@ def _validate_allocator_filesystem_evidence(
                     f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
                     "allocation status/scope must be measured/system allocator"
                 )
+            expected_allocation_keys = {"status", "scope", *_ALLOCATOR_VECTOR_FIELDS}
+            if set(allocation) != expected_allocation_keys:
+                raise ComparisonInputError(
+                    f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                    "raw allocation_metrics must contain status, scope, and every "
+                    "numeric allocator field"
+                )
+            raw_values: dict[str, int] = {}
+            for field in _ALLOCATOR_VECTOR_FIELDS:
+                value = allocation[field]
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise ComparisonInputError(
+                        f"{label}.filesystem_evidence[{index}].samples[{sample_index}] "
+                        f"allocation_metrics.{field} must be a non-negative integer"
+                    )
+                raw_values[field] = value
             cache_state = sample.get("cache_state")
             if cache_state not in sample_indices:
                 raise ComparisonInputError(
@@ -2189,6 +2245,7 @@ def _validate_allocator_filesystem_evidence(
                     "sample_index must be a non-negative integer"
                 )
             sample_indices[cache_state].append(sample_number)
+            raw_samples[(case, cache_state, sample_number)] = raw_values
         expected_indices = set(range(expected_sample_count))
         for cache_state, indices in sample_indices.items():
             if len(indices) != expected_sample_count or set(indices) != expected_indices:
@@ -2200,6 +2257,7 @@ def _validate_allocator_filesystem_evidence(
         raise ComparisonInputError(
             f"{label}.filesystem_evidence cases do not match policy"
         )
+    return raw_samples
 
 
 def _validate_allocator_result_key_cardinality(
@@ -2381,9 +2439,15 @@ def compare_reports(
     current = _require_object(current_raw, "current")
     _validate_report_identity(baseline, current, policy)
     allocator_mode = _allocator_policy(policy)
+    baseline_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
+    current_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
     if allocator_mode:
-        _validate_allocator_filesystem_evidence(baseline, policy, "baseline")
-        _validate_allocator_filesystem_evidence(current, policy, "current")
+        baseline_raw_samples = _validate_allocator_filesystem_evidence(
+            baseline, policy, "baseline"
+        )
+        current_raw_samples = _validate_allocator_filesystem_evidence(
+            current, policy, "current"
+        )
     expected_count = policy["expected_result_count"]
     baseline_results = _index_results(
         baseline,
@@ -2440,10 +2504,16 @@ def compare_reports(
         after_result = current_results[key]
         if allocator_mode:
             _validate_allocator_evidence(
-                before_result, f"baseline.{case}[{cache_state}]", minimum_samples
+                before_result,
+                f"baseline.{case}[{cache_state}]",
+                minimum_samples,
+                baseline_raw_samples,
             )
             _validate_allocator_evidence(
-                after_result, f"current.{case}[{cache_state}]", minimum_samples
+                after_result,
+                f"current.{case}[{cache_state}]",
+                minimum_samples,
+                current_raw_samples,
             )
         before_latency = _latencies(before_result, f"baseline.{case}", minimum_samples)
         after_latency = _latencies(after_result, f"current.{case}", minimum_samples)
