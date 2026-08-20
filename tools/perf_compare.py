@@ -22,7 +22,7 @@ from typing import Any, Iterable
 
 
 COMPARATOR_NAME = "litchi-perf-compare"
-COMPARATOR_VERSION = "1.3.0"
+COMPARATOR_VERSION = "1.3.1"
 SUPPORTED_POLICY_SCHEMA = 2
 SUPPORTED_REPORT_SCHEMA = 1
 
@@ -485,7 +485,7 @@ _METRIC_VECTOR_STATUSES = {"measured", "not_applicable", "unavailable"}
 
 
 def _unwrap_metric_vector(value: Any, path: str) -> Any:
-    """Return a MetricVector's values without exposing wrapper fields to policy.
+    """Return a MetricVector's values and metadata without exposing wrappers.
 
     Operation metrics serialize each vector as an object containing a status and
     scope, with ``values`` omitted when it is not applicable or unavailable.
@@ -525,7 +525,7 @@ def _unwrap_metric_vector(value: Any, path: str) -> Any:
         raise ComparisonInputError(
             f"{path}.values must be omitted for a {status} MetricVector"
         )
-    return values
+    return values, status, scope
 
 
 def _walk_metrics(
@@ -533,9 +533,12 @@ def _walk_metrics(
     path: str,
     policy: dict[str, Any],
     selected: dict[str, tuple[str, float, float, str]],
+    vector_metadata: dict[str, tuple[str, str]],
 ) -> None:
-    vector_values = _unwrap_metric_vector(value, path)
-    if vector_values is not _METRIC_VECTOR_MISSING:
+    vector = _unwrap_metric_vector(value, path)
+    if vector is not _METRIC_VECTOR_MISSING:
+        vector_values, status, scope = vector
+        vector_metadata[path] = (status, scope)
         if vector_values is None:
             return
         value = vector_values
@@ -570,20 +573,30 @@ def _walk_metrics(
     if isinstance(value, dict):
         for key, item in value.items():
             child = f"{path}.{key}" if path else key
-            _walk_metrics(item, child, policy, selected)
+            _walk_metrics(item, child, policy, selected, vector_metadata)
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            _walk_metrics(item, f"{path}[{index}]", policy, selected)
+            _walk_metrics(item, f"{path}[{index}]", policy, selected, vector_metadata)
 
 
-def _optional_metrics(
+def _collect_metrics(
     result: dict[str, Any], policy: dict[str, Any]
-) -> dict[str, tuple[str, float, float, str]]:
+) -> tuple[
+    dict[str, tuple[str, float, float, str]],
+    dict[str, tuple[str, str]],
+]:
     selected: dict[str, tuple[str, float, float, str]] = {}
+    vector_metadata: dict[str, tuple[str, str]] = {}
     for root, value in result.items():
         if root in {"case", "corpus", "elapsed_ns", "output_sha256"}:
             continue
-        _walk_metrics(value, root, policy, selected)
+        _walk_metrics(value, root, policy, selected, vector_metadata)
+    return selected, vector_metadata
+
+
+def _optional_metrics_from_selected(
+    selected: dict[str, tuple[str, float, float, str]]
+) -> dict[str, tuple[str, float, float, str]]:
     return {
         path: metric
         for path, metric in selected.items()
@@ -591,14 +604,9 @@ def _optional_metrics(
     }
 
 
-def _required_metrics(
-    result: dict[str, Any], policy: dict[str, Any]
+def _required_metrics_from_selected(
+    selected: dict[str, tuple[str, float, float, str]], policy: dict[str, Any]
 ) -> dict[str, tuple[str, float, float, str]]:
-    selected: dict[str, tuple[str, float, float, str]] = {}
-    for root, value in result.items():
-        if root in {"case", "corpus", "elapsed_ns", "output_sha256"}:
-            continue
-        _walk_metrics(value, root, policy, selected)
     required = {
         path: metric
         for path, metric in selected.items()
@@ -616,6 +624,40 @@ def _required_metrics(
             "missing required metrics: " + ", ".join(missing_classes)
         )
     return required
+
+
+def _optional_metrics(
+    result: dict[str, Any], policy: dict[str, Any]
+) -> dict[str, tuple[str, float, float, str]]:
+    selected, _ = _collect_metrics(result, policy)
+    return _optional_metrics_from_selected(selected)
+
+
+def _required_metrics(
+    result: dict[str, Any], policy: dict[str, Any]
+) -> dict[str, tuple[str, float, float, str]]:
+    selected, _ = _collect_metrics(result, policy)
+    return _required_metrics_from_selected(selected, policy)
+
+
+def _compare_metric_vector_metadata(
+    case: str,
+    baseline: dict[str, tuple[str, str]],
+    current: dict[str, tuple[str, str]],
+) -> None:
+    for path in sorted(set(baseline) & set(current)):
+        baseline_status, baseline_scope = baseline[path]
+        current_status, current_scope = current[path]
+        if baseline_scope != current_scope:
+            raise ComparisonInputError(
+                f"MetricVector scope mismatch for {case}.{path}: "
+                f"baseline={baseline_scope!r}, current={current_scope!r}"
+            )
+        if baseline_status != current_status:
+            raise ComparisonInputError(
+                f"MetricVector status mismatch for {case}.{path}: "
+                f"baseline={baseline_status!r}, current={current_status!r}"
+            )
 
 
 def _delta_percent(baseline: float, current: float) -> float:
@@ -721,8 +763,15 @@ def compare_reports(
                     threshold=float(latency_thresholds[percentile]),
                 )
             )
-        before_required = _required_metrics(before_result, policy)
-        after_required = _required_metrics(after_result, policy)
+        before_selected, before_vector_metadata = _collect_metrics(
+            before_result, policy
+        )
+        after_selected, after_vector_metadata = _collect_metrics(after_result, policy)
+        _compare_metric_vector_metadata(
+            case, before_vector_metadata, after_vector_metadata
+        )
+        before_required = _required_metrics_from_selected(before_selected, policy)
+        after_required = _required_metrics_from_selected(after_selected, policy)
         if set(before_required) != set(after_required):
             missing = sorted(set(before_required) - set(after_required))
             extra = sorted(set(after_required) - set(before_required))
@@ -730,8 +779,8 @@ def compare_reports(
                 f"required metric mismatch for {case!r}: "
                 f"missing_current={missing}, extra_current={extra}"
             )
-        before_optional = _optional_metrics(before_result, policy)
-        after_optional = _optional_metrics(after_result, policy)
+        before_optional = _optional_metrics_from_selected(before_selected)
+        after_optional = _optional_metrics_from_selected(after_selected)
         if set(before_optional) != set(after_optional):
             missing = sorted(set(before_optional) - set(after_optional))
             extra = sorted(set(after_optional) - set(before_optional))

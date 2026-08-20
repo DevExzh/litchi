@@ -322,6 +322,56 @@ class PerfCompareTests(unittest.TestCase):
                 baseline, current, self.operation_metrics_policy()
             )
 
+    def test_metric_vector_metadata_mismatches_fail_closed(self):
+        def reports():
+            baseline = report()
+            current = report(revision="current")
+            baseline["results"][0]["operation_metrics"] = (
+                operation_metrics_report_fields()
+            )
+            current["results"][0]["operation_metrics"] = (
+                operation_metrics_report_fields()
+            )
+            return baseline, current
+
+        baseline, current = reports()
+        current["results"][0]["operation_metrics"]["process"]["read_bytes"][
+            "scope"
+        ] = "procfs_operation_delta"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "scope mismatch.*operation_metrics.process.read_bytes",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline, current = reports()
+        current["results"][0]["operation_metrics"]["sink"]["output_bytes"][
+            "status"
+        ] = "unavailable"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "status mismatch.*operation_metrics.sink.output_bytes",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline, current = reports()
+        current_read_bytes = current["results"][0]["operation_metrics"]["process"][
+            "read_bytes"
+        ]
+        current_read_bytes["status"] = "unavailable"
+        del current_read_bytes["values"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "status mismatch.*operation_metrics.process.read_bytes",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
     def test_p50_and_p95_regressions_are_reported(self):
         result = perf_compare.compare_reports(report(), report(120, "current"), policy())
         self.assertEqual(result["status"], "regression")
