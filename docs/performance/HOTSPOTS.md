@@ -927,7 +927,7 @@ Current work shape:
 - Legacy path and generic-reader OPC ingress still has a contiguous-buffer
   path, while source-backed ingress uses an immutable positional source with
   source versions and a validated ZIP index.
-- `PackageReader::load_parts_lazy` is not physically lazy: it classifies and
+- `PackageReader::load_parts_eager` is not physically lazy: it classifies and
   decompresses every admitted Part, including unreferenced Parts that must be
   preserved.
 - Ordinary bulk opens are serial. Explicit eager opens opt into local bounded
