@@ -97,6 +97,23 @@ DEFAULT_DRIFT_CEILINGS: dict[str, float] = {
     "p99": 15.0,
 }
 
+# These selectors use a fixed, non-CLI corpus.  Its shape therefore cannot be
+# listed in any of the configurable ``*_shapes`` fields emitted by the
+# historical schema-1 harness.  Keep this exception exact and case-local so an
+# unknown generator or an accidentally substituted corpus still fails closed.
+FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, str]] = {
+    "ods_source_backed_one_edit_save": {
+        "name": "ods-media-publication",
+        "generator": "litchi-ods-media-publication-v1",
+        "shape": "media-rich",
+    },
+    "ods_source_backed_one_percent_edit_save": {
+        "name": "ods-media-publication",
+        "generator": "litchi-ods-media-publication-v1",
+        "shape": "media-rich",
+    },
+}
+
 _MISSING = object()
 _FILESYSTEM_EVIDENCE_KEYS = frozenset(
     {
@@ -1381,6 +1398,7 @@ def _validate_configuration_rows(
         for shape in values
     }
     actual_shapes: set[str] = set()
+    undeclared_rows: list[tuple[str, dict[str, Any]]] = []
     for case, corpus_identity in indexed:
         corpus = json.loads(corpus_identity)
         shape = corpus.get("shape")
@@ -1389,11 +1407,18 @@ def _validate_configuration_rows(
                 f"{label}.results case {case!r} corpus.shape must be a non-empty string"
             )
         actual_shapes.add(shape)
+        if shape not in declared_shapes:
+            undeclared_rows.append((case, corpus))
     filesystem_shape_set = set(filesystem_shapes)
     filesystem_exception = bool(filesystem_shape_set) and actual_shapes.issubset(
         filesystem_shape_set
     )
-    if not actual_shapes.issubset(declared_shapes) and not filesystem_exception:
+    fixed_case_exception = all(
+        (expected := FIXED_CASE_CORPUS_IDENTITIES.get(case)) is not None
+        and all(corpus.get(field) == value for field, value in expected.items())
+        for case, corpus in undeclared_rows
+    )
+    if undeclared_rows and not filesystem_exception and not fixed_case_exception:
         raise AbbaSummaryInputError(
             f"{label}.configuration shape declarations do not cover result shapes"
         )
@@ -1457,6 +1482,24 @@ CFB_OPEN_STREAM_SOURCE_MEASUREMENTS = (
     "total_ns",
 )
 
+ODS_SOURCE_CELL_MEASUREMENTS = (
+    "commit_ns",
+    "content_source_read_bytes",
+    "content_source_read_calls",
+    "lifecycle_ns",
+    "open_ns",
+    "pictures_source_read_bytes",
+    "pictures_source_read_calls",
+    "publication_ns",
+    "source_read_bytes",
+    "source_read_calls",
+    "source_read_range_overlap_bytes",
+    "source_version_calls",
+    "stage_ns",
+    "untouched_source_read_bytes",
+    "untouched_source_read_calls",
+)
+
 
 def _source_identity_projection(value: Any) -> Any:
     """Remove named measurements while retaining every source identity field."""
@@ -1469,6 +1512,16 @@ def _source_identity_projection(value: Any) -> Any:
         for field in CFB_OPEN_STREAM_SOURCE_MEASUREMENTS:
             projected_cfb.pop(field, None)
         projected["cfb_open_stream"] = projected_cfb
+    ods_source_cell = projected.get("ods_source_cell")
+    if isinstance(ods_source_cell, dict):
+        projected_ods = dict(ods_source_cell)
+        for field in ODS_SOURCE_CELL_MEASUREMENTS:
+            projected_ods.pop(field, None)
+        projected["ods_source_cell"] = projected_ods
+        # The harness duplicates the aggregate replay counters at the source
+        # root.  They remain measurements for these exact ODS rows.
+        projected.pop("read_calls", None)
+        projected.pop("read_bytes", None)
     return projected
 
 
