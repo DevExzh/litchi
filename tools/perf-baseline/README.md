@@ -1323,6 +1323,22 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --json target/perf/semantic-office-smoke.json
 ```
 
+Measure the opt-in opened-PPTX slide-name selector controls. The first command
+isolates one-edit index construction on the tiny three-slide corpus; the
+second compares repeated named resolution with the matching numeric control on
+the 100-slide corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --semantic-shape tiny \
+  --case pptx_named_one_edit_save --json target/perf/pptx-named-small.json
+
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --semantic-shape large \
+  --case pptx_named_repeated_edit_save,pptx_numeric_repeated_edit_save \
+  --json target/perf/pptx-named-repeated.json
+```
+
 Measure the bounded validation reports and source-backed DOCX section inventory
 over deterministic in-memory corpora:
 
@@ -2503,6 +2519,14 @@ native-Office claim is made.
   time opened-presentation transaction capture, no-op/one/~1% text-box edits,
   commit, publication, and `to_bytes`, then reopen and verify all slides,
   shapes, and text. The public API has no save-to-sink method.
+- `pptx_named_one_edit_save`: on the named-slide corpus, time one named
+  selector/edit/save (use `--semantic-shape tiny` for the small-deck overhead
+  guard).
+- `pptx_named_repeated_edit_save` and `pptx_numeric_repeated_edit_save`: run
+  the same prepared one-shape edit on every named slide (the large semantic
+  shape has 100 slides); the numeric case is the selector control. Both
+  outputs are compared byte-for-byte with the untimed numeric oracle, while
+  missing and duplicate names are checked against their exact typed errors.
 - `rtf_semantic_open`: parse deterministic owned transport bytes through
   public `Document::from_bytes`.
 - `rtf_semantic_paragraph_count`: query the public exact paragraph cardinality.
