@@ -56,6 +56,43 @@ fn filepass(stream: &[u8]) -> (usize, &[u8]) {
     found.unwrap()
 }
 
+fn assert_post_filepass_sequence(stream: &[u8], filepass_offset: usize, filepass_len: usize) {
+    let mut offset = filepass_offset + 4 + filepass_len;
+
+    let interface_hdr = offset;
+    assert_eq!(
+        u16::from_le_bytes(stream[interface_hdr..interface_hdr + 2].try_into().unwrap()),
+        0x00e1
+    );
+    assert_eq!(
+        u16::from_le_bytes(
+            stream[interface_hdr + 2..interface_hdr + 4]
+                .try_into()
+                .unwrap()
+        ),
+        2
+    );
+    assert_eq!(&stream[interface_hdr + 4..interface_hdr + 6], &[0xb0, 0x04]);
+    offset += 6;
+
+    for (sid, payload_len) in [(0x00c1, 2), (0x00e2, 0), (0x005c, 112)] {
+        assert_eq!(
+            u16::from_le_bytes(stream[offset..offset + 2].try_into().unwrap()),
+            sid
+        );
+        let len = usize::from(u16::from_le_bytes(
+            stream[offset + 2..offset + 4].try_into().unwrap(),
+        ));
+        assert_eq!(len, payload_len);
+        offset += 4 + len;
+    }
+
+    assert_eq!(
+        u16::from_le_bytes(stream[offset..offset + 2].try_into().unwrap()),
+        0x0042
+    );
+}
+
 fn assert_round_trip(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let bytes = encrypted_workbook(profile, password);
     assert!(matches!(open(&bytes, None), Err(Error::PasswordRequired)));
@@ -83,15 +120,17 @@ fn assert_round_trip(profile: EncryptionProfile, password: &str) -> Vec<u8> {
 fn all_profiles_round_trip_and_emit_exact_filepass_families() {
     let xor = assert_round_trip(EncryptionProfile::XorObfuscation, "cafe");
     let xor_stream = workbook_stream(&xor);
-    let (_, xor_pass) = filepass(&xor_stream);
+    let (xor_offset, xor_pass) = filepass(&xor_stream);
     assert_eq!(xor_pass.len(), 6);
     assert_eq!(&xor_pass[..2], &[0, 0]);
+    assert_post_filepass_sequence(&xor_stream, xor_offset, xor_pass.len());
 
     let binary = assert_round_trip(EncryptionProfile::OfficeBinaryRc4, "密码🔐");
     let binary_stream = workbook_stream(&binary);
-    let (_, binary_pass) = filepass(&binary_stream);
+    let (binary_offset, binary_pass) = filepass(&binary_stream);
     assert_eq!(binary_pass.len(), 54);
     assert_eq!(&binary_pass[..6], &[1, 0, 1, 0, 1, 0]);
+    assert_post_filepass_sequence(&binary_stream, binary_offset, binary_pass.len());
 
     for key_bits in [40, 56, 120, 128] {
         let bytes = assert_round_trip(EncryptionProfile::CryptoApiRc4 { key_bits }, "密码🔐");
@@ -102,13 +141,7 @@ fn all_profiles_round_trip_and_emit_exact_filepass_families() {
             u32::from_le_bytes(pass[30..34].try_into().unwrap()),
             u32::from(key_bits)
         );
-        let next = offset + 4 + pass.len();
-        // MS-XLS WORKBOOKCONTENT places FILEPASS before the INTERFACE
-        // production; CODEPAGE follows the complete interface preamble.
-        assert_eq!(
-            u16::from_le_bytes(stream[next..next + 2].try_into().unwrap()),
-            0x00e1
-        );
+        assert_post_filepass_sequence(&stream, offset, pass.len());
     }
 }
 

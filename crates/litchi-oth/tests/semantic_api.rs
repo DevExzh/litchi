@@ -361,7 +361,12 @@ fn loaded_template_snapshot_remains_byte_exact() {
 #[test]
 fn shared_archive_input_opens_without_changing_the_source_bytes() {
     let bytes = Arc::new(Builder::new().build().unwrap());
+    let original_bytes = bytes.as_slice().to_vec();
+    let original_ptr = bytes.as_ptr();
     let template = Template::from_shared_bytes(Arc::clone(&bytes)).unwrap();
+    assert_eq!(template.as_bytes().as_ptr(), original_ptr);
+    assert_eq!(template.as_bytes(), original_bytes.as_slice());
+    assert_eq!(bytes.as_slice(), original_bytes.as_slice());
     assert!(std::ptr::eq(template.as_bytes(), bytes.as_slice()));
     drop(template);
     assert_eq!(Arc::strong_count(&bytes), 1);

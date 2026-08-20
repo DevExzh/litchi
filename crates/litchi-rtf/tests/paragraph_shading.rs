@@ -7,6 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+mod support;
+
 use litchi_rtf::{Paragraph, RtfDocument, RtfWriter, Shading, StyleBlock};
 
 fn block<'a>(document: &'a RtfDocument<'a>, text: &str) -> &'a StyleBlock<'a> {
@@ -128,19 +130,24 @@ fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
             .any(|block| block.paragraph.shading.background_color == Some(0))
     );
 
-    let style_source = include_str!(concat!(
+    let style_and_body = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf"
     ));
-    assert!(matches!(
-        RtfDocument::parse(style_source),
-        Err(litchi_rtf::RtfError::MalformedDocument(message))
-            if message.contains("trailing non-whitespace")
-    ));
-    let balanced_style_source = style_source
-        .strip_suffix("}\n")
-        .expect("fixture retains one documented extra root close");
-    let style_and_body = RtfDocument::parse(balanced_style_source).unwrap();
+    // LibreOffice's tdf108955 fixture has one extra closing brace after the
+    // root group. Keep the vendored bytes untouched and require the typed
+    // strict trailing-token rejection.
+    assert!(
+        matches!(
+            RtfDocument::parse_bytes(style_and_body),
+            Err(litchi_rtf::RtfError::MalformedDocument(message))
+                if message == "RTF document contains trailing non-whitespace tokens"
+        ),
+        "expected strict trailing-token rejection for tdf108955.rtf"
+    );
+    let prefix = support::first_balanced_rtf_root_prefix(style_and_body)
+        .expect("tdf108955.rtf should have a balanced first root group");
+    let style_and_body = RtfDocument::parse_bytes(prefix).unwrap();
     assert_eq!(
         style_and_body
             .stylesheet()

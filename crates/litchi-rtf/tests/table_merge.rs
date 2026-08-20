@@ -131,10 +131,10 @@ fn handles_real_libreoffice_merge_fixtures() {
     assert!(matches!(
         RtfDocument::parse(&horizontal_source),
         Err(litchi_rtf::RtfError::MalformedDocument(message))
-            if message.contains("requires a version parameter")
+            if message == r"RTF \rtf control requires a version parameter"
     ));
-    let versioned_horizontal = horizontal_source.replacen(r"{\rtf", r"{\rtf1", 1);
-    let horizontal = RtfDocument::parse(&versioned_horizontal).unwrap();
+    let horizontal_source = horizontal_source.replacen(r"{\rtf", r"{\rtf1", 1);
+    let horizontal = RtfDocument::parse(&horizontal_source).unwrap();
     let cells = horizontal.tables()[0].rows()[0].cells();
     assert_eq!(cells[0].merge().horizontal, Some(TableCellMergeRole::First));
     assert_eq!(

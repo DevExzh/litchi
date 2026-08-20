@@ -624,7 +624,21 @@ mod tests {
     #[cfg(feature = "rtf")]
     fn rtf_horizontal_merge_roles_resolve_to_a_two_column_span() {
         let path = test_data_path().join("rtf/table-cell-horizontal-merge.rtf");
-        let doc = Document::open(&path).expect("Failed to open RTF");
+        let bytes = std::fs::read(&path).expect("Failed to read RTF");
+        assert!(
+            Document::from_bytes(bytes.clone()).is_err(),
+            "the vendored fixture intentionally omits the RTF version"
+        );
+
+        let rtf_header = b"{\\rtf";
+        assert!(
+            bytes.starts_with(rtf_header),
+            "fixture should begin with an RTF header"
+        );
+        let mut normalized_bytes = bytes;
+        normalized_bytes.splice(rtf_header.len()..rtf_header.len(), [b'1']);
+
+        let doc = Document::from_bytes(normalized_bytes).expect("Failed to parse RTF");
         let tables = doc.tables().expect("Failed to get tables");
         let table = tables.first().expect("fixture has one table");
         let row = table
