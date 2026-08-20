@@ -15,6 +15,8 @@ mod wire;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub(super) use snapshot::scan_with_event_limit;
 #[allow(
     unused_imports,
     reason = "the codec facade preserves the complete crate-visible snapshot surface"

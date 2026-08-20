@@ -39,15 +39,15 @@ pub(super) fn parse_processed_defaults(
     let mut stack = Vec::new();
     let mut closed_root = false;
     let mut defaults = None;
+    let mut buffer = Vec::new();
 
     loop {
-        let decoder = reader.decoder();
         let event = reader
-            .read_event()
-            .map_err(|error| invalid(error.to_string()))?
-            .into_owned();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+            .read_event_into(&mut buffer)
+            .map_err(|error| invalid(error.to_string()))?;
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        let decoder = reader.decoder();
+        let resolver = reader.resolver();
         match event {
             Event::Start(element) if stack.is_empty() => {
                 if closed_root || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet") {
@@ -164,6 +164,7 @@ pub(super) fn parse_processed_defaults(
             Event::Eof => break,
             Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::Decl(_) => {},
         }
+        buffer.clear();
     }
 
     Ok(defaults)
@@ -207,15 +208,15 @@ impl Parser {
         let mut parser = Self::new(extensions);
         let mut stack = Vec::new();
         let mut closed_root = false;
+        let mut buffer = Vec::new();
 
         loop {
-            let decoder = reader.decoder();
             let event = reader
-                .read_event()
-                .map_err(|error| invalid(error.to_string()))?
-                .into_owned();
-            let resolver = reader.resolver().clone();
-            let (namespace, event) = resolver.resolve_event(event);
+                .read_event_into(&mut buffer)
+                .map_err(|error| invalid(error.to_string()))?;
+            let (namespace, event) = reader.resolver().resolve_event(event);
+            let decoder = reader.decoder();
+            let resolver = reader.resolver();
             match event {
                 Event::Start(element) if stack.is_empty() => {
                     if closed_root
@@ -312,6 +313,7 @@ impl Parser {
                 Event::Eof => break,
                 Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
+            buffer.clear();
         }
 
         resolve_shared_formulas(&mut parser.cells)?;
