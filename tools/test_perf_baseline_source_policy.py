@@ -47,6 +47,8 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertNotIn("GlobalAlloc", self.library)
 
     def test_allocator_target_owns_global_allocator_unsafe_surface(self):
+        self.assertIn("use litchi_perf_baseline::allocation_metrics;", self.allocator)
+        self.assertNotIn("use super::allocation_metrics;", self.allocator)
         self.assertIn("unsafe impl GlobalAlloc", self.allocator)
         self.assertIn("#[global_allocator]", self.allocator)
         self.assertIn("System.alloc", self.allocator)
