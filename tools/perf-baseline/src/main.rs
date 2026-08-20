@@ -614,7 +614,7 @@ struct OdfManifestSpec {
 }
 
 impl OdfManifestSpec {
-    const fn shape(self) -> &'static str {
+    fn shape(self) -> &'static str {
         match (self.encrypted, self.entry_count) {
             (false, 1) => "plain-1",
             (false, 64) => "plain-64",
