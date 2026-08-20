@@ -5,9 +5,14 @@
 //! external `fincore` observation immediately before the operation and a
 //! positive process `read_bytes` delta during the operation.
 
+use std::path::Path;
+
+#[cfg(target_os = "linux")]
 use std::{
-    fs::{self, File},
-    path::Path,
+    env,
+    fs::{self, OpenOptions},
+    io::Read,
+    path::PathBuf,
     process::Command,
 };
 
@@ -30,8 +35,12 @@ pub(crate) enum Status {
     IneligibleFincoreMultipleRecords,
     IneligibleFincorePathMismatch,
     IneligibleFincoreSizeMismatch,
+    IneligibleFincoreMetadataUnavailable,
+    IneligibleFincoreUnrecognizedFallback,
     IneligibleSourceNotRegular,
     IneligibleSourceEmpty,
+    IneligibleSourceReadWriteUnavailable,
+    IneligibleSourceHashFailed,
     IneligibleSourcePageSizeUnavailable,
     IneligibleSourceNotPageAligned,
     IneligibleSourceFsyncFailed,
@@ -40,6 +49,7 @@ pub(crate) enum Status {
     IneligibleSourceDirty,
     IneligibleSourceWriteback,
     IneligibleProcIoUnavailable,
+    IneligibleReadBytesBackwards,
     IneligibleReadBytesZero,
     IneligiblePreparedQueryControl,
     IneligibleSourceAlignmentUnavailable,
@@ -52,20 +62,25 @@ impl Status {
     }
 }
 
-/// One verifier result.  No source path is retained in reports.  Optional
-/// values are omitted when a precondition failed before the corresponding
-/// observation could be made.
+/// One verifier result.  No source path is retained as a dedicated report
+/// field; raw external-tool stderr is retained byte-for-byte and may itself
+/// contain a tool-emitted path.  Optional values are omitted when a
+/// precondition failed before the corresponding observation could be made.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct Sample {
     pub status: Status,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filesystem_type: Option<String>,
+    pub filesystem_magic: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page_size_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_pages: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aligned_source_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aligned_source_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fsync_completed: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -79,6 +94,20 @@ pub(crate) struct Sample {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub writeback_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_stderr: Option<Vec<u8>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_version_stderr: Option<Vec<u8>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fincore_fallback: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub read_bytes_before: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_bytes_after: Option<u64>,
@@ -90,16 +119,25 @@ impl Sample {
     pub(crate) fn ineligible(status: Status) -> Self {
         Self {
             status,
-            filesystem_type: None,
+            filesystem_magic: None,
             page_size_bytes: None,
             source_bytes: None,
             source_pages: None,
+            aligned_source_bytes: None,
+            aligned_source_sha256: None,
             fsync_completed: None,
             advice: None,
             fincore_size_bytes: None,
             resident_bytes: None,
             dirty_bytes: None,
             writeback_bytes: None,
+            fincore_path: None,
+            fincore_sha256: None,
+            fincore_version: None,
+            fincore_stderr: None,
+            fincore_version_stderr: None,
+            fincore_method: None,
+            fincore_fallback: None,
             read_bytes_before: None,
             read_bytes_after: None,
             read_bytes_delta: None,
@@ -108,22 +146,31 @@ impl Sample {
 
     fn with_source(
         status: Status,
-        filesystem_type: String,
+        filesystem_magic: u64,
         page_size_bytes: u64,
         source_bytes: u64,
     ) -> Self {
         Self {
             status,
-            filesystem_type: Some(filesystem_type),
+            filesystem_magic: Some(filesystem_magic),
             page_size_bytes: Some(page_size_bytes),
             source_bytes: Some(source_bytes),
             source_pages: Some(source_bytes / page_size_bytes),
+            aligned_source_bytes: Some(source_bytes),
+            aligned_source_sha256: None,
             fsync_completed: Some(false),
             advice: None,
             fincore_size_bytes: None,
             resident_bytes: None,
             dirty_bytes: None,
             writeback_bytes: None,
+            fincore_path: None,
+            fincore_sha256: None,
+            fincore_version: None,
+            fincore_stderr: None,
+            fincore_version_stderr: None,
+            fincore_method: None,
+            fincore_fallback: None,
             read_bytes_before: None,
             read_bytes_after: None,
             read_bytes_delta: None,
@@ -135,7 +182,11 @@ impl Sample {
 /// not a physical-media or device-temperature assertion.
 pub(crate) const CLAIM_SCOPE: &str = "external fincore page-cache residency/dirty/writeback proof plus positive process read_bytes; no physical-media claim";
 pub(crate) const FINCORE_COMMAND: &str =
-    "fincore --json --bytes --output FILE,SIZE,RES,DIRTY,WRITEBACK";
+    "fincore --json --bytes --output FILE,SIZE,RES,DIRTY,WRITEBACK --";
+pub(crate) const FINCORE_METHOD: &str = "external_fincore_json_columns";
+pub(crate) const FINCORE_FALLBACK: &str = "none";
+const FINCORE_UNRECOGNIZED_FALLBACK: &str = "unrecognized_stderr";
+const FINCORE_UNRECOGNIZED_OUTPUT: &str = "unrecognized_output";
 pub(crate) const ADVICE: &str = "posix_fadvise_dontneed_accepted";
 
 pub(crate) fn page_size_for_harness() -> Result<u64, Status> {
@@ -149,37 +200,31 @@ pub(crate) fn page_size_for_harness() -> Result<u64, Status> {
     }
 }
 
-/// A deliberately conservative allowlist of Linux filesystems for which the
-/// verifier's page-residency proof is meaningful.  tmpfs, overlayfs, procfs,
-/// network filesystems, and unknown filesystems are ineligible.
-pub(crate) const SUPPORTED_BLOCK_FILESYSTEMS: &[&str] =
-    &["ext2", "ext3", "ext4", "xfs", "btrfs", "f2fs", "zfs"];
+/// Linux `statfs(2)` magic values admitted by the verifier.  The ext2/ext3/
+/// ext4 family deliberately shares `0xEF53`; names from external `stat`
+/// output are never used for admission.
+pub(crate) const EXT_SUPER_MAGIC: u64 = 0xEF53;
+pub(crate) const XFS_SUPER_MAGIC: u64 = 0x5846_5342;
+pub(crate) const BTRFS_SUPER_MAGIC: u64 = 0x9123_683E;
+pub(crate) const F2FS_SUPER_MAGIC: u64 = 0xF2F5_2010;
+pub(crate) const ZFS_SUPER_MAGIC: u64 = 0x2FC1_2FC1;
+pub(crate) const SUPPORTED_BLOCK_FILESYSTEM_MAGICS: &[u64] = &[
+    EXT_SUPER_MAGIC,
+    XFS_SUPER_MAGIC,
+    BTRFS_SUPER_MAGIC,
+    F2FS_SUPER_MAGIC,
+    ZFS_SUPER_MAGIC,
+];
 
-pub(crate) const fn supported_block_filesystem(filesystem_type: &str) -> bool {
+pub(crate) const fn supported_block_filesystem(magic: u64) -> bool {
     let mut index = 0;
-    while index < SUPPORTED_BLOCK_FILESYSTEMS.len() {
-        if string_eq(filesystem_type, SUPPORTED_BLOCK_FILESYSTEMS[index]) {
+    while index < SUPPORTED_BLOCK_FILESYSTEM_MAGICS.len() {
+        if magic == SUPPORTED_BLOCK_FILESYSTEM_MAGICS[index] {
             return true;
         }
         index += 1;
     }
     false
-}
-
-const fn string_eq(left: &str, right: &str) -> bool {
-    let left = left.as_bytes();
-    let right = right.as_bytes();
-    if left.len() != right.len() {
-        return false;
-    }
-    let mut index = 0;
-    while index < left.len() {
-        if left[index] != right[index] {
-            return false;
-        }
-        index += 1;
-    }
-    true
 }
 
 /// Fincore's JSON output changes its default columns across util-linux
@@ -338,6 +383,44 @@ fn observation_status(observation: FincoreObservation, source_bytes: u64) -> Sta
     }
 }
 
+struct FincoreProbe {
+    observation: Result<FincoreObservation, Status>,
+    path: Option<String>,
+    sha256: Option<String>,
+    version: Option<String>,
+    stderr: Option<Vec<u8>>,
+    version_stderr: Option<Vec<u8>>,
+    method: Option<&'static str>,
+    fallback: Option<&'static str>,
+}
+
+impl FincoreProbe {
+    fn unavailable(status: Status) -> Self {
+        Self {
+            observation: Err(status),
+            path: None,
+            sha256: None,
+            version: None,
+            stderr: None,
+            version_stderr: None,
+            method: None,
+            fallback: None,
+        }
+    }
+}
+
+impl Sample {
+    fn attach_fincore_probe(&mut self, probe: &FincoreProbe) {
+        self.fincore_path = probe.path.clone();
+        self.fincore_sha256 = probe.sha256.clone();
+        self.fincore_version = probe.version.clone();
+        self.fincore_stderr = probe.stderr.clone();
+        self.fincore_version_stderr = probe.version_stderr.clone();
+        self.fincore_method = probe.method.map(str::to_owned);
+        self.fincore_fallback = probe.fallback.map(str::to_owned);
+    }
+}
+
 /// Checks source metadata, filesystem identity, durable source state, and
 /// page residency.  The operation itself is not run here; the child repeats
 /// this immediately before its timed source-touching operation.
@@ -357,25 +440,34 @@ pub(crate) fn prepare(path: &Path) -> Sample {
         if !symlink_metadata.file_type().is_file() {
             return Sample::ineligible(Status::IneligibleSourceNotRegular);
         }
-        let metadata = match fs::metadata(path) {
+        // Open read-write before fstatfs.  This is required for the
+        // fincore/mincore fallback contract and also binds the filesystem
+        // identity to the exact descriptor used for fsync and advice.
+        let mut file = match OpenOptions::new().read(true).write(true).open(path) {
+            Ok(file) => file,
+            Err(_) => return Sample::ineligible(Status::IneligibleSourceReadWriteUnavailable),
+        };
+        let source_metadata = match file.metadata() {
             Ok(metadata) if metadata.is_file() => metadata,
             _ => return Sample::ineligible(Status::IneligibleSourceNotRegular),
         };
-        let source_bytes = metadata.len();
+        let source_bytes = source_metadata.len();
         if source_bytes == 0 {
             return Sample::ineligible(Status::IneligibleSourceEmpty);
         }
-        let filesystem_type = match filesystem_type(path) {
-            Some(filesystem_type) => filesystem_type,
+        let filesystem_magic = match rustix::fs::fstatfs(&file)
+            .ok()
+            .and_then(|statfs| u64::try_from(statfs.f_type).ok())
+        {
+            Some(magic) => magic,
             None => return Sample::ineligible(Status::IneligibleFilesystemUnknown),
         };
-        if !supported_block_filesystem(&filesystem_type) {
-            return Sample {
-                status: Status::IneligibleFilesystemUnsupported,
-                filesystem_type: Some(filesystem_type),
-                source_bytes: Some(source_bytes),
-                ..Sample::ineligible(Status::IneligibleFilesystemUnsupported)
-            };
+        if !supported_block_filesystem(filesystem_magic) {
+            let mut sample = Sample::ineligible(Status::IneligibleFilesystemUnsupported);
+            sample.filesystem_magic = Some(filesystem_magic);
+            sample.source_bytes = Some(source_bytes);
+            sample.aligned_source_bytes = Some(source_bytes);
+            return sample;
         }
         let page_size_bytes = match page_size_bytes() {
             Some(page_size_bytes) if page_size_bytes > 0 => page_size_bytes,
@@ -384,7 +476,7 @@ pub(crate) fn prepare(path: &Path) -> Sample {
         if source_bytes % page_size_bytes != 0 {
             let mut sample = Sample::with_source(
                 Status::IneligibleSourceNotPageAligned,
-                filesystem_type,
+                filesystem_magic,
                 page_size_bytes,
                 source_bytes,
             );
@@ -393,17 +485,19 @@ pub(crate) fn prepare(path: &Path) -> Sample {
         }
         let mut sample = Sample::with_source(
             Status::Eligible,
-            filesystem_type,
+            filesystem_magic,
             page_size_bytes,
             source_bytes,
         );
-        let file = match File::open(path) {
-            Ok(file) => file,
-            Err(_) => {
-                sample.status = Status::IneligibleSourceNotRegular;
-                return sample;
-            },
-        };
+        let mut source_contents = Vec::new();
+        if file.read_to_end(&mut source_contents).is_err()
+            || u64::try_from(source_contents.len()).ok() != Some(source_bytes)
+        {
+            sample.status = Status::IneligibleSourceHashFailed;
+            return sample;
+        }
+        let source_hash = super::sha256_hex(&source_contents);
+        sample.aligned_source_sha256 = Some(source_hash);
         if file.sync_all().is_err() {
             sample.status = Status::IneligibleSourceFsyncFailed;
             return sample;
@@ -414,7 +508,9 @@ pub(crate) fn prepare(path: &Path) -> Sample {
             return sample;
         }
         sample.advice = Some(ADVICE.to_owned());
-        let observation = match run_fincore(path) {
+        let probe = run_fincore(path);
+        sample.attach_fincore_probe(&probe);
+        let observation = match probe.observation {
             Ok(observation) => observation,
             Err(status) => {
                 sample.status = status;
@@ -444,9 +540,15 @@ pub(crate) fn complete(
         sample.status = Status::IneligibleProcIoUnavailable;
         return sample;
     };
-    let read_bytes_delta = after.read_bytes.saturating_sub(before.read_bytes);
     sample.read_bytes_before = Some(before.read_bytes);
     sample.read_bytes_after = Some(after.read_bytes);
+    let read_bytes_delta = match after.read_bytes.checked_sub(before.read_bytes) {
+        Some(delta) => delta,
+        None => {
+            sample.status = Status::IneligibleReadBytesBackwards;
+            return sample;
+        },
+    };
     sample.read_bytes_delta = Some(read_bytes_delta);
     if read_bytes_delta == 0 {
         sample.status = Status::IneligibleReadBytesZero;
@@ -556,28 +658,6 @@ pub(crate) fn page_aligned_archive(
 }
 
 #[cfg(target_os = "linux")]
-fn filesystem_type(path: &Path) -> Option<String> {
-    let output = Command::new("stat")
-        .args(["-f", "-c", "%T"])
-        .arg("--")
-        .arg(path)
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    String::from_utf8(output.stdout)
-        .ok()
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-}
-
-#[cfg(not(target_os = "linux"))]
-fn filesystem_type(_path: &Path) -> Option<String> {
-    None
-}
-
-#[cfg(target_os = "linux")]
 fn page_size_bytes() -> Option<u64> {
     command_output("getconf", &["PAGESIZE"])
         .and_then(|value| value.parse::<u64>().ok())
@@ -590,8 +670,29 @@ fn page_size_bytes() -> Option<u64> {
 }
 
 #[cfg(target_os = "linux")]
-fn run_fincore(path: &Path) -> Result<FincoreObservation, Status> {
-    let output = Command::new("fincore")
+fn run_fincore(path: &Path) -> FincoreProbe {
+    let metadata = match fincore_metadata() {
+        Ok(metadata) => metadata,
+        Err(status) => return FincoreProbe::unavailable(status),
+    };
+    let mut probe = FincoreProbe {
+        observation: Err(Status::IneligibleFincoreFailed),
+        path: Some(metadata.path),
+        sha256: Some(metadata.sha256),
+        version: Some(metadata.version),
+        stderr: None,
+        version_stderr: metadata.version_stderr,
+        method: Some(FINCORE_METHOD),
+        fallback: Some(FINCORE_FALLBACK),
+    };
+    let executable = match probe.path.as_deref() {
+        Some(path) => path,
+        None => {
+            probe.observation = Err(Status::IneligibleFincoreMetadataUnavailable);
+            return probe;
+        },
+    };
+    let output = Command::new(executable)
         .args([
             "--json",
             "--bytes",
@@ -600,31 +701,135 @@ fn run_fincore(path: &Path) -> Result<FincoreObservation, Status> {
         ])
         .arg("--")
         .arg(path)
-        .output()
-        .map_err(|_| Status::IneligibleFincoreUnavailable)?;
+        .output();
+    let output = match output {
+        Ok(output) => output,
+        Err(_) => {
+            probe.observation = Err(Status::IneligibleFincoreFailed);
+            return probe;
+        },
+    };
+    probe.stderr = Some(output.stderr.clone());
     if !output.status.success() {
-        return Err(Status::IneligibleFincoreFailed);
+        probe.observation = Err(Status::IneligibleFincoreFailed);
+        return probe;
     }
-    let observation = parse_fincore_json(&output.stdout)?;
-    let expected_path = path.to_str().ok_or(Status::IneligibleFincorePathMismatch)?;
+    if !output.stderr.is_empty() {
+        probe.fallback = Some(FINCORE_UNRECOGNIZED_FALLBACK);
+        probe.observation = Err(Status::IneligibleFincoreUnrecognizedFallback);
+        return probe;
+    }
+    let observation = match parse_fincore_json(&output.stdout) {
+        Ok(observation) => observation,
+        Err(status) => {
+            probe.fallback = Some(FINCORE_UNRECOGNIZED_OUTPUT);
+            probe.observation = Err(status);
+            return probe;
+        },
+    };
+    let expected_path = match path.to_str() {
+        Some(path) => path,
+        None => {
+            probe.observation = Err(Status::IneligibleFincorePathMismatch);
+            return probe;
+        },
+    };
     // Parse the path separately only after strict structural parsing.  This
     // keeps the parser useful in adversarial unit tests without retaining a
     // caller path in the report.
     let document = serde_json::from_slice::<FincoreDocument>(&output.stdout)
-        .map_err(|_| Status::IneligibleFincoreInvalidJson)?;
+        .map_err(|_| Status::IneligibleFincoreInvalidJson);
+    let document = match document {
+        Ok(document) => document,
+        Err(status) => {
+            probe.observation = Err(status);
+            return probe;
+        },
+    };
     let record = document
         .records
         .first()
-        .ok_or(Status::IneligibleFincoreMultipleRecords)?;
+        .ok_or(Status::IneligibleFincoreMultipleRecords);
+    let record = match record {
+        Ok(record) => record,
+        Err(status) => {
+            probe.observation = Err(status);
+            return probe;
+        },
+    };
     if record.file != expected_path {
-        return Err(Status::IneligibleFincorePathMismatch);
+        probe.observation = Err(Status::IneligibleFincorePathMismatch);
+        return probe;
     }
-    Ok(observation)
+    probe.observation = Ok(observation);
+    probe
 }
 
 #[cfg(not(target_os = "linux"))]
-fn run_fincore(_path: &Path) -> Result<FincoreObservation, Status> {
-    Err(Status::IneligibleNonLinux)
+fn run_fincore(_path: &Path) -> FincoreProbe {
+    FincoreProbe::unavailable(Status::IneligibleNonLinux)
+}
+
+#[cfg(target_os = "linux")]
+struct FincoreMetadata {
+    path: String,
+    sha256: String,
+    version: String,
+    version_stderr: Option<Vec<u8>>,
+}
+
+#[cfg(target_os = "linux")]
+fn fincore_metadata() -> Result<FincoreMetadata, Status> {
+    let path = locate_fincore().ok_or(Status::IneligibleFincoreUnavailable)?;
+    let canonical = fs::canonicalize(path).map_err(|_| Status::IneligibleFincoreUnavailable)?;
+    let canonical_string = canonical
+        .to_str()
+        .ok_or(Status::IneligibleFincoreMetadataUnavailable)?
+        .to_owned();
+    let binary = fs::read(&canonical).map_err(|_| Status::IneligibleFincoreMetadataUnavailable)?;
+    let sha256 = super::sha256_hex(&binary);
+    let version = Command::new(&canonical)
+        .arg("--version")
+        .output()
+        .map_err(|_| Status::IneligibleFincoreMetadataUnavailable)?;
+    if !version.status.success() || version.stdout.is_empty() {
+        return Err(Status::IneligibleFincoreMetadataUnavailable);
+    }
+    let version_stderr = Some(version.stderr);
+    let version = String::from_utf8(version.stdout)
+        .map_err(|_| Status::IneligibleFincoreMetadataUnavailable)?
+        .trim()
+        .to_owned();
+    if version.is_empty() {
+        return Err(Status::IneligibleFincoreMetadataUnavailable);
+    }
+    Ok(FincoreMetadata {
+        path: canonical_string,
+        sha256,
+        version,
+        version_stderr,
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn locate_fincore() -> Option<PathBuf> {
+    let path = env::var_os("PATH")?;
+    env::split_paths(&path).find_map(|directory| {
+        let candidate = directory.join("fincore");
+        let metadata = fs::metadata(&candidate).ok()?;
+        if !metadata.is_file() {
+            return None;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            if metadata.permissions().mode() & 0o111 == 0 {
+                return None;
+            }
+        }
+        Some(candidate)
+    })
 }
 
 #[cfg(target_os = "linux")]
@@ -641,8 +846,10 @@ fn command_output(program: &str, arguments: &[&str]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        FincoreObservation, SUPPORTED_BLOCK_FILESYSTEMS, Sample, Status, complete,
-        observation_status, page_aligned_archive, parse_fincore_json, supported_block_filesystem,
+        BTRFS_SUPER_MAGIC, EXT_SUPER_MAGIC, F2FS_SUPER_MAGIC, FINCORE_FALLBACK, FINCORE_METHOD,
+        FincoreObservation, SUPPORTED_BLOCK_FILESYSTEM_MAGICS, Sample, Status, XFS_SUPER_MAGIC,
+        ZFS_SUPER_MAGIC, complete, observation_status, page_aligned_archive, parse_fincore_json,
+        supported_block_filesystem,
     };
 
     fn valid_json() -> &'static [u8] {
@@ -741,7 +948,7 @@ mod tests {
 
     #[test]
     fn process_read_bytes_gate_requires_a_positive_delta() {
-        let sample = Sample::with_source(Status::Eligible, "ext4".to_owned(), 4096, 8192);
+        let sample = Sample::with_source(Status::Eligible, EXT_SUPER_MAGIC, 4096, 8192);
         let before = crate::process_metrics::Snapshot {
             read_bytes: 10,
             ..Default::default()
@@ -757,11 +964,21 @@ mod tests {
         let zero = complete(sample, Some(before), Some(before));
         assert_eq!(zero.status, Status::IneligibleReadBytesZero);
         assert_eq!(zero.read_bytes_delta, Some(0));
+
+        let backwards = complete(
+            Sample::with_source(Status::Eligible, EXT_SUPER_MAGIC, 4096, 8192),
+            Some(after),
+            Some(before),
+        );
+        assert_eq!(backwards.status, Status::IneligibleReadBytesBackwards);
+        assert_eq!(backwards.read_bytes_before, Some(18));
+        assert_eq!(backwards.read_bytes_after, Some(10));
+        assert_eq!(backwards.read_bytes_delta, None);
     }
 
     #[test]
     fn process_snapshot_failure_is_explicitly_ineligible() {
-        let sample = Sample::with_source(Status::Eligible, "ext4".to_owned(), 4096, 8192);
+        let sample = Sample::with_source(Status::Eligible, EXT_SUPER_MAGIC, 4096, 8192);
         let completed = complete(sample, None, None);
         assert_eq!(completed.status, Status::IneligibleProcIoUnavailable);
         assert_eq!(completed.read_bytes_delta, None);
@@ -769,13 +986,25 @@ mod tests {
 
     #[test]
     fn block_filesystem_allowlist_is_conservative() {
-        assert_eq!(SUPPORTED_BLOCK_FILESYSTEMS.len(), 7);
-        assert!(supported_block_filesystem("ext4"));
-        assert!(supported_block_filesystem("xfs"));
-        assert!(!supported_block_filesystem("tmpfs"));
-        assert!(!supported_block_filesystem("overlayfs"));
-        assert!(!supported_block_filesystem("nfs"));
-        assert!(!supported_block_filesystem(""));
+        assert_eq!(SUPPORTED_BLOCK_FILESYSTEM_MAGICS.len(), 5);
+        for magic in [
+            EXT_SUPER_MAGIC,
+            XFS_SUPER_MAGIC,
+            BTRFS_SUPER_MAGIC,
+            F2FS_SUPER_MAGIC,
+            ZFS_SUPER_MAGIC,
+        ] {
+            assert!(supported_block_filesystem(magic));
+        }
+        for magic in [0x0102_u64, 0x794c_7630, 0x6969, u64::MAX] {
+            assert!(!supported_block_filesystem(magic));
+        }
+    }
+
+    #[test]
+    fn fincore_method_has_no_implicit_fallback() {
+        assert_eq!(FINCORE_METHOD, "external_fincore_json_columns");
+        assert_eq!(FINCORE_FALLBACK, "none");
     }
 
     #[test]
