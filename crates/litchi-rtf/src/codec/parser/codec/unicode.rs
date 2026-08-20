@@ -74,15 +74,17 @@ impl Parser<'_> {
         let unicode_str = String::from_utf16(&unicode_values)
             .map_err(|e| RtfError::InvalidUnicode(format!("Invalid Unicode sequence: {e}")))?;
 
-        let state = self.current_state()?.clone();
-        if state.destination == Destination::DocumentBody
-            && (state.in_table || state.table_nesting_level >= 2)
-        {
-            self.append_table_text(unicode_str.as_bytes(), state.table_nesting_level)?;
+        let (destination, in_table, table_nesting_level) = {
+            let state = self.current_state()?;
+            (state.destination, state.in_table, state.table_nesting_level)
+        };
+        if destination == Destination::DocumentBody && (in_table || table_nesting_level >= 2) {
+            self.append_table_text(unicode_str.as_bytes(), table_nesting_level)?;
             if let Some(remainder) = fallback_remainder {
-                self.append_table_text(remainder.as_bytes(), state.table_nesting_level)?;
+                self.append_table_text(remainder.as_bytes(), table_nesting_level)?;
             }
-        } else if state.destination == Destination::DocumentBody {
+        } else if destination == Destination::DocumentBody {
+            let state = self.current_state()?.clone();
             // Add the Unicode sequence to the document as its own formatted block.
             let allocated = self.arena.alloc_str(&unicode_str);
             let start = self.body_text_len;
