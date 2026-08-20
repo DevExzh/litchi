@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use litchi_iwa_archive::Limits;
-use litchi_iwa_archive::package::Catalog;
+use litchi_iwa_archive::package::{Catalog, EntryEdit, ReassemblyPatchError};
 use litchi_iwa_core::{Archive, SnappyStream};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,6 +125,92 @@ fn native_iwa_headers_and_payloads_are_exactly_preserved() -> Result<(), Box<dyn
             expected,
             "corpus drift in {fixture}"
         );
+    }
+    Ok(())
+}
+
+fn verify_native_reassembly_patch(name: &str) -> Result<(), Box<dyn Error>> {
+    let source = fs::read(fixture_path(name))?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let selected = catalog
+        .iter()
+        .find(|entry| {
+            #[allow(
+                clippy::case_sensitive_file_extension_comparisons,
+                reason = "IWA member names are case-sensitive protocol names."
+            )]
+            {
+                !entry.is_opaque() && !entry.name().ends_with(".iwa")
+            }
+        })
+        .ok_or("native fixture has no decoded non-IWA member")?;
+    let selected_name = selected.name().to_owned();
+    let patch = catalog.reassemble_to_patch(
+        &[EntryEdit::new(
+            &selected_name,
+            b"patched non-IWA physical member",
+        )],
+        Limits::default(),
+    )?;
+    let target = patch.apply(&source)?;
+    let target_catalog = Catalog::from_bytes(&target)?;
+
+    let target_selected = target_catalog
+        .iter()
+        .find(|entry| entry.name() == selected_name)
+        .ok_or("reassembled fixture lost the selected member")?;
+    assert_eq!(target_selected.data(), b"patched non-IWA physical member");
+
+    for target_entry in target_catalog
+        .iter()
+        .filter(|entry| entry.name() != selected_name)
+    {
+        let source_entry = catalog
+            .iter()
+            .find(|entry| entry.name() == target_entry.name())
+            .ok_or("reassembled fixture lost an untouched member")?;
+        assert_eq!(target_entry.data(), source_entry.data());
+        assert_eq!(target_entry.raw_name(), source_entry.raw_name());
+        assert_eq!(
+            target_entry.raw_record().compressed_data(),
+            source_entry.raw_record().compressed_data()
+        );
+        assert_eq!(
+            target_entry.metadata().local(),
+            source_entry.metadata().local()
+        );
+        assert_eq!(
+            target_entry.metadata().central().name(),
+            source_entry.metadata().central().name()
+        );
+        assert_eq!(
+            target_entry.metadata().central().extra(),
+            source_entry.metadata().central().extra()
+        );
+        assert_eq!(
+            target_entry.metadata().central().comment(),
+            source_entry.metadata().central().comment()
+        );
+    }
+
+    assert_eq!(patch.inverse().apply(&target)?, source);
+    let mut foreign = source.clone();
+    foreign.push(0);
+    assert!(matches!(
+        patch.apply(&foreign),
+        Err(ReassemblyPatchError::Conflict)
+    ));
+    Ok(())
+}
+
+#[test]
+fn native_reassembly_patch_round_trips_all_iwork_families() -> Result<(), Box<dyn Error>> {
+    for fixture in [
+        "numbers/basic.numbers",
+        "pages/basic.pages",
+        "keynote/basic.key",
+    ] {
+        verify_native_reassembly_patch(fixture)?;
     }
     Ok(())
 }
