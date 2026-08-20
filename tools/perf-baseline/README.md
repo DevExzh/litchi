@@ -2528,8 +2528,10 @@ does not claim byte preservation for arbitrary third-party XLSX input.
 Reports use `schema_version: 1`. Each result contains sorted raw elapsed-ns
 samples plus min, median p50, nearest-rank p95 and p99, max, mean, sample
 standard deviation, and a two-sided Student's-t 95% confidence interval for
-the mean. Untimed warm-up iterations are recorded in the configuration but are
-never included in these statistics.
+the mean. `elapsed_ns.sample_order` is the retained-iteration index for each
+sorted sample, so additive per-sample evidence can be reordered without
+guessing from duplicate elapsed values. Untimed warm-up iterations are
+recorded in the configuration but are never included in these statistics.
 
 Each case embeds a corpus manifest with the format-specific generator version,
 container format, shape, payload algorithm, logical and serialized sizes,
@@ -2717,20 +2719,26 @@ order. Those fields and the elapsed samples are sufficient to compute
 throughput, speedup, scaling efficiency, and an Amdahl serial-fraction estimate
 outside the harness.
 
-The top-level `parallel_metrics` envelope repeats only sound parallelism
-evidence. `configured_worker_budget` is the sorted
+The top-level `parallel_metrics` envelope is explicitly marked
+`claim: "descriptive"` and repeats only sound parallelism evidence;
+the comparator validates its shape and metadata but does not compare it as a
+latency/resource regression metric. `configured_worker_budget` is the sorted
 `configuration.execution_workers` selection, and each scaling result reports
 its configured `execution.worker_count` and deterministic
-`execution.logical_tasks`. OPC cache contention results additionally report
+`execution.logical_tasks`; every reported worker width must be a member of
+that configured budget. OPC cache contention results additionally report
 `observed_local_worker_count` only when one explicitly created worker team is
-present; this is a harness-created local team width, not a process thread
-count. `deterministic_chunk_count` is unavailable until a producer exposes an
-exact chunk counter. Range-simulation results may additionally report their
-exact per-sample `source.simulation.physical_request_count` vector as
-deterministic request/chunk evidence. The CFB selective and `open_stream`
-simulation paths use their exact nested `physical_request_count` vectors for
-the same purpose; other results leave `deterministic_chunk_count` unavailable
-rather than infer it from bytes.
+present; a serial zero-team result is `not_applicable`, and multiple teams are
+`unavailable` because the local boundary is ambiguous. This is a
+harness-created local team width, not a process thread count.
+`deterministic_chunk_count` is unavailable until a producer exposes an exact
+chunk counter. Range-simulation results may additionally report their exact
+per-sample `source.simulation.physical_request_count` vector, reordered by
+`elapsed_ns.sample_order`, as deterministic request/chunk evidence. The CFB
+selective path reports the `read` phase only, and CFB `open_stream` sums its
+`per_operation` phases only; both deliberately exclude the timed-open phase.
+Other results leave `deterministic_chunk_count` unavailable rather than infer
+it from bytes.
 `lock_wait_ns` is unavailable because waiter counts are not lock-time
 measurements. The envelope never reads process-global thread lists, converts
 CPU utilization or waiter counts into worker/lock metrics, or infers chunks

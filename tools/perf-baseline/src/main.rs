@@ -4731,6 +4731,10 @@ struct SimulatedRangeSource {
 struct Statistics {
     unit: &'static str,
     samples: Vec<u64>,
+    /// Original retained-sample index for each sorted `samples` entry.  The
+    /// index lets additive per-sample evidence reorder itself to the same
+    /// statistics view without guessing from elapsed values.
+    sample_order: Vec<usize>,
     min: u64,
     p50: u64,
     p95: u64,
@@ -40303,8 +40307,17 @@ fn record_elapsed(
     Ok(())
 }
 
-fn statistics(mut samples: Vec<u64>) -> Statistics {
-    samples.sort_unstable();
+fn statistics(samples: Vec<u64>) -> Statistics {
+    let mut ordered = samples.into_iter().enumerate().collect::<Vec<_>>();
+    ordered.sort_unstable_by_key(|&(index, value)| (value, index));
+    let sample_order = ordered
+        .iter()
+        .map(|&(index, _value)| index)
+        .collect::<Vec<_>>();
+    let samples = ordered
+        .iter()
+        .map(|&(_index, value)| value)
+        .collect::<Vec<_>>();
     let count = samples.len();
     let (mean, squared_deviation_sum) = samples.iter().enumerate().fold(
         (0.0, 0.0),
@@ -40330,6 +40343,7 @@ fn statistics(mut samples: Vec<u64>) -> Statistics {
 
     Statistics {
         unit: "ns",
+        sample_order,
         min: samples[0],
         p50: midpoint(samples[(count - 1) / 2], samples[count / 2]),
         p95: nearest_rank(&samples, 95),
@@ -46043,6 +46057,7 @@ mod tests {
         let measured = statistics(vec![5, 1, 4, 2, 3]);
 
         assert_eq!(measured.samples, vec![1, 2, 3, 4, 5]);
+        assert_eq!(measured.sample_order, vec![1, 3, 4, 2, 0]);
         assert_eq!(measured.p50, 3);
         assert_eq!(measured.p95, 5);
         assert_eq!(measured.p99, 5);
