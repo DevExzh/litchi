@@ -2591,9 +2591,10 @@ Filesystem records are additive under `filesystem_evidence`. Each evidence
 sample is keyed by case, corpus manifest, sample index, and `cache_state`
 (`warm` or `cold-requested`), and pairs child elapsed time with parent-observed
 wall time. It includes logical `ReadAt` requested/returned bytes, fixed request
-size buckets, maximum concurrent reads, procfs I/O/fault/RSS deltas (with
-post-sample `VmHWM`), output SHA-256 and byte length for saves, and public API
-publication counters where available. `opc_materialized_parts` is explicit
+size buckets, largest requested/returned range sizes, a range-order pattern,
+maximum concurrent reads, procfs I/O/fault/RSS deltas (with post-sample
+`VmHWM`), output SHA-256 and byte length for saves, and public API publication
+counters where available. `opc_materialized_parts` is explicit
 zero for the raw-copy source overlay path; CFB records changed spans and
 published bytes. The configuration records selected cache states, process
 isolation, fresh-child sampling, and whether a caller-selected filesystem root
@@ -2612,12 +2613,29 @@ Eager OPC filesystem samples use the same explicit boundary,
 `ReadAt` counter; source-backed OPC and CFB overlay samples retain
 `timed_read_at` when their positional counter is active.
 
+The positional wrapper's `sequential`/`random` label is categorical evidence
+about completed logical ranges only: `sequential` requires at least two full,
+contiguous observations in completion order, while a non-contiguous transition
+is `random`. Empty, short, concurrent, or insufficient observations are
+`unknown`; invalid range arithmetic fails closed. The label says nothing about
+kernel readahead, page-cache behavior, device/network requests, or physical I/O.
+Largest range
+sizes and requested/returned byte totals have the same logical-source boundary.
+The timed generic `ReadAt` and atomic-save callbacks expose no exact compressed
+member, decompressed-byte, or recompressed-byte boundary, so the corresponding
+`operation_metrics.source` vectors are explicitly `unavailable` (or
+`not_applicable` for an uninstrumented selector); raw source/output lengths are
+not substituted.
+
 Each filesystem `CaseResult` additionally carries an additive
 `operation_metrics` envelope. Its `sample_count` and `alignment` identify the
 sorted `elapsed_ns.samples` vector, and every measured numeric vector has that
 same cardinality and order. The envelope separates logical source-read
-vectors, procfs process vectors, post-operation output length, publication
-counters, and OPC materialization counts. A vector with a measured zero is
+vectors (including largest range sizes); the aligned categorical
+`logical_read_pattern` vector is descriptive and is not a numeric policy
+metric. It also separates procfs process vectors, post-operation output length,
+publication counters, and OPC materialization counts. A vector with a measured
+zero is
 serialized as a numeric zero; unsupported or unavailable values omit the
 numeric vector and retain an explicit `status` (`not_applicable` or
 `unavailable`). The `/proc/self/io` vectors (`rchar`, `wchar`, `read_bytes`,
@@ -2630,7 +2648,8 @@ the process-lifetime after-sample `VmHWM`, not an operation peak, and
 `rss_delta_bytes` is not a peak. The envelope makes no allocation,
 copied-byte, decompressed-byte, or recompressed-byte claim because the
 filesystem child does not instrument those quantities. The existing raw
-`filesystem_evidence` samples remain unchanged.
+`filesystem_evidence` fields retain their prior semantics; the new counters are
+additive.
 
 Cases with a top-level `sink` summary also carry the same envelope. Their
 `sink.accepted_bytes`, `sink.write_calls`, `sink.largest_write`, and

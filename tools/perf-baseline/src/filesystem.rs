@@ -50,6 +50,23 @@ const DOCX_FILE_SOURCE_SHA256: &str =
 static NEXT_PPTX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 static NEXT_DOCX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
+/// Logical order observed by a positional source wrapper.
+///
+/// `sequential` means every completed non-empty range after the first began
+/// exactly where the previous completed range ended. `random` means at least
+/// one observed transition was non-contiguous. Both labels describe the
+/// caller's logical `ReadAt` ranges only; they do not describe kernel, device,
+/// filesystem, or remote physical I/O. A concurrent, empty, short, or
+/// otherwise insufficient observation is `unknown`; invalid range arithmetic
+/// fails closed.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ReadPattern {
+    Sequential,
+    Random,
+    Unknown,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct CacheSelection {
     warm: bool,
@@ -230,6 +247,10 @@ struct ChildResult {
     logical_read_calls: u64,
     logical_read_requested_bytes: u64,
     logical_read_bytes: u64,
+    logical_read_largest_requested_bytes: u64,
+    logical_read_largest_returned_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logical_read_pattern: Option<ReadPattern>,
     max_concurrent_reads: u64,
     logical_read_request_sizes: Vec<u64>,
     logical_read_request_size_buckets: ReadSizeBuckets,
@@ -385,6 +406,10 @@ pub(crate) struct SampleEvidence {
     pub logical_read_calls: u64,
     pub logical_read_requested_bytes: u64,
     pub logical_read_bytes: u64,
+    pub logical_read_largest_requested_bytes: u64,
+    pub logical_read_largest_returned_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logical_read_pattern: Option<ReadPattern>,
     pub max_concurrent_reads: u64,
     pub logical_read_request_sizes: Vec<u64>,
     pub logical_read_request_size_buckets: ReadSizeBuckets,
@@ -1177,6 +1202,13 @@ fn record_sample(
         logical_read_calls: invocation.child.logical_read_calls,
         logical_read_requested_bytes: invocation.child.logical_read_requested_bytes,
         logical_read_bytes: invocation.child.logical_read_bytes,
+        logical_read_largest_requested_bytes: invocation
+            .child
+            .logical_read_largest_requested_bytes,
+        logical_read_largest_returned_bytes: invocation
+            .child
+            .logical_read_largest_returned_bytes,
+        logical_read_pattern: invocation.child.logical_read_pattern,
         max_concurrent_reads: invocation.child.max_concurrent_reads,
         logical_read_request_sizes: invocation.child.logical_read_request_sizes,
         logical_read_request_size_buckets: invocation.child.logical_read_request_size_buckets,
@@ -1305,6 +1337,9 @@ fn validate_cfb_owned_evidence(
         || child.logical_read_calls != 0
         || child.logical_read_requested_bytes != 0
         || child.logical_read_bytes != 0
+        || child.logical_read_largest_requested_bytes != 0
+        || child.logical_read_largest_returned_bytes != 0
+        || child.logical_read_pattern.is_some()
         || child.max_concurrent_reads != 0
         || !child.logical_read_request_sizes.is_empty()
         || !child.logical_read_request_size_buckets.is_empty()
@@ -1570,7 +1605,8 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
-    let snapshot = counter.map_or_else(ReadMetrics::default, |counter| counter.snapshot());
+    let snapshot = counter
+        .map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
     let logical_read_counter_scope = if operation.is_cfb_owned() {
         "not_applicable_immutable_owned_slice"
     } else if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
@@ -1619,6 +1655,9 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         logical_read_calls: snapshot.calls,
         logical_read_requested_bytes: snapshot.requested_bytes,
         logical_read_bytes: snapshot.returned_bytes,
+        logical_read_largest_requested_bytes: snapshot.largest_requested_bytes,
+        logical_read_largest_returned_bytes: snapshot.largest_returned_bytes,
+        logical_read_pattern: snapshot.pattern,
         max_concurrent_reads: snapshot.max_concurrent,
         logical_read_request_sizes: snapshot.request_sizes,
         logical_read_request_size_buckets: snapshot.request_size_buckets,
@@ -2532,6 +2571,9 @@ struct ReadMetrics {
     calls: u64,
     requested_bytes: u64,
     returned_bytes: u64,
+    largest_requested_bytes: u64,
+    largest_returned_bytes: u64,
+    pattern: Option<ReadPattern>,
     max_concurrent: u64,
     request_sizes: Vec<u64>,
     request_size_buckets: ReadSizeBuckets,
@@ -2549,9 +2591,56 @@ struct CountingReadAt {
     calls: AtomicU64,
     requested_bytes: AtomicU64,
     returned_bytes: AtomicU64,
+    largest_requested_bytes: AtomicU64,
+    largest_returned_bytes: AtomicU64,
     in_flight: AtomicU64,
     max_concurrent: AtomicU64,
     request_sizes: Mutex<Vec<u64>>,
+    pattern: Mutex<ReadPatternState>,
+}
+
+#[derive(Debug, Default)]
+struct ReadPatternState {
+    previous_end: Option<u64>,
+    observations: u64,
+    non_contiguous: bool,
+    unknown: bool,
+}
+
+impl ReadPatternState {
+    fn observe(&mut self, offset: u64, requested: u64, returned: usize) -> io::Result<()> {
+        let returned = u64::try_from(returned)
+            .map_err(|_| io::Error::other("returned source range does not fit u64"))?;
+        if returned == 0 || returned != requested {
+            self.unknown = true;
+            return Ok(());
+        }
+        if let Some(previous_end) = self.previous_end {
+            if previous_end != offset {
+                self.non_contiguous = true;
+            }
+        }
+        self.previous_end = Some(
+            offset
+                .checked_add(returned)
+                .ok_or_else(|| io::Error::other("source range end overflows u64"))?,
+        );
+        self.observations = self
+            .observations
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("source range observation count overflows u64"))?;
+        Ok(())
+    }
+
+    fn classify(&self, max_concurrent: u64) -> ReadPattern {
+        if max_concurrent > 1 || self.unknown || self.observations < 2 {
+            ReadPattern::Unknown
+        } else if self.non_contiguous {
+            ReadPattern::Random
+        } else {
+            ReadPattern::Sequential
+        }
+    }
 }
 
 impl CountingReadAt {
@@ -2561,31 +2650,43 @@ impl CountingReadAt {
             calls: AtomicU64::new(0),
             requested_bytes: AtomicU64::new(0),
             returned_bytes: AtomicU64::new(0),
+            largest_requested_bytes: AtomicU64::new(0),
+            largest_returned_bytes: AtomicU64::new(0),
             in_flight: AtomicU64::new(0),
             max_concurrent: AtomicU64::new(0),
             request_sizes: Mutex::new(Vec::new()),
+            pattern: Mutex::new(ReadPatternState::default()),
         }
     }
 
-    fn snapshot(&self) -> ReadMetrics {
+    fn snapshot(&self) -> io::Result<ReadMetrics> {
         let mut request_sizes = self
             .request_sizes
             .lock()
-            .map(|sizes| sizes.clone())
-            .unwrap_or_default();
+            .map_err(|_| io::Error::other("filesystem source request sizes are poisoned"))?
+            .clone();
         request_sizes.sort_unstable();
         let mut request_size_buckets = ReadSizeBuckets::default();
         for &size in &request_sizes {
             request_size_buckets.observe(size);
         }
-        ReadMetrics {
+        let max_concurrent = self.max_concurrent.load(Ordering::SeqCst);
+        let pattern = self
+            .pattern
+            .lock()
+            .map_err(|_| io::Error::other("filesystem source pattern metrics are poisoned"))?
+            .classify(max_concurrent);
+        Ok(ReadMetrics {
             calls: self.calls.load(Ordering::SeqCst),
             requested_bytes: self.requested_bytes.load(Ordering::SeqCst),
             returned_bytes: self.returned_bytes.load(Ordering::SeqCst),
-            max_concurrent: self.max_concurrent.load(Ordering::SeqCst),
+            largest_requested_bytes: self.largest_requested_bytes.load(Ordering::SeqCst),
+            largest_returned_bytes: self.largest_returned_bytes.load(Ordering::SeqCst),
+            pattern: Some(pattern),
+            max_concurrent,
             request_sizes,
             request_size_buckets,
-        }
+        })
     }
 
     fn totals(&self) -> ReadTotals {
@@ -2611,18 +2712,29 @@ impl ReadAt for CountingReadAt {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-        let requested = u64::try_from(output.len()).unwrap_or(u64::MAX);
+        let requested = u64::try_from(output.len())
+            .map_err(|_| io::Error::other("requested source range does not fit u64"))?;
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.requested_bytes.fetch_add(requested, Ordering::SeqCst);
-        if let Ok(mut sizes) = self.request_sizes.lock() {
-            sizes.push(requested);
-        }
+        self.largest_requested_bytes
+            .fetch_max(requested, Ordering::SeqCst);
+        self.request_sizes
+            .lock()
+            .map_err(|_| io::Error::other("filesystem source request sizes are poisoned"))?
+            .push(requested);
         let in_flight = self.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
         self.max_concurrent.fetch_max(in_flight, Ordering::SeqCst);
         let _guard = InFlight(&self.in_flight);
         let read = self.inner.read_at(offset, output)?;
-        self.returned_bytes
-            .fetch_add(u64::try_from(read).unwrap_or(u64::MAX), Ordering::SeqCst);
+        let returned = u64::try_from(read)
+            .map_err(|_| io::Error::other("filesystem source return count does not fit u64"))?;
+        self.returned_bytes.fetch_add(returned, Ordering::SeqCst);
+        self.largest_returned_bytes
+            .fetch_max(returned, Ordering::SeqCst);
+        self.pattern
+            .lock()
+            .map_err(|_| io::Error::other("filesystem source pattern metrics are poisoned"))?
+            .observe(offset, requested, read)?;
         Ok(read)
     }
 
@@ -3298,9 +3410,12 @@ fn filesystem_root(requested_root: Option<&Path>) -> io::Result<PathBuf> {
 mod tests {
     use std::{fs, sync::Arc};
 
-    use litchi_core::ReadAt;
+    use litchi_core::{OwnedSource, ReadAt};
 
-    use super::{CacheSelection, ChildMode, ColdAdvice, Operation, ReadSizeBuckets};
+    use super::{
+        CacheSelection, ChildMode, ColdAdvice, CountingReadAt, Operation, ReadPattern,
+        ReadSizeBuckets,
+    };
 
     #[test]
     fn filesystem_case_names_are_explicit_and_parseable() {
@@ -3472,6 +3587,48 @@ mod tests {
         assert_eq!(buckets.bytes_4097_to_16384, 2);
         assert_eq!(buckets.bytes_16385_to_65536, 2);
         assert_eq!(buckets.bytes_over_65536, 1);
+    }
+
+    #[test]
+    fn counting_source_records_exact_sizes_and_sequential_pattern() {
+        let source = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 64])));
+        let mut first = [0_u8; 8];
+        let mut second = [0_u8; 4];
+        assert_eq!(source.read_at(12, &mut first).unwrap(), 8);
+        assert_eq!(source.read_at(20, &mut second).unwrap(), 4);
+
+        let metrics = source.snapshot().unwrap();
+        assert_eq!(metrics.calls, 2);
+        assert_eq!(metrics.requested_bytes, 12);
+        assert_eq!(metrics.returned_bytes, 12);
+        assert_eq!(metrics.largest_requested_bytes, 8);
+        assert_eq!(metrics.largest_returned_bytes, 8);
+        assert_eq!(metrics.pattern, Some(ReadPattern::Sequential));
+        assert_eq!(metrics.request_sizes, vec![4, 8]);
+    }
+
+    #[test]
+    fn counting_source_marks_noncontiguous_ranges_random_and_short_reads_unknown() {
+        let source = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 8])));
+        let mut first = [0_u8; 2];
+        let mut second = [0_u8; 2];
+        assert_eq!(source.read_at(0, &mut first).unwrap(), 2);
+        assert_eq!(source.read_at(5, &mut second).unwrap(), 2);
+        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Random));
+
+        let short = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 1])));
+        let mut output = [0_u8; 2];
+        assert_eq!(short.read_at(0, &mut output).unwrap(), 1);
+        assert_eq!(short.read_at(1, &mut output).unwrap(), 0);
+        assert_eq!(short.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
+    }
+
+    #[test]
+    fn counting_source_does_not_call_one_range_sequential() {
+        let source = CountingReadAt::new(Arc::new(OwnedSource::new(vec![0; 8])));
+        let mut output = [0_u8; 2];
+        assert_eq!(source.read_at(3, &mut output).unwrap(), 2);
+        assert_eq!(source.snapshot().unwrap().pattern, Some(ReadPattern::Unknown));
     }
 
     #[test]

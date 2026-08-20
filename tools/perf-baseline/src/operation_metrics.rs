@@ -14,7 +14,7 @@ use std::error::Error;
 
 use serde::Serialize;
 
-use crate::filesystem::{CfbPhaseEvidence, CfbPhaseSample, SampleEvidence};
+use crate::filesystem::{CfbPhaseEvidence, CfbPhaseSample, ReadPattern, SampleEvidence};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -55,6 +55,39 @@ impl MetricVector {
     }
 }
 
+/// A categorical vector aligned with `elapsed_ns.samples`.
+///
+/// Pattern labels are descriptive source-observation evidence, not numeric
+/// performance metrics. The wrapper still carries the same explicit status
+/// and scope so an unavailable classification cannot be represented as a
+/// fabricated string or zero.
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct PatternVector {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub values: Option<Vec<ReadPattern>>,
+    pub status: MetricStatus,
+    pub scope: &'static str,
+}
+
+impl PatternVector {
+    fn measured(values: Vec<ReadPattern>, scope: &'static str) -> Self {
+        Self {
+            values: Some(values),
+            status: MetricStatus::Measured,
+            scope,
+        }
+    }
+
+    fn absent(status: MetricStatus, scope: &'static str) -> Self {
+        debug_assert_ne!(status, MetricStatus::Measured);
+        Self {
+            values: None,
+            status,
+            scope,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct SourceMetrics {
     pub status: MetricStatus,
@@ -62,6 +95,17 @@ pub(crate) struct SourceMetrics {
     pub logical_read_calls: MetricVector,
     pub logical_read_requested_bytes: MetricVector,
     pub logical_read_returned_bytes: MetricVector,
+    pub logical_read_largest_requested_bytes: MetricVector,
+    pub logical_read_largest_returned_bytes: MetricVector,
+    pub logical_read_pattern: PatternVector,
+    /// Exact compressed member bytes are not exposed by the generic `ReadAt`
+    /// wrapper. This remains unavailable instead of treating raw source bytes
+    /// as compressed payload bytes.
+    pub compressed_bytes: MetricVector,
+    /// Exact decompressed bytes are not exposed by the timed source boundary.
+    pub decompressed_bytes: MetricVector,
+    /// Exact recompressed bytes are not exposed by the atomic save callback.
+    pub recompressed_bytes: MetricVector,
     pub max_concurrent_reads: MetricVector,
 }
 
@@ -192,6 +236,12 @@ pub(crate) struct OperationMetrics {
 
 const ALIGNMENT: &str = "elapsed_ns.samples";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
+const SOURCE_PATTERN_SCOPE: &str = "operation_logical_read_at_range_order_not_physical_io";
+const SOURCE_COMPRESSED_SCOPE: &str = "unavailable_read_at_has_no_compressed_member_boundary";
+const SOURCE_DECOMPRESSED_SCOPE: &str =
+    "unavailable_read_at_has_no_decompressed_byte_boundary";
+const SOURCE_RECOMPRESSED_SCOPE: &str =
+    "unavailable_atomic_save_has_no_recompressed_byte_boundary";
 const PROCESS_SCOPE: &str = "procfs_operation_delta";
 const PROC_IO_SCOPE: &str = "child_process_interval_delta_including_procfs_probe_overhead";
 const CLOCK_SCOPE: &str = "procfs_after_sample_unit_factor";
@@ -286,12 +336,47 @@ pub(crate) fn aggregate(
             MetricVector::absent(source_status, SOURCE_SCOPE)
         }
     };
+    let source_pattern = if source_status == MetricStatus::Measured {
+        let values = selected
+            .iter()
+            .map(|sample| {
+                sample.logical_read_pattern.ok_or_else(|| {
+                    std::io::Error::other(format!(
+                        "operation metrics {cache_state} measured source sample omitted logical read pattern"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        PatternVector::measured(values, SOURCE_PATTERN_SCOPE)
+    } else {
+        PatternVector::absent(source_status, SOURCE_PATTERN_SCOPE)
+    };
+    let unavailable_source_value = |scope| {
+        MetricVector::absent(
+            if source_status == MetricStatus::NotApplicable {
+                MetricStatus::NotApplicable
+            } else {
+                MetricStatus::Unavailable
+            },
+            scope,
+        )
+    };
     let source = SourceMetrics {
         status: source_status,
         counter_scope: first_scope,
         logical_read_calls: source_values(|sample| sample.logical_read_calls),
         logical_read_requested_bytes: source_values(|sample| sample.logical_read_requested_bytes),
         logical_read_returned_bytes: source_values(|sample| sample.logical_read_bytes),
+        logical_read_largest_requested_bytes: source_values(|sample| {
+            sample.logical_read_largest_requested_bytes
+        }),
+        logical_read_largest_returned_bytes: source_values(|sample| {
+            sample.logical_read_largest_returned_bytes
+        }),
+        logical_read_pattern: source_pattern,
+        compressed_bytes: unavailable_source_value(SOURCE_COMPRESSED_SCOPE),
+        decompressed_bytes: unavailable_source_value(SOURCE_DECOMPRESSED_SCOPE),
+        recompressed_bytes: unavailable_source_value(SOURCE_RECOMPRESSED_SCOPE),
         max_concurrent_reads: source_values(|sample| sample.max_concurrent_reads),
     };
 
@@ -779,7 +864,8 @@ mod tests {
 
     use super::{MetricStatus, MetricVector, SinkObservation, aggregate, from_sink_observation};
     use crate::filesystem::{
-        CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadSizeBuckets, SampleEvidence,
+        CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadPattern, ReadSizeBuckets,
+        SampleEvidence,
     };
 
     fn sample(
@@ -798,6 +884,9 @@ mod tests {
             logical_read_calls: index as u64,
             logical_read_requested_bytes: 10,
             logical_read_bytes: 8,
+            logical_read_largest_requested_bytes: 10,
+            logical_read_largest_returned_bytes: 8,
+            logical_read_pattern: Some(ReadPattern::Sequential),
             max_concurrent_reads: 1,
             logical_read_request_sizes: vec![10],
             logical_read_request_size_buckets: ReadSizeBuckets::default(),
@@ -846,6 +935,14 @@ mod tests {
         let warm = aggregate(&samples, "warm", &[20, 10]).unwrap();
         assert_eq!(warm.sample_count, 2);
         assert_eq!(warm.source.logical_read_calls.values, Some(vec![1, 0]));
+        assert_eq!(
+            warm.source.logical_read_largest_requested_bytes.values,
+            Some(vec![10, 10])
+        );
+        assert_eq!(
+            warm.source.logical_read_pattern.values,
+            Some(vec![ReadPattern::Sequential, ReadPattern::Sequential])
+        );
         let cold = aggregate(&samples, "cold-requested", &[40, 30]).unwrap();
         assert_eq!(cold.source.logical_read_calls.values, Some(vec![1, 0]));
     }
@@ -867,6 +964,22 @@ mod tests {
             MetricStatus::Measured
         );
         assert_eq!(envelope.source.logical_read_calls.values, Some(vec![0]));
+        assert_eq!(
+            envelope.source.logical_read_pattern.values,
+            Some(vec![ReadPattern::Sequential])
+        );
+        assert_eq!(
+            envelope.source.compressed_bytes.status,
+            MetricStatus::Unavailable
+        );
+        assert_eq!(
+            envelope.source.decompressed_bytes.status,
+            MetricStatus::Unavailable
+        );
+        assert_eq!(
+            envelope.source.recompressed_bytes.status,
+            MetricStatus::Unavailable
+        );
         assert_eq!(envelope.process.status, MetricStatus::Measured);
         assert_eq!(envelope.process.rchar.values, Some(vec![11]));
         assert_eq!(
@@ -907,6 +1020,14 @@ mod tests {
     }
 
     #[test]
+    fn measured_source_pattern_is_required_for_each_sample() {
+        let mut sample = sample(0, "warm", 10, Some(metrics()));
+        sample.logical_read_pattern = None;
+        let error = aggregate(&[sample], "warm", &[10]).unwrap_err();
+        assert!(error.to_string().contains("logical read pattern"));
+    }
+
+    #[test]
     fn asymmetric_option_fails_closed() {
         let samples = vec![
             sample(0, "warm", 10, Some(metrics())),
@@ -934,6 +1055,7 @@ mod tests {
         let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
         assert_eq!(envelope.source.status, MetricStatus::NotApplicable);
         assert!(envelope.source.logical_read_calls.values.is_none());
+        assert!(envelope.source.logical_read_pattern.values.is_none());
     }
 
     #[test]
@@ -1014,6 +1136,11 @@ mod tests {
                 .is_none()
         );
         assert!(envelope.source.logical_read_returned_bytes.values.is_none());
+        assert!(envelope.source.logical_read_pattern.values.is_none());
+        assert_eq!(
+            envelope.source.decompressed_bytes.status,
+            MetricStatus::NotApplicable
+        );
     }
 
     #[test]
@@ -1024,6 +1151,7 @@ mod tests {
         let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
         assert_eq!(envelope.source.status, MetricStatus::Unavailable);
         assert!(envelope.source.logical_read_calls.values.is_none());
+        assert!(envelope.source.logical_read_pattern.values.is_none());
     }
 
     #[test]
