@@ -115,7 +115,7 @@ fn rejects_missing_negative_and_out_of_range_values_but_keeps_destinations_inert
 }
 
 #[test]
-fn parses_clean_libreoffice_explicit_zero_body_and_style_producers() {
+fn handles_libreoffice_explicit_zero_and_malformed_style_producers() {
     let explicit_zero = RtfDocument::parse(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo47764.rtf"
@@ -128,11 +128,19 @@ fn parses_clean_libreoffice_explicit_zero_body_and_style_producers() {
             .any(|block| block.paragraph.shading.background_color == Some(0))
     );
 
-    let style_and_body = RtfDocument::parse(include_str!(concat!(
+    let style_source = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf108955.rtf"
-    )))
-    .unwrap();
+    ));
+    assert!(matches!(
+        RtfDocument::parse(style_source),
+        Err(litchi_rtf::RtfError::MalformedDocument(message))
+            if message.contains("trailing non-whitespace")
+    ));
+    let balanced_style_source = style_source
+        .strip_suffix("}\n")
+        .expect("fixture retains one documented extra root close");
+    let style_and_body = RtfDocument::parse(balanced_style_source).unwrap();
     assert_eq!(
         style_and_body
             .stylesheet()
