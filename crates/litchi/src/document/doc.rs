@@ -228,10 +228,10 @@ impl Document {
         }
     }
 
-    /// Keep the source revision payload intact when an OPC operation crosses
-    /// the unified facade boundary. The generic `From<OpcError>` mapping is
-    /// intentionally lossy for legacy callers, so source-backed DOCX paths
-    /// must translate this variant explicitly.
+    /// Keep source revision and publication-capability classifications intact
+    /// when an OPC operation crosses the unified facade boundary. The
+    /// source-change variant carries structured versions; publication policy
+    /// variants are classified as [`Error::Unsupported`] by the OPC mapping.
     #[cfg(all(
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
         any(unix, windows)

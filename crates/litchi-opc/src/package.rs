@@ -489,6 +489,9 @@ impl OpcPackage {
     /// Returns `OpcError::PartNotFound` if no part with `partname` exists.
     pub fn get_part_mut(&mut self, partname: &PackURI) -> Result<&mut dyn Part> {
         self.revoke_exact_source();
+        // A mutable Part exposes its relationship collection, so retain the
+        // signature audit even when the caller edits that collection directly.
+        self.signature_graph_tracked = true;
         // Resolve the stored key first so the borrow of `self.parts` ends before
         // the mutable lookup; see `find_case_insensitive` for why this matches.
         let key = if self.parts.contains_key(partname) {
@@ -528,6 +531,7 @@ impl OpcPackage {
     /// * `part` - The part to add
     pub fn add_part(&mut self, part: Box<dyn Part + Send + Sync>) {
         self.revoke_exact_source();
+        self.signature_graph_tracked = true;
         let partname = part.partname().clone();
         self.source_xml_parts.remove(&partname);
         self.parts.insert(partname, part);
@@ -540,6 +544,7 @@ impl OpcPackage {
     /// existing part name; the existing part is left untouched.
     pub fn try_add_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
         self.revoke_exact_source();
+        self.signature_graph_tracked = true;
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
         self.parts.insert(partname, part);
@@ -553,6 +558,7 @@ impl OpcPackage {
     /// the metadata map grows through a fallible reservation.
     pub(crate) fn try_add_source_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
         self.revoke_exact_source();
+        self.signature_graph_tracked = true;
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
         self.parts
@@ -597,6 +603,7 @@ impl OpcPackage {
     /// Remove a part by name, returning whether it existed.
     pub fn remove_part(&mut self, partname: &PackURI) -> bool {
         self.revoke_exact_source();
+        self.signature_graph_tracked = true;
         self.source_xml_parts.remove(partname);
         self.parts.remove(partname).is_some()
     }
@@ -623,19 +630,29 @@ impl OpcPackage {
 
     /// Get a mutable reference to the package-level relationships.
     pub fn rels_mut(&mut self) -> &mut Relationships {
+        let was_signed = self.is_signed();
         self.revoke_exact_source();
+        self.signature_graph_tracked = true;
+        if !was_signed && !self.source_ingress {
+            self.signature_policy_authorized = true;
+        }
         &mut self.rels
     }
 
-    /// Whether a package-level signature-origin relationship is present.
+    /// Whether signature infrastructure is present anywhere in the package.
     ///
-    /// This is a cheap capability check. Use `signatures` when graph
-    /// validation and cryptographic verification are required.
+    /// This is a cheap capability check. It intentionally includes orphaned or
+    /// partially formed signature parts and relationship targets, because a
+    /// mutating writer must not treat an incomplete signature graph as an
+    /// unsigned package. Use `signatures` when graph validation and
+    /// cryptographic verification are required.
     #[must_use]
     pub fn is_signed(&self) -> bool {
-        self.rels.iter().any(|relationship| {
-            relationship.reltype() == relationship_type::DIGITAL_SIGNATURE_ORIGIN
-        })
+        self.rels.iter().any(is_signature_relationship_or_target)
+            || self.parts.values().any(|part| {
+                is_signature_infrastructure(&**part)
+                    || part.rels().iter().any(is_signature_relationship_or_target)
+            })
     }
 
     /// Verifies every OPC signature with the safe strict policy.
@@ -797,8 +814,8 @@ impl OpcPackage {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
         let r_id = self.rels.get_or_add(reltype, partname).r_id().to_string();
-        if !was_signed && reltype == relationship_type::DIGITAL_SIGNATURE_ORIGIN {
-            self.signature_graph_tracked = true;
+        self.signature_graph_tracked = true;
+        if !was_signed && !self.source_ingress && is_signature_relationship(reltype) {
             self.signature_policy_authorized = true;
         }
         r_id
@@ -813,8 +830,14 @@ impl OpcPackage {
     /// # Returns
     /// The relationship ID (e.g., "rId1")
     pub fn relate_to_external(&mut self, target_url: &str, reltype: &str) -> String {
+        let was_signed = self.is_signed();
         self.revoke_exact_source();
-        self.rels.get_or_add_ext_rel(reltype, target_url)
+        let r_id = self.rels.get_or_add_ext_rel(reltype, target_url);
+        self.signature_graph_tracked = true;
+        if !was_signed && !self.source_ingress && is_signature_relationship(reltype) {
+            self.signature_policy_authorized = true;
+        }
+        r_id
     }
 
     /// Get mutable access to package-level relationships.
@@ -823,8 +846,8 @@ impl OpcPackage {
     pub fn relationships_mut(&mut self) -> &mut Relationships {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
-        if !was_signed {
-            self.signature_graph_tracked = true;
+        self.signature_graph_tracked = true;
+        if !was_signed && !self.source_ingress {
             self.signature_policy_authorized = true;
         }
         &mut self.rels
@@ -955,12 +978,12 @@ impl OpcPackage {
             .collect();
 
         self.rels.retain(|relationship| {
-            !is_signature_relationship(relationship.reltype())
+            !is_signature_relationship_or_target(relationship)
                 && !targets_any(relationship, &infrastructure)
         });
         for part in self.parts.values_mut() {
             part.rels_mut().retain(|relationship| {
-                !is_signature_relationship(relationship.reltype())
+                !is_signature_relationship_or_target(relationship)
                     && !targets_any(relationship, &infrastructure)
             });
         }
@@ -1219,12 +1242,37 @@ fn targets_any(relationship: &crate::Relationship, infrastructure: &HashSet<Pack
 }
 
 fn is_signature_relationship(kind: &str) -> bool {
-    matches!(
-        kind,
-        relationship_type::DIGITAL_SIGNATURE_ORIGIN
-            | "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
-            | "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/certificate"
-    )
+    [
+        relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+        "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/certificate",
+    ]
+    .iter()
+    .any(|candidate| kind.eq_ignore_ascii_case(candidate))
+}
+
+fn is_signature_relationship_or_target(relationship: &crate::Relationship) -> bool {
+    if is_signature_relationship(relationship.reltype()) {
+        return true;
+    }
+    if relationship.is_external() {
+        return false;
+    }
+    let target_path = relationship.target_path();
+    if is_signature_path(target_path) {
+        return true;
+    }
+    if !target_may_be_signature_path(target_path) {
+        return false;
+    }
+    relationship
+        .target_partname()
+        .map_or(true, |target| is_signature_path(target.as_str()))
+}
+
+fn target_may_be_signature_path(path: &str) -> bool {
+    path.split('/')
+        .any(|segment| segment.eq_ignore_ascii_case("_xmlsignatures"))
 }
 
 fn is_signature_path(path: &str) -> bool {
@@ -1238,12 +1286,13 @@ fn is_signature_infrastructure(part: &dyn Part) -> bool {
     use crate::constants::content_type;
 
     is_signature_path(part.partname().as_str())
-        || matches!(
-            part.content_type(),
-            content_type::OPC_DIGITAL_SIGNATURE_ORIGIN
-                | content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE
-                | content_type::OPC_DIGITAL_SIGNATURE_CERTIFICATE
-        )
+        || [
+            content_type::OPC_DIGITAL_SIGNATURE_ORIGIN,
+            content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE,
+            content_type::OPC_DIGITAL_SIGNATURE_CERTIFICATE,
+        ]
+        .iter()
+        .any(|candidate| part.content_type().eq_ignore_ascii_case(candidate))
 }
 
 fn part_name_conflict_error(
@@ -1432,6 +1481,74 @@ mod tests {
         let mut package = base;
         package.relate_to_external("https://example.com", "urn:example");
         assert!(!package.exact_source_authorized);
+    }
+
+    #[test]
+    fn signature_detection_covers_orphans_and_relationship_targets() {
+        let mut orphan = OpcPackage::new();
+        orphan.add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/orphan.xml").unwrap(),
+            "application/octet-stream".to_owned(),
+            Vec::new(),
+        )));
+        assert!(orphan.is_signed());
+        orphan.unsign();
+        assert!(!orphan.is_signed());
+
+        let mut owner = BlobPart::new(
+            PackURI::new("/custom/owner.bin").unwrap(),
+            "application/octet-stream".to_owned(),
+            Vec::new(),
+        );
+        crate::Part::relate_to(
+            &mut owner,
+            "../_xmlsignatures/orphan.xml",
+            "urn:vendor:signature-reference",
+        );
+        let mut targeted = OpcPackage::new();
+        targeted.add_part(Box::new(owner));
+        assert!(targeted.is_signed());
+        targeted.unsign();
+        assert!(!targeted.is_signed());
+    }
+
+    #[test]
+    fn removing_origin_relationship_does_not_bypass_signature_detection() {
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+            crate::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            Vec::new(),
+        )));
+        package.relate_to(
+            "_xmlsignatures/origin.sigs",
+            relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        );
+        assert!(package.is_signed());
+        package.rels_mut().remove("rId1");
+        assert!(package.is_signed());
+        package.unsign();
+        assert!(!package.is_signed());
+    }
+
+    #[test]
+    fn part_relationship_mutation_retains_signature_policy_tracking() {
+        let mut package = OpcPackage::from_bytes(&create_minimal_docx()).unwrap();
+        let partname = package.main_document_part().unwrap().partname().clone();
+        package
+            .get_part_mut(&partname)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                "urn:vendor:signature-reference".to_owned(),
+                "/_xmlsignatures/orphan.xml".to_owned(),
+                "rId-signature".to_owned(),
+                crate::TargetMode::Internal,
+            )
+            .unwrap();
+
+        assert!(package.is_signed());
+        assert!(package.requires_signature_edit_policy());
     }
 
     #[test]

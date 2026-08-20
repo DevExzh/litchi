@@ -277,15 +277,17 @@ impl From<OpcError> for litchi_core::Error {
                 litchi_core::Error::Other(format!("allocation failed for {resource}"))
             },
             OpcError::ValidationReport(error) => litchi_core::Error::Other(error.to_string()),
+            error @ (OpcError::SourceBackedOverlayUnavailable { .. }
+            | OpcError::PreservationUnavailable { .. }
+            | OpcError::SignedSourceRequiresExplicitPolicy) => {
+                litchi_core::Error::Unsupported(error.to_string())
+            },
             OpcError::InvalidReadLimit { .. }
             | OpcError::ReadLimit { .. }
             | OpcError::Cancelled
             | OpcError::Execution(_)
             | OpcError::ParallelRead(_)
             | OpcError::UnsupportedExecutionAffinity
-            | OpcError::SourceBackedOverlayUnavailable { .. }
-            | OpcError::SignedSourceRequiresExplicitPolicy
-            | OpcError::PreservationUnavailable { .. }
             | OpcError::ManagedPartDataArcEscape
             | OpcError::ManagedPackageMaterialization
             | OpcError::PackageNotFound(_)
@@ -314,6 +316,29 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::Utf8Error(_)
             | OpcError::ParseIntError(_)
             | OpcError::AttrError(_) => litchi_core::Error::Other(err.to_string()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::OpcError;
+
+    #[test]
+    fn publication_capability_errors_retain_typed_core_classification() {
+        for error in [
+            OpcError::PreservationUnavailable {
+                reason: "unsupported framing".to_owned(),
+            },
+            OpcError::SourceBackedOverlayUnavailable {
+                reason: "opaque member cannot be patched".to_owned(),
+            },
+            OpcError::SignedSourceRequiresExplicitPolicy,
+        ] {
+            assert!(matches!(
+                litchi_core::Error::from(error),
+                litchi_core::Error::Unsupported(_)
+            ));
         }
     }
 }
