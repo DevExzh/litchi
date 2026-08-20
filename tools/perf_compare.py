@@ -483,6 +483,310 @@ _METRIC_VECTOR_MISSING = object()
 _METRIC_VECTOR_KEYS = {"values", "status", "scope"}
 _METRIC_VECTOR_STATUSES = {"measured", "not_applicable", "unavailable"}
 
+_OPERATION_METRICS_KEYS = {
+    "sample_count",
+    "alignment",
+    "source",
+    "process",
+    "sink",
+    "publication",
+    "materialization",
+    "cfb_phases",
+}
+_SOURCE_METRICS_KEYS = {
+    "status",
+    "counter_scope",
+    "logical_read_calls",
+    "logical_read_requested_bytes",
+    "logical_read_returned_bytes",
+    "max_concurrent_reads",
+}
+_PROCESS_METRICS_KEYS = {
+    "status",
+    "user_cpu_ticks",
+    "system_cpu_ticks",
+    "clock_ticks_per_second",
+    "minor_faults",
+    "major_faults",
+    "voluntary_context_switches",
+    "nonvoluntary_context_switches",
+    "rss_delta_bytes",
+    "peak_rss_bytes",
+    "rchar",
+    "wchar",
+    "read_bytes",
+    "write_bytes",
+    "cancelled_write_bytes",
+    "syscr",
+    "syscw",
+}
+_SINK_METRICS_KEYS = {
+    "status",
+    "output_bytes",
+    "write_status",
+    "accepted_bytes",
+    "write_calls",
+    "largest_write",
+    "write_size_buckets",
+}
+_WRITE_SIZE_BUCKET_KEYS = {
+    "status",
+    "bytes_0",
+    "bytes_1_to_512",
+    "bytes_513_to_4096",
+    "bytes_4097_to_16384",
+    "bytes_16385_to_65536",
+    "bytes_over_65536",
+}
+_PUBLICATION_METRICS_KEYS = {"status", "changed_spans", "published_bytes"}
+_MATERIALIZATION_METRICS_KEYS = {"status", "opc_parts"}
+_CFB_PHASE_METRICS_KEYS = {"status", "open", "plan", "atomic_publication"}
+_CFB_PHASE_SET_KEYS = {
+    "elapsed_ns",
+    "logical_read_calls",
+    "logical_read_requested_bytes",
+    "logical_read_returned_bytes",
+}
+
+
+def _require_exact_keys(
+    value: Any, path: str, expected: set[str]
+) -> dict[str, Any]:
+    obj = _require_object(value, path)
+    actual = set(obj)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        unknown = sorted(actual - expected)
+        raise ComparisonInputError(
+            f"{path} keys mismatch: missing={missing}, unknown={unknown}"
+        )
+    return obj
+
+
+def _validate_metric_status(value: Any, path: str) -> str:
+    if not isinstance(value, str) or value not in _METRIC_VECTOR_STATUSES:
+        raise ComparisonInputError(
+            f"{path} must be one of {sorted(_METRIC_VECTOR_STATUSES)}"
+        )
+    return value
+
+
+def _validate_metric_vector(
+    value: Any, path: str, sample_count: int
+) -> str:
+    obj = _require_object(value, path)
+    actual = set(obj)
+    allowed = {"status", "scope", "values"}
+    if not {"status", "scope"} <= actual:
+        missing = sorted({"status", "scope"} - actual)
+        raise ComparisonInputError(
+            f"{path} has a partial MetricVector wrapper; "
+            f"missing required keys: {missing}"
+        )
+    unknown = sorted(actual - allowed)
+    if unknown:
+        raise ComparisonInputError(
+            f"{path} MetricVector wrapper has unknown keys: {unknown}"
+        )
+    status = _validate_metric_status(obj["status"], f"{path}.status")
+    scope = obj["scope"]
+    if not isinstance(scope, str) or not scope:
+        raise ComparisonInputError(f"{path}.scope must be a non-empty string")
+    has_values = "values" in obj
+    if status == "measured":
+        if not has_values:
+            raise ComparisonInputError(
+                f"{path}.values is required for a measured MetricVector"
+            )
+        values = obj["values"]
+        if not isinstance(values, list):
+            raise ComparisonInputError(f"{path}.values must be a sample vector")
+        if len(values) != sample_count:
+            raise ComparisonInputError(
+                f"{path}.values has {len(values)} samples; expected {sample_count}"
+            )
+        for index, item in enumerate(values):
+            if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+                raise ComparisonInputError(
+                    f"{path}.values[{index}] must be a non-negative integer"
+                )
+    elif has_values:
+        raise ComparisonInputError(
+            f"{path}.values must be omitted for a {status} MetricVector"
+        )
+    return status
+
+
+def _validate_status_group(
+    value: Any,
+    path: str,
+    expected_keys: set[str],
+    vector_keys: tuple[str, ...],
+    sample_count: int,
+) -> str:
+    obj = _require_exact_keys(value, path, expected_keys)
+    status = _validate_metric_status(obj["status"], f"{path}.status")
+    for key in vector_keys:
+        vector_status = _validate_metric_vector(
+            obj[key], f"{path}.{key}", sample_count
+        )
+        if vector_status != status:
+            raise ComparisonInputError(
+                f"{path}.status does not match {path}.{key}.status"
+            )
+    return status
+
+
+def _validate_phase_set(value: Any, path: str, status: str, sample_count: int) -> None:
+    obj = _require_exact_keys(value, path, _CFB_PHASE_SET_KEYS)
+    for key in sorted(_CFB_PHASE_SET_KEYS):
+        vector_status = _validate_metric_vector(
+            obj[key], f"{path}.{key}", sample_count
+        )
+        if vector_status != status:
+            raise ComparisonInputError(
+                f"{path}.{key}.status does not match cfb_phases.status"
+            )
+
+
+def _validate_operation_metrics(
+    value: Any, path: str, sample_count: int, report_schema: int
+) -> None:
+    """Validate the exact operation-metrics envelope for report schema 1."""
+    # `_validate_report_identity` rejects future report schemas before this
+    # validator runs; keep the guard here for direct callers as well.
+    if report_schema != SUPPORTED_REPORT_SCHEMA:
+        raise ComparisonInputError(
+            f"{path} strict validation requires supported report schema "
+            f"{SUPPORTED_REPORT_SCHEMA}, got {report_schema}"
+        )
+    obj = _require_exact_keys(value, path, _OPERATION_METRICS_KEYS)
+    declared_sample_count = obj["sample_count"]
+    if (
+        isinstance(declared_sample_count, bool)
+        or not isinstance(declared_sample_count, int)
+        or declared_sample_count <= 0
+    ):
+        raise ComparisonInputError(
+            f"{path}.sample_count must be a positive integer"
+        )
+    if declared_sample_count != sample_count:
+        raise ComparisonInputError(
+            f"{path}.sample_count={declared_sample_count} does not match "
+            f"elapsed_ns.samples length {sample_count}"
+        )
+    if obj["alignment"] != "elapsed_ns.samples":
+        raise ComparisonInputError(
+            f"{path}.alignment must be 'elapsed_ns.samples'"
+        )
+
+    _validate_status_group(
+        obj["source"],
+        f"{path}.source",
+        _SOURCE_METRICS_KEYS,
+        (
+            "logical_read_calls",
+            "logical_read_requested_bytes",
+            "logical_read_returned_bytes",
+            "max_concurrent_reads",
+        ),
+        sample_count,
+    )
+    source = obj["source"]
+    if not isinstance(source["counter_scope"], str) or not source["counter_scope"]:
+        raise ComparisonInputError(
+            f"{path}.source.counter_scope must be a non-empty string"
+        )
+    _validate_status_group(
+        obj["process"],
+        f"{path}.process",
+        _PROCESS_METRICS_KEYS,
+        (
+            "user_cpu_ticks",
+            "system_cpu_ticks",
+            "clock_ticks_per_second",
+            "minor_faults",
+            "major_faults",
+            "voluntary_context_switches",
+            "nonvoluntary_context_switches",
+            "rss_delta_bytes",
+            "peak_rss_bytes",
+            "rchar",
+            "wchar",
+            "read_bytes",
+            "write_bytes",
+            "cancelled_write_bytes",
+            "syscr",
+            "syscw",
+        ),
+        sample_count,
+    )
+
+    sink = _require_exact_keys(obj["sink"], f"{path}.sink", _SINK_METRICS_KEYS)
+    sink_status = _validate_metric_status(sink["status"], f"{path}.sink.status")
+    output_status = _validate_metric_vector(
+        sink["output_bytes"], f"{path}.sink.output_bytes", sample_count
+    )
+    if output_status != sink_status:
+        raise ComparisonInputError(
+            f"{path}.sink.status does not match {path}.sink.output_bytes.status"
+        )
+    write_status = _validate_metric_status(
+        sink["write_status"], f"{path}.sink.write_status"
+    )
+    for key in ("accepted_bytes", "write_calls", "largest_write"):
+        vector_status = _validate_metric_vector(
+            sink[key], f"{path}.sink.{key}", sample_count
+        )
+        if vector_status != write_status:
+            raise ComparisonInputError(
+                f"{path}.sink.write_status does not match {path}.sink.{key}.status"
+            )
+    bucket_status = _validate_status_group(
+        sink["write_size_buckets"],
+        f"{path}.sink.write_size_buckets",
+        _WRITE_SIZE_BUCKET_KEYS,
+        (
+            "bytes_0",
+            "bytes_1_to_512",
+            "bytes_513_to_4096",
+            "bytes_4097_to_16384",
+            "bytes_16385_to_65536",
+            "bytes_over_65536",
+        ),
+        sample_count,
+    )
+    if bucket_status != write_status:
+        raise ComparisonInputError(
+            f"{path}.sink.write_status does not match "
+            f"{path}.sink.write_size_buckets.status"
+        )
+
+    _validate_status_group(
+        obj["publication"],
+        f"{path}.publication",
+        _PUBLICATION_METRICS_KEYS,
+        ("changed_spans", "published_bytes"),
+        sample_count,
+    )
+    _validate_status_group(
+        obj["materialization"],
+        f"{path}.materialization",
+        _MATERIALIZATION_METRICS_KEYS,
+        ("opc_parts",),
+        sample_count,
+    )
+    phases = _require_exact_keys(
+        obj["cfb_phases"], f"{path}.cfb_phases", _CFB_PHASE_METRICS_KEYS
+    )
+    phase_status = _validate_metric_status(
+        phases["status"], f"{path}.cfb_phases.status"
+    )
+    for key in ("open", "plan", "atomic_publication"):
+        _validate_phase_set(
+            phases[key], f"{path}.cfb_phases.{key}", phase_status, sample_count
+        )
+
 
 def _unwrap_metric_vector(value: Any, path: str) -> Any:
     """Return a MetricVector's values and metadata without exposing wrappers.
@@ -555,8 +859,13 @@ def _walk_metrics(
     policy: dict[str, Any],
     selected: dict[str, tuple[str, float, float, str]],
     vector_metadata: dict[str, tuple[str, str]],
+    metric_vector_context: bool,
 ) -> None:
-    vector = _unwrap_metric_vector(value, path)
+    vector = (
+        _unwrap_metric_vector(value, path)
+        if metric_vector_context
+        else _METRIC_VECTOR_MISSING
+    )
     if vector is not _METRIC_VECTOR_MISSING:
         vector_values, status, scope = vector
         vector_metadata[path] = (status, scope)
@@ -594,14 +903,30 @@ def _walk_metrics(
     if isinstance(value, dict):
         for key, item in value.items():
             child = f"{path}.{key}" if path else key
-            _walk_metrics(item, child, policy, selected, vector_metadata)
+            _walk_metrics(
+                item,
+                child,
+                policy,
+                selected,
+                vector_metadata,
+                metric_vector_context,
+            )
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            _walk_metrics(item, f"{path}[{index}]", policy, selected, vector_metadata)
+            _walk_metrics(
+                item,
+                f"{path}[{index}]",
+                policy,
+                selected,
+                vector_metadata,
+                metric_vector_context,
+            )
 
 
 def _collect_metrics(
-    result: dict[str, Any], policy: dict[str, Any]
+    result: dict[str, Any],
+    policy: dict[str, Any],
+    report_schema: int = SUPPORTED_REPORT_SCHEMA,
 ) -> tuple[
     dict[str, tuple[str, float, float, str]],
     dict[str, tuple[str, str]],
@@ -611,7 +936,26 @@ def _collect_metrics(
     for root, value in result.items():
         if root in {"case", "corpus", "elapsed_ns", "output_sha256"}:
             continue
-        _walk_metrics(value, root, policy, selected, vector_metadata)
+        metric_vector_context = root == "operation_metrics"
+        if metric_vector_context:
+            elapsed = _require_object(result.get("elapsed_ns"), "elapsed_ns")
+            elapsed_samples = elapsed.get("samples")
+            if not isinstance(elapsed_samples, list):
+                raise ComparisonInputError("elapsed_ns.samples must be a list")
+            _validate_operation_metrics(
+                value,
+                root,
+                len(elapsed_samples),
+                report_schema,
+            )
+        _walk_metrics(
+            value,
+            root,
+            policy,
+            selected,
+            vector_metadata,
+            metric_vector_context,
+        )
     return selected, vector_metadata
 
 
