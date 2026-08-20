@@ -2742,6 +2742,24 @@ filesystem child does not instrument those quantities. The existing raw
 `filesystem_evidence` fields retain their prior semantics; the new counters are
 additive.
 
+The default `litchi-perf-baseline` binary makes no allocation, copied-byte,
+decompressed-byte, or recompressed-byte claim. The separate
+`litchi-perf-baseline-alloc` target enables the benchmark-only
+`allocator-metrics` feature and adds `operation_metrics.allocation` for
+filesystem child operations. It wraps `std::alloc::System` with global atomic
+counters, starts a non-overlapping region immediately before the timed child
+operation, and publishes checked per-sample differences aligned to
+`elapsed_ns.samples`. Totals include allocations from worker threads. Absolute
+live/high-water counters are sampled before and after; they are never reset and
+are not presented as an operation peak. A counter overflow or region-acquire
+failure retains an explicit `overflow`/`unavailable` status and omits numeric
+vectors. The tool identity records `tool.instrumentation` as
+`system_allocator_operation_scoped`; allocator-instrumented elapsed samples
+are never used for latency claims. `perf_abba_summary.py` rejects that identity
+for latency ABBA, while `perf_compare.py` with a matching policy identity
+withholds elapsed comparisons and can compare the allocation vectors. The
+existing raw `filesystem_evidence` samples remain unchanged.
+
 In-process sink-only envelopes use `latency_claim: comparable_timed_operation`;
 filesystem envelopes use `evidence_only_filesystem_selector`. The Python
 comparator validates the claim on both reports, excludes evidence-only elapsed

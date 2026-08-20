@@ -14,6 +14,7 @@ TOOL = {
     "profile": "release",
     "target_os": "linux",
     "target_arch": "x86_64",
+    "instrumentation": "none",
 }
 
 
@@ -48,7 +49,7 @@ def policy():
             {
                 "name": "allocation",
                 "max_regression_percent": 3.0,
-                "path_globs": ["**/allocation_calls"],
+                "path_globs": ["**/allocation_calls", "**/allocation_calls/values"],
                 "presence": "optional",
             },
             {
@@ -374,6 +375,13 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(manifest["source_report_samples_per_case"], 1)
         self.assertEqual(manifest["source_report_warmup_iterations_per_case"], 0)
         self.assertEqual(checked_policy["schema_version"], 2)
+        self.assertEqual(checked_policy["tool_identity"]["instrumentation"], "none")
+        allocation_class = next(
+            item
+            for item in checked_policy["metric_classes"]
+            if item["name"] == "allocation"
+        )
+        self.assertIn("**/*allocation_calls/values", allocation_class["path_globs"])
         self.assertEqual(manifest["default_cases"], checked_policy["required_cases"])
         self.assertEqual(
             set(checked_policy["latency_thresholds_percent"]),
@@ -1072,6 +1080,34 @@ class PerfCompareTests(unittest.TestCase):
         regression = result["regressions"][0]
         self.assertEqual(regression["metric_class"], "allocation")
         self.assertEqual(regression["metric"], "metrics.allocation_calls")
+
+    def test_allocator_instrumentation_withholds_elapsed_latency_claims(self):
+        comparison_policy = policy()
+        comparison_policy["tool_identity"]["instrumentation"] = "system_allocator"
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline, current):
+            item["tool"]["instrumentation"] = "system_allocator"
+            item["results"][0]["operation_metrics"] = {
+                "allocation": {
+                    "status": "measured",
+                    "scope": "operation_global_system_allocator",
+                    "allocation_calls": {"values": [100] * 5, "status": "measured"},
+                }
+            }
+        current["results"][0]["operation_metrics"]["allocation"][
+            "allocation_calls"
+        ]["values"] = [110] * 5
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "regression")
+        self.assertEqual(result["summary"]["latency_claims"], "withheld_instrumentation")
+        self.assertFalse(
+            any(item["metric_class"] == "latency" for item in result["comparisons"])
+        )
+        self.assertEqual(
+            {item["metric"] for item in result["regressions"]},
+            {"operation_metrics.allocation.allocation_calls.values"},
+        )
 
     def test_zero_baseline_metric_fails_on_nonzero_current(self):
         baseline = report()

@@ -272,6 +272,8 @@ struct ChildResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     cold_verified: Option<cold_verified::Sample>,
     process_metrics: Option<process_metrics::Delta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allocation_metrics: Option<crate::allocation_metrics::Sample>,
     output_sha256: Option<String>,
     output_bytes: Option<u64>,
     opc_materialized_parts: Option<u64>,
@@ -304,6 +306,7 @@ impl ChildResult {
             cold_advice: ColdAdvice::NotRequested,
             cold_verified: Some(proof),
             process_metrics: None,
+            allocation_metrics: None,
             output_sha256: None,
             output_bytes: None,
             opc_materialized_parts: None,
@@ -468,6 +471,8 @@ pub(crate) struct SampleEvidence {
     pub logical_read_request_sizes: Vec<u64>,
     pub logical_read_request_size_buckets: ReadSizeBuckets,
     pub process_metrics: Option<process_metrics::Delta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allocation_metrics: Option<crate::allocation_metrics::Sample>,
     pub output_sha256: Option<String>,
     pub output_bytes: Option<u64>,
     pub opc_materialized_parts: Option<u64>,
@@ -1453,6 +1458,7 @@ fn record_sample(
         logical_read_request_sizes: invocation.child.logical_read_request_sizes,
         logical_read_request_size_buckets: invocation.child.logical_read_request_size_buckets,
         process_metrics: invocation.child.process_metrics,
+        allocation_metrics: invocation.child.allocation_metrics,
         output_sha256: invocation.child.output_sha256,
         output_bytes: invocation.child.output_bytes,
         opc_materialized_parts: invocation.child.opc_materialized_parts,
@@ -1867,10 +1873,12 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         None
     };
     let before = verified_before.or_else(|| process_metrics::Snapshot::read().ok());
+    let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
     let mut details = OperationDetails::default();
     let mut deferred_source_open_package = None;
-    let counter = match operation {
+    let counter_result = (|| -> Result<Option<ReadMetrics>, Box<dyn Error>> {
+        Ok(match operation {
         Operation::OpcEagerOpen => run_opc_eager_open(&source, &mut details)?,
         Operation::OpcSourceOpen => {
             let (counter, package) = run_opc_source_open(&source)?;
@@ -1927,8 +1935,11 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
             run_docx_operation(operation, &source, prepared_docx.as_ref())?;
             None
         },
-    };
+        })
+    })();
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
+    let allocation_metrics = allocation_region.finish();
+    let counter = counter_result?;
     if let Some(package) = deferred_source_open_package {
         details.opc_materialized_parts = Some(package.try_cache_diagnostics()?.successful_loads);
         std::hint::black_box(package);
@@ -2002,6 +2013,7 @@ pub(crate) fn run_child_if_requested() -> Result<bool, Box<dyn Error>> {
         cold_advice,
         cold_verified,
         process_metrics: process_delta,
+        allocation_metrics,
         output_sha256,
         output_bytes,
         opc_materialized_parts: details.opc_materialized_parts,

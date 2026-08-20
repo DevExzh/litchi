@@ -4,8 +4,9 @@
 //! It creates all inputs in memory from fixed specifications and writes JSON that
 //! identifies the exact generated corpus by SHA-256.
 
-#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "allocator-metrics"), forbid(unsafe_code))]
 
+mod allocation_metrics;
 mod cold_verified;
 mod corpus_manifest;
 mod filesystem;
@@ -2522,6 +2523,9 @@ struct Tool {
     profile: &'static str,
     target_os: &'static str,
     target_arch: &'static str,
+    /// Separates normal latency reports from allocator-instrumented reports.
+    /// Instrumented elapsed samples are never a latency claim.
+    instrumentation: &'static str,
 }
 
 #[derive(Serialize)]
@@ -8136,6 +8140,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             },
             target_os: std::env::consts::OS,
             target_arch: std::env::consts::ARCH,
+            instrumentation: allocation_metrics::instrumentation_identity(),
         },
         environment: report_environment,
         configuration,
@@ -40641,7 +40646,7 @@ fn environment(host: filesystem::HostEvidence) -> Environment {
         git_worktree_dirty: git_output(&["status", "--porcelain"]).map(|status| !status.is_empty()),
         logical_cpus_available: std::thread::available_parallelism()
             .map_or(1, std::num::NonZeroUsize::get),
-        allocator: "Rust system allocator",
+        allocator: allocation_metrics::allocator_identity(),
         rustflags: std::env::var("RUSTFLAGS")
             .ok()
             .or_else(|| option_env!("RUSTFLAGS").map(str::to_owned)),
