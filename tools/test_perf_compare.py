@@ -127,27 +127,63 @@ def metric_vector(values, *, status="measured", scope="test_scope"):
 
 
 def operation_metrics_report_fields():
+    def not_applicable(scope):
+        return metric_vector(None, status="not_applicable", scope=scope)
+    process_scope = "procfs_operation_delta"
+    proc_io_scope = "child_process_interval_delta_including_procfs_probe_overhead"
+    source_scope = "operation_logical_read_at"
+    cfb_source_scope = "timed_cfb_phase_logical_read_at"
     return {
         "sample_count": 5,
         "alignment": "elapsed_ns.samples",
+        "source": {
+            "status": "measured",
+            "counter_scope": "timed_read_at",
+            "logical_read_calls": metric_vector([10] * 5, scope=source_scope),
+            "logical_read_requested_bytes": metric_vector(
+                [20] * 5, scope=source_scope
+            ),
+            "logical_read_returned_bytes": metric_vector(
+                [20] * 5, scope=source_scope
+            ),
+            "max_concurrent_reads": metric_vector([1] * 5, scope=source_scope),
+        },
         "process": {
             "status": "measured",
+            "user_cpu_ticks": metric_vector([1] * 5, scope=process_scope),
+            "system_cpu_ticks": metric_vector([1] * 5, scope=process_scope),
+            "clock_ticks_per_second": metric_vector([100] * 5, scope=process_scope),
+            "minor_faults": metric_vector([1] * 5, scope=process_scope),
             "major_faults": metric_vector(
                 [2] * 5,
-                scope="child_process_interval_delta_including_procfs_probe_overhead",
+                scope=process_scope,
+            ),
+            "voluntary_context_switches": metric_vector([1] * 5, scope=process_scope),
+            "nonvoluntary_context_switches": metric_vector(
+                [1] * 5, scope=process_scope
+            ),
+            "rss_delta_bytes": metric_vector(
+                [1] * 5, scope="procfs_operation_delta_not_peak"
+            ),
+            "peak_rss_bytes": metric_vector(
+                [1] * 5, scope="process_lifetime_high_water_after_not_operation_peak"
             ),
             "rchar": metric_vector(
                 [3] * 5,
-                scope="child_process_interval_delta_including_procfs_probe_overhead",
+                scope=proc_io_scope,
             ),
             "read_bytes": metric_vector(
                 [4] * 5,
-                scope="child_process_interval_delta_including_procfs_probe_overhead",
+                scope=proc_io_scope,
             ),
+            "wchar": metric_vector([3] * 5, scope=proc_io_scope),
+            "write_bytes": metric_vector([3] * 5, scope=proc_io_scope),
+            "cancelled_write_bytes": metric_vector([0] * 5, scope=proc_io_scope),
             "syscr": metric_vector(
                 [1] * 5,
-                scope="child_process_interval_delta_including_procfs_probe_overhead",
+                scope=proc_io_scope,
             ),
+            "syscw": metric_vector([1] * 5, scope=proc_io_scope),
         },
         "sink": {
             "status": "not_applicable",
@@ -159,9 +195,45 @@ def operation_metrics_report_fields():
             "write_status": "measured",
             "accepted_bytes": metric_vector([100] * 5),
             "write_calls": metric_vector([2] * 5),
+            "largest_write": metric_vector([64] * 5),
             "write_size_buckets": {
                 "status": "measured",
+                "bytes_0": metric_vector([0] * 5),
                 "bytes_1_to_512": metric_vector([2] * 5),
+                "bytes_513_to_4096": metric_vector([0] * 5),
+                "bytes_4097_to_16384": metric_vector([0] * 5),
+                "bytes_16385_to_65536": metric_vector([0] * 5),
+                "bytes_over_65536": metric_vector([0] * 5),
+            },
+        },
+        "publication": {
+            "status": "not_applicable",
+            "changed_spans": not_applicable("logical_publication_counter"),
+            "published_bytes": not_applicable("logical_publication_counter"),
+        },
+        "materialization": {
+            "status": "not_applicable",
+            "opc_parts": not_applicable("logical_materialization_counter"),
+        },
+        "cfb_phases": {
+            "status": "not_applicable",
+            "open": {
+                "elapsed_ns": not_applicable("timed_cfb_phase_elapsed_ns"),
+                "logical_read_calls": not_applicable(cfb_source_scope),
+                "logical_read_requested_bytes": not_applicable(cfb_source_scope),
+                "logical_read_returned_bytes": not_applicable(cfb_source_scope),
+            },
+            "plan": {
+                "elapsed_ns": not_applicable("timed_cfb_phase_elapsed_ns"),
+                "logical_read_calls": not_applicable(cfb_source_scope),
+                "logical_read_requested_bytes": not_applicable(cfb_source_scope),
+                "logical_read_returned_bytes": not_applicable(cfb_source_scope),
+            },
+            "atomic_publication": {
+                "elapsed_ns": not_applicable("timed_cfb_phase_elapsed_ns"),
+                "logical_read_calls": not_applicable(cfb_source_scope),
+                "logical_read_requested_bytes": not_applicable(cfb_source_scope),
+                "logical_read_returned_bytes": not_applicable(cfb_source_scope),
             },
         },
     }
@@ -289,7 +361,7 @@ class PerfCompareTests(unittest.TestCase):
             baseline, current, self.operation_metrics_policy()
         )
         self.assertEqual(result["status"], "pass")
-        self.assertEqual(result["summary"]["compared_metrics"], 10)
+        self.assertEqual(result["summary"]["compared_metrics"], 12)
 
         current["results"][0]["operation_metrics"]["sink"]["write_calls"][
             "values"
@@ -350,6 +422,9 @@ class PerfCompareTests(unittest.TestCase):
         current["results"][0]["operation_metrics"]["sink"]["output_bytes"][
             "status"
         ] = "unavailable"
+        current["results"][0]["operation_metrics"]["sink"]["status"] = (
+            "unavailable"
+        )
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError,
             "status mismatch.*operation_metrics.sink.output_bytes",
@@ -359,14 +434,16 @@ class PerfCompareTests(unittest.TestCase):
             )
 
         baseline, current = reports()
-        current_read_bytes = current["results"][0]["operation_metrics"]["process"][
-            "read_bytes"
-        ]
-        current_read_bytes["status"] = "unavailable"
-        del current_read_bytes["values"]
+        current_process = current["results"][0]["operation_metrics"]["process"]
+        current_process["status"] = "unavailable"
+        for key, value in current_process.items():
+            if key == "status":
+                continue
+            value["status"] = "unavailable"
+            del value["values"]
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError,
-            "status mismatch.*operation_metrics.process.read_bytes",
+            "status mismatch.*operation_metrics.process",
         ):
             perf_compare.compare_reports(
                 baseline, current, self.operation_metrics_policy()
@@ -376,7 +453,7 @@ class PerfCompareTests(unittest.TestCase):
         del current["results"][0]["operation_metrics"]["sink"]["output_bytes"]
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError,
-            "path mismatch.*operation_metrics.sink.output_bytes",
+            "operation_metrics.sink keys mismatch.*output_bytes",
         ):
             perf_compare.compare_reports(
                 baseline, current, self.operation_metrics_policy()
@@ -386,7 +463,18 @@ class PerfCompareTests(unittest.TestCase):
         del current["results"][0]["operation_metrics"]["process"]["rchar"]
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError,
-            "path mismatch.*operation_metrics.process.rchar",
+            "operation_metrics.process keys mismatch.*rchar",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "MetricVector path mismatch.*operation_metrics",
         ):
             perf_compare.compare_reports(
                 baseline, current, self.operation_metrics_policy()
@@ -401,26 +489,122 @@ class PerfCompareTests(unittest.TestCase):
         )
         for partial in partial_wrappers:
             with self.subTest(partial=partial):
+                baseline = report()
                 current = report(revision="current")
-                current["results"][0]["partial_metric"] = partial
+                baseline["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"]["sink"][
+                    "output_bytes"
+                ] = partial
                 with self.assertRaisesRegex(
                     perf_compare.ComparisonInputError,
                     "partial MetricVector wrapper",
                 ):
                     perf_compare.compare_reports(
-                        report(), current, self.operation_metrics_policy()
+                        baseline, current, self.operation_metrics_policy()
                     )
 
         baseline = report()
         current = report(revision="current")
         for item in (baseline["results"][0], current["results"][0]):
             item["ordinary_metadata"] = {
+                "values": [1] * 5,
+                "scope": "ordinary_scope",
                 "status": "measured",
                 "message": "ordinary dictionary",
             }
         result = perf_compare.compare_reports(baseline, current, policy())
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["summary"]["compared_metrics"], 7)
+
+    def test_known_metric_vector_leaves_reject_markerless_and_unknown_shapes(self):
+        malformed_leaves = ({}, {"foo": 1}, {"status": "ok"})
+        for malformed in malformed_leaves:
+            with self.subTest(malformed=malformed):
+                baseline = report()
+                current = report(revision="current")
+                baseline["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"]["sink"][
+                    "output_bytes"
+                ] = malformed
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "operation_metrics.sink.output_bytes",
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, self.operation_metrics_policy()
+                    )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["sink"]["mystery"] = 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "operation_metrics.sink keys mismatch.*mystery",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["sink"]["write_calls"][
+            "mystery"
+        ] = 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "operation_metrics.sink.write_calls.*unknown keys.*mystery",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["mystery"] = 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "operation_metrics keys mismatch.*mystery",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        for field, value, pattern in (
+            ("sample_count", 4, "sample_count=.*elapsed_ns.samples length"),
+            ("alignment", "other.samples", "alignment must be"),
+        ):
+            with self.subTest(envelope_field=field):
+                baseline = report()
+                current = report(revision="current")
+                baseline["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"] = (
+                    operation_metrics_report_fields()
+                )
+                current["results"][0]["operation_metrics"][field] = value
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError, pattern
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, self.operation_metrics_policy()
+                    )
 
     def test_p50_and_p95_regressions_are_reported(self):
         result = perf_compare.compare_reports(report(), report(120, "current"), policy())
