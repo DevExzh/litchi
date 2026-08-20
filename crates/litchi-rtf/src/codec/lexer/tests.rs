@@ -123,6 +123,21 @@ fn plain_text_scan_preserves_utf8_delimiters_and_physical_line_breaks() {
 }
 
 #[test]
+fn token_storage_growth_preserves_every_source_span() {
+    let arena = Bump::new();
+    let input = "{}".repeat(1024);
+    let mut lexer = Lexer::new(&input, &arena);
+    let (tokens, spans) = lexer.tokenize_with_spans().unwrap();
+
+    assert_eq!(tokens.len(), 2048);
+    assert_eq!(spans.len(), tokens.len());
+    for (index, span) in spans.iter().enumerate() {
+        assert_eq!(span, &(index..index + 1));
+        assert_eq!(input.get(span.clone()).unwrap().len(), 1);
+    }
+}
+
+#[test]
 fn test_tokenize_multiple_control_words() {
     let arena = Bump::new();
     let input = r"{\rtf1\ansi\deff0}";

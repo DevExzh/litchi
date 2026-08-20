@@ -77,6 +77,31 @@ fn parses_ordered_nested_content_empty_cells_and_round_trips() {
 }
 
 #[test]
+fn grouped_table_text_keeps_cell_boundaries_and_round_trips() {
+    let source = r"{\rtf1\trowd\cellx1000\cellx2000\intbl A{\b B}\cell\intbl C\cell\row}";
+    let document = RtfDocument::parse(source).unwrap();
+    let row = &document.tables()[0].rows()[0];
+    assert_eq!(row.cells().len(), 2);
+    assert_eq!(row.cells()[0].text(), "AB");
+    assert_eq!(row.cells()[1].text(), "C");
+
+    let mut bytes = Vec::new();
+    RtfWriter::new(&mut bytes)
+        .write_document(&document)
+        .unwrap();
+    let reparsed = RtfDocument::parse(&String::from_utf8(bytes).unwrap()).unwrap();
+    let reparsed_row = &reparsed.tables()[0].rows()[0];
+    assert_eq!(
+        reparsed_row
+            .cells()
+            .iter()
+            .map(|cell| cell.text())
+            .collect::<Vec<_>>(),
+        vec!["AB", "C"]
+    );
+}
+
+#[test]
 fn parses_real_libreoffice_end_defined_nested_table() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf117268.rtf");
