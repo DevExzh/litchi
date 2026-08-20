@@ -21,10 +21,19 @@ upper regression thresholds:
 Allocator-only evidence uses the separate
 [`perf-regression-policy-allocator-v1.json`](perf-regression-policy-allocator-v1.json).
 That policy requires the `litchi-perf-baseline-alloc` binary identity and
-`system_allocator_operation_scoped` instrumentation identity. The comparator
-validates and compares allocation vectors under that policy while withholding
-all elapsed-latency comparisons; the normal policy's `binary` and
-`instrumentation` identity still rejects allocator reports.
+`system_allocator_operation_scoped` instrumentation identity. It deliberately
+selects only the measured filesystem case `opc_file_eager_open`, with warm and
+cold-requested rows keyed by cache state and the pinned corpus in
+[`perf-regression-allocator-manifest-v1.json`](results/perf-regression-allocator-manifest-v1.json).
+It also pins the expected allocator identity to
+`CountingSystemAllocator(std::alloc::System)` so a report cannot silently use a
+different allocator implementation under the same instrumentation label.
+Every allocation vector (calls, bytes, absolute live/peak before and after)
+is required and must be `measured` with non-empty values; unavailable or
+overflowed rows fail closed. The comparator validates and compares those
+vectors while withholding all elapsed-latency comparisons; the normal
+policy's `binary` and `instrumentation` identity still rejects allocator
+reports.
 
 The schema-2 metric-class `presence` field distinguishes required and optional
 counters and is mandatory for every class. Required classes must match at least
@@ -62,11 +71,16 @@ identity, duplicate/missing case-corpus keys, absent required cases, an
 unexpected result count, too few samples, non-finite, overflowing, or negative
 metrics, a missing or reported percentile inconsistent with its samples,
 missing or asymmetric required metrics, and asymmetric optional metrics.
+In allocator mode, `status`, `scope`, alignment, and cardinality are evidence
+metadata rather than numeric metrics; they must agree with the final
+`operation_metrics` schema, and zero allocation vectors are invalid.
 
 The policy also requires a SHA-256 digest of all 198 exact `(case, canonical
 corpus JSON)` keys. Keys are sorted, then hashed as UTF-8 case name, a zero
 byte, compact canonical corpus JSON, and a newline. This prevents a reference
 and candidate from silently agreeing on the same replacement corpus. The
+allocator policy extends that identity with a zero byte and `cache_state`
+before the newline so warm and cold filesystem rows cannot collide. The
 checked default manifest digest is
 `3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f`.
 
@@ -147,6 +161,21 @@ python3 tools/perf_compare.py \
   --current target/perf/current/container-baseline.json \
   --json-out target/perf/comparison/perf-regression.json \
   --summary-out target/perf/comparison/perf-regression.txt
+```
+
+The allocator-only comparator uses the separate filesystem policy and the
+companion target, for example:
+
+```sh
+cargo run --release --locked --features allocator-metrics \
+  --bin litchi-perf-baseline-alloc --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 --case opc_file_eager_open \
+  --filesystem-cache warm,cold-requested \
+  --json target/perf/reference/perf-opc-file-alloc.json
+python3 tools/perf_compare.py \
+  --policy docs/performance/perf-regression-policy-allocator-v1.json \
+  --baseline target/perf/reference/perf-opc-file-alloc.json \
+  --current target/perf/current/perf-opc-file-alloc.json
 ```
 
 Run the performance-tooling unit suites independently with:

@@ -31,6 +31,9 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.filesystem = (PERF_BASELINE / "src" / "filesystem.rs").read_text(
             encoding="utf-8"
         )
+        cls.workflow = (ROOT / ".github" / "workflows" / "perf-baseline.yml").read_text(
+            encoding="utf-8"
+        )
 
     def test_normal_entry_is_unconditionally_forbid_safe(self):
         self.assertIn("#![forbid(unsafe_code)]", self.normal)
@@ -66,6 +69,56 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
             'path = "src/main.rs"\nrequired-features = ["allocator-metrics"]',
             self.manifest,
         )
+
+    def test_allocator_target_is_built_and_tested_by_ci(self):
+        self.assertIn("--features allocator-metrics", self.workflow)
+        self.assertIn("--bin litchi-perf-baseline-alloc", self.workflow)
+        self.assertRegex(self.workflow, r"cargo check[\s\S]+allocator-metrics")
+        self.assertRegex(self.workflow, r"cargo test[\s\S]+allocator-metrics")
+
+    def test_allocator_manifest_selects_filesystem_case_and_pinned_corpus(self):
+        import json
+
+        policy = json.loads(
+            (ROOT / "docs/performance/perf-regression-policy-allocator-v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        manifest = json.loads(
+            (
+                ROOT
+                / "docs/performance/results/perf-regression-allocator-manifest-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(policy["required_cases"], ["opc_file_eager_open"])
+        self.assertEqual(policy["required_cases"], manifest["required_cases"])
+        self.assertEqual(policy["expected_result_count"], manifest["result_count"])
+        self.assertEqual(
+            policy["expected_result_keys_sha256"], manifest["result_keys_sha256"]
+        )
+        self.assertEqual(policy["result_key_fields"], manifest["result_key_fields"])
+        self.assertEqual(policy["metric_classes"][0]["presence"], "required")
+        self.assertEqual(len(policy["metric_classes"]), 1)
+        for field in (
+            "allocation_calls",
+            "deallocation_calls",
+            "reallocation_calls",
+            "failed_allocation_calls",
+            "allocated_bytes",
+            "deallocated_bytes",
+            "live_bytes_before",
+            "live_bytes_after",
+            "peak_live_bytes_before",
+            "peak_live_bytes_after",
+        ):
+            self.assertIn(
+                f"operation_metrics/allocation/{field}/values",
+                policy["metric_classes"][0]["path_globs"],
+            )
+        self.assertNotIn("rss", json.dumps(policy["metric_classes"]))
+        self.assertNotIn("work", json.dumps(policy["metric_classes"]))
+        for unrelated in ("copied_bytes", "decompressed_bytes", "recompressed_bytes"):
+            self.assertNotIn(unrelated, json.dumps(policy["metric_classes"]))
 
     def test_region_scope_is_static_and_heap_free(self):
         self.assertIn("pub scope: Scope", self.metrics)

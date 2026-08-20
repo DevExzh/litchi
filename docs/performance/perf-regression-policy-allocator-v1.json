@@ -1,46 +1,16 @@
 {
   "schema_version": 2,
-  "policy_id": "litchi-hosted-allocator-matrix-v1",
+  "policy_id": "litchi-hosted-allocator-filesystem-v1",
   "minimum_samples": 15,
-  "expected_result_count": 198,
-  "expected_result_keys_sha256": "3b57c3b5aef77f5149d520fd885194d1fd8734460b28bff9d317d1cd840c246f",
+  "expected_result_count": 2,
+  "expected_result_keys_sha256": "debb700930d4be1d2d597de60ef5b64200403407c138bab17dd268996975ec7a",
+  "result_key_fields": [
+    "case",
+    "corpus",
+    "cache_state"
+  ],
   "required_cases": [
-    "zip_index",
-    "zip_read_one",
-    "opc_open",
-    "opc_open_owned",
-    "opc_noop_save",
-    "opc_mutated_save",
-    "opc_source_open",
-    "opc_source_open_main_read",
-    "opc_source_cached_main_read",
-    "opc_source_concurrent_same_part",
-    "cfb_open",
-    "cfb_list_streams",
-    "cfb_read_one",
-    "cfb_create_stream_borrowed",
-    "cfb_create_stream_owned",
-    "cfb_shared_open",
-    "cfb_shared_read_one",
-    "cfb_shared_concurrent_reads",
-    "doc_fresh_write_to",
-    "xls_fresh_write_to",
-    "ppt_fresh_write_to",
-    "xlsx_open_owned",
-    "xlsx_list_sheets",
-    "xlsx_first_cell",
-    "xlsx_full_cell_scan",
-    "xlsx_narrow_column_range_scan",
-    "xlsx_noop_commit",
-    "xlsx_noop_commit_save",
-    "xlsx_one_cell_commit",
-    "xlsx_one_cell_commit_save",
-    "xlsx_one_percent_commit",
-    "xlsx_one_percent_commit_save",
-    "xlsx_source_open",
-    "xlsx_source_list_sheets",
-    "xlsx_source_first_cell",
-    "xlsx_source_narrow_column_range_scan"
+    "opc_file_eager_open"
   ],
   "require_clean_worktree": true,
   "require_distinct_revisions": true,
@@ -70,6 +40,9 @@
     "rustflags",
     "cargo_build_target"
   ],
+  "expected_build_identity": {
+    "allocator": "CountingSystemAllocator(std::alloc::System)"
+  },
   "expected_configuration": {
     "samples_per_case": 15,
     "warmup_iterations_per_case": 3,
@@ -79,41 +52,7 @@
     ],
     "filesystem_fresh_child_per_sample": true,
     "filesystem_process_isolated": true,
-    "filesystem_root_selected": false,
-    "corpus_shapes": [
-      "tiny",
-      "many-small",
-      "few-large",
-      "wide-root"
-    ],
-    "payload_kinds": [
-      "compressible",
-      "incompressible"
-    ],
-    "writer_shapes": [
-      "tiny",
-      "large",
-      "payload-heavy"
-    ],
-    "xlsx_shapes": [
-      "tiny",
-      "medium",
-      "dense-wide"
-    ],
-    "semantic_shapes": [
-      "tiny",
-      "medium",
-      "large"
-    ],
-    "rtf_variants": [
-      "plain"
-    ],
-    "range_simulation": {
-      "fixed_latency_us": 100,
-      "request_overhead_us": 25,
-      "bandwidth_bytes_per_second": 52428800,
-      "max_physical_range_bytes": 4096
-    }
+    "filesystem_root_selected": false
   },
   "latency_thresholds_percent": {
     "p50": 5.0,
@@ -125,76 +64,18 @@
       "name": "allocation",
       "max_regression_percent": 5.0,
       "path_globs": [
-        "**/*allocation_calls",
-        "**/*allocation_calls/values",
-        "**/*deallocation_calls",
-        "**/*deallocation_calls/values",
-        "**/*reallocation_calls",
-        "**/*reallocation_calls/values",
-        "**/*failed_allocation_calls",
-        "**/*failed_allocation_calls/values",
-        "**/*allocations",
-        "**/*allocated_bytes",
-        "**/*allocated_bytes/values",
-        "**/*deallocated_bytes",
-        "**/*deallocated_bytes/values",
-        "**/*live_bytes_before",
-        "**/*live_bytes_before/values",
-        "**/*live_bytes_after",
-        "**/*live_bytes_after/values",
-        "**/*peak_live_bytes_before",
-        "**/*peak_live_bytes_before/values",
-        "**/*peak_live_bytes_after",
-        "**/*peak_live_bytes_after/values",
-        "*allocation_calls",
-        "*allocations",
-        "*allocated_bytes"
+        "operation_metrics/allocation/allocation_calls/values",
+        "operation_metrics/allocation/deallocation_calls/values",
+        "operation_metrics/allocation/reallocation_calls/values",
+        "operation_metrics/allocation/failed_allocation_calls/values",
+        "operation_metrics/allocation/allocated_bytes/values",
+        "operation_metrics/allocation/deallocated_bytes/values",
+        "operation_metrics/allocation/live_bytes_before/values",
+        "operation_metrics/allocation/live_bytes_after/values",
+        "operation_metrics/allocation/peak_live_bytes_before/values",
+        "operation_metrics/allocation/peak_live_bytes_after/values"
       ],
-      "presence": "optional"
-    },
-    {
-      "name": "rss",
-      "max_regression_percent": 5.0,
-      "path_globs": [
-        "**/*rss*",
-        "**/*resident_set*",
-        "*rss*",
-        "*resident_set*"
-      ],
-      "presence": "optional"
-    },
-    {
-      "name": "work",
-      "max_regression_percent": 5.0,
-      "path_globs": [
-        "**/*instructions",
-        "**/*cycles",
-        "**/*faults",
-        "source/*read_calls",
-        "source/*read_bytes",
-        "sink/write_calls",
-        "source/*materializations",
-        "**/*copied_bytes",
-        "**/*decompressed_bytes",
-        "**/*recompressed_bytes",
-        "**/*work_units",
-        "source/*max_in_flight*",
-        "source/*maximum_in_flight*",
-        "*instructions",
-        "*cycles",
-        "*faults",
-        "*read_calls",
-        "*read_bytes",
-        "*write_calls",
-        "*materializations",
-        "*copied_bytes",
-        "*decompressed_bytes",
-        "*recompressed_bytes",
-        "*work_units",
-        "*max_in_flight*",
-        "*maximum_in_flight*"
-      ],
-      "presence": "optional"
+      "presence": "required"
     }
   ]
 }

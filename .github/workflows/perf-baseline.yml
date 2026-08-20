@@ -47,9 +47,11 @@ on:
       - 'tools/test_perf_abba_summary.py'
       - 'tools/perf_resource_profile.py'
       - 'tools/test_perf_resource_profile.py'
+      - 'tools/test_perf_baseline_source_policy.py'
       - 'docs/performance/perf-regression-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
+      - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   pull_request:
@@ -98,9 +100,11 @@ on:
       - 'tools/test_perf_abba_summary.py'
       - 'tools/perf_resource_profile.py'
       - 'tools/test_perf_resource_profile.py'
+      - 'tools/test_perf_baseline_source_policy.py'
       - 'docs/performance/perf-regression-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
+      - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   workflow_dispatch:
@@ -146,6 +150,15 @@ jobs:
           cargo check --locked --manifest-path "$PERF_MANIFEST"
           cargo test --locked --manifest-path "$PERF_MANIFEST"
 
+      - name: Check allocator-only benchmark target
+        run: |
+          cargo check --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc
+          cargo test --locked --manifest-path "$PERF_MANIFEST" \
+            --features allocator-metrics \
+            --bin litchi-perf-baseline-alloc
+
       - name: Test fail-closed performance Python tooling
         run: |
           python3 -m unittest \
@@ -153,6 +166,9 @@ jobs:
             tools.test_perf_abba_summary \
             tools.test_perf_abba_package \
             tools.test_perf_resource_profile
+
+      - name: Test benchmark source policy
+        run: python3 -m unittest tools.test_perf_baseline_source_policy
 
       - name: Run deterministic smoke baseline
         run: |
