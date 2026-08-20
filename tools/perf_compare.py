@@ -545,6 +545,15 @@ _SOURCE_BOUNDARY_VECTOR_KEYS = (
     "decompressed_bytes",
     "recompressed_bytes",
 )
+_SOURCE_COUNTER_SCOPES = {
+    "timed_read_at",
+    "untimed_source_replay_only",
+    "not_applicable_eager_opc",
+    "not_applicable_eager_pptx",
+    "not_applicable_eager_docx",
+    "not_applicable_immutable_owned_slice",
+    "not_applicable_in_process_sink",
+}
 _PATTERN_VALUES = {"sequential", "random", "unknown"}
 _PROCESS_METRICS_KEYS = {
     "status",
@@ -857,10 +866,11 @@ def _validate_operation_metrics(
                 f"{path}.source.{key}.status must be {boundary_status!r} "
                 f"for source status {source_status!r}"
             )
-    source = obj["source"]
-    if not isinstance(source["counter_scope"], str) or not source["counter_scope"]:
+    counter_scope = source["counter_scope"]
+    if not isinstance(counter_scope, str) or counter_scope not in _SOURCE_COUNTER_SCOPES:
         raise ComparisonInputError(
-            f"{path}.source.counter_scope must be a non-empty string"
+            f"{path}.source.counter_scope must be one of "
+            f"{sorted(_SOURCE_COUNTER_SCOPES)}"
         )
     _validate_status_group(
         obj["process"],
@@ -1131,6 +1141,20 @@ def _latency_claim(result: dict[str, Any]) -> str:
     return _require_object(operation_metrics, "operation_metrics")["latency_claim"]
 
 
+def _source_counter_scope(result: dict[str, Any], location: str) -> str | None:
+    operation_metrics = result.get("operation_metrics")
+    if operation_metrics is None:
+        return None
+    operation_metrics = _require_object(operation_metrics, location)
+    source = _require_object(operation_metrics.get("source"), f"{location}.source")
+    counter_scope = source.get("counter_scope")
+    if not isinstance(counter_scope, str):
+        raise ComparisonInputError(
+            f"{location}.source.counter_scope must be a string"
+        )
+    return counter_scope
+
+
 def _optional_metrics_from_selected(
     selected: dict[str, tuple[str, float, float, str]]
 ) -> dict[str, tuple[str, float, float, str]]:
@@ -1308,6 +1332,17 @@ def compare_reports(
         after_selected, after_vector_metadata = _collect_metrics(after_result, policy)
         before_latency_claim = _latency_claim(before_result)
         after_latency_claim = _latency_claim(after_result)
+        before_source_scope = _source_counter_scope(
+            before_result, f"baseline.{case}.operation_metrics"
+        )
+        after_source_scope = _source_counter_scope(
+            after_result, f"current.{case}.operation_metrics"
+        )
+        if before_source_scope != after_source_scope:
+            raise ComparisonInputError(
+                f"source counter scope mismatch for {case!r}: "
+                f"baseline={before_source_scope!r}, current={after_source_scope!r}"
+            )
         if before_latency_claim != after_latency_claim:
             raise ComparisonInputError(
                 f"latency claim mismatch for {case!r}: "
