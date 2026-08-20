@@ -450,7 +450,7 @@ impl ChildMode {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct SampleEvidence {
     pub sample_index: usize,
     pub cache_state: &'static str,
@@ -4382,6 +4382,54 @@ mod tests {
         let serialized = serde_json::to_string(&evidence).unwrap();
         assert!(!serialized.contains(root.to_string_lossy().as_ref()));
         assert!(evidence.os.is_some());
+    }
+
+    #[test]
+    fn child_output_keeps_allocation_sample_additive_and_omits_error_path_absence() {
+        let child = |allocation_metrics| super::ChildResult {
+            elapsed_ns: 1,
+            logical_read_counter_scope: "timed_read_at".to_owned(),
+            logical_read_calls: 0,
+            logical_read_requested_bytes: 0,
+            logical_read_bytes: 0,
+            max_concurrent_reads: 0,
+            logical_read_request_sizes: Vec::new(),
+            logical_read_request_size_buckets: ReadSizeBuckets::default(),
+            cold_advice: ColdAdvice::NotRequested,
+            process_metrics: None,
+            allocation_metrics,
+            output_sha256: None,
+            output_bytes: None,
+            opc_materialized_parts: None,
+            cfb_changed_spans: None,
+            cfb_published_bytes: None,
+            cfb_phases: None,
+            cfb_owned: None,
+            pptx_source_replay: None,
+            docx_source_replay: None,
+        };
+        let sample = crate::allocation_metrics::Sample {
+            status: crate::allocation_metrics::Status::Measured,
+            scope: crate::allocation_metrics::Scope::OperationGlobalSystemAllocator,
+            allocation_calls: Some(1),
+            deallocation_calls: Some(1),
+            reallocation_calls: Some(0),
+            failed_allocation_calls: Some(0),
+            allocated_bytes: Some(16),
+            deallocated_bytes: Some(16),
+            live_bytes_before: Some(100),
+            live_bytes_after: Some(100),
+            peak_live_bytes_before: Some(128),
+            peak_live_bytes_after: Some(128),
+        };
+        let value = serde_json::to_value(child(Some(sample))).unwrap();
+        assert_eq!(value["allocation_metrics"]["status"], "measured");
+        assert_eq!(
+            value["allocation_metrics"]["live_bytes_before"],
+            serde_json::Value::from(100_u64)
+        );
+        let absent = serde_json::to_value(child(None)).unwrap();
+        assert!(absent.get("allocation_metrics").is_none());
     }
 
     #[test]

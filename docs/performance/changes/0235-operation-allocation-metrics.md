@@ -8,9 +8,12 @@ Status: schema and comparator evidence only; no latency or allocation claim
 
 The standalone performance harness now has a second target,
 `litchi-perf-baseline-alloc`, enabled by the `allocator-metrics` feature. The
-default `litchi-perf-baseline` target and all production crates retain their
-existing system allocator and timing path. The companion target installs a
-benchmark-only wrapper around `std::alloc::System`.
+shared harness library and the default `litchi-perf-baseline` entry point both
+retain unconditional `#![forbid(unsafe_code)]`; the normal target has no call
+site that enables allocation metrics. Only the separate allocator entry-point
+crate owns the narrowly scoped benchmark-only wrapper around
+`std::alloc::System`, so enabling all package targets cannot instrument the
+normal latency binary.
 
 Filesystem child operations begin one non-overlapping measurement region just
 before their timed operation and finish it before output verification, hashing,
@@ -22,7 +25,8 @@ counter. Overflow and failed region acquisition retain typed status and omit
 numeric vectors rather than publishing fabricated values.
 
 The additive `operation_metrics.allocation` vectors are aligned with the
-sorted `elapsed_ns.samples` vector. The report's tool identity records
+sorted `elapsed_ns.samples` vector. The report's tool identity records both
+`binary: litchi-perf-baseline-alloc` and
 `instrumentation: system_allocator_operation_scoped`, which prevents normal
 and instrumented reports from being treated as the same implementation.
 Allocator-instrumented elapsed values are validated for schema integrity but
@@ -40,7 +44,10 @@ binary remain unchanged.
 
 Focused Rust unit tests cover disabled-mode omission, status serialization,
 cross-thread totals, non-overlapping regions, elapsed-vector alignment,
-absolute live counters, and overflow omission. Standard-library-only Python
-tests cover comparator metric vectors, instrumentation identity, and refusal
-to use instrumented elapsed samples for latency ABBA. No Cargo build or test is
-run as part of the active benchmark change.
+absolute live counters, overflow omission, strict schema cardinality, child
+output, and actual allocator success/failure/reallocation paths. The latter
+tests live only on the allocator target. Standard-library-only Python tests
+cover comparator metric vectors, both normal/allocator policy identities,
+refusal to use instrumented elapsed samples for latency ABBA, and the
+source-level unsafe target boundary. No Cargo build or test is run as part of
+the active benchmark change.

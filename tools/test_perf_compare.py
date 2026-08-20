@@ -11,6 +11,7 @@ from tools import perf_compare
 TOOL = {
     "name": "litchi-perf-baseline",
     "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
     "profile": "release",
     "target_os": "linux",
     "target_arch": "x86_64",
@@ -375,6 +376,7 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(manifest["source_report_samples_per_case"], 1)
         self.assertEqual(manifest["source_report_warmup_iterations_per_case"], 0)
         self.assertEqual(checked_policy["schema_version"], 2)
+        self.assertEqual(checked_policy["tool_identity"]["binary"], "litchi-perf-baseline")
         self.assertEqual(checked_policy["tool_identity"]["instrumentation"], "none")
         allocation_class = next(
             item
@@ -382,6 +384,7 @@ class PerfCompareTests(unittest.TestCase):
             if item["name"] == "allocation"
         )
         self.assertIn("**/*allocation_calls/values", allocation_class["path_globs"])
+        self.assertIn("**/*peak_live_bytes_after/values", allocation_class["path_globs"])
         self.assertEqual(manifest["default_cases"], checked_policy["required_cases"])
         self.assertEqual(
             set(checked_policy["latency_thresholds_percent"]),
@@ -447,6 +450,29 @@ class PerfCompareTests(unittest.TestCase):
         current = report(revision="current")
         comparison = perf_compare.compare_reports(baseline, current, policy())
         self.assertEqual(comparison["status"], "pass")
+
+    def test_allocator_policy_accepts_only_allocator_binary_identity(self):
+        repository = Path(__file__).resolve().parents[1]
+        allocator_policy = json.loads(
+            (
+                repository
+                / "docs/performance/perf-regression-policy-allocator-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        perf_compare.validate_policy(allocator_policy)
+        self.assertEqual(
+            allocator_policy["tool_identity"]["binary"],
+            "litchi-perf-baseline-alloc",
+        )
+        self.assertEqual(
+            allocator_policy["tool_identity"]["instrumentation"],
+            "system_allocator_operation_scoped",
+        )
+        allocator_report = report()
+        allocator_report["tool"]["binary"] = "litchi-perf-baseline-alloc"
+        allocator_report["tool"]["instrumentation"] = "system_allocator_operation_scoped"
+        with self.assertRaisesRegex(perf_compare.ComparisonInputError, "tool does not match"):
+            perf_compare.compare_reports(allocator_report, report(revision="current"), policy())
 
     def test_pass_compares_latency_and_available_resource_counters(self):
         baseline = report()
@@ -1084,10 +1110,12 @@ class PerfCompareTests(unittest.TestCase):
     def test_allocator_instrumentation_withholds_elapsed_latency_claims(self):
         comparison_policy = policy()
         comparison_policy["tool_identity"]["instrumentation"] = "system_allocator"
+        comparison_policy["tool_identity"]["binary"] = "litchi-perf-baseline-alloc"
         baseline = report()
         current = report(revision="current")
         for item in (baseline, current):
             item["tool"]["instrumentation"] = "system_allocator"
+            item["tool"]["binary"] = "litchi-perf-baseline-alloc"
             item["results"][0]["operation_metrics"] = {
                 "allocation": {
                     "status": "measured",

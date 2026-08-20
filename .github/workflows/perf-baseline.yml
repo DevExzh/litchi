@@ -49,6 +49,7 @@ on:
       - 'tools/test_perf_resource_profile.py'
       - 'docs/performance/perf-regression-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
+      - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   pull_request:
@@ -99,6 +100,7 @@ on:
       - 'tools/test_perf_resource_profile.py'
       - 'docs/performance/perf-regression-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
+      - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   workflow_dispatch:
