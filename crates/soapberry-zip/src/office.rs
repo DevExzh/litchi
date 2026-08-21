@@ -1699,7 +1699,7 @@ where
     let mut probe = [0_u8; 1];
     let extra = reader.read(&mut probe).map_err(Error::from)?;
     if extra != 0 {
-        let actual = copied.checked_add(extra as u64).unwrap_or(u64::MAX);
+        let actual = copied.saturating_add(extra as u64);
         return Err(ErrorKind::InvalidSize {
             expected: expected_size,
             actual,
