@@ -124,8 +124,24 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = crate::package::Package::from_bytes(bytes)?;
-        Self::from_package(package)
+        // Let the prepared detector perform the local MIME probe exactly
+        // once.  A matching ODS result transfers its indexed archive; a
+        // different ODF family still follows the historical package owner so
+        // its MIME error is reported at the same boundary; rejected probes
+        // recover the original allocation for the ordinary parser.
+        match litchi_odf_common::detect::prepared_or_original(bytes) {
+            Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Ods => {
+                Self::from_prepared_package(prepared)
+            },
+            Ok(prepared) => {
+                let package = crate::package::Package::from_owned_package(prepared.into_package())?;
+                Self::from_package(package)
+            },
+            Err(bytes) => {
+                let package = crate::package::Package::from_bytes(bytes)?;
+                Self::from_package(package)
+            },
+        }
     }
 
     /// Adopt the indexed package retained by smart ODF detection.
