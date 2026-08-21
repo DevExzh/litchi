@@ -45,7 +45,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 SCHEMA_VERSION = 1
 TOOL_NAME = "litchi-resource-profile"
-TOOL_VERSION = "0.1.5"
+TOOL_VERSION = "0.1.6"
 ABBA_SCHEMA_VERSION = 1
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HARNESS_MANIFEST = REPO_ROOT / "tools" / "perf-baseline" / "Cargo.toml"
@@ -1860,6 +1860,15 @@ def _xlsx_xml_borrowed_source_identity(
 ) -> tuple[dict[str, Any], list[str]]:
     """Copy a source identity while removing only known timing observations."""
 
+    timing_container = source.get(XLSX_XML_BORROWED_SOURCE_TIMING_PATH[0])
+    if (
+        XLSX_XML_BORROWED_SOURCE_TIMING_PATH[0] in source
+        and not isinstance(timing_container, dict)
+    ):
+        raise ResourceProfileInputError(
+            f"{location}.{XLSX_XML_BORROWED_SOURCE_TIMING_PATH[0]} must be an object"
+        )
+
     excluded: list[str] = []
 
     def copy_identity(value: Any, path: tuple[str, ...]) -> Any:
@@ -1899,7 +1908,10 @@ def _xlsx_xml_borrowed_source_identity(
                 copied[key] = copy_identity(item, item_path)
             return copied
         if isinstance(value, list):
-            return [copy_identity(item, path) for item in value]
+            return [
+                copy_identity(item, (*path, f"[{index}]"))
+                for index, item in enumerate(value)
+            ]
         return value
 
     identity = copy_identity(source, ())
