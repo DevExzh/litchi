@@ -2,17 +2,104 @@
 
 use std::collections::HashSet;
 
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::Uuid;
+use litchi_iwa_protos::comment_storage_codec;
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{fresh_comment_storage_uuid, insert_comment_storage};
-use crate::protobuf::{tsd, tsp, tswp};
+use crate::protobuf::{tsp, tswp};
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
 
 pub(super) const HIGHLIGHT_MESSAGE_TYPE: u32 = 2_013;
 pub(super) const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+
+fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::DecodeOptions {
+    comment_storage_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(32)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+    )
+}
+
+fn comment_storage_allocation_error(amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+        resource: "iWork text annotation reply identifiers",
+        amount,
+    })
+}
+
+#[derive(Debug, Default)]
+struct CommentStorageReplyIds {
+    identifiers: Vec<u64>,
+    allocation_failed: Option<usize>,
+}
+
+impl comment_storage_codec::CommentStorageVisitor for CommentStorageReplyIds {
+    fn visit_reply(
+        &mut self,
+        reply: comment_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
+        if self.allocation_failed.is_some() {
+            return Ok(());
+        }
+        if self.identifiers.try_reserve(1).is_err() {
+            // Keep traversing the source so a later malformed record still
+            // wins over this candidate-local allocation failure.
+            self.allocation_failed = Some(self.identifiers.len().saturating_add(1));
+            return Ok(());
+        }
+        self.identifiers.push(reply.identifier());
+        Ok(())
+    }
+}
+
+fn strict_comment_storage_error(
+    annotation_id: u64,
+    storage_id: u64,
+    error: comment_storage_codec::DecodeError,
+) -> Error {
+    Error::InvalidFormat(format!(
+        "iWork text annotation {annotation_id} comment storage {storage_id} failed strict validation: {error}"
+    ))
+}
+
+fn decode_comment_storage_payload<'source>(
+    annotation_id: u64,
+    storage_id: u64,
+    source: &'source [u8],
+) -> Result<(
+    comment_storage_codec::CommentStorageSnapshot<'source>,
+    Vec<u64>,
+)> {
+    let mut replies = CommentStorageReplyIds::default();
+    let (comment, report) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
+        source,
+        comment_storage_decode_options(source),
+        &mut replies,
+    )
+    .map_err(|error| strict_comment_storage_error(annotation_id, storage_id, error))?;
+    if let Some(amount) = replies.allocation_failed {
+        return Err(comment_storage_allocation_error(amount));
+    }
+    if replies.identifiers.len() != report.reply_references() {
+        return Err(Error::InvalidFormat(format!(
+            "iWork text annotation {annotation_id} comment storage {storage_id} streamed {} replies but reported {}",
+            replies.identifiers.len(),
+            report.reply_references(),
+        )));
+    }
+    Ok((comment, replies.identifiers))
+}
 
 #[derive(Debug, Clone)]
 pub(super) struct AnnotationReplyGraph {
@@ -206,39 +293,38 @@ fn validate_comment_node(
             "iWork text annotation {annotation_id} comment storage {storage_id} must contain exactly one comment payload"
         )));
     }
-    let comment = tsd::CommentStorageArchive::decode(object.messages[0].data.as_slice())?;
-    let body = comment.text.ok_or_else(|| {
+    let (comment, reply_ids) = decode_comment_storage_payload(
+        annotation_id,
+        storage_id,
+        object.messages[0].data.as_slice(),
+    )?;
+    let body = comment.text().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} comment storage {storage_id} is missing text presence"
         ))
-    })?;
-    let creation_date_seconds = comment.creation_date.map(|date| date.seconds);
+    })?.to_owned();
+    let creation_date_seconds = comment.creation_date().map(|date| date.seconds());
     if creation_date_seconds.is_some_and(|seconds| !seconds.is_finite()) {
         return Err(Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} has a non-finite creation date"
         )));
     }
-    let uuid = comment.storage_uuid.ok_or_else(|| {
+    let uuid = comment.storage_uuid().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} comment storage {storage_id} is missing its UUID"
         ))
     })?;
-    if uuid.lower == 0 && uuid.upper == 0 {
+    if uuid.lower() == 0 && uuid.upper() == 0 {
         return Err(Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} comment storage {storage_id} has a zero UUID"
         )));
     }
-    let author_id = comment.author.map(|reference| reference.identifier);
+    let author_id = comment.author().map(|reference| reference.identifier());
     if author_id == Some(0) {
         return Err(Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} has a zero author identifier"
         )));
     }
-    let reply_ids = comment
-        .replies
-        .into_iter()
-        .map(|reference| reference.identifier)
-        .collect::<Vec<_>>();
     if reply_ids.contains(&0) {
         return Err(Error::InvalidFormat(format!(
             "iWork text annotation {annotation_id} has a zero reply identifier"
@@ -248,7 +334,7 @@ fn validate_comment_node(
         body,
         creation_date_seconds,
         author_id,
-        storage_uuid: Uuid::from_parts(uuid.lower, uuid.upper)?,
+        storage_uuid: Uuid::from_parts(uuid.lower(), uuid.upper())?,
         reply_ids,
     })
 }
@@ -319,16 +405,20 @@ pub(super) fn update_annotation_comment_text(
             )));
         }
         let original = &object.messages[0];
-        let comment = tsd::CommentStorageArchive::decode(original.data.as_slice())?;
+        let (comment, _) = decode_comment_storage_payload(
+            annotation_id,
+            storage_id,
+            original.data.as_slice(),
+        )?;
         let data = patch_length_delimited_field(
             &original.data,
             1,
-            comment.text.is_some(),
+            comment.text().is_some(),
             Some(body.as_bytes()),
         )?;
-        if tsd::CommentStorageArchive::decode(data.as_slice())?
-            .text
-            .as_deref()
+        if decode_comment_storage_payload(annotation_id, storage_id, data.as_slice())?
+            .0
+            .text()
             != Some(body)
         {
             return Err(Error::InvalidFormat(format!(

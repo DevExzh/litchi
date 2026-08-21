@@ -346,6 +346,11 @@ fn native_fixture_renames_by_position_and_name_with_clear_and_empty() -> TestRes
     let package = Package::open(fixture_path())?;
     let source_text = package.text()?;
     let source_sections = package.stats().section_count();
+    assert_eq!(
+        package.section_name(SectionSelector::index(0))?,
+        Some("Blank")
+    );
+    assert_eq!(package.section_name("Blank")?, Some("Blank"));
 
     let long_name = "Native Pages section name with a deliberately longer UTF-8 value";
     let mut by_position = package.edit_section_name(SectionSelector::index(0))?;
@@ -363,6 +368,10 @@ fn native_fixture_renames_by_position_and_name_with_clear_and_empty() -> TestRes
     assert_eq!(longer.patch().after(), Some(long_name));
 
     let longer_package = longer.into_package();
+    assert_eq!(
+        longer_package.section_name(SectionSelector::name(long_name))?,
+        Some(long_name)
+    );
     let mut by_name = longer_package.edit_section_name(SectionSelector::name(long_name))?;
     assert_eq!(by_name.name(), Some(long_name));
     by_name.set_name(Some("x"))?;
@@ -376,10 +385,20 @@ fn native_fixture_renames_by_position_and_name_with_clear_and_empty() -> TestRes
     assert_eq!(cleared.package().sections()[0].name(), None);
 
     let cleared_package = cleared.into_package();
+    assert_eq!(
+        cleared_package.section_name(SectionSelector::index(0))?,
+        None
+    );
     let mut empty_edit = cleared_package.edit_section_name(SectionSelector::index(0))?;
     empty_edit.set_name(Some(""))?;
     let empty_commit = empty_edit.commit()?;
     assert_eq!(empty_commit.package().sections()[0].name(), Some(""));
+    assert_eq!(
+        empty_commit
+            .package()
+            .section_name(SectionSelector::index(0))?,
+        Some("")
+    );
     assert_eq!(empty_commit.package().text()?, source_text);
     assert_eq!(
         empty_commit.package().stats().section_count(),
@@ -392,6 +411,19 @@ fn native_fixture_renames_by_position_and_name_with_clear_and_empty() -> TestRes
 fn selector_and_name_validation_fail_before_publication() -> TestResult<()> {
     let bytes = synthetic_package("Same", "Same")?;
     let package = Package::from_bytes(&bytes)?;
+
+    assert!(matches!(
+        package.section_name(SectionSelector::name("Missing")),
+        Err(SectionNameError::NameNotFound)
+    ));
+    assert!(matches!(
+        package.section_name(SectionSelector::index(2)),
+        Err(SectionNameError::PositionNotFound { .. })
+    ));
+    assert!(matches!(
+        package.section_name(SectionSelector::name("Same")),
+        Err(SectionNameError::AmbiguousSelector { .. })
+    ));
 
     assert!(matches!(
         package.edit_section_name(SectionSelector::name("Missing")),

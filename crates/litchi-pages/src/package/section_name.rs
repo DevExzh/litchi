@@ -420,6 +420,36 @@ impl SectionNameCommit {
 }
 
 impl Package {
+    /// Read the optional producer-visible name from one semantically selected
+    /// section.
+    ///
+    /// The name is borrowed from this immutable package snapshot, so a read
+    /// does not allocate or retain any native package state. An explicitly
+    /// present empty name is returned as `Some("")`, while an absent field is
+    /// returned as `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when an exact-name selector is ambiguous or when
+    /// the requested name or position does not identify a section.
+    pub fn section_name<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<Option<&str>, SectionNameError> {
+        let selected_selector = selector.into();
+        let selected = self
+            .semantic_document()
+            .select_section(selected_selector)
+            .map_err(map_selector_error)?
+            .ok_or(match selected_selector {
+                SectionSelector::Name(_) => SectionNameError::NameNotFound,
+                SectionSelector::Position(position) => {
+                    SectionNameError::PositionNotFound { position }
+                },
+            })?;
+        Ok(selected.name())
+    }
+
     /// Start a selector-first edit of one producer-visible section name.
     ///
     /// The selector is resolved immediately against this immutable semantic

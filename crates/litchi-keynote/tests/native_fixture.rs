@@ -113,6 +113,84 @@ fn native_keynote_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std:
 }
 
 #[test]
+fn archive_free_document_accepts_borrowed_package_bytes() -> Result<(), Box<dyn std::error::Error>>
+{
+    let source = std::fs::read(fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let document = Document::from_bytes(&source)?;
+
+    assert_eq!(document.show(), package.show()?);
+    assert_eq!(document.text()?, EXPECTED_TEXT);
+    assert_eq!(document.stats(), Some(package.stats()?));
+    assert_eq!(
+        document
+            .metadata()
+            .and_then(|metadata| metadata.application.as_deref()),
+        Some("Keynote")
+    );
+
+    // Semantic projection owns its values instead of borrowing package bytes.
+    drop(source);
+    assert_eq!(document.text()?, EXPECTED_TEXT);
+    Ok(())
+}
+
+#[test]
+fn archive_free_byte_ingress_honors_source_and_semantic_limits()
+-> Result<(), Box<dyn std::error::Error>> {
+    let source = std::fs::read(fixture_path())?;
+    let defaults = DocumentSourceLimits::default();
+    let exact_source = DocumentSourceLimits::new(
+        u64::try_from(source.len())?,
+        defaults.max_files(),
+        defaults.max_entry_size(),
+        defaults.max_total_size(),
+        defaults.max_iwa_stream_size(),
+    )?;
+    let source_error = Document::from_bytes_with_options(
+        &source,
+        DocumentReadOptions::new(
+            DocumentSourceLimits::new(
+                u64::try_from(source.len().saturating_sub(1))?,
+                defaults.max_files(),
+                defaults.max_entry_size(),
+                defaults.max_total_size(),
+                defaults.max_iwa_stream_size(),
+            )?,
+            SemanticLimits::default(),
+        ),
+    )
+    .expect_err("source max-minus-one must reject complete package bytes");
+    assert!(matches!(
+        source_error,
+        litchi_keynote::ReadError::Archive(_)
+    ));
+
+    let semantic = SemanticLimits::new(
+        EXPECTED_OBJECTS - 1,
+        SemanticLimits::MAX_SLIDES,
+        SemanticLimits::MAX_REFERENCES,
+        SemanticLimits::MAX_TEXT_STORAGES,
+        SemanticLimits::MAX_TEXT_FRAGMENTS,
+        SemanticLimits::MAX_TEXT_BYTES,
+    )?;
+    let semantic_error = Document::from_bytes_with_options(
+        &source,
+        DocumentReadOptions::new(exact_source, semantic),
+    )
+    .expect_err("object max-minus-one must reject before publishing a document");
+    assert!(matches!(
+        semantic_error,
+        litchi_keynote::ReadError::SemanticLimit {
+            kind: SemanticLimitKind::Objects,
+            maximum,
+            ..
+        } if maximum == EXPECTED_OBJECTS - 1
+    ));
+    Ok(())
+}
+
+#[test]
 fn focused_reader_surface_is_exact_shareable_and_archive_free()
 -> Result<(), Box<dyn std::error::Error>> {
     fn assert_send_sync<T: Send + Sync>() {}

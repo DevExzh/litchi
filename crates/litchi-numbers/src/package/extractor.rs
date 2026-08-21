@@ -150,6 +150,8 @@ fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudg
     };
     let mut root_ast_present = false;
     let mut root_ast_count = 0usize;
+    let mut root_known_fields = [0u32; 9];
+    let mut root_known_field_count = 0usize;
     let preflight = preflight_wire_tree_with_limits(source, limits, |visit| {
         let field = visit.field();
         attempted.charge_field()?;
@@ -165,6 +167,19 @@ fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudg
                 )));
             }
         }
+        if visit.path().is_empty()
+            && schema.wire_type.is_some()
+            && !formula_field_is_repeated(visit.path(), field.number())
+        {
+            if root_known_fields[..root_known_field_count].contains(&field.number()) {
+                return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                    "Numbers FormulaArchive field {} occurs more than once",
+                    field.number()
+                )));
+            }
+            root_known_fields[root_known_field_count] = field.number();
+            root_known_field_count += 1;
+        }
         if visit.path().is_empty() && field.number() == 1 {
             root_ast_count = root_ast_count.saturating_add(1);
             if root_ast_count > 1 {
@@ -176,9 +191,26 @@ fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudg
         }
         if schema.nested {
             attempted.charge_nested(field.payload().len())?;
-            if !schema.required_fields.is_empty() {
-                require_formula_fields(field.payload(), schema.required_fields)?;
+            let mut nested_path = [0u32; WireLimits::MAX_NESTING + 1];
+            let Some(path_end) = visit.path().len().checked_add(1) else {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "Numbers FormulaArchive nesting path overflows".to_owned(),
+                ));
+            };
+            if path_end > nested_path.len() {
+                return Err(litchi_iwa_common::Error::LimitExceeded {
+                    kind: LimitKind::Nesting,
+                    observed: path_end,
+                    limit: WireLimits::MAX_NESTING,
+                });
             }
+            nested_path[..visit.path().len()].copy_from_slice(visit.path());
+            nested_path[visit.path().len()] = field.number();
+            require_formula_fields(
+                field.payload(),
+                &nested_path[..path_end],
+                schema.required_fields,
+            )?;
         }
         if formula_ast_array_path(visit.path()) && field.number() == 1 {
             required_formula_ast_node_type(field.payload())?;
@@ -190,9 +222,7 @@ fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudg
                 )
             })?;
         }
-        if schema.canonical_varint {
-            validate_canonical_formula_varint(field)?;
-        }
+        validate_formula_scalar(field, schema.scalar)?;
         Ok(if schema.nested {
             WireDescent::Descend
         } else {
@@ -322,15 +352,45 @@ fn required_formula_ast_node_type(source: &[u8]) -> litchi_iwa_common::Result<()
 /// fields on all of the deferred formula messages.  Keep this check local to
 /// the nested payload selected by the schema so unknown opaque fields remain
 /// untouched and repeated fields retain their normal semantics.
-fn require_formula_fields(source: &[u8], required_fields: &[u32]) -> litchi_iwa_common::Result<()> {
+fn require_formula_fields(
+    source: &[u8],
+    message_path: &[u32],
+    required_fields: &[u32],
+) -> litchi_iwa_common::Result<()> {
     let limits = WireLimits::default()
         .with_input_bytes(source.len().max(1))
         .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
         .and_then(|limits| limits.with_nesting(1))?;
     let view = parse_wire_view_with_limits(source, limits)?;
     let mut seen = [false; 8];
+    let mut known_fields = [0u32; 64];
+    let mut known_field_count = 0usize;
     for field in view.fields() {
         field.validate_canonical_framing()?;
+        let schema = formula_envelope_field(message_path, field.number());
+        if schema.wire_type.is_some() && !formula_field_is_repeated(message_path, field.number()) {
+            if known_fields[..known_field_count].contains(&field.number()) {
+                if required_fields.contains(&field.number()) {
+                    return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                        "Numbers FormulaArchive required field {} occurs more than once",
+                        field.number()
+                    )));
+                }
+                return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                    "Numbers FormulaArchive field {} occurs more than once",
+                    field.number()
+                )));
+            }
+            if known_field_count == known_fields.len() {
+                return Err(litchi_iwa_common::Error::LimitExceeded {
+                    kind: LimitKind::Fields,
+                    observed: known_field_count.saturating_add(1),
+                    limit: known_fields.len(),
+                });
+            }
+            known_fields[known_field_count] = field.number();
+            known_field_count += 1;
+        }
         let Some(index) = required_fields
             .iter()
             .position(|required| *required == field.number())
@@ -356,6 +416,25 @@ fn require_formula_fields(source: &[u8], required_fields: &[u32]) -> litchi_iwa_
     Ok(())
 }
 
+/// Return whether a schema-known field is allowed to occur more than once.
+///
+/// Prost accepts duplicate singular fields with last-value-wins semantics.
+/// The formula archive ingress is stricter: only fields declared `repeated` in
+/// the native schema may repeat. The path distinguishes repeated AST nodes
+/// from the singular field-1 envelopes used by several nearby messages.
+fn formula_field_is_repeated(path: &[u32], number: u32) -> bool {
+    if number == 1 {
+        formula_ast_array_path(path)
+            || path == [38]
+            || matches!(path, [38, 1, 1] | [38, 1, 2])
+            || path == [39, 1, 6]
+            || path == [40]
+            || path == [45]
+    } else {
+        path == [40] && (2..=4).contains(&number)
+    }
+}
+
 fn validate_canonical_formula_varint(
     field: litchi_iwa_common::wire::WireFieldView<'_>,
 ) -> litchi_iwa_common::Result<()> {
@@ -375,12 +454,63 @@ fn validate_canonical_formula_varint(
     Ok(())
 }
 
+fn validate_formula_scalar(
+    field: litchi_iwa_common::wire::WireFieldView<'_>,
+    scalar: FormulaScalar,
+) -> litchi_iwa_common::Result<()> {
+    match scalar {
+        FormulaScalar::Unknown => Ok(()),
+        FormulaScalar::Varint => validate_canonical_formula_varint(field),
+        FormulaScalar::Bool | FormulaScalar::U32 | FormulaScalar::Int32 | FormulaScalar::SInt32 => {
+            let payload = field.payload();
+            let (value, width) =
+                litchi_iwa_common::decode_varint_from_bytes(payload).map_err(|error| {
+                    litchi_iwa_common::Error::InvalidFormat(format!(
+                        "Numbers FormulaArchive field {} has an invalid scalar varint: {error}",
+                        field.number()
+                    ))
+                })?;
+            if width != payload.len() || width != litchi_iwa_common::varint::encoded_len(value) {
+                return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                    "Numbers FormulaArchive field {} has a noncanonical scalar varint",
+                    field.number()
+                )));
+            }
+            let valid = match scalar {
+                FormulaScalar::Bool => value <= 1,
+                FormulaScalar::U32 | FormulaScalar::SInt32 => value <= u64::from(u32::MAX),
+                FormulaScalar::Int32 => {
+                    i32::try_from(value).is_ok() || value >= 0xffff_ffff_8000_0000
+                },
+                FormulaScalar::Unknown | FormulaScalar::Varint => true,
+            };
+            if !valid {
+                return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                    "Numbers FormulaArchive field {} has a noncanonical scalar value",
+                    field.number()
+                )));
+            }
+            Ok(())
+        },
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FormulaScalar {
+    Unknown,
+    Varint,
+    Bool,
+    U32,
+    Int32,
+    SInt32,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct FormulaEnvelopeField {
     wire_type: Option<u8>,
     nested: bool,
     utf8: bool,
-    canonical_varint: bool,
+    scalar: FormulaScalar,
     required_fields: &'static [u32],
 }
 
@@ -396,13 +526,58 @@ const FORMULA_REQUIRED_COORDINATE: &[u32] = &[1];
 const FORMULA_REQUIRED_UID_COORDINATE: &[u32] = &[1, 2, 3, 4];
 const FORMULA_REQUIRED_AST_CATEGORY_LEVELS: &[u32] = &[1, 2];
 const FORMULA_REQUIRED_CROSS_EXTRA: &[u32] = &[1];
+const FORMULA_REQUIRED_RANGE_BEGIN: &[u32] = &[1];
 
 const fn formula_envelope_scalar(wire_type: u8) -> FormulaEnvelopeField {
     FormulaEnvelopeField {
         wire_type: Some(wire_type),
         nested: false,
         utf8: false,
-        canonical_varint: wire_type == 0,
+        scalar: if wire_type == 0 {
+            FormulaScalar::Varint
+        } else {
+            FormulaScalar::Unknown
+        },
+        required_fields: FORMULA_REQUIRED_NONE,
+    }
+}
+
+const fn formula_envelope_bool() -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(0),
+        nested: false,
+        utf8: false,
+        scalar: FormulaScalar::Bool,
+        required_fields: FORMULA_REQUIRED_NONE,
+    }
+}
+
+const fn formula_envelope_u32() -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(0),
+        nested: false,
+        utf8: false,
+        scalar: FormulaScalar::U32,
+        required_fields: FORMULA_REQUIRED_NONE,
+    }
+}
+
+const fn formula_envelope_int32() -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(0),
+        nested: false,
+        utf8: false,
+        scalar: FormulaScalar::Int32,
+        required_fields: FORMULA_REQUIRED_NONE,
+    }
+}
+
+const fn formula_envelope_sint32() -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(0),
+        nested: false,
+        utf8: false,
+        scalar: FormulaScalar::SInt32,
         required_fields: FORMULA_REQUIRED_NONE,
     }
 }
@@ -412,7 +587,7 @@ const fn formula_envelope_nested() -> FormulaEnvelopeField {
         wire_type: Some(2),
         nested: true,
         utf8: false,
-        canonical_varint: false,
+        scalar: FormulaScalar::Unknown,
         required_fields: FORMULA_REQUIRED_NONE,
     }
 }
@@ -422,7 +597,7 @@ const fn formula_envelope_nested_required(required_fields: &'static [u32]) -> Fo
         wire_type: Some(2),
         nested: true,
         utf8: false,
-        canonical_varint: false,
+        scalar: FormulaScalar::Unknown,
         required_fields,
     }
 }
@@ -432,7 +607,7 @@ const fn formula_envelope_utf8() -> FormulaEnvelopeField {
         wire_type: Some(2),
         nested: false,
         utf8: true,
-        canonical_varint: false,
+        scalar: FormulaScalar::Unknown,
         required_fields: FORMULA_REQUIRED_NONE,
     }
 }
@@ -441,7 +616,7 @@ const FORMULA_ENVELOPE_UNKNOWN: FormulaEnvelopeField = FormulaEnvelopeField {
     wire_type: None,
     nested: false,
     utf8: false,
-    canonical_varint: false,
+    scalar: FormulaScalar::Unknown,
     required_fields: FORMULA_REQUIRED_NONE,
 };
 
@@ -452,14 +627,17 @@ const FORMULA_ENVELOPE_UNKNOWN: FormulaEnvelopeField = FormulaEnvelopeField {
 fn formula_envelope_field(path: &[u32], number: u32) -> FormulaEnvelopeField {
     if path.is_empty() {
         return match number {
-            1 | 6..=9 => formula_envelope_nested(),
-            2..=5 => formula_envelope_scalar(0),
+            1 => formula_envelope_nested(),
+            2..=3 => formula_envelope_u32(),
+            4..=5 => formula_envelope_bool(),
+            6 => formula_envelope_nested(),
+            7..=9 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         };
     }
     if path == [6] {
         return if (1..=5).contains(&number) {
-            formula_envelope_scalar(0)
+            formula_envelope_bool()
         } else {
             FORMULA_ENVELOPE_UNKNOWN
         };
@@ -518,9 +696,10 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
     match suffix {
         // TSCE.ASTNodeArchive
         [] => match number {
-            1..=3 | 5 | 9..=13 | 18..=20 | 22..=24 | 29 | 36..=37 | 42..=43 | 46..=47 => {
-                formula_envelope_scalar(0)
-            },
+            1 | 9 | 47 => formula_envelope_int32(),
+            2..=3 | 11..=13 | 18 | 22..=24 | 37 | 46 => formula_envelope_u32(),
+            5 | 10 | 19..=20 | 29 | 36 => formula_envelope_bool(),
+            42..=43 => formula_envelope_scalar(0),
             4 | 7 | 8 => formula_envelope_scalar(1),
             6 | 17 | 21 | 25 | 34 | 35 => formula_envelope_utf8(),
             14 | 40 | 45 => formula_envelope_nested(),
@@ -547,11 +726,11 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
         // separate: only the cross-table variant has field 5 (CFUUID) and
         // fields 6..9 (whitespace strings).
         [15] => match number {
-            1..=4 => formula_envelope_scalar(0),
+            1..=4 => formula_envelope_u32(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         [16] => match number {
-            1..=4 => formula_envelope_scalar(0),
+            1..=4 => formula_envelope_u32(),
             5 => formula_envelope_nested(),
             6..=9 => formula_envelope_utf8(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
@@ -559,12 +738,18 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
         // TSP.CFUUIDArchive
         [16, 5] | [28, 1] => match number {
             1 => formula_envelope_scalar(2),
-            2..=5 => formula_envelope_scalar(0),
+            2..=5 => formula_envelope_u32(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
-        // TSCE.ASTColumn/RowCoordinateArchive and ASTStickyBits
-        [26] | [27] | [33] | [41] => match number {
-            1..=4 => formula_envelope_scalar(0),
+        // TSCE.ASTColumn/RowCoordinateArchive
+        [26] | [27] => match number {
+            1 => formula_envelope_sint32(),
+            2 => formula_envelope_bool(),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTStickyBits
+        [33] | [41] | [38, 2] => match number {
+            1..=4 => formula_envelope_bool(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         // TSCE.ASTCrossTableReferenceExtraInfoArchive
@@ -576,7 +761,7 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
         // TSCE.ASTUidCoordinateArchive
         [30] => match number {
             1 | 2 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID),
-            3..=4 => formula_envelope_scalar(0),
+            3..=4 => formula_envelope_bool(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         // TSP.UUID
@@ -604,7 +789,8 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
         // TSCE.ASTUidTract
         [38, 1] => match number {
             1..=2 => formula_envelope_nested(),
-            3..=5 => formula_envelope_scalar(0),
+            3 | 5 => formula_envelope_bool(),
+            4 => formula_envelope_int32(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         // TSCE.ASTUidList
@@ -618,7 +804,7 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
         // TSCE.ASTCategoryReferenceArchive
         [39] => {
             if number == 1 {
-                formula_envelope_nested_required(FORMULA_REQUIRED_AST_CATEGORY_REFERENCE)
+                formula_envelope_nested_required(FORMULA_REQUIRED_CATEGORY_REFERENCE)
             } else {
                 FORMULA_ENVELOPE_UNKNOWN
             }
@@ -626,7 +812,10 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
         // TSCE.CategoryReferenceArchive
         [39, 1] => match number {
             1 | 2 | 9 | 10 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID),
-            3 | 4 | 8 | 11..=14 => formula_envelope_scalar(0),
+            3 | 13 => formula_envelope_u32(),
+            4 => formula_envelope_sint32(),
+            8 => formula_envelope_int32(),
+            11 | 12 | 14 => formula_envelope_bool(),
             6 | 7 => formula_envelope_nested(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
@@ -640,28 +829,32 @@ fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField
         },
         // TSCE.PreserveColumnRowFlagsArchive
         [39, 1, 7] => match number {
-            1..=4 => formula_envelope_scalar(0),
+            1..=4 => formula_envelope_bool(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         // TSCE.ASTCategoryLevels
         [44] => match number {
-            1..=3 => formula_envelope_scalar(0),
+            1..=3 => formula_envelope_u32(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         // TSCE.ASTColonTractArchive and its four range message variants.
         [40] => match number {
-            1..=4 => formula_envelope_nested(),
-            5 => formula_envelope_scalar(0),
+            1..=4 => formula_envelope_nested_required(FORMULA_REQUIRED_RANGE_BEGIN),
+            5 => formula_envelope_bool(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
-        [40, 1] | [40, 2] | [40, 3] | [40, 4] => match number {
-            1..=2 => formula_envelope_scalar(0),
+        [40, 1] | [40, 2] => match number {
+            1 | 2 => formula_envelope_int32(),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        [40, 3] | [40, 4] => match number {
+            1 | 2 => formula_envelope_u32(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         // TSCE.ASTLambdaIdentsListArchive
         [45] => match number {
             1 | 3 | 4 => formula_envelope_utf8(),
-            2 => formula_envelope_scalar(0),
+            2 => formula_envelope_u32(),
             _ => FORMULA_ENVELOPE_UNKNOWN,
         },
         _ => FORMULA_ENVELOPE_UNKNOWN,
@@ -8632,6 +8825,49 @@ mod tests {
     }
 
     #[test]
+    fn raw_formula_archive_rejects_duplicate_known_singular_fields() -> super::Result<()> {
+        let mut duplicate_host = formula(vec![number_node(1.0)]).encode_to_vec();
+        append_varint_field(&mut duplicate_host, 2, 1)?;
+        append_varint_field(&mut duplicate_host, 2, 1)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&duplicate_host, &mut budget).is_err());
+
+        let mut duplicate_node = Vec::new();
+        append_varint_field(&mut duplicate_node, 1, 17)?;
+        append_varint_field(&mut duplicate_node, 2, 1)?;
+        append_varint_field(&mut duplicate_node, 2, 1)?;
+        let mut node_array = Vec::new();
+        append_length_delimited_field(&mut node_array, 1, &duplicate_node)?;
+        let mut duplicate_nested = Vec::new();
+        append_length_delimited_field(&mut duplicate_nested, 1, &node_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&duplicate_nested, &mut budget).is_err());
+
+        // Repeated ASTNodeArchive entries remain valid and retain their full
+        // generated-renderer semantics.
+        let repeated = formula(vec![number_node(1.0), number_node(2.0)]).encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&repeated, &mut budget).is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_archive_rejects_missing_required_range_fields() -> super::Result<()> {
+        let mut node = Vec::new();
+        append_varint_field(&mut node, 1, 67)?;
+        let mut empty_range = Vec::new();
+        append_length_delimited_field(&mut empty_range, 1, &[])?;
+        append_length_delimited_field(&mut node, 40, &empty_range)?;
+        let mut node_array = Vec::new();
+        append_length_delimited_field(&mut node_array, 1, &node)?;
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 1, &node_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&source, &mut budget).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn raw_formula_archive_recurses_uid_tract_and_category_uuid_paths() -> super::Result<()> {
         // ASTUidTractList.sticky_bits is a required nested message. A scalar
         // at field 2 must not be treated as an opaque unknown field.
@@ -8667,6 +8903,138 @@ mod tests {
         append_length_delimited_field(&mut bad_category_source, 1, &category_array)?;
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         assert!(FormulaArchiveBytes::from_wire(&bad_category_source, &mut budget).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_archive_checks_recursive_required_messages_and_deep_thunks() -> super::Result<()>
+    {
+        let uuid = tsp::Uuid { lower: 1, upper: 2 }.encode_to_vec();
+        let mut category_ref = Vec::new();
+        append_length_delimited_field(&mut category_ref, 1, &uuid)?;
+        append_length_delimited_field(&mut category_ref, 2, &uuid)?;
+        append_varint_field(&mut category_ref, 3, 1)?;
+        append_varint_field(&mut category_ref, 4, 0)?;
+
+        // CategoryReferenceArchive's fields 1..4 are all required. Keep a
+        // complete nested category as a control so the recursive checks do
+        // not reject a valid category reference.
+        let mut category_wrapper = Vec::new();
+        append_length_delimited_field(&mut category_wrapper, 1, &category_ref)?;
+        let mut category_node = Vec::new();
+        append_varint_field(&mut category_node, 1, 66)?;
+        append_length_delimited_field(&mut category_node, 39, &category_wrapper)?;
+        let mut category_array = Vec::new();
+        append_length_delimited_field(&mut category_array, 1, &category_node)?;
+        let mut valid_category = Vec::new();
+        append_length_delimited_field(&mut valid_category, 1, &category_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&valid_category, &mut budget).is_ok());
+
+        // The ASTCategoryReferenceArchive wrapper itself has a required
+        // category_ref field. An empty wrapper must not be accepted merely
+        // because the enclosing AST node and array are structurally valid.
+        let mut missing_category_node = Vec::new();
+        append_varint_field(&mut missing_category_node, 1, 66)?;
+        append_length_delimited_field(&mut missing_category_node, 39, &[])?;
+        let mut missing_category_array = Vec::new();
+        append_length_delimited_field(&mut missing_category_array, 1, &missing_category_node)?;
+        let mut missing_category = Vec::new();
+        append_length_delimited_field(&mut missing_category, 1, &missing_category_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&missing_category, &mut budget).is_err());
+
+        let mut incomplete_category_ref = Vec::new();
+        append_length_delimited_field(&mut incomplete_category_ref, 1, &uuid)?;
+        let mut incomplete_wrapper = Vec::new();
+        append_length_delimited_field(&mut incomplete_wrapper, 1, &incomplete_category_ref)?;
+        let mut incomplete_node = Vec::new();
+        append_varint_field(&mut incomplete_node, 1, 66)?;
+        append_length_delimited_field(&mut incomplete_node, 39, &incomplete_wrapper)?;
+        let mut incomplete_array = Vec::new();
+        append_length_delimited_field(&mut incomplete_array, 1, &incomplete_node)?;
+        let mut incomplete_source = Vec::new();
+        append_length_delimited_field(&mut incomplete_source, 1, &incomplete_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&incomplete_source, &mut budget).is_err());
+
+        // The same malformed category UUID must be rejected through more
+        // than one thunk/ASTNodeArray edge, not only at the root node path.
+        let mut bad_uuid = Vec::new();
+        append_length_delimited_field(&mut bad_uuid, 1, &[])?;
+        let mut bad_uuid_list = Vec::new();
+        append_length_delimited_field(&mut bad_uuid_list, 1, &bad_uuid)?;
+        let mut bad_category_ref = Vec::new();
+        append_length_delimited_field(&mut bad_category_ref, 1, &bad_uuid_list)?;
+        append_length_delimited_field(&mut bad_category_ref, 2, &uuid)?;
+        append_varint_field(&mut bad_category_ref, 3, 1)?;
+        append_varint_field(&mut bad_category_ref, 4, 0)?;
+        let mut bad_category_wrapper = Vec::new();
+        append_length_delimited_field(&mut bad_category_wrapper, 1, &bad_category_ref)?;
+        let mut leaf = Vec::new();
+        append_varint_field(&mut leaf, 1, 66)?;
+        append_length_delimited_field(&mut leaf, 39, &bad_category_wrapper)?;
+        let mut deep_array = Vec::new();
+        append_length_delimited_field(&mut deep_array, 1, &leaf)?;
+        for _ in 0..3 {
+            let mut thunk = Vec::new();
+            append_varint_field(&mut thunk, 1, 26)?;
+            append_length_delimited_field(&mut thunk, 14, &deep_array)?;
+            deep_array.clear();
+            append_length_delimited_field(&mut deep_array, 1, &thunk)?;
+        }
+        let mut deep_source = Vec::new();
+        append_length_delimited_field(&mut deep_source, 1, &deep_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&deep_source, &mut budget).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_archive_enforces_canonical_boolean_and_integer_scalars() -> super::Result<()> {
+        let mut sticky = Vec::new();
+        append_varint_field(&mut sticky, 1, 0)?;
+        append_varint_field(&mut sticky, 2, 0)?;
+        append_varint_field(&mut sticky, 3, 0)?;
+        append_varint_field(&mut sticky, 4, 0)?;
+        let mut node = Vec::new();
+        append_varint_field(&mut node, 1, 17)?;
+        append_length_delimited_field(&mut node, 33, &sticky)?;
+        let mut array = Vec::new();
+        append_length_delimited_field(&mut array, 1, &node)?;
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 1, &array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&source, &mut budget).is_ok());
+
+        let mut bad_bool = Vec::new();
+        append_varint_field(&mut bad_bool, 1, 2)?;
+        append_varint_field(&mut bad_bool, 2, 0)?;
+        append_varint_field(&mut bad_bool, 3, 0)?;
+        append_varint_field(&mut bad_bool, 4, 0)?;
+        let mut bad_node = Vec::new();
+        append_varint_field(&mut bad_node, 1, 17)?;
+        append_length_delimited_field(&mut bad_node, 33, &bad_bool)?;
+        let mut bad_array = Vec::new();
+        append_length_delimited_field(&mut bad_array, 1, &bad_node)?;
+        let mut bad_source = Vec::new();
+        append_length_delimited_field(&mut bad_source, 1, &bad_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&bad_source, &mut budget).is_err());
+
+        // Column coordinates are sint32 and must not carry a value outside
+        // the representable u32 zig-zag domain.
+        let mut coordinate = Vec::new();
+        append_varint_field(&mut coordinate, 1, u64::from(u32::MAX) + 1)?;
+        let mut coordinate_node = Vec::new();
+        append_varint_field(&mut coordinate_node, 1, 36)?;
+        append_length_delimited_field(&mut coordinate_node, 26, &coordinate)?;
+        let mut coordinate_array = Vec::new();
+        append_length_delimited_field(&mut coordinate_array, 1, &coordinate_node)?;
+        let mut coordinate_source = Vec::new();
+        append_length_delimited_field(&mut coordinate_source, 1, &coordinate_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&coordinate_source, &mut budget).is_err());
         Ok(())
     }
 

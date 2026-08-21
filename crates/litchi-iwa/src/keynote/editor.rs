@@ -8,6 +8,7 @@ use std::rc::Rc;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
+use litchi_iwa_protos::keynote_document_codec;
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
@@ -61,6 +62,7 @@ pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as Buil
 use litchi_keynote::transition::Settings as TransitionSettings;
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const BUILD_MESSAGE_TYPE: u32 = 8;
@@ -1487,6 +1489,25 @@ impl KeynoteOperation {
         self.graph.decode(identifier, "KN.SlideArchive")
     }
 
+    /// Resolve the rooted show edge through the bounded focused codec.
+    ///
+    /// The editor still owns the complete mutable object graph, but the root
+    /// reference itself does not need an owned generated `KN.DocumentArchive`.
+    /// Keeping this projection at the graph boundary also makes duplicate or
+    /// malformed root references fail before any slide, text, or media owner is
+    /// traversed.
+    fn document_show_identifier(&self) -> Result<u64> {
+        let payload =
+            self.graph
+                .message_data_type(1, DOCUMENT_MESSAGE_TYPE, "KN.DocumentArchive")?;
+        let options = keynote_document_codec::DecodeOptions::new(payload.len(), 64);
+        keynote_document_codec::decode_show_identifier(payload, options).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote root document projection is malformed: {error}"
+            ))
+        })
+    }
+
     fn remember_slide(&mut self, identifier: u64, slide: &kn::SlideArchive) {
         if self.slide_cache.len() >= MAX_OPERATION_CACHED_SLIDES
             || slide.owned_drawables.len() > MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE
@@ -1553,10 +1574,8 @@ impl KeynoteEditor {
         &self,
         operation: &mut KeynoteOperation,
     ) -> Result<Vec<KeynoteSlideInfo>> {
-        let document: kn::DocumentArchive = operation.graph.decode(1, "KN.DocumentArchive")?;
-        let show: kn::ShowArchive = operation
-            .graph
-            .decode(document.show.identifier, "KN.ShowArchive")?;
+        let show_identifier = operation.document_show_identifier()?;
+        let show: kn::ShowArchive = operation.graph.decode(show_identifier, "KN.ShowArchive")?;
 
         let mut slides = Vec::with_capacity(show.slide_tree.slides.len());
         let mut layout_catalog = None;

@@ -238,17 +238,6 @@ pub(crate) fn rewrite_repeated_fixed64_fields(
     )?)
 }
 
-pub(crate) fn transform_repeated_length_delimited_fields<F>(
-    data: &[u8],
-    field_number: u32,
-    transform: F,
-) -> Result<Vec<u8>>
-where
-    F: FnMut(&[u8]) -> Result<Vec<u8>>,
-{
-    common_wire::transform_repeated_length_delimited_fields(data, field_number, transform)
-}
-
 pub(crate) fn transform_length_delimited_fields_at_path<F>(
     data: &[u8],
     path: &[u32],

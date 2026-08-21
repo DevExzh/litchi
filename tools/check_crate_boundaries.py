@@ -164,6 +164,7 @@ IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS = (
 )
 KEYNOTE_SOURCE_ROOT = Path("crates/litchi-keynote/src")
 KEYNOTE_PACKAGE_MANIFEST = Path("crates/litchi-keynote/Cargo.toml")
+KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES = (KEYNOTE_SOURCE_ROOT / "document.rs",)
 # `perf_tests.rs` is included only from a `#[cfg(test)]` module in its parent
 # source file. Keep the production audit from treating that test-only module
 # body as a reachable crate item when walking the source tree.
@@ -8653,6 +8654,70 @@ def audit_pages_document_public_api(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def _keynote_document_public_leak(identifier: str) -> str | None:
+    """Classify physical vocabulary forbidden by the archive-free reader."""
+
+    if identifier == "wire" or identifier.startswith("Wire") or identifier.endswith("Wire"):
+        return "wire type"
+    return _iwork_public_leak(identifier)
+
+
+def audit_keynote_document_public_api(root: Path = ROOT) -> list[str]:
+    """Keep the focused Keynote document reader archive-free and semantic."""
+
+    violations: list[str] = []
+    for relative in KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        for declaration, line_number in _rust_public_declarations(source):
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                reason = _keynote_document_public_leak(identifier)
+                if reason is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                violations.append(
+                    "focused litchi-keynote document reader public API exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{identifier_line}"
+                )
+
+        doc_regions = [
+            *re.finditer(r"^[ \t]*//[/!][^\r\n]*", source, re.MULTILINE),
+            *re.finditer(r"/\*(?:\*|!)[\s\S]*?\*/", source),
+            *re.finditer(r"#\s*\[\s*doc\s*=\s*[^\]]*\]", source),
+        ]
+        for region in doc_regions:
+            for match in RUST_IDENTIFIER.finditer(region.group(0)):
+                identifier = match.group(1)
+                if not identifier[:1].isupper() or identifier == "Archive":
+                    continue
+                reason = _keynote_document_public_leak(identifier)
+                if reason is None:
+                    words = [
+                        word.lower() for word in CAMEL_CASE_WORD.findall(identifier)
+                    ]
+                    if "native" in words and any(
+                        word in {"id", "identifier", "object"} for word in words
+                    ):
+                        reason = "native object"
+                if reason is None:
+                    continue
+                offset = region.start() + match.start(1)
+                line_number = source.count("\n", 0, offset) + 1
+                violations.append(
+                    "focused litchi-keynote document reader rustdoc exposes "
+                    f"{reason} {identifier}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -9994,6 +10059,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_slide_number_visibility_source_topology()
         + audit_keynote_placeholder_visibility_facade_source_topology()
         + audit_keynote_package_no_eager_prost_source_topology()
+        + audit_keynote_document_public_api()
         + audit_numbers_package_no_eager_prost_source_topology()
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()

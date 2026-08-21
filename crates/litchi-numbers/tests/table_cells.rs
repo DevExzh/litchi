@@ -163,6 +163,30 @@ fn native_single_reads_use_checked_index_and_name_selectors() -> TestResult {
 }
 
 #[test]
+fn native_a1_read_helpers_match_checked_coordinate_reads() -> TestResult {
+    let package = Package::open(fixture_path())?;
+
+    let coordinate = package.table_cell("Sheet 1", "Table 1", CellPosition::from_a1("B2")?)?;
+    let a1 = package.table_cell_a1("Sheet 1", "Table 1", "B2")?;
+    assert_eq!(a1, coordinate);
+
+    let coordinate_range =
+        package.table_cells("Sheet 1", "Table 1", CellRange::from_a1("B2:C3")?)?;
+    let a1_range = package.table_cells_a1("Sheet 1", "Table 1", "$B$2:$C$3")?;
+    assert_eq!(a1_range, coordinate_range);
+
+    assert!(matches!(
+        package.table_cell_a1("Sheet 1", "Table 1", "A0"),
+        Err(Error::InvalidAddress)
+    ));
+    assert!(matches!(
+        package.table_cells_a1("Sheet 1", "Table 1", "A1:B2:C3"),
+        Err(Error::InvalidAddress)
+    ));
+    Ok(())
+}
+
+#[test]
 fn native_dense_range_is_row_major_and_presence_preserving() -> TestResult {
     let package = Package::open(fixture_path())?;
     let states = package.table_cells(

@@ -62,7 +62,7 @@ use litchi_iwa_text_wire::{
 use plist::stream::{Event as PlistEvent, Reader as PlistReader};
 use thiserror::Error;
 
-use crate::{Document, DocumentError, DocumentLimits, Sheet};
+use crate::{Document, DocumentError, DocumentLimits, Sheet, SheetSelector};
 use extractor::TableDataExtractor;
 use index::{Index, Resolved};
 use sheet::DecodedSheet;
@@ -711,6 +711,25 @@ impl Package {
     #[must_use]
     pub fn sheets(&self) -> &[Sheet] {
         self.state.document.sheets()
+    }
+
+    /// Select a rooted semantic sheet by exact visible name or checked
+    /// zero-based position.
+    ///
+    /// This is the package-level convenience form of
+    /// [`Document::sheet`](crate::Document::sheet). Resolution runs only over
+    /// the immutable semantic snapshot; native object identifiers, archive
+    /// member names, and payloads are not part of this API.
+    ///
+    /// Missing names and out-of-range positions return `Ok(None)`. Validated
+    /// package snapshots currently make this lookup infallible, while the
+    /// document result type keeps the selector boundary compatible with
+    /// future semantic validation rules.
+    pub fn sheet<'a, S>(&self, selector: S) -> std::result::Result<Option<&Sheet>, DocumentError>
+    where
+        S: Into<SheetSelector<'a>>,
+    {
+        self.state.document.sheet(selector)
     }
 
     /// Clone the shared semantic sheet allocation without cloning sheet data.

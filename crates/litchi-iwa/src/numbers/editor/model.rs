@@ -12,20 +12,46 @@ const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 
+fn comment_storage_allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
 fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::DecodeOptions {
     comment_storage_codec::DecodeOptions::new(
-        source.len().max(1),
-        source.len().max(1),
-        source.len().saturating_mul(32).max(1),
+        source
+            .len()
+            .clamp(1, litchi_iwa_common::WireLimits::MAX_INPUT_BYTES),
+        source
+            .len()
+            .clamp(1, litchi_iwa_common::WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(32)
+            .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
         COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
-        source.len().max(1),
-        source.len().max(1),
+        source.len().clamp(1, litchi_numbers::MAX_REFERENCES),
+        source
+            .len()
+            .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
     )
 }
 
 #[derive(Debug, Default)]
 struct CommentStorageReplyIds {
     identifiers: Vec<u64>,
+    allocation_failed: Option<usize>,
+}
+
+impl CommentStorageReplyIds {
+    fn into_identifiers(self) -> Result<Vec<u64>> {
+        match self.allocation_failed {
+            Some(amount) => Err(comment_storage_allocation_error(
+                "Numbers comment reply identifiers",
+                amount,
+            )),
+            None => Ok(self.identifiers),
+        }
+    }
 }
 
 impl comment_storage_codec::CommentStorageVisitor for CommentStorageReplyIds {
@@ -33,6 +59,16 @@ impl comment_storage_codec::CommentStorageVisitor for CommentStorageReplyIds {
         &mut self,
         reply: comment_storage_codec::ReferenceRecord<'_>,
     ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
+        if self.allocation_failed.is_some() {
+            return Ok(());
+        }
+        if self.identifiers.try_reserve(1).is_err() {
+            // Keep traversing the source so a later wire/parity failure still
+            // wins over this candidate-local allocation failure. No partial
+            // reply vector is published unless the complete decode succeeds.
+            self.allocation_failed = Some(1);
+            return Ok(());
+        }
         self.identifiers.push(reply.identifier());
         Ok(())
     }
@@ -64,13 +100,21 @@ fn decode_comment_storage_payload<'source>(
     Vec<u64>,
 )> {
     let mut replies = CommentStorageReplyIds::default();
-    let (comment, _) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
+    let (comment, report) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
         source,
         comment_storage_decode_options(source),
         &mut replies,
     )
     .map_err(|error| strict_comment_storage_error(storage_id, error))?;
-    Ok((comment, replies.identifiers))
+    let reply_ids = replies.into_identifiers()?;
+    if reply_ids.len() != report.reply_references() {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers comment storage object {storage_id} streamed {} replies but reported {}",
+            reply_ids.len(),
+            report.reply_references(),
+        )));
+    }
+    Ok((comment, reply_ids))
 }
 pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArchive> {
     package.with_parsed_archive("Index/Document.iwa", |archive| {
@@ -3937,17 +3981,24 @@ pub(super) fn comment_entry_location(
             "Numbers comment storage object {storage_id} is missing"
         ))
     })?;
-    let payloads = object
+    let mut payload = None;
+    for message in object
         .messages
         .iter()
         .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    if payloads.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "Object {storage_id} must contain exactly one TSD comment-storage payload"
-        )));
+    {
+        if payload.replace(message).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {storage_id} must contain exactly one TSD comment-storage payload"
+            )));
+        }
     }
-    validate_comment_storage_payload(storage_id, payloads[0].data.as_slice())?;
+    let payload = payload.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Object {storage_id} must contain exactly one TSD comment-storage payload"
+        ))
+    })?;
+    validate_comment_storage_payload(storage_id, payload.data.as_slice())?;
     Ok(CommentEntryLocation {
         table_id,
         storage_id,
@@ -3975,30 +4026,48 @@ pub(super) fn read_comment_storage_object(
             "Numbers comment storage object {storage_id} is missing"
         ))
     })?;
-    let messages = object
+    let mut payload = None;
+    for message in object
         .messages
         .iter()
         .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    if messages.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "Object {storage_id} must contain exactly one TSD comment-storage payload"
-        )));
+    {
+        if payload.replace(message).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {storage_id} must contain exactly one TSD comment-storage payload"
+            )));
+        }
     }
-    let (comment, reply_ids) =
-        decode_comment_storage_payload(storage_id, messages[0].data.as_slice())?;
+    let payload = payload.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Object {storage_id} must contain exactly one TSD comment-storage payload"
+        ))
+    })?;
+    let (comment, reply_ids) = decode_comment_storage_payload(storage_id, payload.data.as_slice())?;
+    let source_text = comment.text().unwrap_or_default();
+    let mut text = String::new();
+    text.try_reserve_exact(source_text.len())
+        .map_err(|_| comment_storage_allocation_error("Numbers comment text", source_text.len()))?;
+    text.push_str(source_text);
+
+    let mut typed_reply_ids = Vec::new();
+    typed_reply_ids
+        .try_reserve_exact(reply_ids.len())
+        .map_err(|_| {
+            comment_storage_allocation_error("Numbers comment reply identifiers", reply_ids.len())
+        })?;
+    for identifier in reply_ids {
+        typed_reply_ids.push(StorageId::from_raw(identifier).map_err(crate::Error::from)?);
+    }
+
     Ok(Comment {
-        text: comment.text().unwrap_or_default().to_owned(),
+        text,
         creation_date_seconds: comment.creation_date().map(|date| date.seconds()),
         author_id: comment
             .author()
             .map(|author| AuthorId::from_raw(author.identifier()))
             .transpose()?,
-        reply_ids: reply_ids
-            .into_iter()
-            .map(|identifier| StorageId::from_raw(identifier).map_err(crate::Error::from))
-            .collect::<Result<Vec<_>>>()?
-            .into_boxed_slice(),
+        reply_ids: typed_reply_ids.into_boxed_slice(),
         storage_uuid: comment
             .storage_uuid()
             .map(|uuid| Uuid::from_parts(uuid.lower(), uuid.upper()))
@@ -4187,19 +4256,22 @@ pub(super) fn ensure_comment_storage_metadata(
                 "Numbers comment storage object {storage_id} is missing"
             ))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        if indexes.len() != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "Object {storage_id} must contain exactly one TSD comment-storage payload"
-            )));
+        let mut index = None;
+        for (candidate, message) in object.messages.iter().enumerate() {
+            if message.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+                continue;
+            }
+            if index.replace(candidate).is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "Object {storage_id} must contain exactly one TSD comment-storage payload"
+                )));
+            }
         }
-        let index = indexes[0];
+        let index = index.ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Object {storage_id} must contain exactly one TSD comment-storage payload"
+            ))
+        })?;
         let original = object.messages[index].data.as_slice();
         let before = comment_storage_codec::decode_comment_storage_archive(
             original,
@@ -4209,7 +4281,11 @@ pub(super) fn ensure_comment_storage_metadata(
         let before_has_creation_date = before.creation_date().is_some();
         let before_has_author = before.author().is_some();
         let before_has_storage_uuid = before.storage_uuid().is_some();
-        let mut data = original.to_vec();
+        let mut data = Vec::new();
+        data.try_reserve_exact(original.len()).map_err(|_| {
+            comment_storage_allocation_error("Numbers comment-storage wire", original.len())
+        })?;
+        data.extend_from_slice(original);
         if !before_has_creation_date {
             data = patch_length_delimited_field(
                 &data,
@@ -4265,9 +4341,11 @@ pub(super) fn ensure_comment_storage_metadata(
                 .object_references
                 .contains(&author_id)
         {
-            object.archive_info.message_infos[index]
-                .object_references
-                .push(author_id);
+            let references = &mut object.archive_info.message_infos[index].object_references;
+            references.try_reserve(1).map_err(|_| {
+                comment_storage_allocation_error("Numbers comment-storage references", 1)
+            })?;
+            references.push(author_id);
         }
         changed = true;
         Ok(())

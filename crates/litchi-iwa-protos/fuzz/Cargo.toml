@@ -22,6 +22,20 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_formula_archive"
+path = "fuzz_targets/numbers_formula_archive.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_section_codec"
+path = "fuzz_targets/pages_section_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_data_list"
 path = "fuzz_targets/numbers_table_data_list.rs"
 test = false
@@ -31,6 +45,13 @@ bench = false
 [[bin]]
 name = "comment_storage_codec"
 path = "fuzz_targets/comment_storage_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_title"
+path = "fuzz_targets/keynote_chart_title.rs"
 test = false
 doc = false
 bench = false

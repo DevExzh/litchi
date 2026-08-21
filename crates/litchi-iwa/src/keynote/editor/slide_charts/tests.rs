@@ -244,6 +244,11 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
         .set_slide_chart_title(0, second.drawable_object_id, "Cost")
         .unwrap();
 
+    let catalog = editor.slide_chart_catalog(0).unwrap();
+    assert_eq!(catalog.len(), 2);
+    assert_eq!(catalog.select_position("Revenue").unwrap(), Some(0));
+    assert_eq!(catalog.select_position("Cost").unwrap(), Some(1));
+
     assert_eq!(
         editor
             .slide_chart_title_by_selector(0, ChartSelector::name("Cost"))
@@ -574,6 +579,11 @@ fn scratch_presentation_supports_selector_chart_title_crud() {
         .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
         .unwrap();
 
+    let catalog = editor.slide_chart_catalog(0).unwrap();
+    assert_eq!(catalog.len(), 1);
+    assert_eq!(catalog.select_position(0usize).unwrap(), Some(0));
+    assert_eq!(catalog.charts()[0].title(), None);
+
     assert_eq!(
         editor
             .slide_chart_title_by_selector(0, ChartSelector::index(0))
@@ -581,17 +591,17 @@ fn scratch_presentation_supports_selector_chart_title_crud() {
         None
     );
     editor
-        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue by region")
+        .set_slide_chart_title_by_selector(0, 0usize, "Revenue by region")
         .unwrap();
     assert_eq!(
         editor
-            .slide_chart_title_by_selector(0, ChartSelector::name("Revenue by region"))
+            .slide_chart_title_by_selector(0, "Revenue by region")
             .unwrap(),
         Some("Revenue by region".to_owned())
     );
     assert!(
         editor
-            .remove_slide_chart_title_by_selector(0, ChartSelector::name("Revenue by region"))
+            .remove_slide_chart_title_by_selector(0, "Revenue by region")
             .unwrap()
     );
     assert!(

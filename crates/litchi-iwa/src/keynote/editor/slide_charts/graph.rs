@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::image_caption::{DrawableCaptionKind, drawable_caption_slot};
+use crate::package_metadata::component_identifier_for_object_uuid;
 
 pub(super) struct SlideChartGraph {
     pub(super) archive_name: String,
@@ -270,14 +271,21 @@ pub(super) fn chart_graph(
         .copied()
         .filter(|identifier| registered.contains(identifier))
         .collect::<Vec<_>>();
+    for identifier in &object_ids {
+        if let Some(registered_component_id) =
+            component_identifier_for_object_uuid(editor.package(), *identifier)?
+            && registered_component_id != component_id
+        {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote chart object {identifier} is registered in component {registered_component_id}, not {component_id}"
+            )));
+        }
+    }
     // App-created native captions can leave part of their chart graph out of
     // the component UUID map. Placeholder-only graphs retain the strict
     // source-built invariant, while native caption graphs keep their actual
     // registered subset for safe duplication and removal.
-    if !registered.is_empty()
-        && caption.storage_id.is_none()
-        && uuid_object_ids.len() != object_ids.len()
-    {
+    if caption.storage_id.is_none() && uuid_object_ids.len() != object_ids.len() {
         return Err(Error::InvalidFormat(format!(
             "Keynote slide UUID map does not cover chart {drawable_object_id}"
         )));
@@ -328,4 +336,127 @@ fn required_chart_reference(
         .ok_or_else(|| {
             Error::InvalidFormat(format!("Keynote chart {drawable_object_id} has no {label}"))
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use prost::Message;
+
+    use super::*;
+    use crate::archive::RawMessage;
+    use crate::keynote::KeynoteDocumentBuilder;
+    use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
+    use crate::protobuf::tsp::{ObjectUuidMapEntry, PackageMetadata};
+    use crate::shapes::{DrawablePoint, DrawableSize};
+
+    fn chart_editor() -> (KeynoteEditor, u64) {
+        let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+        let data = ChartData::new(
+            vec!["Series".to_owned()],
+            vec!["Category".to_owned()],
+            vec![vec![Some(1.0)]],
+        )
+        .unwrap();
+        let chart = editor
+            .add_slide_chart(
+                0,
+                Kind::Column2d,
+                data,
+                DrawablePoint { x: 10.0, y: 10.0 },
+                DrawableSize {
+                    width: 100.0,
+                    height: 100.0,
+                },
+            )
+            .unwrap();
+        (editor, chart.drawable_object_id)
+    }
+
+    fn rewrite_metadata(
+        package: &mut IWorkPackage,
+        rewrite: impl FnOnce(&mut PackageMetadata),
+    ) -> Result<()> {
+        package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
+            let (object_index, message_index) = archive
+                .objects
+                .iter()
+                .enumerate()
+                .find_map(|(object_index, object)| {
+                    object
+                        .messages
+                        .iter()
+                        .position(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+                        .map(|message_index| (object_index, message_index))
+                })
+                .ok_or_else(|| Error::InvalidFormat("metadata payload is missing".to_owned()))?;
+            let object = &mut archive.objects[object_index];
+            let mut metadata =
+                PackageMetadata::decode(object.messages[message_index].data.as_slice())?;
+            rewrite(&mut metadata);
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                    data: metadata.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+    }
+
+    fn graph_objects(editor: &KeynoteEditor, drawable_object_id: u64) -> (u64, Vec<u64>) {
+        let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
+        (graph.component_id, graph.object_ids)
+    }
+
+    #[test]
+    fn placeholder_chart_graph_requires_complete_uuid_map() {
+        let (editor, drawable_object_id) = chart_editor();
+        let (component_id, object_ids) = graph_objects(&editor, drawable_object_id);
+        let mut package = editor.package().clone();
+        rewrite_metadata(&mut package, |metadata| {
+            metadata
+                .components
+                .iter_mut()
+                .find(|component| component.identifier == component_id)
+                .unwrap()
+                .object_uuid_map_entries
+                .retain(|entry| !object_ids.contains(&entry.identifier));
+        })
+        .unwrap();
+
+        let malformed = KeynoteEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        assert!(chart_graph(&malformed, 0, drawable_object_id).is_err());
+    }
+
+    #[test]
+    fn chart_graph_rejects_private_object_registered_in_foreign_component() {
+        let (editor, drawable_object_id) = chart_editor();
+        let (component_id, object_ids) = graph_objects(&editor, drawable_object_id);
+        let foreign_object = *object_ids.first().unwrap();
+        let mut package = editor.package().clone();
+        rewrite_metadata(&mut package, |metadata| {
+            let source = metadata
+                .components
+                .iter_mut()
+                .find(|component| component.identifier == component_id)
+                .unwrap();
+            source
+                .object_uuid_map_entries
+                .retain(|entry| entry.identifier != foreign_object);
+            let foreign = metadata
+                .components
+                .iter_mut()
+                .find(|component| component.identifier != component_id)
+                .unwrap();
+            foreign.object_uuid_map_entries.push(ObjectUuidMapEntry {
+                identifier: foreign_object,
+                ..Default::default()
+            });
+        })
+        .unwrap();
+
+        let malformed = KeynoteEditor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        assert!(chart_graph(&malformed, 0, drawable_object_id).is_err());
+    }
 }
