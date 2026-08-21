@@ -169,7 +169,7 @@ fn address(value: &str) -> Address {
     Address::from_a1(value).unwrap()
 }
 
-fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
+fn fixture_package(sheet_xml: String, signed: bool) -> OpcPackage {
     let workbook = format!(
         r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><bookViews><workbookView/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/></sheets></workbook>"#
     );
@@ -217,7 +217,11 @@ fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
             .unwrap();
         package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     }
-    PackageWriter::to_bytes(&package).unwrap()
+    package
+}
+
+fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
+    PackageWriter::to_bytes(&fixture_package(sheet_xml, signed)).unwrap()
 }
 
 fn replace_sheet_with_cancel_on_blob_arc(
@@ -342,8 +346,13 @@ fn three_cells() -> Vec<u8> {
     )
 }
 
-fn two_sheets() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&three_cells()).unwrap();
+fn two_sheets_with_signature(signed: bool) -> Vec<u8> {
+    let mut package = fixture_package(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><sheetViews><sheetView workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="2"><c r="B2" t="b"><v>1</v></c></row><row r="3"><c r="C3" t="inlineStr"><is><t>old</t></is></c></row></sheetData></worksheet>"#
+        ),
+        signed,
+    );
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/worksheets/sheet2.xml").unwrap(),
@@ -377,25 +386,12 @@ fn two_sheets() -> Vec<u8> {
     PackageWriter::to_bytes(&package).unwrap()
 }
 
+fn two_sheets() -> Vec<u8> {
+    two_sheets_with_signature(false)
+}
+
 fn signed_two_sheets() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&two_sheets()).unwrap();
-    package
-        .try_add_part(Box::new(BlobPart::new(
-            PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
-            ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-            b"<origin/>".to_vec(),
-        )))
-        .unwrap();
-    package
-        .rels_mut()
-        .try_add_relationship(
-            rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-            "_xmlsignatures/origin.sigs".to_owned(),
-            "rIdSignature".to_owned(),
-            TargetMode::Internal,
-        )
-        .unwrap();
-    PackageWriter::to_bytes(&package).unwrap()
+    two_sheets_with_signature(true)
 }
 
 fn with_two_cell_styles(bytes: &[u8]) -> (Vec<u8>, PackURI, Vec<u8>) {
