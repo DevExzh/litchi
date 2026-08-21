@@ -1,0 +1,35 @@
+// Wire-only Buffa parity projection derived from `TSD.CommentStorageArchive`.
+//
+// The canonical archive's repeated `replies` field is intentionally absent:
+// the strict handwritten codec streams each source-ordered `TSP.Reference`
+// directly to its visitor.  The scalar and singular nested values below are
+// only borrowed parity facts; caller-owned IWA bytes remain authoritative.
+//
+// Canonical declarations mirrored here:
+// - `TSDArchives.proto`: `TSD.CommentStorageArchive` fields 1--3 and 5;
+// - `TSPMessages.proto`: `TSP.Date`, `TSP.Reference`, and `TSP.UUID`.
+syntax = "proto2";
+
+package LitchiIwaCommentStorageProjection;
+
+message Date {
+  required double seconds = 1;
+}
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message Uuid {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}
+
+message CommentStorageArchive {
+  optional string text = 1;
+  optional .LitchiIwaCommentStorageProjection.Date creation_date = 2;
+  optional .LitchiIwaCommentStorageProjection.Reference author = 3;
+  optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;
+}

@@ -33,9 +33,10 @@ use crate::cell::wire::{BncCellView, CachedScalar, StoredValue};
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
 use litchi_iwa_common::{LimitKind, WireLimits};
+use litchi_iwa_protos::comment_storage_codec;
 use litchi_iwa_protos::group_node_category_codec::{self, CategoryValueView, GroupNodeView};
 use litchi_iwa_protos::table_info_codec;
-use litchi_iwa_protos::{numbers_table_cell_storage_codec, tsce, tsd, tst};
+use litchi_iwa_protos::{numbers_table_cell_storage_codec, tsce, tst};
 use prost::Message;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -130,6 +131,62 @@ fn map_table_cell_decode_limit_with_reference_offset(
         },
         _ => {
             return Error::InvalidFormat("Numbers table storage projection is invalid".to_owned());
+        },
+    };
+    Error::SemanticLimit {
+        kind,
+        observed,
+        maximum,
+        path: SemanticPath::Package,
+    }
+}
+
+fn map_comment_storage_codec_error(
+    error: comment_storage_codec::DecodeError,
+    reference_offset: usize,
+    field_offset: usize,
+    work_offset: usize,
+    output_text_offset: usize,
+) -> Error {
+    let Some(limit) = error.resource_limit() else {
+        return Error::MalformedPayload {
+            path: SemanticPath::StructuredTables,
+        };
+    };
+    use comment_storage_codec::DecodeLimit;
+    let (kind, observed, maximum) = match limit {
+        DecodeLimit::Bytes { observed, maximum } => {
+            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+        },
+        DecodeLimit::References { observed, maximum } => (
+            SemanticLimitKind::References,
+            observed.saturating_add(reference_offset),
+            maximum.saturating_add(reference_offset),
+        ),
+        DecodeLimit::Text { observed, maximum } => (
+            SemanticLimitKind::OutputTextBytes,
+            observed.saturating_add(output_text_offset),
+            maximum.saturating_add(output_text_offset),
+        ),
+        DecodeLimit::Fields { observed, maximum } => (
+            SemanticLimitKind::Objects,
+            observed.saturating_add(field_offset),
+            maximum.saturating_add(field_offset),
+        ),
+        DecodeLimit::Work { observed, maximum } => (
+            SemanticLimitKind::FormulaWork,
+            observed.saturating_add(work_offset),
+            maximum.saturating_add(work_offset),
+        ),
+        DecodeLimit::Nesting { observed, maximum } => (
+            SemanticLimitKind::FormulaDepth,
+            observed as usize,
+            maximum as usize,
+        ),
+        _ => {
+            return Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            };
         },
     };
     Error::SemanticLimit {
@@ -302,6 +359,22 @@ impl ProjectionBudget {
         Ok(())
     }
 
+    /// Retain only the non-transactional portion of a failed formula-map
+    /// candidate. Formula discovery may have scanned wire and spent work
+    /// before a later field, name, or retained-entry check rejects the map;
+    /// those counters must remain monotonic, while the map's entries and text
+    /// stay unpublished with the rest of the rejected candidate.
+    fn retain_formula_map_cost(&mut self, work_items: usize, wire_bytes: usize) {
+        self.payload_work = self
+            .payload_work
+            .saturating_add(work_items)
+            .min(MAX_PAYLOAD_WORK);
+        self.formula_wire_bytes = self
+            .formula_wire_bytes
+            .saturating_add(wire_bytes)
+            .min(MAX_FORMULA_WIRE_BYTES);
+    }
+
     fn charge_wire_preflight(
         &mut self,
         report: litchi_iwa_common::wire::WirePreflight,
@@ -324,6 +397,26 @@ impl ProjectionBudget {
     fn charge_decode_report(
         &mut self,
         report: numbers_table_cell_storage_codec::DecodeReport,
+    ) -> Result<()> {
+        self.charge_references(report.references())?;
+        self.payload_fields = projection_charge(
+            self.payload_fields,
+            report.fields(),
+            crate::MAX_REFERENCES,
+            SemanticLimitKind::Objects,
+        )?;
+        self.payload_work = projection_charge(
+            self.payload_work,
+            report.work_bytes(),
+            MAX_PAYLOAD_WORK,
+            SemanticLimitKind::FormulaWork,
+        )?;
+        Ok(())
+    }
+
+    fn charge_comment_decode_report(
+        &mut self,
+        report: comment_storage_codec::DecodeReport,
     ) -> Result<()> {
         self.charge_references(report.references())?;
         self.payload_fields = projection_charge(
@@ -393,6 +486,20 @@ impl ProjectionBudget {
             self.max_output_text_bytes,
             SemanticLimitKind::OutputTextBytes,
         )?;
+        Ok(())
+    }
+
+    /// Admit one owned comment copy before it is attached to a cell.
+    ///
+    /// The comment sidecar owns one decoded value, but every cell reference
+    /// needs an owned value in the current table representation.  Account for
+    /// that copy's text, reply identities, and object slot independently of
+    /// the source-side comment decode so repeated cell references cannot
+    /// amplify memory past the package projection limits.
+    fn charge_comment_materialization(&mut self, comment: &Comment) -> Result<()> {
+        self.charge_materialized_cells(1)?;
+        self.charge_output_text(comment.text.len())?;
+        self.charge_references(comment.reply_ids.len())?;
         Ok(())
     }
 
@@ -484,6 +591,56 @@ struct TypedListVisitor<'converter, T, C> {
     segment_key_max: Option<u32>,
     structural_error: Option<Error>,
     semantic_error: Option<Error>,
+}
+
+/// Stage typed reply identities while the strict comment-storage codec walks
+/// the source.  Reply callbacks can run before a later wire or Buffa parity
+/// failure, so the staged prefix is only published after the complete payload
+/// has decoded successfully.
+struct CommentReplyVisitor {
+    reply_ids: Vec<u64>,
+    semantic_error: Option<Error>,
+}
+
+impl CommentReplyVisitor {
+    fn new() -> Self {
+        Self {
+            reply_ids: Vec::new(),
+            semantic_error: None,
+        }
+    }
+
+    fn record_semantic_error(&mut self, error: Error) {
+        if self.semantic_error.is_none() {
+            self.semantic_error = Some(error);
+        }
+    }
+
+    fn take_parts(self) -> (Vec<u64>, Option<Error>) {
+        (self.reply_ids, self.semantic_error)
+    }
+}
+
+impl comment_storage_codec::CommentStorageVisitor for CommentReplyVisitor {
+    fn visit_reply(
+        &mut self,
+        reply: comment_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
+        // Keep validating the enclosing wire after a candidate-local semantic
+        // failure, allowing a later wire error to retain precedence.
+        if self.semantic_error.is_some() {
+            return Ok(());
+        }
+        if self.reply_ids.try_reserve(1).is_err() {
+            self.record_semantic_error(allocation_error(
+                "Numbers comment replies",
+                self.reply_ids.len().saturating_add(1),
+            ));
+            return Ok(());
+        }
+        self.reply_ids.push(reply.identifier());
+        Ok(())
+    }
 }
 
 impl<'converter, T, C> TypedListVisitor<'converter, T, C> {
@@ -847,6 +1004,39 @@ fn retain_text(value: &str, budget: &mut ProjectionBudget) -> Result<String> {
         .map_err(|_| allocation_error("Numbers retained semantic text", value.len()))?;
     retained.push_str(value);
     Ok(retained)
+}
+
+/// Clone one comment without relying on infallible collection allocation.
+///
+/// Comment values are stored in a sidecar and copied into every referencing
+/// cell.  Keep this boundary fallible even though the source comment itself
+/// has already passed semantic limits: a hostile package can reference one
+/// large comment from many cells and otherwise turn a derived `Clone` into an
+/// unbounded allocation path.
+fn try_clone_comment(comment: &Comment) -> Result<Comment> {
+    let mut text = String::new();
+    text.try_reserve_exact(comment.text.len())
+        .map_err(|_| allocation_error("Numbers materialized comment text", comment.text.len()))?;
+    text.push_str(&comment.text);
+
+    let mut reply_ids = Vec::new();
+    reply_ids
+        .try_reserve_exact(comment.reply_ids.len())
+        .map_err(|_| {
+            allocation_error(
+                "Numbers materialized comment replies",
+                comment.reply_ids.len(),
+            )
+        })?;
+    reply_ids.extend(comment.reply_ids.iter().copied());
+
+    Ok(Comment {
+        text,
+        creation_date_seconds: comment.creation_date_seconds,
+        author_id: comment.author_id,
+        reply_ids: reply_ids.into_boxed_slice(),
+        storage_uuid: comment.storage_uuid,
+    })
 }
 
 fn retained_table_text(
@@ -1512,15 +1702,23 @@ impl<'a> TableDataExtractor<'a> {
             let formula_references = if formula_table.is_empty() {
                 None
             } else {
-                let (references, cost) = build_formula_reference_maps(
-                    self.bundle,
-                    self.object_index,
+                let mut cost = FormulaReferenceBudget::new(
                     projection_budget.remaining_references(),
-                    projection_budget.remaining_payload_work(),
-                    MAX_FORMULA_WIRE_BYTES.saturating_sub(projection_budget.payload_work),
+                    MAX_FORMULA_WORK.min(projection_budget.remaining_payload_work()),
+                    projection_budget.remaining_formula_wire_bytes(),
                     projection_budget.remaining_staging_text_bytes(),
-                )?;
+                );
+                let references =
+                    match build_formula_reference_maps(self.bundle, self.object_index, &mut cost) {
+                        Ok(references) => references,
+                        Err(error) => {
+                            projection_budget
+                                .retain_formula_map_cost(cost.work_items, cost.wire_bytes);
+                            return Err(error);
+                        },
+                    };
                 projection_budget.charge_references(cost.retained_entries)?;
+                projection_budget.charge_formula_wire(cost.wire_bytes)?;
                 projection_budget.charge_staging_text(cost.text_bytes)?;
                 projection_budget.payload_work = projection_charge(
                     projection_budget.payload_work,
@@ -1718,7 +1916,7 @@ impl<'a> TableDataExtractor<'a> {
     ) -> Result<CommentTable> {
         let mut converter =
             |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
-             _budget: &mut ProjectionBudget| {
+             budget: &mut ProjectionBudget| {
                 if entry.ref_count() == 0 {
                     return Err(Error::InvalidFormat(format!(
                         "Numbers comment entry {} has a zero reference count",
@@ -1742,54 +1940,120 @@ impl<'a> TableDataExtractor<'a> {
                             "Numbers comment storage object {storage_id} is missing"
                         ))
                     })?;
-                let comments = storage_object
+                let mut payload_count = 0usize;
+                // Decode the first candidate into the borrowed semantic
+                // snapshot and staged replies. Later candidates still take
+                // the exact strict decode path, but use the no-op visitor so
+                // duplicate payloads do not allocate a generated reply
+                // collection merely to be discarded.
+                let mut first_candidate = None;
+                for message in storage_object
                     .messages
                     .iter()
                     .filter(|message| message.type_ == 3056)
-                    .map(|message| tsd::CommentStorageArchive::decode(message.data.as_slice()))
-                    .collect::<std::result::Result<Vec<_>, _>>()
-                    .map_err(Error::protobuf)?;
-                let comment = comments.first().ok_or_else(|| {
-                    Error::InvalidFormat(format!(
+                {
+                    payload_count += 1;
+                    let source = message.data.as_slice();
+                    let options = comment_storage_codec::DecodeOptions::new(
+                        source.len().max(1),
+                        budget.remaining_payload_fields(),
+                        budget.remaining_payload_work(),
+                        64,
+                        budget.remaining_references(),
+                        budget.remaining_output_text_bytes(),
+                    );
+                    let reference_offset = budget.references;
+                    let field_offset = budget.payload_fields;
+                    let work_offset = budget.payload_work;
+                    let output_text_offset = budget.output_text_bytes;
+
+                    if first_candidate.is_none() {
+                        let mut visitor = CommentReplyVisitor::new();
+                        let (comment, report) =
+                            comment_storage_codec::decode_comment_storage_archive_with_visitor(
+                                source,
+                                options,
+                                &mut visitor,
+                            )
+                            .map_err(|error| {
+                                map_comment_storage_codec_error(
+                                    error,
+                                    reference_offset,
+                                    field_offset,
+                                    work_offset,
+                                    output_text_offset,
+                                )
+                            })?;
+                        budget.charge_comment_decode_report(report)?;
+                        budget.charge_output_text(report.text_bytes())?;
+                        let (raw_reply_ids, semantic_error) = visitor.take_parts();
+                        first_candidate = Some((comment, raw_reply_ids, semantic_error));
+                    } else {
+                        let (_comment, report) =
+                            comment_storage_codec::decode_comment_storage_archive_with_visitor(
+                                source,
+                                options,
+                                &mut (),
+                            )
+                            .map_err(|error| {
+                                map_comment_storage_codec_error(
+                                    error,
+                                    reference_offset,
+                                    field_offset,
+                                    work_offset,
+                                    output_text_offset,
+                                )
+                            })?;
+                        budget.charge_comment_decode_report(report)?;
+                        budget.charge_output_text(report.text_bytes())?;
+                    }
+                }
+                if payload_count == 0 {
+                    return Err(Error::InvalidFormat(format!(
                         "Object {storage_id} has no TSD comment-storage payload"
-                    ))
-                })?;
-                if comments.len() != 1 {
+                    )));
+                }
+                if payload_count != 1 {
                     return Err(Error::InvalidFormat(format!(
                         "Object {storage_id} has multiple TSD comment-storage payloads"
                     )));
                 }
-                let source_text = comment.text.as_deref().unwrap_or_default();
+                let Some((comment, raw_reply_ids, semantic_error)) = first_candidate else {
+                    return Err(Error::MalformedPayload {
+                        path: SemanticPath::StructuredTables,
+                    });
+                };
+                if let Some(error) = semantic_error {
+                    return Err(error);
+                }
+                let source_text = comment.text().unwrap_or_default();
                 let mut text = String::new();
                 text.try_reserve_exact(source_text.len())
                     .map_err(|_| allocation_error("Numbers comment text", source_text.len()))?;
                 text.push_str(source_text);
                 let mut reply_ids = Vec::new();
                 reply_ids
-                    .try_reserve_exact(comment.replies.len())
+                    .try_reserve_exact(raw_reply_ids.len())
                     .map_err(|_| {
-                        allocation_error("Numbers comment replies", comment.replies.len())
+                        allocation_error("Numbers comment replies", raw_reply_ids.len())
                     })?;
-                for reply in &comment.replies {
-                    reply_ids
-                        .push(StorageId::from_raw(reply.identifier).map_err(map_comment_error)?);
+                for reply in raw_reply_ids {
+                    reply_ids.push(StorageId::from_raw(reply).map_err(map_comment_error)?);
                 }
                 Ok(Comment {
                     text,
-                    creation_date_seconds: comment.creation_date.as_ref().map(|date| date.seconds),
+                    creation_date_seconds: comment.creation_date().map(|date| date.seconds()),
                     author_id: comment
-                        .author
-                        .as_ref()
+                        .author()
                         .map(|author| {
-                            AuthorId::from_raw(author.identifier).map_err(map_comment_error)
+                            AuthorId::from_raw(author.identifier()).map_err(map_comment_error)
                         })
                         .transpose()?,
                     reply_ids: reply_ids.into_boxed_slice(),
                     storage_uuid: comment
-                        .storage_uuid
-                        .as_ref()
+                        .storage_uuid()
                         .map(|uuid| {
-                            Uuid::from_parts(uuid.lower, uuid.upper).map_err(map_comment_error)
+                            Uuid::from_parts(uuid.lower(), uuid.upper()).map_err(map_comment_error)
                         })
                         .transpose()?,
                 })
@@ -2292,7 +2556,17 @@ impl<'a> TableDataExtractor<'a> {
                         "Numbers comment table has no entry {identifier} referenced by cell ({row_index}, {column_index})"
                     ))
                 })?;
-                table.try_set_comment(row_index, column_index, comment.clone())?;
+                // Admit and materialize the owned copy as one transaction. A
+                // sidecar comment may be referenced by many cells; charging
+                // each copy before insertion prevents repeated text/reply
+                // cloning from bypassing the projection budget. Keep the
+                // caller's budget unchanged if the fallible clone or table
+                // insertion fails.
+                let mut candidate_budget = *projection_budget;
+                candidate_budget.charge_comment_materialization(comment)?;
+                let materialized = try_clone_comment(comment)?;
+                table.try_set_comment(row_index, column_index, materialized)?;
+                *projection_budget = candidate_budget;
             }
         }
 
@@ -2809,13 +3083,13 @@ impl<'a> TableDataExtractor<'a> {
                             if column_absolute { "$" } else { "" },
                             Self::column_index_to_letter(column),
                             if row_absolute { "$" } else { "" },
-                            row + 1
+                            checked_formula_row_number(row)?
                         ));
                     } else if let Some(ref cell_ref) = node.ast_local_cell_reference_node_reference
                     {
                         // Convert row/column handles to A1 notation
                         let col_letter = Self::column_index_to_letter(cell_ref.column_handle);
-                        let row_num = cell_ref.row_handle + 1; // 0-based to 1-based
+                        let row_num = checked_formula_row_number(cell_ref.row_handle)?;
                         let col_sticky = if cell_ref.column_is_sticky != 0 {
                             "$"
                         } else {
@@ -2831,7 +3105,7 @@ impl<'a> TableDataExtractor<'a> {
                     {
                         // Cross-table reference
                         let col_letter = Self::column_index_to_letter(cross_ref.column_handle);
-                        let row_num = cross_ref.row_handle + 1;
+                        let row_num = checked_formula_row_number(cross_ref.row_handle)?;
                         let prefix =
                             formula_reference_prefix(&cross_ref.table_id, formula_references);
                         expr_stack.push(format!("{prefix}{col_letter}{row_num}"));
@@ -2842,7 +3116,8 @@ impl<'a> TableDataExtractor<'a> {
                 AstNodeType::LocalCellReferenceNode => {
                     if let Some(cell_ref) = &node.ast_local_cell_reference_node_reference {
                         let col_letter = Self::column_index_to_letter(cell_ref.column_handle);
-                        expr_stack.push(format!("{}{}", col_letter, cell_ref.row_handle + 1));
+                        let row_num = checked_formula_row_number(cell_ref.row_handle)?;
+                        expr_stack.push(format!("{}{}", col_letter, row_num));
                     } else {
                         expr_stack.push("#REF!".to_owned());
                     }
@@ -2852,7 +3127,8 @@ impl<'a> TableDataExtractor<'a> {
                         let col_letter = Self::column_index_to_letter(cell_ref.column_handle);
                         let prefix =
                             formula_reference_prefix(&cell_ref.table_id, formula_references);
-                        expr_stack.push(format!("{prefix}{col_letter}{}", cell_ref.row_handle + 1));
+                        let row_num = checked_formula_row_number(cell_ref.row_handle)?;
+                        expr_stack.push(format!("{prefix}{col_letter}{row_num}"));
                     } else {
                         expr_stack.push("#REF!".to_owned());
                     }
@@ -3246,7 +3522,11 @@ impl FormulaReferenceBudget {
             work_items: 0,
             wire_bytes: 0,
             text_bytes: 0,
-            maximum_work,
+            maximum_work: if maximum_work > MAX_FORMULA_WORK {
+                MAX_FORMULA_WORK
+            } else {
+                maximum_work
+            },
             maximum_wire_bytes,
             maximum_text_bytes,
         }
@@ -3274,6 +3554,22 @@ impl FormulaReferenceBudget {
         self.ensure_work_capacity(amount)?;
         self.work_items += amount;
         Ok(())
+    }
+
+    /// Retain work that was performed while a candidate was being rejected.
+    ///
+    /// `charge_work` is intentionally transactional for callers that publish
+    /// a successful candidate: it leaves the counter unchanged when the
+    /// requested amount crosses the limit.  A formula-category preflight is
+    /// different. Its wire walk has already spent the work by the time it
+    /// reports a depth/field/resource error, so the attempted amount must be
+    /// admitted to the candidate budget even though entries and text from
+    /// that candidate are later discarded.
+    fn retain_attempted_work(&mut self, amount: usize) {
+        self.work_items = self
+            .work_items
+            .saturating_add(amount)
+            .min(self.maximum_work);
     }
 
     fn ensure_work_capacity(&self, additional: usize) -> Result<()> {
@@ -3313,6 +3609,16 @@ impl FormulaReferenceBudget {
         Ok(())
     }
 
+    fn charge_table_info_payload(&mut self, source_len: usize) -> Result<()> {
+        // `table_info_codec` charges the source once for each strict/Buffa
+        // pass, with a minimum work allowance of one for an empty payload.
+        // `charge_wire_bytes` already contributes the first source-length
+        // pass to work, so charge the remaining three here.
+        self.charge_wire_bytes(source_len)?;
+        self.charge_work(source_len.saturating_mul(3).max(1))?;
+        Ok(())
+    }
+
     fn charge_text(&mut self, bytes: usize) -> Result<()> {
         self.text_bytes = self.text_bytes.checked_add(bytes).ok_or_else(|| {
             formula_semantic_limit(
@@ -3344,17 +3650,8 @@ fn formula_semantic_limit(kind: SemanticLimitKind, observed: usize, maximum: usi
 fn build_formula_reference_maps(
     bundle: &Components,
     object_index: &Index,
-    max_formula_references: usize,
-    max_work: usize,
-    max_wire_bytes: usize,
-    max_text_bytes: usize,
-) -> Result<(FormulaReferenceMaps, FormulaReferenceBudget)> {
-    let mut budget = FormulaReferenceBudget::new(
-        max_formula_references,
-        max_work,
-        max_wire_bytes,
-        max_text_bytes,
-    );
+    budget: &mut FormulaReferenceBudget,
+) -> Result<FormulaReferenceMaps> {
     let mut result = FormulaReferenceMaps::default();
     result
         .categories
@@ -3418,18 +3715,13 @@ fn build_formula_reference_maps(
                 let Some(drawable_object) = object_index.resolve_ref_id(bundle, drawable)? else {
                     continue;
                 };
-                let table_name = formula_table_name(
-                    bundle,
-                    object_index,
-                    drawable_object.messages,
-                    &mut budget,
-                )?;
+                let table_name =
+                    formula_table_name(bundle, object_index, drawable_object.messages, budget)?;
                 if let Some(table) = table_name {
                     let is_new = !table_info_names.contains_key(&drawable);
                     if is_new {
                         budget.charge_retained_entry()?;
                     }
-                    budget.charge_text(table.len())?;
                     if is_new {
                         table_info_names.try_reserve(1).map_err(|_error| {
                             allocation_error(
@@ -3470,7 +3762,7 @@ fn build_formula_reference_maps(
                     collect_formula_category_payload(
                         message.data.as_slice(),
                         &mut result.categories,
-                        &mut budget,
+                        budget,
                     )?;
                     continue;
                 }
@@ -3478,11 +3770,20 @@ fn build_formula_reference_maps(
                     continue;
                 }
                 budget.charge_wire_bytes(message.data.len())?;
-                let (key, table_identifier, report) = match preflight_formula_owner(&message.data) {
+                // The owner preflight selects two deferred submessages: the
+                // nested UUID and the local table reference.  Charge the
+                // complete selected-tree cost even when the candidate is
+                // malformed; otherwise a stream of rejected owners can make
+                // the nested scans effectively free.  The root source bytes
+                // are already charged above, so the accumulator starts with
+                // that same scan and adds selected descendants/fields.
+                let mut owner_cost = 0usize;
+                let owner_preflight = preflight_formula_owner(&message.data, &mut owner_cost);
+                budget.charge_work(owner_cost)?;
+                let (key, table_identifier, _report) = match owner_preflight {
                     Ok(projection) => projection,
                     Err(_) => continue,
                 };
-                budget.charge_work(report.scanned_bytes().saturating_add(report.fields()))?;
                 let Some(name) = table_info_names.get(&table_identifier) else {
                     continue;
                 };
@@ -3496,7 +3797,7 @@ fn build_formula_reference_maps(
             }
         }
     }
-    Ok((result, budget))
+    Ok(result)
 }
 
 fn formula_table_name(
@@ -3505,17 +3806,37 @@ fn formula_table_name(
     messages: &[litchi_iwa_core::RawMessage],
     budget: &mut FormulaReferenceBudget,
 ) -> Result<Option<String>> {
+    // A malformed TableInfo candidate remains best-effort and is skipped for
+    // compatibility.  Once two candidates pass the strict model-reference
+    // projection, however, selecting whichever happens to occur first would
+    // make formula prefixes depend on archive message order.  Count all
+    // valid candidates before publishing one name and fail closed on a
+    // duplicate.
+    let mut valid_candidates = 0usize;
+    let mut selected_name = None;
     for table_info_message in messages {
         if table_info_message.type_ != 6_000 && table_info_message.type_ != 6_003 {
             continue;
         }
-        budget.charge_work(1)?;
+        let source = table_info_message.data.as_slice();
+        // `table_info_codec` bounds its strict and Buffa traversals with
+        // `source.len().saturating_mul(4).max(1)` work. The wire charge also
+        // contributes one source byte of work, so precharge the remaining
+        // three passes before the best-effort decode. Malformed TableInfo
+        // remains skippable, but its bounded inspection is never free.
+        budget.charge_table_info_payload(source.len())?;
         let Ok(model_reference) = table_info_codec::decode_table_model_reference(
-            table_info_message.data.as_slice(),
-            table_info_decode_options(table_info_message.data.as_slice()),
+            source,
+            table_info_decode_options(source),
         ) else {
             continue;
         };
+        valid_candidates = valid_candidates.saturating_add(1);
+        if valid_candidates > 1 {
+            return Err(Error::InvalidFormat(
+                "Numbers formula table has duplicate valid TableInfo candidates".to_owned(),
+            ));
+        }
         let Some(model_object) =
             object_index.resolve_ref_id(bundle, model_reference.identifier().get())?
         else {
@@ -3559,10 +3880,10 @@ fn formula_table_name(
                 .try_reserve_exact(name.len())
                 .map_err(|_error| allocation_error("Numbers formula table name", name.len()))?;
             retained.push_str(name);
-            return Ok(Some(retained));
+            selected_name = Some(retained);
         }
     }
-    Ok(None)
+    Ok(selected_name)
 }
 
 fn charge_formula_preflight_work(
@@ -3671,9 +3992,21 @@ fn preflight_formula_category_payload(
 ) -> Result<Option<usize>> {
     // Charge source bytes before inspecting their framing so a package cannot
     // multiply malformed-candidate scan work without consuming a hard budget.
-    budget.charge_wire_bytes(source.len())?;
+    let work_before_wire = budget.work_items;
+    if let Err(error) = budget.charge_wire_bytes(source.len()) {
+        // If the wire charge failed at the work boundary, `charge_work` did
+        // not mutate its counter. The bytes were nevertheless inspected, so
+        // retain that attempted work before returning the semantic/resource
+        // error. Wire-limit failures have already charged their work and must
+        // not be counted twice.
+        if budget.work_items == work_before_wire {
+            budget.retain_attempted_work(source.len());
+        }
+        return Err(error);
+    }
     let remaining_work = budget.maximum_work.saturating_sub(budget.work_items);
     if remaining_work == 0 {
+        budget.retain_attempted_work(1);
         return Err(formula_semantic_limit(
             SemanticLimitKind::FormulaWork,
             budget.work_items.saturating_add(1),
@@ -3689,6 +4022,7 @@ fn preflight_formula_category_payload(
         .with_input_bytes(input_bytes)?
         .with_fields(fields)?
         .with_nesting(MAX_FORMULA_CATEGORY_DEPTH)?;
+    let work_before_projection = budget.work_items;
     let mut group_nodes = 1usize;
     let mut projection_work = 1usize;
     let preflight = preflight_wire_tree_with_limits(source, limits, |visit| {
@@ -3751,21 +4085,41 @@ fn preflight_formula_category_payload(
             kind: LimitKind::Nesting,
             observed,
             ..
-        }) => Err(formula_semantic_limit(
-            SemanticLimitKind::FormulaDepth,
-            observed,
-            MAX_FORMULA_CATEGORY_DEPTH,
-        )),
+        }) => {
+            // The scanner may reject the next descent before it produces a
+            // report. Preserve the work already spent on the visited prefix;
+            // only the retained category entries/text are transactional.
+            budget.retain_attempted_work(projection_work);
+            Err(formula_semantic_limit(
+                SemanticLimitKind::FormulaDepth,
+                observed,
+                MAX_FORMULA_CATEGORY_DEPTH,
+            ))
+        },
         Err(litchi_iwa_common::Error::LimitExceeded {
             kind: LimitKind::Fields,
             observed,
             ..
-        }) => Err(formula_semantic_limit(
-            SemanticLimitKind::FormulaWork,
-            budget.work_items.saturating_add(observed),
-            MAX_FORMULA_WORK,
-        )),
-        Err(error) => Err(Error::Common(error)),
+        }) => {
+            // `charge_formula_preflight_work` increments its local counter
+            // before reporting an over-bound field. Keep that attempted work
+            // in the candidate budget even though no category map is
+            // published.
+            budget.retain_attempted_work(projection_work);
+            Err(formula_semantic_limit(
+                SemanticLimitKind::FormulaWork,
+                work_before_projection.saturating_add(observed),
+                MAX_FORMULA_WORK,
+            ))
+        },
+        Err(error) => {
+            // Input/resource failures from the bounded wire scanner likewise
+            // have consumed the visited prefix. Retain its work before
+            // surfacing the error; callers only merge work/wire from a
+            // rejected FormulaReferenceBudget, never entries or text.
+            budget.retain_attempted_work(projection_work);
+            Err(Error::Common(error))
+        },
     }
 }
 
@@ -3941,7 +4295,16 @@ fn formula_owner_key(owner: &litchi_iwa_protos::tsp::Uuid) -> FormulaOwnerKey {
 
 fn preflight_formula_owner(
     source: &[u8],
+    // Aggregate selected-tree work is reported through this side channel so
+    // malformed preflights can retain the cost even though they return no
+    // `WirePreflight` report.
+    work: &mut usize,
 ) -> Result<(FormulaOwnerKey, u64, litchi_iwa_common::wire::WirePreflight)> {
+    // Keep the root-message scan charge outside the wire preflight result so
+    // it survives a parse error.  `WirePreflight` is only returned on
+    // success, while malformed owner candidates are intentionally skipped by
+    // the compatibility scan below.
+    *work = work.saturating_add(source.len());
     let limits = WireLimits::default()
         .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
         .with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS))?
@@ -3949,14 +4312,24 @@ fn preflight_formula_owner(
     let mut owner_key = None;
     let mut table = None;
     let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+        // Count every field before validating its schema role.  This keeps
+        // the bounded work charge for a malformed field that aborts the
+        // preflight, including malformed known fields and malformed trailing
+        // descendants reached before the error.
+        *work = work.saturating_add(1);
         if visit.path().is_empty() && visit.field().number() == 1 {
             if owner_key.is_some() || visit.field().wire_type() != 2 {
                 return Err(litchi_iwa_common::Error::InvalidFormat(
                     "invalid formula owner".into(),
                 ));
             }
+            visit.field().validate_canonical_framing()?;
             let mut lower = None;
             let mut upper = None;
+            // The nested UUID message is scanned independently from the
+            // owner root.  Charge its bounded byte walk before entering it so
+            // malformed nested wire cannot discard the cost on error.
+            *work = work.saturating_add(visit.field().payload().len());
             let nested = preflight_wire_tree_with_limits(
                 visit.field().payload(),
                 WireLimits::default()
@@ -3970,11 +4343,13 @@ fn preflight_formula_owner(
                     .with_fields(8)?
                     .with_nesting(1)?,
                 |uuid| {
+                    *work = work.saturating_add(1);
                     if !uuid.path().is_empty() || uuid.field().wire_type() != 0 {
                         return Err(litchi_iwa_common::Error::InvalidFormat(
                             "invalid formula owner UUID".into(),
                         ));
                     }
+                    uuid.field().validate_canonical_key()?;
                     let (value, length) =
                         litchi_iwa_common::varint::decode_varint_from_bytes(uuid.field().payload())
                             .map_err(|_error| {
@@ -4034,6 +4409,12 @@ fn preflight_formula_owner(
                     "invalid formula owner table".into(),
                 ));
             }
+            visit.field().validate_canonical_framing()?;
+            // `names::preflight_local_reference` performs its own bounded
+            // wire walk but exposes only the decoded identifier.  Charge the
+            // selected payload before invoking it so malformed local
+            // references retain their scan cost as well.
+            *work = work.saturating_add(visit.field().payload().len());
             table = Some(names::preflight_local_reference(visit.field().payload())?);
         }
         Ok(WireDescent::Skip)
@@ -4563,7 +4944,7 @@ fn render_formula_ast_array(
                             || fallible_formula_owned("#REF!", renderer, budget),
                             |cell| {
                                 let column = FormulaColumn(cell.column_handle);
-                                let row = cell.row_handle + 1;
+                                let row = checked_formula_row_number(cell.row_handle)?;
                                 fallible_formula_format(renderer, budget, |output| {
                                     write!(output, "{column}{row}")
                                 })
@@ -4584,7 +4965,7 @@ fn render_formula_ast_array(
                                     formula_references,
                                 );
                                 let column = FormulaColumn(cell.column_handle);
-                                let row = cell.row_handle + 1;
+                                let row = checked_formula_row_number(cell.row_handle)?;
                                 fallible_formula_format(renderer, budget, |output| {
                                     write_formula_reference_prefix(output, prefix)?;
                                     write!(output, "{column}{row}")
@@ -4996,7 +5377,7 @@ fn render_cell_reference(
             } else {
                 ""
             },
-            row + 1
+            checked_formula_row_number(row)?
         ));
     }
     if let Some(cell) = &node.ast_local_cell_reference_node_reference {
@@ -5005,7 +5386,7 @@ fn render_cell_reference(
             if cell.column_is_sticky != 0 { "$" } else { "" },
             TableDataExtractor::column_index_to_letter(cell.column_handle),
             if cell.row_is_sticky != 0 { "$" } else { "" },
-            cell.row_handle + 1
+            checked_formula_row_number(cell.row_handle)?
         ));
     }
     if let Some(cell) = &node.ast_cross_table_cell_reference_node_reference {
@@ -5013,7 +5394,7 @@ fn render_cell_reference(
             "{}{}{}",
             formula_reference_prefix(&cell.table_id, formula_references),
             TableDataExtractor::column_index_to_letter(cell.column_handle),
-            cell.row_handle + 1
+            checked_formula_row_number(cell.row_handle)?
         ));
     }
     Ok("#REF!".to_owned())
@@ -5039,7 +5420,8 @@ fn render_cell_reference_checked(
             ast_row.row,
             ast_row.absolute.unwrap_or(false),
             "row",
-        )? + 1;
+        )?;
+        let row = checked_formula_row_number(row)?;
         let prefix = node
             .ast_cross_table_reference_extra_info
             .as_ref()
@@ -5066,7 +5448,7 @@ fn render_cell_reference_checked(
     }
     if let Some(cell) = &node.ast_local_cell_reference_node_reference {
         let column = FormulaColumn(cell.column_handle);
-        let row = cell.row_handle + 1;
+        let row = checked_formula_row_number(cell.row_handle)?;
         return fallible_formula_format(renderer, budget, |output| {
             write!(
                 output,
@@ -5079,7 +5461,7 @@ fn render_cell_reference_checked(
     if let Some(cell) = &node.ast_cross_table_cell_reference_node_reference {
         let prefix = formula_reference_prefix_parts(&cell.table_id, formula_references);
         let column = FormulaColumn(cell.column_handle);
-        let row = cell.row_handle + 1;
+        let row = checked_formula_row_number(cell.row_handle)?;
         return fallible_formula_format(renderer, budget, |output| {
             write_formula_reference_prefix(output, prefix)?;
             write!(output, "{column}{row}")
@@ -5104,6 +5486,12 @@ fn resolve_formula_coordinate(host: usize, stored: i32, absolute: bool, axis: &s
             "Numbers formula {axis} coordinate {coordinate} is out of range"
         ))
     })
+}
+
+fn checked_formula_row_number(row: u32) -> Result<u64> {
+    u64::from(row)
+        .checked_add(1)
+        .ok_or_else(|| Error::ParseError("Numbers formula row coordinate overflow".to_owned()))
 }
 
 fn render_colon_tract(
@@ -5168,7 +5556,7 @@ fn render_colon_tract(
                 } else {
                     ""
                 },
-                u64::from(begin_row) + 1,
+                checked_formula_row_number(begin_row)?,
                 if sticky.end_column_is_absolute {
                     "$"
                 } else {
@@ -5176,7 +5564,7 @@ fn render_colon_tract(
                 },
                 TableDataExtractor::column_index_to_letter(end_column),
                 if sticky.end_row_is_absolute { "$" } else { "" },
-                u64::from(end_row) + 1,
+                checked_formula_row_number(end_row)?,
             ))
         },
         (false, true) => {
@@ -5195,9 +5583,9 @@ fn render_colon_tract(
                 } else {
                     ""
                 },
-                u64::from(begin) + 1,
+                checked_formula_row_number(begin)?,
                 if sticky.end_row_is_absolute { "$" } else { "" },
-                u64::from(end) + 1,
+                checked_formula_row_number(end)?,
             ))
         },
         (true, false) => {
@@ -5284,7 +5672,10 @@ fn render_colon_tract_checked(
             host_row,
             "row",
         )?;
-        (Some(u64::from(begin) + 1), Some(u64::from(end) + 1))
+        (
+            Some(checked_formula_row_number(begin)?),
+            Some(checked_formula_row_number(end)?),
+        )
     } else {
         (None, None)
     };
@@ -5437,9 +5828,10 @@ mod tests {
         CellBudget, CellTables, Error, FormulaReferenceBudget, FormulaReferenceMaps,
         FormulaRenderer, MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK,
         ProjectionBudget, Table, TableDataExtractor, TileRowVisitor,
-        collect_formula_category_payload, decode_legacy_table_candidate,
+        collect_formula_category_payload, decode_legacy_table_candidate, formula_table_name,
         has_legacy_table_model_wire_shape, map_table_cell_decode_limit_with_reference_offset,
-        render_formula, render_formula_ast_array,
+        preflight_formula_category_payload, preflight_formula_owner, render_formula,
+        render_formula_ast_array,
     };
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
@@ -5450,11 +5842,15 @@ mod tests {
         DEFAULT_MAX_TEXT_BYTES, Package, PackageSemanticLimits as SemanticLimits, SemanticLimitKind,
     };
     use litchi_iwa_archive::Limits;
-    use litchi_iwa_common::comment::Comment;
+    use litchi_iwa_common::comment::{Comment, StorageId};
     use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
-    use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
-    use litchi_iwa_protos::{numbers_table_cell_storage_codec, tn, tsce, tsp, tst};
+    use litchi_iwa_protos::tsce::ast_node_array_archive::ast_colon_tract_archive::AstColonTractAbsoluteRangeArchive;
+    use litchi_iwa_protos::tsce::ast_node_array_archive::{
+        AstColonTractArchive, AstCrossTableCellReferenceNodeArchive,
+        AstLocalCellReferenceNodeArchive, AstNodeArchive, AstNodeType, AstStickyBits,
+    };
+    use litchi_iwa_protos::{numbers_table_cell_storage_codec, tn, tsce, tsd, tsp, tst};
     use prost::Message as _;
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -5487,6 +5883,17 @@ mod tests {
             identifier,
             ..Default::default()
         }
+    }
+
+    fn formula_owner_wire(uuid: &[u8], table: &[u8]) -> Vec<u8> {
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 1, uuid).expect("owner UUID field");
+        append_length_delimited_field(&mut source, 11, table).expect("owner table field");
+        source
+    }
+
+    fn formula_owner_uuid(lower: u64, upper: u64) -> Vec<u8> {
+        tsp::Uuid { lower, upper }.encode_to_vec()
     }
 
     fn archive_object(identifier: u64, messages: Vec<RawMessage>) -> super::Result<ArchiveObject> {
@@ -6240,6 +6647,206 @@ mod tests {
     }
 
     #[test]
+    fn repeated_comment_cells_charge_owned_materialization_before_insertion() -> super::Result<()> {
+        let mut cell = BncCell::minimal();
+        cell.set_comment_identifier(Some(7));
+        let cell = cell.encode();
+        let cell_end = u16::try_from(cell.len())
+            .map_err(|_| Error::InvalidFormat("test comment cell is too large".to_owned()))?;
+        let mut storage = cell.clone();
+        storage.extend_from_slice(&cell);
+        let row_source = tile_row(
+            0,
+            2,
+            Vec::new(),
+            Vec::new(),
+            Some(storage),
+            Some(vec![
+                0,
+                0,
+                cell_end.to_le_bytes()[0],
+                cell_end.to_le_bytes()[1],
+            ]),
+            Some(false),
+        )
+        .encode_to_vec();
+        let options = numbers_table_cell_storage_codec::DecodeOptions::new(
+            row_source.len().max(1),
+            usize::MAX,
+            usize::MAX,
+            16,
+            usize::MAX,
+            usize::MAX,
+        );
+        let row = numbers_table_cell_storage_codec::decode_tile_row_info(&row_source, options)
+            .map_err(|error| Error::InvalidFormat(format!("comment row failed: {error:?}")))?;
+
+        let strings: Box<[(u32, String)]> = Box::default();
+        let formulas: Box<[(u32, tsce::FormulaArchive)]> = Box::default();
+        let formula_errors: Box<[(u32, String)]> = Box::default();
+        let rich_text: Box<[(u32, String)]> = Box::default();
+        let comments: Box<[(u32, Comment)]> = vec![(
+            7,
+            Comment {
+                text: "copy".to_owned(),
+                creation_date_seconds: None,
+                author_id: None,
+                reply_ids: vec![StorageId::new(9).unwrap()].into_boxed_slice(),
+                storage_uuid: None,
+            },
+        )]
+        .into_boxed_slice();
+        let formula_references = FormulaReferenceMaps::default();
+        let cell_tables = CellTables {
+            strings: &strings,
+            formulas: &formulas,
+            formula_errors: &formula_errors,
+            rich_text: &rich_text,
+            comments: Some(&comments),
+            formula_references: &formula_references,
+        };
+        let mut table = Table::with_dimensions("comments", 1, 2)?;
+        let mut cell_budget = CellBudget::new();
+        let limits = SemanticLimits::default()
+            .with_projection_limits(3, 8)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut projection_budget = ProjectionBudget::new(limits);
+
+        TableDataExtractor::parse_tile_row(
+            &row,
+            0,
+            2,
+            1,
+            2,
+            &mut cell_budget,
+            &cell_tables,
+            &mut projection_budget,
+            &mut table,
+        )?;
+
+        assert_eq!(table.comment_count(), 2);
+        assert_eq!(
+            table.get_comment(0, 0).map(|comment| comment.text.as_str()),
+            Some("copy")
+        );
+        assert_eq!(
+            table
+                .get_comment(0, 1)
+                .map(|comment| comment.reply_ids.len()),
+            Some(1)
+        );
+        assert_eq!(projection_budget.materialized_cells, 2);
+        assert_eq!(projection_budget.output_text_bytes, 8);
+        assert_eq!(projection_budget.references, 2);
+        let error = projection_budget
+            .charge_materialized_cells(2)
+            .expect_err("cell and comment materializations must share the bound");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::MaterializedCells,
+                observed: 4,
+                maximum: 3,
+                ..
+            }
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn comment_text_budget_rejects_a_later_copy_before_map_insertion() -> super::Result<()> {
+        let mut cell = BncCell::minimal();
+        cell.set_comment_identifier(Some(7));
+        let cell = cell.encode();
+        let cell_end = u16::try_from(cell.len())
+            .map_err(|_| Error::InvalidFormat("test comment cell is too large".to_owned()))?;
+        let mut storage = cell.clone();
+        storage.extend_from_slice(&cell);
+        let row_source = tile_row(
+            0,
+            2,
+            Vec::new(),
+            Vec::new(),
+            Some(storage),
+            Some(vec![
+                0,
+                0,
+                cell_end.to_le_bytes()[0],
+                cell_end.to_le_bytes()[1],
+            ]),
+            Some(false),
+        )
+        .encode_to_vec();
+        let options = numbers_table_cell_storage_codec::DecodeOptions::new(
+            row_source.len().max(1),
+            usize::MAX,
+            usize::MAX,
+            16,
+            usize::MAX,
+            usize::MAX,
+        );
+        let row = numbers_table_cell_storage_codec::decode_tile_row_info(&row_source, options)
+            .map_err(|error| Error::InvalidFormat(format!("comment row failed: {error:?}")))?;
+        let strings: Box<[(u32, String)]> = Box::default();
+        let formulas: Box<[(u32, tsce::FormulaArchive)]> = Box::default();
+        let formula_errors: Box<[(u32, String)]> = Box::default();
+        let rich_text: Box<[(u32, String)]> = Box::default();
+        let comments: Box<[(u32, Comment)]> = vec![(
+            7,
+            Comment {
+                text: "copy".to_owned(),
+                creation_date_seconds: None,
+                author_id: None,
+                reply_ids: vec![StorageId::new(9).unwrap()].into_boxed_slice(),
+                storage_uuid: None,
+            },
+        )]
+        .into_boxed_slice();
+        let formula_references = FormulaReferenceMaps::default();
+        let cell_tables = CellTables {
+            strings: &strings,
+            formulas: &formulas,
+            formula_errors: &formula_errors,
+            rich_text: &rich_text,
+            comments: Some(&comments),
+            formula_references: &formula_references,
+        };
+        let mut table = Table::with_dimensions("comments", 1, 2)?;
+        let mut cell_budget = CellBudget::new();
+        let limits = SemanticLimits::default()
+            .with_projection_limits(16, 5)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut projection_budget = ProjectionBudget::new(limits);
+        let error = TableDataExtractor::parse_tile_row(
+            &row,
+            0,
+            2,
+            1,
+            2,
+            &mut cell_budget,
+            &cell_tables,
+            &mut projection_budget,
+            &mut table,
+        )
+        .expect_err("second owned comment copy must exceed text budget");
+
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::OutputTextBytes,
+                observed: 8,
+                maximum: 5,
+                ..
+            }
+        ));
+        assert_eq!(table.comment_count(), 1);
+        assert_eq!(projection_budget.materialized_cells, 1);
+        assert_eq!(projection_budget.output_text_bytes, 4);
+        assert_eq!(projection_budget.references, 1);
+        Ok(())
+    }
+
+    #[test]
     fn tile_row_projection_is_atomic_when_a_later_row_is_malformed() -> super::Result<()> {
         let valid = tile_row(0, 1, vec![0; 8], vec![0, 0], None, None, None).encode_to_vec();
         let mut malformed =
@@ -6407,6 +7014,78 @@ mod tests {
         let actual = render_formula(&input, 0, 0, &references, &mut budget)?;
         assert_eq!(actual, expected);
         assert_eq!(actual, "=((1+2)&\"a\"\"b\")");
+        Ok(())
+    }
+
+    #[test]
+    fn formula_row_one_based_conversion_preserves_u32_max() -> super::Result<()> {
+        let references = FormulaReferenceMaps::default();
+        let nodes = [
+            AstNodeArchive {
+                ast_node_type: AstNodeType::LocalCellReferenceNode as i32,
+                ast_local_cell_reference_node_reference: Some(AstLocalCellReferenceNodeArchive {
+                    row_handle: u32::MAX,
+                    column_handle: 0,
+                    row_is_sticky: 0,
+                    column_is_sticky: 0,
+                }),
+                ..Default::default()
+            },
+            AstNodeArchive {
+                ast_node_type: AstNodeType::CrossTableCellReferenceNode as i32,
+                ast_cross_table_cell_reference_node_reference: Some(
+                    AstCrossTableCellReferenceNodeArchive {
+                        row_handle: u32::MAX,
+                        column_handle: 0,
+                        row_is_sticky: 0,
+                        column_is_sticky: 0,
+                        table_id: Default::default(),
+                        ..Default::default()
+                    },
+                ),
+                ..Default::default()
+            },
+        ];
+
+        for (node, expected) in nodes
+            .into_iter()
+            .zip(["=A4294967296", "=Table::A4294967296"])
+        {
+            let input = formula(vec![node]);
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            assert_eq!(
+                render_formula(&input, 0, 0, &references, &mut budget)?,
+                expected
+            );
+        }
+
+        let colon = formula(vec![AstNodeArchive {
+            ast_node_type: AstNodeType::ColonTractNode as i32,
+            ast_colon_tract: Some(AstColonTractArchive {
+                absolute_row: vec![AstColonTractAbsoluteRangeArchive {
+                    range_begin: u32::MAX,
+                    range_end: Some(u32::MAX),
+                }],
+                ..Default::default()
+            }),
+            ast_sticky_bits: Some(AstStickyBits {
+                begin_row_is_absolute: true,
+                begin_column_is_absolute: false,
+                end_row_is_absolute: true,
+                end_column_is_absolute: false,
+            }),
+            ..Default::default()
+        }]);
+        let expected = "=$4294967296:$4294967296";
+        assert_eq!(
+            TableDataExtractor::extract_formula_string_reference(&colon, 0, 0, &references,)?,
+            expected
+        );
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert_eq!(
+            render_formula(&colon, 0, 0, &references, &mut budget)?,
+            expected
+        );
         Ok(())
     }
 
@@ -6837,12 +7516,291 @@ mod tests {
     }
 
     #[test]
+    fn table_info_precharge_is_exactly_the_codec_four_pass_bound() -> super::Result<()> {
+        let source_len = 7;
+        let mut exact = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            source_len * 4,
+            source_len,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        exact.charge_table_info_payload(source_len)?;
+        assert_eq!(exact.wire_bytes, source_len);
+        assert_eq!(exact.work_items, source_len * 4);
+
+        let mut one_short = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            source_len * 4 - 1,
+            source_len,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        assert!(matches!(
+            one_short.charge_table_info_payload(source_len),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWork,
+                observed,
+                maximum,
+                path: SemanticPath::StructuredTables,
+            }) if observed == source_len * 4 && maximum == source_len * 4 - 1
+        ));
+        assert_eq!(one_short.wire_bytes, source_len);
+        assert_eq!(one_short.work_items, source_len);
+        Ok(())
+    }
+
+    #[test]
+    fn formula_owner_preflight_charges_nested_work_on_success_and_error() -> super::Result<()> {
+        let uuid = formula_owner_uuid(0x11, 0x22);
+        let table = reference(7).encode_to_vec();
+        let source = formula_owner_wire(&uuid, &table);
+
+        let mut valid_work = 0;
+        let (_, _, report) = preflight_formula_owner(&source, &mut valid_work)?;
+        assert!(valid_work >= source.len() + uuid.len() + table.len());
+        assert!(valid_work >= report.scanned_bytes() + report.fields());
+
+        // The UUID payload is scanned before its unknown field is rejected.
+        // The owner candidate remains best-effort, but its nested scan must
+        // still consume bounded work.
+        let mut malformed_uuid = uuid.clone();
+        append_varint_field(&mut malformed_uuid, 3, 1)?;
+        let malformed_source = formula_owner_wire(&malformed_uuid, &table);
+        let mut malformed_work = 0;
+        assert!(preflight_formula_owner(&malformed_source, &mut malformed_work).is_err());
+        assert!(malformed_work >= malformed_source.len() + malformed_uuid.len());
+
+        // Local-reference semantic failure is also charged before the helper
+        // is invoked, even though the compatibility caller discards it.
+        let malformed_table = tsp::Reference {
+            identifier: 7,
+            deprecated_is_external: Some(true),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let malformed_source = formula_owner_wire(&uuid, &malformed_table);
+        let mut local_error_work = 0;
+        assert!(preflight_formula_owner(&malformed_source, &mut local_error_work).is_err());
+        assert!(local_error_work >= malformed_source.len() + uuid.len() + malformed_table.len());
+        Ok(())
+    }
+
+    #[test]
+    fn formula_owner_preflight_rejects_noncanonical_known_framing() -> super::Result<()> {
+        let uuid = formula_owner_uuid(0x11, 0x22);
+        let table = reference(7).encode_to_vec();
+
+        let mut overlong_owner_key = vec![0x8a, 0x00, uuid.len() as u8];
+        overlong_owner_key.extend_from_slice(&uuid);
+        append_length_delimited_field(&mut overlong_owner_key, 11, &table)?;
+        let mut work = 0;
+        assert!(preflight_formula_owner(&overlong_owner_key, &mut work).is_err());
+
+        let mut overlong_table_length = Vec::new();
+        append_length_delimited_field(&mut overlong_table_length, 1, &uuid)?;
+        overlong_table_length.extend_from_slice(&[0x5a, 0x80 | table.len() as u8, 0x00]);
+        overlong_table_length.extend_from_slice(&table);
+        let mut work = 0;
+        assert!(preflight_formula_owner(&overlong_table_length, &mut work).is_err());
+
+        // Replace the canonical lower/upper UUID payload with an overlong key
+        // on the lower field while retaining a canonical upper field.
+        let overlong_uuid_key = vec![0x88, 0x00, 0x11, 0x10, 0x22];
+        let source = formula_owner_wire(&overlong_uuid_key, &table);
+        let mut work = 0;
+        assert!(preflight_formula_owner(&source, &mut work).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn formula_table_name_rejects_duplicate_valid_candidates_order_independently()
+    -> super::Result<()> {
+        let model_one = archive_object(
+            90,
+            vec![RawMessage {
+                type_: super::TABLE_MODEL_MESSAGE_TYPE,
+                data: legacy_model("one", 1).encode_to_vec(),
+            }],
+        )?;
+        let model_two = archive_object(
+            91,
+            vec![RawMessage {
+                type_: super::TABLE_MODEL_MESSAGE_TYPE,
+                data: legacy_model("two", 1).encode_to_vec(),
+            }],
+        )?;
+        let bytes = compatibility_package(vec![model_one, model_two])?;
+        let components = Components::from_bytes(&bytes, Limits::default())?;
+        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let table_info = |model_id| RawMessage {
+            type_: 6_000,
+            data: tst::TableInfoArchive {
+                super_: tsd::DrawableArchive::default(),
+                table_model: reference(model_id),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        };
+
+        for messages in [
+            vec![table_info(90), table_info(91)],
+            vec![table_info(91), table_info(90)],
+        ] {
+            let mut budget = FormulaReferenceBudget::new(
+                crate::MAX_REFERENCES,
+                MAX_FORMULA_WORK,
+                MAX_FORMULA_WIRE_BYTES,
+                DEFAULT_MAX_TEXT_BYTES,
+            );
+            assert!(matches!(
+                formula_table_name(&components, &index, &messages, &mut budget),
+                Err(Error::InvalidFormat(message))
+                    if message.contains("duplicate valid TableInfo candidates")
+            ));
+        }
+
+        let valid = table_info(90);
+        let malformed = RawMessage {
+            type_: 6_003,
+            data: vec![0xff],
+        };
+        let mut budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        let name = formula_table_name(
+            &components,
+            &index,
+            &[malformed.clone(), valid.clone()],
+            &mut budget,
+        )?;
+        assert_eq!(name.as_deref(), Some("one"));
+        let mut budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        let name = formula_table_name(&components, &index, &[valid, malformed], &mut budget)?;
+        assert_eq!(name.as_deref(), Some("one"));
+        Ok(())
+    }
+
+    #[test]
+    fn failed_formula_map_publishes_only_monotonic_work_and_wire() -> super::Result<()> {
+        let mut published = ProjectionBudget::new(SemanticLimits::default());
+        published.charge_output_text(3)?;
+        published.charge_staging_text(2)?;
+
+        let mut failed_map = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        failed_map.charge_wire_bytes(5)?;
+        failed_map.charge_text(11)?;
+        failed_map.charge_retained_entry()?;
+
+        let mut rejected = published;
+        rejected.retain_formula_map_cost(failed_map.work_items, failed_map.wire_bytes);
+        rejected.charge_output_text(19)?;
+        rejected.charge_staging_text(13)?;
+        rejected.charge_references(1)?;
+        published.commit_attempt(rejected, false);
+
+        assert_eq!(published.payload_work, failed_map.work_items);
+        assert_eq!(published.formula_wire_bytes, failed_map.wire_bytes);
+        assert_eq!(published.output_text_bytes, 3);
+        assert_eq!(published.staging_text_bytes, 2);
+        assert_eq!(published.references, 0);
+        Ok(())
+    }
+
+    #[test]
     fn rejected_formula_candidate_keeps_wire_work_monotonic() {
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
         let mut candidate = budget;
         candidate.formula_wire_bytes = 17;
         budget.commit_attempt(candidate, false);
         assert_eq!(budget.formula_wire_bytes, 17);
+    }
+
+    #[test]
+    fn formula_reference_wire_cost_is_merged_into_projection_budget() -> super::Result<()> {
+        let formula_list = RawMessage {
+            type_: 6_005,
+            data: tst::TableDataList {
+                list_type: tst::table_data_list::ListType::Formula as i32,
+                next_list_id: 1,
+                entries: vec![tst::table_data_list::ListEntry {
+                    key: 1,
+                    refcount: 1,
+                    formula: Some(tsce::FormulaArchive::default()),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        };
+        let string_list = empty_list(tst::table_data_list::ListType::String);
+        let bytes = compatibility_package(vec![
+            archive_object(
+                1,
+                vec![RawMessage {
+                    type_: 99_999,
+                    data: Vec::new(),
+                }],
+            )?,
+            archive_object(90, vec![string_list, formula_list])?,
+            // The payload is deliberately malformed for the category
+            // projection. Its bytes still belong to the strict wire budget
+            // before the best-effort category decode is discarded.
+            archive_object(
+                100,
+                vec![RawMessage {
+                    type_: 6_383,
+                    data: vec![0x08, 0x01],
+                }],
+            )?,
+        ])?;
+        let components = Components::from_bytes(&bytes, Limits::default())?;
+        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
+        let model = tst::TableModelArchive {
+            table_name: "wire".to_owned(),
+            base_data_store: tst::DataStore {
+                string_table: reference(90),
+                formula_table: reference(90),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mut candidate = ProjectionBudget::new(SemanticLimits::default());
+        candidate.formula_wire_bytes = MAX_FORMULA_WIRE_BYTES - 4;
+        extractor.parse_table_model(model.clone(), false, Some(candidate))?;
+        assert_eq!(
+            extractor.projection_budget.borrow().formula_wire_bytes,
+            MAX_FORMULA_WIRE_BYTES
+        );
+
+        let mut second_candidate = ProjectionBudget::new(SemanticLimits::default());
+        second_candidate.formula_wire_bytes = MAX_FORMULA_WIRE_BYTES - 2;
+        let error = extractor
+            .parse_table_model(model, false, Some(second_candidate))
+            .expect_err("the second formula-map build must see the aggregate wire ceiling");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWireBytes,
+                observed: 2,
+                maximum: 0,
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        Ok(())
     }
 
     #[test]
@@ -7290,6 +8248,131 @@ mod tests {
         );
         assert_eq!(duplicate_budget.retained_entries, 1);
         Ok(())
+    }
+
+    #[test]
+    fn formula_category_preflight_work_boundary_is_monotonic_without_retention() {
+        // One empty category payload spends exactly one unit of the local
+        // preflight work budget. The second attempt is one unit over the
+        // aggregate ceiling and must retain the already-spent boundary work.
+        let mut names = HashMap::new();
+        let mut exact_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            1,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        collect_formula_category_payload(&[], &mut names, &mut exact_budget)
+            .expect("the exact formula-work boundary must be admitted");
+        assert_eq!(exact_budget.work_items, 1);
+        assert_eq!(exact_budget.retained_entries, 0);
+        assert_eq!(exact_budget.text_bytes, 0);
+        assert!(names.is_empty());
+
+        let error = collect_formula_category_payload(&[], &mut names, &mut exact_budget)
+            .expect_err("one unit over the formula-work boundary must fail");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWork,
+                observed: 2,
+                maximum: MAX_FORMULA_WORK,
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        assert_eq!(exact_budget.work_items, 1);
+        assert_eq!(exact_budget.retained_entries, 0);
+        assert_eq!(exact_budget.text_bytes, 0);
+        assert!(names.is_empty());
+
+        // A field that crosses the local preflight allowance fails after the
+        // source wire charge. Its attempted projection work must still
+        // consume the candidate budget, but no map entry or label is visible.
+        let mut one_group = Vec::new();
+        append_length_delimited_field(&mut one_group, 3, &[])
+            .expect("test category wire must encode");
+        let mut names = HashMap::new();
+        let mut rejected_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            4,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        let error = collect_formula_category_payload(&one_group, &mut names, &mut rejected_budget)
+            .expect_err("the category preflight must cross its exact work boundary");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWork,
+                observed: 5,
+                maximum: MAX_FORMULA_WORK,
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        assert_eq!(rejected_budget.wire_bytes, one_group.len());
+        assert_eq!(rejected_budget.work_items, 4);
+        assert_eq!(rejected_budget.retained_entries, 0);
+        assert_eq!(rejected_budget.text_bytes, 0);
+        assert!(names.is_empty());
+    }
+
+    #[test]
+    fn formula_category_depth_boundary_retains_prefix_work_without_map_text() {
+        let nested_wire = |depth: usize| -> Vec<u8> {
+            let mut source = Vec::new();
+            for _ in 0..depth {
+                let mut parent = Vec::new();
+                append_length_delimited_field(&mut parent, 3, &source)
+                    .expect("test category wire must encode");
+                source = parent;
+            }
+            source
+        };
+
+        let exact_source = nested_wire(MAX_FORMULA_CATEGORY_DEPTH);
+        let mut exact_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        let expected_nodes = preflight_formula_category_payload(&exact_source, &mut exact_budget)
+            .expect("the exact category-depth boundary must be admitted");
+        assert_eq!(expected_nodes, Some(MAX_FORMULA_CATEGORY_DEPTH + 1));
+        assert_eq!(exact_budget.wire_bytes, exact_source.len());
+        assert_eq!(
+            exact_budget.work_items,
+            exact_source.len() + (MAX_FORMULA_CATEGORY_DEPTH * 2 + 1)
+        );
+
+        let over_source = nested_wire(MAX_FORMULA_CATEGORY_DEPTH + 1);
+        let mut over_names = HashMap::new();
+        let mut over_budget = FormulaReferenceBudget::new(
+            crate::MAX_REFERENCES,
+            MAX_FORMULA_WORK,
+            MAX_FORMULA_WIRE_BYTES,
+            DEFAULT_MAX_TEXT_BYTES,
+        );
+        let error =
+            collect_formula_category_payload(&over_source, &mut over_names, &mut over_budget)
+                .expect_err("one level over the category-depth boundary must fail");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaDepth,
+                observed,
+                maximum: MAX_FORMULA_CATEGORY_DEPTH,
+                path: SemanticPath::StructuredTables,
+            } if observed == MAX_FORMULA_CATEGORY_DEPTH + 1
+        ));
+        assert_eq!(over_budget.wire_bytes, over_source.len());
+        assert_eq!(
+            over_budget.work_items,
+            over_source.len() + (MAX_FORMULA_CATEGORY_DEPTH * 2 + 2)
+        );
+        assert_eq!(over_budget.retained_entries, 0);
+        assert_eq!(over_budget.text_bytes, 0);
+        assert!(over_names.is_empty());
     }
 
     #[test]

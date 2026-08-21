@@ -10905,18 +10905,57 @@ and source atomicity. Package ceilings remain 512 MiB input and output, one
 million fields, nesting depth 64, and 16 million aggregate work units; tighter
 per-payload and text budgets are checked before fallible allocation. The
 selected raw bytes remain the preservation authority. FormulaArchive and the
-compatibility comment path remain migration debt, and six generated extractor
-decodes remain: four table-model decodes, one formula decode, and one comment
-decode.
+legacy `litchi-iwa` comment path remain migration debt; five generated extractor
+decodes remain: four table-model decodes and one FormulaArchive decode. The
+former generated comment decode is no longer part of this extractor path.
 
-Evidence on 2026-08-21 is 230 passing `litchi-iwa-protos` tests, 47 focused
-extractor tests, nine TDL integration tests, and 276 boundary tests. The live
+Evidence on 2026-08-21 is 237 passing `litchi-iwa-protos` tests, 49 focused
+extractor tests, 14 TDL integration tests, and 281 boundary tests. The live
 graph remains 64 packages, 240 internal declarations, and 14 ordered debts.
-The TDL fuzz corpus has 11 seeds; 100 nightly ASan runs completed without an
-artifact. A 1,200-by-8 Numbers document was saved and reopened through the
-application with strings, formula results, an intentional formula error, rich
-text, and a persisted comment, with no repair dialog. Its archive has
-DataList members, but no parsed type-6011 Segment evidence was established.
-This gate proves focused correctness and boundedness only. It adds no native
-segment or save-mutation claim, performance result, host exit, dependency-edge
-retirement, or complete monolith-exit claim.
+The TDL fuzz corpus has 11 seeds and completed 100 nightly ASan runs without
+an artifact. A disposable 1,200-by-8 Numbers document was saved and reopened
+through the application with strings, formula results, an intentional formula
+error, rich text, and a persisted comment, with no repair dialog. Its archive
+has DataList members, but no parsed type-6011 Segment evidence was
+established. This gate proves focused correctness and boundedness only. It
+adds no native segment or save-mutation claim, performance result, host exit,
+dependency-edge retirement, or complete monolith-exit claim.
+
+## 2026-08-21 Numbers CommentStorage strict-codec verification gate
+
+The focused Numbers extractor now routes `TSD.CommentStorageArchive` through
+a strict handwritten CommentStorage codec with a private Buffa lazy
+projection. Package keeps strict comment validation and resolution; Document
+deliberately skips comment resolution. Per-cell comment materialization is
+bounded and fallible: strict validation precedes each semantic publication,
+reserves are fallible, and only candidate-local values are published. The
+private projection is used for parity, not as the preservation representation.
+
+FormulaArchive and the legacy `litchi-iwa` comment path remain migration debt.
+Five generated extractor decodes remain: four table-model decodes and one
+FormulaArchive decode. The former generated CommentStorage decode is no longer
+part of the production extractor path; legacy monolith/dependency edges and
+all 14 ordered migration debts remain open.
+
+Evidence on 2026-08-21 records 237 passing `litchi-iwa-protos` tests, 324
+passing Numbers library tests with four ignored (including 53 focused
+extractor tests), 14 integration tests, and 281 boundary tests. The
+CommentStorage fuzz corpus has 20 seeds, and its nightly ASan smoke completed
+100 runs cleanly without an artifact. A disposable 1,200-by-8 Numbers document
+with comment, formula, and rich-text content was saved and reopened through
+the application without a repair dialog. Its archive has DataList members,
+but no parsed type-6011 Segment proof was established. This gate proves
+bounded correctness only; it adds no native segment or save-mutation claim,
+performance result, host exit, dependency-edge retirement, or complete
+monolith-exit claim.
+
+## Current present status
+
+The latest final verification records 243 passing `litchi-iwa-protos` tests,
+including six focused Keynote chart-caption codec tests; 329 passing
+`litchi-numbers` library tests with four ignored, 58 focused Numbers extractor
+tests, 14 `table_data_list` integration tests, and 281 boundary unit tests.
+The performance baseline currently exposes 341 selectable cases. The caption
+codec is a narrow strict-ingress projection; its six tests do not represent a
+complete Keynote transaction migration. The dated verification gates above
+remain historical evidence.
