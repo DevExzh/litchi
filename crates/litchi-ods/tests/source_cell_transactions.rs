@@ -121,6 +121,39 @@ fn source_cell_commit_streams_one_and_repeated_run_edits_with_exact_patch() {
 }
 
 #[test]
+fn chained_source_cell_commits_do_not_reuse_offsets_from_the_original_layout() {
+    let source = package(&ordinary_content(), false).unwrap();
+    let owner =
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+
+    // The first replacement changes the row length, so every later row moves
+    // in the derived content.xml.  The owner's cached layout still describes
+    // the original source and must not be used for a commit based on the
+    // first commit's semantic snapshot.
+    let first_value = "expanded-cell-value-".repeat(32);
+    let first_cell = Cell::new(CellValue::Text(first_value.clone()), first_value.clone());
+    let mut first_edit = owner.edit_cells().unwrap();
+    assert_eq!(
+        first_edit.set_cell("Data", 0, 0, first_cell).unwrap(),
+        Some(true)
+    );
+    let first_commit = first_edit.commit().unwrap();
+
+    let mut second_edit = first_commit.snapshot().edit().unwrap();
+    assert_eq!(
+        second_edit.set_cell("Data", 1, 0, text("second-edit")).unwrap(),
+        Some(true)
+    );
+    let second_commit = second_edit.commit().unwrap();
+    let mut output = Vec::new();
+    second_commit.write_to(&mut output).unwrap();
+
+    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    assert_eq!(cell_text(&reopened, 0, 0), Some(first_value.as_str()));
+    assert_eq!(cell_text(&reopened, 1, 0), Some("second-edit"));
+}
+
+#[test]
 fn source_cell_commit_preserves_standard_table_children_and_refuses_paragraph_flattening() {
     const COLUMN: &str =
         r#"<table:table-column table:style-name="co1" table:number-columns-repeated="4"/>"#;
