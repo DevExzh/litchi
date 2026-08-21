@@ -1890,6 +1890,18 @@ Minor (reclaiming a frame) page faults: 34
         ):
             perf_resource_profile._xlsx_xml_borrowed_harness_identity(report, "report")
 
+    def test_xlsx_xml_borrowed_timing_container_must_be_direct_object(self):
+        report = self._xlsx_xml_borrowed_report()
+        report["results"][3]["source"]["xlsx_cell_values"] = [
+            {"open_ns": [1, 1, 1]}
+        ]
+
+        with self.assertRaisesRegex(
+            perf_resource_profile.ResourceProfileInputError,
+            "xlsx_cell_values must be an object",
+        ):
+            perf_resource_profile._xlsx_xml_borrowed_harness_identity(report, "report")
+
     def test_xlsx_xml_borrowed_abba_orchestration_publishes_identity_and_scope(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1951,7 +1963,7 @@ Minor (reclaiming a frame) page faults: 34
         )
         self.assertEqual(published["scope"]["xlsx_shape"], "tiny")
         self.assertEqual(published["scope"]["xlsx_cell_crud_shape"], "medium")
-        self.assertEqual(published["tool"]["version"], "0.1.5")
+        self.assertEqual(published["tool"]["version"], "0.1.6")
         self.assertEqual(published["latency_evidence"]["status"], "not_measured")
         self.assertEqual(len(published["corpus_identities"]), 4)
         self.assertEqual(len(published["result_identities"]), 4)
