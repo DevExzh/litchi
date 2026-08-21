@@ -9351,6 +9351,157 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_extractor_no_eager_comment_storage_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = decode_comment_storage(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tsd::CommentStorageArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = CommentStorageArchive::decode(bytes);\n"
+                "        let _ = tsd::CommentStorageArchive\n"
+                "            ::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "unqualified CommentStorageArchive": (
+                "let _ = CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "tsd namespace CommentStorageArchive": (
+                "let _ = tsd::CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "fully qualified namespace CommentStorageArchive": (
+                "let _ = litchi_iwa_protos::tsd::CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "arbitrary qualified CommentStorageArchive": (
+                "let _ = crate::numbers::wire::CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "multiline qualified CommentStorageArchive": (
+                "let _ = litchi_iwa_protos::tsd::CommentStorageArchive\n"
+                "    ::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+        }
+        for label, (marker, expected_label) in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers extractor production source uses "
+                        f"{expected_label}: "
+                        "crates/litchi-numbers/src/package/extractor.rs:2",
+                        violations,
+                    )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_allows_aliases_and_unrelated_decodes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = CommentStorageArchiveAlias::decode(bytes);\n"
+                "    let _ = CommentStorage::decode(bytes);\n"
+                "    let _ = tsd::CommentStorageArchiveBuilder::decode(bytes);\n"
+                "    let _ = decode_comment_storage(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tsd::CommentStorageArchive::decode\n"
+                'const NOTE: &str = "CommentStorageArchive::decode";\n'
+                "/* litchi_iwa_protos::tsd::CommentStorageArchive::decode */\n"
+                'const RAW: &str = r###"CommentStorageArchive::decode"###;\n'
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_ignores_legacy_iwa_sources(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates/litchi-iwa/src/numbers/table_extractor.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn legacy_projection(bytes: &[u8]) {\n"
+                "    let _ = tsd::CommentStorageArchive::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_focused_numbers_names_package_no_eager_prost_allows_test_only_usage(
         self,
     ) -> None:

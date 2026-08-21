@@ -54,6 +54,14 @@ limits, content-redacted failures, exact-source patch application and
 conflicts, inversion, and byte-exact restoration through public in-memory
 `write_to` without writing a package to disk.
 
+`numbers_formula_cells` is the focused formula-authoring target. It offers
+arbitrary bytes to bounded Numbers ingress and reuses the native
+`basic.numbers` seed for formula, cache, clear, duplicate, mixed-cell, and
+cycle batches. The transaction path covers every public authorable function
+name, local row/column references, bounded deep formula trees near the
+aggregate work ceiling, exact-source patch application and conflicts,
+inversion, and content-redacted failures.
+
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
 layout commands against the native `basic.pages` seed. It covers public layout
@@ -108,6 +116,12 @@ the native transaction.
 Fuzzer-derived names are decoded lossily as UTF-8, reject NUL, and consume at
 most 256 input bytes; keep `-max_len` at 1 KiB so malformed ingress and native
 name transactions both receive every input.
+
+`numbers_formula_cells` uses the same finite Numbers physical and semantic
+profile, with 8 KiB formula-render work and depth 32. Its stress command builds
+at most a 5,461-node bounded formula tree; keep `-max_len` at 1 KiB so
+arbitrary ingress remains bounded while native transaction commands receive
+every input.
 
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
@@ -203,6 +217,13 @@ Run the focused Numbers names target without a checked-in duplicate corpus:
 
 ```sh
 cargo +nightly fuzz run numbers_names -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers formula-authoring target:
+
+```sh
+cargo +nightly fuzz run numbers_formula_cells -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

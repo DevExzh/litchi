@@ -14,7 +14,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
 use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
-use litchi_numbers::{Document, Package};
+use litchi_numbers::{Document, Package, PackageError, PackageSemanticPath};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -41,6 +41,9 @@ const TILE_ID: u64 = 6;
 const RICH_TEXT_PAYLOAD_ID: u64 = 101;
 const RICH_TEXT_STORAGE_ID: u64 = 102;
 const COMMENT_STORAGE_ID: u64 = 111;
+const COMMENT_REPLY_ID: u64 = 112;
+const COMMENT_REPLY_TWO_ID: u64 = 113;
+const COMMENT_AUTHOR_ID: u64 = 121;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Corruption {
@@ -56,6 +59,10 @@ enum Corruption {
     DuplicateRootKey,
     DuplicateSegmentKey,
     SelectedMalformedList,
+    CommentMissingText,
+    CommentMalformedNestedWire,
+    CommentDuplicateCanonicalPayload,
+    CommentDuplicateMalformedPayload,
 }
 
 fn reference(identifier: u64) -> tsp::Reference {
@@ -390,12 +397,88 @@ fn rich_text_storage_object() -> TestResult<ArchiveObject> {
     )
 }
 
-fn comment_storage_object() -> TestResult<ArchiveObject> {
+fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
+    // Keep this fixture deliberately richer than the semantic Numbers
+    // document currently exposes. Package extraction must still strictly
+    // validate and stage every canonical comment fact (including the reply
+    // graph) before publication, while Document extraction skips this
+    // format-owned sidecar entirely.
+    if matches!(corruption, Corruption::CommentMalformedNestedWire) {
+        // Field 2 is a length-delimited TSP.Date. The nested payload is an
+        // invalid wire tag, so a strict comment-storage decoder must reject
+        // the source before publishing a Package snapshot.
+        return object(
+            COMMENT_STORAGE_ID,
+            COMMENT_STORAGE_MESSAGE_TYPE,
+            [0x12, 0x01, 0xff].to_vec(),
+        );
+    }
+
+    let comment = tsd::CommentStorageArchive {
+        text: (!matches!(corruption, Corruption::CommentMissingText))
+            .then(|| "Comment retained by Package".to_owned()),
+        creation_date: Some(tsp::Date { seconds: 123.5 }),
+        author: Some(reference(COMMENT_AUTHOR_ID)),
+        replies: vec![reference(COMMENT_REPLY_ID), reference(COMMENT_REPLY_TWO_ID)],
+        storage_uuid: Some(tsp::Uuid {
+            lower: COMMENT_STORAGE_ID,
+            upper: 0x6c69_7463_6869_6977,
+        }),
+    };
+    let data = comment.encode_to_vec();
+    if matches!(corruption, Corruption::CommentDuplicateCanonicalPayload) {
+        return Ok(ArchiveObject::new(
+            COMMENT_STORAGE_ID,
+            bounded(
+                [
+                    RawMessage {
+                        type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                        data: data.clone(),
+                    },
+                    RawMessage {
+                        type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                        data,
+                    },
+                ],
+                2,
+            )?,
+        )?);
+    }
+    if matches!(corruption, Corruption::CommentDuplicateMalformedPayload) {
+        return Ok(ArchiveObject::new(
+            COMMENT_STORAGE_ID,
+            bounded(
+                [
+                    RawMessage {
+                        type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                        data,
+                    },
+                    RawMessage {
+                        type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                        // Keep the valid candidate first: legacy extraction
+                        // decoded every candidate before applying cardinality,
+                        // so this malformed second candidate must win over the
+                        // duplicate-payload diagnostic.
+                        data: vec![0xff],
+                    },
+                ],
+                2,
+            )?,
+        )?);
+    }
+    object(COMMENT_STORAGE_ID, COMMENT_STORAGE_MESSAGE_TYPE, data)
+}
+
+fn comment_reply_storage_object(identifier: u64, text: &str) -> TestResult<ArchiveObject> {
     object(
-        COMMENT_STORAGE_ID,
+        identifier,
         COMMENT_STORAGE_MESSAGE_TYPE,
         tsd::CommentStorageArchive {
-            text: Some("Comment retained by Package".to_owned()),
+            text: Some(text.to_owned()),
+            storage_uuid: Some(tsp::Uuid {
+                lower: identifier,
+                upper: identifier.rotate_left(17),
+            }),
             ..Default::default()
         }
         .encode_to_vec(),
@@ -542,7 +625,15 @@ fn synthetic_table_data_list_package(
     }
     objects.push(rich_text_payload_object()?);
     objects.push(rich_text_storage_object()?);
-    objects.push(comment_storage_object()?);
+    objects.push(comment_storage_object(corruption)?);
+    objects.push(comment_reply_storage_object(
+        COMMENT_REPLY_ID,
+        "First reply",
+    )?);
+    objects.push(comment_reply_storage_object(
+        COMMENT_REPLY_TWO_ID,
+        "Second reply",
+    )?);
 
     let archive = Archive { objects };
     let iwa = SnappyStream::compress(&archive.to_bytes()?)?;
@@ -690,5 +781,109 @@ fn document_ignores_valid_and_dangling_comment_ids_while_package_stays_strict() 
     let document = Document::from_bytes(&dangling)?;
     assert_semantics(&document)?;
     assert_eq!(dangling, dangling_original);
+    Ok(())
+}
+
+#[test]
+fn package_projects_full_comment_metadata_and_replies_without_mutating_source() -> TestResult {
+    let bytes = synthetic_table_data_list_package(Corruption::None, 12)?;
+    let original = bytes.clone();
+
+    // The public semantic document intentionally drops format-owned comment
+    // sidecars. Package construction nevertheless walks the comment storage
+    // payload (including date, author, UUID, and both replies); the structured
+    // compatibility projection exercises that same strict path a second time.
+    let package = Package::from_bytes(&bytes)?;
+    assert_semantics(package.document())?;
+    assert_eq!(package.extract_structured_tables()?.len(), 1);
+    assert_eq!(bytes, original, "Package parsing mutated its source");
+
+    let document = Document::from_bytes(&bytes)?;
+    assert_semantics(&document)?;
+    assert_eq!(bytes, original, "Document parsing mutated its source");
+    Ok(())
+}
+
+#[test]
+fn missing_comment_text_is_an_empty_strict_value_and_document_still_skips_comments() -> TestResult {
+    let bytes = synthetic_table_data_list_package(Corruption::CommentMissingText, 12)?;
+    let original = bytes.clone();
+
+    let package = Package::from_bytes(&bytes)?;
+    assert_semantics(package.document())?;
+    assert_eq!(package.extract_structured_tables()?.len(), 1);
+    assert_eq!(bytes, original, "Package parsing mutated its source");
+
+    let document = Document::from_bytes(&bytes)?;
+    assert_semantics(&document)?;
+    assert_eq!(bytes, original, "Document parsing mutated its source");
+    Ok(())
+}
+
+fn assert_package_rejects_comment_but_document_skips_it(corruption: Corruption) -> TestResult {
+    let bytes = synthetic_table_data_list_package(corruption, 12)?;
+    let original = bytes.clone();
+
+    assert!(Package::from_bytes(&bytes).is_err());
+    assert_eq!(bytes, original, "Package rejection mutated its source");
+
+    let document = Document::from_bytes(&bytes)?;
+    assert_semantics(&document)?;
+    assert_eq!(bytes, original, "Document parsing mutated its source");
+    Ok(())
+}
+
+#[test]
+fn malformed_nested_comment_wire_is_atomic_in_package_and_skipped_by_document() -> TestResult {
+    assert_package_rejects_comment_but_document_skips_it(Corruption::CommentMalformedNestedWire)
+}
+
+#[test]
+fn duplicate_comment_storage_payload_is_atomic_in_package_and_skipped_by_document() -> TestResult {
+    let bytes =
+        synthetic_table_data_list_package(Corruption::CommentDuplicateCanonicalPayload, 12)?;
+    let original = bytes.clone();
+
+    let error = Package::from_bytes(&bytes).expect_err("duplicate payload must be rejected");
+    assert!(
+        error
+            .to_string()
+            .contains("multiple TSD comment-storage payloads"),
+        "valid duplicate must win over candidate decoding, got {error}"
+    );
+    assert_eq!(bytes, original, "Package rejection mutated its source");
+
+    let document = Document::from_bytes(&bytes)?;
+    assert_semantics(&document)?;
+    assert_eq!(bytes, original, "Document parsing mutated its source");
+    Ok(())
+}
+
+#[test]
+fn malformed_duplicate_comment_payload_preserves_legacy_decode_precedence() -> TestResult {
+    let bytes =
+        synthetic_table_data_list_package(Corruption::CommentDuplicateMalformedPayload, 12)?;
+    let original = bytes.clone();
+
+    let error = Package::from_bytes(&bytes).expect_err("malformed duplicate must be rejected");
+    let message = error.to_string();
+    assert!(
+        matches!(
+            &error,
+            PackageError::MalformedPayload {
+                path: PackageSemanticPath::StructuredTables
+            }
+        ),
+        "expected the malformed candidate error, got {message}"
+    );
+    assert!(
+        !message.contains("multiple TSD comment-storage payloads"),
+        "malformed candidate must win over cardinality, got {message}"
+    );
+    assert_eq!(bytes, original, "Package rejection mutated its source");
+
+    let document = Document::from_bytes(&bytes)?;
+    assert_semantics(&document)?;
+    assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
 }

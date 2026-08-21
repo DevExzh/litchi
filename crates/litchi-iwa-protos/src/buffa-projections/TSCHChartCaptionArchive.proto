@@ -1,0 +1,19 @@
+// Wire-only Buffa projection for the selected chart-caption edge:
+// TSCH.ChartDrawableArchive.super (field 1) ->
+// TSD.DrawableArchive.caption (field 11) -> TSP.Reference.identifier (field 1).
+// The chart extension and unrelated source fields remain opaque.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+}
+
+message DrawableArchive {
+  optional .LitchiIwaProjection.Reference caption = 11;
+}
+
+message ChartDrawableArchive {
+  optional .LitchiIwaProjection.DrawableArchive super = 1;
+}

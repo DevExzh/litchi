@@ -140,3 +140,68 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 The checked-in files are `hex:` recipes rather than generated corpus output,
 so they remain reviewable and the target feeds the exact decoded bytes to both
 strict entry points. Invalid or oversized recipes are skipped.
+
+## Numbers comment-storage codec
+
+`comment_storage_codec` sends one bounded, caller-owned
+`TSD.CommentStorageArchive` source through both strict entry points:
+
+* `decode_comment_storage_archive_with_report` (scalar/report path); and
+* `decode_comment_storage_archive_with_visitor` (source-ordered reply path).
+
+For strict successes the target requires equal snapshots and exact
+`DecodeReport` values from both paths. It then uses generated Prost
+`tsd::CommentStorageArchive` only as an oracle for that strict success, and
+compares text presence/content, IEEE-754 creation-date bits, author and UUID
+presence/values, deprecated reference fields, and every reply in source order.
+Every reply payload and the borrowed text are checked against the unchanged
+source pointer range. Callback state keeps only a bounded prefix of compact
+reply summaries; callback counts, order, and borrow checks still cover every
+reply. Rejections (including malformed wire, unknown groups, and finite-limit
+failures) must remain rejections on both strict paths; a visitor may have
+observed a valid prefix before a later error.
+
+The target accepts raw inputs up to 64 KiB and uses finite limits of 8,192
+fields, 256 KiB of work, 1,024 references, 64 KiB of UTF-8 text, and recursion
+depth 64. The 20 checked-in recipes under
+`corpus/comment_storage_codec/` cover empty and text-only roots, Unicode,
+negative-zero and NaN date bits, deprecated/default reference presence,
+ordered replies, zero/wide UUIDs, mixed field order, unknown scalars and a
+well-formed group, plus duplicate, missing, invalid-UTF-8, truncated,
+malformed-group, wrong-wire, and noncanonical-varint inputs. They are
+hand-authored protobuf wire encodings, not copied from a private Numbers
+document.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check comment_storage_codec
+```
+
+Run a bounded AddressSanitizer/libFuzzer smoke with all mutable corpus,
+artifact, and build locations outside the checkout. Increase `-runs` only for
+a longer local campaign.
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-comment-storage-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/comment_storage_codec/*.hex "$fuzz_corpus/"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  comment_storage_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
+artifacts, and build output stay in the temporary root; set
+`KEEP_FUZZ_CORPUS=1` to retain it for review.

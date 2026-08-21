@@ -103,6 +103,46 @@ mod buffa_text_storage_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for Numbers comment storage.
+///
+/// The native repeated `replies` field is deliberately absent.  The strict
+/// handwritten codec validates and streams each reply directly from the
+/// caller-owned source bytes.
+#[doc(hidden)]
+mod buffa_comment_storage_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-comment-storage/iwa_comment_storage_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the GroupNode category-label path.
 ///
 /// It includes only an empty node envelope, UUID identity, and the scalar
@@ -180,6 +220,46 @@ mod buffa_keynote_document_generated {
     include!(concat!(
         env!("OUT_DIR"),
         "/buffa-keynote-document/iwa_keynote_document_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa lazy-view projection for the Keynote chart-caption edge.
+///
+/// Only the drawable `super`, caption reference, and nested identifier are
+/// generated. The chart extension closure and unrelated source fields remain
+/// caller-owned for strict validation and preservation.
+#[doc(hidden)]
+mod buffa_keynote_chart_caption_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-chart-caption/iwa_keynote_chart_caption_buffa_protos.rs"
     ));
 }
 
@@ -735,6 +815,11 @@ pub mod archive_codec;
 #[doc(hidden)]
 pub mod text_storage_codec;
 
+/// Internal strict Numbers comment-storage projection. Generated types remain
+/// private, and replies are streamed from caller-owned source bytes.
+#[doc(hidden)]
+pub mod comment_storage_codec;
+
 /// Internal raw GroupNode category-label projection implemented by the
 /// private Buffa sidecar. Generated types remain inaccessible to downstream
 /// crates.
@@ -745,6 +830,11 @@ pub mod group_node_category_codec;
 /// Buffa sidecar. Generated types remain inaccessible to downstream crates.
 #[doc(hidden)]
 pub mod keynote_document_codec;
+
+/// Internal strict Keynote chart-caption projection. Generated types remain
+/// private and caller-owned source bytes remain authoritative.
+#[doc(hidden)]
+pub mod keynote_chart_caption_codec;
 
 /// Internal strict Keynote placeholder text-owner projection. Generated types
 /// remain inaccessible and source bytes stay authoritative.

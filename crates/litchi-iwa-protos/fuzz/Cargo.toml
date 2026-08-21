@@ -28,6 +28,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "comment_storage_codec"
+path = "fuzz_targets/comment_storage_codec.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

@@ -17,12 +17,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={BUFFA_PROJECTION_DIRECTORY}");
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_document_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_chart_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_number_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
+    println!("cargo:rerun-if-changed=src/comment_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_header_settings_codec.rs");
@@ -54,6 +56,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_text_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_group_node_category_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_document_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_keynote_chart_caption_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_keynote_show_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_placeholder_text_projection_provenance(
         proto_directory,
@@ -75,6 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_comment_storage_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_names_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_sheet_order_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_header_settings_projection_provenance(
@@ -139,6 +146,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     enforce_text_projection_budget(&buffa_text_out_directory)?;
 
+    // Numbers comment storage needs only the optional text/date/author/UUID
+    // facts.  The repeated replies field remains on the strict handwritten
+    // source router so no generated input-width vector can be materialized.
+    let buffa_comment_storage_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-comment-storage");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSDCommentStorageArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_comment_storage_out_directory)
+        .include_file("iwa_comment_storage_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_comment_storage_projection_budget(&buffa_comment_storage_out_directory)?;
+
     // Group-by category labels need only a zero-field GroupNode envelope plus
     // UUID and four scalar wrappers. The streaming adapter routes recursive
     // children and CellValue branches without a generated repeated-field
@@ -180,6 +207,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_document_projection_budget(&buffa_keynote_document_out_directory)?;
+
+    // Keynote chart caption reads need only the optional drawable super,
+    // optional caption reference, and required nested identifier. Keep the
+    // chart extension closure out of generated code.
+    let buffa_keynote_chart_caption_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-chart-caption");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSCHChartCaptionArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_chart_caption_out_directory)
+        .include_file("iwa_keynote_chart_caption_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_chart_caption_projection_budget(&buffa_keynote_chart_caption_out_directory)?;
 
     // Numbers reaches a table model through field 2 of TableInfo. Keep the
     // drawable base archive and all display metadata out of generated code;
@@ -557,6 +604,141 @@ fn enforce_text_projection_provenance(
     Ok(())
 }
 
+fn enforce_comment_storage_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_PROJECTION_DIGEST: &str =
+        "396d98fd78f6a417a57af4a1e7f3830362e3174753687aef2fe49aaf7a88087d";
+    const TSD_FIELDS: [&str; 5] = [
+        "optional string text = 1;",
+        "optional .TSP.Date creation_date = 2;",
+        "optional .TSP.Reference author = 3;",
+        "repeated .TSP.Reference replies = 4;",
+        "optional .TSP.UUID storage_uuid = 5;",
+    ];
+    const TSP_DATE: &str = "message Date {\n  required double seconds = 1;\n}";
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TSP_UUID: &str =
+        "message UUID {\n  required uint64 lower = 1;\n  required uint64 upper = 2;\n}";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaCommentStorageProjection;\n\
+message Date {\n\
+required double seconds = 1;\n\
+}\n\
+message Reference {\n\
+required uint64 identifier = 1;\n\
+optional int32 deprecated_type = 2;\n\
+optional bool deprecated_is_external = 3;\n\
+}\n\
+message Uuid {\n\
+required uint64 lower = 1;\n\
+required uint64 upper = 2;\n\
+}\n\
+message CommentStorageArchive {\n\
+optional string text = 1;\n\
+optional .LitchiIwaCommentStorageProjection.Date creation_date = 2;\n\
+optional .LitchiIwaCommentStorageProjection.Reference author = 3;\n\
+optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 11] = [
+        "const TEXT_FIELD: u32 = 1;",
+        "const CREATION_DATE_FIELD: u32 = 2;",
+        "const AUTHOR_FIELD: u32 = 3;",
+        "const REPLIES_FIELD: u32 = 4;",
+        "const STORAGE_UUID_FIELD: u32 = 5;",
+        "pub trait CommentStorageVisitor",
+        "pub fn decode_comment_storage_archive(",
+        "pub fn decode_comment_storage_archive_with_report(",
+        "pub fn decode_comment_storage_archive_with_visitor<'source>(",
+        "pub fn decode_comment_storage_with_visitor<'source>(",
+        "pub fn visit_comment_storage_replies<'source, F>(",
+    ];
+    const FORBIDDEN_PUBLIC_FUNCTION_FRAGMENTS: [&str; 4] =
+        ["encode", "serialize", "to_owned", "write"];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_comment_storage_generated {",
+        "\"/buffa-numbers-comment-storage/iwa_comment_storage_buffa_protos.rs\"",
+    ];
+
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSDCommentStorageArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let projection_digest = Sha256::digest(projection.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let expected_projection_schema = PROJECTION_SCHEMA
+        .lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/comment_storage_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !TSD_FIELDS
+        .iter()
+        .all(|declaration| tsd.matches(declaration).count() == 1)
+        || tsp.matches(TSP_DATE).count() != 1
+        || tsp.matches(TSP_REFERENCE).count() != 1
+        || tsp.matches(TSP_UUID).count() != 1
+        || projection_schema != expected_projection_schema
+        || projection_digest != EXPECTED_PROJECTION_DIGEST
+        || projection.len() > 3 * 1024
+        || projection_schema.contains("repeated ")
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+        || production_codec.contains("pub fn encode_comment_storage_archive")
+        || production_codec.contains("pub fn to_owned_comment_storage")
+        || production_codec_has_forbidden_public_function(
+            production_codec,
+            &FORBIDDEN_PUBLIC_FUNCTION_FRAGMENTS,
+        )
+    {
+        return Err(
+            "derived Numbers comment-storage projection/router drifted from canonical TSD/TSP fields, exposed repeated generated replies, or introduced generated/production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn production_codec_has_forbidden_public_function(
+    source: &str,
+    forbidden_name_fragments: &[&str],
+) -> bool {
+    source.lines().any(|line| {
+        let declaration = line.trim_start();
+        let Some(signature) = declaration.strip_prefix("pub fn ") else {
+            return false;
+        };
+        let name = signature
+            .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+            .next()
+            .unwrap_or_default();
+        forbidden_name_fragments
+            .iter()
+            .any(|fragment| name.contains(fragment))
+    })
+}
+
 fn enforce_group_node_category_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
@@ -683,6 +865,82 @@ fn enforce_keynote_document_projection_provenance(
     {
         return Err(
             "derived Keynote document/root codec drifted from KN.DocumentArchive.show or TSP.Reference.identifier, exceeded its 1 KiB source budget, exposed generated code, introduced generated repeated storage, or added production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_chart_caption_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TSCH_DRAWABLE: &str = "message ChartDrawableArchive {\n  optional .TSD.DrawableArchive super = 1;\n  extensions 10000 to 536870911;\n}";
+    const TSD_CAPTION: &str = "optional .TSP.Reference caption = 11;";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message Reference {\n\
+required uint64 identifier = 1;\n\
+}\n\
+message DrawableArchive {\n\
+optional .LitchiIwaProjection.Reference caption = 11;\n\
+}\n\
+message ChartDrawableArchive {\n\
+optional .LitchiIwaProjection.DrawableArchive super = 1;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 7] = [
+        "const CHART_DRAWABLE_SUPER_FIELD: u32 = 1;",
+        "const DRAWABLE_CAPTION_FIELD: u32 = 11;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "pub fn decode_chart_caption(",
+        "fn preflight_chart_caption(",
+        "fn next_strict_field<",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_keynote_chart_caption_generated {",
+        "\"/buffa-keynote-chart-caption/iwa_keynote_chart_caption_buffa_protos.rs\"",
+    ];
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let tsch = fs::read_to_string(proto_directory.join("TSCHArchives.proto"))?;
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSCHChartCaptionArchive.proto"))?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let codec = fs::read_to_string("src/keynote_chart_caption_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || tsch.matches(TSCH_DRAWABLE).count() != 1
+        || tsd.matches(TSD_CAPTION).count() != 1
+        || normalize(&projection) != normalize(PROJECTION_SCHEMA)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection.contains("message ChartArchive")
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "derived Keynote chart-caption projection/router drifted from canonical TSCH/TSD/TSP fields, exposed chart extensions, or introduced generated/production encoding"
                 .into(),
         );
     }
@@ -2405,6 +2663,58 @@ fn enforce_text_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
+fn enforce_comment_storage_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: [&str; 5] = [
+        "LitchiIwaCommentStorageProjection.mod.rs",
+        "TSDCommentStorageArchive.__lazy_view.rs",
+        "TSDCommentStorageArchive.__view.rs",
+        "TSDCommentStorageArchive.rs",
+        "iwa_comment_storage_buffa_protos.rs",
+    ];
+    const MAX_GENERATED_BYTES: u64 = 122_000;
+
+    let mut files = Vec::new();
+    let mut bytes = 0u64;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files.push(
+            entry
+                .file_name()
+                .to_str()
+                .ok_or("generated filename is not UTF-8")?
+                .to_owned(),
+        );
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        if generated.contains("RepeatedView") || generated.contains("LazyRepeatedView") {
+            return Err(
+                "Numbers comment-storage projection generated repeated lazy storage".into(),
+            );
+        }
+    }
+    files.sort_unstable();
+    let mut expected = EXPECTED_FILES
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect::<Vec<_>>();
+    expected.sort_unstable();
+
+    if files != expected || bytes > MAX_GENERATED_BYTES {
+        return Err(format!(
+            "Numbers comment-storage projection generated {} files/{bytes} bytes; expected {} files and at most {MAX_GENERATED_BYTES} bytes",
+            files.len(),
+            EXPECTED_FILES.len(),
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn enforce_group_node_category_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: usize = 5;
     const MAX_GENERATED_BYTES: u64 = 160 * 1024;
@@ -2471,6 +2781,42 @@ fn enforce_keynote_document_projection_budget(directory: &Path) -> Result<(), Bo
     {
         return Err(format!(
             "Keynote document projection generated {files} files/{bytes} bytes/{generated_repeated_views} RepeatedView mentions/{generated_lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_chart_caption_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 96 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "Keynote chart-caption projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

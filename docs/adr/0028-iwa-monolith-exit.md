@@ -3265,15 +3265,55 @@ Required/duplicate/canonical-wire/UTF-8/reference/range/ownership checks,
 candidate atomicity, and later-wire-error precedence remain enforced. The
 package ceilings are 512 MiB input and output, 1,000,000 fields, nesting 64,
 and 16,000,000 work units, with tighter payload and text budgets before
-allocation. Six generated extractor decodes remain (four table-model, one
-FormulaArchive, and one comment), while FormulaArchive/comment migration
+allocation. Five generated extractor decodes remain (four table-model and one
+FormulaArchive), while FormulaArchive/legacy `litchi-iwa` comment migration
 debt, legacy monolith/dependency edges, and all 14 ordered debts remain open.
+The former generated comment decode is no longer part of this extractor path.
 
-Focused evidence on 2026-08-21 is 230 protocol tests, 47 extractor tests, nine
-integration tests, 276 boundary tests, and an 11-seed fuzz corpus with 100
-nightly ASan runs and no artifacts. A native 1,200-by-8 Numbers document was
-saved and reopened with strings, formulas, an intentional formula error, rich
-text, and a persisted comment and showed no repair dialog. The archive has
-DataList members, but no parsed type-6011 Segment was proven. This is a
-correctness/boundedness slice only: no native segment or save-mutation,
-performance, host-exit, or complete monolith-retirement claim is made.
+Focused evidence on 2026-08-21 is 237 protocol tests, 49 extractor tests, 14
+integration tests, 281 boundary tests, and an 11-seed fuzz corpus; the TDL
+nightly ASan smoke completed 100 runs without an artifact. A disposable native
+1,200-by-8 Numbers document was saved and reopened with strings, formulas, an
+intentional formula error, rich text, and a persisted comment and showed no
+repair dialog. The archive has DataList members, but no parsed type-6011
+Segment evidence was established. This is a correctness/boundedness slice
+only: no native segment or save-mutation, performance, host-exit, or complete
+monolith-retirement claim is made.
+
+## 2026-08-21 amendment: Numbers CommentStorage bounded migration
+
+The focused Numbers package now routes `TSD.CommentStorageArchive` through a
+strict handwritten CommentStorage codec backed by a private Buffa lazy
+projection. Package remains strict for comment validation and resolution;
+Document deliberately skips comment resolution. Per-cell comment
+materialization is bounded and fallible, with strict validation before
+candidate-local publication and fallible reserves for the materialized value.
+The private projection is parity-only; raw source bytes remain authoritative.
+
+FormulaArchive and the legacy `litchi-iwa` comment path remain migration debt.
+Five generated extractor decodes remain (four table-model decodes and one
+FormulaArchive decode), and the former generated CommentStorage decode is no
+longer part of the production extractor path. Legacy monolith/dependency edges
+and all 14 ordered debts remain open.
+
+Focused evidence on 2026-08-21 is 237 protocol tests, 324 passing Numbers
+library tests with four ignored (including 53 focused extractor tests), 14
+integration tests, and 281 boundary tests. The CommentStorage fuzz corpus has
+20 seeds, and its nightly ASan smoke completed 100 runs cleanly without an
+artifact. A disposable native 1,200-by-8 Numbers document with comment,
+formula, and rich-text content was saved and reopened without a repair dialog.
+The archive has DataList members, but no parsed type-6011 Segment proof was
+established. This is a bounded correctness slice only: no native segment or
+save-mutation, performance, host-exit, or complete monolith-retirement claim
+is made.
+
+## Current present status
+
+The latest final verification records 243 passing `litchi-iwa-protos` tests,
+including six focused Keynote chart-caption codec tests; 329 passing
+`litchi-numbers` library tests with four ignored, 58 focused Numbers extractor
+tests, 14 `table_data_list` integration tests, and 281 boundary unit tests.
+The performance baseline currently exposes 341 selectable cases. The caption
+codec is a narrow strict-ingress projection; its six tests do not represent a
+complete Keynote transaction migration. The dated gate counts above remain
+historical evidence, and the monolith exit remains incomplete.

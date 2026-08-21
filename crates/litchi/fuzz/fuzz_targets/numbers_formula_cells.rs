@@ -32,9 +32,31 @@ const MAX_FORMULA_WORK: usize = 8 * 1024;
 const MAX_FORMULA_DEPTH: usize = 32;
 const MAX_FORMULA_INPUT_BYTES: usize = 256;
 const CONTROL_BYTES: usize = 8;
+const STRESS_FORMULA_FANOUT: usize = 4;
+const STRESS_FORMULA_MIN_DEPTH: usize = 4;
 const PRIVATE_SELECTOR: &str = "__litchi_private_formula_selector_65d8__";
 const PRIVATE_TEXT: &str = "__litchi_private_formula_text_65d8__";
 const NATIVE_NUMBERS: &[u8] = include_bytes!("../../../../test-data/iwork/numbers/basic.numbers");
+
+// Keep this list aligned with the public formula constructor's authorable
+// subset.  The package-side function map is larger because it also names
+// functions which can be rendered when reading native documents, but these
+// are the names that can reach the transactional lowering path.
+const AUTHORABLE_FUNCTIONS: [(&str, usize); 13] = [
+    ("SUM", 1),
+    ("AVERAGE", 1),
+    ("MIN", 1),
+    ("MAX", 1),
+    ("COUNT", 1),
+    ("COUNTA", 1),
+    ("AND", 1),
+    ("OR", 1),
+    ("IF", 2),
+    ("IFERROR", 2),
+    ("NOT", 1),
+    ("ABS", 1),
+    ("ROUND", 2),
+];
 
 fuzz_target!(|data: &[u8]| {
     // Keep malformed ZIP/IWA ingress under the same finite profile as the
@@ -125,7 +147,7 @@ fn exercise_reads(package: &Package, data: &[u8]) {
 fn exercise_batch(package: &Package, data: &[u8], dimensions: Dimensions) {
     let target = position(data, 0, dimensions);
     let formula_target = position(data, 1, dimensions);
-    let command = control(data, 0) % 8;
+    let command = control(data, 0) % 9;
     let before = exact_bytes(package);
 
     let result = match command {
@@ -136,7 +158,8 @@ fn exercise_batch(package: &Package, data: &[u8], dimensions: Dimensions) {
         4 => clear_batch(package, formula_target),
         5 => duplicate_batch(package, formula_target),
         6 => cycle_batch(package, dimensions, formula_target),
-        _ => mixed_batch(package, data, dimensions, target, formula_target),
+        7 => mixed_batch(package, data, dimensions, target, formula_target),
+        _ => stress_formula_batch(package, data, formula_target),
     };
 
     match result {
@@ -283,6 +306,41 @@ fn mixed_batch(
         .commit()
 }
 
+fn stress_formula_batch(
+    package: &Package,
+    data: &[u8],
+    formula_target: CellPosition,
+) -> Result<litchi::numbers::table::cells::Commit, CellError> {
+    let expression = stress_expression(data)?;
+    package
+        .edit_table_cells(0usize, 0usize)?
+        .set_formula(formula_target, expression)?
+        .commit()
+}
+
+/// Build a small, balanced formula tree whose node count is large enough to
+/// exercise the aggregate formula-work admission without allowing a fuzz
+/// input to request an unbounded allocation.  At the maximum depth this is
+/// 5,461 nodes (4-way fanout), below the public expression ceiling but close
+/// enough to the transaction's 8,192-work profile to cover refusal paths.
+fn stress_expression(data: &[u8]) -> Result<Expression, CellError> {
+    fn build(level: usize, seed: u8) -> Result<Expression, FormulaError> {
+        if level == 0 {
+            return Expression::number(f64::from(seed % 11));
+        }
+        let mut children = Vec::with_capacity(STRESS_FORMULA_FANOUT);
+        for branch in 0..STRESS_FORMULA_FANOUT {
+            children.push(build(level - 1, seed.wrapping_add(branch as u8))?);
+        }
+        Expression::function("SUM", children)
+    }
+
+    let depth = STRESS_FORMULA_MIN_DEPTH + usize::from(control(data, 6) % 3);
+    build(depth, control(data, 7)).map_err(|_| CellError::InvalidSource {
+        path: litchi::numbers::table::cells::Path::Package,
+    })
+}
+
 fn assert_commit_round_trip(
     package: &Package,
     source: &[u8],
@@ -338,7 +396,7 @@ fn expression_for(
             path: litchi::numbers::table::cells::Path::Package,
         }
     })?;
-    let expression = match control(data, 4) % 7 {
+    let expression = match control(data, 4) % 19 {
         0 => Ok(left),
         1 => Expression::binary(BinaryOperator::Add, left, right),
         2 => Expression::binary(BinaryOperator::Multiply, left, right),
@@ -352,6 +410,27 @@ fn expression_for(
                 &table,
                 CellReference::relative(target.row() as usize, target.column() as usize),
             ))
+        },
+        6 => Expression::function("ABS", [left]),
+        7 => Expression::function("AVERAGE", [left]),
+        8 => Expression::function("MIN", [left]),
+        9 => Expression::function("MAX", [left]),
+        10 => Expression::function("COUNT", [left]),
+        11 => Expression::function("COUNTA", [left]),
+        12 => Expression::function("AND", [Expression::boolean(control(data, 7) & 1 != 0)]),
+        13 => Expression::function("OR", [Expression::boolean(control(data, 7) & 1 != 0)]),
+        14 => Expression::function("IF", [Expression::boolean(true), left]),
+        15 => Expression::function("IFERROR", [left, right]),
+        16 => Expression::function("ROUND", [left, right]),
+        17 => {
+            let row = usize::from(control(data, 1)) % dimensions.rows().max(1) as usize;
+            Expression::rows(AxisReference::relative(0), AxisReference::absolute(row))
+                .and_then(|rows| Expression::function("SUM", [rows]))
+        },
+        18 => {
+            let column = usize::from(control(data, 2)) % dimensions.columns().max(1) as usize;
+            Expression::columns(AxisReference::relative(0), AxisReference::absolute(column))
+                .and_then(|columns| Expression::function("SUM", [columns]))
         },
         _ => {
             let argument = Expression::cell(CellReference::relative(
@@ -408,6 +487,12 @@ fn exercise_formula_constructors(data: &[u8]) {
         AxisReference::relative(0),
         AxisReference::absolute(1),
     ));
+    for (name, arity) in AUTHORABLE_FUNCTIONS {
+        let arguments = (0..arity)
+            .map(|index| Expression::boolean((index & 1) == 0))
+            .collect::<Vec<_>>();
+        observe_result(Expression::function(name, arguments));
+    }
 }
 
 fn exercise_foreign_handle(data: &[u8]) {

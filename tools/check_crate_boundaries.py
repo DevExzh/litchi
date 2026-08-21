@@ -1875,6 +1875,15 @@ NUMBERS_EXTRACTOR_NO_EAGER_TABLE_DATA_LIST_SOURCE_PATTERNS = (
         ),
     ),
 )
+NUMBERS_EXTRACTOR_NO_EAGER_COMMENT_STORAGE_SOURCE_PATTERNS = (
+    (
+        "CommentStorageArchive::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])CommentStorageArchive[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+)
 NUMBERS_NAMES_GENERATED_PROTO_MODULES = ("tn", "tsce", "tst", "tswp")
 NUMBERS_NAMES_NO_EAGER_PROST_SOURCE_PATTERNS = (
     (
@@ -8790,6 +8799,44 @@ def audit_numbers_extractor_no_eager_table_data_list_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_extractor_no_eager_comment_storage_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the Numbers comment-storage ingress free of eager Prost reads.
+
+    Comment storage now has a bounded borrowed projection in the Numbers
+    extractor's production path.  Reconstructing the generated
+    ``tsd::CommentStorageArchive`` would materialize the complete legacy
+    envelope, including the unbounded replies vector, before the strict
+    comment budgets are applied.  The audit is scoped to this extractor and
+    its production slice: canonical generated fixtures remain available in
+    the test-only module, and the retired ``litchi-iwa`` implementation is
+    intentionally outside this focused boundary.
+    """
+
+    violations: list[str] = []
+    source_path = root / NUMBERS_EXTRACTOR_SOURCE
+    if not source_path.is_file():
+        return violations
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    masked_source = _mask_rust_non_code(raw_source)
+    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
+    production_source = (
+        raw_source[: test_module.start()] if test_module is not None else raw_source
+    )
+    production_code = _mask_rust_non_code(production_source)
+    for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_COMMENT_STORAGE_SOURCE_PATTERNS:
+        for match in pattern.finditer(production_code):
+            line_number = production_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers extractor production source uses "
+                f"{label}: {NUMBERS_EXTRACTOR_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_names_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -9951,6 +9998,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
+        + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()
