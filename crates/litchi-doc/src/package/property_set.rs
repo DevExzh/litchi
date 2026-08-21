@@ -330,7 +330,18 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         let before = self.source.bytes.clone();
         let bytes = self.editor.finish()?;
-        let snapshot = Snapshot::from_bytes(bytes)?;
+        // The editor can finish without staged changes, or a sequence of
+        // edits can restore the complete source artifact byte-for-byte.  The
+        // source was already validated at transaction creation, so retain
+        // that exact allocation instead of reparsing and allocating a new
+        // snapshot for the no-op result.
+        let snapshot = if bytes.as_slice() == before.as_ref() {
+            Snapshot {
+                bytes: Arc::clone(&before),
+            }
+        } else {
+            Snapshot::from_bytes(bytes)?
+        };
         let changed = before.as_ref() != snapshot.bytes.as_ref();
         Ok(Commit {
             patch: Patch {
@@ -545,10 +556,12 @@ mod tests {
     fn no_op_edits_return_the_exact_source_bytes() {
         let source = package_bytes(None);
         let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
+        let source_pointer = snapshot.bytes().as_ptr();
         let mut transaction = snapshot.transaction().unwrap();
         assert!(!transaction.edit_summary_information(|_| Ok(())).unwrap());
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
+        assert_eq!(commit.snapshot().bytes().as_ptr(), source_pointer);
         assert_eq!(commit.into_bytes(), source);
     }
 
