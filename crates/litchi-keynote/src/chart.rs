@@ -79,6 +79,12 @@ impl<'a> From<&'a str> for ChartSelector<'a> {
     }
 }
 
+impl<'a> From<&'a String> for ChartSelector<'a> {
+    fn from(name: &'a String) -> Self {
+        Self::name(name)
+    }
+}
+
 impl From<usize> for ChartSelector<'_> {
     fn from(index: usize) -> Self {
         Self::index(index)
@@ -335,6 +341,14 @@ mod tests {
 
         assert_eq!(name, ChartSelector::name("Revenue"));
         assert_eq!(position, ChartSelector::index(2));
+    }
+
+    #[test]
+    fn borrowed_owned_names_convert_without_allocating() {
+        let chart_name = String::from("Revenue");
+        let selector: ChartSelector<'_> = (&chart_name).into();
+
+        assert_eq!(selector, ChartSelector::Name("Revenue"));
     }
 
     #[test]

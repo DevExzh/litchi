@@ -581,12 +581,13 @@ pub(crate) fn patch_drawable_caption_reference(
     kind: DrawableCaptionKind,
     replacement: u64,
 ) -> Result<Vec<u8>> {
+    let expected_identifier = replacement;
     let drawable = tsd::DrawableArchive::decode(data)?;
     let was_present = match kind {
         DrawableCaptionKind::Caption => drawable.caption.is_some(),
         DrawableCaptionKind::Title => drawable.title.is_some(),
     };
-    let replacement = reference(replacement).encode_to_vec();
+    let replacement = reference(expected_identifier).encode_to_vec();
     let data =
         patch_length_delimited_field(data, kind.drawable_field(), was_present, Some(&replacement))?;
     let verified = tsd::DrawableArchive::decode(data.as_slice())?;
@@ -595,7 +596,11 @@ pub(crate) fn patch_drawable_caption_reference(
         DrawableCaptionKind::Title => verified.title,
     }
     .map(|reference| reference.identifier);
-    if actual != Some(tsp::Reference::decode(replacement.as_slice())?.identifier) {
+    // `replacement` is encoded from the caller-provided identifier immediately
+    // above, so decoding that freshly-authored payload would only revalidate a
+    // value we already own. Keep the post-patch check focused on the drawable
+    // bytes that came back from the lossless wire transform.
+    if actual != Some(expected_identifier) {
         return Err(Error::InvalidFormat(
             "native drawable title/caption reference patch failed validation".to_owned(),
         ));
@@ -1024,6 +1029,32 @@ mod tests {
         assert_eq!(
             decoded.drawable_anchor_location,
             Some(CaptionAnchorLocation::Bottom as i32)
+        );
+    }
+
+    #[test]
+    fn drawable_caption_reference_patch_keeps_unknown_fields() {
+        let mut source = tsd::DrawableArchive {
+            title: Some(reference(7)),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        // Unknown field 99, varint payload 7. The wire patch must retain it
+        // while changing only the title reference.
+        source.extend([0x98, 0x06, 0x07]);
+
+        let patched = patch_drawable_caption_reference(&source, DrawableCaptionKind::Title, 42)
+            .expect("title reference patch");
+        assert!(
+            patched
+                .windows(3)
+                .any(|window| window == [0x98, 0x06, 0x07])
+        );
+
+        let decoded = tsd::DrawableArchive::decode(patched.as_slice()).expect("patched drawable");
+        assert_eq!(
+            decoded.title.as_ref().map(|reference| reference.identifier),
+            Some(42)
         );
     }
 }

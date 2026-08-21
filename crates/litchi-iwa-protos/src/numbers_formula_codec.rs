@@ -717,6 +717,18 @@ pub enum FormulaNode {
     PrependWhitespace,
 }
 
+/// Return whether a node kind is representable by the compact scalar visitor.
+///
+/// The Numbers package renderer has a broader generated compatibility path;
+/// this predicate deliberately describes only nodes whose source-order
+/// semantics are fully represented by [`FormulaNode`]. In particular,
+/// absolute-coordinate, string/date/array/thunk, and owner-bearing nodes stay
+/// on that compatibility path until a lossless visitor shape exists.
+#[must_use]
+pub const fn is_scalar_visitor_node_type(node_type: u32) -> bool {
+    matches!(node_type, 1..=18 | 22 | 23 | 27 | 29 | 32 | 33 | 45)
+}
+
 /// Owner-aware local precedent emitted beside a reference node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LocalPrecedent {
@@ -874,6 +886,16 @@ impl DecodeError {
     #[must_use]
     pub const fn invalid_reason(&self) -> Option<InvalidReason> {
         self.reason
+    }
+    /// Construct an allocation refusal for a caller-owned streaming visitor.
+    ///
+    /// The decoder itself never allocates for formula traversal, but visitors
+    /// may use this classification when they retain a bounded source-order
+    /// projection. Keeping the constructor here avoids exposing the internal
+    /// error representation to downstream adapters.
+    #[must_use]
+    pub const fn allocation(requested: usize) -> Self {
+        Self::limited(DecodeLimit::Allocation { requested })
     }
     const fn invalid(reason: InvalidReason) -> Self {
         Self {

@@ -5,10 +5,11 @@ use std::ops::Range;
 use std::path::Path;
 use std::rc::Rc;
 
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
-use litchi_iwa_protos::keynote_document_codec;
+use litchi_iwa_protos::{keynote_document_codec, keynote_show_codec};
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
@@ -63,6 +64,7 @@ use litchi_keynote::transition::Settings as TransitionSettings;
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
+const SHOW_MESSAGE_TYPE: u32 = 2;
 const STANDIN_CAPTION_MESSAGE_TYPE: u32 = 3_097;
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const BUILD_MESSAGE_TYPE: u32 = 8;
@@ -1508,6 +1510,37 @@ impl KeynoteOperation {
         })
     }
 
+    /// Decode only the generated-free show topology needed by the editor's
+    /// rooted slide traversal.
+    ///
+    /// The graph still owns the complete source payload and all object
+    /// metadata. This borrowed lookup requires exactly one type-2 show
+    /// message, validates its bounded theme/slide-tree projection, and leaves
+    /// unknown show bytes in the graph-owned source for later rewrites.
+    fn show_snapshot(&self, identifier: u64) -> Result<keynote_show_codec::ShowSnapshot> {
+        let payload =
+            self.graph
+                .message_data_type(identifier, SHOW_MESSAGE_TYPE, "KN.ShowArchive")?;
+        let max_payload_bytes = payload.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+        let max_fields = payload.len().clamp(1, WireLimits::MAX_FIELDS);
+        let max_work_bytes = payload
+            .len()
+            .saturating_mul(8)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK);
+        let recursion_limit = u32::try_from(WireLimits::MAX_NESTING).map_err(|_error| {
+            Error::InvalidFormat("Keynote show nesting limit does not fit u32".to_owned())
+        })?;
+        keynote_show_codec::decode_show(
+            payload,
+            keynote_show_codec::DecodeOptions::new(max_payload_bytes, max_fields, recursion_limit)
+                .with_max_fields(max_fields)
+                .with_max_work_bytes(max_work_bytes),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!("Keynote show projection is malformed: {error}"))
+        })
+    }
+
     fn remember_slide(&mut self, identifier: u64, slide: &kn::SlideArchive) {
         if self.slide_cache.len() >= MAX_OPERATION_CACHED_SLIDES
             || slide.owned_drawables.len() > MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE
@@ -1575,18 +1608,19 @@ impl KeynoteEditor {
         operation: &mut KeynoteOperation,
     ) -> Result<Vec<KeynoteSlideInfo>> {
         let show_identifier = operation.document_show_identifier()?;
-        let show: kn::ShowArchive = operation.graph.decode(show_identifier, "KN.ShowArchive")?;
+        let show = operation.show_snapshot(show_identifier)?;
+        let node_identifiers = show.slide_node_identifiers();
 
-        let mut slides = Vec::with_capacity(show.slide_tree.slides.len());
+        let mut slides = Vec::with_capacity(node_identifiers.len());
         let mut layout_catalog = None;
-        for (index, node_reference) in show.slide_tree.slides.into_iter().enumerate() {
+        for (index, node_identifier) in node_identifiers.iter().copied().enumerate() {
             let node: kn::SlideNodeArchive = operation
                 .graph
-                .decode(node_reference.identifier, "KN.SlideNodeArchive")?;
+                .decode(node_identifier, "KN.SlideNodeArchive")?;
             let slide_reference = node.slide.ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Keynote slide node {} has no slide reference",
-                    node_reference.identifier
+                    node_identifier
                 ))
             })?;
             let slide = operation.decode_slide(slide_reference.identifier)?;
@@ -1598,7 +1632,7 @@ impl KeynoteEditor {
                         None => {
                             let theme = operation
                                 .graph
-                                .decode(show.theme.identifier, "KN.ThemeArchive")?;
+                                .decode(show.theme_identifier(), "KN.ThemeArchive")?;
                             layout_catalog.insert(slide_create::layout::LayoutCatalog::read(
                                 &operation.graph,
                                 &theme,
@@ -1675,7 +1709,7 @@ impl KeynoteEditor {
             };
             slides.push(KeynoteSlideInfo {
                 index,
-                node_id: node_reference.identifier,
+                node_id: node_identifier,
                 slide_id: slide_reference.identifier,
                 name: slide.name.filter(|name| !name.is_empty()),
                 layout,

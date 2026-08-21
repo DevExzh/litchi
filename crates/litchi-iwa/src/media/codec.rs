@@ -4,14 +4,15 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Write;
 use std::path::{Component, Path};
 
-use prost::Message;
-
 use crate::package::IWorkPackage;
-use crate::protobuf;
 use crate::{Error, Result};
-use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
-use litchi_iwa_common::wire::{WireField, parse_wire_fields};
+use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into, encoded_len};
+use litchi_iwa_common::wire::{WireField, parse_wire_fields_with_limits};
+use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_index::ObjectId;
+use litchi_iwa_protos::package_metadata_codec::{
+    PackageMetadataVisitor, RewriteOptions, inspect_package_metadata_with_visitor,
+};
 
 use super::model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaType};
 
@@ -206,9 +207,8 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
     let mut message_counts = HashMap::<u64, usize>::new();
     let metadata_map_identifier = metadata
         .data_metadata_map
-        .as_ref()
-        .map(|reference| {
-            ObjectId::try_from(reference.identifier).map_err(|_| {
+        .map(|identifier| {
+            ObjectId::try_from(identifier).map_err(|_| {
                 Error::InvalidFormat(
                     "DataMetadataMap reference contains a zero object identifier".to_owned(),
                 )
@@ -237,9 +237,8 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
                             metadata_map_payloads.checked_add(1).ok_or_else(|| {
                                 Error::Bundle("DataMetadataMap payload count overflow".to_owned())
                             })?;
-                        let map = protobuf::tsp::DataMetadataMap::decode(message.data.as_slice())?;
-                        for entry in map.data_metadata_entries {
-                            let data_identifier = MediaAssetId::try_from(entry.data_identifier)?;
+                        for data_identifier in data_metadata_identifiers(message.data.as_slice())? {
+                            let data_identifier = MediaAssetId::try_from(data_identifier)?;
                             data_metadata_ids.insert(data_identifier.get());
                         }
                     }
@@ -266,8 +265,23 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
         )));
     }
 
-    let mut assets = Vec::with_capacity(metadata.datas.len());
-    let mut identifiers = std::collections::HashSet::with_capacity(metadata.datas.len());
+    let limits = metadata_wire_limits(metadata.datas.len())?;
+    let mut assets = Vec::new();
+    reserve_metadata(
+        &mut assets,
+        metadata.datas.len(),
+        "media asset snapshots",
+        limits,
+    )?;
+    let mut identifiers = std::collections::HashSet::new();
+    identifiers
+        .try_reserve(metadata.datas.len())
+        .map_err(|_allocation| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "media asset identifiers",
+                amount: metadata.datas.len(),
+            })
+        })?;
     for data in metadata.datas {
         let data_identifier = MediaAssetId::try_from(data.identifier)?;
         if !identifiers.insert(data.identifier) {
@@ -389,7 +403,762 @@ pub(crate) fn reachable_embedded_assets(
         .collect())
 }
 
-fn decode_package_metadata(package: &IWorkPackage) -> Result<protobuf::tsp::PackageMetadata> {
+#[derive(Debug, Default)]
+struct PackageMetadataSnapshot {
+    components: Vec<ComponentSnapshot>,
+    versioned_components: Vec<ComponentSnapshot>,
+    datas: Vec<DataInfoSnapshot>,
+    data_metadata_map: Option<u64>,
+}
+
+#[derive(Debug, Default)]
+struct ComponentSnapshot {
+    data_references: Vec<ComponentDataReferenceSnapshot>,
+}
+
+#[derive(Debug, Default)]
+struct ComponentDataReferenceSnapshot {
+    data_identifier: u64,
+    object_reference_list: Vec<ObjectReferenceSnapshot>,
+}
+
+#[derive(Debug, Default)]
+struct ObjectReferenceSnapshot {
+    object_identifier: u64,
+    count: u32,
+}
+
+#[derive(Debug, Default)]
+struct DataInfoSnapshot {
+    identifier: u64,
+    digest: Vec<u8>,
+    preferred_file_name: String,
+    file_name: Option<String>,
+    materialized_length: Option<u64>,
+}
+
+fn metadata_wire_limits(input_bytes: usize) -> Result<WireLimits> {
+    let input_limit = input_bytes.clamp(1, WireLimits::MAX_INPUT_BYTES);
+    WireLimits::default()
+        .with_input_bytes(input_limit)
+        .map_err(Into::into)
+}
+
+fn reserve_metadata<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    resource: &'static str,
+    limits: WireLimits,
+) -> Result<()> {
+    let requested = values.len().checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat("Metadata collection size overflows usize".to_owned())
+    })?;
+    if requested > limits.max_fields() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::Fields,
+            observed: requested,
+            limit: limits.max_fields(),
+        }));
+    }
+    values.try_reserve(additional).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource,
+            amount: requested,
+        })
+    })
+}
+
+fn reserve_output(output: &mut Vec<u8>, additional: usize, limits: WireLimits) -> Result<()> {
+    let requested = output
+        .len()
+        .checked_add(additional)
+        .ok_or_else(|| Error::InvalidFormat("Metadata output size overflows usize".to_owned()))?;
+    if requested > limits.max_output_bytes() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: requested,
+            limit: limits.max_output_bytes(),
+        }));
+    }
+    output.try_reserve(additional).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "media metadata output",
+            amount: requested,
+        })
+    })
+}
+
+fn output_with_capacity(capacity: usize, limits: WireLimits) -> Result<Vec<u8>> {
+    if capacity > limits.max_output_bytes() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: capacity,
+            limit: limits.max_output_bytes(),
+        }));
+    }
+    let mut output = Vec::new();
+    output.try_reserve_exact(capacity).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "media metadata output",
+            amount: capacity,
+        })
+    })?;
+    Ok(output)
+}
+
+fn extend_output(output: &mut Vec<u8>, bytes: &[u8], limits: WireLimits) -> Result<()> {
+    reserve_output(output, bytes.len(), limits)?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+struct NoopPackageMetadataVisitor;
+
+impl PackageMetadataVisitor for NoopPackageMetadataVisitor {}
+
+fn inspect_package_metadata_projection(metadata: &[u8]) -> Result<()> {
+    // The private projection intentionally covers only the package envelope
+    // and component registries. Keep its complete two-pass inspection bounded
+    // by the source payload while leaving DataInfo and DataMetadataMap on the
+    // source-preserving parser below.
+    let source_limit = metadata.len().max(1);
+    let options = RewriteOptions::new(
+        source_limit,
+        source_limit,
+        source_limit.saturating_mul(2).max(1),
+        metadata.len().saturating_mul(64).max(1),
+        64,
+        source_limit,
+        source_limit,
+        0,
+    );
+    inspect_package_metadata_with_visitor(metadata, options, &mut NoopPackageMetadataVisitor)
+        .map(|_inspection| ())
+        .map_err(|error| {
+            Error::InvalidFormat(format!("PackageMetadata strict inspection failed: {error}"))
+        })
+}
+
+fn strict_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
+    // Parsing is intentionally structural here. Unknown records are copied
+    // from their source spans by the rewrite helpers, so canonicalizing their
+    // keys, length prefixes, or varint payloads would silently change bytes
+    // that this codec does not own. Known fields validate their selected
+    // framing/value at the point where they are decoded below.
+    Ok(parse_wire_fields_with_limits(
+        data,
+        metadata_wire_limits(data.len())?,
+    )?)
+}
+
+fn decode_package_metadata_payload(metadata: &[u8]) -> Result<PackageMetadataSnapshot> {
+    inspect_package_metadata_projection(metadata)?;
+    let fields = strict_wire_fields(metadata)?;
+    let limits = metadata_wire_limits(metadata.len())?;
+    let mut snapshot = PackageMetadataSnapshot::default();
+    let mut last_object_identifier = None;
+    let mut revision = false;
+    let mut save_token = false;
+    let mut preferred_package_type = false;
+    for field in fields {
+        match field.number() {
+            1 => set_metadata_field(
+                &mut last_object_identifier,
+                field_varint(metadata, &field)?,
+                "PackageMetadata.last_object_identifier",
+            )?,
+            2 => {
+                let nested = field_payload(metadata, &field)?;
+                let _ = strict_wire_fields(nested)?;
+                set_metadata_seen(&mut revision, "PackageMetadata.revision")?;
+            },
+            3 => {
+                reserve_metadata(
+                    &mut snapshot.components,
+                    1,
+                    "PackageMetadata components",
+                    limits,
+                )?;
+                snapshot
+                    .components
+                    .push(decode_component(field_payload(metadata, &field)?)?);
+            },
+            4 => {
+                reserve_metadata(&mut snapshot.datas, 1, "PackageMetadata data infos", limits)?;
+                snapshot
+                    .datas
+                    .push(decode_data_info(field_payload(metadata, &field)?)?);
+            },
+            10 => {
+                if snapshot.data_metadata_map.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "PackageMetadata contains duplicate data metadata map references"
+                            .to_owned(),
+                    ));
+                }
+                snapshot.data_metadata_map = Some(decode_reference_identifier(field_payload(
+                    metadata, &field,
+                )?)?);
+            },
+            5..=7 => validate_packed_varints(metadata, &field, u64::from(u32::MAX))?,
+            8 => {
+                let _ = field_varint(metadata, &field)?;
+                set_metadata_seen(&mut save_token, "PackageMetadata.save_token")?;
+            },
+            9 => {
+                let _ = field_varint(metadata, &field)?;
+                set_metadata_seen(
+                    &mut preferred_package_type,
+                    "PackageMetadata.preferred_package_type",
+                )?;
+            },
+            11 => {
+                reserve_metadata(
+                    &mut snapshot.versioned_components,
+                    1,
+                    "PackageMetadata versioned components",
+                    limits,
+                )?;
+                snapshot
+                    .versioned_components
+                    .push(decode_component(field_payload(metadata, &field)?)?);
+            },
+            _ => {},
+        }
+    }
+    let last_object_identifier = last_object_identifier.ok_or_else(|| {
+        Error::InvalidFormat(
+            "PackageMetadata is missing its required last object identifier".to_owned(),
+        )
+    })?;
+    if last_object_identifier == 0 {
+        return Err(Error::InvalidFormat(
+            "PackageMetadata.last_object_identifier must be non-zero".to_owned(),
+        ));
+    }
+    Ok(snapshot)
+}
+
+fn set_metadata_seen(slot: &mut bool, name: &str) -> Result<()> {
+    if *slot {
+        return Err(Error::InvalidFormat(format!("{name} is duplicated")));
+    }
+    *slot = true;
+    Ok(())
+}
+
+fn validate_canonical_bool(data: &[u8], field: &WireField, name: &str) -> Result<()> {
+    let value = field_varint(data, field)?;
+    if value > 1 {
+        return Err(Error::InvalidFormat(format!(
+            "{name} is not a canonical bool"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_packed_varints(data: &[u8], field: &WireField, maximum: u64) -> Result<()> {
+    let mut payload = field_payload(data, field)?;
+    while !payload.is_empty() {
+        let (value, length) = decode_varint_from_bytes(payload).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Protobuf packed field {} contains an invalid varint: {error}",
+                field.number()
+            ))
+        })?;
+        if length != encoded_len(value) {
+            return Err(Error::InvalidFormat(format!(
+                "Protobuf packed field {} contains a noncanonical varint",
+                field.number()
+            )));
+        }
+        if value > maximum {
+            return Err(Error::InvalidFormat(format!(
+                "Protobuf packed field {} value exceeds its schema width",
+                field.number()
+            )));
+        }
+        payload = &payload[length..];
+    }
+    Ok(())
+}
+
+fn decode_component(data: &[u8]) -> Result<ComponentSnapshot> {
+    let fields = strict_wire_fields(data)?;
+    let mut component = ComponentSnapshot::default();
+    let mut identifier = None;
+    let mut preferred_locator = false;
+    let mut locator = false;
+    let mut is_stored_outside_object_archive = false;
+    let mut save_token = false;
+    let mut compression_algorithm = false;
+    let mut can_be_dropped = false;
+    let mut is_wasteful = false;
+    let mut required_package_identifier = false;
+    for field in fields {
+        match field.number() {
+            1 => set_metadata_field(
+                &mut identifier,
+                field_varint(data, &field)?,
+                "ComponentInfo.identifier",
+            )?,
+            2 => {
+                let _ = metadata_utf8(data, &field, "ComponentInfo.preferred_locator")?;
+                set_metadata_seen(&mut preferred_locator, "ComponentInfo.preferred_locator")?;
+            },
+            3 => {
+                let _ = metadata_utf8(data, &field, "ComponentInfo.locator")?;
+                set_metadata_seen(&mut locator, "ComponentInfo.locator")?;
+            },
+            4 | 5 | 14 | 15 => validate_packed_varints(data, &field, u64::from(u32::MAX))?,
+            6 | 13 | 18 => {
+                let _ = field_payload(data, &field)?;
+            },
+            7 => {
+                reserve_metadata(
+                    &mut component.data_references,
+                    1,
+                    "ComponentInfo data references",
+                    metadata_wire_limits(data.len())?,
+                )?;
+                component
+                    .data_references
+                    .push(decode_component_data_reference(field_payload(
+                        data, &field,
+                    )?)?);
+            },
+            10 => {
+                validate_canonical_bool(
+                    data,
+                    &field,
+                    "ComponentInfo.is_stored_outside_object_archive",
+                )?;
+                set_metadata_seen(
+                    &mut is_stored_outside_object_archive,
+                    "ComponentInfo.is_stored_outside_object_archive",
+                )?;
+            },
+            11 => {
+                let _ = field_payload(data, &field)?;
+            },
+            12 => {
+                let _ = field_varint(data, &field)?;
+                set_metadata_seen(&mut save_token, "ComponentInfo.save_token")?;
+            },
+            16 => {
+                let value = field_varint(data, &field)?;
+                u32::try_from(value).map_err(|_error| {
+                    Error::InvalidFormat(
+                        "ComponentInfo.compression_algorithm exceeds u32".to_owned(),
+                    )
+                })?;
+                set_metadata_seen(
+                    &mut compression_algorithm,
+                    "ComponentInfo.compression_algorithm",
+                )?;
+            },
+            17 => {
+                validate_canonical_bool(data, &field, "ComponentInfo.can_be_dropped")?;
+                set_metadata_seen(&mut can_be_dropped, "ComponentInfo.can_be_dropped")?;
+            },
+            19 => {
+                validate_canonical_bool(data, &field, "ComponentInfo.is_wasteful")?;
+                set_metadata_seen(&mut is_wasteful, "ComponentInfo.is_wasteful")?;
+            },
+            20 => validate_packed_varints(data, &field, u64::MAX)?,
+            21 => {
+                let _ = field_varint(data, &field)?;
+                set_metadata_seen(
+                    &mut required_package_identifier,
+                    "ComponentInfo.required_package_identifier",
+                )?;
+            },
+            _ => {},
+        }
+    }
+    let _identifier = identifier.ok_or_else(|| {
+        Error::InvalidFormat("ComponentInfo is missing its required identifier".to_owned())
+    })?;
+    if !preferred_locator {
+        return Err(Error::InvalidFormat(
+            "ComponentInfo is missing its required preferred locator".to_owned(),
+        ));
+    }
+    Ok(component)
+}
+
+fn decode_component_data_reference(data: &[u8]) -> Result<ComponentDataReferenceSnapshot> {
+    let fields = strict_wire_fields(data)?;
+    let limits = metadata_wire_limits(data.len())?;
+    let mut data_identifier = None;
+    let mut object_reference_list = Vec::new();
+    for field in fields {
+        match field.number() {
+            1 => set_metadata_field(
+                &mut data_identifier,
+                field_varint(data, &field)?,
+                "ComponentDataReference.data_identifier",
+            )?,
+            2 => {
+                reserve_metadata(
+                    &mut object_reference_list,
+                    1,
+                    "ComponentDataReference object references",
+                    limits,
+                )?;
+                object_reference_list.push(decode_object_reference(field_payload(data, &field)?)?);
+            },
+            _ => {},
+        }
+    }
+    Ok(ComponentDataReferenceSnapshot {
+        data_identifier: data_identifier.ok_or_else(|| {
+            Error::InvalidFormat(
+                "ComponentDataReference is missing its required data identifier".to_owned(),
+            )
+        })?,
+        object_reference_list,
+    })
+}
+
+fn decode_object_reference(data: &[u8]) -> Result<ObjectReferenceSnapshot> {
+    let fields = strict_wire_fields(data)?;
+    let mut object_identifier = None;
+    let mut count = None;
+    for field in fields {
+        match field.number() {
+            1 => set_metadata_field(
+                &mut object_identifier,
+                field_varint(data, &field)?,
+                "ComponentDataReference.ObjectReference.object_identifier",
+            )?,
+            2 => {
+                let value = field_varint(data, &field)?;
+                let value = u32::try_from(value).map_err(|_error| {
+                    Error::InvalidFormat(
+                        "ComponentDataReference.ObjectReference.count exceeds u32".to_owned(),
+                    )
+                })?;
+                set_metadata_field(
+                    &mut count,
+                    value,
+                    "ComponentDataReference.ObjectReference.count",
+                )?;
+            },
+            _ => {},
+        }
+    }
+    Ok(ObjectReferenceSnapshot {
+        object_identifier: object_identifier.ok_or_else(|| {
+            Error::InvalidFormat(
+                "ComponentDataReference.ObjectReference is missing its required object identifier"
+                    .to_owned(),
+            )
+        })?,
+        count: count.ok_or_else(|| {
+            Error::InvalidFormat(
+                "ComponentDataReference.ObjectReference is missing its required count".to_owned(),
+            )
+        })?,
+    })
+}
+
+fn decode_data_info(data: &[u8]) -> Result<DataInfoSnapshot> {
+    let fields = strict_wire_fields(data)?;
+    let limits = metadata_wire_limits(data.len())?;
+    let mut identifier = None;
+    let mut digest = None;
+    let mut preferred_file_name = None;
+    let mut file_name = None;
+    let mut materialized_length = None;
+    let mut document_resource_locator = false;
+    let mut source_bookmark_data = false;
+    let mut remote_url = false;
+    let mut can_download = false;
+    let mut download_priority = false;
+    let mut attributes = false;
+    let mut encryption_info = false;
+    let mut last_mismatched_digest = false;
+    let mut unmaterialized_ranges = false;
+    let mut remote_data_length = false;
+    let mut remote_data_has_package_storage = false;
+    let mut upload_status = false;
+    let mut remote_data_mtime = false;
+    let mut pasteboard_external_file_path = false;
+    for field in fields {
+        match field.number() {
+            1 => set_metadata_field(
+                &mut identifier,
+                field_varint(data, &field)?,
+                "DataInfo.identifier",
+            )?,
+            2 => set_metadata_field(
+                &mut digest,
+                metadata_bytes(data, &field, "DataInfo.digest", limits)?,
+                "DataInfo.digest",
+            )?,
+            3 => set_metadata_field(
+                &mut preferred_file_name,
+                metadata_string(data, &field, "DataInfo.preferred_file_name")?,
+                "DataInfo.preferred_file_name",
+            )?,
+            4 => set_metadata_field(
+                &mut file_name,
+                metadata_string(data, &field, "DataInfo.file_name")?,
+                "DataInfo.file_name",
+            )?,
+            5 | 7 | 99 => {
+                let name = match field.number() {
+                    5 => "DataInfo.document_resource_locator",
+                    7 => "DataInfo.remote_url",
+                    _ => "DataInfo.pasteboard_external_file_path",
+                };
+                let _ = metadata_utf8(data, &field, name)?;
+                set_metadata_seen(
+                    match field.number() {
+                        5 => &mut document_resource_locator,
+                        7 => &mut remote_url,
+                        _ => &mut pasteboard_external_file_path,
+                    },
+                    name,
+                )?;
+            },
+            6 | 12 => {
+                let name = if field.number() == 6 {
+                    "DataInfo.source_bookmark_data"
+                } else {
+                    "DataInfo.last_mismatched_digest"
+                };
+                let _ = field_payload(data, &field)?;
+                set_metadata_seen(
+                    if field.number() == 6 {
+                        &mut source_bookmark_data
+                    } else {
+                        &mut last_mismatched_digest
+                    },
+                    name,
+                )?;
+            },
+            8 | 15 => {
+                let name = if field.number() == 8 {
+                    "DataInfo.can_download"
+                } else {
+                    "DataInfo.remote_data_has_package_storage"
+                };
+                validate_canonical_bool(data, &field, name)?;
+                set_metadata_seen(
+                    if field.number() == 8 {
+                        &mut can_download
+                    } else {
+                        &mut remote_data_has_package_storage
+                    },
+                    name,
+                )?;
+            },
+            9 | 16 => {
+                let name = if field.number() == 9 {
+                    "DataInfo.download_priority"
+                } else {
+                    "DataInfo.upload_status"
+                };
+                let _ = field_varint(data, &field)?;
+                set_metadata_seen(
+                    if field.number() == 9 {
+                        &mut download_priority
+                    } else {
+                        &mut upload_status
+                    },
+                    name,
+                )?;
+            },
+            10 | 11 | 13 => {
+                let name = match field.number() {
+                    10 => "DataInfo.attributes",
+                    11 => "DataInfo.encryption_info",
+                    _ => "DataInfo.unmaterialized_ranges",
+                };
+                let nested = field_payload(data, &field)?;
+                let _ = strict_wire_fields(nested)?;
+                set_metadata_seen(
+                    match field.number() {
+                        10 => &mut attributes,
+                        11 => &mut encryption_info,
+                        _ => &mut unmaterialized_ranges,
+                    },
+                    name,
+                )?;
+            },
+            14 => {
+                let _ = field_varint(data, &field)?;
+                set_metadata_seen(&mut remote_data_length, "DataInfo.remote_data_length")?;
+            },
+            17 => {
+                if field.wire_type() != 1 {
+                    return Err(Error::InvalidFormat(format!(
+                        "DataInfo.remote_data_mtime has an invalid wire type: {}",
+                        field.wire_type()
+                    )));
+                }
+                field.validate_canonical_key(data)?;
+                if field.checked_payload(data)?.len() != 8 {
+                    return Err(Error::InvalidFormat(
+                        "DataInfo.remote_data_mtime is not a fixed64 value".to_owned(),
+                    ));
+                }
+                set_metadata_seen(&mut remote_data_mtime, "DataInfo.remote_data_mtime")?;
+            },
+            18 => set_metadata_field(
+                &mut materialized_length,
+                field_varint(data, &field)?,
+                "DataInfo.materialized_length",
+            )?,
+            _ => {},
+        }
+    }
+    Ok(DataInfoSnapshot {
+        identifier: identifier.ok_or_else(|| {
+            Error::InvalidFormat("DataInfo is missing its required identifier".to_owned())
+        })?,
+        digest: digest.ok_or_else(|| {
+            Error::InvalidFormat("DataInfo is missing its required digest".to_owned())
+        })?,
+        preferred_file_name: preferred_file_name.ok_or_else(|| {
+            Error::InvalidFormat("DataInfo is missing its required preferred file name".to_owned())
+        })?,
+        file_name,
+        materialized_length,
+    })
+}
+
+fn decode_reference_identifier(data: &[u8]) -> Result<u64> {
+    let fields = strict_wire_fields(data)?;
+    let mut identifier = None;
+    let mut deprecated_type = false;
+    let mut deprecated_is_external = false;
+    for field in fields {
+        match field.number() {
+            1 => set_metadata_field(
+                &mut identifier,
+                field_varint(data, &field)?,
+                "Reference.identifier",
+            )?,
+            2 => {
+                let _ = field_varint(data, &field)?;
+                set_metadata_seen(&mut deprecated_type, "Reference.deprecated_type")?;
+            },
+            3 => {
+                validate_canonical_bool(data, &field, "Reference.deprecated_is_external")?;
+                set_metadata_seen(
+                    &mut deprecated_is_external,
+                    "Reference.deprecated_is_external",
+                )?;
+            },
+            _ => {},
+        }
+    }
+    identifier.ok_or_else(|| {
+        Error::InvalidFormat("Reference is missing its required identifier".to_owned())
+    })
+}
+
+fn data_metadata_identifiers(data: &[u8]) -> Result<Vec<u64>> {
+    let fields = strict_wire_fields(data)?;
+    let limits = metadata_wire_limits(data.len())?;
+    let mut identifiers = Vec::new();
+    for field in fields {
+        if field.number() == 1 {
+            reserve_metadata(&mut identifiers, 1, "DataMetadataMap entries", limits)?;
+            identifiers.push(decode_data_metadata_entry(field_payload(data, &field)?)?);
+        }
+    }
+    Ok(identifiers)
+}
+
+fn decode_data_metadata_entry(data: &[u8]) -> Result<u64> {
+    let fields = strict_wire_fields(data)?;
+    let mut data_identifier = None;
+    let mut data_metadata = None;
+    for field in fields {
+        match field.number() {
+            1 => set_metadata_field(
+                &mut data_identifier,
+                field_varint(data, &field)?,
+                "DataMetadataMap.DataMetadataMapEntry.data_identifier",
+            )?,
+            2 => set_metadata_field(
+                &mut data_metadata,
+                decode_reference_identifier(field_payload(data, &field)?)?,
+                "DataMetadataMap.DataMetadataMapEntry.data_metadata",
+            )?,
+            _ => {},
+        }
+    }
+    let _data_metadata = data_metadata.ok_or_else(|| {
+        Error::InvalidFormat(
+            "DataMetadataMap entry is missing its required data metadata reference".to_owned(),
+        )
+    })?;
+    data_identifier.ok_or_else(|| {
+        Error::InvalidFormat(
+            "DataMetadataMap entry is missing its required data identifier".to_owned(),
+        )
+    })
+}
+
+fn set_metadata_field<T>(slot: &mut Option<T>, value: T, name: &str) -> Result<()> {
+    if slot.replace(value).is_some() {
+        return Err(Error::InvalidFormat(format!("{name} is duplicated")));
+    }
+    Ok(())
+}
+
+fn metadata_string(data: &[u8], field: &WireField, name: &str) -> Result<String> {
+    let value = metadata_utf8(data, field, name)?;
+    let mut output = String::new();
+    output.try_reserve(value.len()).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "media metadata string",
+            amount: value.len(),
+        })
+    })?;
+    output.push_str(value);
+    Ok(output)
+}
+
+fn metadata_bytes(
+    data: &[u8],
+    field: &WireField,
+    _name: &str,
+    limits: WireLimits,
+) -> Result<Vec<u8>> {
+    let value = field_payload(data, field)?;
+    let mut output = Vec::new();
+    if value.len() > limits.max_input_bytes() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed: value.len(),
+            limit: limits.max_input_bytes(),
+        }));
+    }
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|_allocation| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "media metadata bytes",
+                amount: value.len(),
+            })
+        })?;
+    output.extend_from_slice(value);
+    Ok(output)
+}
+
+fn metadata_utf8<'a>(data: &'a [u8], field: &WireField, name: &str) -> Result<&'a str> {
+    let payload = field_payload(data, field)?;
+    std::str::from_utf8(payload)
+        .map_err(|_error| Error::InvalidFormat(format!("{name} is not valid UTF-8")))
+}
+
+fn decode_package_metadata(package: &IWorkPackage) -> Result<PackageMetadataSnapshot> {
     let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
     let mut payload = None;
     for object in &archive.objects {
@@ -403,10 +1172,9 @@ fn decode_package_metadata(package: &IWorkPackage) -> Result<protobuf::tsp::Pack
             }
         }
     }
-    protobuf::tsp::PackageMetadata::decode(
+    decode_package_metadata_payload(
         payload.ok_or_else(|| Error::Bundle("PackageMetadata payload was not found".to_owned()))?,
     )
-    .map_err(Into::into)
 }
 
 pub(crate) fn data_entry_name(file_name: &str) -> Result<String> {
@@ -435,6 +1203,7 @@ pub(crate) fn field_payload<'a>(data: &'a [u8], field: &WireField) -> Result<&'a
             field.number()
         )));
     }
+    field.validate_canonical_framing(data)?;
     field.checked_payload(data).map_err(Error::from)
 }
 
@@ -445,27 +1214,32 @@ fn field_varint(data: &[u8], field: &WireField) -> Result<u64> {
             field.number()
         )));
     }
-    decode_varint_from_bytes(field.checked_payload(data)?)
-        .map(|(value, _)| value)
-        .map_err(|error| Error::InvalidFormat(format!("Invalid protobuf varint: {error}")))
+    field.validate_canonical_key(data)?;
+    let payload = field.checked_payload(data)?;
+    let (value, length) = decode_varint_from_bytes(payload)
+        .map_err(|error| Error::InvalidFormat(format!("Invalid protobuf varint: {error}")))?;
+    if length != payload.len() || length != encoded_len(value) {
+        return Err(Error::InvalidFormat(format!(
+            "Protobuf field {} contains a noncanonical varint",
+            field.number()
+        )));
+    }
+    Ok(value)
 }
 
 fn data_info_identifier(data: &[u8]) -> Result<u64> {
-    let fields = parse_wire_fields(data)?;
-    let identifiers = fields
-        .iter()
-        .filter(|field| field.number() == 1)
-        .map(|field| field_varint(data, field))
-        .collect::<Result<Vec<_>>>()?;
-    match identifiers.as_slice() {
-        [identifier] => Ok(*identifier),
-        [] => Err(Error::InvalidFormat(
-            "DataInfo is missing its required identifier".to_owned(),
-        )),
-        _ => Err(Error::InvalidFormat(
-            "DataInfo contains duplicate identifiers".to_owned(),
-        )),
+    let fields = strict_wire_fields(data)?;
+    let mut identifier = None;
+    for field in fields.iter().filter(|field| field.number() == 1) {
+        set_metadata_field(
+            &mut identifier,
+            field_varint(data, field)?,
+            "DataInfo.identifier",
+        )?;
     }
+    identifier.ok_or_else(|| {
+        Error::InvalidFormat("DataInfo is missing its required identifier".to_owned())
+    })
 }
 
 pub(crate) fn patch_package_metadata(
@@ -480,8 +1254,10 @@ pub(crate) fn patch_package_metadata(
             digest.len()
         )));
     }
-    let fields = parse_wire_fields(metadata)?;
-    let mut output = Vec::with_capacity(metadata.len());
+    let _source = decode_package_metadata_payload(metadata)?;
+    let fields = strict_wire_fields(metadata)?;
+    let limits = metadata_wire_limits(metadata.len())?;
+    let mut output = output_with_capacity(metadata.len(), limits)?;
     let mut patched_count = 0usize;
     for field in fields {
         if field.number() == 4 {
@@ -496,13 +1272,23 @@ pub(crate) fn patch_package_metadata(
                     Error::InvalidFormat("Patched DataInfo count overflow".to_owned())
                 })?;
                 let patched = patch_data_info(data_info, digest, materialized_length)?;
-                output.extend_from_slice(&metadata[field.start()..field.key_end()]);
-                encode_varint_into(&mut output, patched.len() as u64);
-                output.extend_from_slice(&patched);
+                extend_output(
+                    &mut output,
+                    &metadata[field.start()..field.key_end()],
+                    limits,
+                )?;
+                append_varint_to_output(
+                    &mut output,
+                    u64::try_from(patched.len()).map_err(|_error| {
+                        Error::InvalidFormat("Patched DataInfo length exceeds u64".to_owned())
+                    })?,
+                    limits,
+                )?;
+                extend_output(&mut output, &patched, limits)?;
                 continue;
             }
         }
-        output.extend_from_slice(&metadata[field.start()..field.end()]);
+        extend_output(&mut output, &metadata[field.start()..field.end()], limits)?;
     }
     match patched_count {
         1 => {},
@@ -517,15 +1303,19 @@ pub(crate) fn patch_package_metadata(
             )));
         },
     }
-    let decoded = protobuf::tsp::PackageMetadata::decode(output.as_slice())?;
-    let matches = decoded
+    let decoded = decode_package_metadata_payload(output.as_slice())?;
+    let mut matches = decoded
         .datas
         .iter()
-        .filter(|data| data.identifier == data_identifier)
-        .collect::<Vec<_>>();
-    if matches.len() != 1
-        || matches[0].digest != digest
-        || matches[0].materialized_length != Some(materialized_length)
+        .filter(|data| data.identifier == data_identifier);
+    let Some(matched) = matches.next() else {
+        return Err(Error::InvalidFormat(
+            "Patched PackageMetadata did not decode to the requested values".to_owned(),
+        ));
+    };
+    if matches.next().is_some()
+        || matched.digest != digest
+        || matched.materialized_length != Some(materialized_length)
     {
         return Err(Error::InvalidFormat(
             "Patched PackageMetadata did not decode to the requested values".to_owned(),
@@ -548,7 +1338,7 @@ pub(crate) fn append_data_info(
             digest.len()
         )));
     }
-    let decoded = protobuf::tsp::PackageMetadata::decode(metadata)?;
+    let decoded = decode_package_metadata_payload(metadata)?;
     if decoded
         .datas
         .iter()
@@ -559,29 +1349,34 @@ pub(crate) fn append_data_info(
         )));
     }
 
-    let mut data_info = Vec::new();
-    append_wire_varint(&mut data_info, 1, data_identifier);
-    append_wire_bytes(&mut data_info, 2, digest);
-    append_wire_bytes(&mut data_info, 3, preferred_filename.as_bytes());
-    append_wire_bytes(&mut data_info, 4, file_name.as_bytes());
-    append_wire_varint(&mut data_info, 18, materialized_length);
+    let limits = metadata_wire_limits(metadata.len())?;
+    let mut data_info = output_with_capacity(0, limits)?;
+    append_wire_varint_limited(&mut data_info, 1, data_identifier, limits)?;
+    append_wire_bytes_limited(&mut data_info, 2, digest, limits)?;
+    append_wire_bytes_limited(&mut data_info, 3, preferred_filename.as_bytes(), limits)?;
+    append_wire_bytes_limited(&mut data_info, 4, file_name.as_bytes(), limits)?;
+    append_wire_varint_limited(&mut data_info, 18, materialized_length, limits)?;
 
     // Appending a repeated field is protobuf-canonical and avoids rewriting any
     // pre-existing metadata field, including unknown extensions.
-    let mut output = Vec::with_capacity(metadata.len() + data_info.len() + 16);
-    output.extend_from_slice(metadata);
-    append_wire_bytes(&mut output, 4, &data_info);
-    let verified = protobuf::tsp::PackageMetadata::decode(output.as_slice())?;
-    let inserted = verified
+    let mut output = output_with_capacity(metadata.len(), limits)?;
+    extend_output(&mut output, metadata, limits)?;
+    append_wire_bytes_limited(&mut output, 4, &data_info, limits)?;
+    let verified = decode_package_metadata_payload(output.as_slice())?;
+    let mut remaining = verified
         .datas
         .iter()
-        .filter(|data| data.identifier == data_identifier)
-        .collect::<Vec<_>>();
-    if inserted.len() != 1
-        || inserted[0].digest != digest
-        || inserted[0].preferred_file_name != preferred_filename
-        || inserted[0].file_name.as_deref() != Some(file_name)
-        || inserted[0].materialized_length != Some(materialized_length)
+        .filter(|data| data.identifier == data_identifier);
+    let Some(inserted) = remaining.next() else {
+        return Err(Error::InvalidFormat(
+            "Appended DataInfo did not decode to the requested values".to_owned(),
+        ));
+    };
+    if remaining.next().is_some()
+        || inserted.digest != digest
+        || inserted.preferred_file_name != preferred_filename
+        || inserted.file_name.as_deref() != Some(file_name)
+        || inserted.materialized_length != Some(materialized_length)
     {
         return Err(Error::InvalidFormat(
             "Appended DataInfo did not decode to the requested values".to_owned(),
@@ -590,20 +1385,76 @@ pub(crate) fn append_data_info(
     Ok(output)
 }
 
+#[cfg(test)]
 fn append_wire_varint(output: &mut Vec<u8>, field_number: u64, value: u64) {
     encode_varint_into(output, field_number << 3);
     encode_varint_into(output, value);
 }
 
+#[cfg(test)]
 fn append_wire_bytes(output: &mut Vec<u8>, field_number: u64, value: &[u8]) {
     encode_varint_into(output, (field_number << 3) | 2);
     encode_varint_into(output, value.len() as u64);
     output.extend_from_slice(value);
 }
 
+fn append_varint_to_output(output: &mut Vec<u8>, value: u64, limits: WireLimits) -> Result<()> {
+    reserve_output(output, encoded_len(value), limits)?;
+    encode_varint_into(output, value);
+    Ok(())
+}
+
+fn append_wire_varint_limited(
+    output: &mut Vec<u8>,
+    field_number: u64,
+    value: u64,
+    limits: WireLimits,
+) -> Result<()> {
+    let key = field_number
+        .checked_shl(3)
+        .ok_or_else(|| Error::InvalidFormat("Metadata field number overflows u64".to_owned()))?;
+    reserve_output(
+        output,
+        encoded_len(key)
+            .checked_add(encoded_len(value))
+            .ok_or_else(|| {
+                Error::InvalidFormat("Metadata varint size overflows usize".to_owned())
+            })?,
+        limits,
+    )?;
+    encode_varint_into(output, key);
+    encode_varint_into(output, value);
+    Ok(())
+}
+
+fn append_wire_bytes_limited(
+    output: &mut Vec<u8>,
+    field_number: u64,
+    value: &[u8],
+    limits: WireLimits,
+) -> Result<()> {
+    let key = field_number
+        .checked_shl(3)
+        .and_then(|key| key.checked_add(2))
+        .ok_or_else(|| Error::InvalidFormat("Metadata field number overflows u64".to_owned()))?;
+    let length = u64::try_from(value.len())
+        .map_err(|_error| Error::InvalidFormat("Metadata field length exceeds u64".to_owned()))?;
+    let additional = encoded_len(key)
+        .checked_add(encoded_len(length))
+        .and_then(|size| size.checked_add(value.len()))
+        .ok_or_else(|| Error::InvalidFormat("Metadata bytes size overflows usize".to_owned()))?;
+    reserve_output(output, additional, limits)?;
+    encode_varint_into(output, key);
+    encode_varint_into(output, length);
+    output.extend_from_slice(value);
+    Ok(())
+}
+
 pub(crate) fn remove_data_info(metadata: &[u8], data_identifier: u64) -> Result<Vec<u8>> {
-    let fields = parse_wire_fields(metadata)?;
-    let mut output = Vec::with_capacity(metadata.len());
+    let _source = decode_package_metadata_payload(metadata)?;
+    let fields = strict_wire_fields(metadata)?;
+    let limits = metadata_wire_limits(metadata.len())?;
+    let mut output = output_with_capacity(metadata.len(), limits)?;
     let mut removed_count = 0usize;
     for field in fields {
         if field.number() == 4 {
@@ -619,7 +1470,7 @@ pub(crate) fn remove_data_info(metadata: &[u8], data_identifier: u64) -> Result<
                 continue;
             }
         }
-        output.extend_from_slice(&metadata[field.start()..field.end()]);
+        extend_output(&mut output, &metadata[field.start()..field.end()], limits)?;
     }
     match removed_count {
         1 => {},
@@ -634,7 +1485,7 @@ pub(crate) fn remove_data_info(metadata: &[u8], data_identifier: u64) -> Result<
             )));
         },
     }
-    let decoded = protobuf::tsp::PackageMetadata::decode(output.as_slice())?;
+    let decoded = decode_package_metadata_payload(output.as_slice())?;
     if decoded
         .datas
         .iter()
@@ -648,8 +1499,10 @@ pub(crate) fn remove_data_info(metadata: &[u8], data_identifier: u64) -> Result<
 }
 
 fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Result<Vec<u8>> {
-    let fields = parse_wire_fields(data)?;
-    let mut output = Vec::with_capacity(data.len());
+    let _source = decode_data_info(data)?;
+    let fields = strict_wire_fields(data)?;
+    let limits = metadata_wire_limits(data.len())?;
+    let mut output = output_with_capacity(data.len(), limits)?;
     let mut digest_count = 0usize;
     let mut length_count = 0usize;
     for field in fields {
@@ -660,15 +1513,22 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
                         "DataInfo.digest has an invalid wire type".to_owned(),
                     ));
                 }
+                let _ = field_payload(data, &field)?;
                 digest_count += 1;
                 if digest_count > 1 {
                     return Err(Error::InvalidFormat(
                         "DataInfo contains duplicate digests".to_owned(),
                     ));
                 }
-                output.extend_from_slice(&data[field.start()..field.key_end()]);
-                encode_varint_into(&mut output, digest.len() as u64);
-                output.extend_from_slice(digest);
+                extend_output(&mut output, &data[field.start()..field.key_end()], limits)?;
+                append_varint_to_output(
+                    &mut output,
+                    u64::try_from(digest.len()).map_err(|_error| {
+                        Error::InvalidFormat("Digest length exceeds u64".to_owned())
+                    })?,
+                    limits,
+                )?;
+                extend_output(&mut output, digest, limits)?;
             },
             18 => {
                 if field.wire_type() != 0 {
@@ -676,26 +1536,112 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
                         "DataInfo.materialized_length has an invalid wire type".to_owned(),
                     ));
                 }
+                let _ = field_varint(data, &field)?;
                 length_count += 1;
                 if length_count > 1 {
                     return Err(Error::InvalidFormat(
                         "DataInfo contains duplicate materialized lengths".to_owned(),
                     ));
                 }
-                output.extend_from_slice(&data[field.start()..field.key_end()]);
-                encode_varint_into(&mut output, materialized_length);
+                extend_output(&mut output, &data[field.start()..field.key_end()], limits)?;
+                append_varint_to_output(&mut output, materialized_length, limits)?;
             },
-            _ => output.extend_from_slice(&data[field.start()..field.end()]),
+            _ => extend_output(&mut output, &data[field.start()..field.end()], limits)?,
         }
     }
     if digest_count == 0 {
-        encode_varint_into(&mut output, (2 << 3) | 2);
-        encode_varint_into(&mut output, digest.len() as u64);
-        output.extend_from_slice(digest);
+        append_wire_bytes_limited(&mut output, 2, digest, limits)?;
     }
     if length_count == 0 {
-        encode_varint_into(&mut output, 18 << 3);
-        encode_varint_into(&mut output, materialized_length);
+        append_wire_varint_limited(&mut output, 18, materialized_length, limits)?;
     }
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn data_info(identifier: u64) -> Vec<u8> {
+        let mut data_info = Vec::new();
+        append_wire_varint(&mut data_info, 1, identifier);
+        append_wire_bytes(&mut data_info, 2, &[0x11; 20]);
+        append_wire_bytes(&mut data_info, 3, b"image.png");
+        append_wire_bytes(&mut data_info, 4, b"image-7.png");
+        append_wire_varint(&mut data_info, 18, 7);
+        data_info
+    }
+
+    fn package_metadata_with_data_info(data_info: &[u8]) -> Vec<u8> {
+        let mut metadata = Vec::new();
+        append_wire_varint(&mut metadata, 1, 100);
+        append_wire_bytes(&mut metadata, 4, data_info);
+        metadata
+    }
+
+    fn uuid_entry(identifier: u64, lower: u64, upper: u64) -> Vec<u8> {
+        let mut uuid = Vec::new();
+        append_wire_varint(&mut uuid, 1, lower);
+        append_wire_varint(&mut uuid, 2, upper);
+
+        let mut entry = Vec::new();
+        append_wire_varint(&mut entry, 1, identifier);
+        append_wire_bytes(&mut entry, 2, &uuid);
+        entry
+    }
+
+    #[test]
+    fn legacy_uuid_registry_metadata_fits_strict_inspection_budget() {
+        let mut component = Vec::new();
+        append_wire_varint(&mut component, 1, 4);
+        append_wire_bytes(&mut component, 2, b"Slide-4");
+        for identifier in [4, 5, 6, 70, 71, 72, 73] {
+            let entry = uuid_entry(identifier, identifier, identifier + 100);
+            append_wire_bytes(&mut component, 11, &entry);
+        }
+
+        let mut metadata = Vec::new();
+        append_wire_varint(&mut metadata, 1, 100);
+        append_wire_bytes(&mut metadata, 3, &component);
+
+        let snapshot = decode_package_metadata_payload(&metadata).unwrap();
+        assert_eq!(snapshot.components.len(), 1);
+        assert!(snapshot.datas.is_empty());
+    }
+
+    #[test]
+    fn rewrites_preserve_noncanonical_unknown_varints() {
+        let mut data_info = data_info(7);
+        // Field 50 is unknown to the media codec. Its value intentionally
+        // uses an overlong varint representation and must survive a patch.
+        data_info.extend_from_slice(&[0x90, 0x03, 0x81, 0x00]);
+        let metadata = package_metadata_with_data_info(&data_info);
+        let patched = patch_package_metadata(&metadata, 7, &[0x22; 20], 11).unwrap();
+        assert!(
+            patched
+                .windows(4)
+                .any(|window| window == [0x90, 0x03, 0x81, 0x00])
+        );
+
+        let removed = remove_data_info(&patched, 7).unwrap();
+        assert!(
+            !removed
+                .windows(4)
+                .any(|window| window == [0x90, 0x03, 0x81, 0x00])
+        );
+    }
+
+    #[test]
+    fn known_wrong_wire_and_duplicate_fields_are_rejected() {
+        let mut invalid_data_info = data_info(7);
+        // DataInfo.remote_data_length is a known uint64 field, not bytes.
+        append_wire_bytes(&mut invalid_data_info, 14, b"wrong-wire");
+        let metadata = package_metadata_with_data_info(&invalid_data_info);
+        assert!(decode_package_metadata_payload(&metadata).is_err());
+
+        let mut duplicate_reference = Vec::new();
+        append_wire_varint(&mut duplicate_reference, 1, 9);
+        append_wire_varint(&mut duplicate_reference, 1, 10);
+        assert!(decode_reference_identifier(&duplicate_reference).is_err());
+    }
 }

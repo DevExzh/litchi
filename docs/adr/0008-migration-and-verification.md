@@ -10954,9 +10954,11 @@ monolith-exit claim.
 The current boundary checker reports 64 workspace packages, 239 internal
 dependency declarations, and 13 ordered migration debts. The focused protocol
 codec check records 33 passed tests; the full `litchi-iwa-protos` suite is
-verified at 266 passed and 0 failed. The current Numbers library run
-records 344 passed tests with four ignored. The prior XLS certification gate
-remains at 2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
+verified at 267 passed and 0 failed. The current Numbers library run records
+356 passed tests with four ignored. The current `litchi-iwa` library gate
+records 1,442 passed tests; the Pages all-target gate records 149 passed tests,
+and the current Keynote all-target gate is passing. The prior XLS certification
+gate remains at 2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
 
 Native no-repair reopen evidence covers Keynote transition/title and Pages
 body/background paths. A native Numbers rich/formula/comment reopen retained

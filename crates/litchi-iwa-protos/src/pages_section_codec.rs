@@ -199,6 +199,55 @@ pub fn decode_pagination(
     })
 }
 
+/// Decode only the optional native section name from an already-preflighted
+/// payload.
+///
+/// The section envelope has many legacy fields whose decoding belongs to
+/// other callers.  This ingress deliberately routes only field 26 through
+/// the generated lazy view: all other root fields are wire-framed and
+/// bounded, then presented as opaque bytes to the name projection.  The
+/// caller-owned payload remains the preservation authority.
+pub fn decode_section_name<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<Option<&'source str>, DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    budget.charge_work(source.len())?;
+
+    let mut remaining = source;
+    let mut name_field = None;
+    while !remaining.is_empty() {
+        let before = remaining;
+        let Some(field) = next_root_field(&mut remaining, &mut budget, 1)? else {
+            break;
+        };
+        if field.number != SECTION_NAME_FIELD {
+            continue;
+        }
+        if name_field.is_some() {
+            return Err(DecodeError::invalid());
+        }
+        let bytes = field.length_delimited()?;
+        budget.charge_name(bytes.len())?;
+        if bytes.contains(&0) {
+            return Err(DecodeError::invalid());
+        }
+        let consumed = before
+            .len()
+            .checked_sub(remaining.len())
+            .ok_or_else(DecodeError::invalid)?;
+        name_field = Some(&before[..consumed]);
+    }
+
+    let projection_source = name_field.unwrap_or(&[]);
+    budget.charge_work(projection_source.len())?;
+    let view: projection::PagesSectionSettingsArchiveLazyView<'source> = options
+        .buffa()
+        .decode_lazy_view(projection_source)
+        .map_err(|_error| DecodeError::invalid())?;
+    Ok(view.name)
+}
+
 /// Borrowed, presence-preserving aggregate settings from one native section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct SectionSettingsSnapshot<'source> {
@@ -1108,6 +1157,50 @@ mod tests {
         assert!(with_unknown.starts_with(&source));
         assert!(with_unknown.len() > source.len());
         Ok(())
+    }
+
+    #[test]
+    fn name_projection_routes_only_field_26_and_preserves_name_guards() {
+        let mut source = Vec::new();
+        // These records are valid wire values but intentionally malformed for
+        // the aggregate settings projection. A name-only ingress must leave
+        // their interpretation to the existing section decoder.
+        push_length_field(&mut source, FIRST_TEMPLATE_FIELD, &[0xff]);
+        push_length_field(&mut source, SECTION_NAME_FIELD, "Chapter 章".as_bytes());
+        push_length_field(&mut source, FIRST_PAGE_HIDES_HEADER_FOOTER_FIELD, &[0x01]);
+        push_varint_field(&mut source, 99, 0xfeed);
+        let original = source.clone();
+
+        let name = decode_section_name(&source, generous(&source)).expect("name projection");
+        assert_eq!(name, Some("Chapter 章"));
+        assert_eq!(
+            source, original,
+            "the projection must not rewrite source bytes"
+        );
+
+        let limited = decode_section_name(
+            &source,
+            generous(&source).with_max_name_bytes("Chapter 章".len() - 1),
+        )
+        .expect_err("name bytes must be charged before projection");
+        assert_eq!(
+            limited.resource_limit(),
+            Some(DecodeLimit::NameBytes {
+                observed: "Chapter 章".len(),
+                maximum: "Chapter 章".len() - 1,
+            })
+        );
+
+        let mut duplicate = Vec::new();
+        push_length_field(&mut duplicate, SECTION_NAME_FIELD, b"one");
+        push_length_field(&mut duplicate, SECTION_NAME_FIELD, b"two");
+        assert!(decode_section_name(&duplicate, generous(&duplicate)).is_err());
+
+        for name in [&[0xff][..], b"bad\0name"] {
+            let mut malformed = Vec::new();
+            push_length_field(&mut malformed, SECTION_NAME_FIELD, name);
+            assert!(decode_section_name(&malformed, generous(&malformed)).is_err());
+        }
     }
 
     #[test]

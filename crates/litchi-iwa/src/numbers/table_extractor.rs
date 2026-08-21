@@ -36,9 +36,11 @@ use super::cell::CellValue;
 use super::table::NumbersTable;
 use crate::bundle::Bundle;
 use crate::object_index::{ObjectIndex, ResolvedObjectRef};
-use crate::protobuf::{tn, tsce, tsd, tst};
+use crate::protobuf::{tn, tsce, tst};
 use crate::{Error, Result};
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
+use litchi_iwa_protos::comment_storage_codec;
 use litchi_numbers::cell::FiniteF64;
 use litchi_numbers::table::Dimensions;
 use prost::Message;
@@ -58,6 +60,100 @@ const MAX_TABLE_ROWS: usize = 1 << 20;
 const MAX_TABLE_COLUMNS: usize = 1 << 14;
 const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
 const MAX_MATERIALIZED_CELLS: usize = 1 << 20;
+const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+
+fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::DecodeOptions {
+    comment_storage_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(32)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
+        source.len().clamp(1, litchi_numbers::MAX_REFERENCES),
+        source
+            .len()
+            .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+    )
+}
+
+fn comment_storage_allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+#[derive(Debug, Default)]
+struct CommentStorageReplyIds {
+    identifiers: Vec<u64>,
+    allocation_failed: Option<usize>,
+}
+
+impl CommentStorageReplyIds {
+    fn into_identifiers(self) -> Result<Vec<u64>> {
+        match self.allocation_failed {
+            Some(amount) => Err(comment_storage_allocation_error(
+                "Numbers comment reply identifiers",
+                amount,
+            )),
+            None => Ok(self.identifiers),
+        }
+    }
+}
+
+impl comment_storage_codec::CommentStorageVisitor for CommentStorageReplyIds {
+    fn visit_reply(
+        &mut self,
+        reply: comment_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
+        if self.allocation_failed.is_some() {
+            return Ok(());
+        }
+        if self.identifiers.try_reserve(1).is_err() {
+            // Keep traversing so a later malformed field still wins over a
+            // candidate-local allocation failure. IDs are published only
+            // after the enclosing payload has decoded successfully.
+            self.allocation_failed = Some(self.identifiers.len().saturating_add(1));
+            return Ok(());
+        }
+        self.identifiers.push(reply.identifier());
+        Ok(())
+    }
+}
+
+fn strict_comment_storage_error(
+    storage_id: u64,
+    error: comment_storage_codec::DecodeError,
+) -> Error {
+    Error::InvalidFormat(format!(
+        "Numbers comment storage object {storage_id} failed strict validation: {error}"
+    ))
+}
+
+fn decode_comment_storage_payload<'source>(
+    storage_id: u64,
+    source: &'source [u8],
+) -> Result<(
+    comment_storage_codec::CommentStorageSnapshot<'source>,
+    Vec<u64>,
+)> {
+    let mut replies = CommentStorageReplyIds::default();
+    let (comment, report) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
+        source,
+        comment_storage_decode_options(source),
+        &mut replies,
+    )
+    .map_err(|error| strict_comment_storage_error(storage_id, error))?;
+    let reply_ids = replies.into_identifiers()?;
+    if reply_ids.len() != report.reply_references() {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers comment storage object {storage_id} streamed {} replies but reported {}",
+            reply_ids.len(),
+            report.reply_references(),
+        )));
+    }
+    Ok((comment, reply_ids))
+}
 
 struct CellTables<'a> {
     strings: &'a StringTable,
@@ -457,10 +553,10 @@ impl<'a> TableDataExtractor<'a> {
             let comments = storage_object
                 .messages
                 .iter()
-                .filter(|message| message.type_ == 3056)
-                .map(|message| tsd::CommentStorageArchive::decode(message.data.as_slice()))
+                .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+                .map(|message| decode_comment_storage_payload(storage_id, message.data.as_slice()))
                 .collect::<std::result::Result<Vec<_>, _>>()?;
-            let comment = comments.first().ok_or_else(|| {
+            let (comment, reply_ids) = comments.first().ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Object {storage_id} has no TSD comment-storage payload"
                 ))
@@ -473,29 +569,48 @@ impl<'a> TableDataExtractor<'a> {
             result
                 .try_reserve(1)
                 .map_err(|_| allocation_error("Numbers comment sidecar", result.len() + 1))?;
+            let author_id = comment
+                .author()
+                .map(|author| AuthorId::from_raw(author.identifier()))
+                .transpose()?;
+            // Validate IDs before reserving the output vector so a malformed
+            // typed ID retains precedence over a candidate-local allocation
+            // failure. The vector is published only after all IDs and its
+            // capacity have been accepted.
+            for identifier in reply_ids {
+                StorageId::from_raw(*identifier).map_err(crate::Error::from)?;
+            }
+            let mut typed_reply_ids = Vec::new();
+            typed_reply_ids
+                .try_reserve_exact(reply_ids.len())
+                .map_err(|_| {
+                    comment_storage_allocation_error(
+                        "Numbers comment reply identifiers",
+                        reply_ids.len(),
+                    )
+                })?;
+            for identifier in reply_ids {
+                typed_reply_ids.push(StorageId::from_raw(*identifier).map_err(crate::Error::from)?);
+            }
+            let typed_reply_ids = typed_reply_ids.into_boxed_slice();
+            let storage_uuid = comment
+                .storage_uuid()
+                .map(|uuid| Uuid::from_parts(uuid.lower(), uuid.upper()))
+                .transpose()?;
+            let source_text = comment.text().unwrap_or_default();
+            let mut text = String::new();
+            text.try_reserve_exact(source_text.len()).map_err(|_| {
+                comment_storage_allocation_error("Numbers comment text", source_text.len())
+            })?;
+            text.push_str(source_text);
             result.push((
                 entry.key,
                 Comment {
-                    text: comment.text.clone().unwrap_or_default(),
-                    creation_date_seconds: comment.creation_date.as_ref().map(|date| date.seconds),
-                    author_id: comment
-                        .author
-                        .as_ref()
-                        .map(|author| AuthorId::from_raw(author.identifier))
-                        .transpose()?,
-                    reply_ids: comment
-                        .replies
-                        .iter()
-                        .map(|reply| {
-                            StorageId::from_raw(reply.identifier).map_err(crate::Error::from)
-                        })
-                        .collect::<Result<Vec<_>>>()?
-                        .into_boxed_slice(),
-                    storage_uuid: comment
-                        .storage_uuid
-                        .as_ref()
-                        .map(|uuid| Uuid::from_parts(uuid.lower, uuid.upper))
-                        .transpose()?,
+                    text,
+                    creation_date_seconds: comment.creation_date().map(|date| date.seconds()),
+                    author_id,
+                    reply_ids: typed_reply_ids,
+                    storage_uuid,
                 },
             ));
         }
@@ -2445,5 +2560,79 @@ mod tests {
         ];
         let parsed = TableDataExtractor::parse_cell_storage(&pre_bnc, &tables, 0, 0).unwrap();
         assert_eq!(parsed.comment_identifier, Some(9));
+    }
+
+    #[test]
+    fn strict_comment_storage_decode_matches_legacy_projection_and_preserves_unknowns() {
+        use crate::protobuf::{tsd, tsp};
+
+        let legacy = tsd::CommentStorageArchive {
+            text: Some("comment".to_owned()),
+            creation_date: Some(tsp::Date { seconds: -7.5 }),
+            author: Some(tsp::Reference {
+                identifier: 20,
+                ..Default::default()
+            }),
+            replies: vec![
+                tsp::Reference {
+                    identifier: 30,
+                    ..Default::default()
+                },
+                tsp::Reference {
+                    identifier: 31,
+                    ..Default::default()
+                },
+            ],
+            storage_uuid: Some(tsp::Uuid { lower: 1, upper: 2 }),
+        };
+        let mut source = legacy.encode_to_vec();
+        // Unknown fields remain in the caller-owned payload; the strict
+        // projection must accept them without re-encoding the message.
+        source.extend_from_slice(&[0x78, 0x01]);
+        let before = source.clone();
+
+        let (strict, reply_ids) = decode_comment_storage_payload(99, &source).unwrap();
+
+        assert_eq!(source, before);
+        assert_eq!(strict.text(), legacy.text.as_deref());
+        assert_eq!(
+            strict.creation_date().map(|date| date.seconds()),
+            legacy.creation_date.as_ref().map(|date| date.seconds)
+        );
+        assert_eq!(
+            strict.author().map(|author| author.identifier()),
+            legacy.author.as_ref().map(|author| author.identifier)
+        );
+        assert_eq!(reply_ids, [30, 31]);
+        assert_eq!(
+            strict
+                .storage_uuid()
+                .map(|uuid| (uuid.lower(), uuid.upper())),
+            legacy
+                .storage_uuid
+                .as_ref()
+                .map(|uuid| (uuid.lower, uuid.upper))
+        );
+    }
+
+    #[test]
+    fn strict_comment_storage_decode_rejects_malformed_utf8_duplicate_and_missing_reference() {
+        let invalid_utf8 = [0x0a, 0x01, 0xff];
+        let error = decode_comment_storage_payload(99, &invalid_utf8).unwrap_err();
+        assert!(
+            matches!(error, Error::InvalidFormat(message) if message.contains("invalid UTF-8"))
+        );
+
+        let duplicate_text = [0x0a, 0x01, b'a', 0x0a, 0x01, b'b'];
+        let error = decode_comment_storage_payload(99, &duplicate_text).unwrap_err();
+        assert!(
+            matches!(error, Error::InvalidFormat(message) if message.contains("duplicate singular field") && message.contains("text"))
+        );
+
+        let missing_reference = [0x1a, 0x00];
+        let error = decode_comment_storage_payload(99, &missing_reference).unwrap_err();
+        assert!(
+            matches!(error, Error::InvalidFormat(message) if message.contains("missing required field") && message.contains("identifier"))
+        );
     }
 }

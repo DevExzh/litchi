@@ -12,6 +12,7 @@ mod tests;
 mod write;
 
 use chrono::{Days, Local, Months, NaiveDate};
+use litchi_iwa_common::wire::parse_wire_view;
 use prost::Message;
 
 use super::*;
@@ -46,6 +47,7 @@ const APPLE_EPOCH_YEAR: i32 = 2001;
 const APPLE_EPOCH_MONTH: u32 = 1;
 const APPLE_EPOCH_DAY: u32 = 1;
 const SECONDS_PER_DAY: f64 = 86_400.0;
+const CONDITIONAL_STYLE_RULE_COUNT_FIELD: u32 = 1;
 
 pub(super) fn info_in_package(
     package: &IWorkPackage,
@@ -146,7 +148,7 @@ fn info_at_location(
         .iter()
         .find_map(|message| {
             (message.type_ == 6_010)
-                .then(|| tst::ConditionalStyleSetArchive::decode(message.data.as_slice()))
+                .then(|| strict_conditional_style_rule_count(message.data.as_slice()))
         })
         .transpose()?
         .ok_or_else(|| {
@@ -160,8 +162,55 @@ fn info_at_location(
         column,
         list_identifier,
         style_set_object_id,
-        rule_count: style_set.rule_count,
+        rule_count: style_set,
     }))
+}
+
+/// Read the one scalar needed by conditional-highlight identity queries.
+///
+/// The complete style graph is decoded only by the semantic rule reader. This
+/// narrow projection keeps the source bytes authoritative and rejects the
+/// malformed singular/count encodings that Prost's generated value decoder
+/// would otherwise normalize while materializing the entire graph.
+fn strict_conditional_style_rule_count(source: &[u8]) -> Result<u32> {
+    let view = parse_wire_view(source)?;
+    let mut fields = view
+        .fields()
+        .filter(|field| field.number() == CONDITIONAL_STYLE_RULE_COUNT_FIELD);
+    let field = fields.next().ok_or_else(|| {
+        Error::InvalidFormat(
+            "iWork conditional-highlight style set is missing rule count".to_owned(),
+        )
+    })?;
+    if fields.next().is_some() {
+        return Err(Error::InvalidFormat(
+            "iWork conditional-highlight style set has duplicate rule count".to_owned(),
+        ));
+    }
+    if field.wire_type() != 0 {
+        return Err(Error::InvalidFormat(
+            "iWork conditional-highlight style-set rule count is not a varint".to_owned(),
+        ));
+    }
+    field.validate_canonical_key()?;
+    let payload = field.payload();
+    let (value, consumed) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "iWork conditional-highlight style-set rule count is invalid: {error}"
+            ))
+        })?;
+    if consumed != payload.len() || litchi_iwa_common::varint::encoded_len(value) != consumed {
+        return Err(Error::InvalidFormat(
+            "iWork conditional-highlight style-set rule count is not canonically encoded"
+                .to_owned(),
+        ));
+    }
+    u32::try_from(value).map_err(|_| {
+        Error::InvalidFormat(
+            "iWork conditional-highlight style-set rule count exceeds u32".to_owned(),
+        )
+    })
 }
 
 pub(super) fn clear_in_package(

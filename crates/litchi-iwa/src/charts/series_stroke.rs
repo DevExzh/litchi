@@ -11,7 +11,8 @@ use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
 };
-use crate::protobuf::{tsch, tsd};
+use crate::charts::style::replace_known_wire_fields_preserving_unknown;
+use crate::protobuf::tsd;
 use crate::shapes::{
     Join, Pattern, RgbaColor, Stroke, Width, empty_stroke_archive, stroke_from_native,
     stroke_to_native,
@@ -261,27 +262,11 @@ fn read_stroke_field(data: &[u8], field_number: u32) -> Result<Option<Option<Cha
     let Some(extension) = generated_chart_series_style_extension(data)? else {
         return Ok(None);
     };
-    let generated = tsch::generated::ChartSeriesStyleArchive::decode(extension)?;
-    let native = stroke_field(&generated, field_number)?;
-    native.map(ChartSeriesStroke::from_native).transpose()
-}
-
-fn stroke_field(
-    generated: &tsch::generated::ChartSeriesStyleArchive,
-    field_number: u32,
-) -> Result<Option<&tsd::StrokeArchive>> {
-    match field_number {
-        AREA_STROKE_FIELD => Ok(generated.tschchartseriesareastroke.as_ref()),
-        BAR_STROKE_FIELD => Ok(generated.tschchartseriesbarstroke.as_ref()),
-        BUBBLE_STROKE_FIELD => Ok(generated.tschchartseriesbubblestroke.as_ref()),
-        LINE_STROKE_FIELD => Ok(generated.tschchartserieslinestroke.as_ref()),
-        PIE_STROKE_FIELD => Ok(generated.tschchartseriespiestroke.as_ref()),
-        SCATTER_STROKE_FIELD => Ok(generated.tschchartseriesscatterstroke.as_ref()),
-        RADAR_AREA_STROKE_FIELD => Ok(generated.tschchartseriesradarareastroke.as_ref()),
-        _ => Err(Error::InvalidFormat(format!(
-            "unsupported chart series stroke field {field_number}"
-        ))),
-    }
+    let Some(stroke) = strict_optional_message(extension, field_number)? else {
+        return Ok(None);
+    };
+    let native = tsd::StrokeArchive::decode(stroke)?;
+    ChartSeriesStroke::from_native(&native).map(Some)
 }
 
 fn patch_local_stroke(
@@ -292,13 +277,26 @@ fn patch_local_stroke(
     let field_number = storage.field_number();
     let existing_extension = generated_chart_series_style_extension(data)?;
     let extension = existing_extension.unwrap_or_default();
-    tsch::generated::ChartSeriesStyleArchive::decode(extension)?;
     let present = read_stroke_field(data, field_number)?.is_some();
     let native = stroke.map(|stroke| {
         stroke
             .map_or_else(empty_stroke_archive, ChartSeriesStroke::to_native)
             .encode_to_vec()
     });
+    let native = native
+        .map(|replacement| {
+            strict_optional_message(extension, field_number)?.map_or_else(
+                || Ok(replacement.clone()),
+                |existing| {
+                    replace_known_wire_fields_preserving_unknown(
+                        existing,
+                        &replacement,
+                        &[1, 2, 3, 4, 5, 6, 7, 8, 9],
+                    )
+                },
+            )
+        })
+        .transpose()?;
     let extension =
         patch_length_delimited_field(extension, field_number, present, native.as_deref())?;
     let patched = patch_length_delimited_field(
@@ -315,15 +313,56 @@ fn patch_local_stroke(
     Ok(patched)
 }
 
+/// Project one selected stroke field without materializing the wide generated
+/// chart-series style extension. Unselected fields stay opaque and can keep
+/// producer-specific wire forms, while the selected singular message is
+/// required to use canonical length-delimited framing.
+fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
+    if !matches!(
+        field_number,
+        AREA_STROKE_FIELD
+            | BAR_STROKE_FIELD
+            | BUBBLE_STROKE_FIELD
+            | LINE_STROKE_FIELD
+            | PIE_STROKE_FIELD
+            | SCATTER_STROKE_FIELD
+            | RADAR_AREA_STROKE_FIELD
+    ) {
+        return Err(Error::InvalidFormat(format!(
+            "unsupported chart series stroke field {field_number}"
+        )));
+    }
+    let fields = crate::wire::parse_wire_fields(data)?;
+    let mut matches = fields
+        .into_iter()
+        .filter(|field| field.number() == field_number);
+    let Some(field) = matches.next() else {
+        return Ok(None);
+    };
+    if matches.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "chart series stroke field {field_number} occurs more than once"
+        )));
+    }
+    if field.wire_type() != 2 {
+        return Err(Error::InvalidFormat(format!(
+            "chart series stroke field {field_number} is not length-delimited"
+        )));
+    }
+    field.validate_canonical_framing(data)?;
+    Ok(Some(field.payload(data)?))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protobuf::tss;
+    use crate::protobuf::{tsch, tss};
     use crate::shapes::{RgbColorSpace, RgbaColor, Width};
-    use crate::wire::{append_varint_field, parse_wire_fields};
+    use crate::wire::{append_length_delimited_field, append_varint_field, parse_wire_fields};
 
     const UNKNOWN_OUTER_FIELD: u32 = 4_096;
     const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
+    const UNKNOWN_SELECTED_STROKE_FIELD: u32 = 4_098;
 
     #[test]
     fn every_unambiguous_stroke_kind_has_a_typed_storage_family() {
@@ -388,6 +427,149 @@ mod tests {
         assert_eq!(reset, original);
     }
 
+    #[test]
+    fn stroke_projection_ignores_unselected_known_field_wire_type() {
+        let original = style_with_unknown_fields();
+        let extension = generated_chart_series_style_extension(&original)
+            .unwrap()
+            .unwrap();
+        let mut malformed_extension = extension.to_vec();
+        // Field 14 is the generated default-fill message. Its malformed wire
+        // type must not prevent reading or patching the selected bar stroke.
+        append_varint_field(&mut malformed_extension, 14, 77).unwrap();
+        assert!(
+            tsch::generated::ChartSeriesStyleArchive::decode(malformed_extension.as_slice())
+                .is_err()
+        );
+        let original = patch_length_delimited_field(
+            &original,
+            GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
+            true,
+            Some(malformed_extension.as_slice()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            read_stroke_field(&original, BAR_STROKE_FIELD).unwrap(),
+            None
+        );
+        let stroke = ChartSeriesStroke::new(
+            RgbaColor::new(0.1, 0.3, 0.8, 1.0, RgbColorSpace::Srgb).unwrap(),
+            Width::new(3.5).unwrap(),
+            ChartSeriesStrokePattern::RoundedDash,
+        );
+        let patched = patch_local_stroke(
+            &original,
+            ChartSeriesStrokeKind::BarOrColumn2d,
+            Some(Some(stroke)),
+        )
+        .unwrap();
+        assert_eq!(
+            read_stroke_field(&patched, BAR_STROKE_FIELD).unwrap(),
+            Some(Some(stroke))
+        );
+        assert_unknown_fields_retained(&original, &patched);
+        assert_eq!(
+            raw_field(
+                generated_chart_series_style_extension(&patched)
+                    .unwrap()
+                    .unwrap(),
+                14,
+            ),
+            raw_field(
+                generated_chart_series_style_extension(&original)
+                    .unwrap()
+                    .unwrap(),
+                14,
+            )
+        );
+    }
+
+    #[test]
+    fn series_stroke_patch_preserves_unknown_selected_stroke_payload_bytes() {
+        let original_stroke = stroke(0.1, 0.3, 0.8);
+        let replacement_stroke = stroke(0.8, 0.2, 0.1);
+        let outer = style_with_unknown_fields();
+        let extension = generated_chart_series_style_extension(&outer)
+            .unwrap()
+            .unwrap();
+        let mut selected_payload = original_stroke.to_native().encode_to_vec();
+        append_varint_field(&mut selected_payload, UNKNOWN_SELECTED_STROKE_FIELD, 42).unwrap();
+        let mut extension = extension.to_vec();
+        append_length_delimited_field(&mut extension, BAR_STROKE_FIELD, &selected_payload).unwrap();
+        let original = patch_length_delimited_field(
+            &outer,
+            GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
+            true,
+            Some(extension.as_slice()),
+        )
+        .unwrap();
+
+        let patched = patch_local_stroke(
+            &original,
+            ChartSeriesStrokeKind::BarOrColumn2d,
+            Some(Some(replacement_stroke)),
+        )
+        .unwrap();
+        let original_selected = strict_optional_message(
+            generated_chart_series_style_extension(&original)
+                .unwrap()
+                .unwrap(),
+            BAR_STROKE_FIELD,
+        )
+        .unwrap()
+        .unwrap();
+        let patched_selected = strict_optional_message(
+            generated_chart_series_style_extension(&patched)
+                .unwrap()
+                .unwrap(),
+            BAR_STROKE_FIELD,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            raw_field(patched_selected, UNKNOWN_SELECTED_STROKE_FIELD),
+            raw_field(original_selected, UNKNOWN_SELECTED_STROKE_FIELD)
+        );
+
+        let restored = patch_local_stroke(
+            &patched,
+            ChartSeriesStrokeKind::BarOrColumn2d,
+            Some(Some(original_stroke)),
+        )
+        .unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn series_style_extension_rejects_noncanonical_outer_framing() {
+        let original = style_with_unknown_fields();
+        let field = parse_wire_fields(&original)
+            .unwrap()
+            .into_iter()
+            .find(|field| field.number() == GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD)
+            .unwrap();
+        let mut overlong_length = original[..field.key_end()].to_vec();
+        let mut length = original[field.key_end()..field.payload_start()].to_vec();
+        let last = length.pop().unwrap();
+        length.push(last | 0x80);
+        length.push(0);
+        overlong_length.extend_from_slice(&length);
+        overlong_length.extend_from_slice(&original[field.payload_start()..field.end()]);
+        overlong_length.extend_from_slice(&original[field.end()..]);
+
+        let error = generated_chart_series_style_extension(&overlong_length).unwrap_err();
+        assert!(error.to_string().contains("noncanonical length prefix"));
+    }
+
+    fn stroke(red: f32, green: f32, blue: f32) -> ChartSeriesStroke {
+        ChartSeriesStroke::new(
+            RgbaColor::new(red, green, blue, 1.0, RgbColorSpace::Srgb).unwrap(),
+            Width::new(3.5).unwrap(),
+            ChartSeriesStrokePattern::RoundedDash,
+        )
+    }
+
     fn style_with_unknown_fields() -> Vec<u8> {
         let mut generated = tsch::generated::ChartSeriesStyleArchive::default().encode_to_vec();
         append_varint_field(&mut generated, UNKNOWN_GENERATED_FIELD, 77).unwrap();
@@ -429,5 +611,13 @@ mod tests {
                 .map(|field| data[field.start()..field.end()].to_vec())
         };
         assert_eq!(generated(patched_generated), generated(original_generated));
+    }
+
+    fn raw_field(data: &[u8], number: u32) -> Option<Vec<u8>> {
+        parse_wire_fields(data)
+            .unwrap()
+            .into_iter()
+            .find(|field| field.number() == number)
+            .map(|field| data[field.start()..field.end()].to_vec())
     }
 }

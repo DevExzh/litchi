@@ -116,22 +116,24 @@ fn exercise(source: &[u8]) {
     match pagination {
         Ok(snapshot) => {
             black_box(snapshot);
-            // Pagination intentionally leaves the other selected fields
-            // opaque. It can therefore succeed for a payload rejected by the
-            // stricter aggregate projection (for example invalid field 26
-            // UTF-8), but its selected scalars must still match Prost.
-            let archive = SectionArchive::decode(source).unwrap_or_else(|error| {
-                panic!("pagination acceptance disagreed with Prost: {error}")
-            });
-            assert_eq!(snapshot.section_start_kind, archive.section_start_kind);
-            assert_eq!(
-                snapshot.section_page_number_kind,
-                archive.section_page_number_kind
-            );
-            assert_eq!(
-                snapshot.section_page_number_start,
-                archive.section_page_number_start
-            );
+            // Pagination intentionally leaves every non-pagination field
+            // opaque. A malformed field that Prost knows about (for example
+            // field 17 with a length-delimited wire type) can therefore be
+            // accepted here. Only compare selected scalars when the complete
+            // Prost message is itself decodable; malformed oracle inputs are
+            // observed and skipped rather than treated as a differential
+            // failure.
+            if let Some(archive) = decode_section_archive(source) {
+                assert_eq!(snapshot.section_start_kind, archive.section_start_kind);
+                assert_eq!(
+                    snapshot.section_page_number_kind,
+                    archive.section_page_number_kind
+                );
+                assert_eq!(
+                    snapshot.section_page_number_start,
+                    archive.section_page_number_start
+                );
+            }
         },
         Err(error) => observe_error(error),
     }
@@ -154,10 +156,13 @@ fn exercise(source: &[u8]) {
                 source_range.assert_borrowed(name);
             }
             let has_nonempty_name = snapshot.name().is_some_and(|name| !name.is_empty());
-            let archive = SectionArchive::decode(source).unwrap_or_else(|error| {
-                panic!("aggregate acceptance disagreed with Prost: {error}")
-            });
-            assert_snapshot_matches(snapshot, &archive);
+            // The aggregate projection validates only its selected fields and
+            // intentionally leaves the rest of SectionArchive opaque. A
+            // complete Prost decode can reject malformed opaque fields, so a
+            // failed oracle decode is not a parity failure for this view.
+            if let Some(archive) = decode_section_archive(source) {
+                assert_snapshot_matches(snapshot, &archive);
+            }
             black_box((snapshot, report));
             (true, has_nonempty_name)
         },
@@ -294,6 +299,19 @@ fn assert_snapshot_matches(
         snapshot.user_defined_guide_storage(),
         archive.user_defined_guide_storage.as_ref(),
     );
+}
+
+fn decode_section_archive(source: &[u8]) -> Option<SectionArchive> {
+    match SectionArchive::decode(source) {
+        Ok(archive) => Some(archive),
+        Err(error) => {
+            // Keep malformed complete-message inputs observable without
+            // turning an intentionally partial projection into a panic.
+            black_box(error.to_string());
+            black_box(format!("{error:?}"));
+            None
+        },
+    }
 }
 
 fn assert_reference_matches(

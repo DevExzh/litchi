@@ -2,9 +2,105 @@
 
 use crate::Result;
 use crate::archive::ArchiveObject;
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_index::{IndexBuilder, ObjectId};
+use litchi_iwa_protos::comment_storage_codec;
 
 use super::add_reference_if_absent;
+
+const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+
+fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::DecodeOptions {
+    comment_storage_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(32)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
+        source.len().clamp(1, litchi_numbers::MAX_REFERENCES),
+        source
+            .len()
+            .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+    )
+}
+
+#[derive(Debug, Default)]
+struct CommentStorageReferences {
+    replies: Vec<u64>,
+    allocation_failed: Option<usize>,
+}
+
+impl CommentStorageReferences {
+    fn into_replies(self) -> Result<Vec<u64>> {
+        self.allocation_failed.map_or(Ok(self.replies), |amount| {
+            Err(crate::Error::IwaCommon(
+                litchi_iwa_common::Error::Allocation {
+                    resource: "IWA comment reference extraction replies",
+                    amount,
+                },
+            ))
+        })
+    }
+}
+
+impl comment_storage_codec::CommentStorageVisitor for CommentStorageReferences {
+    fn visit_reply(
+        &mut self,
+        reply: comment_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
+        if self.allocation_failed.is_some() {
+            return Ok(());
+        }
+        if self.replies.try_reserve(1).is_err() {
+            // Keep strict traversal going so malformed input still suppresses
+            // every staged edge and wins over this candidate-local failure.
+            self.allocation_failed = Some(self.replies.len().saturating_add(1));
+            return Ok(());
+        }
+        self.replies.push(reply.identifier());
+        Ok(())
+    }
+}
+
+fn extract_comment_storage_references(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    source: &[u8],
+) -> Result<()> {
+    let mut staged = CommentStorageReferences::default();
+    let Ok((comment, report)) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
+        source,
+        comment_storage_decode_options(source),
+        &mut staged,
+    ) else {
+        // Compatibility reference extraction has always ignored malformed
+        // payloads. In particular, do not publish replies visited before a
+        // later malformed field or parity failure.
+        return Ok(());
+    };
+    let replies = staged.into_replies()?;
+    if replies.len() != report.reply_references() {
+        return Ok(());
+    }
+
+    // Only publish after the complete strict decode has succeeded. The
+    // borrowed codec leaves unknown source fields untouched and the builder
+    // sees the same source-order author/reply edges as the legacy decoder.
+    if let Some(author) = comment.author()
+        && let Some(target_id) = ObjectId::new(author.identifier())
+    {
+        add_reference_if_absent(builder, source_id, target_id)?;
+    }
+    for identifier in replies {
+        if let Some(target_id) = ObjectId::new(identifier) {
+            add_reference_if_absent(builder, source_id, target_id)?;
+        }
+    }
+    Ok(())
+}
 
 pub(super) fn extract(
     source_id: ObjectId,
@@ -311,17 +407,8 @@ pub(super) fn extract(
                     }
                 }
             },
-            3056 => {
-                if let Ok(comment) =
-                    crate::protobuf::tsd::CommentStorageArchive::decode(&*raw_msg.data)
-                {
-                    if let Some(author) = &comment.author {
-                        extract_reference(source_id, builder, author)?;
-                    }
-                    for reply in &comment.replies {
-                        extract_reference(source_id, builder, reply)?;
-                    }
-                }
+            COMMENT_STORAGE_MESSAGE_TYPE => {
+                extract_comment_storage_references(source_id, builder, &raw_msg.data)?;
             },
 
             // TSCH (Chart) types
@@ -547,4 +634,105 @@ fn extract_table_data_list_entry_references(
         extract_reference(source_id, builder, reference)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::archive::{ArchiveObject, RawMessage};
+    use crate::protobuf::{tsd, tsp};
+    use litchi_iwa_index::{ByteSpan, FragmentId, ObjectRecord};
+    use prost::Message;
+    use std::num::NonZeroU32;
+
+    fn index_for_comment_payload(data: Vec<u8>) -> litchi_iwa_index::ObjectIndex {
+        let source_id = ObjectId::new(10).expect("non-zero source");
+        let fragment = FragmentId::new(NonZeroU32::new(1).expect("non-zero fragment"));
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment).expect("fragment");
+        builder
+            .add_object(ObjectRecord::new(
+                source_id,
+                fragment,
+                ByteSpan::new(0, data.len() as u64).expect("payload span"),
+            ))
+            .expect("source object");
+        let object = ArchiveObject::new(
+            source_id.get(),
+            vec![RawMessage {
+                type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                data,
+            }],
+        )
+        .expect("archive object");
+        extract(source_id, &object, &mut builder).expect("reference extraction");
+        builder
+            .build_allow_missing_targets()
+            .expect("reference index")
+    }
+
+    #[test]
+    fn strict_comment_storage_reference_extraction_matches_projection_and_unknowns() {
+        let comment = tsd::CommentStorageArchive {
+            author: Some(tsp::Reference {
+                identifier: 20,
+                ..Default::default()
+            }),
+            replies: vec![tsp::Reference {
+                identifier: 30,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let mut data = comment.encode_to_vec();
+        data.extend_from_slice(&[0x78, 0x01]);
+
+        let index = index_for_comment_payload(data);
+        assert_eq!(
+            index
+                .outgoing(ObjectId::new(10).expect("source"))
+                .map(|targets| targets.collect::<Vec<_>>()),
+            Some(vec![
+                ObjectId::new(20).expect("author"),
+                ObjectId::new(30).expect("reply"),
+            ])
+        );
+    }
+
+    #[test]
+    fn malformed_comment_storage_does_not_publish_staged_references() {
+        let comment = tsd::CommentStorageArchive {
+            author: Some(tsp::Reference {
+                identifier: 20,
+                ..Default::default()
+            }),
+            replies: vec![tsp::Reference {
+                identifier: 30,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let mut duplicate_author = comment.encode_to_vec();
+        duplicate_author.extend_from_slice(
+            &tsd::CommentStorageArchive {
+                author: Some(tsp::Reference {
+                    identifier: 99,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        );
+
+        let index = index_for_comment_payload(duplicate_author);
+        assert!(index.outgoing(ObjectId::new(10).expect("source")).is_none());
+    }
+
+    #[test]
+    fn invalid_utf8_and_missing_reference_payloads_are_ignored_without_edges() {
+        for data in [[0x0a, 0x01, 0xff].to_vec(), [0x1a, 0x00].to_vec()] {
+            let index = index_for_comment_payload(data);
+            assert!(index.outgoing(ObjectId::new(10).expect("source")).is_none());
+        }
+    }
 }
