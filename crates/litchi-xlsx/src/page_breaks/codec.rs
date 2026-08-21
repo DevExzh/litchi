@@ -61,14 +61,7 @@ pub fn parse(xml: &[u8]) -> Result<PageBreaks> {
 /// Returns an error when the supplied model violates its axis or grid bounds.
 pub fn write(value: &PageBreaks) -> Result<Vec<u8>> {
     value.validate()?;
-    let mut output = Vec::new();
-    if let Some(collection) = value.horizontal() {
-        write_collection(&mut output, "rowBreaks", collection)?;
-    }
-    if let Some(collection) = value.vertical() {
-        write_collection(&mut output, "colBreaks", collection)?;
-    }
-    Ok(output)
+    write_fragment(value, None)
 }
 
 /// Replace, insert, or remove direct page-break elements without rebuilding
@@ -94,6 +87,9 @@ pub fn replace(xml: &[u8], value: &PageBreaks) -> Result<Vec<u8>> {
     if processed.report.alternate_content_count != 0 {
         let selected = parse_selected(processed.xml.as_ref())?;
         if selected.value != direct.value {
+            if selected.value == *value {
+                return copy_bytes(xml);
+            }
             return Err(invalid(
                 "page breaks projected through markup compatibility cannot be edited",
             ));
@@ -103,7 +99,12 @@ pub fn replace(xml: &[u8], value: &PageBreaks) -> Result<Vec<u8>> {
     if direct.value == *value {
         return copy_bytes(xml);
     }
-    let replacement = write(value)?;
+    if direct.lossy_collection {
+        return Err(invalid(
+            "changed page-break collections contain comments, whitespace, namespace declarations, or qualified attributes",
+        ));
+    }
+    let replacement = write_fragment(value, direct.worksheet_prefix.as_deref())?;
     let insertion = direct
         .first_break_start
         .or(direct.successor_start)
@@ -152,9 +153,17 @@ pub fn replace(xml: &[u8], value: &PageBreaks) -> Result<Vec<u8>> {
     crate::raw::compact::changed(&output, "compact page-break worksheet output")
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Dialect {
+    Transitional,
+    Strict,
+}
+
 #[derive(Debug)]
 struct Parsed {
     value: PageBreaks,
+    worksheet_prefix: Option<Box<[u8]>>,
+    lossy_collection: bool,
     horizontal_span: Option<Range<usize>>,
     vertical_span: Option<Range<usize>>,
     first_break_start: Option<usize>,
@@ -187,6 +196,9 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
     let mut declaration_seen = false;
     let mut events = 0usize;
     let mut value = PageBreaks::new();
+    let mut dialect = None;
+    let mut worksheet_prefix = None;
+    let mut lossy_collection = false;
     let mut horizontal_span = None;
     let mut vertical_span = None;
     let mut first_break_start: Option<usize> = None;
@@ -208,6 +220,10 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
         let end = position(&reader)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
+        reject_unknown_namespace(&namespace)?;
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            reject_unknown_attribute_prefixes(&reader, element)?;
+        }
         match event {
             Event::Start(element) => {
                 if root_closed {
@@ -215,45 +231,67 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                 }
                 if depth == 0 {
                     if root_seen
-                        || !spreadsheet(&namespace)
+                        || dialect_of(&namespace).is_none()
                         || element.local_name().as_ref() != b"worksheet"
                     {
                         return Err(invalid("page-break parser requires one worksheet root"));
                     }
+                    dialect = dialect_of(&namespace);
+                    worksheet_prefix = qualified_prefix(element.name().as_ref());
                     root_seen = true;
-                } else if depth == 1 && spreadsheet(&namespace) {
+                } else if let Some(expected) = dialect {
+                    reject_dialect_mismatch(&namespace, expected)?;
+                }
+                if depth == 1 {
                     let local = element.local_name();
-                    match local.as_ref() {
-                        b"rowBreaks" => {
-                            if value.horizontal().is_some() || collection.is_some() {
-                                return Err(invalid("duplicate rowBreaks element"));
-                            }
-                            first_break_start =
-                                Some(first_break_start.map_or(start, |v| v.min(start)));
-                            collection = Some(begin_collection(
-                                Axis::Horizontal,
-                                start,
-                                &element,
-                                decoder,
-                            )?);
-                        },
-                        b"colBreaks" => {
-                            if value.vertical().is_some() || collection.is_some() {
-                                return Err(invalid("duplicate colBreaks element"));
-                            }
-                            first_break_start =
-                                Some(first_break_start.map_or(start, |v| v.min(start)));
-                            collection =
-                                Some(begin_collection(Axis::Vertical, start, &element, decoder)?);
-                        },
-                        local if break_successor(local) && successor_start.is_none() => {
-                            successor_start = Some(start);
-                        },
-                        _ => {},
+                    if is_page_break_collection(local.as_ref())
+                        && !same_dialect(&namespace, dialect)
+                    {
+                        return Err(invalid(
+                            "page-break collection namespace does not match worksheet dialect",
+                        ));
+                    }
+                    if same_dialect(&namespace, dialect) {
+                        match local.as_ref() {
+                            b"rowBreaks" => {
+                                if value.horizontal().is_some() || collection.is_some() {
+                                    return Err(invalid("duplicate rowBreaks element"));
+                                }
+                                first_break_start =
+                                    Some(first_break_start.map_or(start, |v| v.min(start)));
+                                collection = Some(begin_collection(
+                                    Axis::Horizontal,
+                                    start,
+                                    &element,
+                                    decoder,
+                                    &reader,
+                                    &mut lossy_collection,
+                                )?);
+                            },
+                            b"colBreaks" => {
+                                if value.vertical().is_some() || collection.is_some() {
+                                    return Err(invalid("duplicate colBreaks element"));
+                                }
+                                first_break_start =
+                                    Some(first_break_start.map_or(start, |v| v.min(start)));
+                                collection = Some(begin_collection(
+                                    Axis::Vertical,
+                                    start,
+                                    &element,
+                                    decoder,
+                                    &reader,
+                                    &mut lossy_collection,
+                                )?);
+                            },
+                            local if break_successor(local) && successor_start.is_none() => {
+                                successor_start = Some(start);
+                            },
+                            _ => {},
+                        }
                     }
                 } else if let Some(open) = collection.as_mut() {
                     if depth == 2
-                        && spreadsheet(&namespace)
+                        && same_dialect(&namespace, dialect)
                         && element.local_name().as_ref() == b"brk"
                     {
                         if open_break.is_some() {
@@ -261,7 +299,13 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                         }
                         open_break = Some(OpenBreak {
                             depth: depth + 1,
-                            value: parse_break(&element, decoder, open.axis)?,
+                            value: parse_break(
+                                &element,
+                                decoder,
+                                open.axis,
+                                &reader,
+                                &mut lossy_collection,
+                            )?,
                         });
                     } else {
                         return Err(invalid("unexpected child in page-break collection"));
@@ -280,11 +324,21 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                         "page-break XML element is outside the worksheet root",
                     ));
                 }
-                if depth == 1 && spreadsheet(&namespace) {
+                if let Some(expected) = dialect {
+                    reject_dialect_mismatch(&namespace, expected)?;
+                }
+                if depth == 1 {
                     let local = element.local_name();
+                    if is_page_break_collection(local.as_ref())
+                        && !same_dialect(&namespace, dialect)
+                    {
+                        return Err(invalid(
+                            "page-break collection namespace does not match worksheet dialect",
+                        ));
+                    }
                     let axis = match local.as_ref() {
-                        b"rowBreaks" => Some(Axis::Horizontal),
-                        b"colBreaks" => Some(Axis::Vertical),
+                        b"rowBreaks" if same_dialect(&namespace, dialect) => Some(Axis::Horizontal),
+                        b"colBreaks" if same_dialect(&namespace, dialect) => Some(Axis::Vertical),
                         local if break_successor(local) && successor_start.is_none() => {
                             successor_start = Some(start);
                             None
@@ -301,7 +355,14 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                             return Err(invalid("duplicate page-break collection"));
                         }
                         first_break_start = Some(first_break_start.map_or(start, |v| v.min(start)));
-                        let open = begin_collection(axis, start, &element, decoder)?;
+                        let open = begin_collection(
+                            axis,
+                            start,
+                            &element,
+                            decoder,
+                            &reader,
+                            &mut lossy_collection,
+                        )?;
                         let built = finish_collection(open)?;
                         match axis {
                             Axis::Horizontal => {
@@ -316,10 +377,19 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                     }
                 } else if let Some(open) = collection.as_mut() {
                     if depth == 2
-                        && spreadsheet(&namespace)
+                        && same_dialect(&namespace, dialect)
                         && element.local_name().as_ref() == b"brk"
                     {
-                        push_break(open, parse_break(&element, decoder, open.axis)?)?;
+                        push_break(
+                            open,
+                            parse_break(
+                                &element,
+                                decoder,
+                                open.axis,
+                                &reader,
+                                &mut lossy_collection,
+                            )?,
+                        )?;
                     } else {
                         return Err(invalid("unexpected child in page-break collection"));
                     }
@@ -329,8 +399,12 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                 if depth == 0 {
                     return Err(invalid("unexpected page-break XML end element"));
                 }
+                if let Some(expected) = dialect {
+                    reject_dialect_mismatch(&namespace, expected)?;
+                }
                 if open_break.as_ref().is_some_and(|open| open.depth == depth) {
-                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"brk" {
+                    if !same_dialect(&namespace, dialect) || element.local_name().as_ref() != b"brk"
+                    {
                         return Err(invalid("invalid page-break closing element"));
                     }
                     let item = open_break
@@ -350,7 +424,9 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                         Axis::Horizontal => b"rowBreaks".as_slice(),
                         Axis::Vertical => b"colBreaks".as_slice(),
                     };
-                    if !spreadsheet(&namespace) || element.local_name().as_ref() != expected {
+                    if !same_dialect(&namespace, dialect)
+                        || element.local_name().as_ref() != expected
+                    {
                         return Err(invalid("invalid page-break collection closing element"));
                     }
                     let axis = open.axis;
@@ -367,7 +443,9 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                         },
                     }
                 } else if depth == 1 {
-                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
+                    if !same_dialect(&namespace, dialect)
+                        || element.local_name().as_ref() != b"worksheet"
+                    {
                         return Err(invalid("invalid worksheet closing element"));
                     }
                     root_close = Some(start);
@@ -376,18 +454,31 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
                 depth -= 1;
             },
             Event::Text(text) => {
-                if ((!root_seen || root_closed) || collection.is_some() || depth == 1)
-                    && !text.as_ref().iter().all(u8::is_ascii_whitespace)
-                {
+                let whitespace = text.as_ref().iter().all(u8::is_ascii_whitespace);
+                if collection.is_some() {
+                    if whitespace {
+                        lossy_collection = true;
+                    } else {
+                        return Err(invalid("unexpected text in page-break XML"));
+                    }
+                } else if ((!root_seen || root_closed) || depth == 1) && !whitespace {
                     return Err(invalid("unexpected text in page-break XML"));
                 }
             },
-            Event::CData(_) if collection.is_some() || depth == 1 || !root_seen || root_closed => {
+            Event::CData(text) if collection.is_some() => {
+                if text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    lossy_collection = true;
+                } else {
+                    return Err(invalid("unexpected CDATA in page-break XML"));
+                }
+            },
+            Event::CData(_) if depth == 1 || !root_seen || root_closed => {
                 return Err(invalid("unexpected CDATA in page-break XML"));
             },
-            Event::GeneralRef(_)
-                if collection.is_some() || depth == 1 || !root_seen || root_closed =>
-            {
+            Event::GeneralRef(_) if collection.is_some() => {
+                lossy_collection = true;
+            },
+            Event::GeneralRef(_) if depth == 1 || !root_seen || root_closed => {
                 return Err(invalid("unexpected entity text in page-break XML"));
             },
             Event::Decl(_) => {
@@ -399,6 +490,9 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
             Event::DocType(_) | Event::PI(_) => {
                 return Err(invalid("DTD and processing instructions are rejected"));
             },
+            Event::Comment(_) if collection.is_some() => {
+                lossy_collection = true;
+            },
             Event::Comment(_) | Event::CData(_) | Event::GeneralRef(_) => {},
             Event::Eof => break,
         }
@@ -408,6 +502,8 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
     }
     Ok(Parsed {
         value,
+        worksheet_prefix,
+        lossy_collection,
         horizontal_span,
         vertical_span,
         first_break_start,
@@ -416,12 +512,105 @@ fn parse_selected(xml: &[u8]) -> Result<Parsed> {
     })
 }
 
+fn reject_unknown_namespace(namespace: &ResolveResult<'_>) -> Result<()> {
+    if let ResolveResult::Unknown(prefix) = namespace {
+        return Err(invalid(format!(
+            "undeclared XML namespace prefix '{}'",
+            String::from_utf8_lossy(prefix)
+        )));
+    }
+    Ok(())
+}
+
+fn reject_unknown_attribute_prefixes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<()> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(xml_error)?;
+        if is_namespace_declaration(attribute.key.as_ref()) {
+            continue;
+        }
+        if let ResolveResult::Unknown(prefix) = reader.resolver().resolve_attribute(attribute.key).0
+        {
+            return Err(invalid(format!(
+                "undeclared XML attribute prefix '{}'",
+                String::from_utf8_lossy(&prefix)
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn collection_metadata(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    lossy_collection: &mut bool,
+) -> Result<()> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(xml_error)?;
+        if is_namespace_declaration(attribute.key.as_ref()) {
+            *lossy_collection = true;
+            continue;
+        }
+        match reader.resolver().resolve_attribute(attribute.key).0 {
+            ResolveResult::Unknown(prefix) => {
+                return Err(invalid(format!(
+                    "undeclared XML attribute prefix '{}'",
+                    String::from_utf8_lossy(&prefix)
+                )));
+            },
+            ResolveResult::Bound(_) => *lossy_collection = true,
+            ResolveResult::Unbound => {},
+        }
+    }
+    Ok(())
+}
+
+fn is_namespace_declaration(name: &[u8]) -> bool {
+    name == b"xmlns" || name.starts_with(b"xmlns:")
+}
+
+fn dialect_of(namespace: &ResolveResult<'_>) -> Option<Dialect> {
+    match namespace {
+        ResolveResult::Bound(value) if value.as_ref() == CORE => Some(Dialect::Transitional),
+        ResolveResult::Bound(value) if value.as_ref() == STRICT => Some(Dialect::Strict),
+        ResolveResult::Unbound | ResolveResult::Bound(_) | ResolveResult::Unknown(_) => None,
+    }
+}
+
+fn same_dialect(namespace: &ResolveResult<'_>, expected: Option<Dialect>) -> bool {
+    dialect_of(namespace) == expected
+}
+
+fn reject_dialect_mismatch(namespace: &ResolveResult<'_>, expected: Dialect) -> Result<()> {
+    if dialect_of(namespace).is_some_and(|actual| actual != expected) {
+        return Err(invalid(
+            "worksheet child namespace does not match worksheet root dialect",
+        ));
+    }
+    Ok(())
+}
+
+fn is_page_break_collection(local: &[u8]) -> bool {
+    matches!(local, b"rowBreaks" | b"colBreaks")
+}
+
+fn qualified_prefix(name: &[u8]) -> Option<Box<[u8]>> {
+    name.iter()
+        .position(|byte| *byte == b':')
+        .map(|position| name[..position].to_vec().into_boxed_slice())
+}
+
 fn begin_collection(
     axis: Axis,
     start: usize,
     element: &BytesStart<'_>,
     decoder: Decoder,
+    reader: &NsReader<&[u8]>,
+    lossy_collection: &mut bool,
 ) -> Result<OpenCollection> {
+    collection_metadata(element, reader, lossy_collection)?;
     let mut count = None;
     let mut manual_count = None;
     for attribute in element.attributes().with_checks(true) {
@@ -456,7 +645,14 @@ fn begin_collection(
     })
 }
 
-fn parse_break(element: &BytesStart<'_>, decoder: Decoder, axis: Axis) -> Result<Break> {
+fn parse_break(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    axis: Axis,
+    reader: &NsReader<&[u8]>,
+    lossy_collection: &mut bool,
+) -> Result<Break> {
+    collection_metadata(element, reader, lossy_collection)?;
     let mut id = None;
     let mut minimum = None;
     let mut maximum = None;
@@ -532,7 +728,23 @@ fn finish_collection(open: OpenCollection) -> Result<Collection> {
     }
 }
 
-fn write_collection(output: &mut Vec<u8>, name: &str, collection: &Collection) -> Result<()> {
+fn write_fragment(value: &PageBreaks, prefix: Option<&[u8]>) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    if let Some(collection) = value.horizontal() {
+        write_collection(&mut output, "rowBreaks", collection, prefix)?;
+    }
+    if let Some(collection) = value.vertical() {
+        write_collection(&mut output, "colBreaks", collection, prefix)?;
+    }
+    Ok(output)
+}
+
+fn write_collection(
+    output: &mut Vec<u8>,
+    name: &str,
+    collection: &Collection,
+    prefix: Option<&[u8]>,
+) -> Result<()> {
     let expected = match name {
         "rowBreaks" => Axis::Horizontal,
         "colBreaks" => Axis::Vertical,
@@ -542,6 +754,10 @@ fn write_collection(output: &mut Vec<u8>, name: &str, collection: &Collection) -
         return Err(invalid("page-break collection axis mismatch"));
     }
     output.extend_from_slice(b"<");
+    if let Some(prefix) = prefix {
+        output.extend_from_slice(prefix);
+        output.push(b':');
+    }
     output.extend_from_slice(name.as_bytes());
     if !collection.is_empty() {
         let count = u32::try_from(collection.len()).map_err(|error| {
@@ -566,7 +782,13 @@ fn write_collection(output: &mut Vec<u8>, name: &str, collection: &Collection) -
     }
     output.extend_from_slice(b">");
     for value in collection.breaks() {
-        output.extend_from_slice(b"<brk");
+        if let Some(prefix) = prefix {
+            output.extend_from_slice(b"<");
+            output.extend_from_slice(prefix);
+            output.extend_from_slice(b":brk");
+        } else {
+            output.extend_from_slice(b"<brk");
+        }
         if value.id() != 0 {
             push_number_attribute(output, "id", value.id());
         }
@@ -585,6 +807,10 @@ fn write_collection(output: &mut Vec<u8>, name: &str, collection: &Collection) -
         output.extend_from_slice(b"/>");
     }
     output.extend_from_slice(b"</");
+    if let Some(prefix) = prefix {
+        output.extend_from_slice(prefix);
+        output.push(b':');
+    }
     output.extend_from_slice(name.as_bytes());
     output.extend_from_slice(b">");
     Ok(())
@@ -635,10 +861,6 @@ fn parse_u32(value: &str, what: &'static str) -> Result<u32> {
 fn parse_usize(value: &str, what: &'static str) -> Result<usize> {
     let value = parse_u32(value, what)?;
     usize::try_from(value).map_err(|error| invalid(format!("invalid {what}: {error}")))
-}
-
-fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
-    matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == CORE || value.as_ref() == STRICT)
 }
 
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
