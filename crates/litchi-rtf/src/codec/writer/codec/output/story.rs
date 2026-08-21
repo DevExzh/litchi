@@ -479,26 +479,32 @@ impl<W: Write> RtfWriter<W> {
             ));
         }
         let mut navigation_text_bytes = 0usize;
-        let body_navigation: Vec<bool> = (0..navigation_entries.len())
-            .map(|index| {
-                body_story_events.iter().any(|event| {
-                matches!(event, BodyStoryEvent::NavigationEntry(value) if *value == index)
-            })
-            })
-            .collect();
-        let body_revisions: Vec<bool> = (0..revisions.len())
-            .map(|index| {
-                body_story_events.iter().any(|event| {
-                    matches!(
-                        event,
-                        BodyStoryEvent::RevisionStart(value)
-                            | BodyStoryEvent::RevisionEnd(value)
-                            | BodyStoryEvent::RevisionDeletion(value)
-                            if *value == index
-                    )
-                })
-            })
-            .collect();
+        // Mark body-owned metadata in one pass.  The previous per-index
+        // `iter().any(...)` scans repeated the entire story-event list for
+        // every navigation entry and revision, turning writer validation into
+        // O(metadata * events) work on documents with rich story markup.
+        // Keep out-of-range references unmarked here: the authoritative story
+        // walk below still reports them through `take_story_item`, preserving
+        // the existing validation order and error behavior.
+        let mut body_navigation = vec![false; navigation_entries.len()];
+        let mut body_revisions = vec![false; revisions.len()];
+        for event in body_story_events {
+            match *event {
+                BodyStoryEvent::NavigationEntry(index) => {
+                    if let Some(seen) = body_navigation.get_mut(index) {
+                        *seen = true;
+                    }
+                },
+                BodyStoryEvent::RevisionStart(index)
+                | BodyStoryEvent::RevisionEnd(index)
+                | BodyStoryEvent::RevisionDeletion(index) => {
+                    if let Some(seen) = body_revisions.get_mut(index) {
+                        *seen = true;
+                    }
+                },
+                _ => {},
+            }
+        }
         for (entry, is_body_entry) in navigation_entries.iter().zip(&body_navigation) {
             entry
                 .validate()
