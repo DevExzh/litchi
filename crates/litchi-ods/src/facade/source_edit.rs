@@ -387,7 +387,16 @@ impl<'source> SourceCellEdit<'source> {
         // already scanned this immutable projection; otherwise scan now and
         // retain the layout for later transactions. Both paths run the same
         // gates before the scan in the same order.
-        let content_xml = if let Some(layout) = self.before.owner.cached_content_layout() {
+        // The owner's cached layout is keyed to the exact immutable
+        // `content.xml` Arc retained at open.  A committed source-cell
+        // snapshot may be edited again before it is published; its XML is a
+        // different allocation (and may have different row offsets), so the
+        // owner's layout must not be reused for that derived snapshot.  A
+        // stale layout would splice the second batch at offsets from the
+        // original source and could corrupt otherwise valid chained patches.
+        let content_xml = if Arc::ptr_eq(&self.before.content_xml, &self.before.owner.content_xml)
+            && let Some(layout) = self.before.owner.cached_content_layout()
+        {
             crate::worksheet::package::replace_changed_rows_from_content_xml_with_layout(
                 &self.before.content_xml,
                 layout,
