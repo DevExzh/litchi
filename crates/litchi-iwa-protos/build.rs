@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_document_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_caption_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_chart_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_placeholder_text_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
@@ -60,6 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_keynote_chart_title_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_show_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_placeholder_text_projection_provenance(
         proto_directory,
@@ -227,6 +229,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_keynote_chart_caption_projection_budget(&buffa_keynote_chart_caption_out_directory)?;
+
+    // Keynote chart-title reads need only the two scalar fields from the
+    // generated ChartNonStyleArchive extension. Keep the outer non-style
+    // envelope and every unrelated generated field caller-owned.
+    let buffa_keynote_chart_title_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-chart-title");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSCHChartTitleArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_chart_title_out_directory)
+        .include_file("iwa_keynote_chart_title_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_chart_title_projection_budget(&buffa_keynote_chart_title_out_directory)?;
 
     // Numbers reaches a table model through field 2 of TableInfo. Keep the
     // drawable base archive and all display metadata out of generated code;
@@ -941,6 +963,83 @@ optional .LitchiIwaProjection.DrawableArchive super = 1;\n\
     {
         return Err(
             "derived Keynote chart-caption projection/router drifted from canonical TSCH/TSD/TSP fields, exposed chart extensions, or introduced generated/production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_chart_title_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSCH_NON_STYLE_FIELDS: [&str; 3] = [
+        "message ChartNonStyleArchive {",
+        "optional bool tschchartinfodefaultshowtitle = 21;",
+        "optional string tschchartinfodefaulttitle = 23;",
+    ];
+    const TSCH_NON_STYLE_EXTENSION: &str =
+        "optional .TSCH.Generated.ChartNonStyleArchive current = 10000;";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message ChartTitleArchive {\n\
+optional bool tschchartinfodefaultshowtitle = 21;\n\
+optional string tschchartinfodefaulttitle = 23;\n\
+}";
+    const ROUTER_DECLARATIONS: [&str; 8] = [
+        "const CHART_TITLE_VISIBLE_FIELD: u32 = 21;",
+        "const CHART_TITLE_TEXT_FIELD: u32 = 23;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "pub fn decode_chart_title<'source>(",
+        "pub fn decode_chart_title_with_report<'source>(",
+        "fn preflight_chart_title<'source>(",
+        "fn next_strict_field<",
+        "fn require_canonical_bool(",
+    ];
+    const PRIVATE_MODULE_DECLARATIONS: [&str; 2] = [
+        "#[doc(hidden)]\nmod buffa_keynote_chart_title_generated {",
+        "\"/buffa-keynote-chart-title/iwa_keynote_chart_title_buffa_protos.rs\"",
+    ];
+
+    let tsch = fs::read_to_string(proto_directory.join("TSCHArchives.GEN.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TSCHChartTitleArchive.proto"))?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let expected_projection = normalize(PROJECTION_SCHEMA);
+    let codec = fs::read_to_string("src/keynote_chart_title_codec.rs")?;
+    let production_codec = codec
+        .split_once("#[cfg(test)]")
+        .map_or(codec.as_str(), |(production, _tests)| production);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if !TSCH_NON_STYLE_FIELDS
+        .iter()
+        .all(|declaration| tsch.matches(declaration).count() == 1)
+        || tsch.matches(TSCH_NON_STYLE_EXTENSION).count() != 1
+        || normalize(&projection) != expected_projection
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || !PRIVATE_MODULE_DECLARATIONS
+            .iter()
+            .all(|declaration| lib.matches(declaration).count() == 1)
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+        || production_codec.contains("chart_graph")
+        || production_codec.contains("IWorkPackage")
+    {
+        return Err(
+            "derived Keynote chart-title projection/router drifted from TSCH.Generated.ChartNonStyleArchive fields 21/23, exposed the outer chart transaction, or introduced production encoding"
                 .into(),
         );
     }
@@ -2817,6 +2916,42 @@ fn enforce_keynote_chart_caption_projection_budget(directory: &Path) -> Result<(
     {
         return Err(format!(
             "Keynote chart-caption projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_chart_title_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 52 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "Keynote chart-title projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

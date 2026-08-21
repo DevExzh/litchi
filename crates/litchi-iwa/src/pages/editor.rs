@@ -7,6 +7,7 @@ use std::path::Path;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
+use litchi_iwa_protos::pages_section_codec::{DecodeOptions, decode_section_settings};
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
@@ -4130,15 +4131,11 @@ fn clone_pages_section_graph_object(
     let data = match message.type_ {
         SECTION_MESSAGE_TYPE => {
             const REFERENCE_PATHS: &[&[u32]] = &[&[3], &[4], &[14], &[23], &[24], &[25], &[29]];
-            let section = SectionArchive::decode(message.data.as_slice())?;
+            let name_present = pages_section_name(message.data.as_slice())?.is_some();
             let data = remap_pages_reference_paths(&message.data, REFERENCE_PATHS, remap)?;
-            let data = patch_length_delimited_field(
-                &data,
-                26,
-                section.name.is_some(),
-                Some(name.as_bytes()),
-            )?;
-            if SectionArchive::decode(data.as_slice())?.name.as_deref() != Some(name) {
+            let data =
+                patch_length_delimited_field(&data, 26, name_present, Some(name.as_bytes()))?;
+            if pages_section_name(data.as_slice())? != Some(name) {
                 return Err(Error::InvalidFormat(
                     "Pages section clone name patch failed validation".to_owned(),
                 ));
@@ -4216,6 +4213,18 @@ fn clone_pages_section_graph_object(
         }
     }
     Ok(cloned)
+}
+
+fn pages_section_name(payload: &[u8]) -> Result<Option<&str>> {
+    decode_section_settings(
+        payload,
+        DecodeOptions::new(payload.len(), 64)
+            .with_max_fields(payload.len())
+            .with_max_work_bytes(payload.len().saturating_mul(2))
+            .with_max_name_bytes(payload.len()),
+    )
+    .map(|settings| settings.name())
+    .map_err(|error| Error::InvalidFormat(format!("Invalid Pages section settings: {error}")))
 }
 
 fn insert_section_table_entry(table: &[u8], entry: ObjectAttribute) -> Result<Vec<u8>> {

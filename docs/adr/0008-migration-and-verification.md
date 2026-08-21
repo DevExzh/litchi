@@ -10951,11 +10951,20 @@ monolith-exit claim.
 
 ## Current present status
 
-The latest final verification records 243 passing `litchi-iwa-protos` tests,
-including six focused Keynote chart-caption codec tests; 329 passing
-`litchi-numbers` library tests with four ignored, 58 focused Numbers extractor
-tests, 14 `table_data_list` integration tests, and 281 boundary unit tests.
-The performance baseline currently exposes 341 selectable cases. The caption
-codec is a narrow strict-ingress projection; its six tests do not represent a
-complete Keynote transaction migration. The dated verification gates above
-remain historical evidence.
+The latest isolated `cargo test -p litchi-iwa-protos --lib --all-features`
+verification records 258 passing `litchi-iwa-protos` tests, including 14
+focused private Keynote chart-title codec tests and one bounded Pages
+pagination guard; 329 passing `litchi-numbers` library tests with
+four ignored, 58 focused Numbers extractor tests, 14 `table_data_list`
+integration tests, and 281 boundary unit tests. The bounded Pages
+section-name seam uses the private section-settings codec for field-26
+presence/readback while preserving the rest of the graph bytes. The private
+Keynote chart-title codec projects only generated `ChartNonStyleArchive`
+fields 21 and 23; it is codec-only and does not locate charts or perform a
+graph transaction. The performance baseline currently exposes 341 selectable
+cases. FormulaArchive and the legacy `litchi-iwa` comment path remain
+migration debt; legacy monolith/dependency edges and all 14 ordered debts
+remain open. Native Numbers type-6011 Segment evidence remains withheld, so
+no native segment/save-mutation, performance, host-exit, or complete
+monolith-exit claim follows. The dated verification gates above remain
+historical evidence.
