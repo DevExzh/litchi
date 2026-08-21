@@ -28,6 +28,48 @@ use std::path::Path;
 
 const MAX_ROOT_SHAPES: usize = 65_536;
 const MAX_ROOT_SHAPE_GROUPS: usize = 16_384;
+const FILE_READ_CHUNK_BYTES: usize = 16 * 1024;
+
+fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let mut chunk = [0_u8; FILE_READ_CHUNK_BYTES];
+    loop {
+        let read = reader
+            .read(&mut chunk)
+            .map_err(|error| RtfError::ParserError(format!("Failed to read file: {error}")))?;
+        if read == 0 {
+            break;
+        }
+
+        let read_chunk = chunk.get(..read).ok_or_else(|| {
+            RtfError::ParserError("file reader returned an invalid byte count".to_string())
+        })?;
+        let observed = bytes
+            .len()
+            .checked_add(read)
+            .ok_or(RtfError::LimitExceeded {
+                resource: "source bytes",
+                observed: usize::MAX,
+                limit,
+            })?;
+        if observed > limit {
+            return Err(RtfError::LimitExceeded {
+                resource: "source bytes",
+                observed,
+                limit,
+            });
+        }
+
+        bytes
+            .try_reserve(read)
+            .map_err(|_error| RtfError::AllocationFailed {
+                resource: "source bytes",
+                requested: observed,
+            })?;
+        bytes.extend_from_slice(read_chunk);
+    }
+    Ok(bytes)
+}
 
 fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
     let file = File::open(path)
@@ -47,19 +89,8 @@ fn read_file_with_limit(path: &Path, limit: usize) -> RtfResult<Vec<u8>> {
     // Read at most one byte beyond the configured ceiling so special files,
     // concurrent growth, and inaccurate metadata cannot bypass the budget.
     let read_ceiling = limit.checked_add(1).unwrap_or(limit);
-    let mut reader = file.take(u64::try_from(read_ceiling).unwrap_or(u64::MAX));
-    let mut bytes = Vec::new();
-    reader
-        .read_to_end(&mut bytes)
-        .map_err(|error| RtfError::ParserError(format!("Failed to read file: {error}")))?;
-    if bytes.len() > limit {
-        return Err(RtfError::LimitExceeded {
-            resource: "source bytes",
-            observed: bytes.len(),
-            limit,
-        });
-    }
-    Ok(bytes)
+    let reader = file.take(u64::try_from(read_ceiling).unwrap_or(u64::MAX));
+    read_limited_source(reader, limit)
 }
 
 pub(crate) fn owned_table(
@@ -5875,5 +5906,59 @@ impl<'a> RtfDocument<'a> {
         for table in &mut self.tables {
             table.clear_revision_references();
         }
+    }
+}
+
+#[cfg(test)]
+mod source_tests {
+    use super::{RtfError, read_limited_source};
+    use std::io::{self, Read};
+
+    struct OneByteReader {
+        bytes: Vec<u8>,
+        position: usize,
+    }
+
+    impl Read for OneByteReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if self.position == self.bytes.len() {
+                return Ok(0);
+            }
+            let byte = self
+                .bytes
+                .get(self.position)
+                .copied()
+                .ok_or_else(|| io::Error::other("reader position out of bounds"))?;
+            let destination = output
+                .get_mut(..1)
+                .ok_or_else(|| io::Error::other("reader was given an empty buffer"))?;
+            destination[0] = byte;
+            self.position += 1;
+            Ok(1)
+        }
+    }
+
+    #[test]
+    fn limited_source_reader_handles_short_reads_without_read_to_end_growth() {
+        let reader = OneByteReader {
+            bytes: b"bounded source".to_vec(),
+            position: 0,
+        };
+        let bytes = read_limited_source(reader, b"bounded source".len()).expect("source read");
+        assert_eq!(bytes, b"bounded source");
+    }
+
+    #[test]
+    fn limited_source_reader_rejects_bytes_beyond_the_declared_ceiling() {
+        let reader = io::Cursor::new(b"too large");
+        let error = read_limited_source(reader, 2).expect_err("source limit must be enforced");
+        assert!(matches!(
+            error,
+            RtfError::LimitExceeded {
+                resource: "source bytes",
+                observed: 9,
+                limit: 2,
+            }
+        ));
     }
 }
