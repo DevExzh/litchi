@@ -2,9 +2,8 @@
 
 Date: 2026-08-21
 
-Status: latency-supported on the listed cells, but HELD pending the allocator/
-resource guardrail; the candidate is not landed and no broad XLSX claim is
-made
+Status: LANDED on the listed cells after the strict allocator/resource
+guardrail accepted both ABBA pairings; no broad XLSX claim is made
 
 ## Evidence-package identity
 
@@ -120,24 +119,64 @@ ceiling. No selector has an adverse-both statistic.
 
 These are 15 accepted cells and zero adverse-both cells. The three fully
 accepted selectors and the accepted cells of `xlsx_first_cell` support the
-latency direction for this matched run, but they do not clear the separate
-allocator/resource guardrail required for production landing.
+latency direction for this matched run.
+
+## Strict allocator/resource guardrail
+
+The independently audited strict resource report is retained at
+`/home/zhuhe/CodeProjects/litchi-perf-evidence/0251-xlsx-xml-borrowed-resource-20260821.json`
+with SHA-256
+`85208129e790507c09fdaa24c834de9f718d8125ce5f3b3e036d5fd6be265ea2`.
+It was produced by `litchi-resource-profile` 0.1.6 from the same frozen
+control and candidate binaries, revisions, four selectors, exact corpora,
+30 warmups, and 500 retained samples. All 44 retained timed-harness,
+heaptrack, print, and histogram artifacts match their recorded sizes and
+SHA-256 identities. The instrumented harness elapsed values are retained for
+leg alignment only and are not latency evidence.
+
+The run used fixed order A1 control, B1 candidate, B2 candidate, A2 control.
+Its control binary SHA-256 is
+`f6b461c65dc83b92e81797de5a2c70f0d302d1eefc0340aa751af2ccf6c8dab4`;
+the candidate binary SHA-256 is
+`c8c870eeb5c28790aab9941af82a90306be0484e0384888328f8dd96cb0e26dd`.
+All four captured worktrees are clean. Corpus, configuration,
+source/sink/output, revision, tool, and stable-environment identities pass.
+The five per-iteration edit-phase timing vectors are excluded from
+cross-process identity only at the exact direct
+`source.xlsx_cell_values` object path; every non-timing source value remains
+identity-bearing.
+
+The predeclared gate permits at most a 5% candidate increase in either paired
+direction for every required metric:
+
+| Metric | A1→B1 | A2→B2 | Verdict |
+|---|---:|---:|---|
+| allocation calls | -50.979460638% | -50.979460638% | accepted |
+| allocated bytes | -23.698450827% | -23.698450827% | accepted |
+| temporary allocations | +1.837475130% | +1.837477866% | accepted |
+| peak heap bytes | 0% | 0% | accepted |
+| peak RSS bytes | -0.075891053% | +0.237843957% | accepted |
+| `/usr/bin/time` max RSS | -0.686537173% | -0.204453776% | accepted |
+
+The largest positive delta is +1.837477866%, so both pairings clear the
+resource guardrail. The measured candidate patch and landed patch are
+byte-identical with patch SHA-256
+`7445a308d6cdf48eacd465eb29345398ee74450d35f118c626cc9788aec3e568`
+and stable patch ID `4ed0ddf3f4b0dcdaaee996c54945d1b480f47a00`.
 
 ## Validation and claim boundary
 
-The durable baseline test failure reproduces on the unmodified control base
-`1ac7d8d8b`; it is unrelated to this candidate. The targeted worksheet/parser
-suites passed, as did the matched evidence identity and statistic checks. The
-durable baseline failure is not reclassified as a regression from this change.
+The earlier durable baseline test failure reproduced on the unmodified control
+base `1ac7d8d8b` and was unrelated to this candidate. Its signed fixture was
+updated to construct the complete signed package before first serialization,
+preserving the production refusal to mutate an already signed source. The
+full all-features XLSX unit/integration suite and XLSX doctests pass after that
+test-only correction.
 
-Production remains HELD pending allocator/resource guardrail evidence. The
-candidate is not landed. This record is limited to the listed matched XLSX
-worksheet parsing selectors and their fixed corpora; it makes no broad XLSX
-claim and no claim about allocations, RSS, physical I/O, filesystem or
-cold-cache behavior, decompression, durable preservation, real producers, or
-other CRUD paths. Identity fields that are consistently absent remain absent;
-they are not inferred from the latency result.
-
-Verification for this documentation-only update is Python package/hash/count
-and link checking plus `git diff --check`; no Cargo command or benchmark is
-part of this record.
+The production patch landed as `ecb6b9429`. This record remains limited to the
+listed matched worksheet parsing selectors and fixed corpora; it makes no
+broad XLSX claim and no claim about physical I/O, filesystem or cold-cache
+behavior, decompression, real producers, or other CRUD paths. Allocation and
+RSS claims are limited to the six required whole-process metrics in the strict
+resource report. Identity fields that are consistently absent remain absent;
+they are not inferred from either evidence run.

@@ -40,11 +40,13 @@ matching base-197 schema tool.
 `quick-xml` borrowed-event worksheet parsing change over four selectors. Three
 selectors accept all p50/mean/p95/p99 cells; `xlsx_first_cell` accepts p50,
 mean, and p99, with p95 rejected solely by candidate drift of 10.941931% above
-the 10% ceiling. No adverse-both cell is present. Latency supports the listed
-cells, but production is HELD pending the allocator/resource guardrail; the
-candidate is not landed and no broad XLSX claim is made. The durable baseline
-failure reproduces on the unmodified base and is unrelated; targeted suites
-passed.
+the 10% ceiling. No adverse-both cell is present. The independently audited
+strict resource ABBA accepts all six required metrics in both pairings under
+the 5% ceiling: allocation calls fall 50.98%, allocated bytes fall 23.70%,
+peak heap is unchanged, and the largest positive delta is temporary
+allocations at 1.83748%. The byte-identical production patch landed as
+`ecb6b9429`, and the full XLSX suite passes. The claim remains limited to the
+listed selectors and fixed corpora; no broad XLSX claim is made.
 
 ## ZIP ordering/index ABBA evidence (change 0250)
 

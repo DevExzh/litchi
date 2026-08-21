@@ -13,9 +13,11 @@ an independent code/oracle audit; this is not a broad XLSX claim.)
 (three selectors accept all four statistics; `xlsx_first_cell` accepts p50,
 mean, and p99, while p95 is drift-rejected at +10.941931% candidate drift.
 No adverse-both cell is present. Latency supports the listed cells, but
-production is HELD pending allocator/resource evidence; the candidate is not
-landed. The durable baseline failure reproduces on the unmodified base and is
-unrelated; targeted suites passed. No broad XLSX claim.)
+the strict 0.1.6 resource ABBA accepts all six required metrics in both
+pairings: allocation calls fall 50.98%, allocated bytes fall 23.70%, peak
+heap is unchanged, and the largest positive delta is temporary allocations at
+1.83748%, below the 5% ceiling. The byte-identical production patch landed as
+`ecb6b9429`; the full XLSX suite passes. No broad XLSX claim.)
 [change 0250 — ZIP ordering/index ABBA evidence](changes/0250-zip-ordering-abba.md)
 (the eight-row `zip_index` package accepts no statistic; adverse-both counts
 are p50=5, mean=3, p95=3, and p99=3. The compressible tiny, many-small, and
