@@ -186,6 +186,64 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
 }
 
 #[test]
+fn discover_structure_rejects_duplicate_valid_and_invalid_sections() {
+    let body_id = 42;
+    let section_id = 43;
+    let root = DocumentArchive {
+        body_storage: Some(reference(body_id)),
+        section: Some(reference(section_id)),
+        ..Default::default()
+    };
+    let body = StorageArchive {
+        text: vec!["Body".to_owned()],
+        table_section: Some(ObjectAttributeTable {
+            entries: vec![ObjectAttribute {
+                character_index: 0,
+                object: Some(reference(section_id)),
+            }],
+        }),
+        ..Default::default()
+    };
+    let section_data = SectionArchive {
+        name: Some("First".to_owned()),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let mut invalid_section_data = section_data.clone();
+    append_length_delimited(&mut invalid_section_data, 26, b"Second");
+    let section_object = ArchiveObject::new(
+        section_id,
+        vec![
+            RawMessage {
+                type_: SECTION_MESSAGE_TYPE,
+                data: section_data,
+            },
+            RawMessage {
+                type_: SECTION_MESSAGE_TYPE,
+                data: invalid_section_data,
+            },
+        ],
+    )
+    .unwrap();
+
+    let mut package = IWorkPackage::new();
+    package
+        .replace_archive(
+            "Index/Document.iwa",
+            &Archive {
+                objects: vec![
+                    object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec()),
+                    object(body_id, 2001, body.encode_to_vec()),
+                    section_object,
+                ],
+            },
+        )
+        .unwrap();
+
+    assert!(PagesEditor::from_package(package).is_err());
+}
+
+#[test]
 fn section_append_remove_is_wire_preserving_and_transactional() {
     let body_id = 42;
     let section_id = 43;
@@ -1180,6 +1238,15 @@ fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> V
     field.extend(litchi_iwa_common::varint::encode_varint(value));
     data.extend_from_slice(&field);
     field
+}
+
+fn append_length_delimited(data: &mut Vec<u8>, field_number: u32, value: &[u8]) {
+    let key = litchi_iwa_common::varint::encode_varint((u64::from(field_number) << 3) | 2);
+    data.extend_from_slice(&key);
+    data.extend_from_slice(&litchi_iwa_common::varint::encode_varint(
+        u64::try_from(value.len()).unwrap(),
+    ));
+    data.extend_from_slice(value);
 }
 
 fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> ArchiveObject {

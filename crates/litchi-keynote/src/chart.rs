@@ -1,4 +1,14 @@
-//! Archive-free semantic selectors for Keynote charts.
+//! Archive-free semantic selectors and catalogs for Keynote charts.
+//!
+//! The types in this module intentionally contain only chart order and the
+//! visible native title. An adapter may use [`ChartCatalog`] to resolve a
+//! [`ChartSelector`] before it enters its native graph, but native object IDs,
+//! archive names, and protobuf values do not cross this boundary.
+
+#![allow(
+    clippy::module_name_repetitions,
+    reason = "chart semantic types keep their domain explicit at the crate boundary"
+)]
 
 /// Selects one chart by its visible native title or checked zero-based position.
 ///
@@ -6,10 +16,6 @@
 /// package or archive representation. The concrete Keynote adapter resolves
 /// the selector against the charts owned by a slide, checking the position or
 /// exact name there.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "ChartSelector keeps the chart semantic domain explicit at the crate boundary"
-)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ChartSelector<'a> {
     /// Select the chart at a checked zero-based position in slide chart order.
@@ -50,9 +56,189 @@ impl<'a> ChartSelector<'a> {
     }
 }
 
+impl<'a> From<&'a str> for ChartSelector<'a> {
+    fn from(name: &'a str) -> Self {
+        Self::name(name)
+    }
+}
+
+impl From<usize> for ChartSelector<'_> {
+    fn from(index: usize) -> Self {
+        Self::index(index)
+    }
+}
+
+/// A semantic chart summary in one slide's stable source order.
+///
+/// The summary deliberately has no native identity. Its position is only
+/// meaningful within the [`ChartCatalog`] that produced it, and its title is
+/// the visible native title rather than a generated object or component name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartDescriptor {
+    position: usize,
+    title: Option<Box<str>>,
+}
+
+impl ChartDescriptor {
+    /// Return this chart's zero-based position in its catalog.
+    #[must_use]
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Return the optional visible native title.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// Return a selector local to this catalog entry.
+    ///
+    /// A non-empty title is preferred for readability. Callers that need a
+    /// selector immune to duplicate or later-renamed titles should use
+    /// [`Self::position_selector`] instead.
+    #[must_use]
+    pub fn selector(&self) -> ChartSelector<'_> {
+        self.title
+            .as_deref()
+            .filter(|title| !title.is_empty())
+            .map_or_else(|| ChartSelector::index(self.position), ChartSelector::name)
+    }
+
+    /// Return a selector for this chart's checked catalog position.
+    #[must_use]
+    pub const fn position_selector(&self) -> ChartSelector<'static> {
+        ChartSelector::index(self.position)
+    }
+}
+
+/// Errors raised while resolving a semantic chart selector.
+#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChartSelectorError {
+    /// A name selector cannot select an empty visible title.
+    EmptyName,
+    /// More than one chart has the requested exact visible title.
+    DuplicateChartTitle {
+        /// The ambiguous visible title.
+        name: Box<str>,
+    },
+}
+
+impl std::fmt::Display for ChartSelectorError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyName => formatter.write_str("chart selector name cannot be empty"),
+            Self::DuplicateChartTitle { name } => {
+                write!(formatter, "chart catalog contains duplicate title {name:?}")
+            },
+        }
+    }
+}
+
+impl std::error::Error for ChartSelectorError {}
+
+/// An immutable semantic catalog of charts owned by one slide.
+///
+/// The catalog stores only source order and optional visible titles. It is a
+/// safe hand-off object for a native adapter: resolving a selector yields a
+/// [`ChartDescriptor`] or its semantic position, never a native object ID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChartCatalog {
+    charts: Box<[ChartDescriptor]>,
+}
+
+impl ChartCatalog {
+    /// Build a catalog from chart titles in slide source order.
+    ///
+    /// Missing titles are represented by `None`; an empty title is retained as
+    /// an existing native title but cannot be used as a name selector. Use a
+    /// positional selector for that entry.
+    #[must_use]
+    pub fn from_titles(titles: impl IntoIterator<Item = Option<String>>) -> Self {
+        let charts = titles
+            .into_iter()
+            .enumerate()
+            .map(|(position, title)| ChartDescriptor {
+                position,
+                title: title.map(String::into_boxed_str),
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        Self { charts }
+    }
+
+    /// Borrow chart summaries in source order.
+    #[must_use]
+    pub fn charts(&self) -> &[ChartDescriptor] {
+        &self.charts
+    }
+
+    /// Return the number of charts in this catalog.
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.charts.len()
+    }
+
+    /// Return whether this catalog contains no charts.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.charts.is_empty()
+    }
+
+    /// Resolve a selector against this immutable semantic catalog.
+    ///
+    /// Name matching is exact and case sensitive. Missing charts and
+    /// out-of-range positions are represented by `None`; duplicate titles and
+    /// empty name selectors are rejected rather than selecting arbitrarily.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ChartSelectorError::EmptyName`] for an empty name selector or
+    /// [`ChartSelectorError::DuplicateChartTitle`] when the requested title is
+    /// not unique in this catalog.
+    pub fn select<'selector>(
+        &self,
+        selector: impl Into<ChartSelector<'selector>>,
+    ) -> Result<Option<&ChartDescriptor>, ChartSelectorError> {
+        match selector.into() {
+            ChartSelector::Index(index) => Ok(self.charts.get(index)),
+            ChartSelector::Name(name) => {
+                if name.is_empty() {
+                    return Err(ChartSelectorError::EmptyName);
+                }
+                let mut matches = self
+                    .charts
+                    .iter()
+                    .filter(|chart| chart.title() == Some(name));
+                let Some(chart) = matches.next() else {
+                    return Ok(None);
+                };
+                if matches.next().is_some() {
+                    return Err(ChartSelectorError::DuplicateChartTitle { name: name.into() });
+                }
+                Ok(Some(chart))
+            },
+        }
+    }
+
+    /// Resolve a selector to its semantic zero-based chart position.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same selector errors as [`Self::select`].
+    pub fn select_position<'selector>(
+        &self,
+        selector: impl Into<ChartSelector<'selector>>,
+    ) -> Result<Option<usize>, ChartSelectorError> {
+        self.select(selector)
+            .map(|chart| chart.map(ChartDescriptor::position))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ChartSelector;
+    use super::{ChartCatalog, ChartSelector, ChartSelectorError};
 
     #[test]
     fn index_selector_preserves_checked_position() {
@@ -80,5 +266,59 @@ mod tests {
 
         assert_eq!(INDEX, INDEX);
         assert_eq!(NAME, NAME);
+    }
+
+    #[test]
+    fn selectors_accept_semantic_name_and_position_inputs() {
+        let name: ChartSelector<'_> = "Revenue".into();
+        let position: ChartSelector<'_> = 2usize.into();
+
+        assert_eq!(name, ChartSelector::name("Revenue"));
+        assert_eq!(position, ChartSelector::index(2));
+    }
+
+    #[test]
+    fn catalog_resolves_exact_titles_and_positions_without_native_identity() {
+        let catalog = ChartCatalog::from_titles(vec![
+            None,
+            Some("Revenue".to_owned()),
+            Some("Cost".to_owned()),
+        ]);
+
+        assert_eq!(catalog.len(), 3);
+        assert!(!catalog.is_empty());
+        assert_eq!(catalog.select_position(1usize), Ok(Some(1)));
+        assert_eq!(catalog.select_position("Revenue"), Ok(Some(1)));
+        assert_eq!(catalog.select_position("revenue"), Ok(None));
+        assert_eq!(catalog.select_position(99usize), Ok(None));
+        assert_eq!(catalog.charts()[1].title(), Some("Revenue"));
+        assert_eq!(
+            catalog.charts()[1].selector(),
+            ChartSelector::name("Revenue")
+        );
+        assert_eq!(
+            catalog.charts()[1].position_selector(),
+            ChartSelector::index(1)
+        );
+    }
+
+    #[test]
+    fn catalog_rejects_empty_and_duplicate_name_selectors() {
+        let duplicate =
+            ChartCatalog::from_titles(vec![Some("Revenue".to_owned()), Some("Revenue".to_owned())]);
+        assert_eq!(
+            duplicate.select_position("Revenue"),
+            Err(ChartSelectorError::DuplicateChartTitle {
+                name: "Revenue".into()
+            })
+        );
+
+        let empty = ChartCatalog::from_titles(vec![Some(String::new())]);
+        assert_eq!(
+            empty.select_position(""),
+            Err(ChartSelectorError::EmptyName)
+        );
+        assert_eq!(empty.select_position(0usize), Ok(Some(0)));
+        assert_eq!(empty.charts()[0].selector(), ChartSelector::index(0));
     }
 }

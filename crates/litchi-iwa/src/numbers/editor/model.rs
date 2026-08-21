@@ -4,10 +4,74 @@ use super::*;
 use crate::application::Application;
 use crate::detect::detect_application_from_document;
 use crate::package_metadata::PACKAGE_METADATA_ENTRY;
+use litchi_iwa_protos::comment_storage_codec;
 
 const DEFAULT_TILE_SIZE_ROWS: u32 = 256;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];
+const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+
+fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::DecodeOptions {
+    comment_storage_codec::DecodeOptions::new(
+        source.len().max(1),
+        source.len().max(1),
+        source.len().saturating_mul(32).max(1),
+        COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
+        source.len().max(1),
+        source.len().max(1),
+    )
+}
+
+#[derive(Debug, Default)]
+struct CommentStorageReplyIds {
+    identifiers: Vec<u64>,
+}
+
+impl comment_storage_codec::CommentStorageVisitor for CommentStorageReplyIds {
+    fn visit_reply(
+        &mut self,
+        reply: comment_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
+        self.identifiers.push(reply.identifier());
+        Ok(())
+    }
+}
+
+fn strict_comment_storage_error(
+    storage_id: u64,
+    error: comment_storage_codec::DecodeError,
+) -> Error {
+    Error::InvalidFormat(format!(
+        "Numbers comment storage object {storage_id} failed strict validation: {error}"
+    ))
+}
+
+fn validate_comment_storage_payload(storage_id: u64, source: &[u8]) -> Result<()> {
+    comment_storage_codec::decode_comment_storage_archive(
+        source,
+        comment_storage_decode_options(source),
+    )
+    .map(|_| ())
+    .map_err(|error| strict_comment_storage_error(storage_id, error))
+}
+
+fn decode_comment_storage_payload<'source>(
+    storage_id: u64,
+    source: &'source [u8],
+) -> Result<(
+    comment_storage_codec::CommentStorageSnapshot<'source>,
+    Vec<u64>,
+)> {
+    let mut replies = CommentStorageReplyIds::default();
+    let (comment, _) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
+        source,
+        comment_storage_decode_options(source),
+        &mut replies,
+    )
+    .map_err(|error| strict_comment_storage_error(storage_id, error))?;
+    Ok((comment, replies.identifiers))
+}
 pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArchive> {
     package.with_parsed_archive("Index/Document.iwa", |archive| {
         let object = archive
@@ -3876,15 +3940,14 @@ pub(super) fn comment_entry_location(
     let payloads = object
         .messages
         .iter()
-        .filter(|message| message.type_ == 3056)
+        .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
         .collect::<Vec<_>>();
-    if payloads.len() != 1
-        || tsd::CommentStorageArchive::decode(payloads[0].data.as_slice()).is_err()
-    {
+    if payloads.len() != 1 {
         return Err(Error::InvalidFormat(format!(
             "Object {storage_id} must contain exactly one TSD comment-storage payload"
         )));
     }
+    validate_comment_storage_payload(storage_id, payloads[0].data.as_slice())?;
     Ok(CommentEntryLocation {
         table_id,
         storage_id,
@@ -3915,30 +3978,30 @@ pub(super) fn read_comment_storage_object(
     let messages = object
         .messages
         .iter()
-        .filter(|message| message.type_ == 3056)
+        .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
         .collect::<Vec<_>>();
     if messages.len() != 1 {
         return Err(Error::InvalidFormat(format!(
             "Object {storage_id} must contain exactly one TSD comment-storage payload"
         )));
     }
-    let comment = tsd::CommentStorageArchive::decode(messages[0].data.as_slice())?;
+    let (comment, reply_ids) =
+        decode_comment_storage_payload(storage_id, messages[0].data.as_slice())?;
     Ok(Comment {
-        text: comment.text.unwrap_or_default(),
-        creation_date_seconds: comment.creation_date.map(|date| date.seconds),
+        text: comment.text().unwrap_or_default().to_owned(),
+        creation_date_seconds: comment.creation_date().map(|date| date.seconds()),
         author_id: comment
-            .author
-            .map(|author| AuthorId::from_raw(author.identifier))
+            .author()
+            .map(|author| AuthorId::from_raw(author.identifier()))
             .transpose()?,
-        reply_ids: comment
-            .replies
+        reply_ids: reply_ids
             .into_iter()
-            .map(|reply| StorageId::from_raw(reply.identifier).map_err(crate::Error::from))
+            .map(|identifier| StorageId::from_raw(identifier).map_err(crate::Error::from))
             .collect::<Result<Vec<_>>>()?
             .into_boxed_slice(),
         storage_uuid: comment
-            .storage_uuid
-            .map(|uuid| Uuid::from_parts(uuid.lower, uuid.upper))
+            .storage_uuid()
+            .map(|uuid| Uuid::from_parts(uuid.lower(), uuid.upper()))
             .transpose()?,
     })
 }
@@ -4128,7 +4191,7 @@ pub(super) fn ensure_comment_storage_metadata(
             .messages
             .iter()
             .enumerate()
-            .filter(|(_, message)| message.type_ == 3056)
+            .filter(|(_, message)| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             .map(|(index, _)| index)
             .collect::<Vec<_>>();
         if indexes.len() != 1 {
@@ -4138,9 +4201,16 @@ pub(super) fn ensure_comment_storage_metadata(
         }
         let index = indexes[0];
         let original = object.messages[index].data.as_slice();
-        let before = tsd::CommentStorageArchive::decode(original)?;
+        let before = comment_storage_codec::decode_comment_storage_archive(
+            original,
+            comment_storage_decode_options(original),
+        )
+        .map_err(|error| strict_comment_storage_error(storage_id, error))?;
+        let before_has_creation_date = before.creation_date().is_some();
+        let before_has_author = before.author().is_some();
+        let before_has_storage_uuid = before.storage_uuid().is_some();
         let mut data = original.to_vec();
-        if before.creation_date.is_none() {
+        if !before_has_creation_date {
             data = patch_length_delimited_field(
                 &data,
                 2,
@@ -4148,9 +4218,7 @@ pub(super) fn ensure_comment_storage_metadata(
                 Some(&current_apple_reference_date()?.encode_to_vec()),
             )?;
         }
-        if before.author.is_none()
-            && let Some(author_id) = author_id
-        {
+        if !before_has_author && let Some(author_id) = author_id {
             data = patch_length_delimited_field(
                 &data,
                 3,
@@ -4164,24 +4232,34 @@ pub(super) fn ensure_comment_storage_metadata(
                 ),
             )?;
         }
-        if before.storage_uuid.is_none() {
+        if !before_has_storage_uuid {
             data =
                 patch_length_delimited_field(&data, 5, false, Some(&storage_uuid.encode_to_vec()))?;
         }
         if data == original {
             return Ok(());
         }
-        let verified = tsd::CommentStorageArchive::decode(data.as_slice())?;
-        if verified.creation_date.is_none()
-            || (author_id.is_some() && verified.author.is_none())
-            || verified.storage_uuid.is_none()
+        let verified = comment_storage_codec::decode_comment_storage_archive(
+            data.as_slice(),
+            comment_storage_decode_options(data.as_slice()),
+        )
+        .map_err(|error| strict_comment_storage_error(storage_id, error))?;
+        if verified.creation_date().is_none()
+            || (author_id.is_some() && verified.author().is_none())
+            || verified.storage_uuid().is_none()
         {
             return Err(Error::InvalidFormat(format!(
                 "Numbers comment storage {storage_id} metadata patch failed validation"
             )));
         }
-        object.replace_message(index, RawMessage { type_: 3056, data })?;
-        if before.author.is_none()
+        object.replace_message(
+            index,
+            RawMessage {
+                type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        if !before_has_author
             && let Some(author_id) = author_id
             && !object.archive_info.message_infos[index]
                 .object_references
@@ -4212,29 +4290,43 @@ pub(super) fn update_comment_storage_text(
         let message_index = object
             .messages
             .iter()
-            .position(|message| message.type_ == 3056)
+            .position(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Object {} has no TSD comment-storage payload",
                     entry.storage_id
                 ))
             })?;
-        let comment =
-            tsd::CommentStorageArchive::decode(object.messages[message_index].data.as_slice())?;
+        let original = object.messages[message_index].data.as_slice();
+        let comment = comment_storage_codec::decode_comment_storage_archive(
+            original,
+            comment_storage_decode_options(original),
+        )
+        .map_err(|error| strict_comment_storage_error(entry.storage_id, error))?;
         let data = patch_length_delimited_field(
-            object.messages[message_index].data.as_slice(),
+            original,
             1,
-            comment.text.is_some(),
+            comment.text().is_some(),
             Some(text.as_bytes()),
         )?;
-        let verified = tsd::CommentStorageArchive::decode(data.as_slice())?;
-        if verified.text.as_deref() != Some(text.as_str()) {
+        let verified = comment_storage_codec::decode_comment_storage_archive(
+            data.as_slice(),
+            comment_storage_decode_options(data.as_slice()),
+        )
+        .map_err(|error| strict_comment_storage_error(entry.storage_id, error))?;
+        if verified.text() != Some(text.as_str()) {
             return Err(Error::InvalidFormat(format!(
                 "Numbers comment storage object {} text patch failed validation",
                 entry.storage_id
             )));
         }
-        object.replace_message(message_index, RawMessage { type_: 3056, data })?;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
         Ok(())
     })
 }
@@ -5129,13 +5221,13 @@ pub(super) fn remove_unreferenced_comment_graph(
         for message in object
             .messages
             .iter()
-            .filter(|message| message.type_ == 3056)
+            .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
         {
-            let comment = tsd::CommentStorageArchive::decode(message.data.as_slice())?;
-            if let Some(author) = comment.author {
-                removed.author_ids.insert(author.identifier);
+            let (comment, reply_ids) = decode_comment_storage_payload(identifier, &message.data)?;
+            if let Some(author) = comment.author() {
+                removed.author_ids.insert(author.identifier());
             }
-            replies.extend(comment.replies.into_iter().map(|reply| reply.identifier));
+            replies.extend(reply_ids);
         }
         if let Some(component_identifier) = component_identifier_for_entry(package, archive_name)? {
             remove_component_external_references_to_object(

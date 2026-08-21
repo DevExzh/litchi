@@ -10954,8 +10954,8 @@ monolith-exit claim.
 The latest isolated `cargo test -p litchi-iwa-protos --lib --all-features`
 verification records 258 passing `litchi-iwa-protos` tests, including 14
 focused private Keynote chart-title codec tests and one bounded Pages
-pagination guard; 329 passing `litchi-numbers` library tests with
-four ignored, 58 focused Numbers extractor tests, 14 `table_data_list`
+pagination guard; 339 passing `litchi-numbers` library tests with
+four ignored, 68 focused Numbers extractor tests, 14 `table_data_list`
 integration tests, and 281 boundary unit tests. The bounded Pages
 section-name seam uses the private section-settings codec for field-26
 presence/readback while preserving the rest of the graph bytes. The private

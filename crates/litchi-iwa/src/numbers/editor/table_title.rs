@@ -41,8 +41,7 @@ pub(crate) fn set_table_title_settings_in_package(
         let message_index = table_model_message_index(object, table_id)?;
         let message_type = object.messages[message_index].type_;
         let original = object.messages[message_index].data.as_slice();
-        let model = TableModelArchive::decode(original)?;
-        let data = write_table_title_settings_wire(original, &model, settings)?;
+        let data = write_table_title_settings_wire(original, settings)?;
         object.replace_message(
             message_index,
             RawMessage {
@@ -201,10 +200,7 @@ fn read_table_title_settings(
         ))
     })?;
     let message_index = table_model_message_index(object, descriptor.object_id)?;
-    read_table_title_settings_wire(
-        object.messages[message_index].data.as_slice(),
-        &descriptor.model,
-    )
+    read_table_title_settings_wire(object.messages[message_index].data.as_slice())
 }
 
 fn table_model_message_index(object: &ArchiveObject, table_id: u64) -> Result<usize> {

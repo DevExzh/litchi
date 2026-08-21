@@ -31,7 +31,9 @@ use crate::cell::FiniteF64;
 use crate::cell::Value as CellValue;
 use crate::cell::wire::{BncCellView, CachedScalar, StoredValue};
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
-use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
+use litchi_iwa_common::wire::{
+    WireDescent, parse_wire_view_with_limits, preflight_wire_tree_with_limits,
+};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::comment_storage_codec;
 use litchi_iwa_protos::group_node_category_codec::{self, CategoryValueView, GroupNodeView};
@@ -46,7 +48,7 @@ use std::sync::Arc;
 
 type CompactTable<T> = Box<[(u32, T)]>;
 type StringTable = CompactTable<String>;
-type FormulaTable = CompactTable<tsce::FormulaArchive>;
+type FormulaTable = CompactTable<FormulaArchiveBytes>;
 type FormulaErrorTable = CompactTable<String>;
 type CommentTable = CompactTable<Comment>;
 type FormulaOwnerKey = [u32; 4];
@@ -63,6 +65,661 @@ const MAX_FORMULA_CATEGORY_DEPTH: usize = 64;
 const MAX_FORMULA_WORK: usize = crate::MAX_REFERENCES;
 const MAX_FORMULA_WIRE_BYTES: usize = DEFAULT_MAX_TEXT_BYTES;
 const MAX_PAYLOAD_WORK: usize = WireLimits::MAX_REWRITE_WORK;
+
+/// Formula bytes retained by the table sidecar.
+///
+/// The table-list projection must reject malformed formula payloads even when
+/// no cell eventually references them, but decoding every archive into the
+/// generated repeated-node representation makes an unrelated formula entry an
+/// eager allocation.  Retain one bounded owned wire copy after a strict
+/// envelope preflight and decode it only at the cell that needs rendering.
+/// The renderer still receives the native generated archive, so this seam does
+/// not narrow the set of AST nodes it can render.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FormulaArchiveBytes {
+    bytes: Box<[u8]>,
+}
+
+impl FormulaArchiveBytes {
+    fn from_wire(source: &[u8], budget: &mut ProjectionBudget) -> Result<Self> {
+        // Charge before either preflight or allocation.  A malformed
+        // candidate therefore retains the same monotonic wire cost as the
+        // previous eager decoder, while no partial owned value can escape.
+        budget.charge_formula_wire(source.len())?;
+        preflight_formula_archive_envelope(source, budget)?;
+
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(source.len())
+            .map_err(|_| allocation_error("Numbers formula wire", source.len()))?;
+        owned.extend_from_slice(source);
+        Ok(Self {
+            bytes: owned.into_boxed_slice(),
+        })
+    }
+
+    fn decode(&self) -> Result<tsce::FormulaArchive> {
+        tsce::FormulaArchive::decode(self.bytes.as_ref()).map_err(Error::protobuf)
+    }
+}
+
+/// Validate the complete FormulaArchive wire tree without materializing its
+/// repeated AST representation.
+///
+/// The generic wire scanner is deliberately schema-directed only for nested
+/// message fields.  Unknown fields remain opaque, matching Prost's forward
+/// compatible behavior, while known scalar/string fields still have their
+/// native wire type and UTF-8 checked.  Canonical field framing is required at
+/// every level so a malformed, unreferenced formula cannot hide behind the
+/// deferred generated decode.
+fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudget) -> Result<()> {
+    // Prost accepts an empty proto2 message even when its schema marks field
+    // 1 as required.  The former eager FormulaArchive decoder therefore
+    // admitted the serialized default archive, whose empty AST rendered as
+    // `=`.  Preserve that compatibility case while retaining the required
+    // root field check for every non-empty archive.
+    if source.is_empty() {
+        return Ok(());
+    }
+
+    // The wire preflight report is aggregate: every selected child message is
+    // charged in addition to its parent.  A per-message input/field ceiling
+    // would reject an otherwise small, valid formula as soon as the first
+    // ASTNode is descended.  Keep the scanner finite with the same package
+    // ceilings used by `FormulaEnvelopeCost`; the latter folds the current
+    // package offsets into the admission decision.
+    let max_fields = crate::MAX_REFERENCES
+        .saturating_sub(budget.payload_fields)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let max_input_bytes = MAX_PAYLOAD_WORK
+        .saturating_sub(budget.payload_work)
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let limits = WireLimits::default()
+        .with_input_bytes(max_input_bytes)
+        .and_then(|limits| limits.with_fields(max_fields))
+        .and_then(|limits| limits.with_nesting(WireLimits::MAX_NESTING))
+        .and_then(|limits| limits.with_rewrite_work(MAX_PAYLOAD_WORK))
+        .map_err(map_formula_envelope_wire_error)?;
+
+    let mut attempted = match FormulaEnvelopeCost::new(source.len(), budget) {
+        Ok(cost) => cost,
+        Err(error) => {
+            budget.retain_formula_preflight_cost(0, source.len());
+            return Err(map_formula_envelope_wire_error(error));
+        },
+    };
+    let mut root_ast_present = false;
+    let mut root_ast_count = 0usize;
+    let preflight = preflight_wire_tree_with_limits(source, limits, |visit| {
+        let field = visit.field();
+        attempted.charge_field()?;
+        field.validate_canonical_framing()?;
+        let schema = formula_envelope_field(visit.path(), field.number());
+        if let Some(expected_wire_type) = schema.wire_type {
+            if field.wire_type() != expected_wire_type {
+                return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                    "Numbers FormulaArchive field {} has wire type {}, expected {}",
+                    field.number(),
+                    field.wire_type(),
+                    expected_wire_type
+                )));
+            }
+        }
+        if visit.path().is_empty() && field.number() == 1 {
+            root_ast_count = root_ast_count.saturating_add(1);
+            if root_ast_count > 1 {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "Numbers FormulaArchive AST node array occurs more than once".to_owned(),
+                ));
+            }
+            root_ast_present = true;
+        }
+        if schema.nested {
+            attempted.charge_nested(field.payload().len())?;
+            if !schema.required_fields.is_empty() {
+                require_formula_fields(field.payload(), schema.required_fields)?;
+            }
+        }
+        if formula_ast_array_path(visit.path()) && field.number() == 1 {
+            required_formula_ast_node_type(field.payload())?;
+        }
+        if schema.utf8 {
+            std::str::from_utf8(field.payload()).map_err(|_error| {
+                litchi_iwa_common::Error::InvalidFormat(
+                    "Numbers FormulaArchive string field is not valid UTF-8".to_owned(),
+                )
+            })?;
+        }
+        if schema.canonical_varint {
+            validate_canonical_formula_varint(field)?;
+        }
+        Ok(if schema.nested {
+            WireDescent::Descend
+        } else {
+            WireDescent::Skip
+        })
+    });
+    match preflight {
+        Ok(report) if root_ast_present => {
+            debug_assert_eq!(attempted.fields, report.fields());
+            debug_assert_eq!(attempted.work, report.scanned_bytes());
+            budget.charge_wire_preflight(report)
+        },
+        Ok(report) => {
+            debug_assert_eq!(attempted.fields, report.fields());
+            debug_assert_eq!(attempted.work, report.scanned_bytes());
+            budget.retain_formula_preflight_cost(report.fields(), report.scanned_bytes());
+            Err(Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            })
+        },
+        Err(error) => {
+            budget.retain_formula_preflight_cost(attempted.fields, attempted.work);
+            Err(map_formula_envelope_wire_error(error))
+        },
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FormulaEnvelopeCost {
+    base_fields: usize,
+    base_work: usize,
+    fields: usize,
+    work: usize,
+}
+
+impl FormulaEnvelopeCost {
+    fn new(source_len: usize, budget: &ProjectionBudget) -> litchi_iwa_common::Result<Self> {
+        let mut cost = Self {
+            base_fields: budget.payload_fields,
+            base_work: budget.payload_work,
+            fields: 0,
+            work: 0,
+        };
+        cost.charge_work(source_len)?;
+        Ok(cost)
+    }
+
+    fn charge_field(&mut self) -> litchi_iwa_common::Result<()> {
+        self.fields =
+            self.fields
+                .checked_add(1)
+                .ok_or(litchi_iwa_common::Error::LimitExceeded {
+                    kind: LimitKind::Fields,
+                    observed: usize::MAX,
+                    limit: crate::MAX_REFERENCES,
+                })?;
+        let observed = self.base_fields.saturating_add(self.fields);
+        if observed > crate::MAX_REFERENCES {
+            return Err(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed,
+                limit: crate::MAX_REFERENCES,
+            });
+        }
+        Ok(())
+    }
+
+    fn charge_work(&mut self, amount: usize) -> litchi_iwa_common::Result<()> {
+        self.work =
+            self.work
+                .checked_add(amount)
+                .ok_or(litchi_iwa_common::Error::LimitExceeded {
+                    kind: LimitKind::RewriteWork,
+                    observed: usize::MAX,
+                    limit: MAX_PAYLOAD_WORK,
+                })?;
+        let observed = self.base_work.saturating_add(self.work);
+        if observed > MAX_PAYLOAD_WORK {
+            return Err(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed,
+                limit: MAX_PAYLOAD_WORK,
+            });
+        }
+        Ok(())
+    }
+
+    fn charge_nested(&mut self, bytes: usize) -> litchi_iwa_common::Result<()> {
+        self.charge_work(bytes)
+    }
+}
+
+fn required_formula_ast_node_type(source: &[u8]) -> litchi_iwa_common::Result<()> {
+    let limits = WireLimits::default()
+        .with_input_bytes(source.len().max(1))
+        .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
+        .and_then(|limits| limits.with_nesting(1))?;
+    let view = parse_wire_view_with_limits(source, limits)?;
+    let mut found = false;
+    for field in view.fields() {
+        field.validate_canonical_framing()?;
+        if field.number() == 1 {
+            if found {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "Numbers FormulaArchive AST node type occurs more than once".to_owned(),
+                ));
+            }
+            found = true;
+            if field.wire_type() != 0 {
+                return Err(litchi_iwa_common::Error::InvalidFormat(
+                    "Numbers FormulaArchive AST node type has the wrong wire type".to_owned(),
+                ));
+            }
+        }
+    }
+    if !found {
+        return Err(litchi_iwa_common::Error::InvalidFormat(
+            "Numbers FormulaArchive AST node is missing required node type".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// Check the required direct children of a schema-known nested message.
+///
+/// Prost's generated proto2 decoder does not consistently enforce required
+/// fields on all of the deferred formula messages.  Keep this check local to
+/// the nested payload selected by the schema so unknown opaque fields remain
+/// untouched and repeated fields retain their normal semantics.
+fn require_formula_fields(source: &[u8], required_fields: &[u32]) -> litchi_iwa_common::Result<()> {
+    let limits = WireLimits::default()
+        .with_input_bytes(source.len().max(1))
+        .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
+        .and_then(|limits| limits.with_nesting(1))?;
+    let view = parse_wire_view_with_limits(source, limits)?;
+    let mut seen = [false; 8];
+    for field in view.fields() {
+        field.validate_canonical_framing()?;
+        let Some(index) = required_fields
+            .iter()
+            .position(|required| *required == field.number())
+        else {
+            continue;
+        };
+        if seen[index] {
+            return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                "Numbers FormulaArchive required field {} occurs more than once",
+                field.number()
+            )));
+        }
+        seen[index] = true;
+    }
+    for (index, field_number) in required_fields.iter().enumerate() {
+        if !seen[index] {
+            return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+                "Numbers FormulaArchive required field {} is missing",
+                field_number
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_canonical_formula_varint(
+    field: litchi_iwa_common::wire::WireFieldView<'_>,
+) -> litchi_iwa_common::Result<()> {
+    let payload = field.payload();
+    let (value, width) = litchi_iwa_common::decode_varint_from_bytes(payload).map_err(|error| {
+        litchi_iwa_common::Error::InvalidFormat(format!(
+            "Numbers FormulaArchive field {} has an invalid scalar varint: {error}",
+            field.number()
+        ))
+    })?;
+    if width != payload.len() || width != litchi_iwa_common::varint::encoded_len(value) {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "Numbers FormulaArchive field {} has a noncanonical scalar varint",
+            field.number()
+        )));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FormulaEnvelopeField {
+    wire_type: Option<u8>,
+    nested: bool,
+    utf8: bool,
+    canonical_varint: bool,
+    required_fields: &'static [u32],
+}
+
+const FORMULA_REQUIRED_NONE: &[u32] = &[];
+const FORMULA_REQUIRED_AST_STICKY_BITS: &[u32] = &[1, 2, 3, 4];
+const FORMULA_REQUIRED_AST_UID_TRACT: &[u32] = &[1, 2];
+const FORMULA_REQUIRED_AST_UID: &[u32] = &[1, 2];
+const FORMULA_REQUIRED_AST_CATEGORY_REFERENCE: &[u32] = &[1];
+const FORMULA_REQUIRED_CATEGORY_REFERENCE: &[u32] = &[1, 2, 3, 4];
+const FORMULA_REQUIRED_LOCAL_REFERENCE: &[u32] = &[1, 2, 3, 4];
+const FORMULA_REQUIRED_CROSS_REFERENCE: &[u32] = &[1, 2, 3, 4, 5];
+const FORMULA_REQUIRED_COORDINATE: &[u32] = &[1];
+const FORMULA_REQUIRED_UID_COORDINATE: &[u32] = &[1, 2, 3, 4];
+const FORMULA_REQUIRED_AST_CATEGORY_LEVELS: &[u32] = &[1, 2];
+const FORMULA_REQUIRED_CROSS_EXTRA: &[u32] = &[1];
+
+const fn formula_envelope_scalar(wire_type: u8) -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(wire_type),
+        nested: false,
+        utf8: false,
+        canonical_varint: wire_type == 0,
+        required_fields: FORMULA_REQUIRED_NONE,
+    }
+}
+
+const fn formula_envelope_nested() -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(2),
+        nested: true,
+        utf8: false,
+        canonical_varint: false,
+        required_fields: FORMULA_REQUIRED_NONE,
+    }
+}
+
+const fn formula_envelope_nested_required(required_fields: &'static [u32]) -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(2),
+        nested: true,
+        utf8: false,
+        canonical_varint: false,
+        required_fields,
+    }
+}
+
+const fn formula_envelope_utf8() -> FormulaEnvelopeField {
+    FormulaEnvelopeField {
+        wire_type: Some(2),
+        nested: false,
+        utf8: true,
+        canonical_varint: false,
+        required_fields: FORMULA_REQUIRED_NONE,
+    }
+}
+
+const FORMULA_ENVELOPE_UNKNOWN: FormulaEnvelopeField = FormulaEnvelopeField {
+    wire_type: None,
+    nested: false,
+    utf8: false,
+    canonical_varint: false,
+    required_fields: FORMULA_REQUIRED_NONE,
+};
+
+/// Return the schema shape for a FormulaArchive field.  ASTNodeArray/ASTNode
+/// paths are recognized structurally, so thunk arrays can recurse to any
+/// bounded depth without treating arbitrary length-delimited strings/bytes as
+/// messages.
+fn formula_envelope_field(path: &[u32], number: u32) -> FormulaEnvelopeField {
+    if path.is_empty() {
+        return match number {
+            1 | 6..=9 => formula_envelope_nested(),
+            2..=5 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        };
+    }
+    if path == [6] {
+        return if (1..=5).contains(&number) {
+            formula_envelope_scalar(0)
+        } else {
+            FORMULA_ENVELOPE_UNKNOWN
+        };
+    }
+    if matches!(path, [7] | [8] | [9]) {
+        return if (1..=2).contains(&number) {
+            formula_envelope_scalar(0)
+        } else {
+            FORMULA_ENVELOPE_UNKNOWN
+        };
+    }
+    if formula_ast_array_path(path) {
+        return if number == 1 {
+            formula_envelope_nested()
+        } else {
+            FORMULA_ENVELOPE_UNKNOWN
+        };
+    }
+    let Some(node_prefix_len) = formula_ast_node_prefix_len(path) else {
+        return FORMULA_ENVELOPE_UNKNOWN;
+    };
+    formula_ast_suffix_field(&path[node_prefix_len..], number)
+}
+
+/// `ASTNodeArrayArchive` appears at `[1]`, then at a repeated `1,14` suffix
+/// for every thunk (`ASTNodeArray.ast_node`, `ASTNode.thunk_array`).
+fn formula_ast_array_path(path: &[u32]) -> bool {
+    if path == [1] {
+        return true;
+    }
+    if path.len() < 3 || path[0] != 1 {
+        return false;
+    }
+    let mut index = 1;
+    while index + 1 < path.len() && path[index..index + 2] == [1, 14] {
+        index += 2;
+    }
+    index == path.len()
+}
+
+/// Return the ASTNode path prefix length.  A node is reached through `1,1`,
+/// then zero or more `14,1` thunk/array edges.  The remainder identifies a
+/// child message (for example `[16, 5]` is a cross-table CFUUID).
+fn formula_ast_node_prefix_len(path: &[u32]) -> Option<usize> {
+    if path.len() < 2 || path[..2] != [1, 1] {
+        return None;
+    }
+    let mut index = 2;
+    while index + 1 < path.len() && path[index..index + 2] == [14, 1] {
+        index += 2;
+    }
+    Some(index)
+}
+
+fn formula_ast_suffix_field(suffix: &[u32], number: u32) -> FormulaEnvelopeField {
+    match suffix {
+        // TSCE.ASTNodeArchive
+        [] => match number {
+            1..=3 | 5 | 9..=13 | 18..=20 | 22..=24 | 29 | 36..=37 | 42..=43 | 46..=47 => {
+                formula_envelope_scalar(0)
+            },
+            4 | 7 | 8 => formula_envelope_scalar(1),
+            6 | 17 | 21 | 25 | 34 | 35 => formula_envelope_utf8(),
+            14 | 40 | 45 => formula_envelope_nested(),
+            15 => formula_envelope_nested_required(FORMULA_REQUIRED_LOCAL_REFERENCE),
+            16 => formula_envelope_nested_required(FORMULA_REQUIRED_CROSS_REFERENCE),
+            26 | 27 => formula_envelope_nested_required(FORMULA_REQUIRED_COORDINATE),
+            28 => formula_envelope_nested_required(FORMULA_REQUIRED_CROSS_EXTRA),
+            30 => formula_envelope_nested_required(FORMULA_REQUIRED_UID_COORDINATE),
+            33 | 41 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_STICKY_BITS),
+            38 => formula_envelope_nested_required(&[2]),
+            39 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_CATEGORY_REFERENCE),
+            44 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_CATEGORY_LEVELS),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTNodeArrayArchive (ASTNode.thunk_array)
+        [14] => {
+            if number == 1 {
+                formula_envelope_nested()
+            } else {
+                FORMULA_ENVELOPE_UNKNOWN
+            }
+        },
+        // Local and cross-table cell reference messages are deliberately
+        // separate: only the cross-table variant has field 5 (CFUUID) and
+        // fields 6..9 (whitespace strings).
+        [15] => match number {
+            1..=4 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        [16] => match number {
+            1..=4 => formula_envelope_scalar(0),
+            5 => formula_envelope_nested(),
+            6..=9 => formula_envelope_utf8(),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSP.CFUUIDArchive
+        [16, 5] | [28, 1] => match number {
+            1 => formula_envelope_scalar(2),
+            2..=5 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTColumn/RowCoordinateArchive and ASTStickyBits
+        [26] | [27] | [33] | [41] => match number {
+            1..=4 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTCrossTableReferenceExtraInfoArchive
+        [28] => match number {
+            1 => formula_envelope_nested(),
+            2..=5 => formula_envelope_utf8(),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTUidCoordinateArchive
+        [30] => match number {
+            1 | 2 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID),
+            3..=4 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSP.UUID
+        [30, 1]
+        | [30, 2]
+        | [38, 1, 1, 1]
+        | [38, 1, 2, 1]
+        | [39, 1, 1]
+        | [39, 1, 2]
+        | [39, 1, 9]
+        | [39, 1, 10]
+        | [39, 1, 6, 1] => {
+            if (1..=2).contains(&number) {
+                formula_envelope_scalar(0)
+            } else {
+                FORMULA_ENVELOPE_UNKNOWN
+            }
+        },
+        // TSCE.ASTUidTractList
+        [38] => match number {
+            1 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID_TRACT),
+            2 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_STICKY_BITS),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTUidTract
+        [38, 1] => match number {
+            1..=2 => formula_envelope_nested(),
+            3..=5 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTUidList
+        [38, 1, 1] | [38, 1, 2] => {
+            if number == 1 {
+                formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID)
+            } else {
+                FORMULA_ENVELOPE_UNKNOWN
+            }
+        },
+        // TSCE.ASTCategoryReferenceArchive
+        [39] => {
+            if number == 1 {
+                formula_envelope_nested_required(FORMULA_REQUIRED_AST_CATEGORY_REFERENCE)
+            } else {
+                FORMULA_ENVELOPE_UNKNOWN
+            }
+        },
+        // TSCE.CategoryReferenceArchive
+        [39, 1] => match number {
+            1 | 2 | 9 | 10 => formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID),
+            3 | 4 | 8 | 11..=14 => formula_envelope_scalar(0),
+            6 | 7 => formula_envelope_nested(),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.CategoryReferenceArchive.CatRefUidList
+        [39, 1, 6] => {
+            if number == 1 {
+                formula_envelope_nested_required(FORMULA_REQUIRED_AST_UID)
+            } else {
+                FORMULA_ENVELOPE_UNKNOWN
+            }
+        },
+        // TSCE.PreserveColumnRowFlagsArchive
+        [39, 1, 7] => match number {
+            1..=4 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTCategoryLevels
+        [44] => match number {
+            1..=3 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTColonTractArchive and its four range message variants.
+        [40] => match number {
+            1..=4 => formula_envelope_nested(),
+            5 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        [40, 1] | [40, 2] | [40, 3] | [40, 4] => match number {
+            1..=2 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        // TSCE.ASTLambdaIdentsListArchive
+        [45] => match number {
+            1 | 3 | 4 => formula_envelope_utf8(),
+            2 => formula_envelope_scalar(0),
+            _ => FORMULA_ENVELOPE_UNKNOWN,
+        },
+        _ => FORMULA_ENVELOPE_UNKNOWN,
+    }
+}
+
+fn map_formula_envelope_wire_error(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::InputBytes,
+            observed,
+            limit,
+        } => Error::SemanticLimit {
+            kind: SemanticLimitKind::FormulaWireBytes,
+            observed,
+            maximum: limit,
+            path: SemanticPath::StructuredTables,
+        },
+        litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::Fields,
+            observed,
+            limit,
+        } => Error::SemanticLimit {
+            kind: SemanticLimitKind::Objects,
+            observed,
+            maximum: limit,
+            path: SemanticPath::StructuredTables,
+        },
+        litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::Nesting,
+            observed,
+            limit,
+        } => Error::SemanticLimit {
+            kind: SemanticLimitKind::FormulaDepth,
+            observed,
+            maximum: limit,
+            path: SemanticPath::StructuredTables,
+        },
+        litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::RewriteWork,
+            observed,
+            limit,
+        } => Error::SemanticLimit {
+            kind: SemanticLimitKind::FormulaWork,
+            observed,
+            maximum: limit,
+            path: SemanticPath::StructuredTables,
+        },
+        litchi_iwa_common::Error::Allocation { resource, amount } => {
+            Error::Common(litchi_iwa_common::Error::Allocation { resource, amount })
+        },
+        litchi_iwa_common::Error::InvalidFormat(_)
+        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::MalformedPayload {
+            path: SemanticPath::StructuredTables,
+        },
+        other => Error::Common(other),
+    }
+}
 
 fn table_cell_decode_options(
     source: &[u8],
@@ -89,15 +746,41 @@ fn map_table_cell_codec_error_with_reference_offset(
     error: numbers_table_cell_storage_codec::DecodeError,
     reference_offset: usize,
 ) -> Error {
+    map_table_cell_codec_error_with_offsets(error, reference_offset, 0, 0, 0)
+}
+
+fn map_table_cell_codec_error_with_offsets(
+    error: numbers_table_cell_storage_codec::DecodeError,
+    reference_offset: usize,
+    field_offset: usize,
+    work_offset: usize,
+    text_offset: usize,
+) -> Error {
     let Some(limit) = error.resource_limit() else {
         return Error::InvalidFormat("Numbers table storage projection is invalid".to_owned());
     };
-    map_table_cell_decode_limit_with_reference_offset(limit, reference_offset)
+    map_table_cell_decode_limit_with_offsets(
+        limit,
+        reference_offset,
+        field_offset,
+        work_offset,
+        text_offset,
+    )
 }
 
 fn map_table_cell_decode_limit_with_reference_offset(
     limit: numbers_table_cell_storage_codec::DecodeLimit,
     reference_offset: usize,
+) -> Error {
+    map_table_cell_decode_limit_with_offsets(limit, reference_offset, 0, 0, 0)
+}
+
+fn map_table_cell_decode_limit_with_offsets(
+    limit: numbers_table_cell_storage_codec::DecodeLimit,
+    reference_offset: usize,
+    field_offset: usize,
+    work_offset: usize,
+    text_offset: usize,
 ) -> Error {
     use numbers_table_cell_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
@@ -109,15 +792,21 @@ fn map_table_cell_decode_limit_with_reference_offset(
             observed.saturating_add(reference_offset),
             maximum.saturating_add(reference_offset),
         ),
-        DecodeLimit::Text { observed, maximum } => {
-            (SemanticLimitKind::TextBytes, observed, maximum)
-        },
-        DecodeLimit::Fields { observed, maximum } => {
-            (SemanticLimitKind::Objects, observed, maximum)
-        },
-        DecodeLimit::Work { observed, maximum } => {
-            (SemanticLimitKind::FormulaWork, observed, maximum)
-        },
+        DecodeLimit::Text { observed, maximum } => (
+            SemanticLimitKind::TextBytes,
+            observed.saturating_add(text_offset),
+            maximum.saturating_add(text_offset),
+        ),
+        DecodeLimit::Fields { observed, maximum } => (
+            SemanticLimitKind::Objects,
+            observed.saturating_add(field_offset),
+            maximum.saturating_add(field_offset),
+        ),
+        DecodeLimit::Work { observed, maximum } => (
+            SemanticLimitKind::FormulaWork,
+            observed.saturating_add(work_offset),
+            maximum.saturating_add(work_offset),
+        ),
         DecodeLimit::Nesting { observed, maximum } => (
             SemanticLimitKind::FormulaDepth,
             observed as usize,
@@ -392,6 +1081,19 @@ impl ProjectionBudget {
             SemanticLimitKind::FormulaWork,
         )?;
         Ok(())
+    }
+
+    /// Retain the fields/work spent by a rejected raw formula preflight.
+    ///
+    /// Formula bytes are owned transactionally, but the wire walk itself is
+    /// an aggregate admission cost. Saturation records a failed boundary
+    /// without publishing any staged formula value.
+    fn retain_formula_preflight_cost(&mut self, fields: usize, work: usize) {
+        self.payload_fields = self
+            .payload_fields
+            .saturating_add(fields)
+            .min(crate::MAX_REFERENCES);
+        self.payload_work = self.payload_work.saturating_add(work).min(MAX_PAYLOAD_WORK);
     }
 
     fn charge_decode_report(
@@ -1617,9 +2319,12 @@ impl<'a> TableDataExtractor<'a> {
                     options,
                 )
                 .map_err(|error| {
-                    map_table_cell_codec_error_with_reference_offset(
+                    map_table_cell_codec_error_with_offsets(
                         error,
                         candidate_budget.references,
+                        candidate_budget.payload_fields,
+                        candidate_budget.payload_work,
+                        0,
                     )
                 })?;
             if let Err(error) = candidate_budget.charge_decode_report(report) {
@@ -1818,8 +2523,7 @@ impl<'a> TableDataExtractor<'a> {
                 let value = entry.formula().ok_or_else(|| {
                     Error::InvalidFormat("Numbers formula entry has no formula payload".to_owned())
                 })?;
-                budget.charge_formula_wire(value.len())?;
-                tsce::FormulaArchive::decode(value).map_err(Error::protobuf)
+                FormulaArchiveBytes::from_wire(value, budget)
             };
         self.load_table_data_list_entries(
             object_id,
@@ -2119,6 +2823,9 @@ impl<'a> TableDataExtractor<'a> {
                 budget.remaining_payload_work(),
             );
             let reference_offset = budget.references;
+            let field_offset = budget.payload_fields;
+            let work_offset = budget.payload_work;
+            let text_offset = budget.staging_text_bytes;
             let mut visitor =
                 TypedListVisitor::new(converter, budget, expected, false, admitting_candidate);
             let decoded = numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
@@ -2127,7 +2834,13 @@ impl<'a> TableDataExtractor<'a> {
                 &mut visitor,
             )
             .map_err(|error| {
-                map_table_cell_codec_error_with_reference_offset(error, reference_offset)
+                map_table_cell_codec_error_with_offsets(
+                    error,
+                    reference_offset,
+                    field_offset,
+                    work_offset,
+                    text_offset,
+                )
             })?;
             let (snapshot, report) = decoded;
             let (values, keys, references, callback_structural, callback_semantic) =
@@ -2218,6 +2931,9 @@ impl<'a> TableDataExtractor<'a> {
                     budget.remaining_payload_work(),
                 );
                 let reference_offset = budget.references;
+                let field_offset = budget.payload_fields;
+                let work_offset = budget.payload_work;
+                let text_offset = budget.staging_text_bytes;
                 let mut visitor =
                     TypedListVisitor::new(converter, budget, expected, true, admitting_segment);
                 let decoded =
@@ -2227,7 +2943,13 @@ impl<'a> TableDataExtractor<'a> {
                         &mut visitor,
                     )
                     .map_err(|error| {
-                        map_table_cell_codec_error_with_reference_offset(error, reference_offset)
+                        map_table_cell_codec_error_with_offsets(
+                            error,
+                            reference_offset,
+                            field_offset,
+                            work_offset,
+                            text_offset,
+                        )
                     })?;
                 let (snapshot, report) = decoded;
                 let bounds = visitor.take_segment_bounds();
@@ -2441,6 +3163,9 @@ impl<'a> TableDataExtractor<'a> {
                 projection_budget.remaining_payload_work(),
             );
             let reference_offset = projection_budget.references;
+            let field_offset = projection_budget.payload_fields;
+            let work_offset = projection_budget.payload_work;
+            let text_offset = projection_budget.output_text_bytes;
             let (materialized_cells, semantic_error, report) = {
                 let mut visitor = TileRowVisitor {
                     row_origin,
@@ -2460,7 +3185,13 @@ impl<'a> TableDataExtractor<'a> {
                     &mut visitor,
                 )
                 .map_err(|error| {
-                    map_table_cell_codec_error_with_reference_offset(error, reference_offset)
+                    map_table_cell_codec_error_with_offsets(
+                        error,
+                        reference_offset,
+                        field_offset,
+                        work_offset,
+                        text_offset,
+                    )
                 })?;
                 (
                     visitor.materialized_cells,
@@ -2918,14 +3649,15 @@ impl<'a> TableDataExtractor<'a> {
 
     /// Render a formula through the bounded, non-copying expression arena.
     fn extract_formula_string(
-        formula: &tsce::FormulaArchive,
+        formula: &FormulaArchiveBytes,
         host_row: usize,
         host_column: usize,
         formula_references: &FormulaReferenceMaps,
         projection_budget: &mut ProjectionBudget,
     ) -> Result<String> {
+        let formula = formula.decode()?;
         render_formula(
-            formula,
+            &formula,
             host_row,
             host_column,
             formula_references,
@@ -5825,13 +6557,13 @@ fn finite_zero() -> Result<FiniteF64> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CellBudget, CellTables, Error, FormulaReferenceBudget, FormulaReferenceMaps,
-        FormulaRenderer, MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK,
-        ProjectionBudget, Table, TableDataExtractor, TileRowVisitor,
+        CellBudget, CellTables, Error, FormulaArchiveBytes, FormulaReferenceBudget,
+        FormulaReferenceMaps, FormulaRenderer, MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES,
+        MAX_FORMULA_WORK, ProjectionBudget, Table, TableDataExtractor, TileRowVisitor,
         collect_formula_category_payload, decode_legacy_table_candidate, formula_table_name,
-        has_legacy_table_model_wire_shape, map_table_cell_decode_limit_with_reference_offset,
-        preflight_formula_category_payload, preflight_formula_owner, render_formula,
-        render_formula_ast_array,
+        has_legacy_table_model_wire_shape, map_table_cell_decode_limit_with_offsets,
+        map_table_cell_decode_limit_with_reference_offset, preflight_formula_category_payload,
+        preflight_formula_owner, render_formula, render_formula_ast_array,
     };
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
@@ -6122,7 +6854,7 @@ mod tests {
     )> {
         let mut table = Table::with_dimensions("tile", 2, column_count)?;
         let strings: Box<[(u32, String)]> = Box::default();
-        let formulas: Box<[(u32, tsce::FormulaArchive)]> = Box::default();
+        let formulas: Box<[(u32, FormulaArchiveBytes)]> = Box::default();
         let formula_errors: Box<[(u32, String)]> = Box::default();
         let rich_text: Box<[(u32, String)]> = Box::default();
         let comments: Box<[(u32, Comment)]> = Box::default();
@@ -6413,6 +7145,69 @@ mod tests {
     }
 
     #[test]
+    fn table_cell_codec_aggregate_limits_include_prior_projection_cost() {
+        let fields = map_table_cell_decode_limit_with_offsets(
+            numbers_table_cell_storage_codec::DecodeLimit::Fields {
+                observed: 4,
+                maximum: 5,
+            },
+            0,
+            11,
+            0,
+            0,
+        );
+        assert!(matches!(
+            fields,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::Objects,
+                observed: 15,
+                maximum: 16,
+                ..
+            }
+        ));
+
+        let work = map_table_cell_decode_limit_with_offsets(
+            numbers_table_cell_storage_codec::DecodeLimit::Work {
+                observed: 7,
+                maximum: 8,
+            },
+            0,
+            0,
+            13,
+            0,
+        );
+        assert!(matches!(
+            work,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWork,
+                observed: 20,
+                maximum: 21,
+                ..
+            }
+        ));
+
+        let text = map_table_cell_decode_limit_with_offsets(
+            numbers_table_cell_storage_codec::DecodeLimit::Text {
+                observed: 9,
+                maximum: 10,
+            },
+            0,
+            0,
+            0,
+            17,
+        );
+        assert!(matches!(
+            text,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::TextBytes,
+                observed: 26,
+                maximum: 27,
+                ..
+            }
+        ));
+    }
+
+    #[test]
     fn admitted_legacy_decode_failure_reports_exact_content_free_path() -> super::Result<()> {
         // Required model fields 4, 6, 7, and 8 are present with their schema
         // wire types, but the nested DataStore payload is malformed.
@@ -6682,7 +7477,7 @@ mod tests {
             .map_err(|error| Error::InvalidFormat(format!("comment row failed: {error:?}")))?;
 
         let strings: Box<[(u32, String)]> = Box::default();
-        let formulas: Box<[(u32, tsce::FormulaArchive)]> = Box::default();
+        let formulas: Box<[(u32, FormulaArchiveBytes)]> = Box::default();
         let formula_errors: Box<[(u32, String)]> = Box::default();
         let rich_text: Box<[(u32, String)]> = Box::default();
         let comments: Box<[(u32, Comment)]> = vec![(
@@ -6788,7 +7583,7 @@ mod tests {
         let row = numbers_table_cell_storage_codec::decode_tile_row_info(&row_source, options)
             .map_err(|error| Error::InvalidFormat(format!("comment row failed: {error:?}")))?;
         let strings: Box<[(u32, String)]> = Box::default();
-        let formulas: Box<[(u32, tsce::FormulaArchive)]> = Box::default();
+        let formulas: Box<[(u32, FormulaArchiveBytes)]> = Box::default();
         let formula_errors: Box<[(u32, String)]> = Box::default();
         let rich_text: Box<[(u32, String)]> = Box::default();
         let comments: Box<[(u32, Comment)]> = vec![(
@@ -6963,7 +7758,7 @@ mod tests {
     #[test]
     fn numeric_type_nine_bnc_cell_is_not_misclassified_as_empty_rich_text() {
         let strings: Box<[(u32, String)]> = Box::default();
-        let formulas: Box<[(u32, tsce::FormulaArchive)]> = Box::default();
+        let formulas: Box<[(u32, FormulaArchiveBytes)]> = Box::default();
         let formula_errors: Box<[(u32, String)]> = Box::default();
         let rich_text: Box<[(u32, String)]> = Box::default();
         let comments: Box<[(u32, Comment)]> = Box::default();
@@ -7725,6 +8520,230 @@ mod tests {
         candidate.formula_wire_bytes = 17;
         budget.commit_attempt(candidate, false);
         assert_eq!(budget.formula_wire_bytes, 17);
+    }
+
+    #[test]
+    fn raw_formula_wire_copy_charges_exact_cost_before_lazy_decode() -> super::Result<()> {
+        let source = formula(vec![number_node(1.0)]).encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+
+        assert_eq!(raw.bytes.as_ref(), source.as_slice());
+        assert_eq!(budget.formula_wire_bytes, source.len());
+        assert!(budget.payload_fields > 0);
+        assert!(budget.payload_work >= source.len());
+
+        // Generated repeated AST storage is materialized only when a cell
+        // actually asks the owned wire entry to render.
+        let decoded = raw.decode()?;
+        assert_eq!(decoded.ast_node_array.ast_node.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn raw_empty_formula_archive_preserves_default_prost_renderer() -> super::Result<()> {
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&[], &mut budget)?;
+        let decoded = raw.decode()?;
+
+        assert!(decoded.ast_node_array.ast_node.is_empty());
+        assert_eq!(
+            render_formula(
+                &decoded,
+                0,
+                0,
+                &FormulaReferenceMaps::default(),
+                &mut budget,
+            )?,
+            "="
+        );
+        assert_eq!(budget.formula_wire_bytes, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn raw_nonempty_formula_archive_requires_root_ast_field() -> super::Result<()> {
+        // A non-empty message containing only an optional host field was
+        // accepted by Prost, but is not a valid FormulaArchive envelope for
+        // the strict sidecar preflight.
+        let mut source = Vec::new();
+        append_varint_field(&mut source, 2, 1)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(matches!(
+            FormulaArchiveBytes::from_wire(&source, &mut budget),
+            Err(Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            })
+        ));
+        assert_eq!(budget.formula_wire_bytes, source.len());
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_archive_ast_nodes_require_field_one_type() -> super::Result<()> {
+        for node in [
+            // ASTNodeArchive with no required node type.
+            {
+                let mut node = Vec::new();
+                append_varint_field(&mut node, 2, 1)?;
+                node
+            },
+            // ASTNodeArchive field one has the wrong wire type.
+            {
+                let mut node = Vec::new();
+                append_length_delimited_field(&mut node, 1, b"not-a-varint")?;
+                node
+            },
+        ] {
+            let mut array = Vec::new();
+            append_length_delimited_field(&mut array, 1, &node)?;
+            let mut source = Vec::new();
+            append_length_delimited_field(&mut source, 1, &array)?;
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            assert!(matches!(
+                FormulaArchiveBytes::from_wire(&source, &mut budget),
+                Err(Error::MalformedPayload {
+                    path: SemanticPath::StructuredTables,
+                })
+            ));
+            assert_eq!(budget.formula_wire_bytes, source.len());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_archive_rejects_duplicate_root_and_ast_node_type_fields() -> super::Result<()> {
+        let mut duplicate_root = Vec::new();
+        append_length_delimited_field(&mut duplicate_root, 1, &[])?;
+        append_length_delimited_field(&mut duplicate_root, 1, &[])?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&duplicate_root, &mut budget).is_err());
+
+        let mut duplicate_type = Vec::new();
+        append_varint_field(&mut duplicate_type, 1, 17)?;
+        append_varint_field(&mut duplicate_type, 1, 17)?;
+        let mut node_array = Vec::new();
+        append_length_delimited_field(&mut node_array, 1, &duplicate_type)?;
+        let mut duplicate_node = Vec::new();
+        append_length_delimited_field(&mut duplicate_node, 1, &node_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&duplicate_node, &mut budget).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_archive_recurses_uid_tract_and_category_uuid_paths() -> super::Result<()> {
+        // ASTUidTractList.sticky_bits is a required nested message. A scalar
+        // at field 2 must not be treated as an opaque unknown field.
+        let mut bad_tract_list = Vec::new();
+        append_varint_field(&mut bad_tract_list, 2, 1)?;
+        let mut tract_node = Vec::new();
+        append_varint_field(&mut tract_node, 1, 48)?;
+        append_length_delimited_field(&mut tract_node, 38, &bad_tract_list)?;
+        let mut tract_array = Vec::new();
+        append_length_delimited_field(&mut tract_array, 1, &tract_node)?;
+        let mut bad_tract_source = Vec::new();
+        append_length_delimited_field(&mut bad_tract_source, 1, &tract_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&bad_tract_source, &mut budget).is_err());
+
+        // CatRefUidList.uid entries are repeated TSP.UUID messages. A
+        // length-delimited UUID with no required lower/upper fields must be
+        // rejected after the new recursive descent.
+        let mut bad_uuid_list = Vec::new();
+        append_length_delimited_field(&mut bad_uuid_list, 1, &[])?;
+        let mut category = Vec::new();
+        append_length_delimited_field(&mut category, 6, &bad_uuid_list)?;
+        let mut category_node = Vec::new();
+        append_varint_field(&mut category_node, 1, 66)?;
+        append_length_delimited_field(&mut category_node, 39, &{
+            let mut wrapper = Vec::new();
+            append_length_delimited_field(&mut wrapper, 1, &category)?;
+            wrapper
+        })?;
+        let mut category_array = Vec::new();
+        append_length_delimited_field(&mut category_array, 1, &category_node)?;
+        let mut bad_category_source = Vec::new();
+        append_length_delimited_field(&mut bad_category_source, 1, &category_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&bad_category_source, &mut budget).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_archive_rejects_noncanonical_known_scalar_but_keeps_opaque_varints()
+    -> super::Result<()> {
+        let mut node = Vec::new();
+        // ASTNode.type = 17, encoded with an overlong scalar value.
+        node.extend_from_slice(&[0x08, 0x91, 0x00]);
+        let mut node_array = Vec::new();
+        append_length_delimited_field(&mut node_array, 1, &node)?;
+        let mut known_bad = Vec::new();
+        append_length_delimited_field(&mut known_bad, 1, &node_array)?;
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&known_bad, &mut budget).is_err());
+
+        let mut opaque = known_bad;
+        // Replace the node with a canonical type, then append an unknown
+        // overlong varint. Unknown scalar payloads remain opaque by design.
+        opaque.clear();
+        let mut node = Vec::new();
+        append_varint_field(&mut node, 1, 17)?;
+        let mut node_array = Vec::new();
+        append_length_delimited_field(&mut node_array, 1, &node)?;
+        append_length_delimited_field(&mut opaque, 1, &node_array)?;
+        opaque.extend_from_slice(&[0xd0, 0x05, 0x80, 0x00]);
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        assert!(FormulaArchiveBytes::from_wire(&opaque, &mut budget).is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn raw_formula_wire_budget_failure_is_atomic() -> super::Result<()> {
+        let source = formula(vec![number_node(1.0)]).encode_to_vec();
+        assert!(source.len() > 1);
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        budget.formula_wire_bytes = MAX_FORMULA_WIRE_BYTES - source.len() + 1;
+        let fields_before = budget.payload_fields;
+        let work_before = budget.payload_work;
+
+        let error = FormulaArchiveBytes::from_wire(&source, &mut budget)
+            .expect_err("one byte over the formula wire budget must fail");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWireBytes,
+                observed,
+                maximum,
+                ..
+            } if observed == MAX_FORMULA_WIRE_BYTES + 1 && maximum == MAX_FORMULA_WIRE_BYTES
+        ));
+        assert_eq!(
+            budget.formula_wire_bytes,
+            MAX_FORMULA_WIRE_BYTES - source.len() + 1
+        );
+        assert_eq!(budget.payload_fields, fields_before);
+        assert_eq!(budget.payload_work, work_before);
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_unreferenced_formula_keeps_attempted_preflight_cost() -> super::Result<()> {
+        let source = [0x0a, 0x01, 0xff];
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let error = FormulaArchiveBytes::from_wire(&source, &mut budget)
+            .expect_err("malformed unreferenced formula must be rejected");
+
+        assert!(matches!(
+            error,
+            Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            }
+        ));
+        assert_eq!(budget.formula_wire_bytes, source.len());
+        assert!(budget.payload_fields > 0);
+        assert!(budget.payload_work >= source.len());
+        Ok(())
     }
 
     #[test]
