@@ -64,6 +64,12 @@ impl<'a> From<&'a str> for SlideSelector<'a> {
     }
 }
 
+impl<'a> From<&'a String> for SlideSelector<'a> {
+    fn from(name: &'a String) -> Self {
+        Self::name(name)
+    }
+}
+
 impl From<Position> for SlideSelector<'_> {
     fn from(position: Position) -> Self {
         Self::position(position)
@@ -131,5 +137,13 @@ mod tests {
 
         assert_eq!(from_index, from_position);
         assert_eq!(from_name, SlideSelector::Name("Agenda"));
+    }
+
+    #[test]
+    fn borrowed_owned_names_convert_without_allocating() {
+        let slide_name = String::from("Agenda");
+        let selector: SlideSelector<'_> = (&slide_name).into();
+
+        assert_eq!(selector, SlideSelector::Name("Agenda"));
     }
 }

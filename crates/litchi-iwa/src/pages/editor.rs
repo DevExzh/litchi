@@ -12,7 +12,7 @@ use litchi_iwa_protos::pages_body_codec::{
     self as pages_body_codec, DecodeOptions as PagesBodyDecodeOptions, DocumentBodySnapshot,
 };
 use litchi_iwa_protos::pages_section_codec::{
-    DecodeOptions, SectionSettingsSnapshot, decode_section_settings,
+    DecodeOptions, SectionSettingsSnapshot, decode_section_name, decode_section_settings,
 };
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
@@ -4230,7 +4230,14 @@ fn clone_pages_section_graph_object(
 }
 
 fn pages_section_name(payload: &[u8]) -> Result<Option<&str>> {
-    pages_section_settings(payload).map(SectionSettingsSnapshot::name)
+    decode_section_name(
+        payload,
+        DecodeOptions::new(payload.len(), 64)
+            .with_max_fields(payload.len())
+            .with_max_work_bytes(payload.len().saturating_mul(2))
+            .with_max_name_bytes(payload.len()),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Invalid Pages section name: {error}")))
 }
 
 fn pages_section_settings(payload: &[u8]) -> Result<SectionSettingsSnapshot<'_>> {

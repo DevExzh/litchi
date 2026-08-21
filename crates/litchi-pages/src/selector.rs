@@ -62,6 +62,12 @@ impl<'a> From<&'a str> for SectionSelector<'a> {
     }
 }
 
+impl<'a> From<&'a String> for SectionSelector<'a> {
+    fn from(name: &'a String) -> Self {
+        Self::name(name)
+    }
+}
+
 impl From<usize> for SectionSelector<'_> {
     fn from(position: usize) -> Self {
         Self::index(position)
@@ -117,5 +123,13 @@ mod tests {
         assert_eq!(name.as_name(), Some("Chapter One"));
         assert_eq!(position.as_position(), Some(Position::new(2)));
         assert_eq!(name, name);
+    }
+
+    #[test]
+    fn borrowed_owned_names_convert_without_allocating() {
+        let section_name = String::from("Chapter One");
+        let selector: SectionSelector<'_> = (&section_name).into();
+
+        assert_eq!(selector, SectionSelector::Name("Chapter One"));
     }
 }

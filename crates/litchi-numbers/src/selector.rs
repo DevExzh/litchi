@@ -34,6 +34,12 @@ impl<'a> From<&'a str> for SheetSelector<'a> {
     }
 }
 
+impl<'a> From<&'a String> for SheetSelector<'a> {
+    fn from(name: &'a String) -> Self {
+        Self::name(name)
+    }
+}
+
 impl From<usize> for SheetSelector<'_> {
     fn from(index: usize) -> Self {
         Self::index(index)
@@ -70,6 +76,12 @@ impl<'a> TableSelector<'a> {
 
 impl<'a> From<&'a str> for TableSelector<'a> {
     fn from(name: &'a str) -> Self {
+        Self::name(name)
+    }
+}
+
+impl<'a> From<&'a String> for TableSelector<'a> {
+    fn from(name: &'a String) -> Self {
         Self::name(name)
     }
 }
@@ -112,5 +124,16 @@ mod tests {
         assert_eq!(sheet_index, SheetSelector::Index(1));
         assert_eq!(table, TableSelector::Name("Revenue"));
         assert_eq!(table_index, TableSelector::Index(2));
+    }
+
+    #[test]
+    fn borrowed_owned_names_convert_without_allocating() {
+        let sheet_name = String::from("Summary");
+        let table_name = String::from("Revenue");
+        let sheet: SheetSelector<'_> = (&sheet_name).into();
+        let table: TableSelector<'_> = (&table_name).into();
+
+        assert_eq!(sheet, SheetSelector::Name("Summary"));
+        assert_eq!(table, TableSelector::Name("Revenue"));
     }
 }

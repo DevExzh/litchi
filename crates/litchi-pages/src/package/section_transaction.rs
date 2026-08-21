@@ -314,6 +314,17 @@ fn message_field_count(payload: &[u8], limits: WireLimits) -> Result<usize, Erro
 }
 
 pub(super) fn selected_payload(package: &Package, target: Target) -> Result<&[u8], Error> {
+    Ok(&selected_message(package, target)?.data)
+}
+
+/// Resolve the exact message captured by [`Target`].
+///
+/// A target is a physical ownership proof, not merely an object identifier:
+/// the component and object slots must still contain the captured identifier,
+/// and the message slot must still contain the selected section message.  All
+/// transaction readers and writers use this same check so a stale or
+/// cross-artifact target cannot silently redirect a rewrite to another object.
+fn selected_message(package: &Package, target: Target) -> Result<&RawMessage, Error> {
     let path = Path::section(target.position);
     let component = package
         .state
@@ -328,12 +339,11 @@ pub(super) fn selected_payload(package: &Package, target: Target) -> Result<&[u8
         .get(target.object_index)
         .filter(|object| object.archive_info.identifier == Some(target.identifier.get()))
         .ok_or(Error::InvalidSource { path })?;
-    let message = object
+    object
         .messages
         .get(target.message_index)
         .filter(|message| message.type_ == SECTION_MESSAGE_TYPE)
-        .ok_or(Error::InvalidSource { path })?;
-    Ok(&message.data)
+        .ok_or(Error::InvalidSource { path })
 }
 
 pub(super) fn rewrite_package(
@@ -369,7 +379,9 @@ pub(super) fn rewrite_package(
     let (mut archive, archive_limits) = editable_archive(source, &component_name)?;
     {
         let object = archive
-            .object_mut(target.identifier.get())
+            .objects
+            .get_mut(target.object_index)
+            .filter(|object| object.archive_info.identifier == Some(target.identifier.get()))
             .ok_or(Error::InvalidSource { path })?;
         let message = object
             .messages
@@ -820,7 +832,10 @@ pub(super) fn usize_to_u64(value: usize) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, LimitKind, Package, TransactionBudget, resolve_target};
+    use super::{
+        Error, LimitKind, Package, TransactionBudget, resolve_target, rewrite_package,
+        selected_payload,
+    };
     use litchi_core::Position;
     use litchi_iwa_archive::{Limits, package};
     use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -945,6 +960,35 @@ mod tests {
         assert!(usage.work != 0);
         assert!(usage.references != 0);
         assert!(usage.transaction_work != 0);
+        Ok(())
+    }
+
+    #[test]
+    fn selected_payload_rejects_stale_physical_target() -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = topology_package(4)?;
+        let package = Package::from_bytes(&bytes)?;
+        let mut budget = TransactionBudget::new(&package)?;
+        let target = resolve_target(&package, Position::new(0), &mut budget)?;
+
+        // Keep the logical section and identifier but point at the adjacent
+        // object slot.  Readback must fail closed instead of following the
+        // identifier and allowing a stale physical target to drift.
+        let stale = super::Target {
+            object_index: target.object_index.saturating_add(1),
+            ..target
+        };
+        assert!(matches!(
+            selected_payload(&package, stale),
+            Err(Error::InvalidSource { .. })
+        ));
+        assert!(selected_payload(&package, target).is_ok());
+
+        let payload = selected_payload(&package, target)?.to_vec();
+        let mut rewrite_budget = TransactionBudget::new(&package)?;
+        assert!(matches!(
+            rewrite_package(&package, stale, payload, false, &mut rewrite_budget),
+            Err(Error::InvalidSource { .. })
+        ));
         Ok(())
     }
 

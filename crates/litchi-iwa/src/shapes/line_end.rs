@@ -95,6 +95,12 @@ pub(crate) fn set_shape_line_endpoints(
         .ok_or_else(|| Error::InvalidFormat(format!("iWork line {drawable_id} has no style")))?;
     let style_archive_name = object_archive_name(package, old_style_id)?;
     let old_style_message = shape_style_message(package, &style_archive_name, old_style_id)?;
+    // These generated values are semantic inputs to the copy-on-write
+    // decision below, rather than validation-only decodes. No existing
+    // private strict codec projects the line shape path and shape-style
+    // inheritance fields used here. Keep the RawMessage bytes authoritative:
+    // direct variation replacement is admitted only when the raw field set is
+    // exact, so an unknown field can never be dropped by a generated reencode.
     let old_style = tswp::ShapeStyleArchive::decode(old_style_message.data.as_slice())?;
     let stylesheet_id = old_style
         .super_
@@ -387,6 +393,41 @@ mod tests {
         assert_eq!(
             Endpoints::default(),
             Endpoints::new(Endpoint::None, Endpoint::None)
+        );
+    }
+
+    #[test]
+    fn unknown_style_bytes_are_not_eligible_for_direct_variation_rewrite() {
+        let endpoint = endpoint_archive(Endpoint::SimpleArrow);
+        let object = shape_style_variation_object(
+            11,
+            7,
+            5,
+            ShapeStyleOverrides {
+                head_line_end: Some(endpoint.clone()),
+                tail_line_end: Some(endpoint),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut raw = object.messages[0].data.clone();
+        let decoded = tswp::ShapeStyleArchive::decode(raw.as_slice()).unwrap();
+        assert!(
+            direct_shape_style_overrides(&decoded, &raw)
+                .unwrap()
+                .is_some()
+        );
+
+        raw.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(99_u32) << 3,
+        ));
+        raw.extend(litchi_iwa_common::varint::encode_varint(990));
+
+        let decoded = tswp::ShapeStyleArchive::decode(raw.as_slice()).unwrap();
+        assert!(
+            direct_shape_style_overrides(&decoded, &raw)
+                .unwrap()
+                .is_none()
         );
     }
 }

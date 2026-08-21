@@ -362,5 +362,6 @@ pub(crate) fn generated_chart_series_style_extension(data: &[u8]) -> Result<Opti
             "chart series-style extension {GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD} is not length-delimited"
         )));
     }
-    Ok(Some(&data[extension.payload_start()..extension.end()]))
+    extension.validate_canonical_framing(data)?;
+    Ok(Some(extension.checked_payload(data)?))
 }

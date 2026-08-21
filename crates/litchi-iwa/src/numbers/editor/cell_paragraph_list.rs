@@ -781,6 +781,77 @@ fn plain_cell_text(
     .ok_or_else(|| Error::InvalidFormat(format!("Numbers string table has no entry {key}")))
 }
 
+fn cell_storage_wire_limits(source: &[u8]) -> Result<litchi_iwa_text_wire::RewriteLimits> {
+    let source_bytes = source
+        .len()
+        .clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_MESSAGE_BYTES);
+    let fields = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_FIELDS);
+    let fragments = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_FRAGMENTS);
+    let text_bytes = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_TEXT_BYTES);
+    let table_entries =
+        source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_TABLE_ENTRIES);
+    let object_references = source_bytes.clamp(
+        1,
+        litchi_iwa_text_wire::RewriteLimits::MAX_OBJECT_REFERENCES,
+    );
+    let output_bytes = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_OUTPUT_BYTES);
+    let rewrite_work = source_bytes
+        .saturating_mul(16)
+        .clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_REWRITE_WORK);
+    litchi_iwa_text_wire::RewriteLimits::new(
+        source_bytes,
+        fields,
+        4,
+        fragments,
+        text_bytes,
+        table_entries,
+        object_references,
+        output_bytes,
+        rewrite_work,
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Numbers cell text limits are invalid: {error}")))
+}
+
+fn map_cell_storage_decode_error(
+    storage_id: u64,
+    error: litchi_iwa_text_wire::RewriteError,
+) -> Error {
+    match error {
+        litchi_iwa_text_wire::RewriteError::Allocation { resource, amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+        },
+        error => Error::InvalidFormat(format!(
+            "iWork rich-text storage {storage_id} failed strict validation: {error}"
+        )),
+    }
+}
+
+fn first_cell_storage_text(storage_id: u64, source: &[u8]) -> Result<String> {
+    let limits = cell_storage_wire_limits(source)?;
+    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(source, limits)
+        .map_err(|error| map_cell_storage_decode_error(storage_id, error))?;
+    let storage = decoded.storage();
+    let Some(first_run) = storage.runs().first().copied() else {
+        return Err(Error::InvalidFormat(format!(
+            "iWork rich-text storage {storage_id} has no text"
+        )));
+    };
+    let end = first_run.end().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork rich-text storage {storage_id} has an overflowing first text fragment"
+        ))
+    })?;
+    storage
+        .text()
+        .get(first_run.start()..end)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "iWork rich-text storage {storage_id} has an invalid first text fragment"
+            ))
+        })
+}
+
 fn ensure_storage(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -813,9 +884,8 @@ fn ensure_storage(
                 .archive(&entry.storage_archive)?
                 .object(entry.storage_id)
                 .and_then(|object| object.messages.first())
-                .map(|message| tswp::StorageArchive::decode(message.data.as_slice()))
+                .map(|message| first_cell_storage_text(entry.storage_id, message.data.as_slice()))
                 .transpose()?
-                .and_then(|storage| storage.text.into_iter().next())
                 .ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "iWork rich-text storage {} has no text",
@@ -1168,6 +1238,119 @@ mod tests {
     const COLUMN: usize = 1;
     const TEXT: &str = "First paragraph\nSecond paragraph";
     const MIXED_TEXT: &str = "😀 first\nSecond\nThird";
+
+    fn raw_varint(mut value: u64) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        while value >= 0x80 {
+            encoded.push((value as u8) | 0x80);
+            value >>= 7;
+        }
+        encoded.push(value as u8);
+        encoded
+    }
+
+    fn raw_varint_field(field: u32, value: u64) -> Vec<u8> {
+        [raw_varint(u64::from(field) << 3), raw_varint(value)].concat()
+    }
+
+    fn raw_length_delimited(field: u32, payload: &[u8]) -> Vec<u8> {
+        [
+            raw_varint((u64::from(field) << 3) | 2),
+            raw_varint(payload.len() as u64),
+            payload.to_vec(),
+        ]
+        .concat()
+    }
+
+    fn storage_source(text: &[&str]) -> Vec<u8> {
+        tswp::StorageArchive {
+            text: text.iter().map(|text| (*text).to_owned()).collect(),
+            ..tswp::StorageArchive::default()
+        }
+        .encode_to_vec()
+    }
+
+    #[test]
+    fn first_cell_storage_text_preserves_unicode_newline_and_empty_fragments() {
+        let source = storage_source(&["😀 first\n第二", "later fragment"]);
+        assert_eq!(
+            first_cell_storage_text(17, &source).unwrap(),
+            "😀 first\n第二"
+        );
+
+        let empty = storage_source(&["", "later fragment"]);
+        assert_eq!(first_cell_storage_text(17, &empty).unwrap(), "");
+
+        let no_text = tswp::StorageArchive::default().encode_to_vec();
+        assert!(matches!(
+            first_cell_storage_text(17, &no_text),
+            Err(Error::InvalidFormat(reason)) if reason.contains("has no text")
+        ));
+    }
+
+    #[test]
+    fn first_cell_storage_text_rejects_malformed_utf8_and_known_fields() {
+        let malformed_utf8 = raw_length_delimited(3, &[0xff]);
+        assert!(matches!(
+            first_cell_storage_text(17, &malformed_utf8),
+            Err(Error::InvalidFormat(reason)) if reason.contains("failed strict validation")
+        ));
+
+        let malformed_entry = [raw_varint_field(1, 0), raw_length_delimited(2, &[])].concat();
+        let malformed_known_field = [
+            raw_length_delimited(3, b"safe"),
+            raw_length_delimited(8, &raw_length_delimited(1, &malformed_entry)),
+        ]
+        .concat();
+        assert!(matches!(
+            first_cell_storage_text(17, &malformed_known_field),
+            Err(Error::InvalidFormat(reason)) if reason.contains("failed strict validation")
+        ));
+    }
+
+    #[test]
+    fn first_cell_storage_text_accepts_unknown_fields_without_dropping_them() {
+        let first = raw_length_delimited(3, b"first");
+        let unknown = raw_varint_field(99, 7);
+        let second = raw_length_delimited(3, b"second");
+        let source = [first, unknown.clone(), second].concat();
+
+        assert_eq!(first_cell_storage_text(17, &source).unwrap(), "first");
+        let decoded = litchi_iwa_text_wire::decode_storage_with_limits(
+            &source,
+            cell_storage_wire_limits(&source).unwrap(),
+        )
+        .unwrap();
+        assert!(decoded.validation().has_unknown_wire_fields());
+        assert!(
+            source
+                .windows(unknown.len())
+                .any(|window| window == unknown.as_slice())
+        );
+    }
+
+    #[test]
+    fn cell_storage_wire_limits_are_finite_and_exact_for_source_size() {
+        let source = storage_source(&["a"]);
+        let limits = cell_storage_wire_limits(&source).unwrap();
+        let source_bytes = source.len();
+        assert_eq!(limits.max_message_bytes(), source_bytes);
+        assert_eq!(limits.max_fields(), source_bytes);
+        assert_eq!(limits.max_fragments(), source_bytes);
+        assert_eq!(limits.max_text_bytes(), source_bytes);
+        assert_eq!(limits.max_table_entries(), source_bytes);
+        assert_eq!(limits.max_object_references(), source_bytes);
+        assert_eq!(limits.max_output_bytes(), source_bytes);
+        assert_eq!(limits.max_nesting(), 4);
+        assert_eq!(limits.max_rewrite_work(), source_bytes.saturating_mul(16));
+        assert_eq!(
+            litchi_iwa_text_wire::decode_storage_with_limits(&source, limits)
+                .unwrap()
+                .storage()
+                .text(),
+            "a"
+        );
+    }
 
     fn mixed_lists() -> Vec<ParagraphListPlacement> {
         vec![

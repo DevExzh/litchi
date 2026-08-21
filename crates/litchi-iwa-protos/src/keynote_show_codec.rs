@@ -484,6 +484,7 @@ impl SettingsSnapshot {
 /// Owned, generated-type-free Keynote show projection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShowSnapshot {
+    theme_identifier: u64,
     slide_node_identifiers: Box<[u64]>,
     size: RawSize,
     raw_settings: RawSettings,
@@ -492,6 +493,12 @@ pub struct ShowSnapshot {
 }
 
 impl ShowSnapshot {
+    /// Identifier of the required Keynote theme object.
+    #[must_use]
+    pub const fn theme_identifier(&self) -> u64 {
+        self.theme_identifier
+    }
+
     /// Ordered slide-node identifiers from the native slide tree.
     #[must_use]
     pub fn slide_node_identifiers(&self) -> &[u64] {
@@ -735,6 +742,7 @@ pub fn decode_show(source: &[u8], options: DecodeOptions) -> Result<ShowSnapshot
         &mut budget,
     )?;
     Ok(ShowSnapshot {
+        theme_identifier: preflight.references.theme.identifier,
         slide_node_identifiers: slide_node_identifiers.into_boxed_slice(),
         size: settings.size,
         raw_settings: settings.raw_settings,
@@ -1581,6 +1589,7 @@ mod tests {
                 .map(|reference| reference.identifier)
                 .collect::<Vec<_>>()
         );
+        assert_eq!(snapshot.theme_identifier(), native.theme.identifier);
         assert_eq!(
             snapshot.size().width().to_bits(),
             native.size.width.to_bits()
@@ -1959,10 +1968,9 @@ mod tests {
         let mut show_unknown = minimal_show(&[9]);
         show_unknown.extend_from_slice(&unknown_varint);
         show_unknown.extend_from_slice(&unknown_bytes);
-        assert_eq!(
-            decode_show(&show_unknown, options(&show_unknown, 1))?.slide_node_identifiers(),
-            [9]
-        );
+        let show_snapshot = decode_show(&show_unknown, options(&show_unknown, 1))?;
+        assert_eq!(show_snapshot.slide_node_identifiers(), [9]);
+        assert_eq!(show_snapshot.theme_identifier(), 1);
 
         let mut reference = varint_field(REFERENCE_IDENTIFIER_FIELD, 7);
         reference.extend_from_slice(&unknown_varint);
@@ -2005,6 +2013,7 @@ mod tests {
         assert_eq!(settings.size().width().to_bits(), 1_024.0_f32.to_bits());
         assert_eq!(settings.size().height().to_bits(), 768.0_f32.to_bits());
         let snapshot = decode_show(&source, options(&source, SLIDES))?;
+        assert_eq!(snapshot.theme_identifier(), 1);
         assert_eq!(snapshot.slide_node_identifiers(), identifiers);
         assert_eq!(
             assert_error(decode_settings(&source, options(&source, SLIDES - 1)))

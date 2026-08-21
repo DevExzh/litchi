@@ -38,7 +38,7 @@ use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::comment_storage_codec;
 use litchi_iwa_protos::group_node_category_codec::{self, CategoryValueView, GroupNodeView};
 use litchi_iwa_protos::table_info_codec;
-use litchi_iwa_protos::{numbers_table_cell_storage_codec, tsce, tst};
+use litchi_iwa_protos::{numbers_formula_codec, numbers_table_cell_storage_codec, tsce, tst};
 use prost::Message;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -78,6 +78,13 @@ const MAX_PAYLOAD_WORK: usize = WireLimits::MAX_REWRITE_WORK;
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct FormulaArchiveBytes {
     bytes: Box<[u8]>,
+    /// Whether the complete wire preflight found only nodes represented by
+    /// the compact generated-free scalar visitor.  This is conservative: a
+    /// false value keeps the lossless generated compatibility renderer.
+    scalar_visitor_eligible: bool,
+    /// Exact number of AST nodes observed by the wire preflight.  The scalar
+    /// visitor charges this bound before retaining any decoded nodes.
+    scalar_visitor_node_count: usize,
 }
 
 impl FormulaArchiveBytes {
@@ -86,7 +93,8 @@ impl FormulaArchiveBytes {
         // candidate therefore retains the same monotonic wire cost as the
         // previous eager decoder, while no partial owned value can escape.
         budget.charge_formula_wire(source.len())?;
-        preflight_formula_archive_envelope(source, budget)?;
+        let (scalar_visitor_eligible, scalar_visitor_node_count) =
+            preflight_formula_archive_envelope(source, budget)?;
 
         let mut owned = Vec::new();
         owned
@@ -95,6 +103,8 @@ impl FormulaArchiveBytes {
         owned.extend_from_slice(source);
         Ok(Self {
             bytes: owned.into_boxed_slice(),
+            scalar_visitor_eligible,
+            scalar_visitor_node_count,
         })
     }
 
@@ -112,14 +122,17 @@ impl FormulaArchiveBytes {
 /// native wire type and UTF-8 checked.  Canonical field framing is required at
 /// every level so a malformed, unreferenced formula cannot hide behind the
 /// deferred generated decode.
-fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudget) -> Result<()> {
+fn preflight_formula_archive_envelope(
+    source: &[u8],
+    budget: &mut ProjectionBudget,
+) -> Result<(bool, usize)> {
     // Prost accepts an empty proto2 message even when its schema marks field
     // 1 as required.  The former eager FormulaArchive decoder therefore
     // admitted the serialized default archive, whose empty AST rendered as
     // `=`.  Preserve that compatibility case while retaining the required
     // root field check for every non-empty archive.
     if source.is_empty() {
-        return Ok(());
+        return Ok((false, 0));
     }
 
     // The wire preflight report is aggregate: every selected child message is
@@ -150,6 +163,8 @@ fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudg
     };
     let mut root_ast_present = false;
     let mut root_ast_count = 0usize;
+    let mut scalar_visitor_eligible = true;
+    let mut scalar_visitor_node_count = 0usize;
     let mut root_known_fields = [0u32; 9];
     let mut root_known_field_count = 0usize;
     let preflight = preflight_wire_tree_with_limits(source, limits, |visit| {
@@ -215,6 +230,32 @@ fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudg
         if formula_ast_array_path(visit.path()) && field.number() == 1 {
             required_formula_ast_node_type(field.payload())?;
         }
+        if formula_ast_node_path(visit.path()) {
+            if field.number() == 1 {
+                scalar_visitor_node_count =
+                    scalar_visitor_node_count.checked_add(1).ok_or_else(|| {
+                        litchi_iwa_common::Error::InvalidFormat(
+                            "Numbers FormulaArchive AST node count overflows host usize".to_owned(),
+                        )
+                    })?;
+                let node_type = litchi_iwa_common::decode_varint_from_bytes(field.payload())
+                    .ok()
+                    .and_then(|(value, width)| (width == field.payload().len()).then_some(value))
+                    .and_then(|value| u32::try_from(value).ok());
+                if node_type
+                    .is_none_or(|value| !numbers_formula_codec::is_scalar_visitor_node_type(value))
+                {
+                    scalar_visitor_eligible = false;
+                }
+            } else if !matches!(field.number(), 2 | 3 | 4 | 5 | 10 | 15 | 25) {
+                // These are the only direct AST-node fields the compact
+                // visitor can represent. Nested messages are checked by the
+                // surrounding schema walk; any other direct field (strings,
+                // arrays, thunks, ranges, UIDs, or owner metadata) falls back
+                // to the lossless generated renderer.
+                scalar_visitor_eligible = false;
+            }
+        }
         if schema.utf8 {
             std::str::from_utf8(field.payload()).map_err(|_error| {
                 litchi_iwa_common::Error::InvalidFormat(
@@ -233,7 +274,8 @@ fn preflight_formula_archive_envelope(source: &[u8], budget: &mut ProjectionBudg
         Ok(report) if root_ast_present => {
             debug_assert_eq!(attempted.fields, report.fields());
             debug_assert_eq!(attempted.work, report.scanned_bytes());
-            budget.charge_wire_preflight(report)
+            budget.charge_wire_preflight(report)?;
+            Ok((scalar_visitor_eligible, scalar_visitor_node_count))
         },
         Ok(report) => {
             debug_assert_eq!(attempted.fields, report.fields());
@@ -676,6 +718,13 @@ fn formula_ast_array_path(path: &[u32]) -> bool {
         index += 2;
     }
     index == path.len()
+}
+
+/// Return whether `path` identifies an ASTNodeArchive itself rather than one
+/// of its nested coordinate/reference messages. The scalar visitor eligibility
+/// pass uses this to distinguish direct node fields from nested wire fields.
+fn formula_ast_node_path(path: &[u32]) -> bool {
+    formula_ast_node_prefix_len(path) == Some(path.len())
 }
 
 /// Return the ASTNode path prefix length.  A node is reached through `1,1`,
@@ -2028,9 +2077,10 @@ fn sparse_table_model_compatibility_shape(data: &[u8]) -> bool {
             8 => {
                 // The archive-free compatibility projection mirrors
                 // generated protobuf behavior for a repeated singular name:
-                // retain the last valid value.  Strict model decoding and
-                // the names transaction's independent projection continue
-                // to reject duplicate field 8 occurrences.
+                // retain the last valid value.  Keep that historical
+                // compatibility behavior for sparse model ingress; the names
+                // transaction performs its own strict table-name projection
+                // before any mutation is published.
                 if field.wire_type() != 2
                     || field.validate_canonical_framing().is_err()
                     || std::str::from_utf8(field.payload()).is_err()
@@ -2044,7 +2094,16 @@ fn sparse_table_model_compatibility_shape(data: &[u8]) -> bool {
         }
         Ok(WireDescent::Skip)
     });
-    root_scan.is_ok() && base_data_store && !dense_data_store && table_name && !invalid_shape
+    // Sparse compatibility defaults for omitted dimensions would otherwise
+    // manufacture a valid-looking 0x0 table from a merely truncated model.
+    // An explicit 0x0 pair remains valid and retains historical compatibility.
+    root_scan.is_ok()
+        && base_data_store
+        && number_of_rows
+        && number_of_columns
+        && !dense_data_store
+        && table_name
+        && !invalid_shape
 }
 
 fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<CompactTable<T>> {
@@ -2437,8 +2496,6 @@ impl<'a> TableDataExtractor<'a> {
     ) -> Result<ProjectedTableModel<'source>> {
         let mut compatibility_defaults = !self.document_projection;
         let mut compatibility_data_store = compatibility_defaults;
-        let sparse_compatibility_shape =
-            !compatibility_defaults && sparse_table_model_compatibility_shape(source);
         let options = table_cell_decode_options(
             source,
             budget.remaining_references(),
@@ -2454,7 +2511,15 @@ impl<'a> TableDataExtractor<'a> {
             match numbers_table_cell_storage_codec::decode_table_model_with_report(source, options)
             {
                 Ok(decoded) => Ok(decoded),
-                Err(error) if sparse_compatibility_shape && error.resource_limit().is_none() => {
+                // Classification is deliberately deferred until the strict
+                // route has failed. It is an admission probe, not a second
+                // unconditional walk of every native model, and compatibility
+                // callers retain their generated last-wins behavior outside
+                // this branch.
+                Err(error)
+                    if error.resource_limit().is_none()
+                        && sparse_table_model_compatibility_shape(source) =>
+                {
                     compatibility_defaults = true;
                     compatibility_data_store = true;
                     let compatibility_options = table_cell_decode_options(
@@ -3822,6 +3887,8 @@ impl<'a> TableDataExtractor<'a> {
                 projection_budget,
                 row_index,
                 column_index,
+                row_count,
+                column_count,
             )?;
             table.try_set_cell(row_index, column_index, parsed.value)?;
             if let Some(identifier) = parsed.comment_identifier
@@ -3951,13 +4018,31 @@ impl<'a> TableDataExtractor<'a> {
         projection_budget: &mut ProjectionBudget,
         row: usize,
         column: usize,
+        row_count: usize,
+        column_count: usize,
     ) -> Result<ParsedCell> {
         let version = *data
             .first()
             .ok_or_else(|| Error::ParseError("Empty Numbers cell storage".to_string()))?;
         match version {
-            0..=4 => Self::parse_pre_bnc_cell(data, cell_tables, projection_budget, row, column),
-            5 => Self::parse_bnc_cell(data, cell_tables, projection_budget, row, column),
+            0..=4 => Self::parse_pre_bnc_cell(
+                data,
+                cell_tables,
+                projection_budget,
+                row,
+                column,
+                row_count,
+                column_count,
+            ),
+            5 => Self::parse_bnc_cell(
+                data,
+                cell_tables,
+                projection_budget,
+                row,
+                column,
+                row_count,
+                column_count,
+            ),
             other => Err(Error::ParseError(format!(
                 "Unsupported Numbers cell storage version {other}"
             ))),
@@ -3970,6 +4055,8 @@ impl<'a> TableDataExtractor<'a> {
         projection_budget: &mut ProjectionBudget,
         row: usize,
         column: usize,
+        row_count: usize,
+        column_count: usize,
     ) -> Result<ParsedCell> {
         let cell = BncCellView::parse(data).map_err(|error| {
             Error::ParseError(format!(
@@ -3988,6 +4075,8 @@ impl<'a> TableDataExtractor<'a> {
                 formula,
                 row,
                 column,
+                row_count,
+                column_count,
                 cell_tables.formula_references,
                 projection_budget,
             )
@@ -4067,6 +4156,8 @@ impl<'a> TableDataExtractor<'a> {
         projection_budget: &mut ProjectionBudget,
         row: usize,
         column: usize,
+        row_count: usize,
+        column_count: usize,
     ) -> Result<ParsedCell> {
         let version = data[0];
         let header_length = if version <= 1 { 8 } else { 12 };
@@ -4139,6 +4230,8 @@ impl<'a> TableDataExtractor<'a> {
                 formula,
                 row,
                 column,
+                row_count,
+                column_count,
                 cell_tables.formula_references,
                 projection_budget,
             )
@@ -4197,9 +4290,23 @@ impl<'a> TableDataExtractor<'a> {
         formula: &FormulaArchiveBytes,
         host_row: usize,
         host_column: usize,
+        row_count: usize,
+        column_count: usize,
         formula_references: &FormulaReferenceMaps,
         projection_budget: &mut ProjectionBudget,
     ) -> Result<String> {
+        if formula.scalar_visitor_eligible
+            && let Some(rendered) = render_scalar_formula(
+                formula,
+                host_row,
+                host_column,
+                row_count,
+                column_count,
+                projection_budget,
+            )?
+        {
+            return Ok(rendered);
+        }
         let formula = formula.decode()?;
         render_formula(
             &formula,
@@ -6042,6 +6149,247 @@ fn formula_output_limit_error(observed: usize, budget: &ProjectionBudget) -> Err
     }
 }
 
+/// Compact source-order node sink used for the scalar generated-free formula
+/// subset. The node vector is bounded by the exact wire-preflight node count;
+/// no generated repeated-message tree is retained on this route.
+struct ScalarFormulaVisitor {
+    nodes: Vec<numbers_formula_codec::FormulaNode>,
+    node_limit: usize,
+    unsupported: bool,
+}
+
+impl ScalarFormulaVisitor {
+    fn with_capacity(node_limit: usize) -> Result<Self> {
+        let mut nodes = Vec::new();
+        nodes
+            .try_reserve_exact(node_limit)
+            .map_err(|_| allocation_error("Numbers scalar formula nodes", node_limit))?;
+        Ok(Self {
+            nodes,
+            node_limit,
+            unsupported: false,
+        })
+    }
+}
+
+impl numbers_formula_codec::FormulaVisitor for ScalarFormulaVisitor {
+    fn visit_node(
+        &mut self,
+        node: numbers_formula_codec::FormulaNode,
+    ) -> std::result::Result<(), numbers_formula_codec::DecodeError> {
+        if matches!(
+            node,
+            numbers_formula_codec::FormulaNode::CellReference { .. }
+                | numbers_formula_codec::FormulaNode::ResolvedCellReference { .. }
+                | numbers_formula_codec::FormulaNode::ResolvedRange { .. }
+        ) {
+            self.unsupported = true;
+            return Ok(());
+        }
+        if self.nodes.len() >= self.node_limit {
+            return Err(numbers_formula_codec::DecodeError::allocation(
+                self.node_limit.saturating_add(1),
+            ));
+        }
+        self.nodes.push(node);
+        Ok(())
+    }
+}
+
+/// Try the compact generated-free formula visitor. `None` means that the
+/// archive is valid but outside the scalar subset (or cannot be resolved
+/// against this table's bounds), so the lossless generated renderer must be
+/// used. The strict archive preflight has already charged the complete wire
+/// walk, keeping this bounded fallback probe from admitting an unbounded tree.
+fn render_scalar_formula(
+    formula: &FormulaArchiveBytes,
+    host_row: usize,
+    host_column: usize,
+    row_count: usize,
+    column_count: usize,
+    budget: &mut ProjectionBudget,
+) -> Result<Option<String>> {
+    let owner = 1;
+    let host_row = match u32::try_from(host_row) {
+        Ok(value) => value,
+        Err(_) => return Ok(None),
+    };
+    let host_column = match u32::try_from(host_column) {
+        Ok(value) => value,
+        Err(_) => return Ok(None),
+    };
+    let rows = match u32::try_from(row_count) {
+        Ok(value) if value != 0 => value,
+        _ => return Ok(None),
+    };
+    let columns = match u32::try_from(column_count) {
+        Ok(value) if value != 0 => value,
+        _ => return Ok(None),
+    };
+    if host_row >= rows || host_column >= columns {
+        return Ok(None);
+    }
+
+    // The wire preflight derives this exact bound without retaining any AST
+    // nodes. Charge it before constructing the visitor so a rejected formula
+    // cannot allocate a node vector beyond the package render-work budget.
+    budget.charge_formula_render_work(formula.scalar_visitor_node_count)?;
+
+    let options = numbers_formula_codec::DecodeOptions::new(
+        formula.bytes.len(),
+        crate::MAX_REFERENCES,
+        MAX_PAYLOAD_WORK,
+        32,
+        formula.scalar_visitor_node_count,
+        DEFAULT_MAX_TEXT_BYTES,
+    );
+    let context =
+        numbers_formula_codec::FormulaContext::new(owner, host_row, host_column, rows, columns);
+    let mut visitor = ScalarFormulaVisitor::with_capacity(formula.scalar_visitor_node_count)?;
+    let report = match numbers_formula_codec::decode_formula_archive_with_visitor(
+        formula.bytes.as_ref(),
+        context,
+        options,
+        &mut visitor,
+    ) {
+        Ok(report) => report,
+        Err(error) => {
+            if let Some(numbers_formula_codec::DecodeLimit::Allocation { requested }) =
+                error.resource_limit()
+            {
+                return Err(allocation_error("Numbers scalar formula nodes", requested));
+            }
+            return Ok(None);
+        },
+    };
+    if visitor.unsupported {
+        return Ok(None);
+    }
+    debug_assert_eq!(report.node_count(), formula.scalar_visitor_node_count);
+    Ok(Some(render_scalar_formula_nodes(&visitor.nodes, budget)?))
+}
+
+fn render_scalar_formula_nodes(
+    nodes: &[numbers_formula_codec::FormulaNode],
+    budget: &mut ProjectionBudget,
+) -> Result<String> {
+    if nodes.is_empty() {
+        return retain_text("=", budget);
+    }
+    let mut renderer = FormulaRenderer::default();
+    let mut stack = Vec::new();
+    stack
+        .try_reserve_exact(nodes.len())
+        .map_err(|_| allocation_error("Numbers scalar formula expression stack", nodes.len()))?;
+    for node in nodes {
+        use numbers_formula_codec::{BinaryOperator, FormulaNode};
+        let expression = match *node {
+            FormulaNode::Binary(operator) => {
+                let (symbol, operation) = match operator {
+                    BinaryOperator::Add => ("+", "addition"),
+                    BinaryOperator::Subtract => ("-", "subtraction"),
+                    BinaryOperator::Multiply => ("*", "multiplication"),
+                    BinaryOperator::Divide => ("/", "division"),
+                    BinaryOperator::Power => ("^", "power"),
+                    BinaryOperator::Concatenate => ("&", "concatenation"),
+                    BinaryOperator::GreaterThan => (">", "greater than"),
+                    BinaryOperator::GreaterThanOrEqual => (">=", "greater than or equal"),
+                    BinaryOperator::LessThan => ("<", "less than"),
+                    BinaryOperator::LessThanOrEqual => ("<=", "less than or equal"),
+                    BinaryOperator::Equal => ("=", "equality"),
+                    BinaryOperator::NotEqual => ("<>", "inequality"),
+                };
+                Some(render_binary(
+                    &mut stack,
+                    &mut renderer,
+                    symbol,
+                    operation,
+                    true,
+                    budget,
+                )?)
+            },
+            FormulaNode::Negation => stack
+                .pop()
+                .map(|operand| renderer.unary("-(", operand, ")", budget))
+                .transpose()?,
+            FormulaNode::Percent => {
+                let operand = stack.pop().ok_or_else(|| {
+                    Error::ParseError(
+                        "Numbers formula percent operator is missing an operand".to_owned(),
+                    )
+                })?;
+                Some(renderer.unary("(", operand, ")%", budget)?)
+            },
+            FormulaNode::Function {
+                identifier,
+                argument_count,
+            } => {
+                let arguments = pop_formula_arguments(&mut stack, argument_count, "function")?;
+                Some(renderer.comma_joined(
+                    Some(fallible_function_name(identifier, &renderer, budget)?),
+                    arguments,
+                    "(",
+                    ")",
+                    budget,
+                )?)
+            },
+            FormulaNode::Number { bits } => {
+                let value = fallible_formula_display(f64::from_bits(bits), &renderer, budget)?;
+                Some(renderer.owned_expr(value, budget)?)
+            },
+            FormulaNode::Boolean(value) | FormulaNode::Token(value) => {
+                Some(renderer.static_expr(if value { "TRUE" } else { "FALSE" }, budget)?)
+            },
+            FormulaNode::Empty => Some(renderer.static_expr("", budget)?),
+            FormulaNode::LocalCell {
+                coordinate,
+                row_is_sticky,
+                column_is_sticky,
+            } => {
+                let column = FormulaColumn(coordinate.column());
+                let row = checked_formula_row_number(coordinate.row())?;
+                let value = fallible_formula_format(&renderer, budget, |output| {
+                    write!(
+                        output,
+                        "{}{column}{}{row}",
+                        if column_is_sticky != 0 { "$" } else { "" },
+                        if row_is_sticky != 0 { "$" } else { "" },
+                    )
+                })?;
+                Some(renderer.owned_expr(value, budget)?)
+            },
+            FormulaNode::Colon | FormulaNode::ColonWithUids => Some(render_binary(
+                &mut stack,
+                &mut renderer,
+                ":",
+                "range",
+                false,
+                budget,
+            )?),
+            FormulaNode::PlusSign
+            | FormulaNode::AppendWhitespace
+            | FormulaNode::PrependWhitespace => None,
+            FormulaNode::CellReference { .. }
+            | FormulaNode::ResolvedCellReference { .. }
+            | FormulaNode::ResolvedRange { .. } => {
+                return Err(Error::InvalidFormat(
+                    "Numbers scalar formula visitor received an owner-bearing node".to_owned(),
+                ));
+            },
+        };
+        if let Some(expression) = expression {
+            stack.push(expression);
+        }
+    }
+    let Some(root) = stack.pop() else {
+        // Keep parity with the generated compatibility renderer: an archive
+        // containing only ignored postfix markers (or a missing negation
+        // operand) falls through to its FORMULA() placeholder.
+        return retain_text("=FORMULA()", budget);
+    };
+    renderer.render(root, budget)
+}
+
 fn render_formula(
     formula: &tsce::FormulaArchive,
     host_row: usize,
@@ -7220,6 +7568,163 @@ mod tests {
         }
     }
 
+    fn sparse_model_wire(
+        names: &[&str],
+        dimensions: Option<(u32, u32)>,
+        data_store: &[u8],
+    ) -> Vec<u8> {
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 4, data_store)
+            .expect("sparse model data-store field");
+        if let Some((rows, columns)) = dimensions {
+            append_varint_field(&mut source, 6, u64::from(rows)).expect("sparse model rows");
+            append_varint_field(&mut source, 7, u64::from(columns)).expect("sparse model columns");
+        }
+        for name in names {
+            append_length_delimited_field(&mut source, 8, name.as_bytes())
+                .expect("sparse model name field");
+        }
+        source
+    }
+
+    #[test]
+    fn sparse_shape_requires_explicit_dimensions_and_accepts_legacy_duplicate_name()
+    -> super::Result<()> {
+        let minimal = sparse_model_wire(&["minimal"], None, &[]);
+        assert!(!super::sparse_table_model_compatibility_shape(&minimal));
+
+        // Zero dimensions are valid only when both scalar fields are
+        // explicitly present; omitted fields must not be synthesized by the
+        // compatibility defaults into a 0x0 table.
+        let explicit_zero = sparse_model_wire(&["empty"], Some((0, 0)), &[]);
+        assert!(super::sparse_table_model_compatibility_shape(
+            &explicit_zero
+        ));
+
+        let duplicate = sparse_model_wire(&["first", "last"], Some((1, 1)), &[]);
+        assert!(super::sparse_table_model_compatibility_shape(&duplicate));
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_sparse_projection_retains_last_name() -> super::Result<()> {
+        let source = sparse_model_wire(&["first", "last"], Some((0, 0)), &[]);
+        with_list_extractor(Vec::new(), false, |extractor| {
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            let projected = extractor.project_table_model(
+                &source,
+                &mut budget,
+                SemanticPath::StructuredTables,
+            )?;
+            assert!(projected.compatibility_defaults);
+            assert_eq!(projected.table_name, "last");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn sparse_ingress_fallback_retains_last_duplicate_name() -> super::Result<()> {
+        // An empty DataStore forces the strict model route to fail. Sparse
+        // compatibility ingress mirrors generated protobuf last-wins name
+        // behavior; the names transaction's independent strict projection
+        // rejects this source before publishing a rename.
+        let source = sparse_model_wire(&["first", "last"], Some((1, 1)), &[]);
+        with_list_extractor(Vec::new(), true, |extractor| {
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            let result =
+                extractor.project_table_model(&source, &mut budget, SemanticPath::StructuredTables);
+            let projected = result?;
+            assert!(projected.compatibility_defaults);
+            assert_eq!(projected.table_name, "last");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn dense_native_fallback_rejects_duplicate_name_after_model_failure() -> super::Result<()> {
+        // A non-default required HeaderStorage envelope identifies a native
+        // model even when the selected DataStore routes are incomplete. The
+        // dense fallback must retain the strict names projection and reject
+        // the duplicate instead of applying sparse last-wins behavior.
+        let mut data_store = Vec::new();
+        append_length_delimited_field(&mut data_store, 1, &[0x08, 0x01])
+            .expect("native header-storage envelope");
+        let source = sparse_model_wire(&["first", "last"], Some((1, 1)), &data_store);
+        with_list_extractor(Vec::new(), true, |extractor| {
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            let result =
+                extractor.project_table_model(&source, &mut budget, SemanticPath::StructuredTables);
+            assert!(result.is_err(), "native duplicate name was admitted");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn native_sparse_fallback_does_not_retry_after_model_limit() -> super::Result<()> {
+        let source = sparse_model_wire(&["limited"], Some((1, 1)), &[]);
+        with_list_extractor(Vec::new(), true, |extractor| {
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            // Make the first strict model walk hit its aggregate work ceiling.
+            // A resource limit must remain authoritative; it must not trigger
+            // the sparse compatibility retry.
+            budget.payload_work = super::MAX_PAYLOAD_WORK;
+            let result =
+                extractor.project_table_model(&source, &mut budget, SemanticPath::StructuredTables);
+            assert!(
+                matches!(
+                    &result,
+                    Err(Error::SemanticLimit {
+                        kind: SemanticLimitKind::FormulaWork,
+                        ..
+                    })
+                ),
+                "model limit was retried or mapped incorrectly"
+            );
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn native_sparse_fallback_keeps_malformed_tiles_strict() -> super::Result<()> {
+        let mut data_store = Vec::new();
+        append_length_delimited_field(&mut data_store, 3, &[0xff])
+            .expect("malformed tile-storage field");
+        append_length_delimited_field(&mut data_store, 4, &reference(90).encode_to_vec())
+            .expect("string-table reference");
+        append_length_delimited_field(&mut data_store, 6, &reference(91).encode_to_vec())
+            .expect("formula-table reference");
+        let source = sparse_model_wire(&["tiles"], Some((1, 1)), &data_store);
+        let result = with_list_extractor(
+            vec![
+                archive_object(
+                    90,
+                    vec![list_message(
+                        tst::table_data_list::ListType::String,
+                        Vec::new(),
+                        Vec::new(),
+                    )],
+                )?,
+                archive_object(
+                    91,
+                    vec![list_message(
+                        tst::table_data_list::ListType::Formula,
+                        Vec::new(),
+                        Vec::new(),
+                    )],
+                )?,
+            ],
+            true,
+            |extractor| {
+                extractor.parse_projected_table_payload(&source, SemanticPath::StructuredTables)
+            },
+        );
+        assert!(
+            matches!(&result, Err(Error::InvalidFormat(_))),
+            "malformed tile-storage payload was admitted: {result:?}"
+        );
+        Ok(())
+    }
+
     fn native_fixture() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/numbers/basic.numbers")
@@ -8344,8 +8849,9 @@ mod tests {
             .encode();
 
         let mut budget = ProjectionBudget::new(SemanticLimits::default());
-        let parsed = TableDataExtractor::parse_bnc_cell(&round_tripped, &tables, &mut budget, 2, 3)
-            .unwrap_or_else(|error| panic!("type-nine cell did not extract: {error}"));
+        let parsed =
+            TableDataExtractor::parse_bnc_cell(&round_tripped, &tables, &mut budget, 2, 3, 10, 10)
+                .unwrap_or_else(|error| panic!("type-nine cell did not extract: {error}"));
         let CellValue::Number(value) = parsed.value else {
             panic!("type-nine decimal was not extracted as a number");
         };
@@ -9119,6 +9625,153 @@ mod tests {
             "="
         );
         assert_eq!(budget.formula_wire_bytes, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_visitor_matches_renderer_for_postfix_arithmetic() -> super::Result<()> {
+        let input = formula(vec![
+            number_node(1.0),
+            number_node(2.0),
+            formula_node(AstNodeType::AdditionNode),
+        ]);
+        let source = input.encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+        assert!(raw.scalar_visitor_eligible);
+
+        let references = FormulaReferenceMaps::default();
+        let actual = TableDataExtractor::extract_formula_string(
+            &raw,
+            0,
+            0,
+            10,
+            10,
+            &references,
+            &mut budget,
+        )?;
+        let mut reference_budget = ProjectionBudget::new(SemanticLimits::default());
+        let expected = render_formula(&input, 0, 0, &references, &mut reference_budget)?;
+        assert_eq!(actual, expected);
+        assert_eq!(actual, "=(1+2)");
+        assert_eq!(budget.formula_render_work, 3);
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_visitor_preserves_local_sticky_coordinates() -> super::Result<()> {
+        let local = AstNodeArchive {
+            ast_node_type: AstNodeType::LocalCellReferenceNode as i32,
+            ast_local_cell_reference_node_reference: Some(AstLocalCellReferenceNodeArchive {
+                row_handle: 2,
+                column_handle: 3,
+                row_is_sticky: 1,
+                column_is_sticky: 1,
+            }),
+            ..Default::default()
+        };
+        let input = formula(vec![local]);
+        let source = input.encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+        assert!(raw.scalar_visitor_eligible);
+        let actual = TableDataExtractor::extract_formula_string(
+            &raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut budget,
+        )?;
+        assert_eq!(actual, "=$D$3");
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_visitor_falls_back_for_string_nodes() -> super::Result<()> {
+        let mut string = formula_node(AstNodeType::StringNode);
+        string.ast_string_node_string = Some("a\"b".to_owned());
+        let input = formula(vec![string]);
+        let source = input.encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+        assert!(!raw.scalar_visitor_eligible);
+        let actual = TableDataExtractor::extract_formula_string(
+            &raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut budget,
+        )?;
+        assert_eq!(actual, "=\"a\"\"b\"");
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_visitor_preserves_ignored_and_missing_negation_parity() -> super::Result<()> {
+        for node in [
+            formula_node(AstNodeType::PlusSignNode),
+            formula_node(AstNodeType::NegationNode),
+        ] {
+            let input = formula(vec![node]);
+            let source = input.encode_to_vec();
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+            assert!(raw.scalar_visitor_eligible);
+            let actual = TableDataExtractor::extract_formula_string(
+                &raw,
+                0,
+                0,
+                10,
+                10,
+                &FormulaReferenceMaps::default(),
+                &mut budget,
+            )?;
+            let mut reference_budget = ProjectionBudget::new(SemanticLimits::default());
+            let expected = render_formula(
+                &input,
+                0,
+                0,
+                &FormulaReferenceMaps::default(),
+                &mut reference_budget,
+            )?;
+            assert_eq!(actual, expected);
+            assert_eq!(actual, "=FORMULA()");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_visitor_charges_node_bound_before_rendering() -> super::Result<()> {
+        let input = formula(vec![number_node(1.0), number_node(2.0)]);
+        let source = input.encode_to_vec();
+        let limits = SemanticLimits::default()
+            .with_formula_render_limits(1, 64)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut budget = ProjectionBudget::new(limits);
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+        let error = TableDataExtractor::extract_formula_string(
+            &raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut budget,
+        )
+        .expect_err("scalar node allocation must not precede render-work admission");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaRenderWork,
+                observed: 2,
+                maximum: 1,
+                ..
+            }
+        ));
         Ok(())
     }
 
