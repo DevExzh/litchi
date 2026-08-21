@@ -565,9 +565,12 @@ impl Snapshot {
                 .story_relationships
                 .get(story_index)
                 .ok_or_else(|| invalid("story hyperlink relationship index is out of sync"))?;
-            for relationship in
-                &self.inventory.relationships[relationship_range.start..relationship_range.end]
-            {
+            let relationships = self
+                .inventory
+                .relationships
+                .get(relationship_range.start..relationship_range.end)
+                .ok_or_else(|| invalid("story hyperlink relationship range is out of sync"))?;
+            for relationship in relationships {
                 if targets.binary_search(&relationship.target_url).is_ok() {
                     if removed_relationships >= self.limits.max_selected_relationships {
                         return Err(limit(

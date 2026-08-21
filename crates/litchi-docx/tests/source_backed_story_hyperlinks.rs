@@ -1,14 +1,16 @@
+use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, ReadAt, Resource,
 };
-use litchi_docx::ReadLimits;
 use litchi_docx::package::StoryLimits;
 use litchi_docx::source_backed;
 use litchi_docx::story_hyperlinks::{Limits as StoryHyperlinkLimits, Mode, UnsupportedClass};
+use litchi_docx::{Error, ReadLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -30,7 +32,7 @@ fn story_xml(root: &str, label: &str) -> Vec<u8> {
     .into_bytes()
 }
 
-fn fixture(field: bool) -> Vec<u8> {
+fn package_fixture(field: bool) -> OpcPackage {
     let main_xml = if field {
         format!(
             r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:fldSimple w:instr="HYPERLINK https://field.invalid/"><w:r><w:t>field</w:t></w:r></w:fldSimple><w:hyperlink r:id="rMain"><w:r><w:t>main</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#
@@ -113,12 +115,71 @@ fn fixture(field: bool) -> Vec<u8> {
     }
     package.try_add_part(Box::new(main)).unwrap();
     package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
-    PackageWriter::to_bytes(&package).unwrap()
+    package
+}
+
+fn fixture(field: bool) -> Vec<u8> {
+    PackageWriter::to_bytes(&package_fixture(field)).unwrap()
 }
 
 fn open(bytes: Vec<u8>) -> source_backed::Package {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
     source_backed::Package::from_read_at(source).unwrap()
+}
+
+fn empty_inventory_fixture() -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    for (part_name, relationship_id) in [
+        ("/word/document.xml", "rMain"),
+        ("/word/header1.xml", "rLink"),
+        ("/word/footer1.xml", "rLink"),
+        ("/word/footnotes.xml", "rLink"),
+        ("/word/endnotes.xml", "rLink"),
+        ("/word/comments.xml", "rLink"),
+        ("/word/glossary.xml", "rLink"),
+    ] {
+        let part = package
+            .get_part_mut(&PackURI::new(part_name).unwrap())
+            .unwrap();
+        let opening = format!(r#"<w:hyperlink r:id="{relationship_id}">"#);
+        let blob = std::str::from_utf8(part.blob())
+            .unwrap()
+            .replace(&opening, "")
+            .replace("</w:hyperlink>", "")
+            .into_bytes();
+        part.set_blob(blob);
+        part.rels_mut().remove(relationship_id);
+    }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+struct VersionedSource {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+}
+
+impl ReadAt for VersionedSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<litchi_core::SourceVersion> {
+        Ok(litchi_core::SourceVersion::new(
+            251,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
 }
 
 fn nested_owner_fixture() -> Vec<u8> {
@@ -165,12 +226,19 @@ fn prolog_fixture() -> Vec<u8> {
 }
 
 fn package_signature_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package = package_fixture(false);
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+            ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            b"<origin/>".to_vec(),
+        )))
+        .unwrap();
     package
         .rels_mut()
         .try_add_relationship(
             rt::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
-            "signature/origin.sigs".to_owned(),
+            "_xmlsignatures/origin.sigs".to_owned(),
             "rSignature".to_owned(),
             TargetMode::Internal,
         )
@@ -479,6 +547,123 @@ fn inventories_all_relationship_owned_story_kinds_and_redacts_them() {
 }
 
 #[test]
+fn duplicate_target_selectors_are_deduplicated_and_missing_targets_are_typed() {
+    let package = open(fixture(false));
+    let plan = package
+        .plan_story_hyperlink_redaction(
+            &["https://shared.invalid/", "https://shared.invalid/"],
+            Mode::Strict,
+        )
+        .unwrap();
+    assert_eq!(plan.effect_report().selected_targets(), 1);
+    assert_eq!(plan.effect_report().removed_relationships(), 7);
+
+    assert!(matches!(
+        package.plan_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
+        Err(Error::InvalidFormat(message)) if message.contains("target is not present")
+    ));
+}
+
+#[test]
+fn empty_relationship_inventory_fails_closed_and_publishes_an_exact_noop() {
+    let bytes = empty_inventory_fixture();
+    let package = open(bytes.clone());
+    let snapshot = package.story_hyperlinks_only_snapshot().unwrap();
+    assert_eq!(snapshot.inventory().story_count(), 7);
+    assert_eq!(snapshot.inventory().relationship_count(), 0);
+    assert!(snapshot.inventory().is_complete());
+
+    assert!(matches!(
+        package.plan_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
+        Err(Error::InvalidFormat(message)) if message.contains("target is not present")
+    ));
+    let commit = package
+        .plan_story_hyperlink_redaction(&[], Mode::Strict)
+        .unwrap()
+        .apply()
+        .unwrap();
+    assert!(commit.effect_report().is_noop());
+    let mut output = Vec::new();
+    package
+        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+}
+
+#[test]
+fn stale_and_foreign_commits_fail_before_output() {
+    let source = Arc::new(VersionedSource {
+        bytes: fixture(false),
+        revision: AtomicU64::new(0),
+    });
+    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
+    let commit = package
+        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .unwrap()
+        .apply()
+        .unwrap();
+    source.revision.fetch_add(1, Ordering::SeqCst);
+    let mut output = Vec::new();
+    assert!(matches!(
+        package.publish_story_hyperlink_redaction_to_stream(&mut output, &commit),
+        Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+            | Err(Error::ExternalHyperlinkRedactionConflict)
+    ));
+    assert!(output.is_empty());
+
+    let bytes = fixture(false);
+    let first = open(bytes.clone());
+    let second = open(bytes);
+    let commit = first
+        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .unwrap()
+        .apply()
+        .unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        second.publish_story_hyperlink_redaction_to_stream(&mut output, &commit),
+        Err(Error::ExternalHyperlinkRedactionConflict)
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn redaction_limits_cover_selected_relationships_and_changed_stories() {
+    let package = open(fixture(false));
+    let selected_limit = StoryHyperlinkLimits::default()
+        .with_max_selected_relationships(6)
+        .unwrap();
+    assert!(matches!(
+        package.plan_story_hyperlink_redaction_with_limits(
+            &["https://shared.invalid/"],
+            Mode::Strict,
+            selected_limit,
+        ),
+        Err(Error::ExternalHyperlinkRedactionLimit {
+            resource: "selected story hyperlink relationships",
+            maximum: 6,
+            actual: 7,
+        })
+    ));
+
+    let changed_story_limit = StoryHyperlinkLimits::default()
+        .with_max_changed_stories(6)
+        .unwrap();
+    assert!(matches!(
+        package.plan_story_hyperlink_redaction_with_limits(
+            &["https://shared.invalid/"],
+            Mode::Strict,
+            changed_story_limit,
+        ),
+        Err(Error::ExternalHyperlinkRedactionLimit {
+            resource: "changed story parts",
+            maximum: 6,
+            actual: 7,
+        })
+    ));
+}
+
+#[test]
 fn exact_noop_copies_source_and_strict_fields_refuse_before_output() {
     let bytes = fixture(false);
     let package = open(bytes.clone());
@@ -710,6 +895,30 @@ fn empty_selector_copies_signed_source_exactly_despite_security_diagnostics() {
         .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
         .unwrap();
     assert_eq!(output, bytes);
+}
+
+#[test]
+fn signed_exact_noop_is_byte_exact_and_changed_plan_has_empty_output() {
+    let bytes = package_signature_fixture();
+    let package = open(bytes.clone());
+    let commit = package
+        .plan_story_hyperlink_redaction(&[], Mode::Strict)
+        .unwrap()
+        .apply()
+        .unwrap();
+    let mut output = Vec::new();
+    package
+        .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+
+    let package = open(package_signature_fixture());
+    let output = Vec::<u8>::new();
+    assert!(matches!(
+        package.plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    assert!(output.is_empty());
 }
 
 #[test]
