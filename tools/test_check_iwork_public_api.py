@@ -160,6 +160,9 @@ class IworkPublicApiGateTests(unittest.TestCase):
             "prepared",
             "PreparedSource",
             "source_bytes",
+            "wire",
+            "WireView",
+            "wire_limits",
         )
         for name in names:
             with self.subTest(name=name):

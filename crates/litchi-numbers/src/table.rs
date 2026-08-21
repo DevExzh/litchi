@@ -85,6 +85,47 @@ impl Dimensions {
         self.columns
     }
 
+    /// Checks a zero-based row against the declared extent.
+    ///
+    /// This axis-specific check is useful to archive adapters while they are
+    /// walking sparse rows: it does not require a valid column to be present
+    /// (which matters for a zero-column table), and it returns the same typed
+    /// coordinate error used by the rest of the semantic table API.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::CoordinateOverflow`] when `row` does not fit the
+    /// compact coordinate representation or [`Error::OutOfBounds`] when the
+    /// row lies outside this table's declared extent.
+    pub fn check_row(self, row: usize) -> Result<()> {
+        let position = CellPosition::try_from_usize(row, 0)?;
+        if position.row >= self.rows {
+            return Err(Error::OutOfBounds {
+                position,
+                dimensions: self,
+            });
+        }
+        Ok(())
+    }
+
+    /// Checks a zero-based column against the declared extent.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::CoordinateOverflow`] when `column` does not fit the
+    /// compact coordinate representation or [`Error::OutOfBounds`] when the
+    /// column lies outside this table's declared extent.
+    pub fn check_column(self, column: usize) -> Result<()> {
+        let position = CellPosition::try_from_usize(0, column)?;
+        if position.column >= self.columns {
+            return Err(Error::OutOfBounds {
+                position,
+                dimensions: self,
+            });
+        }
+        Ok(())
+    }
+
     /// Returns the dense area when it fits in `usize`.
     #[must_use]
     pub const fn area(self) -> Option<usize> {
@@ -962,6 +1003,23 @@ mod tests {
 
     fn number(value: f64) -> Value {
         Value::number(value).expect("finite test number")
+    }
+
+    #[test]
+    fn dimensions_check_each_axis_without_requiring_the_other_axis() {
+        let dimensions = Dimensions::new(3, 0);
+        assert!(dimensions.check_row(2).is_ok());
+        assert!(matches!(
+            dimensions.check_row(3),
+            Err(Error::OutOfBounds { position, .. }) if position == Position::new(3, 0)
+        ));
+
+        let dimensions = Dimensions::new(0, 3);
+        assert!(dimensions.check_column(2).is_ok());
+        assert!(matches!(
+            dimensions.check_column(3),
+            Err(Error::OutOfBounds { position, .. }) if position == Position::new(0, 3)
+        ));
     }
 
     #[test]

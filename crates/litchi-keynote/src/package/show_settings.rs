@@ -802,14 +802,21 @@ fn validate_canonical_object_length_prefixes(
 
 fn strict_payload_settings(package: &Package, payload: &[u8]) -> Result<Settings, Error> {
     let wire_limits = package.semantic_wire_limits().map_err(map_read_error)?;
+    // Let the focused codec classify its own bounded slide-reference ceiling
+    // before the package-wide preflight. The latter currently reports the
+    // over-ceiling branch through its generic wire-invalid path, which would
+    // erase the useful `Slides` limit category at this facade. The codec has
+    // the same strict handwritten envelope pass ahead of Buffa, so this does
+    // not weaken malformed-wire admission or lazy projection parity; the
+    // package preflight below still enforces aggregate semantic references.
+    let snapshot =
+        decode_show_settings_snapshot(payload, package.semantic_limits().max_slides(), wire_limits)
+            .map_err(map_read_error)?;
     let mut budget = SemanticBudget::new(package.semantic_limits());
     budget
         .charge_references(1, SemanticPath::Show)
         .map_err(map_read_error)?;
     preflight_show(payload, wire_limits, &mut budget).map_err(map_read_error)?;
-    let snapshot =
-        decode_show_settings_snapshot(payload, package.semantic_limits().max_slides(), wire_limits)
-            .map_err(map_read_error)?;
     settings_from_show_projection(snapshot.size(), snapshot.raw_settings()).map_err(map_read_error)
 }
 

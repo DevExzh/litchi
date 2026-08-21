@@ -1,18 +1,16 @@
 //! End-to-end coverage for packages produced without native iWork templates.
 //!
-//! These tests intentionally exercise both the format detector and the
-//! application-specific readers. They provide a deterministic fixture source
+//! These tests intentionally exercise the unified root reader and each
+//! application-specific reader. They provide a deterministic fixture source
 //! while native-app verification remains an external, opt-in check.
 
 use std::error::Error;
 use std::fs;
-use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
 
 use litchi_iwa::Document;
 use litchi_iwa::application::Application;
-use litchi_iwa::detect::{self, Format};
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::PagesEditor;
@@ -29,7 +27,7 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
 
     let pages_path = directory.path().join("generated.pages");
     PagesEditor::create_with_text("Generated Pages verification document")?.save(&pages_path)?;
-    verify_package(&pages_path, Format::Pages)?;
+    verify_package(&pages_path, Application::Pages)?;
 
     let numbers_path = directory.path().join("generated.numbers");
     NumbersDocumentBuilder::new()
@@ -37,7 +35,7 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
         .table_dimensions(2, 2)
         .build()?
         .save(&numbers_path)?;
-    verify_package(&numbers_path, Format::Numbers)?;
+    verify_package(&numbers_path, Application::Numbers)?;
 
     let keynote_path = directory.path().join("generated.key");
     KeynoteDocumentBuilder::new()
@@ -45,26 +43,13 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
         .subtitle("Created without a native template")
         .build()?
         .save(&keynote_path)?;
-    verify_package(&keynote_path, Format::Keynote)?;
+    verify_package(&keynote_path, Application::Keynote)?;
 
     Ok(())
 }
 
-fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
+fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(path)?;
-    let application = match expected {
-        Format::Pages => Application::Pages,
-        Format::Numbers => Application::Numbers,
-        Format::Keynote => Application::Keynote,
-    };
-
-    assert_eq!(detect::bytes(&bytes)?, Some(expected));
-
-    let mut reader = Cursor::new(bytes.as_slice());
-    reader.set_position(1);
-    assert_eq!(detect::reader(&mut reader)?, Some(expected));
-    assert_eq!(reader.position(), 1);
-    assert_eq!(detect::path(path)?, Some(expected));
 
     let document = Document::open(path)?;
     assert_send_sync::<litchi_iwa::raw::bundle::Bundle>();
@@ -72,9 +57,9 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     assert_send_sync::<PagesSemanticDocument>();
     assert_send_sync::<NumbersSemanticDocument>();
     assert_send_sync::<KeynotePackage>();
-    assert_eq!(document.application(), application);
+    assert_eq!(document.application(), expected);
     let document_stats = document.stats()?;
-    assert_eq!(document_stats.application, application);
+    assert_eq!(document_stats.application, expected);
     assert!(document_stats.total_objects > 0);
     let document_snapshot = document.snapshot();
     assert_eq!(document_snapshot.application(), document.application());
@@ -87,11 +72,11 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
     document.text()?;
 
     let document_from_bytes = Document::from_bytes(&bytes)?;
-    assert_eq!(document_from_bytes.application(), application);
+    assert_eq!(document_from_bytes.application(), expected);
     assert!(document_from_bytes.stats()?.total_objects > 0);
 
     match expected {
-        Format::Pages => {
+        Application::Pages => {
             PagesEditor::open(path)?;
             let specialized = PagesSemanticDocument::open(path)?;
             let snapshot = specialized.snapshot();
@@ -129,7 +114,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
                 specialized_stats.total_objects()
             );
         },
-        Format::Numbers => {
+        Application::Numbers => {
             NumbersEditor::open(path)?;
             let specialized = NumbersSemanticDocument::open(path)?;
             let snapshot = specialized.snapshot();
@@ -173,7 +158,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
                 specialized.metadata().is_some()
             );
         },
-        Format::Keynote => {
+        Application::Keynote => {
             KeynoteEditor::open(path)?;
             let specialized = KeynotePackage::open(path)?;
             let snapshot = specialized.snapshot();
@@ -194,6 +179,7 @@ fn verify_package(path: &Path, expected: Format) -> Result<(), Box<dyn Error>> {
             );
             assert!(!specialized.text()?.is_empty());
         },
+        Application::Common => unreachable!("generated fixtures have a concrete application"),
     }
 
     Ok(())

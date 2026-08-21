@@ -1222,17 +1222,6 @@ fn map_archive_ingress_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-/// Detect the application type from a bundle path
-pub fn detect_application_type<P: AsRef<Path>>(bundle_path: P) -> Result<String> {
-    Ok(match crate::detect::path(bundle_path)? {
-        Some(crate::detect::Format::Pages) => "Pages",
-        Some(crate::detect::Format::Keynote) => "Keynote",
-        Some(crate::detect::Format::Numbers) => "Numbers",
-        None => "Unknown",
-    }
-    .to_owned())
-}
-
 fn ensure_regular_file(path: &Path, label: &str) -> Result<()> {
     match fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() => Err(Error::Bundle(format!(
@@ -1685,20 +1674,6 @@ mod tests {
             Error::InvalidFormat(format!("failed to encode test plist: {error}"))
         })?;
         fs::write(path, bytes)?;
-        Ok(())
-    }
-
-    #[test]
-    fn application_detection_uses_content_not_filename_extension() -> crate::Result<()> {
-        let temp = tempfile::tempdir()?;
-        let file = temp.path().join("looks-like.numbers");
-        fs::write(&file, b"not an iWork archive")?;
-        assert_eq!(detect_application_type(&file)?, "Unknown");
-
-        let directory = temp.path().join("looks-like.pages");
-        fs::create_dir(&directory)?;
-        fs::write(directory.join("index.apxl"), [])?;
-        assert_eq!(detect_application_type(&directory)?, "Keynote");
         Ok(())
     }
 

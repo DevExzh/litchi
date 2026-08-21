@@ -333,12 +333,12 @@ fn exercise_malformed_mutations(source: &[u8], data: &[u8]) {
     }
 
     for suffix in MALFORMED_SUFFIXES {
-        let mut malformed = suffix.to_vec();
-        if source.len().saturating_add(malformed.len()) <= MAX_INPUT_BYTES {
-            let mut prefixed = source.to_vec();
-            prefixed.append(&mut malformed);
-            malformed = prefixed;
-        }
+        // Keep the malformed recipe independent from the arbitrary source.
+        // Appending a malformed suffix to arbitrary bytes can accidentally
+        // turn the suffix into a valid unknown field (or make its bytes part
+        // of a preceding length-delimited span), causing a false harness
+        // assertion rather than testing the intended rejection path.
+        let malformed = suffix.to_vec();
         let before = malformed.clone();
         let decoded = decode_chart_title(&malformed, options(&malformed));
         assert!(decoded.is_err(), "known malformed mutation was accepted");

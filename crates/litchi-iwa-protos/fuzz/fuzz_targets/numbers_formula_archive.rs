@@ -198,10 +198,7 @@ fn exercise_source(source: &[u8]) {
             panic!("visitor accepted a FormulaArchive rejected by inspection");
         },
         (Ok(inspected), Ok(decoded)) => {
-            assert_eq!(
-                decoded, inspected,
-                "formula preflight and callback reports diverged"
-            );
+            assert_formula_report_parity(inspected, decoded);
             assert_eq!(facts.nodes.len(), decoded.node_count());
             assert_eq!(facts.precedents.len(), decoded.precedent_count());
             assert_eq!(facts.unsupported, 0);
@@ -210,6 +207,51 @@ fn exercise_source(source: &[u8]) {
             assert_precedent_parity(&facts);
         },
     }
+}
+
+fn assert_formula_report_parity(
+    inspected: litchi_iwa_protos::numbers_formula_codec::DecodeReport,
+    decoded: litchi_iwa_protos::numbers_formula_codec::DecodeReport,
+) {
+    // The visitor entry point performs the same strict walk twice: once for
+    // callback admission and once for publication. Fields, wire work, and
+    // text are aggregate costs across both passes; semantic counts are
+    // admitted during preflight and therefore remain single-pass values.
+    assert_eq!(decoded.bytes(), inspected.bytes());
+    assert_eq!(
+        decoded.fields(),
+        inspected
+            .fields()
+            .checked_mul(2)
+            .expect("bounded formula field report must not overflow")
+    );
+    assert_eq!(
+        decoded.work(),
+        inspected
+            .work()
+            .checked_mul(2)
+            .expect("bounded formula work report must not overflow")
+    );
+    assert_eq!(decoded.max_depth(), inspected.max_depth());
+    assert_eq!(
+        decoded.text_bytes(),
+        inspected
+            .text_bytes()
+            .checked_mul(2)
+            .expect("bounded formula text report must not overflow")
+    );
+    assert_eq!(decoded.node_count(), inspected.node_count());
+    assert_eq!(decoded.precedent_count(), inspected.precedent_count());
+    assert_eq!(decoded.range_count(), inspected.range_count());
+    assert_eq!(
+        decoded.evaluator_supported(),
+        inspected.evaluator_supported()
+    );
+    assert_eq!(
+        decoded.unsupported_local_count(),
+        inspected.unsupported_local_count()
+    );
+    assert_eq!(decoded.allocations(), inspected.allocations());
 }
 
 fn assert_report_bounds(report: Option<&litchi_iwa_protos::numbers_formula_codec::DecodeReport>) {

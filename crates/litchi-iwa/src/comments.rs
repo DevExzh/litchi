@@ -11,8 +11,8 @@ use litchi_iwa_protos::comment_storage_codec;
 use prost::Message;
 
 use crate::application::Application;
+use crate::application_detection::detect;
 use crate::archive::{ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
-use crate::detect::detect_application_from_document;
 use crate::package_metadata::{
     add_component_external_reference, advance_package_save_token_for_components,
     component_identifier_for_entry, next_object_identifier, release_package_identifier_suffix,
@@ -348,7 +348,7 @@ fn package_application(package: &IWorkPackage) -> Result<Application> {
                 return Ok(());
             };
             for message in &document.messages {
-                let Some(application) = detect_application_from_document(&message.data) else {
+                let Some(application) = detect(&message.data) else {
                     continue;
                 };
                 if detected

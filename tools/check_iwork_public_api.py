@@ -49,7 +49,11 @@ ALLOWED_EXTERNAL_CRATES = frozenset({"alloc", "core", "std"})
 RAW_ID = re.compile(r"^(?:id|ids|[a-z][a-z0-9_]*_(?:id|ids))$", re.IGNORECASE)
 CAMEL_RAW_ID = re.compile(r"^(?:Id|Ids|[A-Za-z][A-Za-z0-9]*Ids?)$")
 NAME_TOKEN = re.compile(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+")
-CAPABILITY_TOKENS = frozenset({"archive", "catalog", "component", "components", "prepared", "raw"})
+CAPABILITY_TOKENS = frozenset(
+    # `wire` is intentionally blocked even when a facade renames a concrete
+    # wire view; the root API must not grow a compatibility vocabulary.
+    {"archive", "catalog", "component", "components", "prepared", "raw", "wire"}
+)
 RETIRED_API_NAMES = frozenset({"StructuredData", "extract_structured_data"})
 
 
@@ -277,10 +281,14 @@ def violations(document: Mapping[str, Any]) -> list[str]:
             referenced_path = _path_entry_path(paths.get(referenced_id))
             if referenced_path:
                 crate_name = referenced_path[0].replace("-", "_")
+                # A dependency-family diagnostic is more useful than a second
+                # name diagnostic for the same resolved physical type.
+                path_violation = False
                 if crate_name in FORBIDDEN_CRATES:
                     failures.add(
                         f"{display} exposes forbidden type `{'::'.join(referenced_path)}`"
                     )
+                    path_violation = True
                 elif crate_name == IWORK_PATH[0] and referenced_path[
                     : len(IWORK_PATH)
                 ] != IWORK_PATH:
@@ -299,7 +307,7 @@ def violations(document: Mapping[str, Any]) -> list[str]:
                     )
                 referenced_name = referenced_path[-1]
                 reason = _name_violation(referenced_name)
-                if reason is not None:
+                if reason is not None and not path_violation:
                     failures.add(
                         f"{display} exposes {reason} type `{'::'.join(referenced_path)}`"
                     )

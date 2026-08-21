@@ -422,13 +422,6 @@
       "exit": "Move object-level mutation behind concrete package APIs and delete litchi-iwa."
     },
     {
-      "order": 6,
-      "dependent": "litchi-iwa",
-      "dependency": "litchi-iwa-detect",
-      "reason": "The legacy unified opener retains a compatibility adapter over focused iWork detection.",
-      "exit": "Route root facade opening directly to concrete packages and delete litchi-iwa."
-    },
-    {
       "order": 8,
       "dependent": "litchi-iwa",
       "dependency": "litchi-iwa-index",

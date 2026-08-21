@@ -708,13 +708,7 @@ fn section_text_at(package: &Package, position: Position) -> Result<&str, Sectio
         .sections()
         .get(position.get())
         .ok_or(SectionTextError::PositionNotFound { position })?;
-    if section.heading().is_some()
-        || !section.paragraphs().is_empty()
-        || section.text_storages().len() != 1
-    {
-        return Err(SectionTextError::InvalidSource);
-    }
-    Ok(section.text_storages()[0].text())
+    section.body_text().ok_or(SectionTextError::InvalidSource)
 }
 
 fn native_body(package: &Package) -> Result<NativeBodySnapshot, SectionTextError> {

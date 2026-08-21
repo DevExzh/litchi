@@ -131,6 +131,7 @@ use litchi_core::SourceVersion;
 // Core parsing modules
 /// Semantic iWork application families.
 pub mod application;
+mod application_detection;
 mod archive;
 mod bundle;
 /// Typed native drawable stacking-order controls.
@@ -160,8 +161,6 @@ pub(crate) mod wire;
 pub mod text;
 
 mod data_reference_registry;
-/// Safe, typed detection for packaged and legacy iWork documents.
-pub mod detect;
 /// High-level iWork document types
 pub mod document;
 

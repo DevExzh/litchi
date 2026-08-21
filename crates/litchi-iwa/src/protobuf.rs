@@ -10,6 +10,7 @@
 )]
 
 use crate::{Error, Result};
+use litchi_iwa_common::WireLimits;
 use phf::phf_map;
 use prost::Message;
 
@@ -18,16 +19,45 @@ use prost::Message;
 // from accidentally becoming part of the raw schema crate.
 pub use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsch, tsd, tsk, tsp, tss, tst, tswp};
 
+const ARCHIVE_CODEC_RECURSION_LIMIT: u32 = 16;
+
+fn archive_codec_decode_options(data: &[u8]) -> litchi_iwa_protos::archive_codec::DecodeOptions {
+    litchi_iwa_protos::archive_codec::DecodeOptions::new(
+        data.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        data.len().clamp(1, WireLimits::MAX_FIELDS),
+        data.len()
+            .saturating_mul(32)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        ARCHIVE_CODEC_RECURSION_LIMIT,
+    )
+}
+
 /// Static decoder function for ArchiveInfo messages
 fn decode_archive_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    tsp::ArchiveInfo::decode(data)?;
-    Ok(Box::new(ArchiveInfoWrapper) as Box<dyn DecodedMessage>)
+    let message = litchi_iwa_protos::archive_codec::decode_archive_info(
+        data,
+        archive_codec_decode_options(data),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "iWork ArchiveInfo payload failed strict validation: {error}"
+        ))
+    })?;
+    Ok(Box::new(ArchiveInfoWrapper(message)) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for MessageInfo messages
 fn decode_message_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    tsp::MessageInfo::decode(data)?;
-    Ok(Box::new(MessageInfoWrapper) as Box<dyn DecodedMessage>)
+    let message = litchi_iwa_protos::archive_codec::decode_message_info(
+        data,
+        archive_codec_decode_options(data),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "iWork MessageInfo payload failed strict validation: {error}"
+        ))
+    })?;
+    Ok(Box::new(MessageInfoWrapper(message)) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for StorageArchive messages
@@ -189,7 +219,7 @@ pub trait DecodedMessage: std::fmt::Debug + Send + Sync {
 
 /// Wrapper for ArchiveInfo message
 #[derive(Debug)]
-struct ArchiveInfoWrapper;
+struct ArchiveInfoWrapper(tsp::ArchiveInfo);
 
 impl DecodedMessage for ArchiveInfoWrapper {
     fn extract_text(&self) -> Vec<String> {
@@ -199,7 +229,7 @@ impl DecodedMessage for ArchiveInfoWrapper {
 
 /// Wrapper for MessageInfo message
 #[derive(Debug)]
-struct MessageInfoWrapper;
+struct MessageInfoWrapper(tsp::MessageInfo);
 
 impl DecodedMessage for MessageInfoWrapper {
     fn extract_text(&self) -> Vec<String> {
@@ -392,6 +422,58 @@ mod tests {
         let archive_info = tsp::ArchiveInfo::default().encode_to_vec();
         let decoded = decode_common(1, &archive_info).unwrap();
         assert!(decoded.extract_text().is_empty());
+    }
+
+    #[test]
+    fn message_info_preserves_empty_optional_fields() {
+        // `type` and `length` are the only required fields. The strict
+        // projection must keep all optional/repeated fields at their empty
+        // or absent values rather than requiring generated defaults.
+        let message_info = [0x08, 0x07, 0x18, 0x0b];
+        let decoded = decode_common(2, &message_info).unwrap();
+        assert!(decoded.extract_text().is_empty());
+    }
+
+    #[test]
+    fn archive_headers_reject_malformed_and_truncated_nested_payloads() {
+        // Prost accepts this proto2 child without its required `length`;
+        // the registry path must publish nothing when strict projection
+        // rejects it.
+        let malformed_message_info = [0x12, 0x02, 0x08, 0x01];
+        assert!(tsp::ArchiveInfo::decode(malformed_message_info.as_slice()).is_ok());
+        assert!(decode_common(1, &malformed_message_info).is_err());
+
+        // The nested MessageInfo body is cut off in the middle of its
+        // length-delimited payload.
+        let truncated_archive_info = [0x12, 0x04, 0x08, 0x01, 0x18];
+        assert!(decode_common(1, &truncated_archive_info).is_err());
+
+        // A malformed FieldInfo path is deferred by the lazy view until the
+        // projection is forced; the registry must still fail atomically.
+        let malformed_field_info = [
+            0x08, 0x01, 0x18, 0x00, // required MessageInfo fields
+            0x22, 0x03, 0x0a, 0x01, 0x80, // unterminated FieldPath varint
+        ];
+        assert!(decode_common(2, &malformed_field_info).is_err());
+    }
+
+    #[test]
+    fn archive_projection_does_not_publish_partial_message_infos() {
+        let valid_message_info = tsp::MessageInfo {
+            r#type: 7,
+            length: 11,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let malformed_message_info = [0x08, 0x09]; // missing required length
+
+        let mut archive_info = Vec::new();
+        archive_info.extend_from_slice(&[0x12, valid_message_info.len() as u8]);
+        archive_info.extend_from_slice(&valid_message_info);
+        archive_info.extend_from_slice(&[0x12, malformed_message_info.len() as u8]);
+        archive_info.extend_from_slice(&malformed_message_info);
+
+        assert!(decode_common(1, &archive_info).is_err());
     }
 
     #[test]

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use thiserror::Error as ThisError;
 
 use crate::cell::Value;
-use crate::{Sheet, SheetSelector};
+use crate::{Sheet, SheetSelector, TableSelector};
 
 /// Maximum number of ordered sheets retained by one semantic document.
 pub const MAX_SHEETS: usize = 4096;
@@ -895,6 +895,34 @@ impl Document {
             },
             SheetSelector::Index(index) => Ok(self.state.sheets.get(index)),
         }
+    }
+
+    /// Select a rooted semantic table by its sheet and table selectors.
+    ///
+    /// This combines the common [`Self::sheet`] then [`Sheet::select`]
+    /// sequence without exposing archive objects, component names, or native
+    /// identifiers. Both selectors accept an exact visible name or a checked
+    /// zero-based position. A missing sheet or table returns `Ok(None)`;
+    /// duplicate table names return the sheet's typed selector error.
+    ///
+    /// ```rust,ignore
+    /// let revenue = document.table("Summary", "Revenue")?;
+    /// let first = document.table(0, 0)?;
+    /// ```
+    pub fn table<'sheet, 'table, S, T>(
+        &self,
+        sheet: S,
+        table: T,
+    ) -> std::result::Result<Option<&crate::Table>, crate::sheet::SelectorError>
+    where
+        S: Into<SheetSelector<'sheet>>,
+        T: Into<TableSelector<'table>>,
+    {
+        let sheet = match sheet.into() {
+            SheetSelector::Name(name) => self.state.sheets.iter().find(|item| item.name() == name),
+            SheetSelector::Index(index) => self.state.sheets.get(index),
+        };
+        sheet.map_or(Ok(None), |sheet| sheet.select(table.into()))
     }
 
     /// Return the number of semantic sheets.
