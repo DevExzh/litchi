@@ -158,6 +158,7 @@ pub fn decode_pagination(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<PaginationSnapshot, DecodeError> {
+    validate_options(source, options)?;
     let view: projection::PagesSectionPaginationArchiveLazyView<'_> =
         options.buffa().decode_lazy_view(source)?;
     Ok(PaginationSnapshot {
@@ -314,6 +315,30 @@ const SECTION_NAME_FIELD: u32 = 26;
 const FIRST_PAGE_HIDES_HEADER_FOOTER_FIELD: u32 = 28;
 const MAX_RECURSION: u32 = 64;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
+
+fn validate_options(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
+    let hard_bytes =
+        usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_conversion| DecodeError::invalid())?;
+    if options.max_message_bytes > hard_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: options.max_message_bytes,
+            maximum: hard_bytes,
+        }));
+    }
+    if source.len() > options.max_message_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: source.len(),
+            maximum: options.max_message_bytes,
+        }));
+    }
+    if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION {
+        return Err(DecodeError::limited(DecodeLimit::Nesting {
+            observed: options.recursion_limit,
+            maximum: MAX_RECURSION,
+        }));
+    }
+    Ok(())
+}
 
 fn strict_section_settings<'source>(
     source: &'source [u8],
@@ -565,26 +590,7 @@ struct Budget {
 
 impl Budget {
     fn new(source: &[u8], options: DecodeOptions) -> Result<Self, DecodeError> {
-        let hard_bytes = usize::try_from(buffa::MAX_MESSAGE_BYTES)
-            .map_err(|_conversion| DecodeError::invalid())?;
-        if options.max_message_bytes > hard_bytes {
-            return Err(DecodeError::limited(DecodeLimit::Bytes {
-                observed: options.max_message_bytes,
-                maximum: hard_bytes,
-            }));
-        }
-        if source.len() > options.max_message_bytes {
-            return Err(DecodeError::limited(DecodeLimit::Bytes {
-                observed: source.len(),
-                maximum: options.max_message_bytes,
-            }));
-        }
-        if options.recursion_limit == 0 || options.recursion_limit > MAX_RECURSION {
-            return Err(DecodeError::limited(DecodeLimit::Nesting {
-                observed: options.recursion_limit,
-                maximum: MAX_RECURSION,
-            }));
-        }
+        validate_options(source, options)?;
         let mut budget = Self {
             options,
             fields: 0,
@@ -697,6 +703,40 @@ mod tests {
             panic!("field 20 with a length-delimited wire type must fail");
         };
         assert!(!error.to_string().is_empty());
+    }
+
+    #[test]
+    fn pagination_profiles_reject_unbounded_buffa_configuration() {
+        let hard = usize::try_from(buffa::MAX_MESSAGE_BYTES).expect("hard limit fits usize");
+        let excessive = decode_pagination(&[], DecodeOptions::new(hard + 1, 1))
+            .expect_err("configured bytes above Buffa's hard limit");
+        assert_eq!(
+            excessive.resource_limit(),
+            Some(DecodeLimit::Bytes {
+                observed: hard + 1,
+                maximum: hard,
+            })
+        );
+
+        let zero_nesting = decode_pagination(&[], DecodeOptions::new(1, 0))
+            .expect_err("zero recursion is not a valid profile");
+        assert_eq!(
+            zero_nesting.resource_limit(),
+            Some(DecodeLimit::Nesting {
+                observed: 0,
+                maximum: MAX_RECURSION,
+            })
+        );
+
+        let too_deep = decode_pagination(&[], DecodeOptions::new(1, MAX_RECURSION + 1))
+            .expect_err("recursion above the strict profile");
+        assert_eq!(
+            too_deep.resource_limit(),
+            Some(DecodeLimit::Nesting {
+                observed: MAX_RECURSION + 1,
+                maximum: MAX_RECURSION,
+            })
+        );
     }
 
     fn push_varint(output: &mut Vec<u8>, mut value: u64) {

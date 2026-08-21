@@ -244,6 +244,20 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
         .set_slide_chart_title(0, second.drawable_object_id, "Cost")
         .unwrap();
 
+    assert_eq!(
+        editor
+            .slide_chart_title_by_selector(0, ChartSelector::name("Cost"))
+            .unwrap(),
+        Some("Cost".to_owned())
+    );
+    let before_case_mismatch = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .set_slide_chart_title_by_selector(0, ChartSelector::name("cost"), "Wrong case")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_case_mismatch);
+
     editor
         .set_slide_chart_kind(0, ChartSelector::name("Cost"), Kind::Bar2d)
         .unwrap();
@@ -261,6 +275,16 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
         .set_slide_chart_title(0, first.drawable_object_id, "Cost")
         .unwrap();
     let before_ambiguous = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .slide_chart_title_by_selector(0, ChartSelector::name("Cost"))
+            .is_err()
+    );
+    assert!(
+        editor
+            .remove_slide_chart_title_by_selector(0, ChartSelector::name("Cost"))
+            .is_err()
+    );
     assert!(
         editor
             .set_slide_chart_kind(0, ChartSelector::name("Cost"), Kind::Pie2d)
@@ -540,6 +564,46 @@ fn scratch_presentation_supports_native_chart_title_crud() {
             .unwrap()
             .iter()
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
+    );
+}
+
+#[test]
+fn scratch_presentation_supports_selector_chart_title_crud() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+
+    assert_eq!(
+        editor
+            .slide_chart_title_by_selector(0, ChartSelector::index(0))
+            .unwrap(),
+        None
+    );
+    editor
+        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue by region")
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_title_by_selector(0, ChartSelector::name("Revenue by region"))
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+    assert!(
+        editor
+            .remove_slide_chart_title_by_selector(0, ChartSelector::name("Revenue by region"))
+            .unwrap()
+    );
+    assert!(
+        !editor
+            .remove_slide_chart_title_by_selector(0, ChartSelector::index(0))
+            .unwrap()
+    );
+    assert_eq!(
+        editor
+            .slide_chart_title_by_selector(0, ChartSelector::index(0))
+            .unwrap(),
+        None
     );
 }
 
