@@ -934,6 +934,120 @@ fn malformed_storage_fails_transactionally() {
 }
 
 #[test]
+fn duplicate_comment_storage_scalar_fails_transactionally() {
+    let mut package = keynote_package(false);
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let storage = archive.object_mut(20).unwrap();
+            let mut data = storage.messages[0].data.clone();
+            data.extend([0x0a, 0x09]);
+            data.extend_from_slice(b"duplicate");
+            storage.replace_message(
+                0,
+                RawMessage {
+                    type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.comment(drawable(5)).is_err());
+    assert!(editor.set_comment(drawable(5), "Rejected").is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn comment_storage_updates_preserve_nested_author_reply_and_unknown_bytes() {
+    let mut package = keynote_package(true);
+    let author_unknown = {
+        let mut field = Vec::new();
+        append_unknown_varint(&mut field, 90, 900);
+        field
+    };
+    let reply_unknown = {
+        let mut field = Vec::new();
+        append_unknown_varint(&mut field, 91, 901);
+        field
+    };
+    let root_unknown = {
+        let mut field = Vec::new();
+        append_unknown_varint(&mut field, 92, 902);
+        field
+    };
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let storage = archive.object_mut(20).unwrap();
+            let mut data = storage.messages[0].data.clone();
+            data = crate::wire::transform_length_delimited_fields_at_path(&data, &[3], |author| {
+                let mut author = author.to_vec();
+                author.extend_from_slice(&author_unknown);
+                Ok(author)
+            })?;
+            data = crate::wire::transform_length_delimited_fields_at_path(&data, &[4], |reply| {
+                let mut reply = reply.to_vec();
+                reply.extend_from_slice(&reply_unknown);
+                Ok(reply)
+            })?;
+            data.extend_from_slice(&root_unknown);
+            storage.replace_message(
+                0,
+                RawMessage {
+                    type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    editor.set_comment(drawable(5), "Updated").unwrap();
+    let root = editor.comment(drawable(5)).unwrap().unwrap();
+    let root_bytes = object_payload(editor.package(), root.storage_id.get());
+    assert!(
+        root_bytes
+            .windows(author_unknown.len())
+            .any(|window| window == author_unknown.as_slice())
+    );
+    assert!(
+        root_bytes
+            .windows(reply_unknown.len())
+            .any(|window| window == reply_unknown.as_slice())
+    );
+    assert!(
+        root_bytes
+            .windows(root_unknown.len())
+            .any(|window| window == root_unknown.as_slice())
+    );
+
+    let reply_id = editor
+        .set_reply(drawable(5), storage(21), "Reply updated")
+        .unwrap();
+    let updated_root = editor.comment(drawable(5)).unwrap().unwrap();
+    let updated_root_bytes = object_payload(editor.package(), updated_root.storage_id.get());
+    assert!(
+        updated_root_bytes
+            .windows(author_unknown.len())
+            .any(|window| window == author_unknown.as_slice())
+    );
+    assert!(
+        updated_root_bytes
+            .windows(reply_unknown.len())
+            .any(|window| window == reply_unknown.as_slice())
+    );
+    assert!(
+        updated_root_bytes
+            .windows(root_unknown.len())
+            .any(|window| window == root_unknown.as_slice())
+    );
+    assert_eq!(editor.replies(drawable(5)).unwrap()[0].storage_id, reply_id);
+}
+
+#[test]
 fn every_supported_drawable_nesting_round_trips_comment_reference() {
     let cases = vec![
         (

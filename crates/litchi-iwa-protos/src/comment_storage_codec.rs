@@ -81,6 +81,7 @@ pub struct DecodeReport {
     work_bytes: usize,
     max_depth: u32,
     references: usize,
+    replies: usize,
     reference_bytes: usize,
     text_bytes: usize,
 }
@@ -111,6 +112,17 @@ impl DecodeReport {
         self.references
     }
 
+    /// Repeated `TSD.CommentStorageArchive.replies` occurrences.
+    ///
+    /// This is deliberately separate from [`Self::references`], which also
+    /// includes the optional `author` reference. Keeping the cardinalities
+    /// distinct lets host adapters verify that a streaming visitor observed
+    /// every reply without mistaking the author for a reply.
+    #[must_use]
+    pub const fn replies(self) -> usize {
+        self.replies
+    }
+
     #[must_use]
     pub const fn reference_bytes(self) -> usize {
         self.reference_bytes
@@ -123,7 +135,7 @@ impl DecodeReport {
 
     #[must_use]
     pub const fn reply_references(self) -> usize {
-        self.references
+        self.replies
     }
 }
 
@@ -567,14 +579,14 @@ fn decode_root<'source>(
                     return Err(DecodeError::duplicate("TSD.CommentStorageArchive.author"));
                 }
                 let raw = field.bytes()?;
-                budget.reference(raw.len())?;
+                budget.reference(raw.len(), false)?;
                 let value = decode_reference(raw, budget, child_depth)?;
                 author = Some(value);
                 raw_author = Some(raw);
             },
             REPLIES_FIELD => {
                 let raw = field.bytes()?;
-                budget.reference(raw.len())?;
+                budget.reference(raw.len(), true)?;
                 let reference = decode_reference(raw, budget, child_depth)?;
                 parity_reference(raw, reference, budget, child_depth)?;
                 visitor.visit_reply(ReferenceRecord { raw, reference })?;
@@ -1025,6 +1037,7 @@ struct Budget {
     work_bytes: usize,
     max_depth: u32,
     references: usize,
+    replies: usize,
     reference_bytes: usize,
     text_bytes: usize,
 }
@@ -1058,6 +1071,7 @@ impl Budget {
             work_bytes: 0,
             max_depth: 0,
             references: 0,
+            replies: 0,
             reference_bytes: 0,
             text_bytes: 0,
         })
@@ -1104,7 +1118,7 @@ impl Budget {
         Ok(())
     }
 
-    fn reference(&mut self, bytes: usize) -> Result<(), DecodeError> {
+    fn reference(&mut self, bytes: usize, is_reply: bool) -> Result<(), DecodeError> {
         let observed = self
             .references
             .checked_add(1)
@@ -1116,6 +1130,12 @@ impl Budget {
             }));
         }
         self.references = observed;
+        if is_reply {
+            self.replies = self
+                .replies
+                .checked_add(1)
+                .ok_or_else(DecodeError::invalid)?;
+        }
         self.reference_bytes = self
             .reference_bytes
             .checked_add(bytes)
@@ -1156,6 +1176,7 @@ impl Budget {
             work_bytes: self.work_bytes,
             max_depth: self.max_depth,
             references: self.references,
+            replies: self.replies,
             reference_bytes: self.reference_bytes,
             text_bytes: self.text_bytes,
         }
@@ -1330,7 +1351,8 @@ mod tests {
         assert_eq!(replies.identifiers, [7, 8]);
         assert_eq!(replies.raw.len(), 2);
         assert_eq!(report.references(), 3);
-        assert_eq!(report.reply_references(), 3);
+        assert_eq!(report.replies(), 2);
+        assert_eq!(report.reply_references(), 2);
         assert_eq!(report.text_bytes(), 7);
         assert!(report.fields() >= 13);
         assert!(report.work_bytes() >= source.len() * 2);

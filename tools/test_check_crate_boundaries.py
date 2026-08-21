@@ -8709,6 +8709,59 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_pages_document_public_api(root), [])
 
+    def test_focused_keynote_document_reader_public_api_rejects_native_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "/// Returns `NativeObjectId` and `DocumentArchive`.\n"
+                "pub fn inspect(object_id: u64, wire: WireView) -> DocumentArchive { todo!() }\n"
+                "pub struct SourceBytes { value: Vec<u8> }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_document_public_api(root)
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                any("raw identifier object_id" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("archive/IWA type DocumentArchive" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("wire type wire" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("wire type WireView" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("raw source bytes SourceBytes" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("rustdoc exposes raw identifier NativeObjectId" in violation for violation in violations)
+            )
+
+    def test_focused_keynote_document_reader_public_api_allows_byte_ingress(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct Document { state: Arc<State> }\n"
+                "pub struct DocumentReadOptions;\n"
+                "impl Document {\n"
+                "pub fn from_bytes(bytes: &[u8]) -> Result<Self, ReadError> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_keynote_document_public_api(root), [])
+
     def test_focused_keynote_package_no_eager_prost_allows_test_only_usage(
         self,
     ) -> None:

@@ -2,11 +2,11 @@
 //!
 //! The established pagination decoder still projects only
 //! `TP.SectionArchive` fields 20--22. The aggregate decoder independently
-//! validates fields 17--22, 26, and 28 before a private lazy view borrows the
-//! optional name. Callers retain and rewrite the original payload; this module
-//! never owns or re-encodes unrelated section fields.
+//! validates fields 17--26, 28, and 29 before a private lazy view borrows the
+//! optional name and graph references. Callers retain and rewrite the original
+//! payload; this module never owns or re-encodes unrelated section fields.
 
-use std::fmt;
+use std::{fmt, num::NonZeroU64};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
@@ -74,6 +74,37 @@ pub struct PaginationSnapshot {
     pub section_page_number_kind: Option<u32>,
     /// Optional native first page number.
     pub section_page_number_start: Option<u32>,
+}
+
+/// Borrow-free native reference facts projected from one section envelope.
+///
+/// The source payload remains authoritative: this value is only a checked
+/// read view used by the Pages editor to route the reachable section graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SectionReferenceSnapshot {
+    identifier: NonZeroU64,
+    deprecated_type: Option<i32>,
+    deprecated_is_external: Option<bool>,
+}
+
+impl SectionReferenceSnapshot {
+    /// Non-zero native object identifier.
+    #[must_use]
+    pub const fn identifier(self) -> NonZeroU64 {
+        self.identifier
+    }
+
+    /// Optional deprecated native object-type hint.
+    #[must_use]
+    pub const fn deprecated_type(self) -> Option<i32> {
+        self.deprecated_type
+    }
+
+    /// Optional deprecated external-reference flag.
+    #[must_use]
+    pub const fn deprecated_is_external(self) -> Option<bool> {
+        self.deprecated_is_external
+    }
 }
 
 /// A finite resource rejected by strict aggregate section routing.
@@ -177,8 +208,12 @@ pub struct SectionSettingsSnapshot<'source> {
     section_start_kind: Option<u32>,
     section_page_number_kind: Option<u32>,
     section_page_number_start: Option<u32>,
+    first_section_template_page: Option<SectionReferenceSnapshot>,
+    even_section_template_page: Option<SectionReferenceSnapshot>,
+    odd_section_template_page: Option<SectionReferenceSnapshot>,
     name: Option<&'source str>,
     section_template_first_page_hides_header_footer: Option<bool>,
+    user_defined_guide_storage: Option<SectionReferenceSnapshot>,
 }
 
 impl<'source> SectionSettingsSnapshot<'source> {
@@ -218,6 +253,24 @@ impl<'source> SectionSettingsSnapshot<'source> {
         self.section_page_number_start
     }
 
+    /// Optional first-page template reference from field 23.
+    #[must_use]
+    pub const fn first_section_template_page(self) -> Option<SectionReferenceSnapshot> {
+        self.first_section_template_page
+    }
+
+    /// Optional even-page template reference from field 24.
+    #[must_use]
+    pub const fn even_section_template_page(self) -> Option<SectionReferenceSnapshot> {
+        self.even_section_template_page
+    }
+
+    /// Optional odd-page template reference from field 25.
+    #[must_use]
+    pub const fn odd_section_template_page(self) -> Option<SectionReferenceSnapshot> {
+        self.odd_section_template_page
+    }
+
     /// Optional UTF-8 section name borrowed directly from field 26.
     #[must_use]
     pub const fn name(self) -> Option<&'source str> {
@@ -228,6 +281,12 @@ impl<'source> SectionSettingsSnapshot<'source> {
     #[must_use]
     pub const fn section_template_first_page_hides_header_footer(self) -> Option<bool> {
         self.section_template_first_page_hides_header_footer
+    }
+
+    /// Optional user-defined-guide map reference from field 29.
+    #[must_use]
+    pub const fn user_defined_guide_storage(self) -> Option<SectionReferenceSnapshot> {
+        self.user_defined_guide_storage
     }
 }
 
@@ -295,9 +354,33 @@ pub fn decode_section_settings_with_report<'source>(
         section_start_kind: view.section_start_kind,
         section_page_number_kind: view.section_page_number_kind,
         section_page_number_start: view.section_page_number_start,
+        first_section_template_page: view
+            .first_section_template_page
+            .get()?
+            .as_ref()
+            .map(project_reference)
+            .transpose()?,
+        even_section_template_page: view
+            .even_section_template_page
+            .get()?
+            .as_ref()
+            .map(project_reference)
+            .transpose()?,
+        odd_section_template_page: view
+            .odd_section_template_page
+            .get()?
+            .as_ref()
+            .map(project_reference)
+            .transpose()?,
         name: view.name,
         section_template_first_page_hides_header_footer: view
             .section_template_first_page_hides_header_footer,
+        user_defined_guide_storage: view
+            .user_defined_guide_storage
+            .get()?
+            .as_ref()
+            .map(project_reference)
+            .transpose()?,
     };
     if projected != strict {
         return Err(DecodeError::invalid());
@@ -311,10 +394,18 @@ const EVEN_ODD_PAGES_DIFFERENT_FIELD: u32 = 19;
 const SECTION_START_FIELD: u32 = 20;
 const PAGE_NUMBERING_FIELD: u32 = 21;
 const STARTING_PAGE_NUMBER_FIELD: u32 = 22;
+const FIRST_TEMPLATE_FIELD: u32 = 23;
+const EVEN_TEMPLATE_FIELD: u32 = 24;
+const ODD_TEMPLATE_FIELD: u32 = 25;
 const SECTION_NAME_FIELD: u32 = 26;
 const FIRST_PAGE_HIDES_HEADER_FOOTER_FIELD: u32 = 28;
+const GUIDE_STORAGE_FIELD: u32 = 29;
+const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
+const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;
+const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;
 const MAX_RECURSION: u32 = 64;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
+const MIN_SIGN_EXTENDED_INT32: u64 = 0xffff_ffff_8000_0000;
 
 fn validate_options(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
     let hard_bytes =
@@ -390,6 +481,27 @@ fn strict_section_settings<'source>(
                 }
                 snapshot.section_page_number_start = Some(number);
             },
+            FIRST_TEMPLATE_FIELD => {
+                if snapshot.first_section_template_page.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                snapshot.first_section_template_page =
+                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+            },
+            EVEN_TEMPLATE_FIELD => {
+                if snapshot.even_section_template_page.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                snapshot.even_section_template_page =
+                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+            },
+            ODD_TEMPLATE_FIELD => {
+                if snapshot.odd_section_template_page.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                snapshot.odd_section_template_page =
+                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+            },
             SECTION_NAME_FIELD => {
                 if snapshot.name.is_some() {
                     return Err(DecodeError::invalid());
@@ -412,10 +524,80 @@ fn strict_section_settings<'source>(
                 snapshot.section_template_first_page_hides_header_footer =
                     Some(canonical_bool(field.varint()?)?);
             },
+            GUIDE_STORAGE_FIELD => {
+                if snapshot.user_defined_guide_storage.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                snapshot.user_defined_guide_storage =
+                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+            },
             _ => {},
         }
     }
     Ok(snapshot)
+}
+
+fn strict_reference(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<SectionReferenceSnapshot, DecodeError> {
+    let mut identifier = None;
+    let mut deprecated_type = None;
+    let mut deprecated_is_external = None;
+    let mut remaining = source;
+    while let Some(field) = next_root_field(&mut remaining, budget, depth)? {
+        match field.number {
+            REFERENCE_IDENTIFIER_FIELD => {
+                if identifier.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                identifier =
+                    Some(NonZeroU64::new(field.varint()?).ok_or_else(DecodeError::invalid)?);
+            },
+            REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if deprecated_type.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                let value = field.varint()?;
+                if value > 0x7fff_ffff && value < MIN_SIGN_EXTENDED_INT32 {
+                    return Err(DecodeError::invalid());
+                }
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_possible_wrap,
+                    reason = "Strict preflight proved the u64 is a canonical sign-extended int32."
+                )]
+                let value = value as i32;
+                deprecated_type = Some(value);
+            },
+            REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if deprecated_is_external.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                deprecated_is_external = Some(canonical_bool(field.varint()?)?);
+            },
+            _ => {},
+        }
+    }
+    Ok(SectionReferenceSnapshot {
+        identifier: identifier.ok_or_else(DecodeError::invalid)?,
+        deprecated_type,
+        deprecated_is_external,
+    })
+}
+
+fn project_reference(
+    view: &projection::ReferenceLazyView<'_>,
+) -> Result<SectionReferenceSnapshot, DecodeError> {
+    if !view.has_identifier() {
+        return Err(DecodeError::invalid());
+    }
+    Ok(SectionReferenceSnapshot {
+        identifier: NonZeroU64::new(view.identifier).ok_or_else(DecodeError::invalid)?,
+        deprecated_type: view.deprecated_type,
+        deprecated_is_external: view.deprecated_is_external,
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -861,6 +1043,97 @@ mod tests {
         assert_eq!(report.work_bytes(), source.len() * 2);
         assert_eq!(report.max_depth(), 1);
         assert_eq!(report.name_bytes(), name.len());
+    }
+
+    #[test]
+    fn aggregate_projection_reads_graph_references_without_reencoding_unknowns()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = crate::tp::SectionArchive {
+            first_section_template_page: Some(crate::tsp::Reference {
+                identifier: 41,
+                deprecated_type: Some(-7),
+                deprecated_is_external: Some(false),
+            }),
+            even_section_template_page: Some(crate::tsp::Reference {
+                identifier: 42,
+                deprecated_type: Some(9),
+                deprecated_is_external: Some(true),
+            }),
+            odd_section_template_page: Some(crate::tsp::Reference {
+                identifier: 43,
+                ..crate::tsp::Reference::default()
+            }),
+            name: Some("Graph section".to_owned()),
+            user_defined_guide_storage: Some(crate::tsp::Reference {
+                identifier: 44,
+                ..crate::tsp::Reference::default()
+            }),
+            ..crate::tp::SectionArchive::default()
+        }
+        .encode_to_vec();
+        let mut with_unknown = source.clone();
+        push_varint_field(&mut with_unknown, 99, 0xfeed);
+        let snapshot = decode_section_settings(&with_unknown, generous(&with_unknown))?;
+        assert_eq!(snapshot.name(), Some("Graph section"));
+        assert_eq!(
+            snapshot
+                .first_section_template_page()
+                .map(|reference| reference.identifier().get()),
+            Some(41)
+        );
+        assert_eq!(
+            snapshot
+                .first_section_template_page()
+                .and_then(|reference| reference.deprecated_type()),
+            Some(-7)
+        );
+        assert_eq!(
+            snapshot
+                .even_section_template_page()
+                .map(|reference| reference.identifier().get()),
+            Some(42)
+        );
+        assert_eq!(
+            snapshot
+                .odd_section_template_page()
+                .map(|reference| reference.identifier().get()),
+            Some(43)
+        );
+        assert_eq!(
+            snapshot
+                .user_defined_guide_storage()
+                .map(|reference| reference.identifier().get()),
+            Some(44)
+        );
+        assert!(with_unknown.starts_with(&source));
+        assert!(with_unknown.len() > source.len());
+        Ok(())
+    }
+
+    #[test]
+    fn graph_reference_projection_rejects_duplicate_or_malformed_nested_values() {
+        let reference = crate::tsp::Reference {
+            identifier: 41,
+            ..crate::tsp::Reference::default()
+        }
+        .encode_to_vec();
+        let mut duplicate = Vec::new();
+        push_length_field(&mut duplicate, FIRST_TEMPLATE_FIELD, &reference);
+        push_length_field(&mut duplicate, FIRST_TEMPLATE_FIELD, &reference);
+        assert!(decode_section_settings(&duplicate, generous(&duplicate)).is_err());
+
+        let mut missing_identifier = Vec::new();
+        push_length_field(&mut missing_identifier, FIRST_TEMPLATE_FIELD, &[0x10, 0x01]);
+        assert!(
+            decode_section_settings(&missing_identifier, generous(&missing_identifier)).is_err()
+        );
+
+        let mut noncanonical_bool = Vec::new();
+        let mut nested = Vec::new();
+        push_varint_field(&mut nested, REFERENCE_IDENTIFIER_FIELD, 41);
+        push_varint_field(&mut nested, REFERENCE_DEPRECATED_EXTERNAL_FIELD, 2);
+        push_length_field(&mut noncanonical_bool, FIRST_TEMPLATE_FIELD, &nested);
+        assert!(decode_section_settings(&noncanonical_bool, generous(&noncanonical_bool)).is_err());
     }
 
     #[test]

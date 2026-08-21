@@ -28,6 +28,7 @@ pub struct DecodeOptions {
     max_fields: usize,
     max_work_bytes: usize,
     recursion_limit: u32,
+    max_output_bytes: usize,
 }
 
 impl DecodeOptions {
@@ -44,27 +45,27 @@ impl DecodeOptions {
             max_fields,
             max_work_bytes,
             recursion_limit,
+            max_output_bytes: max_message_bytes,
         }
     }
 
     /// Build a conservative profile from one known source length.
     #[must_use]
     pub fn for_source(source: &[u8]) -> Self {
-        let bytes = if source.is_empty() { 1 } else { source.len() };
+        let bytes = source.len().max(1);
         Self::new(
             bytes,
-            if bytes.saturating_mul(4) == 0 {
-                1
-            } else {
-                bytes.saturating_mul(4)
-            },
-            if bytes.saturating_mul(8) == 0 {
-                1
-            } else {
-                bytes.saturating_mul(8)
-            },
+            bytes.saturating_mul(4).max(1),
+            bytes.saturating_mul(8).max(1),
             8,
         )
+    }
+
+    /// Replace the aggregate candidate-output ceiling used by rewrites.
+    #[must_use]
+    pub const fn with_max_output_bytes(mut self, maximum: usize) -> Self {
+        self.max_output_bytes = maximum;
+        self
     }
 
     fn buffa(self) -> BuffaDecodeOptions {
@@ -106,6 +107,58 @@ impl ChartCaptionSnapshot {
             Some(drawable) => drawable.caption.map(|reference| reference.identifier),
             None => None,
         }
+    }
+}
+
+/// Requested identifier for one chart-caption reference rewrite.
+///
+/// The write is deliberately limited to the selected reference edge. It does
+/// not locate a chart object, inspect the caption graph, or update archive
+/// metadata; those invariants remain owned by the caller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChartCaptionWrite {
+    identifier: u64,
+}
+
+impl ChartCaptionWrite {
+    /// Build a reference-identifier update.
+    #[must_use]
+    pub const fn new(identifier: u64) -> Self {
+        Self { identifier }
+    }
+
+    /// Return the requested caption-object identifier.
+    #[must_use]
+    pub const fn identifier(self) -> u64 {
+        self.identifier
+    }
+}
+
+/// Exact input/output accounting for one successful chart-caption rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RewriteReport {
+    input_bytes: usize,
+    output_bytes: usize,
+    changed: bool,
+}
+
+impl RewriteReport {
+    /// Source payload bytes inspected before the rewrite.
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    /// Candidate payload bytes produced by the rewrite.
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    /// Whether the selected reference identifier changed.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
     }
 }
 
@@ -154,6 +207,8 @@ enum DecodeErrorKind {
     NonCanonical(&'static str),
     FieldLimit { observed: usize, maximum: usize },
     WorkLimit { observed: usize, maximum: usize },
+    OutputLimit { observed: usize, maximum: usize },
+    Allocation { amount: usize },
     Projection,
 }
 
@@ -203,6 +258,24 @@ impl DecodeError {
         }
     }
 
+    /// Return the exact candidate-output limit observation, when applicable.
+    #[must_use]
+    pub const fn output_limit_values(&self) -> Option<(usize, usize)> {
+        match self.kind {
+            DecodeErrorKind::OutputLimit { observed, maximum } => Some((observed, maximum)),
+            _ => None,
+        }
+    }
+
+    /// Return the requested output allocation, when it could not be reserved.
+    #[must_use]
+    pub const fn allocation_amount(&self) -> Option<usize> {
+        match self.kind {
+            DecodeErrorKind::Allocation { amount } => Some(amount),
+            _ => None,
+        }
+    }
+
     /// Return the exact byte/nesting resource failure, when applicable.
     #[must_use]
     pub const fn wire_resource_limit(&self) -> Option<WireResourceLimit> {
@@ -235,6 +308,18 @@ impl DecodeError {
             kind: DecodeErrorKind::Projection,
         }
     }
+
+    const fn output_limit(observed: usize, maximum: usize) -> Self {
+        Self {
+            kind: DecodeErrorKind::OutputLimit { observed, maximum },
+        }
+    }
+
+    const fn allocation(amount: usize) -> Self {
+        Self {
+            kind: DecodeErrorKind::Allocation { amount },
+        }
+    }
 }
 
 impl fmt::Display for DecodeError {
@@ -265,6 +350,14 @@ impl fmt::Display for DecodeError {
             DecodeErrorKind::WorkLimit { observed, maximum } => write!(
                 formatter,
                 "Keynote chart-caption projection requires {observed} work bytes; maximum is {maximum}"
+            ),
+            DecodeErrorKind::OutputLimit { observed, maximum } => write!(
+                formatter,
+                "Keynote chart-caption rewrite produced {observed} bytes; maximum is {maximum}"
+            ),
+            DecodeErrorKind::Allocation { amount } => write!(
+                formatter,
+                "cannot allocate Keynote chart-caption output for {amount} bytes"
             ),
             DecodeErrorKind::Projection => formatter.write_str(
                 "Keynote chart-caption strict preflight disagrees with the Buffa projection",
@@ -347,6 +440,422 @@ pub fn decode_chart_caption(
         return Err(DecodeError::projection());
     }
     Ok(strict)
+}
+
+/// Rewrite the selected chart-caption reference identifier.
+///
+/// The complete source is strictly decoded before any write is considered.
+/// Existing unknown fields, selected-envelope ordering, and all unrelated
+/// bytes are copied byte-for-byte; only the identifier varint and the enclosing
+/// length prefixes can change. A strict decode of the candidate output is
+/// performed before it is returned.
+pub fn rewrite_chart_caption(
+    source: &[u8],
+    write: ChartCaptionWrite,
+    options: DecodeOptions,
+) -> Result<Vec<u8>, DecodeError> {
+    Ok(rewrite_chart_caption_with_report(source, write, options)?.0)
+}
+
+/// Rewrite the selected chart-caption edge and return exact source/output
+/// accounting.
+pub fn rewrite_chart_caption_with_report(
+    source: &[u8],
+    write: ChartCaptionWrite,
+    options: DecodeOptions,
+) -> Result<(Vec<u8>, RewriteReport), DecodeError> {
+    let current = decode_chart_caption(source, options)?;
+    let current_identifier = current
+        .caption_identifier()
+        .ok_or_else(|| DecodeError::missing_required("TSP.Reference.identifier"))?;
+    if current_identifier == write.identifier {
+        if source.len() > options.max_output_bytes {
+            return Err(DecodeError::output_limit(
+                source.len(),
+                options.max_output_bytes,
+            ));
+        }
+        return Ok((
+            clone_output(source)?,
+            RewriteReport {
+                input_bytes: source.len(),
+                output_bytes: source.len(),
+                changed: false,
+            },
+        ));
+    }
+
+    let mut measure_budget = Budget::new(options);
+    let output_bytes = measure_rewrite_root(source, options, write, &mut measure_budget)?;
+    if output_bytes > options.max_output_bytes {
+        return Err(DecodeError::output_limit(
+            output_bytes,
+            options.max_output_bytes,
+        ));
+    }
+    let mut output = reserve_output(output_bytes)?;
+    let mut write_budget = Budget::new(options);
+    rewrite_root_into(source, options, write, &mut write_budget, &mut output)?;
+    debug_assert_eq!(output.len(), output_bytes);
+
+    let readback_options = DecodeOptions {
+        max_message_bytes: options.max_message_bytes.max(output.len()),
+        max_output_bytes: options.max_output_bytes.max(output.len()),
+        ..options
+    };
+    let readback = decode_chart_caption(&output, readback_options)?;
+    if readback.caption_identifier() != Some(write.identifier) {
+        return Err(DecodeError::projection());
+    }
+    Ok((
+        output,
+        RewriteReport {
+            input_bytes: source.len(),
+            output_bytes,
+            changed: true,
+        },
+    ))
+}
+
+fn measure_rewrite_root(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+) -> Result<usize, DecodeError> {
+    budget.charge_message(source.len())?;
+    let nested_options = options.descend(budget)?;
+    let mut remaining = source;
+    let mut saw_super = false;
+    let mut output_bytes = 0usize;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let end = source.len() - remaining.len();
+        let Some(ParseItem::Field(field)) = item else {
+            return Err(match item {
+                Some(ParseItem::EndGroup(number)) => {
+                    buffa::DecodeError::InvalidEndGroup(number).into()
+                },
+                None => buffa::DecodeError::UnexpectedEof.into(),
+                Some(ParseItem::Field(_)) => DecodeError::projection(),
+            });
+        };
+        let replacement = if field.number == CHART_DRAWABLE_SUPER_FIELD {
+            if saw_super {
+                return Err(DecodeError::duplicate_singular(
+                    "TSCH.ChartDrawableArchive.super",
+                ));
+            }
+            saw_super = true;
+            let nested = field.length_delimited()?;
+            let nested_bytes = measure_rewrite_drawable(nested, nested_options, write, budget)?;
+            length_delimited_field_len(CHART_DRAWABLE_SUPER_FIELD, nested_bytes)
+        } else {
+            end - start
+        };
+        output_bytes = checked_output_add(output_bytes, replacement, options)?;
+    }
+    if !saw_super {
+        return Err(DecodeError::missing_required(
+            "TSCH.ChartDrawableArchive.super",
+        ));
+    }
+    Ok(output_bytes)
+}
+
+fn measure_rewrite_drawable(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+) -> Result<usize, DecodeError> {
+    budget.charge_message(source.len())?;
+    let nested_options = options.descend(budget)?;
+    let mut remaining = source;
+    let mut saw_caption = false;
+    let mut output_bytes = 0usize;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let end = source.len() - remaining.len();
+        let Some(ParseItem::Field(field)) = item else {
+            return Err(match item {
+                Some(ParseItem::EndGroup(number)) => {
+                    buffa::DecodeError::InvalidEndGroup(number).into()
+                },
+                None => buffa::DecodeError::UnexpectedEof.into(),
+                Some(ParseItem::Field(_)) => DecodeError::projection(),
+            });
+        };
+        let replacement = if field.number == DRAWABLE_CAPTION_FIELD {
+            if saw_caption {
+                return Err(DecodeError::duplicate_singular(
+                    "TSD.DrawableArchive.caption",
+                ));
+            }
+            saw_caption = true;
+            let nested = field.length_delimited()?;
+            let nested_bytes = measure_rewrite_reference(nested, nested_options, write, budget)?;
+            length_delimited_field_len(DRAWABLE_CAPTION_FIELD, nested_bytes)
+        } else {
+            end - start
+        };
+        output_bytes = checked_output_add(output_bytes, replacement, options)?;
+    }
+    if !saw_caption {
+        return Err(DecodeError::missing_required("TSD.DrawableArchive.caption"));
+    }
+    Ok(output_bytes)
+}
+
+fn measure_rewrite_reference(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+) -> Result<usize, DecodeError> {
+    budget.charge_message(source.len())?;
+    let mut remaining = source;
+    let mut saw_identifier = false;
+    let mut output_bytes = 0usize;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let end = source.len() - remaining.len();
+        let Some(ParseItem::Field(field)) = item else {
+            return Err(match item {
+                Some(ParseItem::EndGroup(number)) => {
+                    buffa::DecodeError::InvalidEndGroup(number).into()
+                },
+                None => buffa::DecodeError::UnexpectedEof.into(),
+                Some(ParseItem::Field(_)) => DecodeError::projection(),
+            });
+        };
+        let replacement = if field.number == REFERENCE_IDENTIFIER_FIELD {
+            if saw_identifier {
+                return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+            }
+            saw_identifier = true;
+            field.varint()?;
+            varint_field_len(REFERENCE_IDENTIFIER_FIELD, write.identifier)
+        } else {
+            end - start
+        };
+        output_bytes = checked_output_add(output_bytes, replacement, options)?;
+    }
+    if !saw_identifier {
+        return Err(DecodeError::missing_required("TSP.Reference.identifier"));
+    }
+    Ok(output_bytes)
+}
+
+fn rewrite_root_into(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+    output: &mut Vec<u8>,
+) -> Result<(), DecodeError> {
+    let nested_options = options.descend(budget)?;
+    rewrite_message_fields(
+        source,
+        options,
+        budget,
+        output,
+        CHART_DRAWABLE_SUPER_FIELD,
+        nested_options,
+        write,
+        rewrite_drawable_into,
+        "TSCH.ChartDrawableArchive.super",
+    )
+}
+
+fn rewrite_drawable_into(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+    output: &mut Vec<u8>,
+) -> Result<(), DecodeError> {
+    let nested_options = options.descend(budget)?;
+    rewrite_message_fields(
+        source,
+        options,
+        budget,
+        output,
+        DRAWABLE_CAPTION_FIELD,
+        nested_options,
+        write,
+        rewrite_reference_into,
+        "TSD.DrawableArchive.caption",
+    )
+}
+
+fn rewrite_reference_into(
+    source: &[u8],
+    options: DecodeOptions,
+    write: ChartCaptionWrite,
+    budget: &mut Budget,
+    output: &mut Vec<u8>,
+) -> Result<(), DecodeError> {
+    budget.charge_message(source.len())?;
+    let mut remaining = source;
+    let mut saw_identifier = false;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let end = source.len() - remaining.len();
+        let Some(ParseItem::Field(field)) = item else {
+            return Err(match item {
+                Some(ParseItem::EndGroup(number)) => {
+                    buffa::DecodeError::InvalidEndGroup(number).into()
+                },
+                None => buffa::DecodeError::UnexpectedEof.into(),
+                Some(ParseItem::Field(_)) => DecodeError::projection(),
+            });
+        };
+        if field.number == REFERENCE_IDENTIFIER_FIELD {
+            if saw_identifier {
+                return Err(DecodeError::duplicate_singular("TSP.Reference.identifier"));
+            }
+            saw_identifier = true;
+            field.varint()?;
+            append_varint_field(output, REFERENCE_IDENTIFIER_FIELD, write.identifier);
+        } else {
+            output.extend_from_slice(&source[start..end]);
+        }
+    }
+    if !saw_identifier {
+        return Err(DecodeError::missing_required("TSP.Reference.identifier"));
+    }
+    Ok(())
+}
+
+fn rewrite_message_fields(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    output: &mut Vec<u8>,
+    selected_field: u32,
+    nested_options: DecodeOptions,
+    write: ChartCaptionWrite,
+    nested_rewrite: fn(
+        &[u8],
+        DecodeOptions,
+        ChartCaptionWrite,
+        &mut Budget,
+        &mut Vec<u8>,
+    ) -> Result<(), DecodeError>,
+    selected_name: &'static str,
+) -> Result<(), DecodeError> {
+    budget.charge_message(source.len())?;
+    let mut remaining = source;
+    let mut saw_selected = false;
+    while !remaining.is_empty() {
+        let start = source.len() - remaining.len();
+        let item = parse_strict_field(&mut remaining, options.recursion_limit, budget)?;
+        let end = source.len() - remaining.len();
+        let Some(ParseItem::Field(field)) = item else {
+            return Err(match item {
+                Some(ParseItem::EndGroup(number)) => {
+                    buffa::DecodeError::InvalidEndGroup(number).into()
+                },
+                None => buffa::DecodeError::UnexpectedEof.into(),
+                Some(ParseItem::Field(_)) => DecodeError::projection(),
+            });
+        };
+        if field.number != selected_field {
+            output.extend_from_slice(&source[start..end]);
+            continue;
+        }
+        if saw_selected {
+            return Err(DecodeError::duplicate_singular(selected_name));
+        }
+        saw_selected = true;
+        let nested = field.length_delimited()?;
+        let nested_len = match selected_field {
+            CHART_DRAWABLE_SUPER_FIELD => {
+                measure_rewrite_drawable(nested, nested_options, write, budget)?
+            },
+            DRAWABLE_CAPTION_FIELD => {
+                measure_rewrite_reference(nested, nested_options, write, budget)?
+            },
+            _ => return Err(DecodeError::projection()),
+        };
+        let mut nested_output = reserve_output(nested_len)?;
+        nested_rewrite(nested, nested_options, write, budget, &mut nested_output)?;
+        debug_assert_eq!(nested_output.len(), nested_len);
+        append_length_delimited_field(output, selected_field, &nested_output);
+    }
+    if !saw_selected {
+        return Err(DecodeError::missing_required(selected_name));
+    }
+    Ok(())
+}
+
+fn checked_output_add(
+    current: usize,
+    additional: usize,
+    options: DecodeOptions,
+) -> Result<usize, DecodeError> {
+    let total = current
+        .checked_add(additional)
+        .ok_or_else(|| DecodeError::output_limit(usize::MAX, options.max_output_bytes))?;
+    if total > options.max_output_bytes {
+        return Err(DecodeError::output_limit(total, options.max_output_bytes));
+    }
+    Ok(total)
+}
+
+fn length_delimited_field_len(number: u32, payload_len: usize) -> usize {
+    varint_len((u64::from(number) << 3) | 2) + varint_len(payload_len as u64) + payload_len
+}
+
+fn varint_field_len(number: u32, value: u64) -> usize {
+    varint_len(u64::from(number) << 3) + varint_len(value)
+}
+
+fn reserve_output(amount: usize) -> Result<Vec<u8>, DecodeError> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(amount)
+        .map_err(|_allocation_error| DecodeError::allocation(amount))?;
+    Ok(output)
+}
+
+fn clone_output(source: &[u8]) -> Result<Vec<u8>, DecodeError> {
+    let mut output = reserve_output(source.len())?;
+    output.extend_from_slice(source);
+    Ok(output)
+}
+
+fn append_length_delimited_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) {
+    append_varint(output, (u64::from(number) << 3) | 2);
+    append_varint(output, payload.len() as u64);
+    output.extend_from_slice(payload);
+}
+
+fn append_varint_field(output: &mut Vec<u8>, number: u32, value: u64) {
+    append_varint(output, u64::from(number) << 3);
+    append_varint(output, value);
+}
+
+fn append_varint(output: &mut Vec<u8>, mut value: u64) {
+    while value >= 0x80 {
+        output.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    output.push(value as u8);
+}
+
+fn varint_len(mut value: u64) -> usize {
+    let mut length = 1usize;
+    while value >= 0x80 {
+        value >>= 7;
+        length += 1;
+    }
+    length
 }
 
 #[derive(Debug)]
@@ -604,6 +1113,9 @@ fn parse_strict_field<'source>(
         return Ok(None);
     }
     let (encoded_tag, canonical_key) = take_varint(source)?;
+    if !canonical_key {
+        return Err(DecodeError::noncanonical("protobuf field key"));
+    }
     budget.charge_field()?;
     let raw_tag =
         u32::try_from(encoded_tag).map_err(|_error| buffa::DecodeError::InvalidFieldNumber)?;
@@ -616,6 +1128,9 @@ fn parse_strict_field<'source>(
     let (value, canonical_value) = match wire_type {
         buffa::encoding::WireType::Varint => {
             let (value, canonical) = take_varint(source)?;
+            if !canonical {
+                return Err(DecodeError::noncanonical("protobuf varint value"));
+            }
             (StrictValue::Varint(value), canonical)
         },
         buffa::encoding::WireType::Fixed64 => {
@@ -624,6 +1139,9 @@ fn parse_strict_field<'source>(
         },
         buffa::encoding::WireType::LengthDelimited => {
             let (encoded_length, canonical) = take_varint(source)?;
+            if !canonical {
+                return Err(DecodeError::noncanonical("length-delimited size"));
+            }
             let length = usize::try_from(encoded_length)
                 .map_err(|_error| buffa::DecodeError::MessageTooLarge)?;
             (
@@ -721,8 +1239,9 @@ fn take_exact<'source>(
 )]
 mod tests {
     use super::{
-        ChartCaptionSnapshot, DecodeOptions, WireResourceLimit, decode_chart_caption,
-        decode_chart_caption_identifier,
+        CHART_DRAWABLE_SUPER_FIELD, ChartCaptionSnapshot, ChartCaptionWrite,
+        DRAWABLE_CAPTION_FIELD, DecodeOptions, WireResourceLimit, decode_chart_caption,
+        decode_chart_caption_identifier, rewrite_chart_caption_with_report,
     };
 
     fn options(source: &[u8]) -> DecodeOptions {
@@ -753,6 +1272,19 @@ mod tests {
                 return output;
             }
         }
+    }
+
+    fn field_varint(number: u32, value: u64) -> Vec<u8> {
+        [varint(u64::from(number) << 3), varint(value)].concat()
+    }
+
+    fn field_bytes(number: u32, value: &[u8]) -> Vec<u8> {
+        [
+            varint((u64::from(number) << 3) | 2),
+            varint(value.len() as u64),
+            value.to_vec(),
+        ]
+        .concat()
     }
 
     #[test]
@@ -884,5 +1416,76 @@ mod tests {
         .expect_err("refusal");
         assert!(error.wire_resource_limit().is_some());
         assert_eq!(source, before);
+    }
+
+    #[test]
+    fn rewrite_changes_only_identifier_and_preserves_unknown_spans() {
+        let reference = [
+            field_varint(99, 1),
+            field_varint(1, 7),
+            field_varint(2, 1),
+            field_varint(1000, 42),
+        ]
+        .concat();
+        let drawable = [
+            field_varint(2, 9),
+            field_bytes(DRAWABLE_CAPTION_FIELD, &reference),
+            field_varint(13, 1),
+        ]
+        .concat();
+        let source = [
+            field_varint(16, 3),
+            field_bytes(CHART_DRAWABLE_SUPER_FIELD, &drawable),
+            field_varint(17, 4),
+        ]
+        .concat();
+        let rewrite_options = options(&source).with_max_output_bytes(source.len() + 32);
+        let (rewritten, report) = rewrite_chart_caption_with_report(
+            &source,
+            ChartCaptionWrite::new(300),
+            rewrite_options,
+        )
+        .expect("rewrite");
+        assert!(report.changed());
+        assert_eq!(
+            decode_chart_caption_identifier(&rewritten, options(&rewritten)),
+            Ok(Some(300))
+        );
+        assert!(
+            rewritten
+                .windows(field_varint(99, 1).len())
+                .any(|window| { window == field_varint(99, 1).as_slice() })
+        );
+        assert!(
+            rewritten
+                .windows(field_varint(1000, 42).len())
+                .any(|window| { window == field_varint(1000, 42).as_slice() })
+        );
+        assert!(
+            rewritten
+                .windows(field_varint(16, 3).len())
+                .any(|window| { window == field_varint(16, 3).as_slice() })
+        );
+        assert!(
+            rewritten
+                .windows(field_varint(17, 4).len())
+                .any(|window| { window == field_varint(17, 4).as_slice() })
+        );
+        assert_ne!(rewritten, source);
+        assert_eq!(
+            decode_chart_caption_identifier(&source, options(&source)),
+            Ok(Some(7))
+        );
+    }
+
+    #[test]
+    fn matching_rewrite_is_an_exact_noop_after_strict_decode() {
+        let source = chart_with_caption(7);
+        let options = options(&source).with_max_output_bytes(source.len());
+        let (rewritten, report) =
+            rewrite_chart_caption_with_report(&source, ChartCaptionWrite::new(7), options)
+                .expect("no-op");
+        assert_eq!(rewritten, source);
+        assert!(!report.changed());
     }
 }

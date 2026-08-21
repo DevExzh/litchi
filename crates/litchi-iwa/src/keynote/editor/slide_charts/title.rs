@@ -42,12 +42,12 @@ impl KeynoteEditor {
     /// The selector is resolved against the slide's owned chart graph. Name
     /// selectors therefore retain exact, case-sensitive matching and reject
     /// ambiguous titles just like the other selector-facing chart APIs.
-    pub fn slide_chart_title_by_selector(
+    pub fn slide_chart_title_by_selector<'selector>(
         &self,
         slide_index: usize,
-        selector: ChartSelector<'_>,
+        selector: impl Into<ChartSelector<'selector>>,
     ) -> Result<Option<String>> {
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector.into())?;
         slide_chart_title(self, slide_index, drawable_object_id)
     }
 
@@ -55,13 +55,13 @@ impl KeynoteEditor {
     ///
     /// The selector is resolved before the existing graph-aware title update,
     /// so ownership, stand-in, and non-style validation remain unchanged.
-    pub fn set_slide_chart_title_by_selector(
+    pub fn set_slide_chart_title_by_selector<'selector>(
         &mut self,
         slide_index: usize,
-        selector: ChartSelector<'_>,
+        selector: impl Into<ChartSelector<'selector>>,
         title: &str,
     ) -> Result<()> {
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector.into())?;
         set_slide_chart_title(self, slide_index, drawable_object_id, title)
     }
 
@@ -69,12 +69,12 @@ impl KeynoteEditor {
     ///
     /// Returns whether a visible title was present. The selector is resolved
     /// with the same exact-name and ambiguity rules as other chart edits.
-    pub fn remove_slide_chart_title_by_selector(
+    pub fn remove_slide_chart_title_by_selector<'selector>(
         &mut self,
         slide_index: usize,
-        selector: ChartSelector<'_>,
+        selector: impl Into<ChartSelector<'selector>>,
     ) -> Result<bool> {
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
+        let drawable_object_id = self.resolve_chart_selector(slide_index, selector.into())?;
         remove_slide_chart_title(self, slide_index, drawable_object_id)
     }
 }

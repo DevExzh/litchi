@@ -3310,11 +3310,16 @@ is made.
 ## Current present status
 
 The latest isolated `cargo test -p litchi-iwa-protos --lib --all-features`
-verification records 258 passing `litchi-iwa-protos` tests, including 14
+verification records 262 passing `litchi-iwa-protos` tests, including 14
 focused private Keynote chart-title codec tests and one bounded Pages
-pagination guard; 339 passing `litchi-numbers` library tests with
-four ignored, 68 focused Numbers extractor tests, 14 `table_data_list`
-integration tests, and 281 boundary unit tests. The bounded Pages
+pagination guard; 343 passing `litchi-numbers` library tests with four
+ignored, 72 focused Numbers
+extractor tests, 16 `table_cells` integration tests, 14 `table_data_list`
+integration tests; 71 passing `litchi-pages` library tests, five
+`section_name` tests, one native-fixture test; 113 passing `litchi-keynote`
+library tests, nine native-fixture tests; 1,412 passing `litchi-iwa` library
+tests; and 296 boundary unit tests. The boundary audit remains 64 packages,
+240 internal declarations, and 14 ordered debts. The bounded Pages
 section-name seam uses the private section-settings codec for field-26
 presence/readback while preserving the rest of the graph bytes. The private
 Keynote chart-title codec projects only generated `ChartNonStyleArchive`

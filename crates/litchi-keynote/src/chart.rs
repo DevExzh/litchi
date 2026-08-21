@@ -10,6 +10,8 @@
     reason = "chart semantic types keep their domain explicit at the crate boundary"
 )]
 
+use litchi_core::Position;
+
 /// Selects one chart by its visible native title or checked zero-based position.
 ///
 /// A selector carries no native object identifier and does not depend on a
@@ -31,6 +33,12 @@ impl<'a> ChartSelector<'a> {
         Self::Index(index)
     }
 
+    /// Create a selector from a typed zero-based position.
+    #[must_use]
+    pub const fn position(position: Position) -> Self {
+        Self::index(position.get())
+    }
+
     /// Create an exact-name chart selector without allocating.
     #[must_use]
     pub const fn name(name: &'a str) -> Self {
@@ -42,6 +50,15 @@ impl<'a> ChartSelector<'a> {
     pub const fn as_index(self) -> Option<usize> {
         match self {
             Self::Index(index) => Some(index),
+            Self::Name(_) => None,
+        }
+    }
+
+    /// Return the selected typed zero-based position, if this is an index selector.
+    #[must_use]
+    pub const fn as_position(self) -> Option<Position> {
+        match self {
+            Self::Index(index) => Some(Position::new(index)),
             Self::Name(_) => None,
         }
     }
@@ -65,6 +82,12 @@ impl<'a> From<&'a str> for ChartSelector<'a> {
 impl From<usize> for ChartSelector<'_> {
     fn from(index: usize) -> Self {
         Self::index(index)
+    }
+}
+
+impl From<Position> for ChartSelector<'_> {
+    fn from(position: Position) -> Self {
+        Self::position(position)
     }
 }
 
@@ -155,13 +178,16 @@ impl ChartCatalog {
     /// an existing native title but cannot be used as a name selector. Use a
     /// positional selector for that entry.
     #[must_use]
-    pub fn from_titles(titles: impl IntoIterator<Item = Option<String>>) -> Self {
+    pub fn from_titles<T>(titles: impl IntoIterator<Item = Option<T>>) -> Self
+    where
+        T: AsRef<str>,
+    {
         let charts = titles
             .into_iter()
             .enumerate()
             .map(|(position, title)| ChartDescriptor {
                 position,
-                title: title.map(String::into_boxed_str),
+                title: title.map(|title| title.as_ref().into()),
             })
             .collect::<Vec<_>>()
             .into_boxed_slice();
@@ -239,6 +265,7 @@ impl ChartCatalog {
 #[cfg(test)]
 mod tests {
     use super::{ChartCatalog, ChartSelector, ChartSelectorError};
+    use litchi_core::Position;
 
     #[test]
     fn index_selector_preserves_checked_position() {
@@ -246,7 +273,20 @@ mod tests {
 
         assert_eq!(selector, ChartSelector::Index(3));
         assert_eq!(selector.as_index(), Some(3));
+        assert_eq!(selector.as_position(), Some(Position::new(3)));
         assert_eq!(selector.as_name(), None);
+    }
+
+    #[test]
+    fn typed_positions_round_trip_without_native_identity() {
+        let position = Position::new(3);
+        let selector = ChartSelector::position(position);
+        let from_position: ChartSelector<'_> = position.into();
+
+        assert_eq!(selector, ChartSelector::index(3));
+        assert_eq!(from_position, selector);
+        assert_eq!(selector.as_position(), Some(position));
+        assert_eq!(ChartSelector::name("Chart").as_position(), None);
     }
 
     #[test]
@@ -279,11 +319,8 @@ mod tests {
 
     #[test]
     fn catalog_resolves_exact_titles_and_positions_without_native_identity() {
-        let catalog = ChartCatalog::from_titles(vec![
-            None,
-            Some("Revenue".to_owned()),
-            Some("Cost".to_owned()),
-        ]);
+        let titles = [None, Some("Revenue"), Some("Cost")];
+        let catalog = ChartCatalog::from_titles(titles);
 
         assert_eq!(catalog.len(), 3);
         assert!(!catalog.is_empty());
@@ -304,8 +341,7 @@ mod tests {
 
     #[test]
     fn catalog_rejects_empty_and_duplicate_name_selectors() {
-        let duplicate =
-            ChartCatalog::from_titles(vec![Some("Revenue".to_owned()), Some("Revenue".to_owned())]);
+        let duplicate = ChartCatalog::from_titles([Some("Revenue"), Some("Revenue")]);
         assert_eq!(
             duplicate.select_position("Revenue"),
             Err(ChartSelectorError::DuplicateChartTitle {
@@ -313,7 +349,7 @@ mod tests {
             })
         );
 
-        let empty = ChartCatalog::from_titles(vec![Some(String::new())]);
+        let empty = ChartCatalog::from_titles([Some("")]);
         assert_eq!(
             empty.select_position(""),
             Err(ChartSelectorError::EmptyName)

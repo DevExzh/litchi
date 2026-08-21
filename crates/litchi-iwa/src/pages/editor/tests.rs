@@ -91,6 +91,32 @@ fn semantic_body_update_and_clear_are_transactional() {
 }
 
 #[test]
+fn root_body_projection_preserves_unknowns_and_rejects_duplicate_references() {
+    let mut package = test_package("Body");
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let root = archive.object_mut(1).unwrap();
+            append_unknown_varint(&mut root.messages[0].data, 98, 980);
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    let editor = PagesEditor::from_package(package).unwrap();
+    assert_eq!(editor.body_text().unwrap(), "Body");
+    assert_eq!(editor.to_bytes().unwrap(), before);
+
+    let mut duplicate = test_package("Body");
+    duplicate
+        .update_archive("Index/Document.iwa", |archive| {
+            let root = archive.object_mut(1).unwrap();
+            append_length_delimited(&mut root.messages[0].data, 4, &[0x08, 0x2a]);
+            Ok(())
+        })
+        .unwrap();
+    assert!(PagesEditor::from_package(duplicate).is_err());
+}
+
+#[test]
 fn reachable_header_footer_crud_is_typed_and_transactional() {
     let body_id = 42;
     let section_id = 43;

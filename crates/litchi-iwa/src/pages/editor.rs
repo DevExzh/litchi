@@ -4,10 +4,16 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::path::Path;
 
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
-use litchi_iwa_protos::pages_section_codec::{DecodeOptions, decode_section_settings};
+use litchi_iwa_protos::pages_body_codec::{
+    self as pages_body_codec, DecodeOptions as PagesBodyDecodeOptions, DocumentBodySnapshot,
+};
+use litchi_iwa_protos::pages_section_codec::{
+    DecodeOptions, SectionSettingsSnapshot, decode_section_settings,
+};
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
@@ -3028,6 +3034,14 @@ struct PagesSectionGraph {
     uuid_object_ids: Vec<u64>,
 }
 
+#[derive(Debug, Clone)]
+struct DiscoveredPagesSection {
+    name: Option<String>,
+    first_template_id: Option<u64>,
+    even_template_id: Option<u64>,
+    odd_template_id: Option<u64>,
+}
+
 impl PagesSectionGraph {
     fn removal_order(&self) -> Vec<u64> {
         let mut result = vec![self.section_id];
@@ -4216,6 +4230,10 @@ fn clone_pages_section_graph_object(
 }
 
 fn pages_section_name(payload: &[u8]) -> Result<Option<&str>> {
+    pages_section_settings(payload).map(SectionSettingsSnapshot::name)
+}
+
+fn pages_section_settings(payload: &[u8]) -> Result<SectionSettingsSnapshot<'_>> {
     decode_section_settings(
         payload,
         DecodeOptions::new(payload.len(), 64)
@@ -4223,7 +4241,6 @@ fn pages_section_name(payload: &[u8]) -> Result<Option<&str>> {
             .with_max_work_bytes(payload.len().saturating_mul(2))
             .with_max_name_bytes(payload.len()),
     )
-    .map(|settings| settings.name())
     .map_err(|error| Error::InvalidFormat(format!("Invalid Pages section settings: {error}")))
 }
 
@@ -4392,12 +4409,41 @@ fn package_references_object(package: &IWorkPackage, identifier: u64) -> Result<
 }
 
 fn body_storage_id(package: &IWorkPackage) -> Result<TextStorageId> {
-    root_document(package)?
-        .body_storage
-        .map(|reference| reference.identifier)
+    root_document_body(package)?
+        .body_storage()
+        .map(|reference| reference.identifier().get())
         .map(crate::text::native_storage_id)
         .transpose()?
         .ok_or_else(|| Error::InvalidFormat("Pages document has no body storage".to_owned()))
+}
+
+fn root_document_body(package: &IWorkPackage) -> Result<DocumentBodySnapshot> {
+    let archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
+    let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
+        Error::InvalidFormat(format!("Pages root object {DOCUMENT_OBJECT_ID} is missing"))
+    })?;
+    let payload = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
+        .map(|message| message.data.as_slice())
+        .ok_or_else(|| {
+            Error::InvalidFormat("Pages root has no TP.DocumentArchive payload".to_owned())
+        })?;
+    let limits = WireLimits::default();
+    let recursion_limit = u32::try_from(limits.max_nesting()).map_err(|_error| {
+        Error::InvalidFormat("Pages root projection nesting limit does not fit u32".to_owned())
+    })?;
+    pages_body_codec::decode_document_body(
+        payload,
+        PagesBodyDecodeOptions::new(
+            limits.max_input_bytes(),
+            limits.max_fields(),
+            limits.max_rewrite_work(),
+            recursion_limit,
+        ),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Invalid Pages root body references: {error}")))
 }
 
 fn root_document(package: &IWorkPackage) -> Result<DocumentArchive> {
@@ -4419,22 +4465,10 @@ fn discover_structure(
     package: &IWorkPackage,
     body_storage_id: u64,
 ) -> Result<(Vec<PagesSectionInfo>, Vec<HeaderFooterLocation>)> {
-    let document_archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
-    let document = document_archive
-        .object(DOCUMENT_OBJECT_ID)
-        .and_then(|object| {
-            object
-                .messages
-                .iter()
-                .find(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
-        })
-        .and_then(|message| DocumentArchive::decode(message.data.as_slice()).ok())
-        .ok_or_else(|| {
-            Error::InvalidFormat("Pages root has no TP.DocumentArchive payload".to_owned())
-        })?;
+    let document = root_document_body(package)?;
 
     let mut body = None;
-    let mut sections = HashMap::new();
+    let mut sections = HashMap::<u64, DiscoveredPagesSection>::new();
     let mut section_objects = HashSet::new();
     let mut templates = HashMap::new();
     let mut writable_storages = HashSet::new();
@@ -4461,13 +4495,26 @@ fn discover_structure(
                                 "Pages section object {identifier} occurs more than once"
                             )));
                         }
-                        let Ok(name) = pages_section_name(message.data.as_slice()) else {
+                        let Ok(settings) = pages_section_settings(message.data.as_slice()) else {
                             continue;
                         };
-                        if let Ok(mut section) = SectionArchive::decode(message.data.as_slice()) {
-                            section.name = name.map(str::to_owned);
-                            insert_unique(&mut sections, identifier, section, "section")?;
-                        }
+                        insert_unique(
+                            &mut sections,
+                            identifier,
+                            DiscoveredPagesSection {
+                                name: settings.name().map(str::to_owned),
+                                first_template_id: settings
+                                    .first_section_template_page()
+                                    .map(|reference| reference.identifier().get()),
+                                even_template_id: settings
+                                    .even_section_template_page()
+                                    .map(|reference| reference.identifier().get()),
+                                odd_template_id: settings
+                                    .odd_section_template_page()
+                                    .map(|reference| reference.identifier().get()),
+                            },
+                            "section",
+                        )?;
                     },
                     SECTION_TEMPLATE_MESSAGE_TYPE => {
                         if let Ok(template) =
@@ -4499,8 +4546,8 @@ fn discover_structure(
     })?;
 
     let mut section_references = Vec::new();
-    if let Some(reference) = document.section {
-        section_references.push((0, reference.identifier));
+    if let Some(reference) = document.initial_section() {
+        section_references.push((0, reference.identifier().get()));
     }
     if let Some(table) = body.table_section {
         section_references.extend(table.entries.into_iter().filter_map(|entry| {
@@ -4561,31 +4608,18 @@ fn discover_structure(
             object_id: section_id,
             character_index,
             name: section.name.clone(),
-            first_template_id: section
-                .first_section_template_page
-                .as_ref()
-                .map(|reference| reference.identifier),
-            even_template_id: section
-                .even_section_template_page
-                .as_ref()
-                .map(|reference| reference.identifier),
-            odd_template_id: section
-                .odd_section_template_page
-                .as_ref()
-                .map(|reference| reference.identifier),
+            first_template_id: section.first_template_id,
+            even_template_id: section.even_template_id,
+            odd_template_id: section.odd_template_id,
         });
-        for (template_kind, reference) in [
-            (
-                Template::First,
-                section.first_section_template_page.as_ref(),
-            ),
-            (Template::Even, section.even_section_template_page.as_ref()),
-            (Template::Odd, section.odd_section_template_page.as_ref()),
+        for (template_kind, template_id) in [
+            (Template::First, section.first_template_id),
+            (Template::Even, section.even_template_id),
+            (Template::Odd, section.odd_template_id),
         ] {
-            let Some(reference) = reference else {
+            let Some(template_id) = template_id else {
                 continue;
             };
-            let template_id = reference.identifier;
             let template = templates.get(&template_id).ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Pages section template object {template_id} is missing or invalid"

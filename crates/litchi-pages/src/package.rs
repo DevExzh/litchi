@@ -32,6 +32,7 @@ use litchi_iwa_text::storage::{Run, Storage};
 use plist::Value;
 use thiserror::Error;
 
+use crate::selector::{SectionSelector, SelectorResult};
 use crate::{
     Body, DEFAULT_MAX_TEXT_BYTES, Document, Error as SemanticError, MAX_BODY_STORAGES,
     MAX_SECTIONS, Root, Section, SectionType,
@@ -395,6 +396,23 @@ impl Package {
     #[must_use]
     pub fn sections(&self) -> &[Section] {
         self.state.document.sections()
+    }
+
+    /// Select one semantic section by exact name or checked source position.
+    ///
+    /// This package-level convenience delegates to the immutable semantic
+    /// snapshot. Native object identifiers, archive members, and protobuf
+    /// payloads are not part of this lookup boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::SelectorError::AmbiguousSectionName`] when more than
+    /// one section has the requested exact name.
+    pub fn select_section<'a, S>(&self, selector: S) -> SelectorResult<Option<&Section>>
+    where
+        S: Into<SectionSelector<'a>>,
+    {
+        self.state.document.select_section(selector)
     }
 
     /// Borrow the immutable Pages semantic snapshot.

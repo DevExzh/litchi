@@ -1,9 +1,10 @@
 // Wire-only Buffa projections derived from TP.SectionArchive fields
-// 17--22, 26, and 28 in `TPArchives.proto`.
+// 17--26, 28, and 29 in `TPArchives.proto`.
 //
 // The pagination-only message is retained so its established decoder keeps
 // treating every non-pagination record as opaque.  The aggregate settings
-// message adds the four presence-sensitive flags and a borrowed section name.
+// message adds the four presence-sensitive flags, selected graph references,
+// and a borrowed section name.
 // Every template reference, background, and unknown field stays opaque in
 // caller-owned IWA bytes, which remain the preservation authority.
 syntax = "proto2";
@@ -23,6 +24,16 @@ message PagesSectionSettingsArchive {
   optional uint32 section_start_kind = 20;
   optional uint32 section_page_number_kind = 21;
   optional uint32 section_page_number_start = 22;
+  optional .LitchiIwaProjection.Reference first_section_template_page = 23;
+  optional .LitchiIwaProjection.Reference even_section_template_page = 24;
+  optional .LitchiIwaProjection.Reference odd_section_template_page = 25;
   optional string name = 26;
   optional bool section_template_first_page_hides_header_footer = 28;
+  optional .LitchiIwaProjection.Reference user_defined_guide_storage = 29;
+}
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
 }

@@ -25,6 +25,12 @@ fn native_pages_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::e
     assert_eq!(selected.index(), 0);
     assert_eq!(selected.name(), Some("Blank"));
     assert_eq!(
+        package
+            .select_section("Blank")?
+            .map(litchi_pages::Section::index),
+        Some(0)
+    );
+    assert_eq!(
         document
             .section_named("Blank")?
             .map(litchi_pages::Section::index),

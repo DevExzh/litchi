@@ -723,6 +723,7 @@ optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;\n\
         || !ROUTER_DECLARATIONS
             .iter()
             .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || production_codec.contains("prost")
         || production_codec.contains("to_owned_message")
         || production_codec.contains("encode_to_vec")
         || production_codec.contains("try_encode")
@@ -735,7 +736,7 @@ optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;\n\
         )
     {
         return Err(
-            "derived Numbers comment-storage projection/router drifted from canonical TSD/TSP fields, exposed repeated generated replies, or introduced generated/production encoding"
+            "derived Numbers comment-storage projection/router drifted from canonical TSD/TSP fields, exposed repeated generated replies, or introduced Prost/generated/production encoding"
                 .into(),
         );
     }
@@ -2092,27 +2093,39 @@ fn enforce_pages_section_projection_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    const CANONICAL_FIELDS: [&str; 8] = [
+    const CANONICAL_FIELDS: [&str; 12] = [
         "optional bool inherit_previous_header_footer = 17;",
         "optional bool section_template_first_page_different = 18;",
         "optional bool section_template_even_odd_pages_different = 19;",
         "optional uint32 section_start_kind = 20;",
         "optional uint32 section_page_number_kind = 21;",
         "optional uint32 section_page_number_start = 22;",
+        "optional .TSP.Reference first_section_template_page = 23;",
+        "optional .TSP.Reference even_section_template_page = 24;",
+        "optional .TSP.Reference odd_section_template_page = 25;",
         "optional string name = 26;",
         "optional bool section_template_first_page_hides_header_footer = 28;",
+        "optional .TSP.Reference user_defined_guide_storage = 29;",
     ];
     const PAGINATION_PROJECTION: &str = "message PagesSectionPaginationArchive {\n  optional uint32 section_start_kind = 20;\n  optional uint32 section_page_number_kind = 21;\n  optional uint32 section_page_number_start = 22;\n}";
-    const SETTINGS_PROJECTION: &str = "message PagesSectionSettingsArchive {\n  optional bool inherit_previous_header_footer = 17;\n  optional bool section_template_first_page_different = 18;\n  optional bool section_template_even_odd_pages_different = 19;\n  optional uint32 section_start_kind = 20;\n  optional uint32 section_page_number_kind = 21;\n  optional uint32 section_page_number_start = 22;\n  optional string name = 26;\n  optional bool section_template_first_page_hides_header_footer = 28;\n}";
-    const ROUTER_DECLARATIONS: [&str; 10] = [
+    const SETTINGS_PROJECTION: &str = "message PagesSectionSettingsArchive {\n  optional bool inherit_previous_header_footer = 17;\n  optional bool section_template_first_page_different = 18;\n  optional bool section_template_even_odd_pages_different = 19;\n  optional uint32 section_start_kind = 20;\n  optional uint32 section_page_number_kind = 21;\n  optional uint32 section_page_number_start = 22;\n  optional .LitchiIwaProjection.Reference first_section_template_page = 23;\n  optional .LitchiIwaProjection.Reference even_section_template_page = 24;\n  optional .LitchiIwaProjection.Reference odd_section_template_page = 25;\n  optional string name = 26;\n  optional bool section_template_first_page_hides_header_footer = 28;\n  optional .LitchiIwaProjection.Reference user_defined_guide_storage = 29;\n}";
+    const REFERENCE_PROJECTION: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const ROUTER_DECLARATIONS: [&str; 17] = [
         "const INHERIT_HEADER_FOOTER_FIELD: u32 = 17;",
         "const FIRST_PAGE_DIFFERENT_FIELD: u32 = 18;",
         "const EVEN_ODD_PAGES_DIFFERENT_FIELD: u32 = 19;",
         "const SECTION_START_FIELD: u32 = 20;",
         "const PAGE_NUMBERING_FIELD: u32 = 21;",
         "const STARTING_PAGE_NUMBER_FIELD: u32 = 22;",
+        "const FIRST_TEMPLATE_FIELD: u32 = 23;",
+        "const EVEN_TEMPLATE_FIELD: u32 = 24;",
+        "const ODD_TEMPLATE_FIELD: u32 = 25;",
         "const SECTION_NAME_FIELD: u32 = 26;",
         "const FIRST_PAGE_HIDES_HEADER_FOOTER_FIELD: u32 = 28;",
+        "const GUIDE_STORAGE_FIELD: u32 = 29;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
         "const MAX_RECURSION: u32 = 64;",
         "const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;",
     ];
@@ -2128,18 +2141,20 @@ fn enforce_pages_section_projection_provenance(
         .all(|declaration| pages.matches(declaration).count() == 1)
         || projection.matches(PAGINATION_PROJECTION).count() != 1
         || projection.matches(SETTINGS_PROJECTION).count() != 1
+        || projection.matches(REFERENCE_PROJECTION).count() != 1
         || !ROUTER_DECLARATIONS
             .iter()
             .all(|declaration| codec.matches(declaration).count() == 1)
         || projection.len() > 2 * 1024
         || projection.contains("repeated ")
+        || production_codec.contains("prost")
         || production_codec.contains("to_owned_message")
         || production_codec.contains("encode_to_vec")
         || production_codec.contains("try_encode")
         || production_codec.contains(".encode(")
     {
         return Err(
-            "derived Pages section projections drifted from TP.SectionArchive fields 17--22/26/28, exceeded their 2 KiB source budget, introduced generated repeated storage, or added production encoding"
+            "derived Pages section projections drifted from TP.SectionArchive fields 17--29 (excluding 27), exceeded their 2 KiB source budget, introduced generated repeated storage, or added Prost/generated production encoding"
                 .into(),
         );
     }
@@ -3598,12 +3613,12 @@ fn enforce_pages_section_projection_budget(directory: &Path) -> Result<(), Box<d
         "TPSectionArchive.rs",
         "iwa_pages_section_buffa_protos.rs",
     ];
-    // Buffa 0.9.1 emits 80,202 bytes for the retained pagination projection
-    // and the eight-field aggregate projection. Keep less than 1.7 KiB of
-    // generator/formatter allowance; the digest catches any within-cap drift.
-    const MAX_GENERATED_BYTES: u64 = 80 * 1024;
+    // Buffa 0.9.1 emits 132,318 bytes for the retained pagination projection
+    // and the reference-aware aggregate projection. Keep a narrow allowance
+    // for generator/formatter drift; the digest catches any within-cap drift.
+    const MAX_GENERATED_BYTES: u64 = 136 * 1024;
     const EXPECTED_DIGEST: &str =
-        "2202f4b1d394346450cb9f88a41c2784ab476cff23b181fffbab6f37b4a42b62";
+        "245050c1428bf926619ca05f01a5e83ef2b0edbaa0b880a3c050663556ab9440";
 
     let mut entries = fs::read_dir(directory)?
         .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))

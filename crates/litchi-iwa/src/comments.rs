@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use litchi_iwa_common::comment::{
     AuthorId, Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId, Uuid,
 };
+use litchi_iwa_protos::comment_storage_codec;
 use prost::Message;
 
 use crate::application::Application;
@@ -22,8 +23,8 @@ use crate::protobuf::{kn, tn, tp, tsch, tsd, tsk, tsp, tst, tswp};
 use crate::wire::parse_wire_fields;
 use crate::wire::{
     append_repeated_length_delimited_field, patch_length_delimited_field,
-    patch_nested_length_delimited_field, remove_repeated_length_delimited_field_where,
-    transform_repeated_length_delimited_fields,
+    patch_nested_length_delimited_field, patch_varint_field,
+    remove_repeated_length_delimited_field_where, transform_length_delimited_fields_at_path,
 };
 use crate::{Error, IWorkPackage, Result};
 
@@ -32,6 +33,102 @@ const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
 const ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
 const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
 const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
+const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+
+fn comment_storage_allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::DecodeOptions {
+    comment_storage_codec::DecodeOptions::new(
+        source.len().max(1),
+        source.len().max(1),
+        source.len().saturating_mul(32).max(1),
+        COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
+        source.len().max(1),
+        source.len().max(1),
+    )
+}
+
+#[derive(Debug, Default)]
+struct CommentStorageReplyIds {
+    identifiers: Vec<u64>,
+    allocation_failed: Option<usize>,
+}
+
+impl CommentStorageReplyIds {
+    fn into_identifiers(self) -> Result<Vec<u64>> {
+        match self.allocation_failed {
+            Some(amount) => Err(comment_storage_allocation_error(
+                "iWork comment reply identifiers",
+                amount,
+            )),
+            None => Ok(self.identifiers),
+        }
+    }
+}
+
+impl comment_storage_codec::CommentStorageVisitor for CommentStorageReplyIds {
+    fn visit_reply(
+        &mut self,
+        reply: comment_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
+        if self.allocation_failed.is_some() {
+            return Ok(());
+        }
+        if self.identifiers.try_reserve(1).is_err() {
+            // Continue strict traversal so a later malformed record still
+            // wins over this candidate-local allocation failure.
+            self.allocation_failed = Some(self.identifiers.len().saturating_add(1));
+            return Ok(());
+        }
+        self.identifiers.push(reply.identifier());
+        Ok(())
+    }
+}
+
+fn strict_comment_storage_error(
+    storage_id: u64,
+    error: comment_storage_codec::DecodeError,
+) -> Error {
+    Error::InvalidFormat(format!(
+        "comment storage object {storage_id} failed strict validation: {error}"
+    ))
+}
+
+fn decode_comment_storage_payload<'source>(
+    storage_id: u64,
+    source: &'source [u8],
+) -> Result<(
+    comment_storage_codec::CommentStorageSnapshot<'source>,
+    Vec<u64>,
+)> {
+    let mut replies = CommentStorageReplyIds::default();
+    let (comment, report) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
+        source,
+        comment_storage_decode_options(source),
+        &mut replies,
+    )
+    .map_err(|error| strict_comment_storage_error(storage_id, error))?;
+    let reply_ids = replies.into_identifiers()?;
+    if reply_ids.len() != report.reply_references() {
+        return Err(Error::InvalidFormat(format!(
+            "comment storage object {storage_id} streamed {} replies but reported {}",
+            reply_ids.len(),
+            report.reply_references(),
+        )));
+    }
+    Ok((comment, reply_ids))
+}
+
+fn validate_comment_storage_payload(storage_id: u64, source: &[u8]) -> Result<()> {
+    comment_storage_codec::decode_comment_storage_archive(
+        source,
+        comment_storage_decode_options(source),
+    )
+    .map(|_| ())
+    .map_err(|error| strict_comment_storage_error(storage_id, error))
+}
 
 fn drawable_id_from_raw(raw: u64) -> Result<DrawableId> {
     DrawableId::from_raw(raw).map_err(|error| Error::ParseError(error.to_string()))
@@ -373,7 +470,22 @@ fn drawable_comment_replies_in_package(
     let root_storage_id = root.storage_id.get();
     let locations = object_locations(package)?;
     let mut seen = HashSet::new();
-    let mut replies = Vec::with_capacity(root.comment.reply_ids.len());
+    seen.try_reserve(root.comment.reply_ids.len())
+        .map_err(|_| {
+            comment_storage_allocation_error(
+                "iWork drawable comment reply identifiers",
+                root.comment.reply_ids.len(),
+            )
+        })?;
+    let mut replies = Vec::new();
+    replies
+        .try_reserve_exact(root.comment.reply_ids.len())
+        .map_err(|_| {
+            comment_storage_allocation_error(
+                "iWork drawable comment replies",
+                root.comment.reply_ids.len(),
+            )
+        })?;
     for reply_id in root.comment.reply_ids {
         let reply_id = reply_id.get();
         if reply_id == root_storage_id || !seen.insert(reply_id) {
@@ -746,6 +858,12 @@ fn validate_direct_reply_graph(
     root: &Comment,
 ) -> Result<()> {
     let mut seen = HashSet::new();
+    seen.try_reserve(root.reply_ids.len()).map_err(|_| {
+        comment_storage_allocation_error(
+            "iWork direct comment reply identifiers",
+            root.reply_ids.len(),
+        )
+    })?;
     for reply_id in &root.reply_ids {
         let reply_id = reply_id.get();
         if reply_id == root_storage_id || !seen.insert(reply_id) {
@@ -896,6 +1014,25 @@ fn update_reference_list(references: &mut Vec<u64>, old: Option<u64>, new: Optio
     }
 }
 
+fn comment_storage_message_index(object: &ArchiveObject, storage_id: u64) -> Result<usize> {
+    let mut index = None;
+    for (candidate, message) in object.messages.iter().enumerate() {
+        if message.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+            continue;
+        }
+        if index.replace(candidate).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "object {storage_id} must contain exactly one TSD comment-storage payload"
+            )));
+        }
+    }
+    index.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "object {storage_id} must contain exactly one TSD comment-storage payload"
+        ))
+    })
+}
+
 fn read_comment_storage(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -908,34 +1045,35 @@ fn read_comment_storage(
         let object = archive.object(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("comment storage object {storage_id} is missing"))
         })?;
-        let messages = object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-            .collect::<Vec<_>>();
-        if messages.len() != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "object {storage_id} must contain exactly one TSD comment-storage payload"
-            )));
-        }
-        let comment = tsd::CommentStorageArchive::decode(messages[0].data.as_slice())?;
+        let index = comment_storage_message_index(object, storage_id)?;
+        let (comment, reply_ids) =
+            decode_comment_storage_payload(storage_id, object.messages[index].data.as_slice())?;
         let author_id = comment
-            .author
-            .map(|author| author_id_from_raw(author.identifier))
+            .author()
+            .map(|author| author_id_from_raw(author.identifier()))
             .transpose()?;
-        let reply_ids = comment
-            .replies
-            .into_iter()
-            .map(|reply| storage_id_from_raw(reply.identifier))
-            .collect::<Result<Vec<_>>>()?
-            .into_boxed_slice();
+        let mut typed_reply_ids = Vec::new();
+        for reply_id in &reply_ids {
+            // Preserve malformed-ID precedence before requesting the full
+            // typed collection's capacity.
+            storage_id_from_raw(*reply_id)?;
+        }
+        typed_reply_ids
+            .try_reserve_exact(reply_ids.len())
+            .map_err(|_| {
+                comment_storage_allocation_error("iWork comment reply identifiers", reply_ids.len())
+            })?;
+        for reply_id in reply_ids {
+            typed_reply_ids.push(storage_id_from_raw(reply_id)?);
+        }
+        let reply_ids = typed_reply_ids.into_boxed_slice();
         let storage_uuid = comment
-            .storage_uuid
-            .map(|uuid| comment_uuid(uuid.lower, uuid.upper))
+            .storage_uuid()
+            .map(|uuid| comment_uuid(uuid.lower(), uuid.upper()))
             .transpose()?;
         Ok(Comment {
-            text: comment.text.unwrap_or_default(),
-            creation_date_seconds: comment.creation_date.map(|date| date.seconds),
+            text: comment.text().unwrap_or_default().to_owned(),
+            creation_date_seconds: comment.creation_date().map(|date| date.seconds()),
             author_id,
             reply_ids,
             storage_uuid,
@@ -956,28 +1094,17 @@ fn update_comment_storage_text(
         let object = archive.object_mut(storage_id).ok_or_else(|| {
             Error::InvalidFormat(format!("comment storage object {storage_id} is missing"))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        if indexes.len() != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "object {storage_id} must contain exactly one TSD comment-storage payload"
-            )));
-        }
-        let index = indexes[0];
-        let comment = tsd::CommentStorageArchive::decode(object.messages[index].data.as_slice())?;
+        let index = comment_storage_message_index(object, storage_id)?;
+        let original = object.messages[index].data.as_slice();
+        let (comment, _) = decode_comment_storage_payload(storage_id, original)?;
         let data = patch_length_delimited_field(
-            object.messages[index].data.as_slice(),
+            original,
             1,
-            comment.text.is_some(),
+            comment.text().is_some(),
             Some(text.as_bytes()),
         )?;
-        let verified = tsd::CommentStorageArchive::decode(data.as_slice())?;
-        if verified.text.as_deref() != Some(text.as_str()) {
+        let (verified, _) = decode_comment_storage_payload(storage_id, data.as_slice())?;
+        if verified.text() != Some(text.as_str()) {
             return Err(Error::InvalidFormat(format!(
                 "comment storage object {storage_id} text patch failed validation"
             )));
@@ -1017,23 +1144,27 @@ fn clone_comment_storage(
             "cannot safely clone multi-payload comment object {old_storage_id}"
         )));
     }
-    let comment = tsd::CommentStorageArchive::decode(source.messages[0].data.as_slice())?;
+    let (comment, _) =
+        decode_comment_storage_payload(old_storage_id, source.messages[0].data.as_slice())?;
     let data = patch_length_delimited_field(
         source.messages[0].data.as_slice(),
         1,
-        comment.text.is_some(),
+        comment.text().is_some(),
         Some(text.as_bytes()),
     )?;
     let uuid = storage_uuid.encode_to_vec();
     let data = patch_length_delimited_field(
         data.as_slice(),
         5,
-        comment.storage_uuid.is_some(),
+        comment.storage_uuid().is_some(),
         Some(uuid.as_slice()),
     )?;
-    let verified = tsd::CommentStorageArchive::decode(data.as_slice())?;
-    if verified.text.as_deref() != Some(text.as_str())
-        || verified.storage_uuid != Some(storage_uuid)
+    let (verified, _) = decode_comment_storage_payload(new_storage_id, data.as_slice())?;
+    let verified_uuid = verified
+        .storage_uuid()
+        .map(|uuid| (uuid.lower(), uuid.upper()));
+    if verified.text() != Some(text.as_str())
+        || verified_uuid != Some((storage_uuid.lower, storage_uuid.upper))
     {
         return Err(Error::InvalidFormat(format!(
             "comment storage clone {new_storage_id} failed validation"
@@ -1075,7 +1206,7 @@ pub(crate) fn clone_comment_storage_exact(
             "cannot safely clone multi-payload comment object {old_storage_id}"
         )));
     }
-    tsd::CommentStorageArchive::decode(source.messages[0].data.as_slice())?;
+    validate_comment_storage_payload(old_storage_id, source.messages[0].data.as_slice())?;
     let mut clone = ArchiveObject::new(new_storage_id, source.messages.clone())?;
     clone.archive_info.should_merge = source.archive_info.should_merge;
     clone.archive_info.message_infos = source.archive_info.message_infos.clone();
@@ -1133,26 +1264,13 @@ pub(crate) fn update_comment_reply_reference(
                 "comment storage object {root_storage_id} is missing"
             ))
         })?;
-        let indexes = object
-            .messages
-            .iter()
-            .enumerate()
-            .filter(|(_, message)| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        if indexes.len() != 1 {
-            return Err(Error::InvalidFormat(format!(
-                "object {root_storage_id} must contain exactly one TSD comment-storage payload"
-            )));
-        }
-        let index = indexes[0];
+        let index = comment_storage_message_index(object, root_storage_id)?;
         let original = object.messages[index].data.as_slice();
-        let before = tsd::CommentStorageArchive::decode(original)?;
+        let (_, before_replies) = decode_comment_storage_payload(root_storage_id, original)?;
         let old_count = old_reply_id.map_or(0, |identifier| {
-            before
-                .replies
+            before_replies
                 .iter()
-                .filter(|reference| reference.identifier == identifier)
+                .filter(|reply| **reply == identifier)
                 .count()
         });
         if old_reply_id.is_some() && old_count != 1 {
@@ -1163,10 +1281,7 @@ pub(crate) fn update_comment_reply_reference(
         }
         if let Some(identifier) = new_reply_id
             && Some(identifier) != old_reply_id
-            && before
-                .replies
-                .iter()
-                .any(|reference| reference.identifier == identifier)
+            && before_replies.contains(&identifier)
         {
             return Err(Error::InvalidFormat(format!(
                 "comment storage {root_storage_id} already references reply {identifier}"
@@ -1179,42 +1294,60 @@ pub(crate) fn update_comment_reply_reference(
                 &object_reference(identifier).encode_to_vec(),
             )?,
             (Some(old), Some(new)) => {
-                transform_repeated_length_delimited_fields(original, 4, |payload| {
-                    let reference = tsp::Reference::decode(payload)?;
-                    if reference.identifier == old {
-                        Ok(object_reference(new).encode_to_vec())
+                let mut reply_index = 0;
+                let data = transform_length_delimited_fields_at_path(original, &[4], |payload| {
+                    let identifier = *before_replies.get(reply_index).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "comment storage {root_storage_id} reply count changed during patch"
+                        ))
+                    })?;
+                    reply_index += 1;
+                    if identifier == old {
+                        patch_varint_field(payload, 1, true, Some(new))
                     } else {
                         Ok(payload.to_vec())
                     }
-                })?
+                })?;
+                if reply_index != before_replies.len() {
+                    return Err(Error::InvalidFormat(format!(
+                        "comment storage {root_storage_id} reply count changed during patch"
+                    )));
+                }
+                data
             },
             (Some(identifier), None) => {
-                remove_repeated_length_delimited_field_where(original, 4, |payload| {
-                    Ok(tsp::Reference::decode(payload)?.identifier == identifier)
-                })?
+                let mut reply_index = 0;
+                let data = remove_repeated_length_delimited_field_where(original, 4, |_payload| {
+                    let current = *before_replies.get(reply_index).ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "comment storage {root_storage_id} reply count changed during patch"
+                        ))
+                    })?;
+                    reply_index += 1;
+                    Ok(current == identifier)
+                })?;
+                if reply_index != before_replies.len() {
+                    return Err(Error::InvalidFormat(format!(
+                        "comment storage {root_storage_id} reply count changed during patch"
+                    )));
+                }
+                data
             },
             (None, None) => return Ok(()),
         };
-        let verified = tsd::CommentStorageArchive::decode(data.as_slice())?;
-        let expected = before
-            .replies
+        let (_, verified_replies) =
+            decode_comment_storage_payload(root_storage_id, data.as_slice())?;
+        let expected = before_replies
             .iter()
-            .filter_map(|reference| {
-                if old_reply_id == Some(reference.identifier) {
+            .filter_map(|identifier| {
+                if old_reply_id == Some(*identifier) {
                     new_reply_id
                 } else {
-                    Some(reference.identifier)
+                    Some(*identifier)
                 }
             })
-            .chain((old_reply_id.is_none()).then_some(new_reply_id).flatten())
-            .collect::<Vec<_>>();
-        if verified
-            .replies
-            .iter()
-            .map(|reference| reference.identifier)
-            .collect::<Vec<_>>()
-            != expected
-        {
+            .chain((old_reply_id.is_none()).then_some(new_reply_id).flatten());
+        if !verified_replies.iter().copied().eq(expected) {
             return Err(Error::InvalidFormat(format!(
                 "comment storage {root_storage_id} reply patch failed validation"
             )));
@@ -1253,15 +1386,18 @@ pub(crate) fn fresh_comment_storage_uuid(package: &IWorkPackage) -> Result<tsp::
     let mut existing = HashSet::new();
     for name in package.iwa_entry_names() {
         for object in package.archive(name)?.objects {
+            let object_id = object.archive_info.identifier.ok_or_else(|| {
+                Error::Archive(format!("object in {name} has no archive identifier"))
+            })?;
             for message in object
                 .messages
                 .iter()
                 .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             {
-                if let Some(uuid) =
-                    tsd::CommentStorageArchive::decode(message.data.as_slice())?.storage_uuid
-                {
-                    existing.insert((uuid.lower, uuid.upper));
+                let (comment, _) =
+                    decode_comment_storage_payload(object_id, message.data.as_slice())?;
+                if let Some(uuid) = comment.storage_uuid() {
+                    existing.insert((uuid.lower(), uuid.upper()));
                 }
             }
         }
@@ -1570,14 +1706,19 @@ pub(crate) fn remove_generated_annotation_author_if_unused(
     }
     for name in package.iwa_entry_names() {
         for object in package.archive(name)?.objects {
+            let object_id = object.archive_info.identifier.ok_or_else(|| {
+                Error::Archive(format!("object in {name} has no archive identifier"))
+            })?;
             for message in object
                 .messages
                 .iter()
                 .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             {
-                if tsd::CommentStorageArchive::decode(message.data.as_slice())?
-                    .author
-                    .is_some_and(|reference| reference.identifier == author_id)
+                let (comment, _) =
+                    decode_comment_storage_payload(object_id, message.data.as_slice())?;
+                if comment
+                    .author()
+                    .is_some_and(|reference| reference.identifier() == author_id)
                 {
                     return Ok(false);
                 }
@@ -1690,16 +1831,12 @@ fn remove_unreferenced_comment_graph(
             .iter()
             .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
         {
-            let comment = tsd::CommentStorageArchive::decode(message.data.as_slice())?;
-            if let Some(author) = comment.author {
-                removed.author_ids.insert(author.identifier);
+            let (comment, reply_ids) =
+                decode_comment_storage_payload(identifier, message.data.as_slice())?;
+            if let Some(author) = comment.author() {
+                removed.author_ids.insert(author.identifier());
             }
-            replies.extend(
-                comment
-                    .replies
-                    .into_iter()
-                    .map(|reference| reference.identifier),
-            );
+            replies.extend(reply_ids);
         }
         let mut archive = package.archive(&archive_name)?;
         archive.remove_object(identifier).ok_or_else(|| {
@@ -1734,12 +1871,12 @@ fn comment_object_is_referenced(
         for object in &archive.objects {
             for message in &object.messages {
                 if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE {
-                    let comment = tsd::CommentStorageArchive::decode(message.data.as_slice())?;
-                    if comment
-                        .replies
-                        .iter()
-                        .any(|reply| reply.identifier == identifier)
-                    {
+                    let object_id = object.archive_info.identifier.ok_or_else(|| {
+                        Error::Archive(format!("object in {name} has no archive identifier"))
+                    })?;
+                    let (_, reply_ids) =
+                        decode_comment_storage_payload(object_id, message.data.as_slice())?;
+                    if reply_ids.contains(&identifier) {
                         return Ok(true);
                     }
                 }

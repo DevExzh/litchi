@@ -201,6 +201,28 @@ impl Package {
         state_at(selected.table, position, selected.path)
     }
 
+    /// Read one presence-preserving cell using a relative or absolute A1
+    /// address.
+    ///
+    /// This is the string-address convenience form of [`Self::table_cell`].
+    /// The address is parsed by the archive-free [`CellPosition`] parser before
+    /// selector resolution and no native package identifier is retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidAddress`] for malformed A1 input. Other errors
+    /// are the same selector and bounds failures returned by
+    /// [`Self::table_cell`].
+    pub fn table_cell_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+    ) -> Result<State, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        self.table_cell(sheet, table, position)
+    }
+
     /// Read a bounded dense row-major range from a selected table.
     ///
     /// Missing cells remain [`Storage::Missing`], while an explicitly stored
@@ -290,6 +312,29 @@ impl Package {
             });
         }
         Ok(states)
+    }
+
+    /// Read a bounded dense row-major range using a relative or absolute A1
+    /// cell or range address.
+    ///
+    /// This is the string-address convenience form of [`Self::table_cells`].
+    /// A single cell such as `B2` yields a one-element range; an inclusive
+    /// range such as `B2:C3` yields the same half-open dense result as the
+    /// checked [`CellRange`] API.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidAddress`] for malformed A1 input. Other errors
+    /// are the same selector, bounds, resource, and allocation failures
+    /// returned by [`Self::table_cells`].
+    pub fn table_cells_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+    ) -> Result<Vec<State>, Error> {
+        let range = CellRange::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        self.table_cells(sheet, table, range)
     }
 }
 

@@ -293,3 +293,47 @@ fn comment_backed_annotations_are_classified_without_mutation() {
     );
     assert_eq!(package.to_bytes().unwrap(), before);
 }
+
+#[test]
+fn duplicate_comment_text_is_rejected_before_highlight_use() {
+    let mut pages = PagesEditor::create_with_text("Body").unwrap();
+    let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
+    let storage_id = text_box.storage.id;
+    let mut package = pages.into_package();
+    let created = add_text_highlight(
+        &mut package,
+        storage_id.get(),
+        TextRange::from_utf16_indexes(0, 5).unwrap(),
+    )
+    .unwrap();
+    let location = locate_storage(&package, storage_id.get()).unwrap();
+    let archive_name = location.archive_name.clone();
+    let annotation_id = native_object_id(created.id);
+    let comment_storage_id = {
+        let archive = package.archive(&archive_name).unwrap();
+        let object = archive.object(annotation_id).unwrap();
+        validate_plain_highlight_graph(&package, &archive_name, annotation_id, object)
+            .unwrap()
+            .unwrap()
+            .comment_storage_id
+    };
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(comment_storage_id).unwrap();
+            let original = &object.messages[0];
+            let mut data = original.data.clone();
+            append_length_delimited_field(&mut data, 1, b"duplicate")?;
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: original.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    assert!(text_highlights(&package, storage_id.get()).is_err());
+    assert_eq!(package.to_bytes().unwrap(), before);
+}

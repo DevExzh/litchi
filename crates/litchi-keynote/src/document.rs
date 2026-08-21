@@ -21,20 +21,20 @@ struct State {
 /// the independent hard ceiling [`crate::MAX_DOCUMENT_PROPERTIES_BYTES`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DocumentReadOptions {
-    source: litchi_iwa_detect::Limits,
+    source: crate::DocumentSourceLimits,
     semantic: SemanticLimits,
 }
 
 impl DocumentReadOptions {
     /// Combine checked source-capture and semantic resource profiles.
     #[must_use]
-    pub const fn new(source: litchi_iwa_detect::Limits, semantic: SemanticLimits) -> Self {
+    pub const fn new(source: crate::DocumentSourceLimits, semantic: SemanticLimits) -> Self {
         Self { source, semantic }
     }
 
     /// Return the bounded source-capture profile.
     #[must_use]
-    pub const fn source(self) -> litchi_iwa_detect::Limits {
+    pub const fn source(self) -> crate::DocumentSourceLimits {
         self.source
     }
 
@@ -94,6 +94,56 @@ impl Document {
             return Err(ReadError::NotKeynote);
         }
         crate::package::semantic_document_from_prepared_source(source, options.semantic())
+    }
+
+    /// Decode complete Keynote package bytes into an archive-free snapshot.
+    ///
+    /// The input is borrowed only for bounded capture. The returned document
+    /// retains semantic show values and source diagnostics, but no package
+    /// bytes, archive objects, protobuf messages, or native identifiers.
+    /// Use [`crate::Package::from_bytes`] when exact package preservation or
+    /// editing is required.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes are missing a recognized Keynote root,
+    /// violate a physical or semantic ceiling, or contain malformed semantic
+    /// content.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ReadError> {
+        Self::from_bytes_with_options(bytes, DocumentReadOptions::default())
+    }
+
+    /// Decode complete Keynote package bytes under explicit resource limits.
+    ///
+    /// The source profile is translated once at this package boundary; the
+    /// semantic profile is passed through unchanged. The package handle is
+    /// dropped before this method returns, so the result remains archive-free.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same failures as [`Self::from_bytes`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: DocumentReadOptions,
+    ) -> Result<Self, ReadError> {
+        let source = options.source();
+        let package_limits = crate::Limits::new(
+            source.max_input_bytes(),
+            source.max_files(),
+            source.max_entry_size(),
+            source.max_total_size(),
+            source.max_iwa_stream_size(),
+        )?;
+        let package = crate::Package::from_bytes_with_options(
+            bytes,
+            crate::ReadOptions::new(package_limits, options.semantic()),
+        )?;
+        let show = package.show()?.clone();
+        let metadata = package.metadata()?.ok_or_else(|| {
+            ReadError::InvalidFormat("Keynote package has no semantic metadata".to_owned())
+        })?;
+        let stats = package.stats()?;
+        Ok(Self::from_source(show, metadata, stats))
     }
 
     /// Create a snapshot from an already decoded semantic show.

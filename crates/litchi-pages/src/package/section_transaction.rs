@@ -960,7 +960,7 @@ mod tests {
                 small.references,
                 small.transaction_work
             ),
-            (77, 564, 4, 292_154),
+            (86, 564, 4, 292_154),
         );
         assert_eq!(
             (
@@ -969,7 +969,7 @@ mod tests {
                 large.references,
                 large.transaction_work
             ),
-            (77, 564, 4, 587_222),
+            (86, 564, 4, 587_222),
         );
         for (small_counter, large_counter) in [
             (small.fields, large.fields),

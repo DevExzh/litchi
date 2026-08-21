@@ -87,7 +87,7 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
-use litchi_keynote::ChartSelector;
+use litchi_keynote::{ChartCatalog, ChartSelector, ChartSelectorError};
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
@@ -131,6 +131,17 @@ impl KeynoteEditor {
             }
         }
         Ok(charts)
+    }
+
+    /// List the archive-free chart catalog owned directly by one slide.
+    ///
+    /// The catalog contains only source order and visible native titles. Native
+    /// drawable identifiers and component names remain private to the IWA
+    /// adapter. Chart graph, title stand-in, ownership, and non-style guards
+    /// are all checked before the catalog is published.
+    pub fn slide_chart_catalog(&self, slide_index: usize) -> Result<ChartCatalog> {
+        let charts = self.slide_charts(slide_index)?;
+        self.slide_chart_catalog_from_charts(slide_index, &charts)
     }
 
     /// Build an independently editable chart directly from typed inline data.
@@ -654,38 +665,47 @@ impl KeynoteEditor {
                     ))
                 }),
             ChartSelector::Name(name) => {
-                if name.is_empty() {
-                    return Err(Error::ParseError(
-                        "Keynote chart selector name cannot be empty".to_owned(),
-                    ));
-                }
-                let graph = ObjectGraph::read(self.package())?;
-                let context = text_box_create::text_box_context(&graph, slide_index)?;
-                let archive_name = graph.archive_name(context.slide_id)?;
-                let mut match_id = None;
-                for chart in charts {
-                    let title = chart_title(
-                        self.package(),
-                        archive_name,
-                        chart.drawable_object_id,
-                        "Keynote",
-                    )?;
-                    if title.as_deref() != Some(name) {
-                        continue;
-                    }
-                    if match_id.replace(chart.drawable_object_id).is_some() {
-                        return Err(Error::InvalidFormat(format!(
-                            "Keynote slide {slide_index} has multiple charts named {name:?}"
-                        )));
-                    }
-                }
-                match_id.ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote slide {slide_index} has no chart named {name:?}"
-                    ))
-                })
+                let catalog = self.slide_chart_catalog_from_charts(slide_index, &charts)?;
+                let position = catalog
+                    .select_position(name)
+                    .map_err(|error| map_chart_selector_error(slide_index, error))?
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Keynote slide {slide_index} has no chart named {name:?}"
+                        ))
+                    })?;
+                charts
+                    .get(position)
+                    .map(|chart| chart.drawable_object_id)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(format!(
+                            "Keynote slide {slide_index} chart catalog position {position} is out of range"
+                        ))
+                    })
             },
         }
+    }
+
+    fn slide_chart_catalog_from_charts(
+        &self,
+        slide_index: usize,
+        charts: &[KeynoteSlideChartInfo],
+    ) -> Result<ChartCatalog> {
+        let graph = ObjectGraph::read(self.package())?;
+        let context = text_box_create::text_box_context(&graph, slide_index)?;
+        let archive_name = graph.archive_name(context.slide_id)?;
+        let titles = charts
+            .iter()
+            .map(|chart| {
+                chart_title(
+                    self.package(),
+                    archive_name,
+                    chart.drawable_object_id,
+                    "Keynote",
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(ChartCatalog::from_titles(titles))
     }
 
     fn update_slide_chart(
@@ -707,6 +727,22 @@ impl KeynoteEditor {
         verify(&verified)?;
         *self = verified;
         Ok(())
+    }
+}
+
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "ChartSelectorError is a non-exhaustive archive-free boundary type"
+)]
+fn map_chart_selector_error(slide_index: usize, error: ChartSelectorError) -> Error {
+    match error {
+        ChartSelectorError::EmptyName => {
+            Error::ParseError("Keynote chart selector name cannot be empty".to_owned())
+        },
+        ChartSelectorError::DuplicateChartTitle { name } => Error::InvalidFormat(format!(
+            "Keynote slide {slide_index} has multiple charts named {name:?}"
+        )),
+        _ => Error::InvalidFormat("Keynote chart selector is invalid".to_owned()),
     }
 }
 
