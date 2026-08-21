@@ -1567,6 +1567,26 @@ fn malformed_comment_storage_fails_transactionally() {
 }
 
 #[test]
+fn noncanonical_comment_storage_fails_transactionally() {
+    let mut package = test_package_with_comments(false);
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(61).unwrap();
+            let mut data = object.messages[0].data.clone();
+            // A second singular text field was accepted by the old generated
+            // decoder but is rejected by the strict CommentStorage codec.
+            data.extend_from_slice(&[0x0a, 0x03, b'B', b'a', b'd']);
+            object.replace_message(0, RawMessage { type_: 3056, data })?;
+            Ok(())
+        })
+        .unwrap();
+    let mut editor = NumbersEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_cell_comment(10, 0, 1, "Rejected").is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn public_reader_applies_tile_row_origins() {
     let mut package = test_package();
     package

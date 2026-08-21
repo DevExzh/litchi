@@ -4435,6 +4435,7 @@ fn discover_structure(
 
     let mut body = None;
     let mut sections = HashMap::new();
+    let mut section_objects = HashSet::new();
     let mut templates = HashMap::new();
     let mut writable_storages = HashSet::new();
     for name in package.iwa_entry_names() {
@@ -4455,7 +4456,16 @@ fn discover_structure(
                         }
                     },
                     SECTION_MESSAGE_TYPE => {
-                        if let Ok(section) = SectionArchive::decode(message.data.as_slice()) {
+                        if !section_objects.insert(identifier) {
+                            return Err(Error::InvalidFormat(format!(
+                                "Pages section object {identifier} occurs more than once"
+                            )));
+                        }
+                        let Ok(name) = pages_section_name(message.data.as_slice()) else {
+                            continue;
+                        };
+                        if let Ok(mut section) = SectionArchive::decode(message.data.as_slice()) {
+                            section.name = name.map(str::to_owned);
                             insert_unique(&mut sections, identifier, section, "section")?;
                         }
                     },

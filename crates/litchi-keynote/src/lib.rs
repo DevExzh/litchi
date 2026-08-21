@@ -312,7 +312,7 @@ pub mod transition;
 
 pub use background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use build::{AnimationType, Build};
-pub use chart::ChartSelector;
+pub use chart::{ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError};
 pub use document::{Document, DocumentReadOptions};
 pub use error::{Error, Result};
 pub use litchi_core::Position;

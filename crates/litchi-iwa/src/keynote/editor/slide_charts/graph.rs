@@ -208,6 +208,11 @@ pub(super) fn chart_graph(
     );
     for (identifier, message_type, label) in local_styles {
         if graph.archive_name(identifier)? != archive_name {
+            if message_type == CHART_NON_STYLE_MESSAGE_TYPE {
+                return Err(Error::InvalidFormat(format!(
+                    "Keynote chart {label} {identifier} is outside slide component {archive_name}"
+                )));
+            }
             continue;
         }
         let style = archive.object(identifier).ok_or_else(|| {

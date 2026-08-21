@@ -67,6 +67,11 @@ pub(crate) fn chart_non_style_slot(
         })?;
     let archive_name =
         unique_chart_object_archive_name(package, non_style_id, "chart non-style object")?;
+    if archive_name != chart_archive_name {
+        return Err(Error::InvalidFormat(format!(
+            "{drawable_label} chart non-style {non_style_id} is outside chart component {chart_archive_name}"
+        )));
+    }
     let archive = package.archive(&archive_name)?;
     let non_style_object = archive.object(non_style_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -215,5 +220,68 @@ pub(crate) fn generated_chart_non_style_extension(data: &[u8]) -> Result<Option<
             "chart non-style extension {GENERATED_CHART_NON_STYLE_EXTENSION_FIELD} is not length-delimited"
         )));
     }
+    extension.validate_canonical_framing(data)?;
     Ok(Some(&data[extension.payload_start()..extension.end()]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::wire::{append_length_delimited_field, parse_wire_fields};
+
+    const TITLE_EXTENSION: &[u8] = &[0xa8, 0x01, 0x01];
+
+    #[test]
+    fn generated_extension_rejects_overlong_outer_key() {
+        let (key, length) = canonical_outer_framing();
+        let mut overlong_key = key;
+        let last = overlong_key.pop().expect("canonical key");
+        overlong_key.push(last | 0x80);
+        overlong_key.extend([0x80, 0x00]);
+
+        let data = outer_field(&overlong_key, &length);
+        let error = generated_chart_non_style_extension(&data)
+            .expect_err("overlong generated-extension key");
+        assert!(error.to_string().contains("noncanonical key"));
+    }
+
+    #[test]
+    fn generated_extension_rejects_overlong_outer_length() {
+        let (key, length) = canonical_outer_framing();
+        let mut overlong_length = length;
+        let last = overlong_length.pop().expect("canonical length");
+        overlong_length.push(last | 0x80);
+        overlong_length.push(0);
+
+        let data = outer_field(&key, &overlong_length);
+        let error = generated_chart_non_style_extension(&data)
+            .expect_err("overlong generated-extension length");
+        assert!(error.to_string().contains("noncanonical length prefix"));
+    }
+
+    fn canonical_outer_framing() -> (Vec<u8>, Vec<u8>) {
+        let mut data = Vec::new();
+        append_length_delimited_field(
+            &mut data,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            TITLE_EXTENSION,
+        )
+        .expect("canonical extension");
+        let field = parse_wire_fields(&data)
+            .expect("canonical wire")
+            .pop()
+            .expect("outer extension");
+        (
+            data[field.start()..field.key_end()].to_vec(),
+            data[field.key_end()..field.payload_start()].to_vec(),
+        )
+    }
+
+    fn outer_field(key: &[u8], length: &[u8]) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(key);
+        data.extend_from_slice(length);
+        data.extend_from_slice(TITLE_EXTENSION);
+        data
+    }
 }

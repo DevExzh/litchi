@@ -14,14 +14,15 @@ use crate::charts::non_style::{
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_protos::keynote_chart_title_codec::{
+    ChartTitleWrite, DecodeOptions, decode_chart_title, decode_visible_chart_title,
+    rewrite_chart_title,
+};
 
 /// `tschchartinfodefaultshowlegend` in `TSCH.Generated.ChartNonStyleArchive`.
 const CHART_LEGEND_VISIBLE_FIELD: u32 = 20;
-/// `tschchartinfodefaultshowtitle` in `TSCH.Generated.ChartNonStyleArchive`.
-const CHART_TITLE_VISIBLE_FIELD: u32 = 21;
-/// `tschchartinfodefaulttitle` in `TSCH.Generated.ChartNonStyleArchive`.
-const CHART_TITLE_TEXT_FIELD: u32 = 23;
-
+/// Private hard ceiling for one native chart title's UTF-8 bytes.
+const MAX_CHART_TITLE_BYTES: usize = 64 * 1024 * 1024;
 /// Read one chart title from its native chart non-style extension.
 pub(crate) fn chart_title(
     package: &IWorkPackage,
@@ -146,13 +147,9 @@ pub(crate) fn read_chart_non_style_title(data: &[u8]) -> Result<Option<String>> 
     let Some(extension) = generated_chart_non_style_extension(data)? else {
         return Ok(None);
     };
-    let generated = tsch::generated::ChartNonStyleArchive::decode(extension)?;
-    if generated.tschchartinfodefaultshowtitle != Some(true) {
-        return Ok(None);
-    }
-    Ok(Some(
-        generated.tschchartinfodefaulttitle.unwrap_or_default(),
-    ))
+    decode_visible_chart_title(extension, chart_title_decode_options(extension, None))
+        .map(|title| title.map(str::to_owned))
+        .map_err(chart_title_codec_error)
 }
 
 /// Decode a `TSCH.ChartNonStyleArchive` and return its native legend switch.
@@ -169,36 +166,37 @@ fn patch_chart_non_style_title(data: &[u8], title: Option<&str>) -> Result<Vec<u
         let Some(title) = title else {
             return Ok(data.to_vec());
         };
-        let generated = tsch::generated::ChartNonStyleArchive {
-            tschchartinfodefaultshowtitle: Some(true),
-            tschchartinfodefaulttitle: Some(title.to_owned()),
-            ..Default::default()
-        };
+        let extension = rewrite_chart_title(
+            &[],
+            ChartTitleWrite::new(Some(true), Some(title)),
+            chart_title_decode_options(&[], Some(title)),
+        )
+        .map_err(chart_title_codec_error)?;
         let patched = patch_length_delimited_field(
             data,
             GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
             false,
-            Some(generated.encode_to_vec().as_slice()),
+            Some(extension.as_slice()),
         )?;
         validate_patched_title(&patched, Some(title))?;
         return Ok(patched);
     };
 
-    let generated = tsch::generated::ChartNonStyleArchive::decode(extension)?;
-    let visible_present = generated.tschchartinfodefaultshowtitle.is_some();
-    let title_present = generated.tschchartinfodefaulttitle.is_some();
-    let extension = patch_varint_field(
+    if title.is_none()
+        && decode_chart_title(extension, chart_title_decode_options(extension, None))
+            .map_err(chart_title_codec_error)?
+            .title_visible()
+            != Some(true)
+    {
+        return Ok(data.to_vec());
+    }
+
+    let extension = rewrite_chart_title(
         extension,
-        CHART_TITLE_VISIBLE_FIELD,
-        visible_present,
-        Some(u64::from(title.is_some())),
-    )?;
-    let extension = patch_length_delimited_field(
-        &extension,
-        CHART_TITLE_TEXT_FIELD,
-        title_present,
-        title.map(str::as_bytes),
-    )?;
+        ChartTitleWrite::new(Some(title.is_some()), title),
+        chart_title_decode_options(extension, title),
+    )
+    .map_err(chart_title_codec_error)?;
     let patched = patch_length_delimited_field(
         data,
         GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
@@ -207,6 +205,43 @@ fn patch_chart_non_style_title(data: &[u8], title: Option<&str>) -> Result<Vec<u
     )?;
     validate_patched_title(&patched, title)?;
     Ok(patched)
+}
+
+/// Build a finite policy for the strict generated title projection.
+///
+/// The codec validates the whole selected extension, while this module owns
+/// the outer length-delimited field. A replacement title may be larger than
+/// the source extension, so the rewrite budget is based on both payloads;
+/// the source byte ceiling remains exact for the first decode and is widened
+/// by the codec itself only for its readback of the candidate output.
+fn chart_title_decode_options(source: &[u8], replacement: Option<&str>) -> DecodeOptions {
+    let title_bytes = replacement.map_or(0, str::len);
+    let output_bytes = source
+        .len()
+        .saturating_add(title_bytes)
+        .saturating_add(32)
+        .max(1);
+    let source_bytes = source.len().max(1);
+    DecodeOptions::new(
+        source_bytes,
+        output_bytes.saturating_mul(8).max(1),
+        output_bytes.saturating_mul(16).max(1),
+        8,
+    )
+    .with_max_output_bytes(output_bytes)
+    .with_max_title_bytes(chart_title_limit(source.len(), title_bytes))
+}
+
+fn chart_title_limit(source_bytes: usize, replacement_bytes: usize) -> usize {
+    source_bytes
+        .max(replacement_bytes)
+        .clamp(1, MAX_CHART_TITLE_BYTES)
+}
+
+fn chart_title_codec_error(
+    error: litchi_iwa_protos::keynote_chart_title_codec::DecodeError,
+) -> Error {
+    Error::InvalidFormat(format!("invalid chart title generated extension: {error}"))
 }
 
 fn patch_chart_non_style_legend_visibility(data: &[u8], visible: bool) -> Result<Vec<u8>> {
@@ -322,6 +357,142 @@ mod tests {
     }
 
     #[test]
+    fn title_patch_preserves_hidden_stale_text_until_explicitly_replaced() {
+        let generated = tsch::generated::ChartNonStyleArchive {
+            tschchartinfodefaultshowtitle: Some(false),
+            tschchartinfodefaulttitle: Some("stale title".to_owned()),
+            ..Default::default()
+        };
+        let mut extension = generated.encode_to_vec();
+        append_varint_field(&mut extension, UNMAPPED_GENERATED_FIELD, UNMAPPED_VALUE).unwrap();
+        let base = tsch::ChartNonStyleArchive {
+            super_: Some(tss::StyleArchive::default()),
+        };
+        let mut original = base.encode_to_vec();
+        append_length_delimited_field(
+            &mut original,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            &extension,
+        )
+        .unwrap();
+        append_varint_field(&mut original, UNMAPPED_OUTER_FIELD, UNMAPPED_VALUE).unwrap();
+
+        assert_eq!(read_chart_non_style_title(&original).unwrap(), None);
+        assert_eq!(
+            patch_chart_non_style_title(&original, None).unwrap(),
+            original
+        );
+
+        let visible = patch_chart_non_style_title(&original, Some("fresh title")).unwrap();
+        assert_eq!(
+            read_chart_non_style_title(&visible).unwrap(),
+            Some("fresh title".to_owned())
+        );
+        assert_eq!(
+            raw_field(&visible, UNMAPPED_OUTER_FIELD),
+            raw_field(&original, UNMAPPED_OUTER_FIELD)
+        );
+        assert_eq!(
+            raw_field(
+                generated_chart_non_style_extension(&visible)
+                    .unwrap()
+                    .unwrap(),
+                UNMAPPED_GENERATED_FIELD
+            ),
+            raw_field(
+                generated_chart_non_style_extension(&original)
+                    .unwrap()
+                    .unwrap(),
+                UNMAPPED_GENERATED_FIELD
+            )
+        );
+    }
+
+    #[test]
+    fn title_patch_preserves_absent_visibility_with_stale_text() {
+        let mut extension = Vec::new();
+        append_length_delimited_field(&mut extension, 23, b"stale title").unwrap();
+        let original = outer_chart_non_style(&extension);
+
+        assert_eq!(read_chart_non_style_title(&original).unwrap(), None);
+        assert_eq!(
+            patch_chart_non_style_title(&original, None).unwrap(),
+            original
+        );
+
+        let visible = patch_chart_non_style_title(&original, Some("fresh title")).unwrap();
+        assert_eq!(
+            read_chart_non_style_title(&visible).unwrap(),
+            Some("fresh title".to_owned())
+        );
+    }
+
+    #[test]
+    fn title_patch_preserves_visible_empty_default_when_text_is_absent() {
+        let mut extension = Vec::new();
+        append_varint_field(&mut extension, 21, 1).unwrap();
+        let original = outer_chart_non_style(&extension);
+
+        assert_eq!(
+            read_chart_non_style_title(&original).unwrap(),
+            Some(String::new())
+        );
+        let titled = patch_chart_non_style_title(&original, Some("fresh title")).unwrap();
+        assert_eq!(
+            read_chart_non_style_title(&titled).unwrap(),
+            Some("fresh title".to_owned())
+        );
+
+        let removed = patch_chart_non_style_title(&original, None).unwrap();
+        assert_eq!(read_chart_non_style_title(&removed).unwrap(), None);
+    }
+
+    #[test]
+    fn title_codec_rejects_duplicate_selected_fields_before_rewrite() {
+        let base = tsch::ChartNonStyleArchive {
+            super_: Some(tss::StyleArchive::default()),
+        };
+        let mut extension = Vec::new();
+        append_varint_field(&mut extension, 21, 1).unwrap();
+        append_varint_field(&mut extension, 21, 0).unwrap();
+        let mut original = base.encode_to_vec();
+        append_length_delimited_field(
+            &mut original,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            &extension,
+        )
+        .unwrap();
+
+        let error = read_chart_non_style_title(&original).expect_err("duplicate title switch");
+        assert!(error.to_string().contains("duplicate singular field"));
+        assert!(patch_chart_non_style_title(&original, Some("new")).is_err());
+    }
+
+    #[test]
+    fn title_decode_policy_caps_source_and_replacement_at_64_mib() {
+        assert_eq!(
+            chart_title_limit(0, MAX_CHART_TITLE_BYTES),
+            MAX_CHART_TITLE_BYTES
+        );
+        assert_eq!(
+            chart_title_limit(0, MAX_CHART_TITLE_BYTES + 1),
+            MAX_CHART_TITLE_BYTES
+        );
+        assert_eq!(
+            chart_title_limit(MAX_CHART_TITLE_BYTES + 1, 0),
+            MAX_CHART_TITLE_BYTES
+        );
+    }
+
+    #[test]
+    fn title_patch_rejects_replacement_over_64_mib_before_output_reservation() {
+        let oversized = "x".repeat(MAX_CHART_TITLE_BYTES + 1);
+        let error = patch_chart_non_style_title(&[], Some(&oversized))
+            .expect_err("oversized chart title must fail closed");
+        assert!(error.to_string().contains("maximum is 67108864"));
+    }
+
+    #[test]
     fn legend_patch_retains_title_and_unmapped_chart_non_style_fields() {
         let generated = tsch::generated::ChartNonStyleArchive {
             tschchartinfodefaultshowlegend: Some(true),
@@ -380,5 +551,16 @@ mod tests {
             .filter(|field| field.number() == number)
             .map(|field| data[field.start()..field.end()].to_vec())
             .collect()
+    }
+
+    fn outer_chart_non_style(extension: &[u8]) -> Vec<u8> {
+        let mut data = tsch::ChartNonStyleArchive::default().encode_to_vec();
+        append_length_delimited_field(
+            &mut data,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            extension,
+        )
+        .unwrap();
+        data
     }
 }
