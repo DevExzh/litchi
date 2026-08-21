@@ -4,13 +4,17 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use std::io::Cursor;
+use std::io::{self, Cursor, Read, Seek, SeekFrom};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
 use crate::consts::{
     DIRENTRY_SIZE, FREESECT, HEADER_DIFAT_ENTRIES, HEADER_DIFAT_OFFSET, NUM_FAT_SECTORS_OFFSET,
     SECTOR_SHIFT_OFFSET, SECTOR_SHIFT_V3, SECTOR_SIZE_V3,
 };
-use crate::{OleFile, writer::OleWriter};
+use crate::{OleError, OleFile, OleFileLimits, writer::OleWriter};
 
 fn sample_file() -> Vec<u8> {
     let mut writer = OleWriter::new();
@@ -28,11 +32,173 @@ fn write_u32(bytes: &mut [u8], offset: usize, value: u32) {
     bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
 }
 
+#[derive(Debug)]
+struct ReportedLengthReader {
+    bytes: Vec<u8>,
+    position: u64,
+    reported_length: u64,
+    reads: Arc<AtomicUsize>,
+}
+
+impl Read for ReportedLengthReader {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        self.reads.fetch_add(1, Ordering::Relaxed);
+        let Some(start) = usize::try_from(self.position).ok() else {
+            return Ok(0);
+        };
+        let Some(input) = self.bytes.get(start..) else {
+            return Ok(0);
+        };
+        let count = input.len().min(output.len());
+        output[..count].copy_from_slice(&input[..count]);
+        self.position = self
+            .position
+            .checked_add(u64::try_from(count).unwrap())
+            .unwrap();
+        Ok(count)
+    }
+}
+
+impl Seek for ReportedLengthReader {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let next = match position {
+            SeekFrom::Start(offset) => offset,
+            SeekFrom::End(offset) => self
+                .reported_length
+                .checked_add_signed(offset)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "seek overflow"))?,
+            SeekFrom::Current(offset) => self
+                .position
+                .checked_add_signed(offset)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "seek overflow"))?,
+        };
+        self.position = next;
+        Ok(next)
+    }
+}
+
 #[test]
 fn rejects_version_3_directory_sector_count() {
     let mut bytes = sample_file();
     write_u32(&mut bytes, 0x28, 1);
     assert!(OleFile::open(Cursor::new(bytes)).is_err());
+}
+
+#[test]
+fn low_level_default_ingress_limit_is_finite() {
+    assert!(OleFileLimits::default().max_input_bytes() < u64::MAX);
+    assert!(matches!(
+        OleFileLimits::new(0),
+        Err(OleError::InvalidLimit {
+            resource: "CFB input bytes",
+            value: 0,
+            maximum: OleFileLimits::MAX_INPUT_BYTES,
+        })
+    ));
+    assert!(matches!(
+        OleFileLimits::new(OleFileLimits::MAX_INPUT_BYTES + 1),
+        Err(OleError::InvalidLimit {
+            resource: "CFB input bytes",
+            value,
+            maximum,
+        }) if value == maximum + 1
+    ));
+}
+
+#[test]
+fn low_level_ingress_accepts_exact_limit_and_rejects_max_plus_one() {
+    let bytes = sample_file();
+    let exact = OleFileLimits::new(bytes.len() as u64).unwrap();
+    OleFile::open_with_limits(Cursor::new(bytes.clone()), exact)
+        .expect("a source exactly at its configured limit opens");
+
+    let over_limit = OleFileLimits::new(bytes.len() as u64).unwrap();
+    let mut oversized = bytes;
+    oversized.push(0);
+    assert!(matches!(
+        OleFile::open_with_limits(Cursor::new(oversized), over_limit),
+        Err(OleError::LimitExceeded {
+            resource: "input bytes",
+            observed,
+            maximum,
+        }) if observed == maximum + 1
+    ));
+}
+
+#[test]
+fn hostile_reported_length_is_rejected_before_header_read() {
+    let bytes = sample_file();
+    let reads = Arc::new(AtomicUsize::new(0));
+    let reader = ReportedLengthReader {
+        reported_length: bytes.len() as u64 + 1,
+        bytes,
+        position: 0,
+        reads: reads.clone(),
+    };
+    let limits = OleFileLimits::new(reader.reported_length - 1).unwrap();
+
+    assert!(matches!(
+        OleFile::open_with_limits(reader, limits),
+        Err(OleError::LimitExceeded {
+            resource: "input bytes",
+            observed,
+            maximum,
+        }) if observed == maximum + 1
+    ));
+    assert_eq!(reads.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn hostile_count_metadata_is_rejected_before_index_allocation() {
+    let mut bytes = sample_file();
+    write_u32(&mut bytes, NUM_FAT_SECTORS_OFFSET, u32::MAX);
+
+    assert!(matches!(
+        OleFile::open(Cursor::new(bytes)),
+        Err(OleError::CorruptedFile(message))
+            if message.contains("Declared FAT sector count exceeds the physical file")
+    ));
+}
+
+#[test]
+fn hostile_difat_and_minifat_counts_are_rejected_before_index_allocation() {
+    for (count_offset, first_offset, message) in [
+        (
+            0x48,
+            0x44,
+            "Declared DIFAT sector count exceeds the physical file",
+        ),
+        (
+            0x40,
+            0x3C,
+            "Declared MiniFAT sector count exceeds the physical file",
+        ),
+    ] {
+        let mut bytes = sample_file();
+        write_u32(&mut bytes, count_offset, u32::MAX);
+        write_u32(&mut bytes, first_offset, 0);
+
+        assert!(matches!(
+            OleFile::open(Cursor::new(bytes)),
+            Err(OleError::CorruptedFile(actual)) if actual == message
+        ));
+    }
+}
+
+#[test]
+fn hostile_version_4_directory_count_is_rejected_before_index_allocation() {
+    let mut writer = OleWriter::with_sector_size(crate::consts::SECTOR_SIZE_V4).unwrap();
+    writer.create_stream(&["Payload"], b"bounded").unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let mut bytes = output.into_inner();
+    write_u32(&mut bytes, 0x28, u32::MAX);
+
+    assert!(matches!(
+        OleFile::open(Cursor::new(bytes)),
+        Err(OleError::CorruptedFile(message))
+            if message == "Declared directory sector count exceeds the physical file"
+    ));
 }
 
 #[test]
