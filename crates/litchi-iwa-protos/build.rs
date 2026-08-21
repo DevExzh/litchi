@@ -54,6 +54,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     if proto_files.is_empty() {
         return Err(format!("no Protocol Buffer schemas found in {PROTO_DIRECTORY}").into());
     }
+    enforce_projection_schema_ratchets(buffa_projection_directory)?;
+    enforce_production_ingress_ratchets()?;
     enforce_text_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_group_node_category_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_document_projection_provenance(proto_directory, buffa_projection_directory)?;
@@ -605,6 +607,375 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_pages_body_projection_budget(&buffa_pages_body_out_directory)?;
 
+    Ok(())
+}
+
+fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(), Box<dyn Error>> {
+    // Every derived schema is compiled in isolation.  Keep the complete
+    // source inventory, byte width, and digest explicit so a new field,
+    // imported closure, or unreviewed projection file cannot silently widen a
+    // lazy ingress boundary while remaining under a per-generator budget.
+    const EXPECTED_PROJECTIONS: &[(&str, usize, &str)] = &[
+        (
+            "KNDocumentArchive.proto",
+            844,
+            "d4dba9f6a73a35531e9c8bb9731504891000d415bb981b74f783710998630236",
+        ),
+        (
+            "KNPlaceholderTextOwnerArchive.proto",
+            1108,
+            "2f076952a2f963ab9fa410f2625f3eac7f5ee1f26f5b1c49f833266016f13d8c",
+        ),
+        (
+            "KNShowArchive.proto",
+            1682,
+            "06641b66f5bc7c137578a29ff16e43167a6e307fe13159b07538a99e49c96d56",
+        ),
+        (
+            "KNSlideNumberArchive.proto",
+            767,
+            "0467ffa978c763fb10bf9de2097eaad354eedef61714ee4707a2e1355bc4b607",
+        ),
+        (
+            "KNSlideTransitionArchive.proto",
+            2347,
+            "7a74d790563b72453833a73fa7352b0a796ba11a8b87f9c7665897b9ce3a28e0",
+        ),
+        (
+            "KNSoundtrackSettingsArchive.proto",
+            338,
+            "7c64e558e49c485272e1c878aa93571e516a4a7730e6de945f72998829e4f2d2",
+        ),
+        (
+            "KNSpeakerNotesArchive.proto",
+            1402,
+            "20500304a527d8c0531148217c3302b36eb2cee7a48d7a90533130f9a70acd77",
+        ),
+        (
+            "TNNumbersNamesArchive.proto",
+            910,
+            "348c2e554240f1f2800fb283bb62e025897ed5c45c720550844a83d796126e93",
+        ),
+        (
+            "TNNumbersSheetReferenceArchive.proto",
+            280,
+            "5ea19e0ad657c4367b1974d0730d1ea0a75602d4e38d2da4dfeb67b1ac753436",
+        ),
+        (
+            "TPDocumentBodyArchive.proto",
+            2600,
+            "3461ea3c1165a3fd82fba1aebbcd239a604dd56e8ea1052014e59900a3db0d7b",
+        ),
+        (
+            "TPSectionArchive.proto",
+            1653,
+            "4f284cd2403ade092ae8e8105924e15c34f69e203307fd0aabc90e5d705041d7",
+        ),
+        (
+            "TPSectionBackgroundArchive.proto",
+            783,
+            "0a6f03a7046c285e431953b8752096a1f0117206724b561da294c64092aa9cfc",
+        ),
+        (
+            "TSCEFormulaArchive.proto",
+            2343,
+            "3c477f4610fedd8fc563ffd83122984d3042cfa8b9d756e3e1c60a719e8d5ba8",
+        ),
+        (
+            "TSCETableCellDependenciesArchive.proto",
+            3257,
+            "b1ec4313ee2c0012f0441829de19662567457ea9b445dc557fc6354c7abfe533",
+        ),
+        (
+            "TSCHChartCaptionArchive.proto",
+            546,
+            "caa27f6d9eaab23e7eb33d48744c205cf38629765be97b7f135ceb9edab04d12",
+        ),
+        (
+            "TSCHChartTitleArchive.proto",
+            526,
+            "8faaf5b5fd30a2a73e34e73aa003cff591c4f2aa3e32dfca58cc1c5fce09f10a",
+        ),
+        (
+            "TSDCommentStorageArchive.proto",
+            1173,
+            "396d98fd78f6a417a57af4a1e7f3830362e3174753687aef2fe49aaf7a88087d",
+        ),
+        (
+            "TSPPackageMetadataArchive.proto",
+            858,
+            "f33fc54b7382231d9b8ece89390928cf634bd9a8108e5a929a30563e2d693a60",
+        ),
+        (
+            "TSTGroupNodeCategoryArchive.proto",
+            1196,
+            "3f2a9a2d2f53d6cd9f6496899f356f53cb507122c71da8dfc82acf57b5735f40",
+        ),
+        (
+            "TSTTableCellStorageArchive.proto",
+            3607,
+            "b2017f2f7e40581ca85410f1bb2cbb793571c29b51f63314acd060f945370081",
+        ),
+        (
+            "TSTTableHeaderSettingsArchive.proto",
+            930,
+            "1236d9a9d0116885c7140683e5de2d33b6a083435bf3d3cfbebf91172c856d24",
+        ),
+        (
+            "TSTTableInfoArchive.proto",
+            1010,
+            "93d7d29b24f2e279e5d62a900142890e99417ce0caa098cbf65d3dbb47088c3c",
+        ),
+        (
+            "TSTTableTitleSettingsArchive.proto",
+            746,
+            "66e04d6d4049bd2bdaa79da79f52e01431cd1579890c903c16ac1764e1476715",
+        ),
+        (
+            "TSWPStorageArchive.proto",
+            587,
+            "54be1aea50f7e6a211ccb2e19b4abbf9b7ab9c9748a99941dad3e68b7cfa37ba",
+        ),
+    ];
+
+    let mut actual_names = fs::read_dir(projection_directory)?
+        .map(|entry| {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
+                return Ok(None);
+            }
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| "projection filename is not UTF-8")?;
+            if !name.ends_with(".proto") {
+                return Err(format!("unexpected non-proto projection file {name}").into());
+            }
+            Ok(Some(name))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    actual_names.sort_unstable();
+    let mut expected_names = EXPECTED_PROJECTIONS
+        .iter()
+        .map(|(name, _length, _digest)| (*name).to_owned())
+        .collect::<Vec<_>>();
+    expected_names.sort_unstable();
+    if actual_names != expected_names {
+        return Err(format!(
+            "derived projection inventory drifted: found {actual_names:?}, expected {expected_names:?}"
+        )
+        .into());
+    }
+
+    for (name, expected_length, expected_digest) in EXPECTED_PROJECTIONS {
+        let path = projection_directory.join(name);
+        let source = fs::read(&path)?;
+        if source.len() != *expected_length {
+            return Err(format!(
+                "derived projection {name} changed size to {} bytes; expected {expected_length}",
+                source.len()
+            )
+            .into());
+        }
+        let digest = Sha256::digest(&source)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        if digest != *expected_digest {
+            return Err(format!(
+                "derived projection {name} digest {digest} does not match reviewed digest {expected_digest}"
+            )
+            .into());
+        }
+        if source
+            .split(|byte| *byte == b'\n')
+            .map(|line| line.iter().copied().skip_while(u8::is_ascii_whitespace))
+            .any(|line| line.collect::<Vec<_>>().starts_with(b"import "))
+        {
+            return Err(format!(
+                "derived projection {name} introduced an unreviewed imported dependency"
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
+    // Keep every production Buffa ingress tied to one private generated
+    // module.  Prost remains the compatibility type generator, but no
+    // production codec may decode untrusted bytes through a Prost-owned
+    // message or expose a generated view boundary to downstream crates.
+    const CODECS: &[(&str, &str, &str)] = &[
+        (
+            "src/archive_codec.rs",
+            "buffa_generated::TSP",
+            "mod buffa_generated {",
+        ),
+        (
+            "src/text_storage_codec.rs",
+            "crate::buffa_text_storage_generated::",
+            "mod buffa_text_storage_generated {",
+        ),
+        (
+            "src/comment_storage_codec.rs",
+            "crate::buffa_comment_storage_generated::",
+            "mod buffa_comment_storage_generated {",
+        ),
+        (
+            "src/group_node_category_codec.rs",
+            "crate::buffa_group_node_category_generated::",
+            "mod buffa_group_node_category_generated {",
+        ),
+        (
+            "src/keynote_document_codec.rs",
+            "crate::buffa_keynote_document_generated::",
+            "mod buffa_keynote_document_generated {",
+        ),
+        (
+            "src/keynote_chart_caption_codec.rs",
+            "crate::buffa_keynote_chart_caption_generated::",
+            "mod buffa_keynote_chart_caption_generated {",
+        ),
+        (
+            "src/keynote_chart_title_codec.rs",
+            "crate::buffa_keynote_chart_title_generated::",
+            "mod buffa_keynote_chart_title_generated {",
+        ),
+        (
+            "src/keynote_placeholder_text_codec.rs",
+            "crate::buffa_keynote_placeholder_text_generated::",
+            "mod buffa_keynote_placeholder_text_generated {",
+        ),
+        (
+            "src/keynote_speaker_notes_codec.rs",
+            "crate::buffa_keynote_speaker_notes_generated::",
+            "mod buffa_keynote_speaker_notes_generated {",
+        ),
+        (
+            "src/keynote_slide_number_codec.rs",
+            "crate::buffa_keynote_slide_number_generated::",
+            "mod buffa_keynote_slide_number_generated {",
+        ),
+        (
+            "src/keynote_soundtrack_settings_codec.rs",
+            "crate::buffa_keynote_soundtrack_settings_generated::",
+            "mod buffa_keynote_soundtrack_settings_generated {",
+        ),
+        (
+            "src/keynote_slide_transition_codec.rs",
+            "crate::buffa_keynote_slide_transition_generated::",
+            "mod buffa_keynote_slide_transition_generated {",
+        ),
+        (
+            "src/keynote_show_codec.rs",
+            "crate::buffa_keynote_show_generated::",
+            "mod buffa_keynote_show_generated {",
+        ),
+        (
+            "src/numbers_names_codec.rs",
+            "crate::buffa_numbers_names_generated::",
+            "mod buffa_numbers_names_generated {",
+        ),
+        (
+            "src/numbers_sheet_order_codec.rs",
+            "crate::buffa_numbers_sheet_order_generated::",
+            "mod buffa_numbers_sheet_order_generated {",
+        ),
+        (
+            "src/numbers_table_header_settings_codec.rs",
+            "crate::buffa_numbers_table_header_settings_generated::",
+            "mod buffa_numbers_table_header_settings_generated {",
+        ),
+        (
+            "src/numbers_table_title_codec.rs",
+            "crate::buffa_numbers_table_title_generated::",
+            "mod buffa_numbers_table_title_generated {",
+        ),
+        (
+            "src/numbers_table_cell_storage_codec.rs",
+            "crate::buffa_numbers_table_cell_storage_generated::",
+            "mod buffa_numbers_table_cell_storage_generated {",
+        ),
+        (
+            "src/numbers_table_cell_dependency_codec.rs",
+            "crate::buffa_numbers_table_cell_dependency_generated::",
+            "mod buffa_numbers_table_cell_dependency_generated {",
+        ),
+        (
+            "src/package_metadata_codec.rs",
+            "crate::buffa_package_metadata_generated::",
+            "mod buffa_package_metadata_generated {",
+        ),
+        (
+            "src/numbers_formula_codec.rs",
+            "crate::buffa_formula_generated::",
+            "mod buffa_formula_generated {",
+        ),
+        (
+            "src/table_info_codec.rs",
+            "crate::buffa_table_info_generated::",
+            "mod buffa_table_info_generated {",
+        ),
+        (
+            "src/pages_section_codec.rs",
+            "crate::buffa_pages_section_generated::",
+            "mod buffa_pages_section_generated {",
+        ),
+        (
+            "src/pages_section_background_codec.rs",
+            "crate::buffa_pages_section_background_generated::",
+            "mod buffa_pages_section_background_generated {",
+        ),
+        (
+            "src/pages_body_codec.rs",
+            "crate::buffa_pages_body_generated::",
+            "mod buffa_pages_body_generated {",
+        ),
+        (
+            "src/pages_page_layout_codec.rs",
+            "crate::buffa_pages_body_generated::",
+            "mod buffa_pages_body_generated {",
+        ),
+        (
+            "src/pages_document_settings_codec.rs",
+            "crate::buffa_pages_body_generated::",
+            "mod buffa_pages_body_generated {",
+        ),
+    ];
+    const FORBIDDEN_PROST_INGRESS: &[&str] = &[
+        "prost::",
+        "prost ::",
+        "Message::decode",
+        "Message::merge",
+        "decode_length_delimited",
+    ];
+
+    let lib = fs::read_to_string("src/lib.rs")?;
+    for (path, generated_marker, private_module_marker) in CODECS {
+        let source = fs::read_to_string(path)?;
+        // A few codecs have cfg(test) allocation probes near their imports;
+        // remove the trailing test module instead of truncating production at
+        // the first test-only item.
+        let production = source
+            .rsplit_once("#[cfg(test)]")
+            .map_or(source.as_str(), |(body, _tests)| body);
+        if !production.contains("decode_lazy_view")
+            || !production.contains(generated_marker)
+            || !lib.contains(private_module_marker)
+            || FORBIDDEN_PROST_INGRESS
+                .iter()
+                .any(|fragment| production.contains(fragment))
+        {
+            return Err(format!(
+                "production Buffa ingress ratchet failed for {path}: expected private {generated_marker} lazy decode and no Prost decode"
+            )
+            .into());
+        }
+    }
     Ok(())
 }
 

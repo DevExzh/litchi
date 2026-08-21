@@ -194,6 +194,26 @@ impl ChartCatalog {
         Self { charts }
     }
 
+    /// Build a catalog from owned chart titles without copying their strings.
+    ///
+    /// This variant is intended for adapters that already decoded titles into
+    /// [`String`] values. Converting each string directly into its boxed
+    /// semantic representation reuses the existing allocation when possible;
+    /// [`Self::from_titles`] remains the convenient borrowed-input form.
+    #[must_use]
+    pub fn from_owned_titles(titles: impl IntoIterator<Item = Option<String>>) -> Self {
+        let charts = titles
+            .into_iter()
+            .enumerate()
+            .map(|(position, title)| ChartDescriptor {
+                position,
+                title: title.map(String::into_boxed_str),
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        Self { charts }
+    }
+
     /// Borrow chart summaries in source order.
     #[must_use]
     pub fn charts(&self) -> &[ChartDescriptor] {
@@ -337,6 +357,20 @@ mod tests {
             catalog.charts()[1].position_selector(),
             ChartSelector::index(1)
         );
+    }
+
+    #[test]
+    fn catalog_accepts_owned_titles_without_changing_selection() {
+        let catalog = ChartCatalog::from_owned_titles(vec![
+            Some("Revenue".to_owned()),
+            None,
+            Some("Cost".to_owned()),
+        ]);
+
+        assert_eq!(catalog.len(), 3);
+        assert_eq!(catalog.select_position("Revenue"), Ok(Some(0)));
+        assert_eq!(catalog.select_position(2usize), Ok(Some(2)));
+        assert_eq!(catalog.charts()[1].title(), None);
     }
 
     #[test]

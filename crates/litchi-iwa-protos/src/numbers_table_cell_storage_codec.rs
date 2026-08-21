@@ -313,6 +313,7 @@ impl StorageVisitor for () {}
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TableModelSnapshot<'source> {
     table_id: &'source str,
+    table_name: &'source str,
     base_data_store: &'source [u8],
     number_of_rows: u32,
     number_of_columns: u32,
@@ -328,6 +329,10 @@ impl<'source> TableModelSnapshot<'source> {
     #[must_use]
     pub const fn table_id(self) -> &'source str {
         self.table_id
+    }
+    #[must_use]
+    pub const fn table_name(self) -> &'source str {
+        self.table_name
     }
     #[must_use]
     pub const fn base_data_store(self) -> &'source [u8] {
@@ -956,14 +961,94 @@ pub fn decode_table_model_with_report(
     decode_table_model_with_visitor(source, options, &mut ())
 }
 
+/// Decode a historical table-model payload while treating omitted proto2
+/// required fields as their generated default values.
+///
+/// Numbers compatibility fixtures and older archives may omit metadata-only
+/// required fields that Prost materializes as defaults. The selected storage
+/// routes remain strict; this mode only relaxes the model/datastore envelope
+/// so the archive-free projection can preserve that historical behavior.
+pub fn decode_table_model_compatibility_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TableModelSnapshot<'_>, DecodeReport), DecodeError> {
+    decode_table_model_compatibility_with_visitor(source, options, &mut ())
+}
+
+/// Decode a native table-model envelope while projecting only its selected
+/// base-data-store routes through the compatibility envelope.
+///
+/// The model root, dimensions, identity, and selected optional references
+/// remain strict. This narrow recovery route exists for native archives whose
+/// unselected row/header metadata is malformed: the table can still be
+/// opened, while a later operation that needs that metadata remains the
+/// authority for rejecting the source.
+pub fn decode_table_model_with_compatibility_data_store_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TableModelSnapshot<'_>, DecodeReport), DecodeError> {
+    decode_table_model_with_visitor_mode(
+        source,
+        options,
+        &mut (),
+        false,
+        DataStoreProjection::DenseNative,
+    )
+}
+
 /// Decode a model and stream every selected repeated storage record.
 pub fn decode_table_model_with_visitor<'source>(
     source: &'source [u8],
     options: DecodeOptions,
     visitor: &mut dyn StorageVisitor,
 ) -> Result<(TableModelSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_table_model_with_visitor_mode(
+        source,
+        options,
+        visitor,
+        false,
+        DataStoreProjection::Strict,
+    )
+}
+
+/// Compatibility variant of [`decode_table_model_with_visitor`].
+pub fn decode_table_model_compatibility_with_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+) -> Result<(TableModelSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_table_model_with_visitor_mode(
+        source,
+        options,
+        visitor,
+        true,
+        DataStoreProjection::Compatibility,
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DataStoreProjection {
+    Strict,
+    Compatibility,
+    DenseNative,
+}
+
+fn decode_table_model_with_visitor_mode<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+    compatibility_defaults: bool,
+    data_store_projection: DataStoreProjection,
+) -> Result<(TableModelSnapshot<'source>, DecodeReport), DecodeError> {
     let mut budget = Budget::new(source, options)?;
-    let snapshot = decode_table_model_in(source, &mut budget, 1, visitor)?;
+    let snapshot = decode_table_model_in(
+        source,
+        &mut budget,
+        1,
+        visitor,
+        compatibility_defaults,
+        data_store_projection,
+    )?;
     Ok((snapshot, budget.report()))
 }
 
@@ -972,10 +1057,13 @@ fn decode_table_model_in<'source>(
     budget: &mut Budget,
     depth: u32,
     visitor: &mut dyn StorageVisitor,
+    compatibility_defaults: bool,
+    data_store_projection: DataStoreProjection,
 ) -> Result<TableModelSnapshot<'source>, DecodeError> {
     budget.message(source, depth)?;
     let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
     let mut table_id = None;
+    let mut table_name = None;
     let mut base_data_store = None;
     let mut number_of_rows = None;
     let mut number_of_columns = None;
@@ -987,6 +1075,9 @@ fn decode_table_model_in<'source>(
     let mut spill_owner = None;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if compatibility_defaults && !matches!(field.number, 4 | 6 | 7 | 8) {
+            continue;
+        }
         match field.number {
             1 => {
                 let raw = field.bytes()?;
@@ -997,11 +1088,22 @@ fn decode_table_model_in<'source>(
                 if base_data_store.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                let _ = decode_data_store_in(raw, budget, child_depth, visitor)?;
+                let _ =
+                    decode_data_store_in(raw, budget, child_depth, visitor, data_store_projection)?;
                 base_data_store = Some(raw);
             },
             6 => set_once(&mut number_of_rows, canonical_u32(field.varint()?)?)?,
             7 => set_once(&mut number_of_columns, canonical_u32(field.varint()?)?)?,
+            8 if compatibility_defaults => {
+                // Historical generated decoding follows protobuf's singular
+                // scalar rule for this compatibility-only projection: when a
+                // malformed-but-readable archive repeats the display name,
+                // the final value wins.  Keep the strict table-model route
+                // below unchanged; the names transaction still uses its
+                // independent strict projection and rejects the duplicate
+                // source before publication.
+                table_name = Some(strict_utf8(field.bytes()?, budget)?);
+            },
             34 => {
                 let raw = field.bytes()?;
                 let reference = decode_reference(raw, budget, child_depth)?;
@@ -1042,10 +1144,27 @@ fn decode_table_model_in<'source>(
         }
     }
     let snapshot = TableModelSnapshot {
-        table_id: table_id.ok_or_else(DecodeError::invalid)?,
-        base_data_store: base_data_store.ok_or_else(DecodeError::invalid)?,
-        number_of_rows: number_of_rows.ok_or_else(DecodeError::invalid)?,
-        number_of_columns: number_of_columns.ok_or_else(DecodeError::invalid)?,
+        table_id: match table_id {
+            Some(value) => value,
+            None if compatibility_defaults => "",
+            None => return Err(DecodeError::invalid()),
+        },
+        table_name: table_name.unwrap_or(""),
+        base_data_store: match base_data_store {
+            Some(value) => value,
+            None if compatibility_defaults => &[],
+            None => return Err(DecodeError::invalid()),
+        },
+        number_of_rows: match number_of_rows {
+            Some(value) => value,
+            None if compatibility_defaults => 0,
+            None => return Err(DecodeError::invalid()),
+        },
+        number_of_columns: match number_of_columns {
+            Some(value) => value,
+            None if compatibility_defaults => 0,
+            None => return Err(DecodeError::invalid()),
+        },
         hidden_state_formula_owner_for_columns: hidden_columns.map(|(_raw, reference)| reference),
         hidden_state_formula_owner_for_rows: hidden_rows.map(|(_raw, reference)| reference),
         conditional_style_formula_owner_id: conditional_owner,
@@ -1053,25 +1172,28 @@ fn decode_table_model_in<'source>(
         category_owner: category_owner.map(|(_raw, reference)| reference),
         spill_owner,
     };
-    budget.message(source, depth)?;
-    let view: projection::TableModelArchiveLazyView<'_> = budget
-        .options
-        .buffa()
-        .decode_lazy_view(source)
-        .map_err(|_error| DecodeError::invalid())?;
-    if view.table_id != snapshot.table_id
-        || view.base_data_store != snapshot.base_data_store
-        || view.number_of_rows != snapshot.number_of_rows
-        || view.number_of_columns != snapshot.number_of_columns
-        || view.hidden_state_formula_owner_for_columns
-            != hidden_columns.map(|(raw, _reference)| raw)
-        || view.hidden_state_formula_owner_for_rows != hidden_rows.map(|(raw, _reference)| raw)
-        || view.conditional_style_formula_owner_id != snapshot.conditional_style_formula_owner_id
-        || view.pivot_owner != pivot_owner.map(|(raw, _reference)| raw)
-        || view.category_owner != category_owner.map(|(raw, _reference)| raw)
-        || view.spill_owner != snapshot.spill_owner
-    {
-        return Err(DecodeError::invalid());
+    if !compatibility_defaults {
+        budget.message(source, depth)?;
+        let view: projection::TableModelArchiveLazyView<'_> = budget
+            .options
+            .buffa()
+            .decode_lazy_view(source)
+            .map_err(|_error| DecodeError::invalid())?;
+        if view.table_id != snapshot.table_id
+            || view.base_data_store != snapshot.base_data_store
+            || view.number_of_rows != snapshot.number_of_rows
+            || view.number_of_columns != snapshot.number_of_columns
+            || view.hidden_state_formula_owner_for_columns
+                != hidden_columns.map(|(raw, _reference)| raw)
+            || view.hidden_state_formula_owner_for_rows != hidden_rows.map(|(raw, _reference)| raw)
+            || view.conditional_style_formula_owner_id
+                != snapshot.conditional_style_formula_owner_id
+            || view.pivot_owner != pivot_owner.map(|(raw, _reference)| raw)
+            || view.category_owner != category_owner.map(|(raw, _reference)| raw)
+            || view.spill_owner != snapshot.spill_owner
+        {
+            return Err(DecodeError::invalid());
+        }
     }
     Ok(snapshot)
 }
@@ -1091,13 +1213,57 @@ pub fn decode_data_store_with_report(
     decode_data_store_with_visitor(source, options, &mut ())
 }
 
+/// Decode a historical base-data-store envelope with generated proto2
+/// defaults for omitted metadata-only required fields. Nested tile/header
+/// records and non-empty references remain strictly validated.
+pub fn decode_data_store_compatibility_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(DataStoreSnapshot<'_>, DecodeReport), DecodeError> {
+    decode_data_store_compatibility_with_visitor(source, options, &mut ())
+}
+
+/// Decode a native base-data-store envelope while deferring only the
+/// metadata-only row/header routes. Selected sidecar references and tile
+/// storage remain on the strict route; this mode is used only after a native
+/// model's strict envelope has identified an unselected metadata failure.
+pub fn decode_data_store_dense_native_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(DataStoreSnapshot<'_>, DecodeReport), DecodeError> {
+    decode_data_store_with_visitor_mode(source, options, &mut (), DataStoreProjection::DenseNative)
+}
+
 pub fn decode_data_store_with_visitor<'source>(
     source: &'source [u8],
     options: DecodeOptions,
     visitor: &mut dyn StorageVisitor,
 ) -> Result<(DataStoreSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_data_store_with_visitor_mode(source, options, visitor, DataStoreProjection::Strict)
+}
+
+/// Compatibility variant of [`decode_data_store_with_visitor`].
+pub fn decode_data_store_compatibility_with_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+) -> Result<(DataStoreSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_data_store_with_visitor_mode(
+        source,
+        options,
+        visitor,
+        DataStoreProjection::Compatibility,
+    )
+}
+
+fn decode_data_store_with_visitor_mode<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+    data_store_projection: DataStoreProjection,
+) -> Result<(DataStoreSnapshot<'source>, DecodeReport), DecodeError> {
     let mut budget = Budget::new(source, options)?;
-    let snapshot = decode_data_store_in(source, &mut budget, 1, visitor)?;
+    let snapshot = decode_data_store_in(source, &mut budget, 1, visitor, data_store_projection)?;
     Ok((snapshot, budget.report()))
 }
 
@@ -1106,7 +1272,10 @@ fn decode_data_store_in<'source>(
     budget: &mut Budget,
     depth: u32,
     visitor: &mut dyn StorageVisitor,
+    data_store_projection: DataStoreProjection,
 ) -> Result<DataStoreSnapshot<'source>, DecodeError> {
+    let compatibility_defaults = data_store_projection == DataStoreProjection::Compatibility;
+    let dense_native = data_store_projection == DataStoreProjection::DenseNative;
     budget.message(source, depth)?;
     let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
     let mut raw_fields: [Option<&'source [u8]>; 22] = [None; 22];
@@ -1116,6 +1285,15 @@ fn decode_data_store_in<'source>(
     let mut storage_version_pre_bnc = None;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        // Sparse compatibility routing only owns the tile and sidecar
+        // references consumed by semantic extraction. Every other DataStore
+        // field is opaque there, including fields required by the native
+        // proto2 schema. Dense-native routing still visits those fields so
+        // their presence, framing, and duplicate keys remain bounded, but it
+        // defers their nested metadata validation below.
+        if compatibility_defaults && !matches!(field.number, 3 | 4 | 6 | 12 | 17 | 19) {
+            continue;
+        }
         let number = usize::try_from(field.number).map_err(|_conversion| DecodeError::invalid())?;
         match field.number {
             1 => {
@@ -1123,7 +1301,21 @@ fn decode_data_store_in<'source>(
                 if raw_fields[0].is_some() {
                     return Err(DecodeError::invalid());
                 }
-                let _ = decode_header_storage_in(raw, budget, child_depth, visitor)?;
+                if data_store_projection == DataStoreProjection::Strict {
+                    let _ = decode_header_storage_in(
+                        raw,
+                        budget,
+                        child_depth,
+                        visitor,
+                        compatibility_defaults,
+                    )?;
+                } else {
+                    // HeaderStorage is metadata-only for the archive-free
+                    // table projection. Keep its source width and nesting in
+                    // the finite ledger, but leave ownership/axis agreement
+                    // to the table-dimension transaction's source proof.
+                    budget.message(raw, child_depth)?;
+                }
                 raw_fields[0] = Some(raw);
             },
             3 => {
@@ -1131,7 +1323,21 @@ fn decode_data_store_in<'source>(
                 if raw_fields[2].is_some() {
                     return Err(DecodeError::invalid());
                 }
-                let _ = decode_tile_storage_in(raw, budget, child_depth, visitor)?;
+                // The compatibility envelope keeps the tile-storage bytes
+                // borrowed and opaque.  TileStorage is a separate selected
+                // route whose strict decoder owns its own required fields,
+                // repeated references, and private Buffa parity check.  Do
+                // not enter that generated-backed route here: a sparse
+                // compatibility projection must stay generated-free and
+                // leave nested tile validation to the extractor after the
+                // envelope has been admitted.
+                if data_store_projection != DataStoreProjection::Compatibility {
+                    let _ = decode_tile_storage_in(raw, budget, child_depth, visitor)?;
+                } else {
+                    // Even while opaque, the selected nested message still
+                    // participates in the aggregate size/depth ledger.
+                    budget.message(raw, child_depth)?;
+                }
                 raw_fields[2] = Some(raw);
             },
             2 | 4 | 5 | 6 | 11 | 12 | 13 | 15..=22 => {
@@ -1139,7 +1345,20 @@ fn decode_data_store_in<'source>(
                 if raw_fields[number - 1].is_some() {
                     return Err(DecodeError::invalid());
                 }
-                refs[number - 1] = Some(decode_reference(raw, budget, child_depth)?);
+                let selected = matches!(field.number, 4 | 6 | 12 | 17 | 19);
+                if !compatibility_defaults || selected {
+                    refs[number - 1] = Some(if compatibility_defaults {
+                        decode_reference_compatibility(raw, budget, child_depth)?
+                    } else {
+                        decode_reference(raw, budget, child_depth)?
+                    });
+                } else {
+                    // Dense-native metadata references are not consumed by
+                    // semantic extraction. Their length-delimited framing is
+                    // still checked above and their bounded payload width is
+                    // charged without admitting a generated/reference value.
+                    budget.message(raw, child_depth)?;
+                }
                 raw_fields[number - 1] = Some(raw);
             },
             7 => set_once(&mut next_row_strip_id, canonical_u32(field.varint()?)?)?,
@@ -1159,18 +1378,33 @@ fn decode_data_store_in<'source>(
             _ => {},
         }
     }
+    let required_bytes = |slot: Option<&'source [u8]>| match slot {
+        Some(value) => Ok(value),
+        None if compatibility_defaults => Ok(&[][..]),
+        None => Err(DecodeError::invalid()),
+    };
+    let required_reference = |slot: Option<ReferenceSnapshot>| match slot {
+        Some(value) => Ok(value),
+        None if compatibility_defaults || dense_native => Ok(default_reference()),
+        None => Err(DecodeError::invalid()),
+    };
+    let required_u32 = |slot: Option<u32>| match slot {
+        Some(value) => Ok(value),
+        None if compatibility_defaults => Ok(0),
+        None => Err(DecodeError::invalid()),
+    };
     let snapshot = DataStoreSnapshot {
-        row_headers: raw_fields[0].ok_or_else(DecodeError::invalid)?,
-        column_headers: refs[1].ok_or_else(DecodeError::invalid)?,
-        tiles: raw_fields[2].ok_or_else(DecodeError::invalid)?,
-        string_table: refs[3].ok_or_else(DecodeError::invalid)?,
-        style_table: refs[4].ok_or_else(DecodeError::invalid)?,
-        formula_table: refs[5].ok_or_else(DecodeError::invalid)?,
-        next_row_strip_id: next_row_strip_id.ok_or_else(DecodeError::invalid)?,
-        next_column_strip_id: next_column_strip_id.ok_or_else(DecodeError::invalid)?,
-        row_tile_tree: raw_fields[8].ok_or_else(DecodeError::invalid)?,
-        column_tile_tree: raw_fields[9].ok_or_else(DecodeError::invalid)?,
-        format_table_pre_bnc: refs[10].ok_or_else(DecodeError::invalid)?,
+        row_headers: required_bytes(raw_fields[0])?,
+        column_headers: required_reference(refs[1])?,
+        tiles: required_bytes(raw_fields[2])?,
+        string_table: required_reference(refs[3])?,
+        style_table: required_reference(refs[4])?,
+        formula_table: required_reference(refs[5])?,
+        next_row_strip_id: required_u32(next_row_strip_id)?,
+        next_column_strip_id: required_u32(next_column_strip_id)?,
+        row_tile_tree: required_bytes(raw_fields[8])?,
+        column_tile_tree: required_bytes(raw_fields[9])?,
+        format_table_pre_bnc: required_reference(refs[10])?,
         formula_error_table: refs[11],
         merge_region_map: refs[12],
         storage_version_pre_bnc,
@@ -1183,37 +1417,39 @@ fn decode_data_store_in<'source>(
         control_cell_spec_table: refs[20],
         format_table: refs[21],
     };
-    budget.message(source, depth)?;
-    let view: projection::DataStoreArchiveLazyView<'_> = budget
-        .options
-        .buffa()
-        .decode_lazy_view(source)
-        .map_err(|_error| DecodeError::invalid())?;
-    let raw = |field: usize| raw_fields[field - 1];
-    if view.row_headers != snapshot.row_headers
-        || Some(view.column_headers) != raw(2)
-        || view.tiles != snapshot.tiles
-        || Some(view.string_table) != raw(4)
-        || Some(view.style_table) != raw(5)
-        || Some(view.formula_table) != raw(6)
-        || view.next_row_strip_id != snapshot.next_row_strip_id
-        || view.next_column_strip_id != snapshot.next_column_strip_id
-        || view.row_tile_tree != snapshot.row_tile_tree
-        || view.column_tile_tree != snapshot.column_tile_tree
-        || Some(view.format_table_pre_bnc) != raw(11)
-        || view.formula_error_table != raw(12)
-        || view.merge_region_map != raw(13)
-        || view.storage_version_pre_bnc != snapshot.storage_version_pre_bnc
-        || view.deprecated_custom_format_table != raw(15)
-        || view.multiple_choice_list_format_table != raw(16)
-        || view.rich_text_table != raw(17)
-        || view.conditional_style_table != raw(18)
-        || view.comment_storage_table != raw(19)
-        || view.import_warning_set_table != raw(20)
-        || view.control_cell_spec_table != raw(21)
-        || view.format_table != raw(22)
-    {
-        return Err(DecodeError::invalid());
+    if !compatibility_defaults && !dense_native {
+        budget.message(source, depth)?;
+        let view: projection::DataStoreArchiveLazyView<'_> = budget
+            .options
+            .buffa()
+            .decode_lazy_view(source)
+            .map_err(|_error| DecodeError::invalid())?;
+        let raw = |field: usize| raw_fields[field - 1];
+        if view.row_headers != raw(1).ok_or_else(DecodeError::invalid)?
+            || view.column_headers != raw(2).ok_or_else(DecodeError::invalid)?
+            || view.tiles != raw(3).ok_or_else(DecodeError::invalid)?
+            || view.string_table != raw(4).ok_or_else(DecodeError::invalid)?
+            || view.style_table != raw(5).ok_or_else(DecodeError::invalid)?
+            || view.formula_table != raw(6).ok_or_else(DecodeError::invalid)?
+            || view.next_row_strip_id != snapshot.next_row_strip_id
+            || view.next_column_strip_id != snapshot.next_column_strip_id
+            || view.row_tile_tree != raw(9).ok_or_else(DecodeError::invalid)?
+            || view.column_tile_tree != raw(10).ok_or_else(DecodeError::invalid)?
+            || view.format_table_pre_bnc != raw(11).ok_or_else(DecodeError::invalid)?
+            || view.formula_error_table != raw(12)
+            || view.merge_region_map != raw(13)
+            || view.storage_version_pre_bnc != snapshot.storage_version_pre_bnc
+            || view.deprecated_custom_format_table != raw(15)
+            || view.multiple_choice_list_format_table != raw(16)
+            || view.rich_text_table != raw(17)
+            || view.conditional_style_table != raw(18)
+            || view.comment_storage_table != raw(19)
+            || view.import_warning_set_table != raw(20)
+            || view.control_cell_spec_table != raw(21)
+            || view.format_table != raw(22)
+        {
+            return Err(DecodeError::invalid());
+        }
     }
     Ok(snapshot)
 }
@@ -1481,7 +1717,7 @@ pub fn decode_header_storage_with_visitor(
     visitor: &mut dyn StorageVisitor,
 ) -> Result<(HeaderStorageSnapshot, DecodeReport), DecodeError> {
     let mut budget = Budget::new(source, options)?;
-    let snapshot = decode_header_storage_in(source, &mut budget, 1, visitor)?;
+    let snapshot = decode_header_storage_in(source, &mut budget, 1, visitor, false)?;
     Ok((snapshot, budget.report()))
 }
 
@@ -1490,6 +1726,7 @@ fn decode_header_storage_in(
     budget: &mut Budget,
     depth: u32,
     visitor: &mut dyn StorageVisitor,
+    compatibility_defaults: bool,
 ) -> Result<HeaderStorageSnapshot, DecodeError> {
     budget.message(source, depth)?;
     let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
@@ -1500,14 +1737,22 @@ fn decode_header_storage_in(
             1 => set_once(&mut bucket_hash_function, canonical_u32(field.varint()?)?)?,
             2 => {
                 let raw = field.bytes()?;
-                let reference = decode_reference(raw, budget, child_depth)?;
+                let reference = if compatibility_defaults {
+                    decode_reference_compatibility(raw, budget, child_depth)?
+                } else {
+                    decode_reference(raw, budget, child_depth)?
+                };
                 visitor.visit_header_bucket(ReferenceRecord { raw, reference })?;
             },
             _ => {},
         }
     }
     let snapshot = HeaderStorageSnapshot {
-        bucket_hash_function: bucket_hash_function.ok_or_else(DecodeError::invalid)?,
+        bucket_hash_function: match bucket_hash_function {
+            Some(value) => value,
+            None if compatibility_defaults => 0,
+            None => return Err(DecodeError::invalid()),
+        },
     };
     budget.message(source, depth)?;
     let view: projection::HeaderStorageArchiveLazyView<'_> = budget
@@ -2200,6 +2445,99 @@ pub fn decode_table_data_list(
     options: DecodeOptions,
 ) -> Result<TableDataListSnapshot, DecodeError> {
     Ok(decode_table_data_list_with_report(source, options)?.0)
+}
+
+/// Borrowed list-type envelope used to route a candidate before streaming its
+/// entries.  Repeated entry/segment payloads are intentionally not retained
+/// or decoded here; the full list codec remains authoritative for those
+/// records after the candidate has been admitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TableDataListTypeSnapshot {
+    list_type: i32,
+}
+
+impl TableDataListTypeSnapshot {
+    #[must_use]
+    pub const fn list_type(self) -> i32 {
+        self.list_type
+    }
+}
+
+/// Strictly inspect only the root `TableDataList` envelope needed for
+/// candidate routing.
+///
+/// The handwritten pass validates canonical field framing, unknown groups,
+/// and the required root scalars while skipping repeated entry payloads.  A
+/// private Buffa lazy view then checks the same scalar presence/value contract
+/// without allocating the generated repeated representation.  The returned
+/// report accounts for both passes, so callers can charge the dispatch work
+/// before deciding whether entry values may be staged.
+pub fn decode_table_data_list_type_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TableDataListTypeSnapshot, DecodeReport), DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let snapshot = decode_table_data_list_type_in(source, &mut budget, 1, false)?;
+    Ok((snapshot, budget.report()))
+}
+
+/// Strictly inspect only the referenced `TableDataListSegment` envelope
+/// needed for candidate routing.  The segment message type is an object-local
+/// compatibility route; this function makes no claim about native archive
+/// type numbers and validates only the bytes supplied by its caller.
+pub fn decode_table_data_list_segment_type_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TableDataListTypeSnapshot, DecodeReport), DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let snapshot = decode_table_data_list_type_in(source, &mut budget, 1, true)?;
+    Ok((snapshot, budget.report()))
+}
+
+fn decode_table_data_list_type_in(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+    segment: bool,
+) -> Result<TableDataListTypeSnapshot, DecodeError> {
+    budget.message(source, depth)?;
+    let mut list_type = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number == 1 {
+            set_once(&mut list_type, canonical_int32(field.varint()?)?)?;
+        }
+    }
+    let snapshot = TableDataListTypeSnapshot {
+        list_type: list_type.ok_or_else(DecodeError::invalid)?,
+    };
+
+    // Keep the projection pass in lockstep with the full root/segment
+    // decoders.  The generated view contains only scalar envelope fields, so
+    // repeated entries remain opaque and caller-owned while Buffa still
+    // enforces required scalar presence and wire types.
+    budget.message(source, depth)?;
+    if segment {
+        let view: projection::TableDataListSegmentArchiveLazyView<'_> = budget
+            .options
+            .buffa()
+            .decode_lazy_view(source)
+            .map_err(|_error| DecodeError::invalid())?;
+        if !view.has_list_type() || !view.has_key_range() || view.list_type != snapshot.list_type {
+            return Err(DecodeError::invalid());
+        }
+    } else {
+        let view: projection::TableDataListArchiveLazyView<'_> = budget
+            .options
+            .buffa()
+            .decode_lazy_view(source)
+            .map_err(|_error| DecodeError::invalid())?;
+        if !view.has_list_type() || !view.has_next_list_id() || view.list_type != snapshot.list_type
+        {
+            return Err(DecodeError::invalid());
+        }
+    }
+    Ok(snapshot)
 }
 
 pub fn decode_table_data_list_with_report(
@@ -2895,6 +3233,49 @@ pub(crate) fn decode_reference(
     Ok(snapshot)
 }
 
+fn default_reference() -> ReferenceSnapshot {
+    ReferenceSnapshot {
+        identifier: 0,
+        deprecated_type: None,
+        deprecated_is_external: None,
+    }
+}
+
+/// Decode a reference used by a compatibility envelope. An empty nested
+/// proto2 message is the generated default for an omitted required reference;
+/// any non-empty payload still goes through the strict reference decoder.
+fn decode_reference_compatibility(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<ReferenceSnapshot, DecodeError> {
+    budget.reference(source.len())?;
+    budget.message(source, depth)?;
+    let mut identifier = None;
+    let mut deprecated_type = None;
+    let mut deprecated_is_external = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut identifier, field.varint()?)?,
+            2 => set_once(&mut deprecated_type, canonical_int32(field.varint()?)?)?,
+            3 => set_once(
+                &mut deprecated_is_external,
+                canonical_bool(field.varint()?)?,
+            )?,
+            _ => {},
+        }
+    }
+    if deprecated_is_external == Some(true) {
+        return Err(DecodeError::invalid());
+    }
+    Ok(ReferenceSnapshot {
+        identifier: identifier.unwrap_or(0),
+        deprecated_type,
+        deprecated_is_external,
+    })
+}
+
 fn strict_utf8<'source>(
     source: &'source [u8],
     budget: &mut Budget,
@@ -3165,6 +3546,93 @@ mod tests {
         );
         assert!(report.work_bytes() > model.len() * 2);
         assert_eq!(report.max_depth(), 3);
+    }
+
+    #[test]
+    fn compatibility_model_store_projection_is_sparse_and_generated_free() {
+        // The compatibility envelope intentionally omits the native proto2
+        // required metadata and carries an opaque TileStorage payload.  The
+        // selected sidecar references use both an empty nested message and a
+        // zero identifier, matching generated proto2 defaults while retaining
+        // borrowed source slices.
+        let mut store = Vec::new();
+        b(&mut store, 1, &[0xff]); // unselected/opaque HeaderStorage
+        b(&mut store, 1, &[0x80]); // duplicate unselected key is skipped
+        b(&mut store, 3, &[0xff]); // nested TileStorage is validated later
+        b(&mut store, 4, &[]); // empty Reference => identifier 0
+        b(&mut store, 6, &reference(0)); // explicit zero identifier
+        b(&mut store, 12, &[]);
+        b(&mut store, 17, &[]);
+        b(&mut store, 19, &[]);
+        unknown_group(&mut store, 90, 91, 0x9000);
+
+        let mut model = Vec::new();
+        b(&mut model, 4, &store);
+        v(&mut model, 7, 3);
+        b(&mut model, 8, b"Sparse");
+        b(&mut model, 1, &[0xff]); // unselected table-id wire is opaque
+        unknown_group(&mut model, 92, 93, 0x9200);
+
+        let (snapshot, report) =
+            decode_table_model_compatibility_with_report(&model, options(&model)).unwrap();
+        assert_eq!(snapshot.table_id(), "");
+        assert_eq!(snapshot.table_name(), "Sparse");
+        assert_eq!(snapshot.number_of_rows(), 0);
+        assert_eq!(snapshot.number_of_columns(), 3);
+        assert_eq!(snapshot.base_data_store(), store.as_slice());
+        assert!(report.fields() > 0);
+
+        let store_options = options(&store);
+        let (store_snapshot, _store_report) =
+            decode_data_store_compatibility_with_report(&store, store_options).unwrap();
+        assert_eq!(store_snapshot.tiles(), &[0xff]);
+        assert_eq!(store_snapshot.string_table().identifier(), 0);
+        assert_eq!(store_snapshot.formula_table().identifier(), 0);
+        assert_eq!(
+            store_snapshot
+                .formula_error_table()
+                .expect("explicit empty optional reference")
+                .identifier(),
+            0
+        );
+        assert_eq!(
+            store_snapshot
+                .rich_text_table()
+                .expect("explicit empty optional reference")
+                .identifier(),
+            0
+        );
+        assert_eq!(
+            store_snapshot
+                .comment_storage_table()
+                .expect("explicit empty optional reference")
+                .identifier(),
+            0
+        );
+
+        // Strict mode still preserves its required-field/Buffa parity
+        // contract and therefore does not silently become the compatibility
+        // route.
+        assert!(decode_table_model_with_report(&model, options(&model)).is_err());
+    }
+
+    #[test]
+    fn compatibility_selected_duplicates_and_wrong_wires_fail() {
+        let mut store = Vec::new();
+        b(&mut store, 4, &[]);
+        b(&mut store, 4, &[]);
+        let mut model = Vec::new();
+        b(&mut model, 4, &store);
+        assert!(decode_table_model_compatibility_with_report(&model, options(&model)).is_err());
+
+        let mut wrong_store = Vec::new();
+        v(&mut wrong_store, 4, 0);
+        let mut wrong_model = Vec::new();
+        b(&mut wrong_model, 4, &wrong_store);
+        assert!(
+            decode_table_model_compatibility_with_report(&wrong_model, options(&wrong_model))
+                .is_err()
+        );
     }
 
     #[derive(Default)]
@@ -4585,6 +5053,97 @@ mod tests {
         let absent = decode_table_data_list(&absent_source, options(&absent_source)).unwrap();
         assert_eq!(absent.is_new_for_bnc(), None);
         assert_eq!(absent_prost.is_new_for_bnc, None);
+    }
+
+    #[test]
+    fn list_type_routes_match_prost_and_skip_repeated_payloads() {
+        let mut root = list_oracle().encode_to_vec();
+        // The dispatch projection must not descend into repeated entry
+        // payloads; the full list decoder remains responsible for this
+        // malformed child once the candidate is selected.
+        b(&mut root, 3, &[0x80]);
+        unknown_fields(&mut root, 90);
+        let before = root.clone();
+        let (root_probe, root_report) =
+            decode_table_data_list_type_with_report(&root, options(&root)).unwrap();
+        assert_eq!(root, before);
+        assert_eq!(
+            root_probe.list_type(),
+            tst::table_data_list::ListType::Format as i32
+        );
+        assert!(root_report.fields() > 0);
+        assert!(root_report.work_bytes() >= root.len().saturating_mul(2));
+        assert!(decode_table_data_list(&root, options(&root)).is_err());
+
+        let mut segment = segment_oracle().encode_to_vec();
+        b(&mut segment, 3, &[0x80]);
+        unknown_fields(&mut segment, 120);
+        let before = segment.clone();
+        let (segment_probe, segment_report) =
+            decode_table_data_list_segment_type_with_report(&segment, options(&segment)).unwrap();
+        assert_eq!(segment, before);
+        assert_eq!(
+            segment_probe.list_type(),
+            tst::table_data_list::ListType::Formula as i32
+        );
+        assert!(segment_report.fields() > 0);
+        assert!(segment_report.work_bytes() >= segment.len().saturating_mul(2));
+        assert!(decode_table_data_list_segment(&segment, options(&segment)).is_err());
+    }
+
+    #[test]
+    fn list_type_routes_reject_missing_scalars_duplicate_knowns_and_noncanonical_wire() {
+        let mut missing_root_scalar = Vec::new();
+        v(&mut missing_root_scalar, 1, 1);
+        assert!(
+            decode_table_data_list_type_with_report(
+                &missing_root_scalar,
+                options(&missing_root_scalar)
+            )
+            .is_err()
+        );
+
+        let mut duplicate_root_type = list_minimal();
+        v(&mut duplicate_root_type, 1, 2);
+        assert!(
+            decode_table_data_list_type_with_report(
+                &duplicate_root_type,
+                options(&duplicate_root_type)
+            )
+            .is_err()
+        );
+
+        let mut noncanonical_root_type = Vec::new();
+        key(&mut noncanonical_root_type, 1, 0);
+        noncanonical_root_type.extend_from_slice(&[0x81, 0x00]);
+        v(&mut noncanonical_root_type, 2, 2);
+        assert!(
+            decode_table_data_list_type_with_report(
+                &noncanonical_root_type,
+                options(&noncanonical_root_type)
+            )
+            .is_err()
+        );
+
+        let mut missing_segment_range = Vec::new();
+        v(&mut missing_segment_range, 1, 1);
+        assert!(
+            decode_table_data_list_segment_type_with_report(
+                &missing_segment_range,
+                options(&missing_segment_range)
+            )
+            .is_err()
+        );
+
+        let mut duplicate_segment_type = segment_minimal();
+        v(&mut duplicate_segment_type, 1, 2);
+        assert!(
+            decode_table_data_list_segment_type_with_report(
+                &duplicate_segment_type,
+                options(&duplicate_segment_type)
+            )
+            .is_err()
+        );
     }
 
     #[test]

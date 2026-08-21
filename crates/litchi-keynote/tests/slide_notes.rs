@@ -592,6 +592,9 @@ fn changed_notes_preserve_unknowns_scope_and_exact_inverse_application() -> Test
 
     let applied = package.apply_slide_notes(commit.patch())?;
     assert_eq!(applied.package().exact_bytes(), target);
+    let shared_source = package.snapshot();
+    let applied_from_shared_source = shared_source.apply_slide_notes(commit.patch())?;
+    assert_eq!(applied_from_shared_source.package().exact_bytes(), target);
     let inverse = commit.patch().inverse();
     assert_eq!(inverse.before(), commit.patch().after());
     assert_eq!(inverse.after(), commit.patch().before());

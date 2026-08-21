@@ -18,8 +18,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::application::Application;
+use crate::application_detection::detect;
 use crate::bundle::{Bundle, BundleLimits};
-use crate::detect::detect_application_from_document;
 use crate::media::{MediaLimits, MediaManager, MediaStats};
 use crate::object_index::ObjectIndex;
 use crate::package::PackageLimits;
@@ -270,7 +270,7 @@ fn detect_bundle_application(bundle: &Bundle) -> Option<Application> {
         .flat_map(|(_, archive)| &archive.objects)
         .filter(|object| object.archive_info.identifier == Some(1))
         .flat_map(|object| &object.messages)
-        .find_map(|message| detect_application_from_document(&message.data))
+        .find_map(|message| detect(&message.data))
 }
 
 /// Statistics about a document

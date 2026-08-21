@@ -595,9 +595,15 @@ impl Package {
         patch: &SlideNotesPatch,
     ) -> Result<SlideNotesCommit, SlideNotesError> {
         let catalog = physical_catalog(self)?;
-        if fingerprint(catalog.source_bytes()) != patch.source_fingerprint
-            || catalog.source_bytes() != patch.source.as_ref()
-        {
+        let source_bytes = catalog.shared_source();
+        // A patch produced by this exact immutable package retains the same
+        // source allocation. Avoid hashing and rescanning the complete ZIP in
+        // that common path; the byte comparison remains the authorization
+        // fallback for an independently retained but byte-identical source.
+        let exact_source = Arc::ptr_eq(&source_bytes, &patch.source)
+            || (fingerprint(&source_bytes) == patch.source_fingerprint
+                && source_bytes.as_ref() == patch.source.as_ref());
+        if !exact_source {
             return Err(SlideNotesError::PatchConflict);
         }
         let current =

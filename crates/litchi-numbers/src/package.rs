@@ -886,7 +886,7 @@ impl Package {
         budget.charge_references(document.sheet_references().len(), SemanticPath::Document)?;
         let extractor = TableDataExtractor::new(components, index, limits);
         let extractor = if retain_comments {
-            extractor
+            extractor.native_projection()
         } else {
             extractor.without_comments()
         };
@@ -1017,8 +1017,6 @@ impl Package {
             table_info_decode_options(message.data.as_slice()),
         )
         .map_err(|_error| Error::MalformedPayload { path })?;
-        budget.charge_references(1, path)?;
-        extractor.charge_references(1)?;
         let model_id = model_reference.identifier().get();
         let model = index.resolve_ref_id(components, model_id)?.ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers {path} table model is missing"))
@@ -1029,6 +1027,8 @@ impl Package {
             )));
         }
         budget.charge_table(path)?;
+        budget.charge_references(1, path)?;
+        extractor.charge_references(1)?;
         seen_models.try_reserve(1).map_err(|_error| {
             allocation_error(
                 "Numbers rooted table model identities",

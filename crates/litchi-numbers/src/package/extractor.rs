@@ -931,6 +931,43 @@ fn table_cell_decode_options(
     )
 }
 
+/// Route one list candidate using only its scalar envelope.
+///
+/// The Numbers storage codec performs the bounded handwritten/Buffa parity
+/// pass; this adapter charges its report before the caller decides whether
+/// entry values may be staged.  In particular, a wrong-list candidate cannot
+/// resolve rich text/comments, and a referenced segment is accepted solely by
+/// the bytes found in that object (the object message type is not schema
+/// evidence).
+fn probe_table_data_list_type(
+    source: &[u8],
+    segment: bool,
+    budget: &mut ProjectionBudget,
+) -> Result<i32> {
+    let options = table_cell_decode_options(
+        source,
+        usize::MAX,
+        usize::MAX,
+        budget.remaining_payload_fields(),
+        budget.remaining_payload_work(),
+    );
+    let field_offset = budget.payload_fields;
+    let work_offset = budget.payload_work;
+    let decoded = if segment {
+        numbers_table_cell_storage_codec::decode_table_data_list_segment_type_with_report(
+            source, options,
+        )
+    } else {
+        numbers_table_cell_storage_codec::decode_table_data_list_type_with_report(source, options)
+    }
+    .map_err(|error| {
+        map_table_cell_codec_error_with_offsets(error, 0, field_offset, work_offset, 0)
+    })?;
+    let (snapshot, report) = decoded;
+    budget.charge_decode_work(report)?;
+    Ok(snapshot.list_type())
+}
+
 fn map_table_cell_codec_error(error: numbers_table_cell_storage_codec::DecodeError) -> Error {
     map_table_cell_codec_error_with_reference_offset(error, 0)
 }
@@ -1348,22 +1385,6 @@ impl ProjectionBudget {
         Ok(())
     }
 
-    fn charge_list_type_probe(&mut self, fields: usize, work_bytes: usize) -> Result<()> {
-        self.payload_fields = projection_charge(
-            self.payload_fields,
-            fields,
-            crate::MAX_REFERENCES,
-            SemanticLimitKind::Objects,
-        )?;
-        self.payload_work = projection_charge(
-            self.payload_work,
-            work_bytes,
-            MAX_PAYLOAD_WORK,
-            SemanticLimitKind::FormulaWork,
-        )?;
-        Ok(())
-    }
-
     fn check_output_text(&self, amount: usize) -> Result<()> {
         projection_charge(
             self.output_text_bytes,
@@ -1746,6 +1767,51 @@ impl<'a, 'tables> numbers_table_cell_storage_codec::StorageVisitor for TileRowVi
     }
 }
 
+/// Stage tile-storage references until the complete strict envelope has
+/// decoded successfully. A later wire error must not leave parsed cells in a
+/// candidate table, so this visitor never resolves or publishes a tile.
+struct TileStorageReferenceStage {
+    references: Vec<(u32, u64)>,
+    allocation_error: Option<Error>,
+}
+
+impl TileStorageReferenceStage {
+    fn new() -> Self {
+        Self {
+            references: Vec::new(),
+            allocation_error: None,
+        }
+    }
+
+    fn take(self) -> Result<Vec<(u32, u64)>> {
+        if let Some(error) = self.allocation_error {
+            return Err(error);
+        }
+        Ok(self.references)
+    }
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for TileStorageReferenceStage {
+    fn visit_tile_reference(
+        &mut self,
+        record: numbers_table_cell_storage_codec::TileReferenceRecord<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        if self.allocation_error.is_some() {
+            return Ok(());
+        }
+        if self.references.try_reserve(1).is_err() {
+            self.allocation_error = Some(allocation_error(
+                "Numbers tile-storage references",
+                self.references.len().saturating_add(1),
+            ));
+            return Ok(());
+        }
+        self.references
+            .push((record.tile_id(), record.reference().identifier()));
+        Ok(())
+    }
+}
+
 fn projection_charge(
     current: usize,
     amount: usize,
@@ -1782,10 +1848,10 @@ fn table_limit_error(observed: usize, maximum: usize) -> Error {
     }
 }
 
-fn decode_legacy_table_candidate<T>(
+fn decode_projected_legacy_candidate<T>(
     data: &[u8],
     admit: impl FnOnce() -> Result<()>,
-    parse: impl FnOnce(tst::TableModelArchive) -> Result<T>,
+    parse: impl FnOnce(&[u8]) -> Result<T>,
 ) -> Result<Option<T>> {
     match has_legacy_table_model_wire_shape(data) {
         Ok(true) => {},
@@ -1793,8 +1859,12 @@ fn decode_legacy_table_candidate<T>(
         Err(error) => return Err(error),
     }
     admit()?;
-    let table_model = tst::TableModelArchive::decode(data).map_err(Error::protobuf)?;
-    parse(table_model).map(Some)
+    parse(data).map(Some).map_err(|error| match error {
+        Error::InvalidFormat(_) => Error::MalformedPayload {
+            path: SemanticPath::StructuredTables,
+        },
+        other => other,
+    })
 }
 
 /// Require the parse-relevant required fields that distinguish a historical
@@ -1858,6 +1928,125 @@ fn has_legacy_table_model_wire_shape(data: &[u8]) -> Result<bool> {
     Ok(true)
 }
 
+fn sparse_table_model_compatibility_shape(data: &[u8]) -> bool {
+    let mut table_id = false;
+    let mut base_data_store = false;
+    let mut dense_data_store = false;
+    let mut number_of_rows = false;
+    let mut number_of_columns = false;
+    let mut table_name = false;
+    let mut invalid_shape = false;
+    let root_scan = preflight_wire_tree_with_limits(data, WireLimits::default(), |visit| {
+        // A sparse compatibility model omits the native DataStore metadata
+        // envelopes. Complete native models carry row headers, column
+        // headers, and style metadata (fields 1, 2, and 5), and must continue
+        // through the strict storage codec. Descend only into the selected
+        // base-data-store envelope so this admission gate can distinguish the
+        // two shapes without decoding or indexing it.
+        if visit.path() == [4] {
+            let field = visit.field();
+            // Prost emits an empty required message as the canonical
+            // default scalar (`08 00`) in the synthetic/legacy sparse
+            // envelopes. Treat that representation (and a truly omitted
+            // payload) as sparse; any other metadata bytes make this a
+            // complete native store and keep it on the strict route.
+            let default_metadata =
+                field.wire_type() == 2 && matches!(field.payload(), [] | [0x08, 0x00]);
+            if matches!(field.number(), 1 | 2 | 5) && !default_metadata {
+                dense_data_store = true;
+            }
+            return Ok(WireDescent::Skip);
+        }
+        if !visit.path().is_empty() {
+            return Ok(WireDescent::Skip);
+        }
+        let field = visit.field();
+        match field.number() {
+            1 => {
+                // The compatibility extractor does not consume table_id, but
+                // a present value still has to retain the strict scalar
+                // framing/UTF-8 contract before sparse fallback is admitted.
+                if field.wire_type() != 2
+                    || table_id
+                    || field.validate_canonical_framing().is_err()
+                    || std::str::from_utf8(field.payload()).is_err()
+                {
+                    invalid_shape = true;
+                } else {
+                    table_id = true;
+                }
+            },
+            4 => {
+                if field.wire_type() != 2
+                    || base_data_store
+                    || field.validate_canonical_framing().is_err()
+                {
+                    invalid_shape = true;
+                } else {
+                    base_data_store = true;
+                    return Ok(WireDescent::Descend);
+                }
+            },
+            6 => {
+                let payload = field.payload();
+                let canonical = litchi_iwa_common::decode_varint_from_bytes(payload).is_ok_and(
+                    |(value, width)| {
+                        width == payload.len()
+                            && width == litchi_iwa_common::varint::encoded_len(value)
+                            && u32::try_from(value).is_ok()
+                    },
+                );
+                if field.wire_type() != 0
+                    || number_of_rows
+                    || field.validate_canonical_framing().is_err()
+                    || !canonical
+                {
+                    invalid_shape = true;
+                } else {
+                    number_of_rows = true;
+                }
+            },
+            7 => {
+                let payload = field.payload();
+                let canonical = litchi_iwa_common::decode_varint_from_bytes(payload).is_ok_and(
+                    |(value, width)| {
+                        width == payload.len()
+                            && width == litchi_iwa_common::varint::encoded_len(value)
+                            && u32::try_from(value).is_ok()
+                    },
+                );
+                if field.wire_type() != 0
+                    || number_of_columns
+                    || field.validate_canonical_framing().is_err()
+                    || !canonical
+                {
+                    invalid_shape = true;
+                } else {
+                    number_of_columns = true;
+                }
+            },
+            8 => {
+                // The archive-free compatibility projection mirrors
+                // generated protobuf behavior for a repeated singular name:
+                // retain the last valid value.  Strict model decoding and
+                // the names transaction's independent projection continue
+                // to reject duplicate field 8 occurrences.
+                if field.wire_type() != 2
+                    || field.validate_canonical_framing().is_err()
+                    || std::str::from_utf8(field.payload()).is_err()
+                {
+                    invalid_shape = true;
+                } else {
+                    table_name = true;
+                }
+            },
+            _ => {},
+        }
+        Ok(WireDescent::Skip)
+    });
+    root_scan.is_ok() && base_data_store && !dense_data_store && table_name && !invalid_shape
+}
+
 fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<CompactTable<T>> {
     let mut compacted = Vec::new();
     let entries = entries.into_iter();
@@ -1889,6 +2078,10 @@ fn compact_table_get<T>(table: &[(u32, T)], key: u32) -> Option<&T> {
         .binary_search_by_key(&key, |(entry_key, _)| *entry_key)
         .ok()
         .map(|index| &table[index].1)
+}
+
+fn nonzero_reference_id(identifier: u64) -> Option<u64> {
+    (identifier != 0).then_some(identifier)
 }
 
 fn retain_text(value: &str, budget: &mut ProjectionBudget) -> Result<String> {
@@ -2001,181 +2194,6 @@ fn validate_table_column(column: usize, column_count: usize) -> Result<()> {
     Ok(())
 }
 
-/// Read only the root list-type scalar to decide whether entry conversion is
-/// worth staging. The strict storage codec remains authoritative for every
-/// candidate; this bounded probe merely avoids resolving rich/comment payloads
-/// from a known wrong-list candidate before that codec reports the mismatch.
-///
-/// The caller charges one source-byte of projection work for this complete
-/// envelope pass. Length-delimited child payloads are skipped without
-/// descending, while unknown groups are balanced and field-counted.
-#[derive(Debug, Clone, Copy)]
-struct ListTypeProbe {
-    list_type: Option<i32>,
-    fields: usize,
-}
-
-fn probe_table_data_list_type(source: &[u8]) -> ListTypeProbe {
-    let mut remaining = source;
-    let mut list_type = None;
-    let mut fields = 0usize;
-    while !remaining.is_empty() {
-        let Some(tag) = probe_varint(&mut remaining) else {
-            return ListTypeProbe { list_type, fields };
-        };
-        fields = fields.saturating_add(1);
-        let Ok(number) = u32::try_from(tag >> 3) else {
-            return ListTypeProbe { list_type, fields };
-        };
-        let Ok(wire_type) = u8::try_from(tag & 7) else {
-            return ListTypeProbe { list_type, fields };
-        };
-        if number == 0 || number > 0x1fff_ffff {
-            return ListTypeProbe { list_type, fields };
-        }
-        match wire_type {
-            0 => {
-                let Some(value) = probe_varint(&mut remaining) else {
-                    return ListTypeProbe { list_type, fields };
-                };
-                if number == 1 {
-                    let Some(value) = probe_int32(value) else {
-                        return ListTypeProbe { list_type, fields };
-                    };
-                    if list_type.replace(value).is_some() {
-                        return ListTypeProbe { list_type, fields };
-                    }
-                }
-            },
-            1 => {
-                let Some(next) = remaining.get(8..) else {
-                    return ListTypeProbe { list_type, fields };
-                };
-                remaining = next;
-            },
-            2 => {
-                let Some(length) =
-                    probe_varint(&mut remaining).and_then(|value| usize::try_from(value).ok())
-                else {
-                    return ListTypeProbe { list_type, fields };
-                };
-                let Some(next) = remaining.get(length..) else {
-                    return ListTypeProbe { list_type, fields };
-                };
-                remaining = next;
-            },
-            3 => {
-                if !probe_skip_group(&mut remaining, number, 1, &mut fields) {
-                    return ListTypeProbe { list_type, fields };
-                }
-            },
-            4 => return ListTypeProbe { list_type, fields },
-            5 => {
-                let Some(next) = remaining.get(4..) else {
-                    return ListTypeProbe { list_type, fields };
-                };
-                remaining = next;
-            },
-            _ => return ListTypeProbe { list_type, fields },
-        }
-    }
-    ListTypeProbe { list_type, fields }
-}
-
-fn probe_skip_group(source: &mut &[u8], expected: u32, depth: usize, fields: &mut usize) -> bool {
-    if depth > WireLimits::MAX_NESTING {
-        return false;
-    }
-    while !source.is_empty() {
-        let Some(tag) = probe_varint(source) else {
-            return false;
-        };
-        *fields = fields.saturating_add(1);
-        let Ok(number) = u32::try_from(tag >> 3) else {
-            return false;
-        };
-        let Ok(wire_type) = u8::try_from(tag & 7) else {
-            return false;
-        };
-        if number == 0 || number > 0x1fff_ffff {
-            return false;
-        }
-        match wire_type {
-            0 => {
-                if probe_varint(source).is_none() {
-                    return false;
-                }
-            },
-            1 => {
-                if source.get(8..).is_none() {
-                    return false;
-                }
-                *source = &source[8..];
-            },
-            2 => {
-                let Some(length) =
-                    probe_varint(source).and_then(|value| usize::try_from(value).ok())
-                else {
-                    return false;
-                };
-                if source.get(length..).is_none() {
-                    return false;
-                }
-                *source = &source[length..];
-            },
-            3 => {
-                if !probe_skip_group(source, number, depth + 1, fields) {
-                    return false;
-                }
-            },
-            4 => return number == expected,
-            5 => {
-                if source.get(4..).is_none() {
-                    return false;
-                }
-                *source = &source[4..];
-            },
-            _ => return false,
-        }
-    }
-    false
-}
-
-fn probe_varint(source: &mut &[u8]) -> Option<u64> {
-    let original = *source;
-    let mut value = 0u64;
-    for index in 0..10usize {
-        let byte = *original.get(index)?;
-        if index == 9 && byte > 1 {
-            return None;
-        }
-        value |= u64::from(byte & 0x7f) << (index * 7);
-        if byte & 0x80 == 0 {
-            let encoded_length = if value == 0 {
-                1
-            } else {
-                (64usize - value.leading_zeros() as usize).div_ceil(7)
-            };
-            if encoded_length != index + 1 {
-                return None;
-            }
-            *source = &original[index + 1..];
-            return Some(value);
-        }
-    }
-    None
-}
-
-fn probe_int32(value: u64) -> Option<i32> {
-    if let Ok(value) = i32::try_from(value) {
-        return Some(value);
-    }
-    if value < 0xffff_ffff_8000_0000 {
-        return None;
-    }
-    Some(i32::from_ne_bytes((value as u32).to_ne_bytes()))
-}
-
 fn record_first_list_error(slot: &mut Option<Error>, error: Error) {
     if slot.is_none() {
         *slot = Some(error);
@@ -2232,6 +2250,23 @@ struct FormulaReferenceMaps {
     categories: HashMap<FormulaCategoryKey, String>,
 }
 
+/// Borrowed table-model values needed by semantic extraction.
+///
+/// The strict storage codec validates the complete selected model/datastore
+/// envelope but intentionally does not retain a generated archive.  The
+/// table name is supplied by the separate strict name projection, while the
+/// datastore snapshot supplies the sidecar references and tile-storage bytes
+/// consumed below.
+#[derive(Clone, Copy)]
+struct ProjectedTableModel<'source> {
+    table_name: &'source str,
+    number_of_rows: u32,
+    number_of_columns: u32,
+    compatibility_defaults: bool,
+    compatibility_data_store: bool,
+    base_data_store: numbers_table_cell_storage_codec::DataStoreSnapshot<'source>,
+}
+
 /// Extractor for Numbers table data
 pub(super) struct TableDataExtractor<'a> {
     bundle: &'a Components,
@@ -2274,6 +2309,11 @@ impl<'a> TableDataExtractor<'a> {
 
     pub(super) fn without_comments(mut self) -> Self {
         self.retain_comments = false;
+        self.document_projection = true;
+        self
+    }
+
+    pub(super) fn native_projection(mut self) -> Self {
         self.document_projection = true;
         self
     }
@@ -2381,6 +2421,165 @@ impl<'a> TableDataExtractor<'a> {
         Ok(())
     }
 
+    /// Strictly project the model and its embedded datastore without
+    /// constructing generated Prost values.
+    ///
+    /// The model codec already walks the datastore once while validating the
+    /// model envelope.  The second datastore pass is deliberately retained
+    /// only to recover the borrowed sidecar/tile routes needed by extraction;
+    /// its references are not charged twice, while its actual field/work
+    /// inspection remains part of the aggregate projection budget.
+    fn project_table_model<'source>(
+        &self,
+        source: &'source [u8],
+        budget: &mut ProjectionBudget,
+        path: SemanticPath,
+    ) -> Result<ProjectedTableModel<'source>> {
+        let mut compatibility_defaults = !self.document_projection;
+        let mut compatibility_data_store = compatibility_defaults;
+        let sparse_compatibility_shape =
+            !compatibility_defaults && sparse_table_model_compatibility_shape(source);
+        let options = table_cell_decode_options(
+            source,
+            budget.remaining_references(),
+            MAX_FORMULA_WIRE_BYTES,
+            budget.remaining_payload_fields(),
+            budget.remaining_payload_work(),
+        );
+        let decoded = if compatibility_defaults {
+            numbers_table_cell_storage_codec::decode_table_model_compatibility_with_report(
+                source, options,
+            )
+        } else {
+            match numbers_table_cell_storage_codec::decode_table_model_with_report(source, options)
+            {
+                Ok(decoded) => Ok(decoded),
+                Err(error) if sparse_compatibility_shape && error.resource_limit().is_none() => {
+                    compatibility_defaults = true;
+                    compatibility_data_store = true;
+                    let compatibility_options = table_cell_decode_options(
+                        source,
+                        usize::MAX,
+                        MAX_FORMULA_WIRE_BYTES,
+                        budget.remaining_payload_fields(),
+                        budget.remaining_payload_work(),
+                    );
+                    numbers_table_cell_storage_codec::decode_table_model_compatibility_with_report(
+                        source,
+                        compatibility_options,
+                    )
+                },
+                Err(error) => {
+                    if error.resource_limit().is_some() {
+                        Err(error)
+                    } else {
+                        // A dense native model remains strict at the root, but a
+                        // malformed unselected DataStore metadata route (for
+                        // example, row-header ownership) must not make package
+                        // ingress fail. Retry only the nested store compatibility
+                        // projection; selected sidecars and tile storage remain
+                        // strict in the extraction pass below.
+                        match numbers_table_cell_storage_codec::decode_table_model_with_compatibility_data_store_with_report(source, options)
+                        {
+                            Ok(decoded) => {
+                                compatibility_data_store = true;
+                                Ok(decoded)
+                            },
+                            Err(_compatibility_error) => Err(error),
+                        }
+                    }
+                },
+            }
+        };
+        let (model, report) = decoded.map_err(|error| {
+            map_table_cell_codec_error_with_offsets(
+                error,
+                budget.references,
+                budget.payload_fields,
+                budget.payload_work,
+                0,
+            )
+        })?;
+        if compatibility_defaults {
+            // Generated compatibility defaults do not represent newly
+            // retained references. The sidecar/list/tile routes charge the
+            // references they actually resolve below; retain this envelope
+            // pass's bounded wire/work cost without charging its borrowed
+            // default/reference fields a second time.
+            budget.charge_decode_work(report)?;
+        } else {
+            budget.charge_decode_report(report)?;
+        }
+
+        // Decode the display name only after the model envelope has passed its
+        // wire gate. Compatibility models use generated defaults for omitted
+        // fields, while native models retain the independent strict names
+        // projection.
+        let table_name = if compatibility_defaults {
+            model.table_name()
+        } else {
+            names::preflight_table_name(source)
+                .map_err(|error| super::map_sheet_preflight_error(error, path, 0))?
+        };
+        budget.charge_output_text(table_name.len())?;
+
+        let data_store_source = model.base_data_store();
+        let data_store_options = table_cell_decode_options(
+            data_store_source,
+            usize::MAX,
+            usize::MAX,
+            budget.remaining_payload_fields(),
+            budget.remaining_payload_work(),
+        );
+        let data_store_decoded = if compatibility_data_store {
+            numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
+                data_store_source,
+                data_store_options,
+            )
+        } else {
+            numbers_table_cell_storage_codec::decode_data_store_with_report(
+                data_store_source,
+                data_store_options,
+            )
+        };
+        let (base_data_store, data_store_report) = data_store_decoded.map_err(|error| {
+            map_table_cell_codec_error_with_offsets(
+                error,
+                budget.references,
+                budget.payload_fields,
+                budget.payload_work,
+                0,
+            )
+        })?;
+        // The model pass is authoritative for selected reference admission;
+        // this recovery pass only adds the second scan's fields/work cost.
+        budget.charge_decode_work(data_store_report)?;
+
+        Ok(ProjectedTableModel {
+            table_name,
+            number_of_rows: model.number_of_rows(),
+            number_of_columns: model.number_of_columns(),
+            compatibility_defaults,
+            compatibility_data_store,
+            base_data_store,
+        })
+    }
+
+    /// Project one raw model payload into a candidate-local semantic table.
+    fn parse_projected_table_payload(&self, source: &[u8], path: SemanticPath) -> Result<Table> {
+        let mut candidate_budget = *self.projection_budget.borrow();
+        let projected = match self.project_table_model(source, &mut candidate_budget, path) {
+            Ok(projected) => projected,
+            Err(error) => {
+                self.projection_budget
+                    .borrow_mut()
+                    .commit_attempt(candidate_budget, false);
+                return Err(error);
+            },
+        };
+        self.parse_projected_table_model(projected, true, Some(candidate_budget))
+    }
+
     /// Extract a single table from a resolved object
     fn extract_table_candidate(
         &self,
@@ -2403,13 +2602,12 @@ impl<'a> TableDataExtractor<'a> {
                     "Numbers canonical table candidate has duplicate canonical payloads".to_owned(),
                 ));
             }
-            let table_model = tst::TableModelArchive::decode(&*message.data).map_err(|error| {
-                Error::InvalidFormat(format!(
-                    "Numbers table-model message {} is malformed: {error}",
-                    message.type_
-                ))
-            })?;
-            return self.parse_table_model(table_model, false, None).map(Some);
+            return self
+                .parse_projected_table_payload(
+                    message.data.as_slice(),
+                    SemanticPath::StructuredTables,
+                )
+                .map(Some);
         }
 
         // Protobuf is permissive, and legacy fixtures used 6000 for a model.
@@ -2435,16 +2633,19 @@ impl<'a> TableDataExtractor<'a> {
                 "Numbers legacy table candidate has duplicate legacy payloads".to_owned(),
             ));
         }
-        decode_legacy_table_candidate(&message.data, legacy_admit, |table_model| {
-            self.parse_table_model(table_model, false, None)
+        decode_projected_legacy_candidate(&message.data, legacy_admit, |source| {
+            self.parse_projected_table_payload(source, SemanticPath::StructuredTables)
         })
     }
 
     /// Extract a table model reached through a schema-proven `TableInfo` edge.
     ///
     /// Rooted ownership is stricter than the global compatibility scan:
-    /// canonical and legacy payloads are mutually exclusive and duplicates
-    /// fail independently of message order.
+    /// canonical payloads are authoritative, while a native projection
+    /// accepts one historical 6000 payload beside a canonical 6001 payload
+    /// only when their bytes are identical. Conflicting mixed payloads and
+    /// duplicate canonical payloads fail; compatibility mode preserves its
+    /// canonical-first treatment of mixed legacy candidates.
     pub(super) fn extract_reachable_table_from_object(
         &self,
         object: &Resolved<'_>,
@@ -2472,7 +2673,16 @@ impl<'a> TableDataExtractor<'a> {
             )));
         }
         let message = match (canonical, legacy_first) {
-            (Some(message), Some(_)) if !self.document_projection => message,
+            // Generated compatibility archives can repeat canonical model
+            // bytes under the historical model type. Canonical is
+            // authoritative for compatibility extraction; native extraction
+            // accepts this alias only when the bytes are identical and rejects
+            // conflicting payloads.
+            (Some(message), Some(legacy))
+                if !self.document_projection || message.data == legacy.data =>
+            {
+                message
+            },
             (Some(_), Some(_)) => {
                 return Err(Error::InvalidFormat(format!(
                     "Numbers {path} table model has ambiguous payload ownership"
@@ -2486,87 +2696,76 @@ impl<'a> TableDataExtractor<'a> {
             },
         };
         if !self.document_projection {
-            let table_model =
-                tst::TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
-                    Error::InvalidFormat(format!(
-                        "Numbers {path} table-model payload is malformed: {error}"
-                    ))
-                })?;
-            return self.parse_table_model(table_model, false, None);
+            return self.parse_projected_table_payload(message.data.as_slice(), path);
         }
-        let projected_name = names::preflight_table_name(message.data.as_slice())
-            .map_err(|error| super::map_sheet_preflight_error(error, path, 0))?;
         let mut candidate_budget = *self.projection_budget.borrow();
-        candidate_budget.charge_output_text(projected_name.len())?;
-        let projected_model = if self.document_projection {
-            let options = table_cell_decode_options(
-                &message.data,
-                candidate_budget.remaining_references(),
-                MAX_FORMULA_WIRE_BYTES,
-                candidate_budget.remaining_payload_fields(),
-                candidate_budget.remaining_payload_work(),
-            );
-            let (projected, report) =
-                numbers_table_cell_storage_codec::decode_table_model_with_report(
-                    &message.data,
-                    options,
-                )
-                .map_err(|error| {
-                    map_table_cell_codec_error_with_offsets(
-                        error,
-                        candidate_budget.references,
-                        candidate_budget.payload_fields,
-                        candidate_budget.payload_work,
-                        0,
-                    )
-                })?;
-            if let Err(error) = candidate_budget.charge_decode_report(report) {
-                self.projection_budget
-                    .borrow_mut()
-                    .commit_attempt(candidate_budget, false);
-                return Err(error);
-            }
-            Some(projected)
-        } else {
-            None
-        };
-        let table_model = match tst::TableModelArchive::decode(message.data.as_slice()) {
-            Ok(table_model) => table_model,
-            Err(error) => {
-                self.projection_budget
-                    .borrow_mut()
-                    .commit_attempt(candidate_budget, false);
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers {path} table-model payload is malformed: {error}"
-                )));
-            },
-        };
-        if table_model.table_name != projected_name {
-            self.projection_budget
-                .borrow_mut()
-                .commit_attempt(candidate_budget, false);
-            return Err(Error::MalformedPayload { path });
-        }
-        if let Some(projected_model) = projected_model
-            && (table_model.number_of_rows != projected_model.number_of_rows()
-                || table_model.number_of_columns != projected_model.number_of_columns()
-                || table_model.table_id != projected_model.table_id())
-        {
-            self.projection_budget
-                .borrow_mut()
-                .commit_attempt(candidate_budget, false);
-            return Err(Error::MalformedPayload { path });
-        }
-        self.parse_table_model(table_model, true, Some(candidate_budget))
+        let projected =
+            match self.project_table_model(message.data.as_slice(), &mut candidate_budget, path) {
+                Ok(projected) => projected,
+                Err(error) => {
+                    self.projection_budget
+                        .borrow_mut()
+                        .commit_attempt(candidate_budget, false);
+                    return Err(error);
+                },
+            };
+        self.parse_projected_table_model(projected, true, Some(candidate_budget))
     }
 
-    /// Parse a TableModelArchive protobuf message
-    fn parse_table_model(
+    fn parse_projected_table_model(
         &self,
-        table_model: tst::TableModelArchive,
+        table_model: ProjectedTableModel<'_>,
         name_precharged: bool,
         initial_budget: Option<ProjectionBudget>,
     ) -> Result<Table> {
+        let data_store = table_model.base_data_store;
+        let compatibility_defaults = table_model.compatibility_defaults;
+        self.parse_table_model_parts(
+            table_model.table_name,
+            table_model.number_of_rows,
+            table_model.number_of_columns,
+            data_store.string_table().identifier(),
+            data_store.formula_table().identifier(),
+            data_store
+                .formula_error_table()
+                .and_then(|reference| nonzero_reference_id(reference.identifier())),
+            data_store
+                .rich_text_table()
+                .and_then(|reference| nonzero_reference_id(reference.identifier())),
+            data_store
+                .comment_storage_table()
+                .and_then(|reference| nonzero_reference_id(reference.identifier())),
+            name_precharged,
+            initial_budget,
+            move |extractor, cell_tables, budget, table| {
+                extractor.parse_projected_tiles(
+                    data_store.tiles(),
+                    compatibility_defaults,
+                    cell_tables,
+                    budget,
+                    table,
+                )
+            },
+        )
+    }
+
+    fn parse_table_model_parts<F>(
+        &self,
+        table_name: &str,
+        number_of_rows: u32,
+        number_of_columns: u32,
+        string_table_id: u64,
+        formula_table_id: u64,
+        formula_error_table_id: Option<u64>,
+        rich_text_table_id: Option<u64>,
+        comment_storage_table_id: Option<u64>,
+        name_precharged: bool,
+        initial_budget: Option<ProjectionBudget>,
+        parse_tiles: F,
+    ) -> Result<Table>
+    where
+        F: FnOnce(&Self, &CellTables<'_>, &mut ProjectionBudget, &mut Table) -> Result<()>,
+    {
         // Projection is transactional at the table boundary. A rejected legacy
         // candidate must not consume retained-cell or retained-text capacity
         // that belongs to a later schema-proven table. Formula work remains a
@@ -2574,29 +2773,21 @@ impl<'a> TableDataExtractor<'a> {
         let mut projection_budget =
             initial_budget.unwrap_or_else(|| *self.projection_budget.borrow());
         let result = (|| {
-            let (row_count, column_count) = checked_table_dimensions(
-                table_model.number_of_rows,
-                table_model.number_of_columns,
-            )?;
+            let (row_count, column_count) =
+                checked_table_dimensions(number_of_rows, number_of_columns)?;
             if !name_precharged {
-                projection_budget.charge_output_text(table_model.table_name.len())?;
+                projection_budget.charge_output_text(table_name.len())?;
             }
-            let mut table =
-                Table::with_dimensions(table_model.table_name, row_count, column_count)?;
+            let mut table = Table::with_dimensions(table_name, row_count, column_count)?;
 
             // Extract string table for cell text values
             // string_table is a required field, not Optional
-            let string_table = self.load_string_table(
-                table_model.base_data_store.string_table.identifier,
-                &mut projection_budget,
-            )?;
+            let string_table = self.load_string_table(string_table_id, &mut projection_budget)?;
 
             // Extract formula table for formula cells
             // formula_table is a required field, not Optional
-            let formula_table = self.load_formula_table(
-                table_model.base_data_store.formula_table.identifier,
-                &mut projection_budget,
-            )?;
+            let formula_table =
+                self.load_formula_table(formula_table_id, &mut projection_budget)?;
             let formula_references = if formula_table.is_empty() {
                 None
             } else {
@@ -2627,23 +2818,23 @@ impl<'a> TableDataExtractor<'a> {
                 Some(references)
             };
             let empty_formula_references = FormulaReferenceMaps::default();
-            let formula_error_table = match table_model.base_data_store.formula_error_table {
-                Some(reference) => {
-                    self.load_formula_error_table(reference.identifier, &mut projection_budget)?
+            let formula_error_table = match formula_error_table_id {
+                Some(identifier) => {
+                    self.load_formula_error_table(identifier, &mut projection_budget)?
                 },
                 None => Box::default(),
             };
 
-            let rich_text_table = match table_model.base_data_store.rich_text_table {
-                Some(reference) => {
-                    self.load_rich_text_table(reference.identifier, &mut projection_budget)?
+            let rich_text_table = match rich_text_table_id {
+                Some(identifier) => {
+                    self.load_rich_text_table(identifier, &mut projection_budget)?
                 },
                 None => Box::default(),
             };
             let comment_table = if self.retain_comments {
-                match table_model.base_data_store.comment_storage_table {
-                    Some(reference) => {
-                        Some(self.load_comment_table(reference.identifier, &mut projection_budget)?)
+                match comment_storage_table_id {
+                    Some(identifier) => {
+                        Some(self.load_comment_table(identifier, &mut projection_budget)?)
                     },
                     None => None,
                 }
@@ -2662,12 +2853,7 @@ impl<'a> TableDataExtractor<'a> {
                     .as_ref()
                     .unwrap_or(&empty_formula_references),
             };
-            self.parse_tiles(
-                &table_model.base_data_store.tiles,
-                &cell_tables,
-                &mut projection_budget,
-                &mut table,
-            )?;
+            parse_tiles(self, &cell_tables, &mut projection_budget, &mut table)?;
 
             Ok(table)
         })();
@@ -2678,12 +2864,67 @@ impl<'a> TableDataExtractor<'a> {
         result
     }
 
+    /// Parse a generated model for the compatibility projection. Rooted
+    /// semantic extraction uses the strict borrowed projection below when
+    /// `document_projection` is enabled; compatibility callers retain the
+    /// keeping every production caller on the strict borrowed projection.
+    #[cfg(test)]
+    fn parse_table_model(
+        &self,
+        table_model: tst::TableModelArchive,
+        name_precharged: bool,
+        initial_budget: Option<ProjectionBudget>,
+    ) -> Result<Table> {
+        let tst::TableModelArchive {
+            table_name,
+            number_of_rows,
+            number_of_columns,
+            base_data_store,
+            ..
+        } = table_model;
+        let string_table_id = base_data_store.string_table.identifier;
+        let formula_table_id = base_data_store.formula_table.identifier;
+        let formula_error_table_id = base_data_store
+            .formula_error_table
+            .as_ref()
+            .map(|reference| reference.identifier);
+        let rich_text_table_id = base_data_store
+            .rich_text_table
+            .as_ref()
+            .map(|reference| reference.identifier);
+        let comment_storage_table_id = base_data_store
+            .comment_storage_table
+            .as_ref()
+            .map(|reference| reference.identifier);
+        self.parse_table_model_parts(
+            &table_name,
+            number_of_rows,
+            number_of_columns,
+            string_table_id,
+            formula_table_id,
+            formula_error_table_id,
+            rich_text_table_id,
+            comment_storage_table_id,
+            name_precharged,
+            initial_budget,
+            move |extractor, cell_tables, budget, table| {
+                extractor.parse_generated_tiles(&base_data_store.tiles, cell_tables, budget, table)
+            },
+        )
+    }
+
     /// Load a TableDataList from an object reference
     fn load_string_table(
         &self,
         object_id: u64,
         budget: &mut ProjectionBudget,
     ) -> Result<StringTable> {
+        // Compatibility envelopes materialize an omitted/empty required
+        // reference as identifier zero.  Zero is a valid generated default,
+        // not an object lookup; retain an empty sidecar for that route.
+        if object_id == 0 {
+            return Ok(Box::default());
+        }
         let mut converter =
             |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
              _budget: &mut ProjectionBudget| {
@@ -2710,6 +2951,9 @@ impl<'a> TableDataExtractor<'a> {
         object_id: u64,
         budget: &mut ProjectionBudget,
     ) -> Result<FormulaTable> {
+        if object_id == 0 {
+            return Ok(Box::default());
+        }
         let mut converter =
             |entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
              budget: &mut ProjectionBudget| {
@@ -2993,13 +3237,9 @@ impl<'a> TableDataExtractor<'a> {
             .iter()
             .filter(|message| message.type_ == 6005 || message.type_ == 6201)
         {
-            let list_type_probe = probe_table_data_list_type(&message.data);
-            budget.charge_list_type_probe(list_type_probe.fields, message.data.len())?;
+            let list_type_probe = probe_table_data_list_type(&message.data, false, budget)?;
             let duplicate_candidate = selected_values.is_some();
-            let admitting_candidate = !duplicate_candidate
-                && list_type_probe
-                    .list_type
-                    .is_none_or(|value| value == expected);
+            let admitting_candidate = !duplicate_candidate && list_type_probe == expected;
             let options = table_cell_decode_options(
                 &message.data,
                 if admitting_candidate {
@@ -3101,13 +3341,9 @@ impl<'a> TableDataExtractor<'a> {
                 .filter(|message| message.type_ == 6011)
             {
                 segment_count = segment_count.saturating_add(1);
-                let list_type_probe = probe_table_data_list_type(&segment_message.data);
-                budget
-                    .charge_list_type_probe(list_type_probe.fields, segment_message.data.len())?;
-                let admitting_segment = segment_count == 1
-                    && list_type_probe
-                        .list_type
-                        .is_none_or(|value| value == expected);
+                let list_type_probe =
+                    probe_table_data_list_type(&segment_message.data, true, budget)?;
+                let admitting_segment = segment_count == 1 && list_type_probe == expected;
                 let options = table_cell_decode_options(
                     &segment_message.data,
                     if admitting_segment {
@@ -3254,8 +3490,124 @@ impl<'a> TableDataExtractor<'a> {
         compact_table_vec(values)
     }
 
-    /// Parse tile storage to extract cells
-    fn parse_tiles(
+    /// Strictly decode tile-storage metadata, stage its references, then
+    /// resolve tiles only after the enclosing payload has passed wire parity.
+    fn parse_projected_tiles(
+        &self,
+        source: &[u8],
+        compatibility_defaults: bool,
+        cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
+        table: &mut Table,
+    ) -> Result<()> {
+        // Prost materializes an omitted TileStorage message as its generated
+        // default. Preserve that historical compatibility behavior while
+        // keeping the native strict path's required-envelope validation.
+        if compatibility_defaults && source.is_empty() {
+            return Ok(());
+        }
+        let options = table_cell_decode_options(
+            source,
+            crate::MAX_REFERENCES,
+            usize::MAX,
+            projection_budget.remaining_payload_fields(),
+            projection_budget.remaining_payload_work(),
+        );
+        let reference_offset = projection_budget.references;
+        let field_offset = projection_budget.payload_fields;
+        let work_offset = projection_budget.payload_work;
+        let mut visitor = TileStorageReferenceStage::new();
+        let (snapshot, report) =
+            numbers_table_cell_storage_codec::decode_tile_storage_with_visitor(
+                source,
+                options,
+                &mut visitor,
+            )
+            .map_err(|error| {
+                map_table_cell_codec_error_with_offsets(
+                    error,
+                    reference_offset,
+                    field_offset,
+                    work_offset,
+                    0,
+                )
+            })?;
+        projection_budget.charge_decode_work(report)?;
+        let references = visitor.take()?;
+        let tile_size = usize::try_from(snapshot.tile_size().unwrap_or(256)).map_err(|_| {
+            Error::InvalidFormat("Numbers tile size does not fit the host usize".to_owned())
+        })?;
+        self.parse_tiles_from_references(
+            tile_size,
+            references,
+            cell_tables,
+            projection_budget,
+            table,
+        )
+    }
+
+    fn parse_tiles_from_references(
+        &self,
+        tile_size: usize,
+        references: Vec<(u32, u64)>,
+        cell_tables: &CellTables<'_>,
+        projection_budget: &mut ProjectionBudget,
+        table: &mut Table,
+    ) -> Result<()> {
+        if tile_size == 0 {
+            return Err(Error::InvalidFormat(
+                "Numbers table declares a zero tile size".to_owned(),
+            ));
+        }
+        let tile_count = if table.row_count() == 0 {
+            0
+        } else {
+            (table.row_count() - 1) / tile_size + 1
+        };
+        let mut seen_tile_ids = HashSet::new();
+        seen_tile_ids
+            .try_reserve(references.len())
+            .map_err(|_| allocation_error("Numbers tile keys", references.len()))?;
+        let mut budget = CellBudget::new();
+        // Resolve each tile reference and parse its contents only after the
+        // strict tile-storage envelope has completed successfully.
+        for (tile_id, tile_reference) in references {
+            let tile_key = usize::try_from(tile_id).map_err(|_| {
+                Error::InvalidFormat("Numbers tile key does not fit the host usize".to_owned())
+            })?;
+            if tile_key >= tile_count {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers tile key {tile_key} is outside the declared table height {}",
+                    table.row_count()
+                )));
+            }
+            if !seen_tile_ids.insert(tile_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers table repeats tile key {tile_key}"
+                )));
+            }
+            let row_origin = tile_key
+                .checked_mul(tile_size)
+                .ok_or_else(|| Error::ParseError("Numbers tile row origin overflow".to_owned()))?;
+            self.parse_tile(
+                tile_reference,
+                row_origin,
+                tile_size,
+                table.row_count(),
+                table.column_count(),
+                &mut budget,
+                cell_tables,
+                projection_budget,
+                table,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Test-only generated fixture adapter. Production receives only the
+    /// borrowed strict tile-storage snapshot above.
+    #[cfg(test)]
+    fn parse_generated_tiles(
         &self,
         tile_storage: &tst::TileStorage,
         cell_tables: &CellTables<'_>,
@@ -6745,6 +7097,22 @@ fn finite_zero() -> Result<FiniteF64> {
     FiniteF64::new(0.0).map_err(|_| {
         Error::InvalidFormat("Numbers zero scalar is unexpectedly non-finite".to_string())
     })
+}
+
+#[cfg(test)]
+fn decode_legacy_table_candidate<T>(
+    data: &[u8],
+    admit: impl FnOnce() -> Result<()>,
+    parse: impl FnOnce(tst::TableModelArchive) -> Result<T>,
+) -> Result<Option<T>> {
+    match has_legacy_table_model_wire_shape(data) {
+        Ok(true) => {},
+        Ok(false) => return Ok(None),
+        Err(error) => return Err(error),
+    }
+    admit()?;
+    let table_model = tst::TableModelArchive::decode(data).map_err(Error::protobuf)?;
+    parse(table_model).map(Some)
 }
 
 #[cfg(test)]

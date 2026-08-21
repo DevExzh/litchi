@@ -425,6 +425,25 @@ impl Section {
         &self.text_storages
     }
 
+    /// Borrow the direct body text when this section has one unambiguous
+    /// storage and no separately modeled heading or paragraphs.
+    ///
+    /// A section can retain multiple rich-text storages for archive-free
+    /// fallback projection, or combine a storage with heading/paragraph
+    /// values. Those shapes have no single borrowed body-text value and
+    /// therefore return `None` instead of allocating or silently flattening
+    /// structure.
+    #[must_use]
+    pub fn body_text(&self) -> Option<&str> {
+        if self.heading.is_some() || !self.paragraphs.is_empty() {
+            return None;
+        }
+        let [storage] = self.text_storages.as_ref() else {
+            return None;
+        };
+        Some(storage.text())
+    }
+
     /// Returns the known page count, when present.
     #[must_use]
     pub const fn page_count(&self) -> Option<usize> {
@@ -756,6 +775,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["Storage text"]
         );
+        assert_eq!(section.body_text(), None);
         assert_eq!(
             section.all_text(),
             ["Introduction", "First paragraph", "Storage text"]
@@ -783,8 +803,18 @@ mod tests {
         let section = builder.build();
 
         assert_eq!(section.text_storages().len(), 1);
+        assert_eq!(section.body_text(), Some(""));
         assert_eq!(section.plain_text(), "");
         assert!(section.is_empty());
+    }
+
+    #[test]
+    fn one_direct_text_storage_borrows_body_text() {
+        let mut builder = Section::builder(0, SectionType::Body);
+        builder.push_text_storage(Storage::from_text("body".to_owned()));
+        let section = builder.build();
+
+        assert_eq!(section.body_text(), Some("body"));
     }
 
     #[test]
@@ -796,6 +826,7 @@ mod tests {
         let section = builder.build();
 
         assert_eq!(section.text_storages().len(), 3);
+        assert_eq!(section.body_text(), None);
         assert_eq!(section.plain_text(), "");
         assert!(section.is_empty());
     }

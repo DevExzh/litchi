@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::application::Application;
-use crate::detect::detect_application_from_document;
+use crate::application_detection::detect;
 use crate::package_metadata::PACKAGE_METADATA_ENTRY;
 use litchi_iwa_protos::comment_storage_codec;
 
@@ -124,9 +124,7 @@ pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArc
         object
             .messages
             .iter()
-            .find(|message| {
-                detect_application_from_document(&message.data) == Some(Application::Numbers)
-            })
+            .find(|message| detect(&message.data) == Some(Application::Numbers))
             .and_then(|message| tn::DocumentArchive::decode(message.data.as_slice()).ok())
             .ok_or_else(|| {
                 Error::InvalidFormat("package does not contain a Numbers root document".to_owned())
@@ -1035,7 +1033,7 @@ where
             .messages
             .iter()
             .position(|message| {
-                detect_application_from_document(&message.data) == Some(Application::Numbers)
+                detect(&message.data) == Some(Application::Numbers)
                     && tn::DocumentArchive::decode(message.data.as_slice()).is_ok()
             })
             .ok_or_else(|| {

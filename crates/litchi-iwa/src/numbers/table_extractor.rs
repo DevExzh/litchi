@@ -40,6 +40,7 @@ use crate::protobuf::{tn, tsce, tsd, tst};
 use crate::{Error, Result};
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_numbers::cell::FiniteF64;
+use litchi_numbers::table::Dimensions;
 use prost::Message;
 use std::collections::{HashMap, HashSet};
 
@@ -178,24 +179,6 @@ fn checked_table_dimensions(row_count: u32, column_count: u32) -> Result<(usize,
     }
 
     Ok((row_count, column_count))
-}
-
-fn validate_table_row(row: usize, row_count: usize) -> Result<()> {
-    if row >= row_count {
-        return Err(Error::InvalidFormat(format!(
-            "Numbers tile row {row} is outside the declared table height {row_count}"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_table_column(column: usize, column_count: usize) -> Result<()> {
-    if column >= column_count {
-        return Err(Error::InvalidFormat(format!(
-            "Numbers cell column {column} is outside the declared table width {column_count}"
-        )));
-    }
-    Ok(())
 }
 
 fn validate_table_data_list_segment(
@@ -631,6 +614,8 @@ impl<'a> TableDataExtractor<'a> {
         } else {
             (table.row_count() - 1) / tile_size + 1
         };
+        let dimensions = Dimensions::try_from_usize(table.row_count(), table.column_count())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut seen_tile_ids = HashSet::new();
         seen_tile_ids
             .try_reserve(tile_storage.tiles.len())
@@ -661,8 +646,7 @@ impl<'a> TableDataExtractor<'a> {
                 tile_reference.identifier,
                 row_origin,
                 tile_size,
-                table.row_count(),
-                table.column_count(),
+                dimensions,
                 &mut budget,
                 cell_tables,
                 table,
@@ -678,8 +662,7 @@ impl<'a> TableDataExtractor<'a> {
         tile_id: u64,
         row_origin: usize,
         tile_size: usize,
-        row_count: usize,
-        column_count: usize,
+        dimensions: Dimensions,
         budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
@@ -711,8 +694,7 @@ impl<'a> TableDataExtractor<'a> {
                 &tile,
                 row_origin,
                 tile_size,
-                row_count,
-                column_count,
+                dimensions,
                 budget,
                 cell_tables,
                 table,
@@ -735,8 +717,7 @@ impl<'a> TableDataExtractor<'a> {
         tile: &tst::Tile,
         row_origin: usize,
         tile_size: usize,
-        row_count: usize,
-        column_count: usize,
+        dimensions: Dimensions,
         budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
@@ -746,8 +727,7 @@ impl<'a> TableDataExtractor<'a> {
                 row_info,
                 row_origin,
                 tile_size,
-                row_count,
-                column_count,
+                dimensions,
                 budget,
                 cell_tables,
                 table,
@@ -763,8 +743,7 @@ impl<'a> TableDataExtractor<'a> {
         row_info: &tst::TileRowInfo,
         row_origin: usize,
         tile_size: usize,
-        row_count: usize,
-        column_count: usize,
+        dimensions: Dimensions,
         budget: &mut CellBudget,
         cell_tables: &CellTables<'_>,
         table: &mut NumbersTable,
@@ -781,7 +760,12 @@ impl<'a> TableDataExtractor<'a> {
         let row_index = row_origin
             .checked_add(tile_row_index)
             .ok_or_else(|| Error::ParseError("Numbers tile row index overflow".to_owned()))?;
-        validate_table_row(row_index, row_count)?;
+        dimensions.check_row(row_index).map_err(|_| {
+            Error::InvalidFormat(format!(
+                "Numbers tile row {row_index} is outside the declared table height {}",
+                dimensions.rows()
+            ))
+        })?;
 
         // The cell_storage_buffer contains serialized Cell messages
         // The cell_offsets buffer contains the byte offsets for each cell
@@ -806,12 +790,17 @@ impl<'a> TableDataExtractor<'a> {
             cell_storage.len(),
             row_info.has_wide_offsets.unwrap_or(false),
             expected_cells,
-            column_count,
+            dimensions.columns() as usize,
         )?;
         budget.consume(cells.len())?;
 
         for (column_index, range) in cells {
-            validate_table_column(column_index, column_count)?;
+            dimensions.check_column(column_index).map_err(|_| {
+                Error::InvalidFormat(format!(
+                    "Numbers cell column {column_index} is outside the declared table width {}",
+                    dimensions.columns()
+                ))
+            })?;
             let parsed = Self::parse_cell_storage(
                 &cell_storage[range],
                 cell_tables,
@@ -2243,10 +2232,11 @@ mod tests {
 
     #[test]
     fn table_coordinates_are_checked_against_declared_dimensions() {
-        validate_table_row(2, 3).unwrap();
-        validate_table_column(4, 5).unwrap();
-        assert!(validate_table_row(3, 3).is_err());
-        assert!(validate_table_column(5, 5).is_err());
+        let dimensions = Dimensions::new(3, 5);
+        dimensions.check_row(2).unwrap();
+        dimensions.check_column(4).unwrap();
+        assert!(dimensions.check_row(3).is_err());
+        assert!(dimensions.check_column(5).is_err());
     }
 
     #[test]

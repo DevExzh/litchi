@@ -170,14 +170,6 @@ fn adversarial_size(width: f32, height: f32) -> TestResult<Vec<u8>> {
     Ok(output)
 }
 
-fn raw_show(
-    settings: NativeSettings,
-    malformation: Malformation,
-    unknown_sentinel: u64,
-) -> TestResult<Vec<u8>> {
-    raw_show_with_slide_nodes(settings, malformation, unknown_sentinel, &[])
-}
-
 fn raw_show_with_slide_nodes(
     settings: NativeSettings,
     malformation: Malformation,
@@ -241,6 +233,15 @@ fn package_bytes(
     malformation: Malformation,
     unknown_sentinel: u64,
 ) -> TestResult<Vec<u8>> {
+    package_bytes_with_slide_nodes(settings, malformation, unknown_sentinel, &[])
+}
+
+fn package_bytes_with_slide_nodes(
+    settings: NativeSettings,
+    malformation: Malformation,
+    unknown_sentinel: u64,
+    slide_nodes: &[u64],
+) -> TestResult<Vec<u8>> {
     let document = kn::DocumentArchive {
         super_: tsa::DocumentArchive {
             super_: tsk::DocumentArchive::default(),
@@ -258,7 +259,12 @@ fn package_bytes(
             },
             RawMessage {
                 type_: 2,
-                data: raw_show(settings, malformation, unknown_sentinel)?,
+                data: raw_show_with_slide_nodes(
+                    settings,
+                    malformation,
+                    unknown_sentinel,
+                    slide_nodes,
+                )?,
             },
             RawMessage {
                 type_: 778,
@@ -1445,6 +1451,28 @@ fn nondefault_tight_limits_survive_read_edit_commit_and_apply() -> TestResult<()
         .apply_show_settings(&commit.patch().inverse())?;
     assert_eq!(restored.package().read_options(), options);
     assert_eq!(written(restored.package())?, bytes);
+    Ok(())
+}
+
+#[test]
+fn focused_reader_reports_typed_slide_limit_before_publication() -> TestResult<()> {
+    let bytes =
+        package_bytes_with_slide_nodes(NativeSettings::absent(), Malformation::None, 150, &[3, 4])?;
+    let semantic = SemanticLimits::new(8, 1, 16, 1, 1, 64)?;
+    let package =
+        Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic))?;
+
+    let expected = ShowSettingsError::LimitExceeded {
+        kind: ShowSettingsLimitKind::Slides,
+        observed: 2,
+        maximum: 1,
+    };
+    assert_eq!(package.show_settings(), Err(expected));
+    assert!(matches!(
+        package.edit_show_settings(),
+        Err(error) if error == expected
+    ));
+    assert_eq!(written(&package)?, bytes);
     Ok(())
 }
 

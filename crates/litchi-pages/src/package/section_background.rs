@@ -131,7 +131,9 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
 }
 
 fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
-    if source.source_bytes() != patch.source_artifact().as_ref() {
+    if transaction::fingerprint(source.source_bytes()) != patch.source_fingerprint()
+        || source.source_bytes() != patch.source_artifact().as_ref()
+    {
         return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
@@ -140,6 +142,11 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
             patch.clone(),
             Diagnostics::unchanged(),
         ));
+    }
+    if !source.state.source.source_is_exact()
+        || transaction::fingerprint(patch.target_artifact().as_ref()) != patch.target_fingerprint()
+    {
+        return Err(Error::PatchConflict);
     }
     let mut budget = transaction::TransactionBudget::new(source).map_err(map_transaction)?;
     let (source_target, source_background) =
@@ -350,6 +357,10 @@ fn validate_reference_ownership(
     )
     .map_err(transaction::map_wire_error)
     .map_err(map_transaction)?;
+    budget
+        .charge_fields(view.len(), transaction_path(path))
+        .and_then(|()| budget.charge_work(payload.len(), transaction_path(path)))
+        .map_err(map_transaction)?;
     let mut preserved = [None; 4];
     for field in view.fields() {
         let slot = match field.number() {

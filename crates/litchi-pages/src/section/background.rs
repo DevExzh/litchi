@@ -239,7 +239,9 @@ impl Patch {
     }
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.before == self.after && self.source.as_ref() == self.target.as_ref()
+        self.before == self.after
+            && self.source_fingerprint == self.target_fingerprint
+            && self.source.as_ref() == self.target.as_ref()
     }
     #[must_use]
     pub fn inverse(&self) -> Self {

@@ -3,14 +3,18 @@
 use super::*;
 use crate::image_caption::{
     CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind, DrawableCaptionSlot, caption_objects,
-    drawable_caption_slot, patch_drawable_caption_reference, replace_object_reference,
-    standin_caption_object,
+    drawable_caption_slot, replace_object_reference, standin_caption_object,
 };
 use crate::protobuf::kn;
-use crate::wire::transform_length_delimited_field;
+use litchi_iwa_protos::keynote_chart_caption_codec::{
+    ChartCaptionWrite, DecodeError as ChartCaptionDecodeError, DecodeOptions,
+    decode_chart_caption_identifier, rewrite_chart_caption,
+};
 
-/// `TSCH.ChartDrawableArchive` embeds its `TSD.DrawableArchive` in field one.
-const CHART_DRAWABLE_SUPER_FIELD: u32 = 1;
+/// The private caption codec only rewrites the selected chart-caption edge.
+/// Keep a small headroom for the three enclosing length prefixes and a larger
+/// replacement identifier; all other chart bytes remain source-owned.
+const CHART_CAPTION_REWRITE_HEADROOM: usize = 32;
 
 impl KeynoteEditor {
     /// Read the native caption attached to one slide chart.
@@ -81,16 +85,20 @@ fn slide_chart_caption_slot(
             "Keynote chart {drawable_object_id} must have exactly one chart payload"
         )));
     };
-    let chart = IWorkChartArchive::decode(message.data.as_slice())?;
-    let drawable = chart.drawable.super_.as_ref().ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Keynote chart {drawable_object_id} has no drawable payload"
-        ))
-    })?;
+    let caption_reference_id = decode_chart_caption_identifier(
+        message.data.as_slice(),
+        chart_caption_decode_options(message.data.as_slice()),
+    )
+    .map_err(chart_caption_codec_error)?;
+    let caption_reference =
+        caption_reference_id.map(|identifier| crate::protobuf::tsp::Reference {
+            identifier,
+            ..Default::default()
+        });
     drawable_caption_slot(
         editor.package(),
         drawable_object_id,
-        drawable.caption.as_ref(),
+        caption_reference.as_ref(),
         DrawableCaptionKind::Caption,
         "Keynote chart",
     )
@@ -287,28 +295,25 @@ fn replace_slide_chart_caption_reference(
         )));
     };
     let original = object.messages[*message_index].data.as_slice();
-    let chart = IWorkChartArchive::decode(original)?;
-    let current_reference_id = chart
-        .drawable
-        .super_
-        .as_ref()
-        .and_then(|drawable| drawable.caption.as_ref())
-        .map(|reference| reference.identifier);
+    let current_reference_id =
+        decode_chart_caption_identifier(original, chart_caption_decode_options(original))
+            .map_err(chart_caption_codec_error)?;
     if current_reference_id != Some(old_reference_id) {
         return Err(Error::InvalidFormat(format!(
             "Keynote chart {drawable_object_id} caption reference changed unexpectedly"
         )));
     }
-    let data =
-        transform_length_delimited_field(original, CHART_DRAWABLE_SUPER_FIELD, |drawable| {
-            patch_drawable_caption_reference(drawable, DrawableCaptionKind::Caption, replacement_id)
-        })?;
-    let actual_reference_id = IWorkChartArchive::decode(data.as_slice())?
-        .drawable
-        .super_
-        .as_ref()
-        .and_then(|drawable| drawable.caption.as_ref())
-        .map(|reference| reference.identifier);
+    let data = rewrite_chart_caption(
+        original,
+        ChartCaptionWrite::new(replacement_id),
+        chart_caption_decode_options(original),
+    )
+    .map_err(chart_caption_codec_error)?;
+    let actual_reference_id = decode_chart_caption_identifier(
+        data.as_slice(),
+        chart_caption_decode_options(data.as_slice()),
+    )
+    .map_err(chart_caption_codec_error)?;
     if actual_reference_id != Some(replacement_id) {
         return Err(Error::InvalidFormat(
             "Keynote chart caption reference patch failed validation".to_owned(),
@@ -327,4 +332,22 @@ fn replace_slide_chart_caption_reference(
         replacement_id,
     );
     Ok(())
+}
+
+fn chart_caption_decode_options(source: &[u8]) -> DecodeOptions {
+    let source_bytes = source.len().max(1);
+    let output_bytes = source_bytes
+        .saturating_add(CHART_CAPTION_REWRITE_HEADROOM)
+        .max(1);
+    DecodeOptions::new(
+        source_bytes,
+        output_bytes.saturating_mul(4).max(1),
+        output_bytes.saturating_mul(8).max(1),
+        8,
+    )
+    .with_max_output_bytes(output_bytes)
+}
+
+fn chart_caption_codec_error(error: ChartCaptionDecodeError) -> Error {
+    Error::InvalidFormat(format!("invalid Keynote chart caption wire: {error}"))
 }

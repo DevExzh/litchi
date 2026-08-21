@@ -962,7 +962,14 @@ fn transition_decode_options(
 }
 
 fn preflight_selected_transition_payload(source: &[u8], limits: WireLimits) -> Result<(), Error> {
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    // The transition codec charges every selected message twice: once while
+    // parsing the strict wire view and once while the borrowed projection
+    // cross-checks it.  Reject an oversized root before the generic wire
+    // scanner walks every unknown field; otherwise a payload may be below the
+    // archive byte ceiling while still bypassing the configured work budget
+    // for the most expensive part of this read path.
+    ensure_transition_preflight_work(source.len(), limits)?;
+    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
         if matches!(visit.field().wire_type(), 3 | 4) {
             return Err(litchi_iwa_common::Error::InvalidFormat(
                 "group-bearing transition payload".to_owned(),
@@ -976,8 +983,24 @@ fn preflight_selected_transition_payload(source: &[u8], limits: WireLimits) -> R
         };
         Ok(descend)
     })
-    .map(|_preflight| ())
-    .map_err(map_wire_error)
+    .map_err(map_wire_error)?;
+    ensure_transition_preflight_work(report.scanned_bytes(), limits)
+}
+
+fn ensure_transition_preflight_work(scanned_bytes: usize, limits: WireLimits) -> Result<(), Error> {
+    let observed = scanned_bytes.checked_mul(2).ok_or(Error::LimitExceeded {
+        kind: LimitKind::WireWork,
+        observed: u64::MAX,
+        maximum: limits.max_rewrite_work() as u64,
+    })?;
+    if observed > limits.max_rewrite_work() {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: limits.max_rewrite_work() as u64,
+        });
+    }
+    Ok(())
 }
 
 fn map_document_codec_error(error: keynote_document_codec::DecodeError) -> Error {
@@ -2588,7 +2611,10 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, validate_opaque_color, validate_opaque_path};
+    use super::{
+        Error, LimitKind, preflight_selected_transition_payload, validate_opaque_color,
+        validate_opaque_path,
+    };
     use litchi_iwa_common::WireLimits;
 
     fn length_delimited(number: u8, payload: &[u8]) -> Vec<u8> {
@@ -2649,5 +2675,20 @@ mod tests {
         let mut scalar = vec![0x22, 0x05, 0x15];
         scalar.extend_from_slice(&f32::INFINITY.to_le_bytes());
         assert_invalid(validate_opaque_path(&scalar, limits));
+    }
+
+    #[test]
+    fn transition_preflight_charges_root_before_scanning_unknown_fields() {
+        let limits = WireLimits::default()
+            .with_rewrite_work(3)
+            .expect("positive rewrite-work limit");
+        assert!(matches!(
+            preflight_selected_transition_payload(&[0x08, 0x00], limits),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::WireWork,
+                observed: 4,
+                maximum: 3,
+            })
+        ));
     }
 }

@@ -198,6 +198,16 @@ impl Edit<'_> {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
+        // The edit captures both the semantic value and its private rooted
+        // location. Re-read the source value before entering the changed
+        // path so a future mutable/source-backed Package implementation
+        // cannot publish against a location that no longer represents the
+        // captured settings. Keep this after the no-op fast path: exact
+        // no-ops deliberately do not inspect cache ownership or revalidate
+        // any derived state.
+        if document_settings(self.source)? != self.before {
+            return Err(Error::InvalidSource);
+        }
         if !catalog.source_is_exact() {
             return Err(Error::UnsupportedSource);
         }

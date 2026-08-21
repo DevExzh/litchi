@@ -584,6 +584,7 @@ fn set_clear_noop_and_patch_lifecycle_preserve_exact_source_rules() -> TestResul
         .package()
         .apply_section_background(&commit.patch().inverse())?;
     assert_eq!(restored.package().source_bytes(), bytes);
+    assert_eq!(commit.patch().inverse().inverse(), commit.patch().clone());
 
     let unrelated = Package::from_bytes(&package(Some(&solid_payload(0.9, 0.8, 0.7, 1.0)), None)?)?;
     assert!(matches!(

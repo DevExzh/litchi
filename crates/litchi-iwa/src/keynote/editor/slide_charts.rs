@@ -705,7 +705,7 @@ impl KeynoteEditor {
                 )
             })
             .collect::<Result<Vec<_>>>()?;
-        Ok(ChartCatalog::from_titles(titles))
+        Ok(ChartCatalog::from_owned_titles(titles))
     }
 
     fn update_slide_chart(

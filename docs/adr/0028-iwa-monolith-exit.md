@@ -3307,27 +3307,46 @@ established. This is a bounded correctness slice only: no native segment or
 save-mutation, performance, host-exit, or complete monolith-retirement claim
 is made.
 
+## 2026-08-21 amendment: focused detector host-edge retirement
+
+The legacy `litchi-iwa` host no longer depends on `litchi-iwa-detect`. Its
+public detector facade, detector-only bundle helper, host detector assertions,
+and detector fuzz import were removed. The unified host reader, comment
+package-root validation, and Numbers root selection now share a small private
+canonical `DocumentArchive` classifier. It recognizes the Pages, Numbers, and
+Keynote root shapes without consulting raw message-type IDs or publishing a
+detector vocabulary.
+
+The focused detector remains the sole owner of packaged-file, seekable-reader,
+and legacy-directory ingress. Its malformed/ambiguous-root, marker-conflict,
+and cursor-restoration coverage is unchanged; generated host roundtrip
+coverage still exercises all three unified and focused readers. This closes
+ordered debt 006 and removes exactly one normal host dependency declaration.
+No other host migration edge or semantic ownership claim changes here.
+
+The current topology is 64 workspace packages, 239 internal dependency
+declarations, and 13 ordered migration debts. The remaining host readers,
+editors, examples/tests/fuzz ownership, and the broader monolith exit remain
+open.
+
 ## Current present status
 
-The latest isolated `cargo test -p litchi-iwa-protos --lib --all-features`
-verification records 262 passing `litchi-iwa-protos` tests, including 14
-focused private Keynote chart-title codec tests and one bounded Pages
-pagination guard; 343 passing `litchi-numbers` library tests with four
-ignored, 72 focused Numbers
-extractor tests, 16 `table_cells` integration tests, 14 `table_data_list`
-integration tests; 71 passing `litchi-pages` library tests, five
-`section_name` tests, one native-fixture test; 113 passing `litchi-keynote`
-library tests, nine native-fixture tests; 1,412 passing `litchi-iwa` library
-tests; and 296 boundary unit tests. The boundary audit remains 64 packages,
-240 internal declarations, and 14 ordered debts. The bounded Pages
-section-name seam uses the private section-settings codec for field-26
-presence/readback while preserving the rest of the graph bytes. The private
-Keynote chart-title codec projects only generated `ChartNonStyleArchive`
-fields 21 and 23; it is codec-only and does not locate charts or perform a
-graph transaction. The performance baseline currently exposes 341 selectable
-cases. FormulaArchive and the legacy `litchi-iwa` comment path remain
-migration debt; legacy monolith/dependency edges and all 14 ordered debts
-remain open. Native Numbers type-6011 Segment evidence remains withheld, so
-no native segment/save-mutation, performance, host-exit, or complete
-monolith-exit claim follows. The dated gate counts above remain historical
-evidence, and the monolith exit remains incomplete.
+The current boundary checker reports 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts. The focused protocol
+codec check records 33 passed tests; the full `litchi-iwa-protos` suite is
+verified at 266 passed and 0 failed. The current Numbers library run
+records 344 passed tests with four ignored. The prior XLS certification gate
+remains at 2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
+
+Native no-repair reopen evidence covers Keynote transition/title and Pages
+body/background paths. A native Numbers rich/formula/comment reopen retained
+the exact `Persistent TDL comment`; its archive inspection recorded 24
+type-6005 entries and 0 type-6011 entries. This does not establish the
+type-6011/Segment path, whose proof remains withheld.
+
+FormulaArchive and the legacy `litchi-iwa` comment path remain migration debt;
+legacy monolith/dependency edges and all 13 ordered debts remain open. These
+checks provide focused correctness/boundedness and native no-repair evidence
+only: no native segment/save-mutation, performance, host-exit, or complete
+monolith-exit claim follows. The dated verification gates above remain
+historical evidence, and the monolith exit remains incomplete.

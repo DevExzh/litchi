@@ -699,6 +699,18 @@ fn semantic_groups_presence_unknowns_gap_and_exact_noop_are_lossless() -> TestRe
     let replay = package.apply_document_settings(commit.patch())?;
     assert!(replay.patch().is_noop());
     assert_eq!(replay.package().source_bytes().as_ptr(), pointer);
+
+    // Exact-source matching also admits an independently reopened copy while
+    // the no-op result reuses that caller's own source allocation.
+    let reopened = Package::from_bytes(&bytes)?;
+    let reopened_pointer = reopened.source_bytes().as_ptr();
+    let reopened_replay = reopened.apply_document_settings(commit.patch())?;
+    assert!(reopened_replay.patch().is_noop());
+    assert_eq!(
+        reopened_replay.package().source_bytes().as_ptr(),
+        reopened_pointer
+    );
+    assert_eq!(reopened_replay.package().source_bytes(), bytes);
     Ok(())
 }
 
@@ -1178,6 +1190,19 @@ fn stale_rooted_cache_headers_and_no_layout_merge_diff_fail_atomically() -> Test
         info.diff_read_version = vec![1];
         Ok(())
     })?;
+
+    // Exact semantic no-ops intentionally do not inspect derived cache
+    // ownership. They retain the source bytes even when the cache is stale;
+    // only a changed edit must fail closed on that state.
+    let stale_noop = Package::from_bytes(&stale_view_root)?;
+    let stale_pointer = stale_noop.source_bytes().as_ptr();
+    let stale_noop_commit = stale_noop.edit_document_settings()?.set(before).commit()?;
+    assert_eq!(stale_noop_commit.package().source_bytes(), stale_view_root);
+    assert_eq!(
+        stale_noop_commit.package().source_bytes().as_ptr(),
+        stale_pointer
+    );
+    assert!(!stale_noop_commit.diagnostics().changed());
 
     for adversarial in [
         stale_document,
