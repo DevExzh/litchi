@@ -3,6 +3,14 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0254 — DOCX story-hyperlink planning ABBA evidence](changes/0254-docx-story-hyperlink-index-abba.md)
+(the independently audited `fcb3104a5` release package accepts all p50/mean/p95/p99
+statistics for eight repeated `Snapshot::plan_target_urls` calls on a prepared
+immutable 49-story/1,152-link snapshot. The candidate replaces per-selector
+repeated story/relationship scans with preindexed targets; paired reductions
+range from 88.225897% to 91.592577% under CPU-0 release A1/B1/B2/A2 with 20
+warmups and 500 retained samples per leg. This is plan-only evidence, not an
+end-to-end DOCX, I/O, allocation, RSS, resource, or general speedup claim.)
 [change 0252 — XLSX page-break projection ABBA evidence](changes/0252-xlsx-pagebreak-projection-abba.md)
 (the fixed media-rich eager page-break selector accepts p50/mean/p95/p99 at
 approximately 1.2%-2.0% lower candidate latency; the source-backed selector
