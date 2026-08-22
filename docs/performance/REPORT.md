@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-21
+Date: 2026-08-22
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -10,6 +10,19 @@ claim that the end-to-end performance program or CRUD scenario matrix is
 complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
+
+## DOCX story-hyperlink planning ABBA evidence (change 0254)
+
+[Change 0254](changes/0254-docx-story-hyperlink-index-abba.md) records the
+independently audited evidence package from `fcb3104a5` for the DOCX story
+hyperlink index. The candidate replaces per-selector repeated story/relationship
+scans with preindexed targets on the immutable source snapshot. In CPU-0
+release A1/B1/B2/A2 with 20 warmups and 500 retained samples per leg, all
+p50/mean/p95/p99 cells are accepted for eight repeated
+`Snapshot::plan_target_urls` calls on a prepared immutable 49-story/1,152-link
+snapshot; paired reductions range from 88.225897% to 91.592577%. This is
+prepared-snapshot planning evidence only, not an end-to-end DOCX, I/O,
+allocation, RSS, resource, or general speedup claim.
 
 ## XLSX page-break projection ABBA evidence (change 0252)
 
