@@ -201,24 +201,29 @@ impl PagesEditor {
 
     /// Delete one native body footnote, its body anchor, and its owned objects.
     pub fn remove_body_footnote(&mut self, selector: Selector) -> Result<Footnote> {
-        let removed = body_footnote_by_selector(self, selector)?.footnote;
-        let start = usize::try_from(removed.position.utf16_index()).map_err(|_| {
+        let removed = body_footnote_by_selector(self, selector)?;
+        let start = usize::try_from(removed.footnote.position.utf16_index()).map_err(|_| {
             Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
         })?;
         let end = start
             .checked_add(1)
             .ok_or_else(|| Error::ParseError("Pages footnote anchor range overflow".to_owned()))?;
-        self.replace_body_text(start..end, "")?;
-        if self
-            .body_footnotes()?
+        // Keep the legacy graph edit and its cleanup off the live editor until
+        // the removed native reference is absent. Position-only validation is
+        // incorrect when a following footnote shifts into the deleted anchor.
+        let mut staged = self.clone();
+        staged.replace_body_text(start..end, "")?;
+        if body_footnote_graphs(&staged, staged.body_storage_id.get())?
             .iter()
-            .any(|footnote| footnote.position == removed.position)
+            .any(|graph| graph.reference_id == removed.reference_id)
         {
             return Err(Error::InvalidFormat(
                 "Pages footnote deletion failed validation".to_owned(),
             ));
         }
-        Ok(removed)
+        let result = removed.footnote;
+        *self = staged;
+        Ok(result)
     }
 }
 
@@ -1046,6 +1051,32 @@ mod tests {
         assert_eq!(editor.body_text().unwrap(), "A😀B");
         assert!(editor.body_footnotes().unwrap().is_empty());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn removing_adjacent_body_footnote_is_atomic_and_tracks_identity() {
+        let mut editor = PagesEditor::create_with_text("AB").unwrap();
+        let first = editor
+            .insert_body_footnote(Position::from_utf16_index(1).unwrap(), "First")
+            .unwrap();
+        let second = editor
+            .insert_body_footnote(Position::from_utf16_index(2).unwrap(), "Second")
+            .unwrap();
+
+        let removed = editor
+            .remove_body_footnote(Selector::At(first.position))
+            .unwrap();
+
+        assert_eq!(removed, first);
+        assert_eq!(editor.body_text().unwrap(), "A\u{e}B");
+        assert_eq!(
+            editor.body_footnotes().unwrap(),
+            vec![Footnote {
+                position: Position::from_utf16_index(1).unwrap(),
+                text: second.text,
+                custom_mark: second.custom_mark,
+            }]
+        );
     }
 
     #[test]
