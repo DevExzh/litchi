@@ -22,7 +22,7 @@ use bumpalo::Bump;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fs::File;
-use std::io::Read;
+use std::io::{ErrorKind, Read};
 use std::ops::Range;
 use std::path::Path;
 
@@ -34,9 +34,17 @@ fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8
     let mut bytes = Vec::new();
     let mut chunk = [0_u8; FILE_READ_CHUNK_BYTES];
     loop {
-        let read = reader
-            .read(&mut chunk)
-            .map_err(|error| RtfError::ParserError(format!("Failed to read file: {error}")))?;
+        let read = loop {
+            match reader.read(&mut chunk) {
+                Ok(read) => break read,
+                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+                Err(error) => {
+                    return Err(RtfError::ParserError(format!(
+                        "Failed to read file: {error}"
+                    )));
+                },
+            }
+        };
         if read == 0 {
             break;
         }
@@ -5938,6 +5946,27 @@ mod source_tests {
         }
     }
 
+    struct InterruptedReader {
+        interrupted_reads: usize,
+        bytes: &'static [u8],
+        finished: bool,
+    }
+
+    impl Read for InterruptedReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if self.interrupted_reads > 0 {
+                self.interrupted_reads -= 1;
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "retry"));
+            }
+            if self.finished {
+                return Ok(0);
+            }
+            output[..self.bytes.len()].copy_from_slice(self.bytes);
+            self.finished = true;
+            Ok(self.bytes.len())
+        }
+    }
+
     #[test]
     fn limited_source_reader_handles_short_reads_without_read_to_end_growth() {
         let reader = OneByteReader {
@@ -5960,5 +5989,16 @@ mod source_tests {
                 limit: 2,
             }
         ));
+    }
+
+    #[test]
+    fn limited_source_reader_retries_interrupted_reads() {
+        let reader = InterruptedReader {
+            interrupted_reads: 2,
+            bytes: b"retry me",
+            finished: false,
+        };
+        let bytes = read_limited_source(reader, b"retry me".len()).expect("source read");
+        assert_eq!(bytes, b"retry me");
     }
 }
