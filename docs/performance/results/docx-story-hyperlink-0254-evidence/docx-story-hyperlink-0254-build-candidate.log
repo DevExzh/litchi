@@ -1,0 +1,37 @@
+build=candidate
+started_utc=2026-08-22T03:57:33Z
+avail_bytes_before=21881217024
+   Compiling litchi-core v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/xml-minifier-macros)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/xml-minifier)
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-cfb)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-opc)
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-codepage)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-drawingml)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-odf-common)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-ole-common)
+   Compiling litchi-odraw v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-odraw)
+   Compiling litchi-biff v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-biff)
+   Compiling litchi-ograph v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-ograph)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-crypto)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-vba)
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-sign)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-sheet)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-xlsx)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-ods)
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-odt)
+   Compiling litchi-odp v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-odp)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-pptx)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-docx)
+   Compiling litchi v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi)
+   Compiling litchi-rtf v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-rtf)
+   Compiling litchi-doc v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-doc)
+   Compiling litchi-xls v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-xls)
+   Compiling litchi-ppt v0.0.1 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/crates/litchi-ppt)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-candidate/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 11m 19s
+finished_utc=2026-08-22T04:08:52Z
+avail_bytes_after=23984619520

@@ -1,0 +1,8 @@
+verified_binary=a1 sha256=ec2d0e73f5f449315197e664412375f04f27737954571cbb1db37fbdfee4fd3d size=45459504 mode=555
+leg=a1
+start_utc=2026-08-22T04:09:53Z
+avail_bytes_before=23938686976
+finish_utc=2026-08-22T04:09:53Z
+avail_bytes_after=23938650112
+59e207ad6b2e6b1d7ac4b9c9f25892577bf92410a519a50ad230be4baae4288d  /home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-staging/reports/a1.json
+report_size=33438 report_mode=664

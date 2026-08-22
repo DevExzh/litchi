@@ -1,0 +1,153 @@
+{
+  "artifact_set": "docx-story-hyperlink-0254-evidence",
+  "files": [
+    {
+      "bytes": 33438,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-a1.json",
+      "sha256": "59e207ad6b2e6b1d7ac4b9c9f25892577bf92410a519a50ad230be4baae4288d"
+    },
+    {
+      "bytes": 6277,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-a1.json.zst",
+      "sha256": "3455a1601bf65ee7bfd8664b5520f465b555baab11227df6716f0148d9b369d0"
+    },
+    {
+      "bytes": 33431,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-a2.json",
+      "sha256": "93bd6f9f003a879b6db4c2bb26bcf55d095977ccdc49da8867063cf5c0109b4c"
+    },
+    {
+      "bytes": 6308,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-a2.json.zst",
+      "sha256": "7f7ad0fa49b6e6850fa02d7e091c5800369041865fd9ea00d608d0f3ad1e7b9d"
+    },
+    {
+      "bytes": 32450,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-b1.json",
+      "sha256": "b0d72590f87787e483a893f6eb24a05b62fe7a1d0d1b08393eb7406f3916865c"
+    },
+    {
+      "bytes": 5702,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-b1.json.zst",
+      "sha256": "625f371434c19c403547ae6a03163ec359deb8c3fbffafc165cdff3cbb999b95"
+    },
+    {
+      "bytes": 32441,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-b2.json",
+      "sha256": "9c1db3f2b98dd447f0ee2ac5d85abe771f34002337d35f3b3afeebd0e1b84d64"
+    },
+    {
+      "bytes": 5508,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-b2.json.zst",
+      "sha256": "72193127868f84edd8935a8dbd1e15960de482ff5ad5f040ad4902f56a4dbfee"
+    },
+    {
+      "bytes": 4371,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-build-candidate.log",
+      "sha256": "5536bc0a12ef1ed019a339b77aa5da0688559b3a9fb9d18ed6881fdddfc6acf2"
+    },
+    {
+      "bytes": 9503,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-build-control.log",
+      "sha256": "3a4340fdf66ce25e7d46f2653ce8df6a37b2d61092ed6c2ee6a996e05bd7d5cf"
+    },
+    {
+      "bytes": 45523880,
+      "mode": "0555",
+      "name": "docx-story-hyperlink-0254-candidate.bin",
+      "sha256": "1a4e2bdc0ff1720173054ed5f61fbfa06b4e239416086a175e8a6f8c2b4ff67b"
+    },
+    {
+      "bytes": 45459504,
+      "mode": "0555",
+      "name": "docx-story-hyperlink-0254-control.bin",
+      "sha256": "ec2d0e73f5f449315197e664412375f04f27737954571cbb1db37fbdfee4fd3d"
+    },
+    {
+      "bytes": 437,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-run-a1.log",
+      "sha256": "6a2bb01064096e2b3a7a946a11296a0436216f73e3cf1cd74698218c3940cea0"
+    },
+    {
+      "bytes": 437,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-run-a2.log",
+      "sha256": "4bff9338a4712a3cc4c80a016f877f25459b885b9b7bf84e0740d7b2d562bcf6"
+    },
+    {
+      "bytes": 437,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-run-b1.log",
+      "sha256": "667c4c19fbe454cce05f1e219be34487cd873c85ad454ce1506010780c55a0b4"
+    },
+    {
+      "bytes": 437,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-run-b2.log",
+      "sha256": "deacb69cb7a842160fdd558903a7e03b5c691fcccd572556c8cb6399e3c34a1c"
+    },
+    {
+      "bytes": 89,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-summary-control-helper.log",
+      "sha256": "fa456d24a7ca97ae0aecd7ea5546f15ed6f102eee603d998b274ef73364b59f3"
+    },
+    {
+      "bytes": 14190,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-summary.json",
+      "sha256": "05c8d30e2ed2a5d208725ff3584dcf8ae72166260879fc87f7a5e8e2439acdde"
+    },
+    {
+      "bytes": 3604,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-summary.json.zst",
+      "sha256": "94fa9c0d2d82df77213c5fc82c49f7bf732ac08415a87367dbc1b89e8f9a125e"
+    },
+    {
+      "bytes": 63,
+      "mode": "0444",
+      "name": "docx-story-hyperlink-0254-summary.log",
+      "sha256": "325df6179dd80f806672c325d13d546b49ebd672f9d9c63f9647776b70dd0676"
+    }
+  ],
+  "generated_from": {
+    "candidate_revision": "9f2350e393da9a8e3ce98892cf2abc32dda9a56d",
+    "control_base": "ecbc8cdb5",
+    "control_harness_commit": "9f2350e39 (cherry-picked)",
+    "control_revision": "dbf33bdc0fa381c531fb8a2eda92f388e9a20a49"
+  },
+  "notes": [
+    "Raw reports are retained as JSON and deterministic zstd-compressed JSON.",
+    "Binary files are copied mode 0555 and hashes are checked before every leg.",
+    "The custom summary recomputes p50/mean/p95/p99 from raw samples because the repository ABBA helper is incompatible with these committed reports.",
+    "source_immutability_verified is retained as harness-reported but is not independent proof."
+  ],
+  "protocol": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "cpu_affinity": "0",
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "samples_per_leg": 500,
+    "warmups": 20,
+    "zstd": "zstd 1.5.7, -T1 -19"
+  },
+  "purpose": "Controlled release A1/B1/B2/A2 evidence for DOCX story hyperlink planning",
+  "schema_version": 1
+}
