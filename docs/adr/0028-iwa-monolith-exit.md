@@ -596,10 +596,11 @@ This is visual compatibility evidence, not a native nonmutation claim, and
 future direct application checks must use disposable copies.
 
 The root fuzz target compiles offline, but `cargo-fuzz` is not installed and no
-sanitizer campaign was executed. Consequently the host structured adapter,
-its dependency, and all 17 recorded monolith debt edges remain. This amendment
-does not authorize monolith deletion, claim complete Buffa laziness, or infer
-edit/resave fidelity from the new source routes.
+sanitizer campaign was executed. At the time of this 2026-08-08 gate, the host
+structured adapter, its dependency, and all 17 recorded monolith debt edges
+remained; later debt-retirement amendments supersede that historical count.
+This amendment does not authorize monolith deletion, claim complete Buffa
+laziness, or infer edit/resave fidelity from the new source routes.
 
 ## 2026-08-08 Keynote Show/SlideTree and slide-order ownership
 
@@ -673,13 +674,15 @@ Acceptance evidence was executed rather than inferred:
   evidence.
 
 No latency, RSS, allocation-performance, fuzz, or sanitizer result is claimed.
-All 17 ordered host dependency debts remain. Slide nodes, slides, builds,
-shapes, notes, tables, charts, media, other mutation paths, and portions of
-semantic graph projection still use the migration host and/or generated Prost
-values. Protobuf groups remain transactionally fail-closed at shared package
-preflight. The unavailable sanitizer campaign, missing aggregate transaction
-peak-memory option, durable JSON patch envelope, atomic filesystem save, and
-remaining examples/tests/fuzz targets keep the monolith deletion gate open.
+At the time of this 2026-08-08 gate, all 17 ordered host dependency debts
+remained; later debt-retirement amendments supersede that historical count.
+Slide nodes, slides, builds, shapes, notes, tables, charts, media, other
+mutation paths, and portions of semantic graph projection still use the
+migration host and/or generated Prost values. Protobuf groups remain
+transactionally fail-closed at shared package preflight. The unavailable
+sanitizer campaign, missing aggregate transaction peak-memory option, durable
+JSON patch envelope, atomic filesystem save, and remaining examples/tests/fuzz
+targets keep the monolith deletion gate open.
 
 ## 2026-08-08 focused Keynote settings and direct graph-edge retirement
 
@@ -3329,16 +3332,176 @@ declarations, and 13 ordered migration debts. The remaining host readers,
 editors, examples/tests/fuzz ownership, and the broader monolith exit remain
 open.
 
+## 2026-08-22 prior-commit section-text bridge and aggregate gate evidence (historical; predates current-wave amendments)
+
+The prior committed record verifies the Pages host section-text selector-first
+bridge. This is historical evidence, not a current-wave gate. The
+bridge rejects U+FFFC, uses strict invalid-format fallback, and passes the
+topology, readback, and budget proofs. The Numbers scalar shortcut
+interop/no-op test passes and preserves the source on the no-op path. The XLS
+gate records 1,274 passed; the boundary, iWork-leaf, and root checks record
+301, 13, and 10 respectively.
+
+The prior all-target aggregate gates were green: Pages all-targets include the
+reported 84+15+14+1+10+8+5+6+7+4 runs; Numbers records 374 library tests
+plus green integration targets; `litchi-iwa` records 1,520 library tests; and
+strict Clippy passes. Native evidence includes the Pages lock reopen and a
+native Numbers 1,200-by-8 formula/error/rich-text/comment reopen. Direct
+type-6011 proof remains explicitly unconfirmed.
+
+This is bounded verification evidence only. No host dependency edge or
+ordered debt is retired, and this wave makes no full monolith-exit or
+complete Prost-migration claim.
+
+## 2026-08-22 amendment: focused semantic read and bounded API gates
+
+The Pages package now owns the immutable semantic read of body footnotes
+through `Package::body_footnotes()`. Its bounded strict projection validates
+the body boundary, source-order UTF-16 positions, anchors, references, and
+marker identity before publishing only public footnote values; native object
+IDs and storage/marker attachments remain private. The focused package test
+reads the projection repeatedly and verifies that the source bytes are
+unchanged. The Pages host editor still owns footnote CRUD, so this read-owner
+slice does not retire the `litchi-iwa -> litchi-pages` edge or its ordered
+debt, and it makes no native-mutation determination.
+
+The accepted report records a native Pages body/section/footnote fixture
+reopening without a repair, recovery, conversion, or warning UI. The reported
+artifact is 100,389 bytes with SHA-256
+`0ac8f1db0fb64556031a05284f7e7e7ec11d70a7dcbccd0a2c698365fd355fc2`; the
+artifact is absent from this checkout, so this remains reported/accepted
+historical evidence only. Its reported pre-close and reopened accessibility
+snapshots match while retaining the body, section, and footnote text. This is
+native semantic no-repair evidence for the inspected fixture only; it is not
+byte-inert-save evidence, a general native-mutation claim, or host-edge
+retirement.
+
+The focused Numbers API gate verifies name, index, and typed `Position`
+shortcuts for sheet and table selectors, semantic `Package::table` lookup,
+and a presence-preserving A1 view that distinguishes a stored empty cell from
+a missing cell. Scalar set/clear shortcuts reuse the existing source-bound
+atomic transaction and inverse path; the failure cases leave the source
+unchanged. The typed index gate verifies `Reference` iteration through
+`ObjectIndex::references()`: ordinary sources remain deterministic and
+sorted, while an explicit per-source opt-in preserves insertion order. These
+are selector and index API gates only; no host edge or ordered debt changes.
+
+The transition gate verifies bounded opaque payloads are fallibly reserved and
+copied before publication, maps allocation failure to the existing typed
+`PayloadTooLarge` error, and retains the copied semantic payload after its
+source is changed. This is allocation/ownership hardening only; no native
+mutation conclusion follows from it. The deleted
+`crates/litchi-iwa/examples/edit_pages_section_text.rs` was only the duplicate
+migration-host example; the canonical
+`crates/litchi-pages/examples/edit_section_text.rs` remains. `PagesEditor`,
+the other host examples, and the host dependency edge remain migration
+surface.
+
+These focused Pages, Numbers, index, and transition gates, together with the
+example-inventory change, are verified correctness and ownership evidence for
+this amendment. They do not close the remaining host edges or ordered debts,
+and the monolith exit remains incomplete.
+
+## 2026-08-22 pre-gate worktree evidence disposition
+
+The current working wave adds further strict codec and owner seams, including
+Pages footnote/movie-caption inputs, Numbers table-model inputs, Keynote chart
+title inputs, archive entry views, source-backed text handling, and the
+archive-free transition projection. These changes are not admitted as a new
+deletion-gate result yet. The current `litchi-iwa-protos` `cargo test` reaches
+339 tests: 338 pass and one known strict-model failure remains. The protocol
+gate therefore remains unadmitted for this wave, and this result is recorded
+for diagnosis only rather than as a current gate.
+
+The available current-wave aggregate runs are also not clean: the recorded
+`litchi-iwa` library run ended at 1,231 passed and 274 failed, and the Numbers
+library run ended at 360 passed, 7 failed, and 4 ignored with integration
+targets also failing.
+Those results cannot satisfy deletion gates 3 or 4 and cannot support a host
+edge-retirement claim. The prior clean counts above remain historical rather
+than evidence for these changes. The new fuzz manifests and corpora document
+compile-check commands, but no completed current-wave sanitizer smoke result
+is accepted; the existing dated fuzz gates remain the only recorded fuzz
+evidence. The separate native Pages body/footnote run used a 100,426-byte
+artifact with SHA-256
+`bfdd06db92af66df5cb434858ff8274eba9f1a8fe2135a3e711526e28edf504b`; its
+pre-close and reopened accessibility snapshots compare equal and retain the
+body, section, and footnote text without a repair or conversion prompt. A
+separate Keynote chart-title cycle saved and reopened `Revenue by region`,
+then cleared the visible title (two AX matches before/after set, zero after
+clear, and the chart-title checkbox false); both 57-file ZIP checks passed and
+no repair or warning UI appeared. The source, set, and cleared artifacts have
+SHA-256 values `ee57fa54e90a8256b5b9973c24233ac4a2ec8b506614fc725e048c4195f`,
+`473c8df61e1e118e1768926ce4dd8eaf05096651a56546e04ea7d1967cfd6a1d`, and
+`c728fd9b1c5283fd107bd2efe330d1a320a565d84442075a4091bd3c69306a13`.
+These are standalone native semantic
+no-repair results for the inspected artifacts only, not Litchi save-mutation,
+byte-inertness, or deletion-gate evidence while the source/build and
+aggregate test gates are incomplete.
+
+This disposition records no new debt retirement, dependency-edge change,
+native mutation/save claim, performance result, or monolith-exit progress.
+
+## 2026-08-22/23 amendment: committed bounded-projection wave verification
+
+This amendment preserves prior committed-baseline evidence, but the cited
+detached commit/tree is unavailable in this checkout, so its provenance is
+unavailable. The counts below are not current-wave gates. The current wave
+remains pending its final checks; its worktree changes are not verification
+evidence and are not promoted by this record.
+
+The prior committed baseline reported a clean focused protocol-codec check
+with 33 passed tests and a full `litchi-iwa-protos` suite with 267 passed and 0
+failed; its Pages all-target gate recorded 149 passed; its Numbers library
+gate recorded 356 passed with four ignored; its Keynote all-target gate passed;
+and its `litchi-iwa` library gate recorded 1,442 passed. The prior committed
+root `litchi` facade/API and rustdoc checks were free of a public
+migration-host, generated-message, native-ID, or BNC bridge. Its boundary
+check reported 64 workspace packages, 239 internal dependency declarations,
+and exactly 13 ordered migration debts. None of these baseline counts is a
+current-wave gate.
+
+The prior baseline's native evidence remains semantic no-repair evidence for
+inspected artifacts only. It includes the accepted Keynote transition and
+title and Pages body/background reopen paths, plus the Numbers
+rich/formula/comment reopen that retained `Persistent TDL comment` and whose
+archive inspection found 24 type-6005 entries and 0 type-6011 entries. The
+separate recorded Pages body/footnote artifact is 100,426 bytes with SHA-256
+`bfdd06db92af66df5cb434858ff8274eba9f1a8fe2135a3e711526e28edf504b`; its
+pre-close and reopened accessibility snapshots agree. The separate Keynote
+chart-title cycle reopened `Revenue by region`, cleared the visible title,
+passed both 57-file ZIP checks, and has source/set/cleared hashes
+`ee57fa54e90a8256b5b9973c24233ac4a2ec8b506614fc725e048c4195f`,
+`473c8df61e1e118e1768926ce4dd8eaf05096651a56546e04ea7d1967cfd6a1d`, and
+`c728fd9b1c5283fd107bd2efe330d1a320a565d84442075a4091bd3c69306a13`.
+These baseline native runs do not prove Litchi save mutation, byte-inertness,
+native segment support, performance, or a current-wave deletion-gate result.
+
+The baseline fuzz manifests and checked-in corpora establish target shape and
+compile/list coverage only. The dated TableDataList and CommentStorage ASan
+smokes remain the recorded baseline sanitizer evidence (100 runs with 11 and
+20 seeds respectively). No current-wave sanitizer campaign or current-wave
+fuzz gate is claimed, and a stable fuzz build or `cargo check` is not
+sanitizer-backed fuzz evidence.
+
+The current wave retires no host dependency edge and removes no debt pending
+final checks. The authoritative baseline ledger remains at 13 ordered debts,
+including the remaining `litchi-iwa` format-owner edges; host
+readers/editors, examples, tests, and fuzz ownership remain migration work.
+The monolith deletion gate therefore remains open.
+
 ## Current present status
 
-The current boundary checker reports 64 workspace packages, 239 internal
-dependency declarations, and 13 ordered migration debts. The focused protocol
-codec check records 33 passed tests; the full `litchi-iwa-protos` suite is
-verified at 267 passed and 0 failed. The current Numbers library run records
-356 passed tests with four ignored. The current `litchi-iwa` library gate
-records 1,442 passed tests; the Pages all-target gate records 149 passed tests,
-and the current Keynote all-target gate is passing. The prior XLS certification
-gate remains at 2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
+The recorded detached baseline (its commit/tree provenance is unavailable in
+this checkout) records 64 workspace packages,
+239 internal dependency declarations, and 13 ordered migration debts. Its
+focused protocol codec check records 33 passed tests; the full
+`litchi-iwa-protos` suite records 267 passed and 0 failed. The baseline
+Numbers library gate records 356 passed tests with four ignored; the
+`litchi-iwa` library gate records 1,442 passed; the Pages all-target gate
+records 149 passed; and the Keynote all-target gate passes. The current wave
+has no admitted gate result yet. The prior XLS certification gate remains at
+2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
 
 Native no-repair reopen evidence covers Keynote transition/title and Pages
 body/background paths. A native Numbers rich/formula/comment reopen retained
@@ -3352,3 +3515,71 @@ checks provide focused correctness/boundedness and native no-repair evidence
 only: no native segment/save-mutation, performance, host-exit, or complete
 monolith-exit claim follows. The dated verification gates above remain
 historical evidence, and the monolith exit remains incomplete.
+
+## 2026-08-23 amendment: wave17 focused gates and native no-repair evidence
+
+Wave17 records the Buffa guard at 12/12, the Pages footnote codec at 11/11,
+and a successful associated fuzz-target check. Numbers TableDataList storage
+records 37/37. The reviewer’s post-strict-model-fix report recorded the
+`litchi-iwa-protos` result as 341/341 during wave17; this remains dated wave17
+evidence, not a current-worktree result. The current worktree contains 347
+`#[test]` declarations under `crates/litchi-iwa-protos`, but no current-wave
+execution result is admitted. This does not rewrite the historical 267/0
+baseline or the earlier 339/338+1 pre-gate observation.
+
+The wave’s native fixtures opened without repair. The Keynote
+focused report records 20+5 cases; its fixture is 503,480 bytes with SHA-256
+`1d67d4263851487bc3868342884f77f46fa643e542e661951d222411c11d21d1`.
+The Pages fixture is 104,319 bytes with SHA-256
+`7e01c1caa6fe3b0f0b699d5a022c0f2daf3667a22896a53e65289f5297d3ddb2`; the
+Numbers fixture is 136,527 bytes with SHA-256
+`fa87cffc0669af1ca0ecc6c4e41932aee4619929fa303e52f06ea77887990d98`.
+Numbers archive inspection found 24 type-6005 entries and 0 type-6011
+entries. The zero type-6011 result is explicitly a no-claim: it does not
+prove the native Segment path.
+
+These are bounded codec and compatibility results for the named fixtures.
+They do not establish byte-inert save behavior, native Segment support,
+performance, host-edge retirement, or monolith deletion. The historical
+counts and the authoritative 13-entry ordered migration-debt ledger remain
+unchanged; no debt or host dependency edge is retired by this amendment.
+
+## 2026-08-23 amendment: Keynote text allocation shape and soundtrack-order scope
+
+The new `Slide::plain_text` path computes a checked UTF-8 output length for
+title, content, non-empty text storages, and notes, reserves one destination
+`String` when that length is representable, and appends values in the same
+semantic order as `all_text().join("\n")`. Its focused cases cover empty
+values and empty storages. This is structural allocation-shape and semantic
+ordering evidence only; it is not an allocation-count, latency, throughput,
+RSS, or peak-memory measurement.
+
+The focused soundtrack-order transaction changes only the order of existing
+soundtrack media references. Its package-level cases cover a synthetic bounded
+media closure, exact-source no-op and inverse behavior, unknown-field and
+untouched-entry preservation, malformed ownership rejection, and aggregate
+reference limits. This scope does not claim native Keynote open/save evidence,
+soundtrack settings or media CRUD ownership, host-edge retirement, or any
+monolith-exit result. The monolith deletion gate therefore remains open.
+
+## 2026-08-23 superseding amendment: Keynote soundtrack-reference order ownership
+
+The preceding soundtrack-order paragraph is superseded only as to ownership;
+its dated evidence remains historical. The concrete Keynote package now owns
+the bounded `soundtrack::order` move transaction exposed by
+`Package::{edit_soundtrack_order, apply_soundtrack_order}`. It validates the
+rooted Document -> Show -> type-21 Soundtrack chain, streams and bounds the
+existing field-3 media-reference sequence, and rewrites only its order while
+preserving media assets, metadata, unknown fields, and unrelated components.
+
+This is not soundtrack media/settings CRUD. `litchi-iwa` remains the owner of
+the remaining media/settings CRUD and host compatibility, including item and
+asset creation, add/insert/replace/remove/lifecycle operations, and retained
+host readers/editors outside the focused package seams. The separate focused
+`soundtrack::{Mode, Settings}` API remains the owner for playback mode and
+volume.
+
+The order transaction's synthetic bounded cases are not a native Keynote
+open/save gate. No host dependency edge or ordered debt is retired, and this
+amendment makes no host-exit, host-deletion, or complete monolith-exit claim;
+the monolith deletion gate remains open.

@@ -237,6 +237,38 @@ fn reported_weights_are_validated_after_parsing() {
 }
 
 #[test]
+fn borrowed_weighted_lookup_defers_owned_key_until_a_miss() {
+    let cache = WeightedCache::<String, usize>::new(4)
+        .unwrap_or_else(|error| panic!("test cache construction failed: {error}"));
+    let key_constructions = AtomicUsize::new(0);
+
+    let first = cache
+        .get_or_try_insert_with_weight_borrowed(
+            "key",
+            || {
+                key_constructions.fetch_add(1, Ordering::SeqCst);
+                String::from("key")
+            },
+            || Ok::<(usize, usize), ParseError>((7, 1)),
+        )
+        .unwrap_or_else(|error| panic!("initial borrowed parse failed: {error}"));
+    let second = cache
+        .get_or_try_insert_with_weight_borrowed(
+            "key",
+            || {
+                key_constructions.fetch_add(1, Ordering::SeqCst);
+                String::from("key")
+            },
+            || Ok::<(usize, usize), ParseError>((9, 1)),
+        )
+        .unwrap_or_else(|error| panic!("borrowed cache hit failed: {error}"));
+
+    assert_eq!(*first, 7);
+    assert!(Arc::ptr_eq(&first, &second));
+    assert_eq!(key_constructions.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn invalidation_detaches_old_parser_generation() {
     let cache = Arc::new(cache(4));
     let parser_started = Arc::new(Barrier::new(2));

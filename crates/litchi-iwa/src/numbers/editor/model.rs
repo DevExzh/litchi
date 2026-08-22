@@ -3923,6 +3923,34 @@ pub(super) struct CommentEntryLocation {
     owner: TableDataListEntryOwner,
 }
 
+/// Resolve the one canonical comment-storage payload in an archive object.
+///
+/// Comment storage is a repeated archive-message surface even though the
+/// semantic model admits exactly one `TSD.CommentStorageArchive` payload.
+/// Keep this cardinality check at every read/write boundary: selecting the
+/// first matching message would make a write depend on message ordering and
+/// could silently leave a duplicate payload behind.  The message bytes remain
+/// the source-of-truth; callers patch those bytes rather than re-encoding a
+/// generated protobuf and dropping producer fields.
+fn comment_storage_message_index(object: &ArchiveObject, storage_id: u64) -> Result<usize> {
+    let mut index = None;
+    for (candidate, message) in object.messages.iter().enumerate() {
+        if message.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+            continue;
+        }
+        if index.replace(candidate).is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {storage_id} must contain exactly one TSD comment-storage payload"
+            )));
+        }
+    }
+    index.ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Object {storage_id} must contain exactly one TSD comment-storage payload"
+        ))
+    })
+}
+
 pub(super) fn comment_entry_location(
     package: &IWorkPackage,
     locations: &HashMap<u64, String>,
@@ -3979,23 +4007,7 @@ pub(super) fn comment_entry_location(
             "Numbers comment storage object {storage_id} is missing"
         ))
     })?;
-    let mut payload = None;
-    for message in object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-    {
-        if payload.replace(message).is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "Object {storage_id} must contain exactly one TSD comment-storage payload"
-            )));
-        }
-    }
-    let payload = payload.ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Object {storage_id} must contain exactly one TSD comment-storage payload"
-        ))
-    })?;
+    let payload = &object.messages[comment_storage_message_index(object, storage_id)?];
     validate_comment_storage_payload(storage_id, payload.data.as_slice())?;
     Ok(CommentEntryLocation {
         table_id,
@@ -4024,23 +4036,7 @@ pub(super) fn read_comment_storage_object(
             "Numbers comment storage object {storage_id} is missing"
         ))
     })?;
-    let mut payload = None;
-    for message in object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-    {
-        if payload.replace(message).is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "Object {storage_id} must contain exactly one TSD comment-storage payload"
-            )));
-        }
-    }
-    let payload = payload.ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Object {storage_id} must contain exactly one TSD comment-storage payload"
-        ))
-    })?;
+    let payload = &object.messages[comment_storage_message_index(object, storage_id)?];
     let (comment, reply_ids) = decode_comment_storage_payload(storage_id, payload.data.as_slice())?;
     let source_text = comment.text().unwrap_or_default();
     let mut text = String::new();
@@ -4254,22 +4250,7 @@ pub(super) fn ensure_comment_storage_metadata(
                 "Numbers comment storage object {storage_id} is missing"
             ))
         })?;
-        let mut index = None;
-        for (candidate, message) in object.messages.iter().enumerate() {
-            if message.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
-                continue;
-            }
-            if index.replace(candidate).is_some() {
-                return Err(Error::InvalidFormat(format!(
-                    "Object {storage_id} must contain exactly one TSD comment-storage payload"
-                )));
-            }
-        }
-        let index = index.ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Object {storage_id} must contain exactly one TSD comment-storage payload"
-            ))
-        })?;
+        let index = comment_storage_message_index(object, storage_id)?;
         let original = object.messages[index].data.as_slice();
         let before = comment_storage_codec::decode_comment_storage_archive(
             original,
@@ -4363,16 +4344,7 @@ pub(super) fn update_comment_storage_text(
                 entry.storage_id
             ))
         })?;
-        let message_index = object
-            .messages
-            .iter()
-            .position(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Object {} has no TSD comment-storage payload",
-                    entry.storage_id
-                ))
-            })?;
+        let message_index = comment_storage_message_index(object, entry.storage_id)?;
         let original = object.messages[message_index].data.as_slice();
         let comment = comment_storage_codec::decode_comment_storage_archive(
             original,
@@ -5294,17 +5266,13 @@ pub(super) fn remove_unreferenced_comment_graph(
             continue;
         };
         let mut replies = Vec::new();
-        for message in object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
-        {
-            let (comment, reply_ids) = decode_comment_storage_payload(identifier, &message.data)?;
-            if let Some(author) = comment.author() {
-                removed.author_ids.insert(author.identifier());
-            }
-            replies.extend(reply_ids);
+        let message_index = comment_storage_message_index(object, identifier)?;
+        let message = &object.messages[message_index];
+        let (comment, reply_ids) = decode_comment_storage_payload(identifier, &message.data)?;
+        if let Some(author) = comment.author() {
+            removed.author_ids.insert(author.identifier());
         }
+        replies.extend(reply_ids);
         if let Some(component_identifier) = component_identifier_for_entry(package, archive_name)? {
             remove_component_external_references_to_object(
                 package,

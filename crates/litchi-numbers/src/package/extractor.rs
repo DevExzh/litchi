@@ -85,6 +85,12 @@ struct FormulaArchiveBytes {
     /// Exact number of AST nodes observed by the wire preflight.  The scalar
     /// visitor charges this bound before retaining any decoded nodes.
     scalar_visitor_node_count: usize,
+    /// Number of non-AST repeated entries the generated compatibility decoder
+    /// will stage while rendering a fallback archive. AST-node entries are
+    /// accounted separately by `scalar_visitor_node_count` and the render
+    /// work budget; this counter keeps the generated decoder's other native
+    /// vectors bounded without retaining the generated archive.
+    generated_repeated_entry_count: usize,
 }
 
 impl FormulaArchiveBytes {
@@ -93,7 +99,7 @@ impl FormulaArchiveBytes {
         // candidate therefore retains the same monotonic wire cost as the
         // previous eager decoder, while no partial owned value can escape.
         budget.charge_formula_wire(source.len())?;
-        let (scalar_visitor_eligible, scalar_visitor_node_count) =
+        let (scalar_visitor_eligible, scalar_visitor_node_count, generated_repeated_entry_count) =
             preflight_formula_archive_envelope(source, budget)?;
 
         let mut owned = Vec::new();
@@ -105,6 +111,7 @@ impl FormulaArchiveBytes {
             bytes: owned.into_boxed_slice(),
             scalar_visitor_eligible,
             scalar_visitor_node_count,
+            generated_repeated_entry_count,
         })
     }
 
@@ -125,14 +132,14 @@ impl FormulaArchiveBytes {
 fn preflight_formula_archive_envelope(
     source: &[u8],
     budget: &mut ProjectionBudget,
-) -> Result<(bool, usize)> {
+) -> Result<(bool, usize, usize)> {
     // Prost accepts an empty proto2 message even when its schema marks field
     // 1 as required.  The former eager FormulaArchive decoder therefore
     // admitted the serialized default archive, whose empty AST rendered as
     // `=`.  Preserve that compatibility case while retaining the required
     // root field check for every non-empty archive.
     if source.is_empty() {
-        return Ok((false, 0));
+        return Ok((false, 0, 0));
     }
 
     // The wire preflight report is aggregate: every selected child message is
@@ -165,6 +172,7 @@ fn preflight_formula_archive_envelope(
     let mut root_ast_count = 0usize;
     let mut scalar_visitor_eligible = true;
     let mut scalar_visitor_node_count = 0usize;
+    let mut generated_repeated_entry_count = 0usize;
     let mut root_known_fields = [0u32; 9];
     let mut root_known_field_count = 0usize;
     let preflight = preflight_wire_tree_with_limits(source, limits, |visit| {
@@ -172,6 +180,15 @@ fn preflight_formula_archive_envelope(
         attempted.charge_field()?;
         field.validate_canonical_framing()?;
         let schema = formula_envelope_field(visit.path(), field.number());
+        // Unknown fields are intentionally retained as opaque wire data by
+        // the envelope preflight, but they are not represented by the compact
+        // scalar visitor.  Keep these archives on the generated compatibility
+        // renderer so a future extension cannot silently disappear on the
+        // generated-free route.  The strict wire walk and bounded fallback
+        // still apply exactly as before.
+        if schema.wire_type.is_none() {
+            scalar_visitor_eligible = false;
+        }
         if let Some(expected_wire_type) = schema.wire_type {
             if field.wire_type() != expected_wire_type {
                 return Err(litchi_iwa_common::Error::InvalidFormat(format!(
@@ -230,6 +247,23 @@ fn preflight_formula_archive_envelope(
         if formula_ast_array_path(visit.path()) && field.number() == 1 {
             required_formula_ast_node_type(field.payload())?;
         }
+        // Prost materializes every repeated native vector in the generated
+        // compatibility archive. AST node entries are charged separately by
+        // the formula-render work budget, so count only the other repeated
+        // entries (UID lists, ranges, lambda identifiers, and similar
+        // vectors) before the fallback decoder is allowed to allocate.
+        if formula_field_is_repeated(visit.path(), field.number())
+            && !(formula_ast_array_path(visit.path()) && field.number() == 1)
+        {
+            generated_repeated_entry_count = generated_repeated_entry_count
+                .checked_add(1)
+                .ok_or_else(|| {
+                    litchi_iwa_common::Error::InvalidFormat(
+                        "Numbers FormulaArchive repeated-entry count overflows host usize"
+                            .to_owned(),
+                    )
+                })?;
+        }
         if formula_ast_node_path(visit.path()) {
             if field.number() == 1 {
                 scalar_visitor_node_count =
@@ -247,12 +281,31 @@ fn preflight_formula_archive_envelope(
                 {
                     scalar_visitor_eligible = false;
                 }
-            } else if !matches!(field.number(), 2 | 3 | 4 | 5 | 10 | 15 | 25) {
+            } else if field.number() == 2 {
+                // The streaming evaluator admits only the five function
+                // identifiers below.  Unknown/native function IDs are valid
+                // compatibility-renderer input, but attempting the scalar
+                // visitor first would allocate its full node vector only to
+                // fall back after the codec rejects the function.
+                let function_identifier =
+                    litchi_iwa_common::decode_varint_from_bytes(field.payload())
+                        .ok()
+                        .and_then(|(value, width)| {
+                            (width == field.payload().len()).then_some(value)
+                        })
+                        .and_then(|value| u32::try_from(value).ok());
+                if function_identifier.is_none_or(|value| !matches!(value, 15 | 30 | 84 | 88 | 168))
+                {
+                    scalar_visitor_eligible = false;
+                }
+            } else if !matches!(field.number(), 2 | 3 | 4 | 5 | 10 | 15 | 25 | 42 | 43) {
                 // These are the only direct AST-node fields the compact
-                // visitor can represent. Nested messages are checked by the
+                // visitor can represent. Decimal128 sidecars (fields 42/43)
+                // are validated by the scalar codec and do not change the
+                // rendered number. Nested messages are checked by the
                 // surrounding schema walk; any other direct field (strings,
-                // arrays, thunks, ranges, UIDs, or owner metadata) falls back
-                // to the lossless generated renderer.
+                // dates, arrays, thunks, ranges, UIDs, or owner metadata)
+                // falls back to the lossless generated renderer.
                 scalar_visitor_eligible = false;
             }
         }
@@ -275,7 +328,11 @@ fn preflight_formula_archive_envelope(
             debug_assert_eq!(attempted.fields, report.fields());
             debug_assert_eq!(attempted.work, report.scanned_bytes());
             budget.charge_wire_preflight(report)?;
-            Ok((scalar_visitor_eligible, scalar_visitor_node_count))
+            Ok((
+                scalar_visitor_eligible,
+                scalar_visitor_node_count,
+                generated_repeated_entry_count,
+            ))
         },
         Ok(report) => {
             debug_assert_eq!(attempted.fields, report.fields());
@@ -465,15 +522,22 @@ fn require_formula_fields(
 /// the native schema may repeat. The path distinguishes repeated AST nodes
 /// from the singular field-1 envelopes used by several nearby messages.
 fn formula_field_is_repeated(path: &[u32], number: u32) -> bool {
+    // Nested formula messages are visited with the complete path from the
+    // FormulaArchive root (for example `[1, 1, 39, 1, 6]` for
+    // CategoryReferenceArchive.CatRefUidList).  The repeated-field table is
+    // expressed relative to the AST node, so strip that prefix before
+    // matching the message-specific suffix.  Root AST-node arrays remain
+    // addressable by their original path.
+    let suffix = formula_ast_node_prefix_len(path).map_or(path, |prefix_len| &path[prefix_len..]);
     if number == 1 {
         formula_ast_array_path(path)
-            || path == [38]
-            || matches!(path, [38, 1, 1] | [38, 1, 2])
-            || path == [39, 1, 6]
-            || path == [40]
-            || path == [45]
+            || suffix == [38]
+            || matches!(suffix, [38, 1, 1] | [38, 1, 2])
+            || suffix == [39, 1, 6]
+            || suffix == [40]
+            || suffix == [45]
     } else {
-        path == [40] && (2..=4).contains(&number)
+        suffix == [40] && (2..=4).contains(&number)
     }
 }
 
@@ -1379,19 +1443,44 @@ impl ProjectionBudget {
         &mut self,
         report: numbers_table_cell_storage_codec::DecodeReport,
     ) -> Result<()> {
-        self.charge_references(report.references())?;
-        self.payload_fields = projection_charge(
-            self.payload_fields,
+        // Admit the complete report as one transaction. A referenced segment
+        // can cross any one of the aggregate ceilings after an earlier root
+        // has already consumed part of it; publishing references/fields before
+        // work fails would leave the next segment with a budget that no longer
+        // describes the successful projection.
+        let mut next = *self;
+        next.charge_references(report.references())?;
+        next.payload_fields = projection_charge(
+            next.payload_fields,
             report.fields(),
             crate::MAX_REFERENCES,
             SemanticLimitKind::Objects,
         )?;
-        self.payload_work = projection_charge(
-            self.payload_work,
+        next.payload_work = projection_charge(
+            next.payload_work,
             report.work_bytes(),
             MAX_PAYLOAD_WORK,
             SemanticLimitKind::FormulaWork,
         )?;
+        *self = next;
+        Ok(())
+    }
+
+    /// Atomically admit one selected root/segment report and its staged text.
+    ///
+    /// `DecodeReport::text_bytes` is charged separately from generic reports
+    /// because model/tile reports use different semantic text owners. List
+    /// roots and segments, however, publish both counters together; keeping
+    /// this operation transactional prevents a text-limit refusal from
+    /// retaining the report's references, fields, or work.
+    fn charge_table_list_decode_report(
+        &mut self,
+        report: numbers_table_cell_storage_codec::DecodeReport,
+    ) -> Result<()> {
+        let mut next = *self;
+        next.charge_decode_report(report)?;
+        next.charge_staging_text(report.text_bytes())?;
+        *self = next;
         Ok(())
     }
 
@@ -1399,19 +1488,21 @@ impl ProjectionBudget {
         &mut self,
         report: comment_storage_codec::DecodeReport,
     ) -> Result<()> {
-        self.charge_references(report.references())?;
-        self.payload_fields = projection_charge(
-            self.payload_fields,
+        let mut next = *self;
+        next.charge_references(report.references())?;
+        next.payload_fields = projection_charge(
+            next.payload_fields,
             report.fields(),
             crate::MAX_REFERENCES,
             SemanticLimitKind::Objects,
         )?;
-        self.payload_work = projection_charge(
-            self.payload_work,
+        next.payload_work = projection_charge(
+            next.payload_work,
             report.work_bytes(),
             MAX_PAYLOAD_WORK,
             SemanticLimitKind::FormulaWork,
         )?;
+        *self = next;
         Ok(())
     }
 
@@ -1419,15 +1510,31 @@ impl ProjectionBudget {
         &mut self,
         report: numbers_table_cell_storage_codec::DecodeReport,
     ) -> Result<()> {
-        self.payload_fields = projection_charge(
-            self.payload_fields,
+        let mut next = *self;
+        next.payload_fields = projection_charge(
+            next.payload_fields,
             report.fields(),
             crate::MAX_REFERENCES,
             SemanticLimitKind::Objects,
         )?;
+        next.payload_work = projection_charge(
+            next.payload_work,
+            report.work_bytes(),
+            MAX_PAYLOAD_WORK,
+            SemanticLimitKind::FormulaWork,
+        )?;
+        *self = next;
+        Ok(())
+    }
+
+    /// Admit non-AST repeated entries before the generated FormulaArchive
+    /// fallback stages them into native vectors. The generated archive is
+    /// decoded and dropped for each cell, so this is a per-decode work cost,
+    /// not retained cache state.
+    fn charge_generated_formula_work(&mut self, amount: usize) -> Result<()> {
         self.payload_work = projection_charge(
             self.payload_work,
-            report.work_bytes(),
+            amount,
             MAX_PAYLOAD_WORK,
             SemanticLimitKind::FormulaWork,
         )?;
@@ -3361,8 +3468,7 @@ impl<'a> TableDataExtractor<'a> {
                 );
                 continue;
             }
-            budget.charge_decode_report(report)?;
-            budget.charge_staging_text(report.text_bytes())?;
+            budget.charge_table_list_decode_report(report)?;
             if let Some(error) = callback_structural {
                 record_first_list_error(&mut structural_error, error);
             }
@@ -3478,8 +3584,7 @@ impl<'a> TableDataExtractor<'a> {
                     );
                     continue;
                 }
-                budget.charge_decode_report(report)?;
-                budget.charge_staging_text(report.text_bytes())?;
+                budget.charge_table_list_decode_report(report)?;
                 if let Some(error) = callback_structural {
                     record_first_list_error(&mut structural_error, error);
                 }
@@ -4295,6 +4400,7 @@ impl<'a> TableDataExtractor<'a> {
         formula_references: &FormulaReferenceMaps,
         projection_budget: &mut ProjectionBudget,
     ) -> Result<String> {
+        let render_work_before_scalar = projection_budget.formula_render_work;
         if formula.scalar_visitor_eligible
             && let Some(rendered) = render_scalar_formula(
                 formula,
@@ -4307,8 +4413,20 @@ impl<'a> TableDataExtractor<'a> {
         {
             return Ok(rendered);
         }
+        // The scalar probe charges its exact node bound before allocating its
+        // visitor. If it declines after that charge, carry the same admission
+        // into the generated compatibility renderer; otherwise admit the
+        // preflighted bound before Prost can stage its repeated node vector.
+        let nodes_precharged = projection_budget
+            .formula_render_work
+            .saturating_sub(render_work_before_scalar)
+            >= formula.scalar_visitor_node_count;
+        if !nodes_precharged {
+            projection_budget.charge_formula_render_work(formula.scalar_visitor_node_count)?;
+        }
+        projection_budget.charge_generated_formula_work(formula.generated_repeated_entry_count)?;
         let formula = formula.decode()?;
-        render_formula(
+        render_formula_precharged(
             &formula,
             host_row,
             host_column,
@@ -6056,10 +6174,13 @@ impl FormulaRenderer {
     }
 
     fn reserve_node(&mut self, part_count: usize) -> Result<()> {
-        self.nodes.try_reserve(1).map_err(|_error| {
-            allocation_error("Numbers formula render nodes", self.nodes.len() + 1)
+        self.nodes.try_reserve_exact(1).map_err(|_error| {
+            allocation_error(
+                "Numbers formula render nodes",
+                self.nodes.len().saturating_add(1),
+            )
         })?;
-        self.parts.try_reserve(part_count).map_err(|_error| {
+        self.parts.try_reserve_exact(part_count).map_err(|_error| {
             allocation_error(
                 "Numbers formula render parts",
                 self.parts.len().saturating_add(part_count),
@@ -6129,7 +6250,7 @@ impl FormulaRenderer {
         range: std::ops::Range<usize>,
     ) -> Result<()> {
         let count = range.len();
-        pending.try_reserve(count).map_err(|_error| {
+        pending.try_reserve_exact(count).map_err(|_error| {
             allocation_error(
                 "Numbers formula render stack",
                 pending.len().saturating_add(count),
@@ -6179,7 +6300,9 @@ impl numbers_formula_codec::FormulaVisitor for ScalarFormulaVisitor {
     ) -> std::result::Result<(), numbers_formula_codec::DecodeError> {
         if matches!(
             node,
-            numbers_formula_codec::FormulaNode::CellReference { .. }
+            numbers_formula_codec::FormulaNode::LocalCellReference { .. }
+                | numbers_formula_codec::FormulaNode::LocalRange { .. }
+                | numbers_formula_codec::FormulaNode::CellReference { .. }
                 | numbers_formula_codec::FormulaNode::ResolvedCellReference { .. }
                 | numbers_formula_codec::FormulaNode::ResolvedRange { .. }
         ) {
@@ -6369,7 +6492,9 @@ fn render_scalar_formula_nodes(
             FormulaNode::PlusSign
             | FormulaNode::AppendWhitespace
             | FormulaNode::PrependWhitespace => None,
-            FormulaNode::CellReference { .. }
+            FormulaNode::LocalCellReference { .. }
+            | FormulaNode::LocalRange { .. }
+            | FormulaNode::CellReference { .. }
             | FormulaNode::ResolvedCellReference { .. }
             | FormulaNode::ResolvedRange { .. } => {
                 return Err(Error::InvalidFormat(
@@ -6397,6 +6522,41 @@ fn render_formula(
     formula_references: &FormulaReferenceMaps,
     budget: &mut ProjectionBudget,
 ) -> Result<String> {
+    render_formula_with_node_charge(
+        formula,
+        host_row,
+        host_column,
+        formula_references,
+        budget,
+        false,
+    )
+}
+
+fn render_formula_precharged(
+    formula: &tsce::FormulaArchive,
+    host_row: usize,
+    host_column: usize,
+    formula_references: &FormulaReferenceMaps,
+    budget: &mut ProjectionBudget,
+) -> Result<String> {
+    render_formula_with_node_charge(
+        formula,
+        host_row,
+        host_column,
+        formula_references,
+        budget,
+        true,
+    )
+}
+
+fn render_formula_with_node_charge(
+    formula: &tsce::FormulaArchive,
+    host_row: usize,
+    host_column: usize,
+    formula_references: &FormulaReferenceMaps,
+    budget: &mut ProjectionBudget,
+    nodes_precharged: bool,
+) -> Result<String> {
     let ast = &formula.ast_node_array;
     if ast.ast_node.is_empty() {
         return retain_text("=", budget);
@@ -6411,6 +6571,7 @@ fn render_formula(
         budget,
         &mut renderer,
         1,
+        nodes_precharged,
     )? {
         Some(root) => root,
         None => renderer.static_expr("FORMULA()", budget)?,
@@ -6430,15 +6591,20 @@ fn render_formula_ast_array(
     budget: &mut ProjectionBudget,
     renderer: &mut FormulaRenderer,
     depth: usize,
+    nodes_precharged: bool,
 ) -> Result<Option<FormulaExpr>> {
     use litchi_iwa_protos::tsce::ast_node_array_archive::AstNodeType;
 
     budget.check_formula_render_depth(depth)?;
-    budget.charge_formula_render_work(ast.ast_node.len())?;
+    if !nodes_precharged {
+        budget.charge_formula_render_work(ast.ast_node.len())?;
+    }
     let mut stack = Vec::new();
-    stack.try_reserve(ast.ast_node.len()).map_err(|_error| {
-        allocation_error("Numbers formula expression stack", ast.ast_node.len())
-    })?;
+    stack
+        .try_reserve_exact(ast.ast_node.len())
+        .map_err(|_error| {
+            allocation_error("Numbers formula expression stack", ast.ast_node.len())
+        })?;
 
     for node in &ast.ast_node {
         let expression = match node.ast_node_type() {
@@ -6653,6 +6819,7 @@ fn render_formula_ast_array(
                             maximum: budget.max_formula_render_depth,
                             path: SemanticPath::StructuredTables,
                         })?,
+                        nodes_precharged,
                     )? {
                         Some(expression) => expression,
                         None => renderer.static_expr(
@@ -7468,9 +7635,10 @@ mod tests {
     use super::{
         CellBudget, CellTables, Error, FormulaArchiveBytes, FormulaReferenceBudget,
         FormulaReferenceMaps, FormulaRenderer, MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES,
-        MAX_FORMULA_WORK, ProjectionBudget, Table, TableDataExtractor, TileRowVisitor,
-        collect_formula_category_payload, decode_legacy_table_candidate, formula_table_name,
-        has_legacy_table_model_wire_shape, map_table_cell_decode_limit_with_offsets,
+        MAX_FORMULA_WORK, MAX_PAYLOAD_WORK, ProjectionBudget, Table, TableDataExtractor,
+        TileRowVisitor, collect_formula_category_payload, decode_legacy_table_candidate,
+        formula_table_name, has_legacy_table_model_wire_shape,
+        map_table_cell_decode_limit_with_offsets,
         map_table_cell_decode_limit_with_reference_offset, preflight_formula_category_payload,
         preflight_formula_owner, render_formula, render_formula_ast_array,
     };
@@ -7667,7 +7835,7 @@ mod tests {
             // Make the first strict model walk hit its aggregate work ceiling.
             // A resource limit must remain authoritative; it must not trigger
             // the sparse compatibility retry.
-            budget.payload_work = super::MAX_PAYLOAD_WORK;
+            budget.payload_work = MAX_PAYLOAD_WORK;
             let result =
                 extractor.project_table_model(&source, &mut budget, SemanticPath::StructuredTables);
             assert!(
@@ -8108,7 +8276,7 @@ mod tests {
             .extract_all_semantic_tables(0)
             .expect_err("over-budget legacy model");
         assert!(matches!(
-            error,
+            &error,
             Error::SemanticLimit {
                 kind: SemanticLimitKind::Tables,
                 observed: 1,
@@ -8975,6 +9143,7 @@ mod tests {
             &mut budget,
             &mut renderer,
             1,
+            false,
         )?
         .unwrap_or_else(|| panic!("skewed formula did not produce an expression"));
         assert_eq!(renderer.nodes.len(), VALUES * 2 - 1);
@@ -9659,6 +9828,62 @@ mod tests {
     }
 
     #[test]
+    fn scalar_formula_visitor_accepts_matching_decimal128_number_sidecars() -> super::Result<()> {
+        // Writer-canonical number nodes carry the decimal128 representation
+        // beside the fixed64 value. Those fields are metadata for the same
+        // scalar and must not force a generated compatibility decode.
+        let input = formula(vec![AstNodeArchive {
+            ast_number_node_decimal_low: Some(75),
+            ast_number_node_decimal_high: Some(0x303c_0000_0000_0000),
+            ..number_node(0.75)
+        }]);
+        let source = input.encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+        assert!(raw.scalar_visitor_eligible);
+
+        let actual = TableDataExtractor::extract_formula_string(
+            &raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut budget,
+        )?;
+        let mut reference_budget = ProjectionBudget::new(SemanticLimits::default());
+        let expected = render_formula(
+            &input,
+            0,
+            0,
+            &FormulaReferenceMaps::default(),
+            &mut reference_budget,
+        )?;
+        assert_eq!(actual, expected);
+        assert_eq!(actual, "=0.75");
+        assert_eq!(budget.formula_render_work, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_visitor_keeps_date_array_and_thunk_fallbacks() -> super::Result<()> {
+        for kind in [
+            AstNodeType::DateNode,
+            AstNodeType::ArrayNode,
+            AstNodeType::ThunkNode,
+        ] {
+            let source = formula(vec![formula_node(kind)]).encode_to_vec();
+            let mut budget = ProjectionBudget::new(SemanticLimits::default());
+            let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+            assert!(
+                !raw.scalar_visitor_eligible,
+                "{kind:?} must retain generated compatibility fallback"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn scalar_formula_visitor_preserves_local_sticky_coordinates() -> super::Result<()> {
         let local = AstNodeArchive {
             ast_node_type: AstNodeType::LocalCellReferenceNode as i32,
@@ -9707,6 +9932,206 @@ mod tests {
             &mut budget,
         )?;
         assert_eq!(actual, "=\"a\"\"b\"");
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_visitor_falls_back_for_opaque_nested_fields() -> super::Result<()> {
+        // The strict envelope accepts an unknown field as opaque, matching
+        // Prost's forward-compatible behavior.  It is nevertheless outside
+        // the generated-free scalar representation and must not be admitted
+        // to that route merely because the known number fields are scalar.
+        let mut node = number_node(1.25).encode_to_vec();
+        append_varint_field(&mut node, 48, 1)?;
+        let mut ast = Vec::new();
+        append_length_delimited_field(&mut ast, 1, &node)?;
+        let mut source = Vec::new();
+        append_length_delimited_field(&mut source, 1, &ast)?;
+
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+        assert!(!raw.scalar_visitor_eligible);
+
+        let actual = TableDataExtractor::extract_formula_string(
+            &raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut budget,
+        )?;
+        let input = formula(vec![number_node(1.25)]);
+        let mut reference_budget = ProjectionBudget::new(SemanticLimits::default());
+        let expected = render_formula(
+            &input,
+            0,
+            0,
+            &FormulaReferenceMaps::default(),
+            &mut reference_budget,
+        )?;
+        assert_eq!(actual, expected);
+        assert_eq!(actual, "=1.25");
+        Ok(())
+    }
+
+    #[test]
+    fn scalar_formula_preflight_skips_unknown_function_reservation() -> super::Result<()> {
+        let mut function = formula_node(AstNodeType::FunctionNode);
+        function.ast_function_node_index = Some(999);
+        function.ast_function_node_num_args = Some(1);
+        let source = formula(vec![number_node(1.0), function]).encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+
+        // The generated compatibility renderer retains unknown function IDs;
+        // do not allocate the scalar visitor only to discover that the strict
+        // evaluator rejects this native function.
+        assert!(!raw.scalar_visitor_eligible);
+        Ok(())
+    }
+
+    #[test]
+    fn generated_formula_fallback_node_guard_is_inclusive_and_one_over() -> super::Result<()> {
+        let mut first = formula_node(AstNodeType::StringNode);
+        first.ast_string_node_string = Some("a".to_owned());
+        let mut second = formula_node(AstNodeType::StringNode);
+        second.ast_string_node_string = Some("b".to_owned());
+        let source = formula(vec![first, second]).encode_to_vec();
+
+        let mut probe_budget = ProjectionBudget::new(SemanticLimits::default());
+        let probe = FormulaArchiveBytes::from_wire(&source, &mut probe_budget)?;
+        assert_eq!(probe.scalar_visitor_node_count, 2);
+
+        let exact_limits = SemanticLimits::default()
+            .with_formula_render_limits(2, 64)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut exact_budget = ProjectionBudget::new(exact_limits);
+        let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
+        assert_eq!(
+            TableDataExtractor::extract_formula_string(
+                &exact_raw,
+                0,
+                0,
+                10,
+                10,
+                &FormulaReferenceMaps::default(),
+                &mut exact_budget,
+            )?,
+            "=\"b\""
+        );
+        assert_eq!(exact_budget.formula_render_work, 2);
+
+        let tight_limits = SemanticLimits::default()
+            .with_formula_render_limits(1, 64)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut tight_budget = ProjectionBudget::new(tight_limits);
+        let tight_raw = FormulaArchiveBytes::from_wire(&source, &mut tight_budget)?;
+        let error = TableDataExtractor::extract_formula_string(
+            &tight_raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut tight_budget,
+        )
+        .expect_err("one-over generated fallback must fail before Prost staging");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaRenderWork,
+                observed: 2,
+                maximum: 1,
+                ..
+            }
+        ));
+        assert_eq!(tight_budget.formula_render_work, 1);
+        assert_eq!(tight_budget.output_text_bytes, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn generated_formula_fallback_charges_non_ast_repeated_entries_before_decode()
+    -> super::Result<()> {
+        let uuid = tsp::Uuid { lower: 1, upper: 2 };
+        let category = tsce::CategoryReferenceArchive {
+            group_by_uid: uuid,
+            column_uid: uuid,
+            aggregate_type: 1,
+            group_level: 0,
+            group_uids: Some(tsce::category_reference_archive::CatRefUidList {
+                uid: vec![uuid; 3],
+            }),
+            ..Default::default()
+        };
+        let node = AstNodeArchive {
+            ast_node_type: AstNodeType::CategoryRefNode as i32,
+            ast_category_ref: Some(tsce::ast_node_array_archive::AstCategoryReferenceArchive {
+                category_ref: category,
+            }),
+            ..Default::default()
+        };
+        let source = formula(vec![node]).encode_to_vec();
+
+        let mut probe_budget = ProjectionBudget::new(SemanticLimits::default());
+        let probe = FormulaArchiveBytes::from_wire(&source, &mut probe_budget)?;
+        assert!(!probe.scalar_visitor_eligible);
+        assert_eq!(probe.scalar_visitor_node_count, 1);
+        assert_eq!(probe.generated_repeated_entry_count, 3);
+
+        let exact_limits = SemanticLimits::default()
+            .with_formula_render_limits(4, 64)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut exact_budget = ProjectionBudget::new(exact_limits);
+        let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
+        let pre_render_work = exact_budget.payload_work;
+        let actual = TableDataExtractor::extract_formula_string(
+            &exact_raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut exact_budget,
+        )?;
+        assert_eq!(actual, "=#CATEGORY!");
+        assert_eq!(exact_budget.formula_render_work, 1);
+        assert_eq!(
+            exact_budget.payload_work,
+            pre_render_work + exact_raw.generated_repeated_entry_count
+        );
+
+        let mut tight_budget = ProjectionBudget::new(SemanticLimits::default());
+        let tight_raw = FormulaArchiveBytes::from_wire(&source, &mut tight_budget)?;
+        tight_budget.payload_work = MAX_PAYLOAD_WORK - 2;
+        let error = TableDataExtractor::extract_formula_string(
+            &tight_raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut tight_budget,
+        )
+        .expect_err("one repeated-entry overage must fail before Prost staging");
+        assert!(matches!(
+            error,
+            Error::SemanticLimit {
+                kind: SemanticLimitKind::FormulaWork,
+                ..
+            }
+        ));
+        if let Error::SemanticLimit {
+            observed, maximum, ..
+        } = error
+        {
+            assert_eq!(observed, MAX_PAYLOAD_WORK + 1);
+            assert_eq!(maximum, MAX_PAYLOAD_WORK);
+        } else {
+            unreachable!("formula-work limit already matched above");
+        }
+        assert_eq!(tight_budget.output_text_bytes, 0);
         Ok(())
     }
 

@@ -481,6 +481,46 @@ impl SettingsSnapshot {
     }
 }
 
+/// Generated-type-free direct reference projection for one Keynote show.
+///
+/// The strict pass still validates the complete known show envelope and slide
+/// tree, but unlike [`ShowSnapshot`] it does not retain the repeated slide
+/// identifiers. This keeps compatibility reference indexing scalar-only while
+/// preserving the caller-owned source bytes as the representation for writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReferencesSnapshot {
+    theme_identifier: u64,
+    stylesheet_identifier: u64,
+    ui_state_identifier: Option<u64>,
+    recording_identifier: Option<u64>,
+}
+
+impl ReferencesSnapshot {
+    /// Identifier of the required Keynote theme object.
+    #[must_use]
+    pub const fn theme_identifier(self) -> u64 {
+        self.theme_identifier
+    }
+
+    /// Identifier of the required Keynote stylesheet object.
+    #[must_use]
+    pub const fn stylesheet_identifier(self) -> u64 {
+        self.stylesheet_identifier
+    }
+
+    /// Optional identifier of the Keynote show UI-state object.
+    #[must_use]
+    pub const fn ui_state_identifier(self) -> Option<u64> {
+        self.ui_state_identifier
+    }
+
+    /// Optional identifier of the Keynote recording object.
+    #[must_use]
+    pub const fn recording_identifier(self) -> Option<u64> {
+        self.recording_identifier
+    }
+}
+
 /// Owned, generated-type-free Keynote show projection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShowSnapshot {
@@ -748,6 +788,34 @@ pub fn decode_show(source: &[u8], options: DecodeOptions) -> Result<ShowSnapshot
         raw_settings: settings.raw_settings,
         has_deprecated_root_slide_node: preflight.has_deprecated_root_slide_node,
         has_slide_list: preflight.has_slide_list,
+    })
+}
+
+/// Decode only the direct object-reference edges from one Keynote show.
+///
+/// The strict preflight validates the complete known envelope and slide tree,
+/// while the private Buffa pass forces the selected scalar references. No
+/// repeated slide-reference vector is allocated, and the caller-owned source
+/// remains authoritative for unknown-field preservation.
+pub fn decode_references(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<ReferencesSnapshot, DecodeError> {
+    validate_decode_input(source, options)?;
+    let mut budget = Budget::new(options);
+    let preflight = preflight_show(source, options, &mut budget)?;
+    let _settings = project_settings(source, options, &preflight, &mut budget)?;
+    Ok(ReferencesSnapshot {
+        theme_identifier: preflight.references.theme.identifier,
+        stylesheet_identifier: preflight.references.stylesheet.identifier,
+        ui_state_identifier: preflight
+            .references
+            .ui_state
+            .map(|reference| reference.identifier),
+        recording_identifier: preflight
+            .references
+            .recording
+            .map(|reference| reference.identifier),
     })
 }
 
@@ -1578,6 +1646,7 @@ mod tests {
         let source = expected.encode_to_vec();
         let native = kn::ShowArchive::decode(source.as_slice())?;
         let snapshot = decode_show(&source, options(&source, 3))?;
+        let references = decode_references(&source, options(&source, 3))?;
         let settings_only = decode_settings(&source, options(&source, 3))?;
 
         assert_eq!(
@@ -1590,6 +1659,19 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert_eq!(snapshot.theme_identifier(), native.theme.identifier);
+        assert_eq!(references.theme_identifier(), native.theme.identifier);
+        assert_eq!(
+            references.stylesheet_identifier(),
+            native.stylesheet.identifier
+        );
+        assert_eq!(
+            references.ui_state_identifier(),
+            native.ui_state.map(|reference| reference.identifier)
+        );
+        assert_eq!(
+            references.recording_identifier(),
+            native.recording.map(|reference| reference.identifier)
+        );
         assert_eq!(
             snapshot.size().width().to_bits(),
             native.size.width.to_bits()

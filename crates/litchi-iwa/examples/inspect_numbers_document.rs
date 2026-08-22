@@ -2,7 +2,6 @@
 
 use std::env;
 
-use litchi_iwa::numbers::NumbersEditor;
 use litchi_numbers::{Document, cell::Value as CellValue};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,27 +38,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("    ({}, {}) {formula}", position.row(), position.column());
             }
         }
-    }
-    let editor = NumbersEditor::open(path)?;
-    for table in editor.tables()? {
-        println!(
-            "table id={} name={:?} dimensions={}x{}",
-            table.id(),
-            table.name,
-            table.rows,
-            table.columns
-        );
-    }
-    for category in editor.pivot_categories()? {
-        println!(
-            "pivot category label={:?} group_by={:?} column={:?} group={:?} aggregate_type={} level={}",
-            category.label,
-            category.reference.group_by_uid,
-            category.reference.column_uid,
-            category.reference.group_uid,
-            category.reference.aggregate_type,
-            category.reference.group_level,
-        );
     }
     Ok(())
 }

@@ -4,14 +4,14 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::hash::Hash;
 
-use prost::Message;
-
-use crate::protobuf::tsp;
 use crate::wire::{repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields};
 use crate::{Error, Result};
 
 const BACK_LAYER_INDEX: usize = 0;
 const LAYER_STEP: usize = 1;
+const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
+const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;
+const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;
 
 /// A native Arrange command that changes one drawable's stacking layer.
 ///
@@ -94,8 +94,8 @@ pub(crate) fn reorder_reference_field(
 
     let mut payload_indexes = HashMap::with_capacity(current.len());
     for (index, (&expected, payload)) in current.iter().zip(&payloads).enumerate() {
-        let reference = tsp::Reference::decode(*payload)?;
-        if reference.identifier != expected {
+        let identifier = decode_reference_identifier(payload)?;
+        if identifier != expected {
             return Err(Error::InvalidFormat(format!(
                 "protobuf drawable-order field {field_number} changed during mutation"
             )));
@@ -119,6 +119,48 @@ pub(crate) fn reorder_reference_field(
         })
         .collect::<Result<Vec<_>>>()?;
     rewrite_repeated_length_delimited_fields(data, field_number, &replacements)
+}
+
+/// Read only the required identifier from one nested `TSP.Reference`.
+///
+/// Drawable-order edits retain each complete nested payload verbatim. The
+/// previous implementation eagerly materialized a generated `TSP.Reference`
+/// solely to compare this scalar, which also made the shared helper one of
+/// the last production Prost decode leaves. Common wire parsing validates the
+/// envelope and known scalar wire kinds without retaining generated state.
+fn decode_reference_identifier(source: &[u8]) -> Result<u64> {
+    let fields = litchi_iwa_common::wire::parse_wire_fields(source)?;
+    let mut identifier = None;
+    for field in fields {
+        if matches!(
+            field.number(),
+            REFERENCE_IDENTIFIER_FIELD
+                | REFERENCE_DEPRECATED_TYPE_FIELD
+                | REFERENCE_DEPRECATED_EXTERNAL_FIELD
+        ) && field.wire_type() != 0
+        {
+            return Err(Error::InvalidFormat(format!(
+                "TSP.Reference field {} has wire type {}; expected varint",
+                field.number(),
+                field.wire_type()
+            )));
+        }
+        if field.number() != REFERENCE_IDENTIFIER_FIELD {
+            continue;
+        }
+        let encoded = field.payload(source)?;
+        let (value, _) =
+            litchi_iwa_common::varint::decode_varint_from_bytes(encoded).map_err(|error| {
+                Error::InvalidFormat(format!("invalid TSP.Reference identifier: {error}"))
+            })?;
+        // Prost's proto2 scalar decoder uses the last occurrence for a
+        // duplicate singular field. Preserve that merge behavior while
+        // avoiding any generated message allocation.
+        identifier = Some(value);
+    }
+    identifier.ok_or_else(|| {
+        Error::InvalidFormat("TSP.Reference is missing its required identifier".to_owned())
+    })
 }
 
 pub(crate) fn validate_unique_drawables<T>(order: &[T], label: &str) -> Result<()>
@@ -162,7 +204,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protobuf::tsp;
     use crate::wire::{append_length_delimited_field, repeated_length_delimited_payloads};
+    use prost::Message as _;
 
     #[test]
     fn reorder_preserves_reference_payloads_and_unrelated_wire() {
@@ -218,6 +262,31 @@ mod tests {
             None
         );
         assert!(move_drawable_layer(&[10, 20], 30, DrawableLayerMove::ToFront).is_err());
+    }
+
+    #[test]
+    fn reference_identifier_projection_keeps_last_duplicate_scalar() {
+        let mut source = tsp::Reference {
+            identifier: 10,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        source.extend_from_slice(&[0x08, 0x14]);
+
+        assert_eq!(decode_reference_identifier(&source).unwrap(), 20);
+        assert_eq!(
+            tsp::Reference::decode(source.as_slice())
+                .unwrap()
+                .identifier,
+            20
+        );
+    }
+
+    #[test]
+    fn reference_identifier_projection_rejects_missing_and_wrong_wire_fields() {
+        assert!(decode_reference_identifier(&[0x18, 0x01]).is_err());
+        assert!(decode_reference_identifier(&[0x0a, 0x01, 0x01]).is_err());
+        assert!(decode_reference_identifier(&[0x08, 0x80]).is_err());
     }
 
     fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {

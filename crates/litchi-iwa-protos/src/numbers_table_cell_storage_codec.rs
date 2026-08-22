@@ -317,6 +317,17 @@ pub struct TableModelSnapshot<'source> {
     base_data_store: &'source [u8],
     number_of_rows: u32,
     number_of_columns: u32,
+    table_style: Option<ReferenceSnapshot>,
+    body_text_style: Option<ReferenceSnapshot>,
+    header_row_text_style: Option<ReferenceSnapshot>,
+    header_column_text_style: Option<ReferenceSnapshot>,
+    footer_row_text_style: Option<ReferenceSnapshot>,
+    body_cell_style: Option<ReferenceSnapshot>,
+    header_row_style: Option<ReferenceSnapshot>,
+    header_column_style: Option<ReferenceSnapshot>,
+    footer_row_style: Option<ReferenceSnapshot>,
+    table_name_style: Option<ReferenceSnapshot>,
+    table_name_shape_style: Option<ReferenceSnapshot>,
     hidden_state_formula_owner_for_columns: Option<ReferenceSnapshot>,
     hidden_state_formula_owner_for_rows: Option<ReferenceSnapshot>,
     conditional_style_formula_owner_id: Option<&'source [u8]>,
@@ -345,6 +356,61 @@ impl<'source> TableModelSnapshot<'source> {
     #[must_use]
     pub const fn number_of_columns(self) -> u32 {
         self.number_of_columns
+    }
+    /// Optional table-style reference from field 3.
+    #[must_use]
+    pub const fn table_style(self) -> Option<ReferenceSnapshot> {
+        self.table_style
+    }
+    /// Optional body-text-style reference from field 24.
+    #[must_use]
+    pub const fn body_text_style(self) -> Option<ReferenceSnapshot> {
+        self.body_text_style
+    }
+    /// Optional header-row-text-style reference from field 25.
+    #[must_use]
+    pub const fn header_row_text_style(self) -> Option<ReferenceSnapshot> {
+        self.header_row_text_style
+    }
+    /// Optional header-column-text-style reference from field 26.
+    #[must_use]
+    pub const fn header_column_text_style(self) -> Option<ReferenceSnapshot> {
+        self.header_column_text_style
+    }
+    /// Optional footer-row-text-style reference from field 27.
+    #[must_use]
+    pub const fn footer_row_text_style(self) -> Option<ReferenceSnapshot> {
+        self.footer_row_text_style
+    }
+    /// Optional body-cell-style reference from field 18.
+    #[must_use]
+    pub const fn body_cell_style(self) -> Option<ReferenceSnapshot> {
+        self.body_cell_style
+    }
+    /// Optional header-row-style reference from field 19.
+    #[must_use]
+    pub const fn header_row_style(self) -> Option<ReferenceSnapshot> {
+        self.header_row_style
+    }
+    /// Optional header-column-style reference from field 20.
+    #[must_use]
+    pub const fn header_column_style(self) -> Option<ReferenceSnapshot> {
+        self.header_column_style
+    }
+    /// Optional footer-row-style reference from field 21.
+    #[must_use]
+    pub const fn footer_row_style(self) -> Option<ReferenceSnapshot> {
+        self.footer_row_style
+    }
+    /// Optional title-paragraph-style reference from field 30.
+    #[must_use]
+    pub const fn table_name_style(self) -> Option<ReferenceSnapshot> {
+        self.table_name_style
+    }
+    /// Optional title-shape-style reference from field 36.
+    #[must_use]
+    pub const fn table_name_shape_style(self) -> Option<ReferenceSnapshot> {
+        self.table_name_shape_style
     }
     #[must_use]
     pub const fn hidden_state_formula_owner_for_columns(self) -> Option<ReferenceSnapshot> {
@@ -1033,6 +1099,23 @@ enum DataStoreProjection {
     DenseNative,
 }
 
+fn decode_style_reference(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+    data_store_projection: DataStoreProjection,
+) -> Result<ReferenceSnapshot, DecodeError> {
+    if data_store_projection == DataStoreProjection::Compatibility {
+        // Historical compatibility model envelopes may encode omitted
+        // required style references as an explicit zero-identifier proto2
+        // default. Dense-native model roots remain strict; only their nested
+        // DataStore metadata routes are projected compatibly.
+        decode_reference_compatibility(source, budget, depth)
+    } else {
+        decode_reference(source, budget, depth)
+    }
+}
+
 fn decode_table_model_with_visitor_mode<'source>(
     source: &'source [u8],
     options: DecodeOptions,
@@ -1067,6 +1150,17 @@ fn decode_table_model_in<'source>(
     let mut base_data_store = None;
     let mut number_of_rows = None;
     let mut number_of_columns = None;
+    let mut table_style = None;
+    let mut body_text_style = None;
+    let mut header_row_text_style = None;
+    let mut header_column_text_style = None;
+    let mut footer_row_text_style = None;
+    let mut body_cell_style = None;
+    let mut header_row_style = None;
+    let mut header_column_style = None;
+    let mut footer_row_style = None;
+    let mut table_name_style = None;
+    let mut table_name_shape_style = None;
     let mut hidden_columns = None;
     let mut hidden_rows = None;
     let mut conditional_owner = None;
@@ -1088,9 +1182,87 @@ fn decode_table_model_in<'source>(
                 if base_data_store.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                let _ =
-                    decode_data_store_in(raw, budget, child_depth, visitor, data_store_projection)?;
+                let store =
+                    decode_data_store_in(raw, budget, child_depth, visitor, data_store_projection);
+                let _ = store?;
                 base_data_store = Some(raw);
+            },
+            3 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut table_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            18 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut body_cell_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            19 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut header_row_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            20 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut header_column_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            21 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut footer_row_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            24 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut body_text_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            25 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut header_row_text_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            26 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut header_column_text_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            27 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut footer_row_text_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            30 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut table_name_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
+            },
+            36 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut table_name_shape_style,
+                    decode_style_reference(raw, budget, child_depth, data_store_projection)?,
+                )?;
             },
             6 => set_once(&mut number_of_rows, canonical_u32(field.varint()?)?)?,
             7 => set_once(&mut number_of_columns, canonical_u32(field.varint()?)?)?,
@@ -1104,6 +1276,7 @@ fn decode_table_model_in<'source>(
                 // source before publication.
                 table_name = Some(strict_utf8(field.bytes()?, budget)?);
             },
+            8 => set_once(&mut table_name, strict_utf8(field.bytes()?, budget)?)?,
             34 => {
                 let raw = field.bytes()?;
                 let reference = decode_reference(raw, budget, child_depth)?;
@@ -1149,7 +1322,11 @@ fn decode_table_model_in<'source>(
             None if compatibility_defaults => "",
             None => return Err(DecodeError::invalid()),
         },
-        table_name: table_name.unwrap_or(""),
+        table_name: match table_name {
+            Some(value) => value,
+            None if compatibility_defaults => "",
+            None => return Err(DecodeError::invalid()),
+        },
         base_data_store: match base_data_store {
             Some(value) => value,
             None if compatibility_defaults => &[],
@@ -1165,6 +1342,17 @@ fn decode_table_model_in<'source>(
             None if compatibility_defaults => 0,
             None => return Err(DecodeError::invalid()),
         },
+        table_style,
+        body_text_style,
+        header_row_text_style,
+        header_column_text_style,
+        footer_row_text_style,
+        body_cell_style,
+        header_row_style,
+        header_column_style,
+        footer_row_style,
+        table_name_style,
+        table_name_shape_style,
         hidden_state_formula_owner_for_columns: hidden_columns.map(|(_raw, reference)| reference),
         hidden_state_formula_owner_for_rows: hidden_rows.map(|(_raw, reference)| reference),
         conditional_style_formula_owner_id: conditional_owner,
@@ -1183,6 +1371,7 @@ fn decode_table_model_in<'source>(
             || view.base_data_store != snapshot.base_data_store
             || view.number_of_rows != snapshot.number_of_rows
             || view.number_of_columns != snapshot.number_of_columns
+            || view.table_name != snapshot.table_name
             || view.hidden_state_formula_owner_for_columns
                 != hidden_columns.map(|(raw, _reference)| raw)
             || view.hidden_state_formula_owner_for_rows != hidden_rows.map(|(raw, _reference)| raw)
@@ -1345,8 +1534,8 @@ fn decode_data_store_in<'source>(
                 if raw_fields[number - 1].is_some() {
                     return Err(DecodeError::invalid());
                 }
-                let selected = matches!(field.number, 4 | 6 | 12 | 17 | 19);
-                if !compatibility_defaults || selected {
+                let strict_route = matches!(field.number, 2 | 4 | 5 | 6 | 11 | 12 | 17 | 19);
+                if (!compatibility_defaults && !dense_native) || strict_route {
                     refs[number - 1] = Some(if compatibility_defaults {
                         decode_reference_compatibility(raw, budget, child_depth)?
                     } else {
@@ -1383,27 +1572,42 @@ fn decode_data_store_in<'source>(
         None if compatibility_defaults => Ok(&[][..]),
         None => Err(DecodeError::invalid()),
     };
-    let required_reference = |slot: Option<ReferenceSnapshot>| match slot {
+    let required_metadata_bytes = |slot: Option<&'source [u8]>| match slot {
         Some(value) => Ok(value),
-        None if compatibility_defaults || dense_native => Ok(default_reference()),
+        None if compatibility_defaults || dense_native => Ok(&[][..]),
         None => Err(DecodeError::invalid()),
     };
-    let required_u32 = |slot: Option<u32>| match slot {
+    let required_reference = |slot: Option<ReferenceSnapshot>| match slot {
         Some(value) => Ok(value),
-        None if compatibility_defaults => Ok(0),
+        // Dense-native recovery only defers unselected metadata envelopes.
+        // Every required DataStore reference remains part of the selected
+        // storage contract; an omitted route must not be synthesized as the
+        // compatibility zero-ID default.
+        None if compatibility_defaults => Ok(default_reference()),
         None => Err(DecodeError::invalid()),
     };
     let snapshot = DataStoreSnapshot {
-        row_headers: required_bytes(raw_fields[0])?,
+        // Dense-native recovery leaves row/header metadata opaque.  Its
+        // absence is therefore equivalent to the generated proto2 default;
+        // selected tile and sidecar routes remain required below.
+        row_headers: required_metadata_bytes(raw_fields[0])?,
         column_headers: required_reference(refs[1])?,
         tiles: required_bytes(raw_fields[2])?,
         string_table: required_reference(refs[3])?,
         style_table: required_reference(refs[4])?,
         formula_table: required_reference(refs[5])?,
-        next_row_strip_id: required_u32(next_row_strip_id)?,
-        next_column_strip_id: required_u32(next_column_strip_id)?,
-        row_tile_tree: required_bytes(raw_fields[8])?,
-        column_tile_tree: required_bytes(raw_fields[9])?,
+        next_row_strip_id: match next_row_strip_id {
+            Some(value) => value,
+            None if compatibility_defaults || dense_native => 0,
+            None => return Err(DecodeError::invalid()),
+        },
+        next_column_strip_id: match next_column_strip_id {
+            Some(value) => value,
+            None if compatibility_defaults || dense_native => 0,
+            None => return Err(DecodeError::invalid()),
+        },
+        row_tile_tree: required_metadata_bytes(raw_fields[8])?,
+        column_tile_tree: required_metadata_bytes(raw_fields[9])?,
         format_table_pre_bnc: required_reference(refs[10])?,
         formula_error_table: refs[11],
         merge_region_map: refs[12],
@@ -1817,6 +2021,15 @@ pub fn plan_header_storage_bucket_sizes<'source>(
     let (_bucket, source_report) =
         decode_header_storage_bucket_with_visitor(source, options, &mut records)?;
     let header_indices = records.validate(dimension_limit)?;
+    let (preflight_output_bytes, preflight_work_bytes) = preflight_rewrite_limits(
+        source_report,
+        source.len(),
+        records.records.len(),
+        &header_indices,
+        edits,
+        dimension_limit,
+        options,
+    )?;
     let mut ordered_edits = fallible_copy(edits)?;
     ordered_edits.sort_unstable_by_key(|edit| edit.index);
     validate_sorted_edits(&ordered_edits, dimension_limit)?;
@@ -1872,6 +2085,16 @@ pub fn plan_header_storage_bucket_sizes<'source>(
             maximum: options.max_message_bytes,
         }));
     }
+    debug_assert!(output_len <= preflight_output_bytes);
+    debug_assert!(
+        rewrite_work_upper_bound(
+            source.len(),
+            output_len,
+            records.records.len(),
+            ordered_edits.len(),
+        )
+        .is_ok_and(|work| work <= preflight_work_bytes)
+    );
     let result_upper_bound = result_decode_upper_bound(
         source_report,
         source.len(),
@@ -1966,11 +2189,7 @@ impl HeaderRecordStage {
 impl HeaderRecordStage {
     fn validate(&self, dimension_limit: u32) -> Result<Vec<u32>, DecodeError> {
         let mut indices = Vec::new();
-        indices.try_reserve_exact(self.records.len()).map_err(|_| {
-            DecodeError::limited(DecodeLimit::Allocation {
-                requested: self.records.len(),
-            })
-        })?;
+        reserve_exact(&mut indices, self.records.len())?;
         indices.extend(self.records.iter().map(|record| record.snapshot.index()));
         indices.sort_unstable();
         if indices
@@ -2126,11 +2345,7 @@ fn assemble_rewritten_bucket(
     output_len: usize,
 ) -> Result<Vec<u8>, DecodeError> {
     let mut output = Vec::new();
-    output.try_reserve_exact(output_len).map_err(|_| {
-        DecodeError::limited(DecodeLimit::Allocation {
-            requested: output_len,
-        })
-    })?;
+    reserve_exact(&mut output, output_len)?;
     let mut cursor = 0usize;
     for record in records {
         output.extend_from_slice(&source[cursor..record.start]);
@@ -2195,15 +2410,111 @@ fn validate_sorted_edits(
     Ok(())
 }
 
+fn preflight_rewrite_limits(
+    source: DecodeReport,
+    source_bytes: usize,
+    header_count: usize,
+    header_indices: &[u32],
+    edits: &[HeaderSizeEdit],
+    dimension_limit: u32,
+    options: DecodeOptions,
+) -> Result<(usize, usize), DecodeError> {
+    let edit_count = edits.len();
+    if edit_count > options.max_fields {
+        return Err(DecodeError::limited(DecodeLimit::Fields {
+            observed: edit_count,
+            maximum: options.max_fields,
+        }));
+    }
+    for edit in edits {
+        if edit.index >= dimension_limit {
+            return Err(DecodeError::invalid());
+        }
+    }
+
+    // Estimate the largest output without retaining the caller's edit slice.
+    // Removes and same-size updates never increase the wire width; only an
+    // insertion can do so. Duplicate edits are still rejected after staging,
+    // but counting each potential insertion here keeps this bound conservative
+    // and makes the resource refusal happen before that staging allocation.
+    let mut output_bytes = source_bytes;
+    for edit in edits {
+        if let Some(bits) = edit.replacement_size_bits
+            && header_indices.binary_search(&edit.index).is_err()
+        {
+            let (_, payload_len) = canonical_minimal_header(edit.index, bits);
+            output_bytes = output_bytes
+                .checked_add(encoded_header_field_length(payload_len)?)
+                .ok_or_else(DecodeError::invalid)?;
+        }
+    }
+    if output_bytes > options.max_message_bytes
+        || output_bytes
+            > usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_| DecodeError::invalid())?
+    {
+        return Err(DecodeError::limited(DecodeLimit::Bytes {
+            observed: output_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
+
+    let work_bytes =
+        rewrite_work_upper_bound(source_bytes, output_bytes, header_count, edit_count)?;
+    if work_bytes > options.max_work_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Work {
+            observed: work_bytes,
+            maximum: options.max_work_bytes,
+        }));
+    }
+    // The source pass has already consumed its own field budget. Only a set
+    // for an absent header adds wire fields (the canonical inserted record
+    // has one outer field plus four nested fields). In-place updates and
+    // removals preserve or reduce the field count, so charging every edit as
+    // an insertion would reject a valid rewrite when the caller deliberately
+    // gives an exact field budget for the source projection.
+    let inserted_fields = edits.iter().try_fold(0usize, |count, edit| {
+        let additional = usize::from(
+            edit.replacement_size_bits.is_some()
+                && header_indices.binary_search(&edit.index).is_err(),
+        )
+        .checked_mul(5)
+        .ok_or_else(DecodeError::invalid)?;
+        count
+            .checked_add(additional)
+            .ok_or_else(DecodeError::invalid)
+    })?;
+    let result_fields = source
+        .fields
+        .checked_add(inserted_fields)
+        .ok_or_else(DecodeError::invalid)?;
+    if result_fields > options.max_fields {
+        return Err(DecodeError::limited(DecodeLimit::Fields {
+            observed: result_fields,
+            maximum: options.max_fields,
+        }));
+    }
+    Ok((output_bytes, work_bytes))
+}
+
 fn fallible_copy<T: Copy>(source: &[T]) -> Result<Vec<T>, DecodeError> {
     let mut output = Vec::new();
-    output.try_reserve_exact(source.len()).map_err(|_| {
-        DecodeError::limited(DecodeLimit::Allocation {
-            requested: source.len(),
-        })
-    })?;
+    reserve_exact(&mut output, source.len())?;
     output.extend_from_slice(source);
     Ok(output)
+}
+
+fn reserve_exact<T>(output: &mut Vec<T>, additional: usize) -> Result<(), DecodeError> {
+    let requested = output
+        .len()
+        .checked_add(additional)
+        .ok_or_else(DecodeError::invalid)?;
+    output
+        .try_reserve_exact(additional)
+        .map_err(|_| DecodeError::limited(DecodeLimit::Allocation { requested }))?;
+    if output.capacity() != requested {
+        return Err(DecodeError::limited(DecodeLimit::Allocation { requested }));
+    }
+    Ok(())
 }
 
 fn ceil_log2(value: usize) -> usize {
@@ -3488,6 +3799,56 @@ mod tests {
         out
     }
 
+    fn minimal_store_without(omitted: u32) -> Vec<u8> {
+        let r = reference(7);
+        let mut headers = Vec::new();
+        v(&mut headers, 1, 3);
+        let mut out = Vec::new();
+        if omitted != 1 {
+            b(&mut out, 1, &headers);
+        }
+        if omitted != 2 {
+            b(&mut out, 2, &r);
+        }
+        if omitted != 3 {
+            b(&mut out, 3, &[]);
+        }
+        for field in 4..=6 {
+            if omitted != field {
+                b(&mut out, field, &r);
+            }
+        }
+        if omitted != 7 {
+            v(&mut out, 7, 1);
+        }
+        if omitted != 8 {
+            v(&mut out, 8, 2);
+        }
+        if omitted != 9 {
+            b(&mut out, 9, &[]);
+        }
+        if omitted != 10 {
+            b(&mut out, 10, &[]);
+        }
+        if omitted != 11 {
+            b(&mut out, 11, &r);
+        }
+        out
+    }
+
+    fn strict_model(table_name: Option<&[u8]>) -> Vec<u8> {
+        let store = minimal_store();
+        let mut out = Vec::new();
+        b(&mut out, 1, b"T-1");
+        b(&mut out, 4, &store);
+        v(&mut out, 6, 10);
+        v(&mut out, 7, 20);
+        if let Some(table_name) = table_name {
+            b(&mut out, 8, table_name);
+        }
+        out
+    }
+
     fn header_record(index: u32, size_bits: u32) -> Vec<u8> {
         let mut header = Vec::new();
         v(&mut header, 1, u64::from(index));
@@ -3531,10 +3892,12 @@ mod tests {
         b(&mut model, 4, &store);
         v(&mut model, 6, 10);
         v(&mut model, 7, 20);
+        b(&mut model, 8, b"Table");
         b(&mut model, 34, &reference(40));
         b(&mut model, 85, &reference(85));
         let (snapshot, report) = decode_table_model_with_report(&model, options(&model)).unwrap();
         assert_eq!(snapshot.table_id(), "T-1");
+        assert_eq!(snapshot.table_name(), "Table");
         assert_eq!(snapshot.number_of_rows(), 10);
         assert_eq!(snapshot.number_of_columns(), 20);
         assert_eq!(snapshot.pivot_owner().unwrap().identifier(), 85);
@@ -3546,6 +3909,32 @@ mod tests {
         );
         assert!(report.work_bytes() > model.len() * 2);
         assert_eq!(report.max_depth(), 3);
+    }
+
+    #[test]
+    fn strict_model_requires_table_name_but_keeps_unknown_wire_opaque() {
+        let store = minimal_store();
+        let mut valid = strict_model(Some(b"Table"));
+        // Keep the generated projection's high-numbered known `spill_owner`
+        // field (93) out of this unknown-field matrix: `unknown_fields`
+        // appends three additional field numbers after its base.
+        unknown_fields(&mut valid, 100);
+        let before = valid.clone();
+        let (snapshot, _) = decode_table_model_with_report(&valid, options(&valid)).unwrap();
+        assert_eq!(snapshot.table_name(), "Table");
+        assert_eq!(snapshot.base_data_store(), store.as_slice());
+        assert_eq!(valid, before);
+
+        let missing = strict_model(None);
+        assert!(decode_table_model_with_report(&missing, options(&missing)).is_err());
+
+        let mut wrong_wire = strict_model(None);
+        v(&mut wrong_wire, 8, 1);
+        assert!(decode_table_model_with_report(&wrong_wire, options(&wrong_wire)).is_err());
+
+        let mut duplicate = strict_model(Some(b"Table"));
+        b(&mut duplicate, 8, b"Second");
+        assert!(decode_table_model_with_report(&duplicate, options(&duplicate)).is_err());
     }
 
     #[test]
@@ -3633,6 +4022,49 @@ mod tests {
             decode_table_model_compatibility_with_report(&wrong_model, options(&wrong_model))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn dense_native_keeps_required_and_selected_references_strict() {
+        for field in [2, 4, 5, 6, 11] {
+            let source = minimal_store_without(field);
+            assert!(
+                decode_data_store_dense_native_with_report(&source, options(&source)).is_err(),
+                "dense-native accepted omitted required datastore field {field}"
+            );
+        }
+
+        for field in [4, 12, 17, 19] {
+            let mut source = minimal_store();
+            b(&mut source, field, &[0x80]);
+            assert!(
+                decode_data_store_dense_native_with_report(&source, options(&source)).is_err(),
+                "dense-native accepted malformed selected datastore reference {field}"
+            );
+        }
+    }
+
+    #[test]
+    fn dense_native_accepts_valid_store() {
+        let source = minimal_store();
+        let (snapshot, _report) =
+            decode_data_store_dense_native_with_report(&source, options(&source)).unwrap();
+
+        assert_eq!(snapshot.column_headers().identifier(), 7);
+        assert_eq!(snapshot.string_table().identifier(), 7);
+        assert_eq!(snapshot.style_table().identifier(), 7);
+        assert_eq!(snapshot.formula_table().identifier(), 7);
+        assert_eq!(snapshot.format_table_pre_bnc().identifier(), 7);
+    }
+
+    #[test]
+    fn dense_native_accepts_malformed_unselected_reference() {
+        let mut source = minimal_store();
+        b(&mut source, 13, &[0x80]);
+
+        let (snapshot, _report) =
+            decode_data_store_dense_native_with_report(&source, options(&source)).unwrap();
+        assert!(snapshot.merge_region_map().is_none());
     }
 
     #[derive(Default)]
@@ -3942,6 +4374,73 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn rewrite_preflight_rejects_exhausted_edit_budget_before_staging() {
+        let source = header_bucket(&[]);
+        let before = source.clone();
+        let edits = [HeaderSizeEdit::set(0, 10.0f32.to_bits())];
+        let error = plan_header_storage_bucket_sizes(
+            &source,
+            1,
+            &edits,
+            DecodeOptions::new(128, 1, 4096, 64, 0, 0),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields {
+                observed: 6,
+                maximum: 1
+            })
+        ));
+        assert_eq!(source, before);
+        assert_eq!(edits[0].index(), 0);
+    }
+
+    #[test]
+    fn rewrite_in_place_update_accepts_exact_source_field_budget_and_preserves_unknowns() {
+        let mut record = header_record(1, 10.0f32.to_bits());
+        b(&mut record, 99, b"opaque");
+        let mut source = header_bucket(&[record.clone()]);
+        v(&mut source, 100, 77);
+        let before = source.clone();
+        let (_, source_report) =
+            decode_header_storage_bucket_with_report(&source, rewrite_options()).unwrap();
+        let exact_fields = DecodeOptions::new(
+            source.len(),
+            source_report.fields(),
+            usize::MAX,
+            source_report.max_depth(),
+            source_report.references(),
+            source_report.text_bytes(),
+        );
+
+        let (rewritten, report) = rewrite_header_storage_bucket_sizes(
+            &source,
+            2,
+            &[HeaderSizeEdit::set(1, 20.0f32.to_bits())],
+            exact_fields,
+        )
+        .expect("an in-place update should not consume additional fields");
+
+        assert_eq!(source, before);
+        assert_eq!(report.source().fields(), source_report.fields());
+        assert_eq!(report.result().fields(), source_report.fields());
+        assert_eq!(
+            (report.updated(), report.inserted(), report.removed()),
+            (1, 0, 0)
+        );
+        assert!(rewritten.ends_with(&[0xa0, 0x06, 77]));
+
+        let mut after = RawHeaders::default();
+        decode_header_storage_bucket_with_visitor(&rewritten, rewrite_options(), &mut after)
+            .unwrap();
+        assert_eq!(after.records.len(), 1);
+        assert_eq!(after.records[0].1.size_bits(), 20.0f32.to_bits());
+        assert!(after.records[0].0.ends_with(b"opaque"));
+        assert_eq!(after.records[0].0.len(), record.len());
     }
 
     #[test]

@@ -5,6 +5,7 @@
 //! semantic content is represented by the archive-free [`crate::Document`].
 
 pub(crate) mod document_settings;
+mod footnote_text;
 mod page_layout;
 pub(crate) mod section_background;
 mod section_name;
@@ -12,6 +13,9 @@ mod section_pagination;
 pub(crate) mod section_settings;
 mod section_text;
 mod section_transaction;
+mod table_lock;
+#[cfg(feature = "internal-iwork-source")]
+mod text_storage;
 
 use std::fmt;
 use std::fs::{Metadata as FileMetadata, OpenOptions};
@@ -28,16 +32,22 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::pages_body_codec::{self, DecodeOptions as PagesBodyDecodeOptions};
+use litchi_iwa_protos::{pages_footnote_codec, pages_footnote_marker_codec};
 use litchi_iwa_text::storage::{Run, Storage};
 use plist::Value;
 use thiserror::Error;
 
+use crate::footnote::body::{Footnote, Position};
 use crate::selector::{SectionSelector, SelectorResult};
 use crate::{
     Body, DEFAULT_MAX_TEXT_BYTES, Document, Error as SemanticError, MAX_BODY_STORAGES,
     MAX_SECTIONS, Root, Section, SectionType,
 };
 
+pub use footnote_text::{
+    FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
+    FootnoteTextLimitKind, FootnoteTextPatch,
+};
 pub use page_layout::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
     PageLayoutPatch,
@@ -54,10 +64,37 @@ pub use section_text::{
     SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, SectionTextError,
     SectionTextLimitKind, SectionTextPatch,
 };
-
+pub use table_lock::{
+    BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
+    BodyTableLockLimitKind, BodyTableLockPatch, TableLockCommit, TableLockDiagnostics,
+    TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
+};
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
+const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
+const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;
+const FOOTNOTE_TABLE_FIELD: u32 = 16;
+const TABLE_ENTRIES_FIELD: u32 = 1;
+const TABLE_ATTACHMENT_FIELD: u32 = 9;
+const STORAGE_KIND_FIELD: u32 = 1;
+const STORAGE_TEXT_PREFIX: &str = "\u{fffc} ";
+const FOOTNOTE_ANCHOR_UNIT: u16 = 0x000e;
+const FOOTNOTE_MARK_KIND: i32 = 2;
+const FOOTNOTE_STORAGE_KIND: u64 = 2;
+const MAX_BODY_FOOTNOTES: usize = 4096;
 /// Hard package-wide ceiling for native objects inspected by Pages ingress.
 pub const MAX_OBJECTS: usize = 1_000_000;
+
+/// Validate one native Pages text-storage payload through the focused,
+/// source-borrowing adapter.
+///
+/// This is intentionally hidden from the supported semantic API. The legacy
+/// migration host uses it while its editor remains in place; the focused
+/// adapter owns the finite profile and the text-wire qualification itself.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __is_valid_pages_text_storage(source: &[u8]) -> bool {
+    text_storage::is_valid(source)
+}
 
 /// Bounded physical ingress limits for a Pages package.
 ///
@@ -88,7 +125,7 @@ pub enum PackageError {
     /// The native package decoded successfully but exceeded a Pages semantic
     /// bound while being projected into an immutable document.
     #[error(transparent)]
-    Semantic(#[from] SemanticError),
+    Semantic(SemanticError),
     /// Section names exceed the aggregate retained-text budget.
     #[error("Pages section names require at least {observed} bytes; budget is {limit}")]
     SectionNamesTooLarge {
@@ -178,6 +215,12 @@ struct RootReferences {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct NativeSectionReference {
+    character_index: u32,
+    identifier: NonZeroU64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NativeFootnoteReference {
     character_index: u32,
     identifier: NonZeroU64,
 }
@@ -342,7 +385,6 @@ impl Package {
             text_limit,
             limits,
         )?;
-
         Ok(Self {
             state: Arc::new(State {
                 source,
@@ -398,6 +440,28 @@ impl Package {
         self.state.document.sections()
     }
 
+    /// Read every footnote attached to the rooted Pages body in native source
+    /// order.
+    ///
+    /// The projection exposes only checked UTF-16 positions, semantic text,
+    /// and optional custom markers. Native attachment, storage, and marker
+    /// identities remain private to this package adapter. The retained source
+    /// catalog is never changed by this read.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::InvalidFormat`] when the body table, reference,
+    /// footnote storage, or marker graph is malformed, or when a referenced
+    /// object is missing. Returns a bounded semantic error when the projected
+    /// note text exceeds the package text budget.
+    pub fn body_footnotes(&self) -> PackageResult<Vec<Footnote>> {
+        project_body_footnotes(
+            self.state.source.components(),
+            self.state.source.limits(),
+            effective_text_limit(self.state.source.limits()),
+        )
+    }
+
     /// Select one semantic section by exact name or checked source position.
     ///
     /// This package-level convenience delegates to the immutable semantic
@@ -413,6 +477,28 @@ impl Package {
         S: Into<SectionSelector<'a>>,
     {
         self.state.document.select_section(selector)
+    }
+
+    /// Select one semantic section by its exact, case-sensitive name.
+    ///
+    /// This is the package-level counterpart to [`Document::section_named`].
+    /// It keeps callers on the semantic selector surface while the package
+    /// retains its native archive state privately.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::SelectorError::AmbiguousSectionName`] when more than
+    /// one section has the requested exact name.
+    pub fn section_named(&self, name: &str) -> SelectorResult<Option<&Section>> {
+        self.select_section(SectionSelector::name(name))
+    }
+
+    /// Select one semantic section by its checked zero-based source position.
+    ///
+    /// A missing position returns `Ok(None)`, matching [`Document::section_at`]
+    /// and keeping package callers independent of native object identifiers.
+    pub fn section_at(&self, position: usize) -> SelectorResult<Option<&Section>> {
+        self.select_section(SectionSelector::index(position))
     }
 
     /// Borrow the immutable Pages semantic snapshot.
@@ -1032,11 +1118,10 @@ fn decode_document(
             max_sections,
         )?;
         if section_references.is_empty() && max_sections == 0 {
-            return Err(SemanticError::TooManySections {
+            return Err(PackageError::Semantic(SemanticError::TooManySections {
                 actual: 1,
                 limit: max_sections,
-            }
-            .into());
+            }));
         }
         return project_native_body(
             components,
@@ -1056,11 +1141,13 @@ fn decode_document(
     let body = {
         let storages = extract_storages(components, max_sections, max_text_bytes, limits)?;
         (!storages.is_empty())
-            .then(|| Body::with_max_text_bytes(storages, max_text_bytes))
+            .then(|| {
+                Body::with_max_text_bytes(storages, max_text_bytes).map_err(PackageError::Semantic)
+            })
             .transpose()?
     };
     let root = body.map_or_else(Root::empty, Root::with_body);
-    Document::from_root_with_max_text_bytes(root, max_text_bytes).map_err(Into::into)
+    Document::from_root_with_max_text_bytes(root, max_text_bytes).map_err(PackageError::Semantic)
 }
 
 fn find_object(
@@ -1103,6 +1190,435 @@ fn decode_body_storage(
         )));
     }
     Ok((storage, preflight.section_references))
+}
+
+fn project_body_footnotes(
+    components: &ComponentCatalog,
+    limits: Limits,
+    max_text_bytes: usize,
+) -> PackageResult<Vec<Footnote>> {
+    let root_references = root_references_with_limits(components, limits)?;
+    let Some(body_identifier) = root_references.body else {
+        return Ok(Vec::new());
+    };
+    let body_object = find_object(components, body_identifier.get()).ok_or_else(|| {
+        PackageError::InvalidFormat(format!(
+            "Pages body storage object {body_identifier} is missing"
+        ))
+    })?;
+    let body_payload = unique_text_payload(&body_object.messages, body_identifier)?;
+    let (body_storage, _) = decode_body_storage(
+        &body_object.messages,
+        body_identifier,
+        MAX_SECTIONS,
+        max_text_bytes,
+        limits,
+    )?;
+    let entries = footnote_table_entries(body_payload, body_identifier, limits)?;
+    if entries.len() > MAX_BODY_FOOTNOTES {
+        return Err(PackageError::PayloadLimit {
+            observed: entries.len(),
+            limit: MAX_BODY_FOOTNOTES,
+        });
+    }
+
+    let mut footnotes = Vec::new();
+    footnotes
+        .try_reserve_exact(entries.len())
+        .map_err(|_error| PackageError::Allocation {
+            amount: entries.len(),
+        })?;
+    let mut seen_references = Vec::new();
+    seen_references
+        .try_reserve_exact(entries.len())
+        .map_err(|_error| PackageError::Allocation {
+            amount: entries.len(),
+        })?;
+    let mut seen_storages = Vec::new();
+    seen_storages
+        .try_reserve_exact(entries.len())
+        .map_err(|_error| PackageError::Allocation {
+            amount: entries.len(),
+        })?;
+    let mut seen_markers = Vec::new();
+    seen_markers
+        .try_reserve_exact(entries.len())
+        .map_err(|_error| PackageError::Allocation {
+            amount: entries.len(),
+        })?;
+    let mut previous_position = None;
+    for entry in entries {
+        if previous_position.is_some_and(|previous| previous >= entry.character_index) {
+            return Err(PackageError::InvalidFormat(
+                "Pages body footnote positions are not strictly increasing".to_owned(),
+            ));
+        }
+        previous_position = Some(entry.character_index);
+        if seen_references.contains(&entry.identifier) {
+            return Err(PackageError::InvalidFormat(format!(
+                "Pages body references footnote object {} more than once",
+                entry.identifier
+            )));
+        }
+        seen_references.push(entry.identifier);
+        validate_body_footnote_anchor(body_storage.text(), body_identifier, entry.character_index)?;
+        let (footnote, storage_identifier, marker_identifier) =
+            project_one_body_footnote(components, limits, max_text_bytes, entry)?;
+        if entry.identifier == storage_identifier
+            || entry.identifier == marker_identifier
+            || seen_storages.contains(&storage_identifier)
+            || seen_markers.contains(&marker_identifier)
+        {
+            return Err(PackageError::InvalidFormat(
+                "Pages body footnote graph reuses a native object".to_owned(),
+            ));
+        }
+        seen_storages.push(storage_identifier);
+        seen_markers.push(marker_identifier);
+        footnotes.push(footnote);
+    }
+    Ok(footnotes)
+}
+
+fn footnote_table_entries(
+    body_payload: &[u8],
+    body_identifier: NonZeroU64,
+    limits: Limits,
+) -> PackageResult<Vec<NativeFootnoteReference>> {
+    let wire_limits = storage_wire_limits(limits)?;
+    let context = format!("Pages body object {body_identifier}");
+    let body_view = WireView::parse_with_limits(body_payload, wire_limits).map_err(|error| {
+        PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
+    })?;
+    let Some(table_field) =
+        unique_wire_field(&body_view, FOOTNOTE_TABLE_FIELD, 2, false, &context)?
+    else {
+        return Ok(Vec::new());
+    };
+    let table_view =
+        WireView::parse_with_limits(table_field.payload(), wire_limits).map_err(|error| {
+            PackageError::InvalidFormat(format!(
+                "{context} footnote table has invalid protobuf wire data: {error}"
+            ))
+        })?;
+    let boundary_options = pages_body_options(limits)?;
+    let mut entries = Vec::new();
+    for field in table_view
+        .fields()
+        .filter(|field| field.number() == TABLE_ENTRIES_FIELD)
+    {
+        validate_wire_field(field, 2, &context)?;
+        let next_count = entries.len().saturating_add(1);
+        if next_count > MAX_BODY_FOOTNOTES {
+            return Err(PackageError::PayloadLimit {
+                observed: next_count,
+                limit: MAX_BODY_FOOTNOTES,
+            });
+        }
+        let boundary = pages_body_codec::decode_section_boundary(field.payload(), boundary_options)
+            .map_err(|error| {
+                PackageError::InvalidFormat(format!(
+                    "{context} footnote table entry is invalid: {error}"
+                ))
+            })?;
+        let identifier = boundary.section().ok_or_else(|| {
+            PackageError::InvalidFormat(format!(
+                "{context} footnote table entry has no footnote reference"
+            ))
+        })?;
+        entries
+            .try_reserve(1)
+            .map_err(|_error| PackageError::Allocation { amount: next_count })?;
+        entries.push(NativeFootnoteReference {
+            character_index: boundary.character_index(),
+            identifier: identifier.identifier(),
+        });
+    }
+    Ok(entries)
+}
+
+fn project_one_body_footnote(
+    components: &ComponentCatalog,
+    limits: Limits,
+    max_text_bytes: usize,
+    entry: NativeFootnoteReference,
+) -> PackageResult<(Footnote, NonZeroU64, NonZeroU64)> {
+    let reference_object = find_object(components, entry.identifier.get()).ok_or_else(|| {
+        PackageError::InvalidFormat(format!(
+            "Pages footnote reference object {} is missing",
+            entry.identifier
+        ))
+    })?;
+    let reference_payload = unique_message_payload(
+        &reference_object.messages,
+        FOOTNOTE_REFERENCE_MESSAGE_TYPE,
+        &format!("Pages footnote reference object {}", entry.identifier),
+    )?;
+    let reference = pages_footnote_codec::decode_footnote_reference(
+        reference_payload,
+        footnote_decode_options(reference_payload, limits)?,
+    )
+    .map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "Pages footnote reference object {} failed strict validation: {error}",
+            entry.identifier
+        ))
+    })?;
+    if reference
+        .super_kind()
+        .is_some_and(|kind| kind != FOOTNOTE_MARK_KIND)
+    {
+        return Err(PackageError::InvalidFormat(format!(
+            "Pages footnote object {} has the wrong attachment kind",
+            entry.identifier
+        )));
+    }
+    let storage_identifier = reference
+        .contained_storage()
+        .map(|reference| reference.identifier())
+        .ok_or_else(|| {
+            PackageError::InvalidFormat(format!(
+                "Pages footnote object {} has no contained storage",
+                entry.identifier
+            ))
+        })?;
+    let storage_object = find_object(components, storage_identifier.get()).ok_or_else(|| {
+        PackageError::InvalidFormat(format!(
+            "Pages footnote storage object {} is missing",
+            storage_identifier
+        ))
+    })?;
+    let (storage, _) = decode_body_storage(
+        &storage_object.messages,
+        storage_identifier,
+        MAX_SECTIONS,
+        max_text_bytes,
+        limits,
+    )?;
+    let storage_payload = unique_text_payload(&storage_object.messages, storage_identifier)?;
+    let marker_identifier =
+        footnote_marker_identifier(storage_payload, storage_identifier, limits)?;
+    let marker_object = find_object(components, marker_identifier.get()).ok_or_else(|| {
+        PackageError::InvalidFormat(format!(
+            "Pages footnote marker object {} is missing",
+            marker_identifier
+        ))
+    })?;
+    let marker_payload = unique_message_payload(
+        &marker_object.messages,
+        TEXTUAL_ATTACHMENT_MESSAGE_TYPE,
+        &format!("Pages footnote marker object {}", marker_identifier),
+    )?;
+    let marker = pages_footnote_marker_codec::decode_textual_attachment(
+        marker_payload,
+        footnote_marker_decode_options(marker_payload, limits)?,
+    )
+    .map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "Pages footnote marker object {} failed strict validation: {error}",
+            marker_identifier
+        ))
+    })?;
+    if marker.kind() != Some(FOOTNOTE_MARK_KIND) {
+        return Err(PackageError::InvalidFormat(format!(
+            "Pages footnote marker object {} has the wrong attachment kind",
+            marker_identifier
+        )));
+    }
+
+    let text = storage
+        .text()
+        .strip_prefix(STORAGE_TEXT_PREFIX)
+        .ok_or_else(|| {
+            PackageError::InvalidFormat(format!(
+                "Pages footnote storage {} lacks its native marker prefix",
+                storage_identifier
+            ))
+        })?;
+    let custom_mark = reference
+        .custom_mark_string()
+        .map(str::to_owned)
+        .map(String::into_boxed_str);
+    let footnote = Footnote::with_custom_mark(
+        Position::from_utf16_index(entry.character_index as usize).map_err(|error| {
+            PackageError::InvalidFormat(format!(
+                "Pages footnote position {} is invalid: {error}",
+                entry.character_index
+            ))
+        })?,
+        text.to_owned().into_boxed_str(),
+        custom_mark,
+    )
+    .map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "Pages footnote object {} has an invalid semantic value: {error}",
+            entry.identifier
+        ))
+    })?;
+    Ok((footnote, storage_identifier, marker_identifier))
+}
+
+fn validate_body_footnote_anchor(
+    text: &str,
+    body_identifier: NonZeroU64,
+    requested: u32,
+) -> PackageResult<()> {
+    let requested = usize::try_from(requested).map_err(|_error| {
+        PackageError::InvalidFormat(format!(
+            "Pages body object {body_identifier} footnote position exceeds the platform index range"
+        ))
+    })?;
+    let mut offset = 0usize;
+    for character in text.chars() {
+        if offset == requested {
+            if character as u32 == u32::from(FOOTNOTE_ANCHOR_UNIT) {
+                return Ok(());
+            }
+            return Err(PackageError::InvalidFormat(format!(
+                "Pages body object {body_identifier} has no U+000E footnote anchor at UTF-16 index {requested}"
+            )));
+        }
+        offset = offset.checked_add(character.len_utf16()).ok_or_else(|| {
+            PackageError::InvalidFormat(format!(
+                "Pages body object {body_identifier} UTF-16 length overflows usize"
+            ))
+        })?;
+        if offset > requested {
+            return Err(PackageError::InvalidFormat(format!(
+                "Pages body object {body_identifier} footnote position {requested} splits a UTF-16 surrogate pair"
+            )));
+        }
+    }
+    Err(PackageError::InvalidFormat(format!(
+        "Pages body object {body_identifier} footnote position {requested} exceeds body UTF-16 length {offset}"
+    )))
+}
+
+fn footnote_marker_identifier(
+    storage_payload: &[u8],
+    storage_identifier: NonZeroU64,
+    limits: Limits,
+) -> PackageResult<NonZeroU64> {
+    let wire_limits = storage_wire_limits(limits)?;
+    let context = format!("Pages footnote storage object {storage_identifier}");
+    let view = WireView::parse_with_limits(storage_payload, wire_limits).map_err(|error| {
+        PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
+    })?;
+    let kind = unique_wire_field(&view, STORAGE_KIND_FIELD, 0, true, &context)?
+        .ok_or_else(|| PackageError::InvalidFormat(format!("{context} has no native kind")))?;
+    let kind = decode_canonical_varint(kind, &context)?;
+    if kind != FOOTNOTE_STORAGE_KIND {
+        return Err(PackageError::InvalidFormat(format!(
+            "{context} is not a native footnote storage"
+        )));
+    }
+    let table =
+        unique_wire_field(&view, TABLE_ATTACHMENT_FIELD, 2, true, &context)?.ok_or_else(|| {
+            PackageError::InvalidFormat(format!("{context} has no marker attachment table"))
+        })?;
+    let table_view =
+        WireView::parse_with_limits(table.payload(), wire_limits).map_err(|error| {
+            PackageError::InvalidFormat(format!(
+                "{context} marker attachment table has invalid protobuf wire data: {error}"
+            ))
+        })?;
+    let boundary_options = pages_body_options(limits)?;
+    let mut marker = None;
+    for field in table_view
+        .fields()
+        .filter(|field| field.number() == TABLE_ENTRIES_FIELD)
+    {
+        validate_wire_field(field, 2, &context)?;
+        let entry = pages_body_codec::decode_section_boundary(field.payload(), boundary_options)
+            .map_err(|error| {
+                PackageError::InvalidFormat(format!(
+                    "{context} marker attachment entry is invalid: {error}"
+                ))
+            })?;
+        if entry.character_index() != 0 {
+            continue;
+        }
+        let identifier = entry.section().ok_or_else(|| {
+            PackageError::InvalidFormat(format!(
+                "{context} marker attachment at index zero has no object reference"
+            ))
+        })?;
+        if marker.replace(identifier.identifier()).is_some() {
+            return Err(PackageError::InvalidFormat(format!(
+                "{context} has more than one marker attachment at index zero"
+            )));
+        }
+    }
+    marker.ok_or_else(|| {
+        PackageError::InvalidFormat(format!("{context} has no marker attachment at index zero"))
+    })
+}
+
+fn decode_canonical_varint(field: WireFieldView<'_>, context: &str) -> PackageResult<u64> {
+    let payload = field.payload();
+    let (value, length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(payload).map_err(|error| {
+            PackageError::InvalidFormat(format!("{context} protobuf varint is invalid: {error}"))
+        })?;
+    if length != payload.len() || litchi_iwa_common::varint::encoded_len(value) != length {
+        return Err(PackageError::InvalidFormat(format!(
+            "{context} protobuf varint is not canonical"
+        )));
+    }
+    Ok(value)
+}
+
+fn footnote_decode_options(
+    _source: &[u8],
+    limits: Limits,
+) -> PackageResult<pages_footnote_codec::DecodeOptions> {
+    let rewrite_limits = storage_rewrite_limits(limits).map_err(map_storage_wire_limits_error)?;
+    let recursion_limit = u32::try_from(rewrite_limits.max_nesting()).map_err(|_error| {
+        PackageError::InvalidFormat("Pages footnote nesting limit does not fit u32".to_owned())
+    })?;
+    Ok(pages_footnote_codec::DecodeOptions::new(
+        rewrite_limits.max_message_bytes(),
+        rewrite_limits.max_fields(),
+        rewrite_limits.max_rewrite_work(),
+        recursion_limit,
+    ))
+}
+
+fn footnote_marker_decode_options(
+    _source: &[u8],
+    limits: Limits,
+) -> PackageResult<pages_footnote_marker_codec::DecodeOptions> {
+    let rewrite_limits = storage_rewrite_limits(limits).map_err(map_storage_wire_limits_error)?;
+    let recursion_limit = u32::try_from(rewrite_limits.max_nesting()).map_err(|_error| {
+        PackageError::InvalidFormat("Pages footnote nesting limit does not fit u32".to_owned())
+    })?;
+    Ok(pages_footnote_marker_codec::DecodeOptions::new(
+        rewrite_limits.max_message_bytes(),
+        rewrite_limits.max_fields(),
+        rewrite_limits.max_rewrite_work(),
+        recursion_limit,
+    ))
+}
+
+fn storage_wire_limits(limits: Limits) -> PackageResult<WireLimits> {
+    let rewrite_limits = storage_rewrite_limits(limits).map_err(map_storage_wire_limits_error)?;
+    WireLimits::default()
+        .with_input_bytes(rewrite_limits.max_message_bytes())
+        .and_then(|limits| limits.with_fields(rewrite_limits.max_fields()))
+        .and_then(|limits| limits.with_nesting(rewrite_limits.max_nesting()))
+        .and_then(|limits| limits.with_rewrite_work(rewrite_limits.max_rewrite_work()))
+        .map_err(|error| {
+            PackageError::InvalidFormat(format!("Pages footnote wire limits are invalid: {error}"))
+        })
+}
+
+fn map_storage_wire_limits_error(error: StorageWireLimitsError) -> PackageError {
+    match error {
+        StorageWireLimitsError::Physical(error) => PackageError::Archive(error),
+        StorageWireLimitsError::Wire(error) => {
+            PackageError::InvalidFormat(format!("Pages footnote wire limits are invalid: {error}"))
+        },
+    }
 }
 
 fn map_rooted_storage_decode_error(error: litchi_iwa_text_wire::RewriteError) -> PackageError {
@@ -1194,11 +1710,10 @@ fn preflight_body_wire(
             PackageError::InvalidFormat(format!("{context} section count overflows usize"))
         })?;
         if entry_count > max_sections {
-            return Err(SemanticError::TooManySections {
+            return Err(PackageError::Semantic(SemanticError::TooManySections {
                 actual: entry_count,
                 limit: max_sections,
-            }
-            .into());
+            }));
         }
         let reference = preflight_section_table_entry(
             field.payload(),
@@ -1300,11 +1815,10 @@ fn native_section_references(
             PackageError::InvalidFormat("Pages section count overflows usize".to_owned())
         })?;
     if maximum_count > max_sections.saturating_add(1) {
-        return Err(SemanticError::TooManySections {
+        return Err(PackageError::Semantic(SemanticError::TooManySections {
             actual: maximum_count,
             limit: max_sections,
-        }
-        .into());
+        }));
     }
 
     references.sort_unstable_by_key(|reference| reference.character_index);
@@ -1353,11 +1867,10 @@ fn native_section_references(
         )));
     }
     if references.len() > max_sections {
-        return Err(SemanticError::TooManySections {
+        return Err(PackageError::Semantic(SemanticError::TooManySections {
             actual: references.len(),
             limit: max_sections,
-        }
-        .into());
+        }));
     }
 
     let mut identifiers = Vec::new();
@@ -1388,9 +1901,10 @@ fn project_native_body(
     body_identifier: NonZeroU64,
 ) -> PackageResult<Document> {
     if section_references.is_empty() {
-        let body = Body::with_max_text_bytes(vec![storage], max_text_bytes)?;
+        let body = Body::with_max_text_bytes(vec![storage], max_text_bytes)
+            .map_err(PackageError::Semantic)?;
         return Document::from_root_with_max_text_bytes(Root::with_body(body), max_text_bytes)
-            .map_err(Into::into);
+            .map_err(PackageError::Semantic);
     }
 
     let ranges = section_text_ranges(storage.text(), &section_references, body_identifier)?;
@@ -1420,7 +1934,8 @@ fn project_native_body(
         sections.push(builder.build());
     }
 
-    Document::from_sections_with_max_text_bytes(sections, max_text_bytes).map_err(Into::into)
+    Document::from_sections_with_max_text_bytes(sections, max_text_bytes)
+        .map_err(PackageError::Semantic)
 }
 
 fn decode_section_names(
@@ -1889,18 +2404,16 @@ fn extract_storages(
                 continue;
             }
             if max_sections == 0 {
-                return Err(SemanticError::TooManySections {
+                return Err(PackageError::Semantic(SemanticError::TooManySections {
                     actual: 1,
                     limit: max_sections,
-                }
-                .into());
+                }));
             }
             if storages.len() == MAX_BODY_STORAGES {
-                return Err(SemanticError::TooManyBodyStorages {
+                return Err(PackageError::Semantic(SemanticError::TooManyBodyStorages {
                     actual: storages.len().saturating_add(1),
                     limit: MAX_BODY_STORAGES,
-                }
-                .into());
+                }));
             }
             let next_text_bytes = text_bytes.checked_add(storage.len()).ok_or({
                 PackageError::Semantic(SemanticError::TextTooLarge {
@@ -2297,6 +2810,130 @@ mod tests {
         archive_package_bytes(objects, false)
     }
 
+    fn body_footnote_package_bytes() -> PackageResult<Vec<u8>> {
+        let body_identifier = 42;
+        let root = tp::DocumentArchive {
+            body_storage: Some(Reference {
+                identifier: body_identifier,
+                ..Reference::default()
+            }),
+            ..tp::DocumentArchive::default()
+        };
+        let body_text = "A😀\u{e}B\u{e}C";
+        let body = tswp::StorageArchive {
+            kind: Some(tswp::storage_archive::KindType::Body as i32),
+            text: vec![body_text.to_owned()],
+            table_footnote: Some(ObjectAttributeTable {
+                entries: vec![
+                    ObjectAttribute {
+                        character_index: 3,
+                        object: Some(Reference {
+                            identifier: 100,
+                            ..Reference::default()
+                        }),
+                    },
+                    ObjectAttribute {
+                        character_index: 5,
+                        object: Some(Reference {
+                            identifier: 110,
+                            ..Reference::default()
+                        }),
+                    },
+                ],
+            }),
+            ..tswp::StorageArchive::default()
+        };
+        let footnote = |reference_id: u64,
+                        storage_id: u64,
+                        marker_id: u64,
+                        text: &str,
+                        custom_mark: Option<&str>| {
+            let mut reference = tswp::FootnoteReferenceAttachmentArchive {
+                super_: Some(tswp::TextualAttachmentArchive {
+                    string_equivalent: Some("*".to_owned()),
+                    kind: Some(tswp::textual_attachment_archive::Kind::KKindFootnoteMark as i32),
+                }),
+                contained_storage: Some(Reference {
+                    identifier: storage_id,
+                    ..Reference::default()
+                }),
+                custom_mark_string: custom_mark.map(str::to_owned),
+            }
+            .encode_to_vec();
+            reference.extend_from_slice(&[0xa0, 0x06, 0x01, 0xaa, 0x06, 0x03, b'r', b'e', b'f']);
+
+            let storage = tswp::StorageArchive {
+                kind: Some(tswp::storage_archive::KindType::Footnote as i32),
+                text: vec![format!("{STORAGE_TEXT_PREFIX}{text}")],
+                table_attachment: Some(ObjectAttributeTable {
+                    entries: vec![ObjectAttribute {
+                        character_index: 0,
+                        object: Some(Reference {
+                            identifier: marker_id,
+                            ..Reference::default()
+                        }),
+                    }],
+                }),
+                ..tswp::StorageArchive::default()
+            };
+            let mut marker = tswp::TextualAttachmentArchive {
+                string_equivalent: Some("*".to_owned()),
+                kind: Some(tswp::textual_attachment_archive::Kind::KKindFootnoteMark as i32),
+            }
+            .encode_to_vec();
+            marker.extend_from_slice(&[0xa0, 0x06, 0x01, 0xaa, 0x06, 0x03, b'm', b'a', b'r']);
+            [
+                ArchiveObject::new(
+                    reference_id,
+                    vec![RawMessage {
+                        type_: FOOTNOTE_REFERENCE_MESSAGE_TYPE,
+                        data: reference,
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string())),
+                ArchiveObject::new(
+                    storage_id,
+                    vec![RawMessage {
+                        type_: 2_001,
+                        data: storage.encode_to_vec(),
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string())),
+                ArchiveObject::new(
+                    marker_id,
+                    vec![RawMessage {
+                        type_: TEXTUAL_ATTACHMENT_MESSAGE_TYPE,
+                        data: marker,
+                    }],
+                )
+                .map_err(|error| PackageError::InvalidFormat(error.to_string())),
+            ]
+        };
+        let first = footnote(100, 101, 102, "First", None);
+        let second = footnote(110, 111, 112, "Second", Some("†"));
+        let mut objects = vec![
+            ArchiveObject::new(
+                1,
+                vec![RawMessage {
+                    type_: 10_000,
+                    data: root.encode_to_vec(),
+                }],
+            )
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            ArchiveObject::new(
+                body_identifier,
+                vec![RawMessage {
+                    type_: 2_001,
+                    data: body.encode_to_vec(),
+                }],
+            )
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+        ];
+        objects.extend(first.into_iter().collect::<PackageResult<Vec<_>>>()?);
+        objects.extend(second.into_iter().collect::<PackageResult<Vec<_>>>()?);
+        archive_package_bytes(objects, false)
+    }
+
     fn archive_package_bytes(
         objects: Vec<ArchiveObject>,
         metadata: bool,
@@ -2557,6 +3194,159 @@ mod tests {
             package.semantic_document(),
             snapshot.semantic_document()
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn package_projects_body_footnotes_in_source_order_without_mutating_source() -> PackageResult<()>
+    {
+        let package_bytes = body_footnote_package_bytes()?;
+        let package = Package::from_bytes(&package_bytes)?;
+        let source_before = package.source_bytes().to_vec();
+
+        let footnotes = package.body_footnotes()?;
+
+        assert_eq!(
+            footnotes,
+            vec![
+                Footnote {
+                    position: Position::from_utf16_index(3)
+                        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+                    text: "First".into(),
+                    custom_mark: None,
+                },
+                Footnote {
+                    position: Position::from_utf16_index(5)
+                        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+                    text: "Second".into(),
+                    custom_mark: Some("†".into()),
+                },
+            ]
+        );
+        assert_eq!(package.source_bytes(), source_before.as_slice());
+        assert_eq!(package.body_footnotes()?, footnotes);
+        Ok(())
+    }
+
+    #[test]
+    fn package_rewrites_existing_body_footnote_text_as_an_exact_reversible_edit()
+    -> PackageResult<()> {
+        let package_bytes = body_footnote_package_bytes()?;
+        let package = Package::from_bytes(&package_bytes)?;
+        let source_footnotes = package.body_footnotes()?;
+
+        let mut edit = package
+            .edit_body_footnote_text(crate::footnote::body::Selector::Index(1))
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        assert_eq!(edit.position(), Position::from_utf16_index(5).unwrap());
+        assert_eq!(edit.before(), &source_footnotes[1]);
+        edit.set("Updated😀")
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let commit = edit
+            .commit()
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().touched_components(), 1);
+        assert!(commit.diagnostics().full_reparse_performed());
+        assert_eq!(commit.package().body_footnotes()?[0], source_footnotes[0]);
+        assert_eq!(
+            commit.package().body_footnotes()?[1],
+            Footnote {
+                position: Position::from_utf16_index(5).unwrap(),
+                text: "Updated😀".into(),
+                custom_mark: Some("†".into()),
+            }
+        );
+
+        let inverse = commit.patch().inverse();
+        let restored = commit
+            .package()
+            .apply_body_footnote_text(&inverse)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        assert_eq!(restored.package().source_bytes(), package_bytes.as_slice());
+        assert_eq!(restored.package().body_footnotes()?, source_footnotes);
+        assert!(!format!("{:?}", commit.patch()).contains("Index/Document.iwa"));
+        Ok(())
+    }
+
+    #[test]
+    fn package_rewrites_existing_body_footnote_marker_without_touching_graph_or_unknown_bytes()
+    -> PackageResult<()> {
+        let package_bytes = body_footnote_package_bytes()?;
+        let package = Package::from_bytes(&package_bytes)?;
+        let source_footnotes = package.body_footnotes()?;
+        let unknown_reference_bytes = [0xa0, 0x06, 0x01, 0xaa, 0x06, 0x03, b'r', b'e', b'f'];
+        let source_reference_payload = package
+            .state
+            .source
+            .components()
+            .iter()
+            .find_map(|component| component.archive().object(110))
+            .and_then(|object| {
+                object
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == FOOTNOTE_REFERENCE_MESSAGE_TYPE)
+                    .map(|message| message.data.as_slice())
+            })
+            .ok_or_else(|| PackageError::InvalidFormat("test reference is missing".to_owned()))?;
+        assert!(
+            source_reference_payload
+                .windows(unknown_reference_bytes.len())
+                .any(|window| { window == unknown_reference_bytes })
+        );
+
+        let mut edit = package
+            .edit_body_footnote_text(crate::footnote::body::Selector::Index(1))
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        assert_eq!(edit.custom_mark(), Some("†"));
+        edit.set("UpdatedSecond")
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        edit.set_custom_mark(Some("‡"))
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let commit = edit
+            .commit()
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().touched_components(), 1);
+        assert_eq!(commit.package().body_footnotes()?[0], source_footnotes[0]);
+        assert_eq!(
+            commit.package().body_footnotes()?[1],
+            Footnote {
+                position: Position::from_utf16_index(5).unwrap(),
+                text: "UpdatedSecond".into(),
+                custom_mark: Some("‡".into()),
+            }
+        );
+        assert!(
+            commit
+                .package()
+                .state
+                .source
+                .components()
+                .iter()
+                .find_map(|component| component.archive().object(110))
+                .and_then(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .find(|message| message.type_ == FOOTNOTE_REFERENCE_MESSAGE_TYPE)
+                        .map(|message| message.data.as_slice())
+                })
+                .is_some_and(|payload| {
+                    payload
+                        .windows(unknown_reference_bytes.len())
+                        .any(|window| window == unknown_reference_bytes)
+                })
+        );
+
+        let inverse = commit.patch().inverse();
+        let restored = commit
+            .package()
+            .apply_body_footnote_text(&inverse)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        assert_eq!(restored.package().source_bytes(), package_bytes.as_slice());
+        assert_eq!(restored.package().body_footnotes()?, source_footnotes);
         Ok(())
     }
 
@@ -2921,6 +3711,13 @@ mod tests {
         assert_eq!(package.sections()[0].name(), Some("Introduction"));
         assert_eq!(package.sections()[0].plain_text(), "A🚀");
         assert_eq!(
+            package
+                .section_named("Introduction")
+                .unwrap_or_else(|error| panic!("unique section name should resolve: {error}"))
+                .map(Section::index),
+            Some(0)
+        );
+        assert_eq!(
             package.sections()[0].text_storages()[0].runs(),
             [Run::new(0, 5)]
         );
@@ -2928,9 +3725,8 @@ mod tests {
         assert_eq!(package.sections()[1].plain_text(), "B");
         assert_eq!(
             package
-                .semantic_document()
-                .section_named("Appendix")
-                .unwrap_or_else(|error| panic!("unique native name should resolve: {error}"))
+                .section_at(1)
+                .unwrap_or_else(|error| panic!("checked native position should resolve: {error}"))
                 .map(Section::index),
             Some(1)
         );
@@ -2965,7 +3761,7 @@ mod tests {
         )?)?;
 
         assert_eq!(
-            package.semantic_document().section_named("Repeated").err(),
+            package.section_named("Repeated").err(),
             Some(crate::SelectorError::AmbiguousSectionName {
                 name: "Repeated".into(),
                 first: 0,
@@ -2974,7 +3770,6 @@ mod tests {
         );
         assert_eq!(
             package
-                .semantic_document()
                 .section_at(1)
                 .unwrap_or_else(|error| panic!("typed native position should resolve: {error}"))
                 .and_then(Section::name),

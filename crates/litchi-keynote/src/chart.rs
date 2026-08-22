@@ -10,6 +10,8 @@
     reason = "chart semantic types keep their domain explicit at the crate boundary"
 )]
 
+use std::collections::TryReserveError;
+
 use litchi_core::Position;
 
 /// Selects one chart by its visible native title or checked zero-based position.
@@ -43,6 +45,24 @@ impl<'a> ChartSelector<'a> {
     #[must_use]
     pub const fn name(name: &'a str) -> Self {
         Self::Name(name)
+    }
+
+    /// Create an exact-name selector after checking that the name is usable.
+    ///
+    /// This checked constructor is useful at input boundaries where an empty
+    /// visible chart title should be rejected before a chart catalog or native
+    /// adapter is consulted. [`Self::name`] remains available for callers that
+    /// intentionally preserve an empty title as a positional-only selector.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ChartSelectorError::EmptyName`] when `name` is empty.
+    pub const fn try_name(name: &'a str) -> Result<Self, ChartSelectorError> {
+        if name.is_empty() {
+            Err(ChartSelectorError::EmptyName)
+        } else {
+            Ok(Self::Name(name))
+        }
     }
 
     /// Return the selected zero-based position, if this is an index selector.
@@ -220,6 +240,62 @@ impl ChartCatalog {
         Self { charts }
     }
 
+    /// Build a catalog from owned chart titles with fallible collection growth.
+    ///
+    /// This variant is intended for adapters that decoded titles from an
+    /// untrusted native source. Existing `String` allocations are transferred
+    /// into the catalog without copying; only the descriptor collection is
+    /// grown here.
+    ///
+    /// # Errors
+    ///
+    /// Returns the standard allocation error when the descriptor collection
+    /// cannot reserve its next entry.
+    pub fn try_from_owned_titles(
+        titles: impl IntoIterator<Item = Option<String>>,
+    ) -> Result<Self, TryReserveError> {
+        let mut charts = Vec::new();
+        for (position, title) in titles.into_iter().enumerate() {
+            charts.try_reserve(1)?;
+            charts.push(ChartDescriptor {
+                position,
+                title: title.map(String::into_boxed_str),
+            });
+        }
+        Ok(Self {
+            charts: charts.into_boxed_slice(),
+        })
+    }
+
+    /// Build a catalog from borrowed chart titles with fallible ownership.
+    ///
+    /// Each title is copied into exactly sized storage before its descriptor
+    /// is published. Use this when title values originate outside the
+    /// caller's trusted semantic model.
+    ///
+    /// # Errors
+    ///
+    /// Returns the standard allocation error when either a title or the
+    /// descriptor collection cannot reserve its required storage.
+    pub fn try_from_titles<T>(
+        titles: impl IntoIterator<Item = Option<T>>,
+    ) -> Result<Self, TryReserveError>
+    where
+        T: AsRef<str>,
+    {
+        let mut charts = Vec::new();
+        for (position, title) in titles.into_iter().enumerate() {
+            charts.try_reserve(1)?;
+            let title = title
+                .map(|title| try_boxed_str(title.as_ref()))
+                .transpose()?;
+            charts.push(ChartDescriptor { position, title });
+        }
+        Ok(Self {
+            charts: charts.into_boxed_slice(),
+        })
+    }
+
     /// Borrow chart summaries in source order.
     #[must_use]
     pub fn charts(&self) -> &[ChartDescriptor] {
@@ -288,6 +364,13 @@ impl ChartCatalog {
     }
 }
 
+fn try_boxed_str(value: &str) -> Result<Box<str>, TryReserveError> {
+    let mut owned = String::new();
+    owned.try_reserve_exact(value.len())?;
+    owned.push_str(value);
+    Ok(owned.into_boxed_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ChartCatalog, ChartSelector, ChartSelectorError};
@@ -323,6 +406,19 @@ mod tests {
         assert_eq!(selector, ChartSelector::Name("Revenue chart"));
         assert_eq!(selector.as_name(), Some("Revenue chart"));
         assert_eq!(selector.as_index(), None);
+    }
+
+    #[test]
+    fn checked_name_rejects_empty_input_without_changing_name_constructor() {
+        assert_eq!(
+            ChartSelector::try_name(""),
+            Err(ChartSelectorError::EmptyName)
+        );
+        assert_eq!(
+            ChartSelector::try_name("Revenue"),
+            Ok(ChartSelector::name("Revenue"))
+        );
+        assert_eq!(ChartSelector::name(""), ChartSelector::Name(""));
     }
 
     #[test]
@@ -385,6 +481,23 @@ mod tests {
         assert_eq!(catalog.select_position("Revenue"), Ok(Some(0)));
         assert_eq!(catalog.select_position(2usize), Ok(Some(2)));
         assert_eq!(catalog.charts()[1].title(), None);
+    }
+
+    #[test]
+    fn fallible_catalog_constructors_preserve_titles()
+    -> Result<(), std::collections::TryReserveError> {
+        let borrowed = ChartCatalog::try_from_titles([Some("Revenue"), None, Some("Cost")])?;
+        assert_eq!(borrowed.charts()[0].title(), Some("Revenue"));
+        assert_eq!(borrowed.charts()[1].title(), None);
+        assert_eq!(borrowed.select_position("Cost"), Ok(Some(2)));
+
+        let owned = ChartCatalog::try_from_owned_titles(vec![
+            Some("Revenue".to_owned()),
+            None,
+            Some("Cost".to_owned()),
+        ])?;
+        assert_eq!(owned.charts(), borrowed.charts());
+        Ok(())
     }
 
     #[test]

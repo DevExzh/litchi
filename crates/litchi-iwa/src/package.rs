@@ -11,7 +11,9 @@ use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
 use litchi_core::ReadAt;
-use litchi_iwa_archive::package::{GetOrInsertError, PackageState, ParseError};
+use litchi_iwa_archive::package::{
+    GetOrInsertError, PackageState, ParseError, is_legacy_operation_storage,
+};
 use litchi_iwa_package::{Entry, Error as EntryStoreError, Patch};
 
 fn entry_store_error(error: EntryStoreError) -> Error {
@@ -545,16 +547,34 @@ impl IWorkPackage {
     }
 
     pub fn len(&self) -> usize {
-        self.state.entries().len()
+        self.state.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.state.entries().is_empty()
+        self.state.is_empty()
     }
 
     /// Return the resource profile retained for lazy archive reads and edits.
     pub const fn limits(&self) -> PackageLimits {
         self.limits
+    }
+
+    /// Return whether this snapshot retains an exact packaged source.
+    ///
+    /// Format-specific migration seams use this provenance bit to avoid
+    /// routing normalized legacy bundles or already-mutated snapshots through
+    /// preserve-mode semantic writers.
+    pub(crate) const fn source_is_exact(&self) -> bool {
+        self.source.is_some()
+    }
+
+    /// Borrow the exact packaged source retained for preserve-mode readers.
+    ///
+    /// Format-specific migration seams use this only after checking
+    /// [`Self::source_is_exact`], so they do not need to serialize and rescan
+    /// an already-retained source before handing it to a focused adapter.
+    pub(crate) fn exact_source_bytes(&self) -> Option<&[u8]> {
+        self.source.as_deref()
     }
 
     /// Return the monotonic revision of this mutable package view.
@@ -577,7 +597,7 @@ impl IWorkPackage {
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.entries().iter().map(Entry::name)
+        self.state.iter().map(Entry::name)
     }
 
     /// Enumerate package members that contain IWA object archives.
@@ -586,14 +606,7 @@ impl IWorkPackage {
     /// `bvxn` payload is a separate operation-log format. It is intentionally
     /// retained as a raw entry but excluded from object-archive scans.
     pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state
-            .entries()
-            .iter()
-            .filter(|entry| {
-                entry.name().ends_with(".iwa")
-                    && !is_legacy_operation_storage(entry.name(), entry.data())
-            })
-            .map(Entry::name)
+        self.state.iwa_entry_names()
     }
 
     /// Locate the package's calculation-engine component without allocating.
@@ -618,12 +631,12 @@ impl IWorkPackage {
     }
 
     pub fn contains_entry(&self, name: &str) -> bool {
-        self.entry_position(normalize_entry_name(name)).is_some()
+        self.state.position(normalize_entry_name(name)).is_some()
     }
 
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
-        let position = self.entry_position(normalize_entry_name(name))?;
-        Some(self.state.entries().get_at(position)?.data())
+        let position = self.state.position(normalize_entry_name(name))?;
+        Some(self.state.get_at(position)?.data())
     }
 
     /// Borrow a raw package member for package invariant tests.
@@ -634,7 +647,7 @@ impl IWorkPackage {
     #[cfg(test)]
     fn entry_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
         let name = normalize_entry_name(name);
-        self.entry_position(name)?;
+        self.state.position(name)?;
         self.mark_mutated();
         let state = Arc::make_mut(&mut self.state);
         state.entry_data_mut(name)
@@ -649,7 +662,7 @@ impl IWorkPackage {
         let supplied_name = name.into();
         let name = normalize_entry_name(&supplied_name).to_string();
         validate_entry_name(&name)?;
-        let position = self.entry_position(&name);
+        let position = self.state.position(&name);
         self.validate_entry_update(position, &data)?;
         if position.is_some() {
             let state = Arc::make_mut(&mut self.state);
@@ -669,7 +682,7 @@ impl IWorkPackage {
     /// Delete a package member.
     pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
         let normalized = normalize_entry_name(name);
-        self.entry_position(normalized)?;
+        self.state.position(normalized)?;
         let state = Arc::make_mut(&mut self.state);
         let removed = state.remove_entry(normalized)?.into_parts().1;
         self.mark_mutated();
@@ -746,7 +759,28 @@ impl IWorkPackage {
         let data = archive.to_bytes_with_limits(self.limits.effective_archive_limits()?)?;
         self.limits.check_iwa_stream_size(data.len())?;
         let compressed = SnappyStream::compress(&data)?;
-        self.insert_entry(normalized, compressed)
+        // Preserve the existing mutation validation boundary even when the
+        // replacement turns out to be an exact no-op.
+        self.validate_state()?;
+
+        // Replacing an archive is the one legacy package mutation that can
+        // stay within the archive owner's bounded physical reassembly
+        // contract: it edits one existing member and does not change package
+        // topology. Keep an unchanged payload as a true no-op, and otherwise
+        // retain the reassembled source when the physical layout is safe to
+        // patch. If the source uses a layout outside that narrow contract,
+        // fall back to the historical logical writer so this migration seam
+        // keeps its previous acceptance surface.
+        let previous = self.entry(&normalized).map(ToOwned::to_owned);
+        if previous.as_deref() == Some(compressed.as_slice()) {
+            return Ok(previous);
+        }
+        let preserved_source = self.reassembled_source(&normalized, &compressed);
+        let previous = self.insert_entry(normalized, compressed)?;
+        if let Some(source) = preserved_source {
+            self.source = Some(source);
+        }
+        Ok(previous)
     }
 
     /// Serialize and insert a new IWA component before an existing package member.
@@ -770,7 +804,8 @@ impl IWorkPackage {
             )));
         }
         let position = self
-            .entry_position(before)
+            .state
+            .position(before)
             .ok_or_else(|| Error::Bundle(format!("IWA insertion anchor not found: {before}")))?;
         let data = archive.to_bytes_with_limits(self.limits.effective_archive_limits()?)?;
         self.limits.check_iwa_stream_size(data.len())?;
@@ -825,11 +860,7 @@ impl IWorkPackage {
             return Ok(bytes);
         }
         litchi_iwa_archive::package::to_bytes(
-            self.state
-                .entries()
-                .as_slice()
-                .iter()
-                .map(|entry| (entry.name(), entry.data())),
+            self.state.iter().map(|entry| (entry.name(), entry.data())),
             self.limits.physical_archive_limits()?,
         )
         .map_err(|error| Error::Bundle(format!("iWork package egress: {error}")))
@@ -848,11 +879,7 @@ impl IWorkPackage {
             return Ok(());
         }
         litchi_iwa_archive::package::write_to(
-            self.state
-                .entries()
-                .as_slice()
-                .iter()
-                .map(|entry| (entry.name(), entry.data())),
+            self.state.iter().map(|entry| (entry.name(), entry.data())),
             sink,
             self.limits.physical_archive_limits()?,
         )
@@ -904,14 +931,10 @@ impl IWorkPackage {
         Ok(())
     }
 
-    fn entry_position(&self, name: &str) -> Option<usize> {
-        self.state.position(name)
-    }
-
     fn validate_entry_update(&self, position: Option<usize>, data: &[u8]) -> Result<()> {
         let current_total = self.validate_state()?;
         self.validate_entry_data(data)?;
-        if position.is_none() && self.state.entries().len() >= self.limits.max_entries {
+        if position.is_none() && self.state.len() >= self.limits.max_entries {
             return Err(Error::Bundle(format!(
                 "iWork package entry count exceeds the {} entry limit",
                 self.limits.max_entries
@@ -919,7 +942,7 @@ impl IWorkPackage {
         }
 
         let previous_size = position
-            .and_then(|index| self.state.entries().get_at(index))
+            .and_then(|index| self.state.get_at(index))
             .map_or(0, |entry| entry.data().len());
         let previous_size = u64::try_from(previous_size)
             .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
@@ -939,28 +962,23 @@ impl IWorkPackage {
     }
 
     fn validate_state(&self) -> Result<u64> {
-        if self.state.entries().len() > self.limits.max_entries {
+        if self.state.len() > self.limits.max_entries {
             return Err(Error::Bundle(format!(
                 "iWork package entry count exceeds the {} entry limit",
                 self.limits.max_entries
             )));
         }
-        for entry in self.state.entries().iter() {
+        for entry in self.state.iter() {
             validate_entry_name(entry.name())?;
             self.validate_entry_data(entry.data())?;
         }
-        let total = self
-            .state
-            .entries()
-            .iter()
-            .try_fold(0_u64, |total, entry| {
-                let size = u64::try_from(entry.data().len()).map_err(|_| {
-                    Error::Bundle("package member length does not fit u64".to_owned())
-                })?;
-                total
-                    .checked_add(size)
-                    .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))
-            })?;
+        let total = self.state.iter().try_fold(0_u64, |total, entry| {
+            let size = u64::try_from(entry.data().len())
+                .map_err(|_| Error::Bundle("package member length does not fit u64".to_owned()))?;
+            total
+                .checked_add(size)
+                .ok_or_else(|| Error::Bundle("iWork package total size overflow".to_owned()))
+        })?;
         if total > self.limits.max_total_bytes {
             return Err(Error::Bundle(format!(
                 "iWork package total size exceeds the {} byte limit",
@@ -984,11 +1002,32 @@ impl IWorkPackage {
 
     fn insert_new_entry(&mut self, name: String, data: Vec<u8>) -> Result<()> {
         let state = Arc::make_mut(&mut self.state);
-        let position = usize::from(name != "Index/Document.iwa") * state.entries().len();
+        let position = usize::from(name != "Index/Document.iwa") * state.len();
         state
             .try_insert_entry_at(position, Entry::new(name, data))
             .map_err(entry_store_error)?;
         Ok(())
+    }
+
+    /// Attempt the archive owner's physical single-member reassembly for an
+    /// existing flat source. A failed attempt is deliberately non-fatal: the
+    /// legacy package writer remains the compatibility fallback for layouts
+    /// that the bounded reassembler cannot safely preserve.
+    fn reassembled_source(&self, name: &str, data: &[u8]) -> Option<Arc<[u8]>> {
+        let source = self.source.as_ref()?;
+        let limits = self.limits.physical_archive_limits().ok()?;
+        let catalog = litchi_iwa_archive::package::Catalog::from_shared_bytes_with_limits(
+            Arc::clone(source),
+            limits,
+        )
+        .ok()?;
+        let bytes = catalog
+            .reassemble_to_bytes(
+                &[litchi_iwa_archive::package::EntryEdit::new(name, data)],
+                limits,
+            )
+            .ok()?;
+        Some(bytes.into())
     }
 
     fn mark_mutated(&mut self) {
@@ -1000,12 +1039,12 @@ impl IWorkPackage {
 impl Snapshot {
     /// Return the number of retained package members.
     pub fn len(&self) -> usize {
-        self.state.entries().len()
+        self.state.len()
     }
 
     /// Report whether the package contains no members.
     pub fn is_empty(&self) -> bool {
-        self.state.entries().is_empty()
+        self.state.is_empty()
     }
 
     /// Return the resource profile retained by this immutable snapshot.
@@ -1015,14 +1054,14 @@ impl Snapshot {
 
     /// Enumerate package members in preserved source order.
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.entries().iter().map(Entry::name)
+        self.state.iter().map(Entry::name)
     }
 
     /// Borrow one package member without copying it.
     pub fn entry(&self, name: &str) -> Option<&[u8]> {
         let name = normalize_entry_name(name);
         let position = self.state.position(name)?;
-        Some(self.state.entries().get_at(position)?.data())
+        Some(self.state.get_at(position)?.data())
     }
 
     /// Validate this immutable snapshot without creating serialized output.
@@ -1036,10 +1075,7 @@ impl Snapshot {
     /// Apply a source-checked package patch without mutating this snapshot.
     pub fn apply(&self, patch: &Patch) -> Result<Self> {
         self.validate()?;
-        let entries = patch
-            .apply(self.state.entries())
-            .map_err(package_patch_error)?;
-        let state = PackageState::from_store(entries, self.limits.effective_archive_limits()?);
+        let state = self.state.apply_patch(patch).map_err(package_patch_error)?;
         let target = Self {
             state: Arc::new(state),
             limits: self.limits,
@@ -1075,7 +1111,7 @@ impl Snapshot {
         let snapshot = candidate.snapshot();
         Ok(Commit {
             value,
-            patch: Patch::between(self.state.entries(), snapshot.state.entries()),
+            patch: self.state.patch_to(&snapshot.state),
             snapshot,
         })
     }
@@ -1103,14 +1139,7 @@ impl Snapshot {
 
     /// Enumerate object-archive members in preserved source order.
     pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state
-            .entries()
-            .iter()
-            .filter(|entry| {
-                entry.name().ends_with(".iwa")
-                    && !is_legacy_operation_storage(entry.name(), entry.data())
-            })
-            .map(Entry::name)
+        self.state.iwa_entry_names()
     }
 
     /// Locate the package's calculation-engine component without first
@@ -1156,10 +1185,6 @@ pub(crate) fn is_calculation_engine_entry_name(name: &str) -> bool {
                         })
                 })
     })
-}
-
-fn is_legacy_operation_storage(name: &str, data: &[u8]) -> bool {
-    name.rsplit('/').next() == Some("OperationStorage.iwa") && data.starts_with(b"bvxn")
 }
 
 fn validate_entry_name(name: &str) -> Result<()> {
@@ -1304,6 +1329,68 @@ mod tests {
         let mut written = Vec::new();
         package.write_to(&mut written)?;
         assert_eq!(written, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn replacing_an_archive_preserves_flat_source_physical_records() -> crate::Result<()> {
+        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let mut source = zip(&[
+            ("Index/Document.iwa", &compressed),
+            ("preview.jpg", b"preview"),
+        ]);
+        let comment = b"legacy-physical-comment\0\xfe";
+        let end_of_central_directory = source.len() - 22;
+        source[end_of_central_directory + 20..end_of_central_directory + 22]
+            .copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        source.extend_from_slice(comment);
+
+        let before_catalog = litchi_iwa_archive::package::Catalog::from_bytes(&source)?;
+        let before_preview = before_catalog
+            .iter()
+            .find(|entry| entry.name() == "preview.jpg")
+            .ok_or_else(|| Error::Bundle("preview fixture entry is missing".to_owned()))?;
+        let mut package = IWorkPackage::from_bytes(&source)?;
+        package.update_archive("Index/Document.iwa", |archive| {
+            archive.objects[0].messages[0].data.push(4);
+            Ok(())
+        })?;
+
+        let output = package.to_bytes()?;
+        assert!(output.ends_with(comment));
+        let after_catalog = litchi_iwa_archive::package::Catalog::from_bytes(&output)?;
+        let after_preview = after_catalog
+            .iter()
+            .find(|entry| entry.name() == "preview.jpg")
+            .ok_or_else(|| Error::Bundle("reassembled preview entry is missing".to_owned()))?;
+        assert_eq!(
+            after_preview.raw_record().local_record(),
+            before_preview.raw_record().local_record()
+        );
+        assert_eq!(after_preview.metadata(), before_preview.metadata());
+
+        let mut streamed = Vec::new();
+        package.write_to(&mut streamed)?;
+        assert_eq!(streamed, output);
+        Ok(())
+    }
+
+    #[test]
+    fn identical_archive_replacement_is_an_exact_source_noop() -> crate::Result<()> {
+        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let source = zip(&[
+            ("Index/Document.iwa", &compressed),
+            ("preview.jpg", b"preview"),
+        ]);
+        let mut package = IWorkPackage::from_bytes(&source)?;
+        let before = package.to_bytes()?;
+        let revision = package.mutation_revision();
+        let existing = package.archive("Index/Document.iwa")?;
+
+        package.replace_archive("Index/Document.iwa", &existing)?;
+
+        assert_eq!(package.to_bytes()?, before);
+        assert_eq!(package.mutation_revision(), revision);
         Ok(())
     }
 
@@ -2024,6 +2111,32 @@ mod tests {
             Some(before_bytes.as_slice())
         );
         assert_eq!(package.mutation_revision(), before_revision);
+    }
+
+    #[test]
+    fn exact_source_update_failure_keeps_source_bytes_atomic() -> crate::Result<()> {
+        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let source = zip(&[
+            ("Index/Document.iwa", &compressed),
+            ("preview.jpg", b"preview"),
+        ]);
+        let mut package = IWorkPackage::from_bytes(&source)?;
+        let before = package.to_bytes()?;
+        let before_revision = package.mutation_revision();
+
+        let error = package
+            .update_archive("Index/Document.iwa", |_archive| {
+                Err(Error::InvalidFormat("reject exact archive edit".to_owned()))
+            })
+            .unwrap_err();
+
+        assert!(error.to_string().contains("reject exact archive edit"));
+        assert_eq!(package.to_bytes()?, before);
+        assert_eq!(package.mutation_revision(), before_revision);
+        let mut streamed = Vec::new();
+        package.write_to(&mut streamed)?;
+        assert_eq!(streamed, before);
+        Ok(())
     }
 
     #[test]

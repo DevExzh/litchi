@@ -141,26 +141,6 @@ impl KeynoteEditor {
             .ok_or_else(|| Error::InvalidFormat("Replaced soundtrack item vanished".to_owned()))
     }
 
-    /// Move one soundtrack item to a new final index without rewriting its reference payload.
-    pub fn move_soundtrack_item(&mut self, from_index: usize, to_index: usize) -> Result<()> {
-        let mut context = self.soundtrack_context()?;
-        let count = context.payloads.len();
-        if from_index >= count {
-            return Err(index_error(from_index, count, false));
-        }
-        if to_index >= count {
-            return Err(index_error(to_index, count, false));
-        }
-        if from_index == to_index {
-            return Ok(());
-        }
-        let payload = context.payloads.remove(from_index);
-        context.payloads.insert(to_index, payload);
-        let mut staged = self.package().clone();
-        apply_soundtrack_payloads(&mut staged, &context)?;
-        self.commit_soundtrack_items(staged, &context.payloads)
-    }
-
     /// Remove one soundtrack entry and cull its media asset when no reference remains.
     pub fn remove_soundtrack_item(&mut self, index: usize) -> Result<KeynoteSoundtrackItemInfo> {
         let items = self.soundtrack_items()?;

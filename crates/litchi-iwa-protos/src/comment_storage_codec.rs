@@ -483,6 +483,20 @@ pub fn decode_comment_storage_archive(
     Ok(decode_comment_storage_archive_with_report(source, options)?.0)
 }
 
+/// Decode one canonical `TSP.Reference` without materializing a generated
+/// message.  This narrow helper is shared by adjacent comment metadata
+/// readers whose source bytes remain authoritative for preservation.
+pub fn decode_reference(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<ReferenceSnapshot, DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    budget.reference(source.len(), false)?;
+    let reference = decode_reference_fields(source, &mut budget, 1)?;
+    parity_reference(source, reference, &mut budget, 1)?;
+    Ok(reference)
+}
+
 /// Decode one comment-storage payload and return aggregate resource usage.
 pub fn decode_comment_storage_archive_with_report(
     source: &[u8],
@@ -580,14 +594,14 @@ fn decode_root<'source>(
                 }
                 let raw = field.bytes()?;
                 budget.reference(raw.len(), false)?;
-                let value = decode_reference(raw, budget, child_depth)?;
+                let value = decode_reference_fields(raw, budget, child_depth)?;
                 author = Some(value);
                 raw_author = Some(raw);
             },
             REPLIES_FIELD => {
                 let raw = field.bytes()?;
                 budget.reference(raw.len(), true)?;
-                let reference = decode_reference(raw, budget, child_depth)?;
+                let reference = decode_reference_fields(raw, budget, child_depth)?;
                 parity_reference(raw, reference, budget, child_depth)?;
                 visitor.visit_reply(ReferenceRecord { raw, reference })?;
             },
@@ -744,7 +758,7 @@ fn decode_date(
         .ok_or_else(|| DecodeError::missing("TSP.Date.seconds"))
 }
 
-fn decode_reference(
+fn decode_reference_fields(
     source: &[u8],
     budget: &mut Budget,
     depth: u32,
@@ -1357,6 +1371,35 @@ mod tests {
         assert!(report.fields() >= 13);
         assert!(report.work_bytes() >= source.len() * 2);
         assert_eq!(replies.raw[0].as_slice(), &[8, 7]);
+    }
+
+    #[test]
+    fn standalone_reference_charges_one_budget_unit_without_root_double_charge() {
+        let source = reference(17, None, None);
+        let rejected = decode_reference(
+            &source,
+            DecodeOptions::new(source.len(), 128, usize::MAX, 8, 0, 4096),
+        )
+        .unwrap_err();
+        assert_eq!(
+            rejected.resource_limit(),
+            Some(DecodeLimit::References {
+                observed: 1,
+                maximum: 0,
+            })
+        );
+
+        let accepted = decode_reference(
+            &source,
+            DecodeOptions::new(source.len(), 128, usize::MAX, 8, 1, 4096),
+        )
+        .unwrap();
+        assert_eq!(accepted.identifier(), 17);
+
+        let archive = fixture();
+        let (_, report) =
+            decode_comment_storage_archive_with_report(&archive, options(&archive)).unwrap();
+        assert_eq!(report.references(), 3);
     }
 
     #[test]

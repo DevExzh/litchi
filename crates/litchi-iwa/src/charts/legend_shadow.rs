@@ -7,6 +7,7 @@
 use prost::Message;
 
 use crate::charts::legend_style::{GENERATED_LEGEND_STYLE_EXTENSION_FIELD, legend_style_slot};
+use crate::charts::style::{copy_wire_bytes, encode_wire_message};
 use crate::protobuf::tsd;
 use crate::shapes::{Drop, Shadow, shadow_from_native, shadow_to_native};
 use crate::wire::{WireField, parse_wire_fields, patch_length_delimited_field};
@@ -258,7 +259,7 @@ fn patch_legend_shadow(data: &[u8], shadow: ChartLegendShadow) -> Result<Vec<u8>
             validate_patched_legend_shadow(&patched, shadow)?;
             return Ok(patched);
         };
-        return Ok(data.to_vec());
+        return copy_wire_bytes(data, "legend shadow wire output");
     };
 
     let existing_shadow = strict_optional_message(
@@ -288,7 +289,7 @@ fn patch_legend_shadow(data: &[u8], shadow: ChartLegendShadow) -> Result<Vec<u8>
         data,
         GENERATED_LEGEND_STYLE_EXTENSION_FIELD,
         true,
-        Some(extension.as_slice()),
+        (!extension.is_empty()).then_some(extension.as_slice()),
     )?;
     validate_patched_legend_shadow(&patched, shadow)?;
     Ok(patched)
@@ -304,7 +305,7 @@ fn native_shadow_bytes(shadow: ChartLegendShadow) -> Result<Vec<u8>> {
         ChartLegendShadow::NoShadow => shadow_to_native(Shadow::Disabled),
         ChartLegendShadow::Shadow(shadow) => shadow_to_native(Shadow::Drop(shadow)),
     };
-    Ok(native.encode_to_vec())
+    encode_wire_message(&native, "legend shadow payload")
 }
 
 /// Return one schema-selected message while leaving all other fields opaque.
@@ -464,7 +465,10 @@ fn merge_strict_message(
                 encode_replacement_message(replacement, *replacement_field, &merged)?
             },
             StrictFieldKind::Varint | StrictFieldKind::Bool | StrictFieldKind::Fixed32 => {
-                replacement_field.raw(replacement)?.to_vec()
+                copy_wire_bytes(
+                    replacement_field.raw(replacement)?,
+                    "legend shadow scalar replacement",
+                )?
             },
         };
         output.extend_from_slice(&replacement_bytes);
@@ -484,21 +488,26 @@ fn merge_strict_message(
 fn encode_replacement_message(source: &[u8], field: WireField, payload: &[u8]) -> Result<Vec<u8>> {
     let key = field.key(source)?;
     let mut encoded = Vec::new();
-    encoded
-        .try_reserve(key.len().saturating_add(payload.len()))
-        .map_err(|_| {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "legend shadow nested wire output",
-                amount: key.len().saturating_add(payload.len()),
-            })
-        })?;
-    encoded.extend_from_slice(key);
     let mut length = [0_u8; litchi_iwa_common::varint::MAX_BYTES];
     let length = litchi_iwa_common::varint::encode_varint_to_buffer(
         u64::try_from(payload.len())
             .map_err(|_| Error::InvalidFormat("legend shadow payload exceeds u64".to_owned()))?,
         &mut length,
     );
+    let amount = key
+        .len()
+        .checked_add(length.len())
+        .and_then(|amount| amount.checked_add(payload.len()))
+        .ok_or_else(|| {
+            Error::InvalidFormat("legend shadow nested wire output overflow".to_owned())
+        })?;
+    encoded.try_reserve_exact(amount).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "legend shadow nested wire output",
+            amount,
+        })
+    })?;
+    encoded.extend_from_slice(key);
     encoded.extend_from_slice(length);
     encoded.extend_from_slice(payload);
     Ok(encoded)
@@ -608,6 +617,33 @@ mod tests {
         );
         let inherited = patch_legend_shadow(&disabled, ChartLegendShadow::Inherited).unwrap();
         assert_eq!(inherited, original);
+    }
+
+    #[test]
+    fn resetting_only_shadow_removes_empty_generated_extension() {
+        let shadow = ChartLegendShadow::Shadow(Drop::new(
+            Appearance::new(
+                RgbaColor::black(),
+                BlurRadius::from_points(8).unwrap(),
+                Offset::from_points(4.0).unwrap(),
+                Opacity::new(0.4).unwrap(),
+            ),
+            Angle::from_degrees(15.0).unwrap(),
+        ));
+        let native = native_shadow_bytes(shadow).unwrap();
+        let extension =
+            patch_length_delimited_field(&[], LEGEND_SHADOW_FIELD, false, Some(&native)).unwrap();
+        let original = patch_length_delimited_field(
+            &[],
+            GENERATED_LEGEND_STYLE_EXTENSION_FIELD,
+            false,
+            Some(&extension),
+        )
+        .unwrap();
+
+        let inherited = patch_legend_shadow(&original, ChartLegendShadow::Inherited).unwrap();
+        assert_eq!(inherited, Vec::<u8>::new());
+        assert_eq!(generated_legend_style_extension(&inherited).unwrap(), None);
     }
 
     #[test]

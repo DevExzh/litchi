@@ -5,6 +5,7 @@
 //! remains the public semantic owner; this module retains no dependency on the
 //! historical umbrella facade.
 
+pub mod comments;
 #[allow(
     dead_code,
     reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
@@ -62,7 +63,7 @@ use litchi_iwa_text_wire::{
 use plist::stream::{Event as PlistEvent, Reader as PlistReader};
 use thiserror::Error;
 
-use crate::{Document, DocumentError, DocumentLimits, Sheet, SheetSelector};
+use crate::{Document, DocumentError, DocumentLimits, Sheet, SheetSelector, TableSelector};
 use extractor::TableDataExtractor;
 use index::{Index, Resolved};
 use sheet::DecodedSheet;
@@ -231,7 +232,7 @@ pub enum Error {
     ParseError(String),
     /// Semantic ingress rejected the decoded sheet sequence.
     #[error("invalid Numbers semantic document: {0}")]
-    Semantic(#[from] DocumentError),
+    Semantic(DocumentError),
     /// A package-wide semantic resource ceiling was exceeded.
     #[error(
         "Numbers semantic {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
@@ -611,7 +612,8 @@ impl Package {
             semantic.max_output_text_bytes(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let document = Document::from_sheets_with_limits(sheets, document_limits)?;
+        let document =
+            Document::from_sheets_with_limits(sheets, document_limits).map_err(Error::Semantic)?;
         Ok(Self {
             state: Arc::new(State {
                 source,
@@ -730,6 +732,29 @@ impl Package {
         S: Into<SheetSelector<'a>>,
     {
         self.state.document.sheet(selector)
+    }
+
+    /// Select a rooted semantic table by its sheet and table selectors.
+    ///
+    /// This is the package-level convenience form of
+    /// [`Document::table`](crate::Document::table). Resolution runs only over
+    /// the immutable semantic snapshot; native object identifiers, archive
+    /// member names, and payloads are not part of this API.
+    ///
+    /// Both selectors accept an exact visible name, a checked zero-based
+    /// position, or a typed semantic position conversion. Missing sheets and
+    /// tables return `Ok(None)`. A duplicate table name returns the same
+    /// [`crate::TableSelectorError`] as the document-level lookup.
+    pub fn table<'sheet, 'table, S, T>(
+        &self,
+        sheet: S,
+        table: T,
+    ) -> std::result::Result<Option<&crate::Table>, crate::TableSelectorError>
+    where
+        S: Into<SheetSelector<'sheet>>,
+        T: Into<TableSelector<'table>>,
+    {
+        self.state.document.table(sheet, table)
     }
 
     /// Clone the shared semantic sheet allocation without cloning sheet data.
@@ -1300,7 +1325,8 @@ pub(crate) fn semantic_document_from_prepared_source(
             maximum: semantic.max_tables(),
             path: SemanticPath::Document,
         })?;
-    let document = Document::from_sheets_with_limits(sheets, document_limits)?;
+    let document =
+        Document::from_sheets_with_limits(sheets, document_limits).map_err(Error::Semantic)?;
     let stats = crate::document::Stats {
         source_record_count,
         sheet_count: document.sheet_count(),

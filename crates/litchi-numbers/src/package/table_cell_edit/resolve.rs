@@ -2529,6 +2529,8 @@ struct ListCount {
     segments: usize,
     embedded_references: usize,
     entries: usize,
+    minimum_key: Option<u32>,
+    maximum_key: Option<u32>,
     overflowed: bool,
 }
 
@@ -2543,6 +2545,14 @@ impl storage_codec::StorageVisitor for ListCount {
         &mut self,
         entry: storage_codec::TableDataListEntrySnapshot<'_>,
     ) -> Result<(), storage_codec::DecodeError> {
+        match self.minimum_key {
+            Some(minimum) => self.minimum_key = Some(minimum.min(entry.key())),
+            None => self.minimum_key = Some(entry.key()),
+        }
+        match self.maximum_key {
+            Some(maximum) => self.maximum_key = Some(maximum.max(entry.key())),
+            None => self.maximum_key = Some(entry.key()),
+        }
         if let Some(next) = self.entries.checked_add(1) {
             self.entries = next;
         } else {
@@ -2645,6 +2655,39 @@ fn validate_embedded_list_references(
     Ok(())
 }
 
+/// Validate the key envelope carried by one `TableDataListSegment`.
+///
+/// The generated-free codec intentionally reports the range fields and entry
+/// callbacks separately. Keep the range proof at the resolver boundary so a
+/// segment cannot be admitted (and later projected or edited) merely because
+/// its requested key happens to be absent. The minimum and maximum entry keys
+/// are sufficient to prove that every visited key is in the half-open range
+/// `[location, location + length)`.
+fn validate_segment_key_range(
+    location: u32,
+    length: u32,
+    minimum: Option<u32>,
+    maximum: Option<u32>,
+    path: Path,
+) -> Result<(), Error> {
+    if length == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    let end = location
+        .checked_add(length)
+        .ok_or(Error::InvalidSource { path })?;
+    match (minimum, maximum) {
+        (Some(minimum), Some(maximum)) => {
+            if minimum > maximum || minimum < location || maximum >= end {
+                return Err(Error::InvalidSource { path });
+            }
+        },
+        (None, None) => {},
+        _ => return Err(Error::InvalidSource { path }),
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments, reason = "one segmented-list proof")]
 fn resolve_list_segments(
     source: &Package,
@@ -2677,6 +2720,13 @@ fn resolve_list_segments(
         if snapshot.list_type() != expected_kind as i32 || count.segments != 0 {
             return Err(Error::InvalidSource { path });
         }
+        validate_segment_key_range(
+            snapshot.key_range_location(),
+            snapshot.key_range_length(),
+            count.minimum_key,
+            count.maximum_key,
+            path,
+        )?;
         let mut stage = ListStage {
             segments: Vec::new(),
             embedded_references: budget
@@ -5474,6 +5524,28 @@ mod tests {
         assert!(matches!(
             validate_positions(&[CellPosition::new(2, 0)], 2, 1, path),
             Err(Error::OutOfBounds { .. })
+        ));
+    }
+
+    #[test]
+    fn segmented_list_key_ranges_reject_overflow_and_out_of_range_entries() {
+        let path = Path::Table { sheet: 0, table: 0 };
+        assert!(validate_segment_key_range(10, 2, Some(10), Some(11), path).is_ok());
+        assert!(matches!(
+            validate_segment_key_range(u32::MAX, 1, Some(u32::MAX), Some(u32::MAX), path),
+            Err(Error::InvalidSource { .. })
+        ));
+        assert!(matches!(
+            validate_segment_key_range(10, 0, None, None, path),
+            Err(Error::InvalidSource { .. })
+        ));
+        assert!(matches!(
+            validate_segment_key_range(10, 2, Some(9), Some(10), path),
+            Err(Error::InvalidSource { .. })
+        ));
+        assert!(matches!(
+            validate_segment_key_range(10, 2, Some(10), Some(12), path),
+            Err(Error::InvalidSource { .. })
         ));
     }
 

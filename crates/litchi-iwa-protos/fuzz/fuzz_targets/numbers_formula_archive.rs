@@ -356,6 +356,25 @@ fn assert_node_matches(node: FormulaNode, expected: &AstNodeArchive) {
             assert_eq!(reference.row_is_sticky, row_is_sticky);
             assert_eq!(reference.column_is_sticky, column_is_sticky);
         },
+        FormulaNode::LocalCellReference {
+            coordinate,
+            row_is_sticky,
+            column_is_sticky,
+        } => {
+            assert_eq!(kind, 36);
+            let column = expected
+                .ast_column
+                .as_ref()
+                .expect("strict local cell reference had no generated column");
+            let row = expected
+                .ast_row
+                .as_ref()
+                .expect("strict local cell reference had no generated row");
+            assert_eq!(column.coordinate(), coordinate.column() as i32);
+            assert_eq!(column.absolute(), column_is_sticky);
+            assert_eq!(row.coordinate(), coordinate.row() as i32);
+            assert_eq!(row.absolute(), row_is_sticky);
+        },
         FormulaNode::CellReference { coordinate } => {
             assert_eq!(kind, 36);
             let column = expected
@@ -369,6 +388,7 @@ fn assert_node_matches(node: FormulaNode, expected: &AstNodeArchive) {
             assert_axis(column, coordinate.column(), true);
             assert_axis(row, coordinate.row(), false);
         },
+        FormulaNode::LocalRange { .. } => assert_eq!(kind, 67),
         FormulaNode::Colon => assert_eq!(kind, 29),
         FormulaNode::ColonWithUids => assert_eq!(kind, 45),
         FormulaNode::AppendWhitespace => assert_eq!(kind, 32),

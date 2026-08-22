@@ -6,8 +6,12 @@ use litchi_iwa_archive::{
     Limits,
     package::{Catalog, EntryEdit},
 };
+use litchi_iwa_common::wire::{patch_length_delimited_field, patch_nested_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, SnappyStream};
-use litchi_iwa_protos::{tn, tsce, tsp, tst};
+use litchi_iwa_protos::{
+    numbers_table_cell_storage_codec::{self, StorageVisitor},
+    tn, tsce, tsp, tst,
+};
 use litchi_numbers::{
     Package,
     cell::Value,
@@ -230,6 +234,49 @@ fn cfuuid(value: tsp::Uuid) -> tsp::CfuuidArchive {
     }
 }
 
+fn storage_decode_options(source: &[u8]) -> numbers_table_cell_storage_codec::DecodeOptions {
+    numbers_table_cell_storage_codec::DecodeOptions::new(
+        source.len().max(1),
+        source.len().max(1),
+        source.len().saturating_mul(128).max(1),
+        64,
+        source.len().max(1),
+        source.len().max(1),
+    )
+}
+
+#[derive(Default)]
+struct TileReferenceCollector {
+    identifiers: Vec<u64>,
+}
+
+impl StorageVisitor for TileReferenceCollector {
+    fn visit_tile_reference(
+        &mut self,
+        record: numbers_table_cell_storage_codec::TileReferenceRecord<'_>,
+    ) -> Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        self.identifiers.push(record.reference().identifier());
+        Ok(())
+    }
+}
+
+fn table_model_routes(source: &[u8]) -> TestResult<(u64, u64)> {
+    let options = storage_decode_options(source);
+    let model = numbers_table_cell_storage_codec::decode_table_model(source, options)?;
+    let data_store =
+        numbers_table_cell_storage_codec::decode_data_store(model.base_data_store(), options)?;
+    let mut tiles = TileReferenceCollector::default();
+    numbers_table_cell_storage_codec::decode_tile_storage_with_visitor(
+        data_store.tiles(),
+        options,
+        &mut tiles,
+    )?;
+    let [tile_identifier] = tiles.identifiers.as_slice() else {
+        return Err(std::io::Error::other("native formula seed must have one tile").into());
+    };
+    Ok((*tile_identifier, data_store.formula_table().identifier()))
+}
+
 /// Clone the native table graph into a distinct second semantic owner while
 /// retaining the app-authored storage/list/engine envelopes. This fixture is
 /// synthetic and deterministic; it never becomes a checked host file.
@@ -332,21 +379,16 @@ fn two_table_formula_package() -> TestResult<Package> {
         &components[model_component].archive.objects[model_object],
         TABLE_MODEL_MESSAGE_TYPE,
     )?;
-    let mut model = tst::TableModelArchive::decode(
-        components[model_component].archive.objects[model_object].messages[model_message]
-            .data
-            .as_slice(),
-    )?;
-    if model.base_data_store.tiles.tiles.len() != 1 {
-        return Err(std::io::Error::other("native formula seed must have one tile").into());
-    }
-    let tile_identifier = model.base_data_store.tiles.tiles[0].tile.identifier;
+    let model_source = components[model_component].archive.objects[model_object].messages
+        [model_message]
+        .data
+        .clone();
+    let (tile_identifier, formula_list_identifier) = table_model_routes(&model_source)?;
     let (tile_component, tile_object) = object_route(&components, tile_identifier)?;
     object_message_index(
         &components[tile_component].archive.objects[tile_object],
         TILE_MESSAGE_TYPE,
     )?;
-    let formula_list_identifier = model.base_data_store.formula_table.identifier;
     let (formula_list_component, formula_list_object) =
         object_route(&components, formula_list_identifier)?;
 
@@ -449,15 +491,30 @@ fn two_table_formula_package() -> TestResult<Package> {
         formula_list_identifier,
         new_formula_list_identifier,
     )?;
-    model.table_name = "External".to_owned();
-    model.table_id = "litchi-formula-external-owner".to_owned();
-    model.base_data_store.tiles.tiles[0].tile.identifier = new_tile_identifier;
-    model.base_data_store.formula_table.identifier = new_formula_list_identifier;
+    let mut model_payload = patch_length_delimited_field(
+        &model_source,
+        1,
+        true,
+        Some(b"litchi-formula-external-owner"),
+    )?;
+    model_payload = patch_length_delimited_field(&model_payload, 8, true, Some(b"External"))?;
+    model_payload = patch_nested_varint_field(
+        &model_payload,
+        &[4, 3, 1, 2, 1],
+        true,
+        Some(new_tile_identifier),
+    )?;
+    model_payload = patch_nested_varint_field(
+        &model_payload,
+        &[4, 6, 1],
+        true,
+        Some(new_formula_list_identifier),
+    )?;
     cloned_model.replace_message_preserving_header(
         model_message,
         litchi_iwa_core::RawMessage {
             type_: TABLE_MODEL_MESSAGE_TYPE,
-            data: model.encode_to_vec(),
+            data: model_payload,
         },
     )?;
 

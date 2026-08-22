@@ -610,10 +610,12 @@ impl SemanticPatch {
         if retained > policy.max_patch_bytes {
             return Err(invalid("ODI semantic patch exceeds the byte policy"));
         }
+        let source = copy_patch_bytes(source, "ODI semantic patch source")?;
+        let target = copy_patch_bytes(target, "ODI semantic patch target")?;
         Ok(Self {
             kind,
-            source: Arc::new(source.to_vec()),
-            target: Arc::new(target.to_vec()),
+            source: Arc::new(source),
+            target: Arc::new(target),
             operations,
         })
     }
@@ -2206,6 +2208,14 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
 
+fn copy_patch_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copy.extend_from_slice(bytes);
+    Ok(copy)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
@@ -2217,6 +2227,21 @@ mod tests {
     const AUTOMATIC: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:automatic-styles><style:style style:name="gr1" style:family="graphic"/></office:automatic-styles></office:document-styles>"#;
     const COLLIDING: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles><style:style style:name="gr1" style:family="graphic" style:display-name="Other"/></office:styles></office:document-styles>"#;
     const ACTIVE: &str = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"><office:script script:language="python"/></office:document-styles>"#;
+
+    #[test]
+    fn semantic_patch_retains_exact_source_and_target_bytes() {
+        let patch = SemanticPatch::new(
+            ArtifactKind::Flat,
+            b"source bytes",
+            b"target bytes",
+            Vec::new(),
+            &SecurityPolicy::default(),
+        )
+        .unwrap();
+
+        assert_eq!(patch.source.as_slice(), b"source bytes");
+        assert_eq!(patch.target.as_slice(), b"target bytes");
+    }
 
     #[test]
     fn style_dependency_states_cover_the_exact_cross_part_lifecycle() {

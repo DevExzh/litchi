@@ -40,12 +40,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let (filename, data) = read_audio(&audio)?;
             editor.replace_soundtrack_item(index, &filename, &data)?;
         },
-        "move" => {
-            let from = parse_index(arguments.next())?;
-            let to = parse_index(arguments.next())?;
-            require_exhausted(arguments)?;
-            editor.move_soundtrack_item(from, to)?;
-        },
         "remove" => {
             let index = parse_index(arguments.next())?;
             require_exhausted(arguments)?;
@@ -91,4 +85,4 @@ fn require_exhausted(mut arguments: impl Iterator<Item = String>) -> Result<(), 
     Ok(())
 }
 
-const USAGE: &str = "usage:\n  edit_keynote_soundtrack_items list <input.key>\n  edit_keynote_soundtrack_items add <input.key> <output.key> <audio>\n  edit_keynote_soundtrack_items insert <input.key> <output.key> <index> <audio>\n  edit_keynote_soundtrack_items replace <input.key> <output.key> <index> <audio>\n  edit_keynote_soundtrack_items move <input.key> <output.key> <from-index> <to-index>\n  edit_keynote_soundtrack_items remove <input.key> <output.key> <index>";
+const USAGE: &str = "usage:\n  edit_keynote_soundtrack_items list <input.key>\n  edit_keynote_soundtrack_items add <input.key> <output.key> <audio>\n  edit_keynote_soundtrack_items insert <input.key> <output.key> <index> <audio>\n  edit_keynote_soundtrack_items replace <input.key> <output.key> <index> <audio>\n  edit_keynote_soundtrack_items remove <input.key> <output.key> <index>";

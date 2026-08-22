@@ -1,6 +1,7 @@
 //! Standalone movie-object CRUD for Keynote slides.
 
 use litchi_iwa_common::media::Type as MediaType;
+use litchi_iwa_protos::keynote_media_codec;
 use litchi_keynote::slide::media::MovieKind;
 use litchi_keynote::slide::movie::Options as SlideMovieOptions;
 
@@ -29,6 +30,8 @@ use graph::*;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 const BUILD_MESSAGE_TYPE: u32 = 8;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const MOVIE_DATA_FIELD: u32 = 14;
+const POSTER_IMAGE_DATA_FIELD: u32 = 15;
 const SLIDE_BUILDS_FIELD: u32 = 2;
 const SLIDE_BUILD_CHUNKS_FIELD: u32 = 43;
 const MOVIE_MEDIA_PLACEHOLDER_FLAG: u32 = 1;
@@ -76,7 +79,7 @@ impl KeynoteEditor {
         Ok(self
             .slide_media_infos(slide_index)?
             .into_iter()
-            .filter(|movie| movie.kind != MovieKind::Audio)
+            .filter(|movie| !movie.kind.is_audio())
             .collect())
     }
 
@@ -898,8 +901,22 @@ fn movie_info(
     slide_index: usize,
     identifier: u64,
 ) -> Result<KeynoteSlideMovieInfo> {
+    let raw = graph.message_data_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
+    let movie_data_identifier = movie_data_reference_identifier(raw, MOVIE_DATA_FIELD, identifier)?;
+    let poster_image_data_identifier =
+        movie_data_reference_identifier(raw, POSTER_IMAGE_DATA_FIELD, identifier)?;
     let movie: tsd::MovieArchive =
         graph.decode_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
+    if movie.movie_data.map(|reference| reference.identifier) != movie_data_identifier
+        || movie
+            .poster_image_data
+            .map(|reference| reference.identifier)
+            != poster_image_data_identifier
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote movie {identifier} data-reference projection disagrees with MovieArchive"
+        )));
+    }
     let kind = if movie.is_live_video == Some(true) {
         MovieKind::LiveVideo
     } else if movie.audio_only == Some(true) {
@@ -926,15 +943,39 @@ fn movie_info(
         slide_index,
         drawable_object_id: identifier,
         kind,
-        movie_data_identifier: movie.movie_data.map(|reference| reference.identifier),
-        poster_image_data_identifier: movie
-            .poster_image_data
-            .map(|reference| reference.identifier),
+        movie_data_identifier,
+        poster_image_data_identifier,
         geometry: geometry_from_drawable(&movie.super_)?,
         properties: crate::shapes::drawable_properties(&movie.super_),
         playback,
         original_size: movie.original_size.map(drawable_size),
         natural_size: movie.natural_size.map(drawable_size),
+    })
+}
+
+fn movie_data_reference_identifier(
+    source: &[u8],
+    field_number: u32,
+    movie_identifier: u64,
+) -> Result<Option<u64>> {
+    let payloads = repeated_length_delimited_payloads(source, field_number)?;
+    if payloads.len() > 1 {
+        return Err(Error::InvalidFormat(format!(
+            "Keynote movie {movie_identifier} field {field_number} repeats its data reference"
+        )));
+    }
+    let Some(payload) = payloads.first().copied() else {
+        return Ok(None);
+    };
+    keynote_media_codec::decode_data_reference(
+        payload,
+        keynote_media_codec::DecodeOptions::for_source(payload),
+    )
+    .map(|reference| Some(reference.identifier()))
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote movie {movie_identifier} field {field_number} has malformed data reference: {error}"
+        ))
     })
 }
 

@@ -1,17 +1,29 @@
 //! Native hyperlink smart-field object encoding, mutation, and ownership checks.
 
-use prost::Message;
-
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::protobuf::tswp;
 use crate::wire::patch_length_delimited_field;
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_protos::hyperlink_codec::{self, DecodeOptions as HyperlinkDecodeOptions};
 
 use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
 use litchi_iwa_text::hyperlink::TextHyperlinkTarget;
 
 const HYPERLINK_TARGET_FIELD: u32 = 2;
 pub(super) const HYPERLINK_MESSAGE_TYPE: u32 = 2_032;
+
+fn decode_options(source: &[u8]) -> HyperlinkDecodeOptions {
+    HyperlinkDecodeOptions::for_source(source)
+}
+
+fn decode_hyperlink(
+    source: &[u8],
+) -> Result<litchi_iwa_protos::hyperlink_codec::HyperlinkSnapshot<'_>> {
+    hyperlink_codec::decode_hyperlink(source, decode_options(source)).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "iWork hyperlink payload failed strict validation: {error}"
+        ))
+    })
+}
 
 pub(super) fn validate_hyperlink_object(
     identifier: u64,
@@ -35,24 +47,20 @@ pub(super) fn validate_hyperlink_object(
             "iWork hyperlink object {identifier} contains unrelated payloads"
         )));
     }
-    let hyperlink = tswp::HyperlinkFieldArchive::decode(message.data.as_slice())?;
-    let uuid = hyperlink
-        .super_
-        .as_ref()
-        .and_then(|smart_field| smart_field.text_attribute_uuid_string.as_deref())
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "iWork hyperlink object {identifier} is missing its text-attribute UUID"
-            ))
-        })?;
+    let hyperlink = decode_hyperlink(message.data.as_slice())?;
+    let uuid = hyperlink.text_attribute_uuid().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "iWork hyperlink object {identifier} is missing its text-attribute UUID"
+        ))
+    })?;
     validate_text_attribute_uuid(identifier, "hyperlink", uuid)?;
-    let target = hyperlink.url_ref.ok_or_else(|| {
+    let target = hyperlink.url_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "iWork hyperlink object {identifier} is missing its target"
         ))
     })?;
     Ok(Some(TextHyperlinkTarget::from_boxed(
-        target.into_boxed_str(),
+        target.to_owned().into_boxed_str(),
     )?))
 }
 
@@ -61,17 +69,14 @@ pub(super) fn new_hyperlink_object(
     target: &TextHyperlinkTarget,
 ) -> Result<ArchiveObject> {
     let uuid = generated_text_attribute_uuid()?;
-    let hyperlink = tswp::HyperlinkFieldArchive {
-        super_: Some(tswp::SmartFieldArchive {
-            text_attribute_uuid_string: Some(uuid),
-        }),
-        url_ref: Some(target.as_str().to_owned()),
-    };
+    let data = hyperlink_codec::encode_hyperlink(&uuid, target.as_str()).map_err(|error| {
+        Error::InvalidFormat(format!("could not encode iWork hyperlink payload: {error}"))
+    })?;
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: HYPERLINK_MESSAGE_TYPE,
-            data: hyperlink.encode_to_vec(),
+            data,
         }],
     )?)
 }
@@ -104,11 +109,11 @@ pub(super) fn patch_hyperlink_target(
             )));
         }
         let original = &object.messages[*index];
-        let hyperlink = tswp::HyperlinkFieldArchive::decode(original.data.as_slice())?;
+        let hyperlink = decode_hyperlink(original.data.as_slice())?;
         let data = patch_length_delimited_field(
             &original.data,
             HYPERLINK_TARGET_FIELD,
-            hyperlink.url_ref.is_some(),
+            hyperlink.url_ref().is_some(),
             Some(target.as_str().as_bytes()),
         )?;
         object.replace_message(

@@ -15,6 +15,11 @@ use litchi_iwa_protos::keynote_chart_caption_codec::{
 /// Keep a small headroom for the three enclosing length prefixes and a larger
 /// replacement identifier; all other chart bytes remain source-owned.
 const CHART_CAPTION_REWRITE_HEADROOM: usize = 32;
+/// Rewrites account for source decode, sizing, emission, and candidate
+/// readback in one aggregate budget. The selected edge has three nested
+/// envelopes, so the per-pass 8x source profile is insufficient once those
+/// passes are retained together.
+const CHART_CAPTION_REWRITE_WORK_MULTIPLIER: usize = 32;
 
 impl KeynoteEditor {
     /// Read the native caption attached to one slide chart.
@@ -342,7 +347,9 @@ fn chart_caption_decode_options(source: &[u8]) -> DecodeOptions {
     DecodeOptions::new(
         source_bytes,
         output_bytes.saturating_mul(4).max(1),
-        output_bytes.saturating_mul(8).max(1),
+        output_bytes
+            .saturating_mul(CHART_CAPTION_REWRITE_WORK_MULTIPLIER)
+            .max(1),
         8,
     )
     .with_max_output_bytes(output_bytes)

@@ -667,6 +667,33 @@ fn selectors_unicode_invalid_names_and_final_collisions_are_typed() -> TestResul
 }
 
 #[test]
+fn names_selectors_are_case_sensitive_and_failed_selection_preserves_source() -> TestResult {
+    let source = package_bytes(false, false, 1)?;
+    let package = Package::from_bytes(&source)?;
+    let before = bytes(&package)?;
+
+    assert!(matches!(
+        package.edit_names().rename_sheet("alpha", "Changed"),
+        Err(names::Error::SheetNotFound)
+    ));
+    assert_eq!(bytes(&package)?, before);
+
+    assert!(matches!(
+        package.edit_names().rename_table("Alpha", "one", "Changed"),
+        Err(names::Error::TableNotFound)
+    ));
+    assert_eq!(bytes(&package)?, before);
+
+    let commit = package
+        .edit_names()
+        .rename_sheet("Alpha", "Changed")?
+        .commit()?;
+    assert_eq!(sheet_name(commit.package(), 0), "Changed");
+    assert_eq!(bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
 fn staged_name_bytes_accept_exact_limit_reject_one_over_and_bound_multiple_operations() -> TestResult
 {
     let maximum = 256;

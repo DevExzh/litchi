@@ -64,8 +64,8 @@ impl DecodeOptions {
         let bytes = source.len().max(1);
         Self::new(
             bytes,
-            bytes.saturating_mul(4).max(1),
-            bytes.saturating_mul(8).max(1),
+            bytes.checked_mul(4).unwrap_or(usize::MAX).max(1),
+            bytes.checked_mul(8).unwrap_or(usize::MAX).max(1),
             8,
         )
     }
@@ -243,13 +243,15 @@ impl RewriteReport {
         self.output_bytes
     }
 
-    /// Strict field visits from source preflight and, when changed, candidate readback.
+    /// Strict field visits from source preflight, rewrite sizing/emission, and
+    /// (when changed) candidate readback.
     #[must_use]
     pub const fn fields(self) -> usize {
         self.fields
     }
 
-    /// Strict-plus-Buffa work charged for source preflight and, when changed, candidate readback.
+    /// Aggregate strict-plus-Buffa work charged for the complete decode or
+    /// rewrite transaction.
     #[must_use]
     pub const fn work_bytes(self) -> usize {
         self.work_bytes
@@ -629,8 +631,28 @@ pub fn decode_chart_title_with_report<'source>(
     options: DecodeOptions,
 ) -> Result<(ChartTitleSnapshot<'source>, DecodeReport), DecodeError> {
     validate_decode_input(source, options)?;
-    let mut budget = Budget::new(source, options)?;
-    let strict = preflight_chart_title(source, &mut budget)?;
+    let mut budget = Budget::new(source, options);
+    let snapshot = decode_chart_title_with_budget(source, options, &mut budget)?;
+    Ok((snapshot, budget.report()))
+}
+
+/// Decode one chart-title payload while charging an existing aggregate
+/// budget. Rewrites use this entry point for both their source and candidate
+/// readback passes so the field/work ceilings cover the complete transaction.
+fn decode_chart_title_with_budget<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<ChartTitleSnapshot<'source>, DecodeError> {
+    // Work and field counters are aggregate across a rewrite transaction,
+    // while the selected title/output ceilings apply to each decode pass.
+    // Reset the per-pass semantic counters before source and candidate reads
+    // so a large replacement is not rejected merely because both snapshots
+    // are charged through one shared budget.
+    budget.output_bytes = 0;
+    budget.title_bytes = 0;
+    budget.message(source.len(), ROOT_DEPTH)?;
+    let strict = preflight_chart_title(source, budget)?;
     let view: projection::ChartTitleArchiveLazyView<'source> = options
         .buffa()
         .decode_lazy_view(source)
@@ -643,7 +665,7 @@ pub fn decode_chart_title_with_report<'source>(
     if projected.title_visible != strict.title_visible || projected.title != strict.title {
         return Err(DecodeError::projection());
     }
-    Ok((strict, budget.report()))
+    Ok(strict)
 }
 
 /// Decode only the optional field-23 title text.
@@ -664,11 +686,21 @@ pub fn decode_visible_chart_title(
 
 /// Rewrite only fields 21 and 23 of one generated-extension payload.
 ///
-/// Existing unknown field spans are copied byte-for-byte and selected fields
-/// are replaced at their original positions. Missing requested fields are
-/// appended in field-number order. If the requested pair already matches,
-/// the returned bytes are an exact source copy and the report marks the
-/// operation as unchanged.
+/// Existing unknown field spans and their order are copied byte-for-byte.
+/// Existing selected fields (21 and 23) are replaced at their original
+/// positions. A requested selected field that is absent from `source` is
+/// appended after all source spans in field-number order (21, then 23).
+///
+/// This is deliberately a source-local contract. Once a selected field has
+/// been removed, its former position is no longer represented by the wire
+/// payload, so a later call cannot infer where to put it back. Callers that
+/// need an exact inverse across a remove/add sequence must retain the source
+/// layout (or the original bytes) outside this API and replay the inverse in a
+/// transaction that has that metadata. The codec never guesses a missing
+/// field's historical position.
+///
+/// If the requested pair already matches, the returned bytes are an exact
+/// source copy and the report marks the operation as unchanged.
 pub fn rewrite_chart_title<'source, 'title>(
     source: &'source [u8],
     write: ChartTitleWrite<'title>,
@@ -686,7 +718,9 @@ pub fn rewrite_chart_title_with_report<'source, 'title>(
     // Strictly validate the complete source before looking at the requested
     // semantic pair. This keeps an otherwise matching write from taking a
     // fast path around duplicate selected fields or malformed unknown spans.
-    let (current, source_report) = decode_chart_title_with_report(source, options)?;
+    validate_decode_input(source, options)?;
+    let mut budget = Budget::new(source, options);
+    let current = decode_chart_title_with_budget(source, options, &mut budget)?;
     if let Some(title) = write.title {
         if title.len() > options.max_title_bytes {
             return Err(DecodeError::title_limit(
@@ -696,7 +730,15 @@ pub fn rewrite_chart_title_with_report<'source, 'title>(
         }
     }
 
-    let changed = current.title_visible != write.title_visible || current.title != write.title;
+    // A public clear means "remove a visible title". Hidden and absent title
+    // state is already clear, even when an old field-23 value remains in the
+    // generated payload. Treat that request as an exact source no-op so a
+    // stale hidden value is never rewritten or normalized.
+    let clear_noop = write.title_visible == Some(false)
+        && write.title.is_none()
+        && current.title_visible != Some(true);
+    let changed = !clear_noop
+        && (current.title_visible != write.title_visible || current.title != write.title);
     if !changed {
         if source.len() > options.max_output_bytes {
             return Err(DecodeError::output_limit(
@@ -710,19 +752,19 @@ pub fn rewrite_chart_title_with_report<'source, 'title>(
             RewriteReport {
                 input_bytes: source.len(),
                 output_bytes: source.len(),
-                fields: source_report.fields,
-                work_bytes: source_report.work_bytes,
-                max_depth: source_report.max_depth,
+                fields: budget.fields,
+                work_bytes: budget.work_bytes,
+                max_depth: budget.max_depth,
                 changed: false,
             },
         ));
     }
 
-    let output_bytes = measure_rewrite_output(source, write, options)?;
+    let output_bytes = measure_rewrite_output(source, write, options, &mut budget)?;
     let mut output = reserve_output(output_bytes)?;
     let mut saw_visible = false;
     let mut saw_title = false;
-    visit_field_spans(source, options, |span| {
+    visit_field_spans(source, &mut budget, |span| {
         let raw = &source[span.start..span.end];
         match span.number {
             CHART_TITLE_VISIBLE_FIELD => {
@@ -741,6 +783,9 @@ pub fn rewrite_chart_title_with_report<'source, 'title>(
         }
         Ok(())
     })?;
+    // Append every missing selected field after all original spans in field
+    // number order. The source does not carry a position for an absent field,
+    // so this deterministic rule is part of the public contract.
     if !saw_visible && let Some(value) = write.title_visible {
         append_varint_field(&mut output, CHART_TITLE_VISIBLE_FIELD, u64::from(value));
     }
@@ -749,36 +794,29 @@ pub fn rewrite_chart_title_with_report<'source, 'title>(
     }
     debug_assert_eq!(output.len(), output_bytes);
 
+    // The candidate may be larger than the source when a title grows. Let its
+    // message ceiling reach the larger of the caller's input ceiling and the
+    // candidate length, but keep the independent output ceiling unchanged.
+    // `measure_rewrite_output` has already checked that the candidate fits the
+    // caller's output cap, and retaining that cap here keeps readback from
+    // widening the write budget.
     let readback_options = DecodeOptions {
         max_message_bytes: options.max_message_bytes.max(output.len()),
         ..options
     };
-    let (readback, readback_report) = decode_chart_title_with_report(&output, readback_options)?;
+    validate_decode_input(&output, readback_options)?;
+    let readback = decode_chart_title_with_budget(&output, readback_options, &mut budget)?;
     if readback.title_visible != write.title_visible || readback.title != write.title {
         return Err(DecodeError::projection());
-    }
-    let fields = source_report
-        .fields
-        .checked_add(readback_report.fields)
-        .ok_or_else(|| DecodeError::field_limit(usize::MAX, options.max_fields))?;
-    if fields > options.max_fields {
-        return Err(DecodeError::field_limit(fields, options.max_fields));
-    }
-    let work_bytes = source_report
-        .work_bytes
-        .checked_add(readback_report.work_bytes)
-        .ok_or_else(|| DecodeError::work_limit(usize::MAX, options.max_work_bytes))?;
-    if work_bytes > options.max_work_bytes {
-        return Err(DecodeError::work_limit(work_bytes, options.max_work_bytes));
     }
     Ok((
         output,
         RewriteReport {
             input_bytes: source.len(),
             output_bytes,
-            fields,
-            work_bytes,
-            max_depth: source_report.max_depth.max(readback_report.max_depth),
+            fields: budget.fields,
+            work_bytes: budget.work_bytes,
+            max_depth: budget.max_depth,
             changed: true,
         },
     ))
@@ -847,8 +885,8 @@ struct Budget {
 }
 
 impl Budget {
-    fn new(source: &[u8], options: DecodeOptions) -> Result<Self, DecodeError> {
-        let mut budget = Self {
+    const fn new(source: &[u8], options: DecodeOptions) -> Self {
+        Self {
             source_bytes: source.len(),
             fields: 0,
             work_bytes: 0,
@@ -856,13 +894,14 @@ impl Budget {
             output_bytes: 0,
             title_bytes: 0,
             options,
-        };
-        budget.message(source.len(), ROOT_DEPTH)?;
-        Ok(budget)
+        }
     }
 
     fn field(&mut self) -> Result<(), DecodeError> {
-        let observed = self.fields.saturating_add(1);
+        let observed = self
+            .fields
+            .checked_add(1)
+            .ok_or_else(|| DecodeError::field_limit(usize::MAX, self.options.max_fields))?;
         if observed > self.options.max_fields {
             return Err(DecodeError::field_limit(observed, self.options.max_fields));
         }
@@ -880,7 +919,13 @@ impl Budget {
             });
         }
         self.max_depth = self.max_depth.max(depth);
-        let observed = self.work_bytes.saturating_add(bytes.saturating_mul(2));
+        let cost = bytes
+            .checked_mul(2)
+            .ok_or_else(|| DecodeError::work_limit(usize::MAX, self.options.max_work_bytes))?;
+        let observed = self
+            .work_bytes
+            .checked_add(cost)
+            .ok_or_else(|| DecodeError::work_limit(usize::MAX, self.options.max_work_bytes))?;
         if observed > self.options.max_work_bytes {
             return Err(DecodeError::work_limit(
                 observed,
@@ -911,14 +956,20 @@ impl Budget {
                 self.options.max_title_bytes,
             ));
         }
-        let output = self.output_bytes.saturating_add(bytes);
+        let output = self
+            .output_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| DecodeError::output_limit(usize::MAX, self.options.max_output_bytes))?;
         if output > self.options.max_output_bytes {
             return Err(DecodeError::output_limit(
                 output,
                 self.options.max_output_bytes,
             ));
         }
-        self.title_bytes = self.title_bytes.saturating_add(bytes);
+        self.title_bytes = self
+            .title_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| DecodeError::title_limit(usize::MAX, self.options.max_title_bytes))?;
         self.output_bytes = output;
         Ok(())
     }
@@ -985,22 +1036,14 @@ struct FieldSpan {
 
 fn visit_field_spans(
     source: &[u8],
-    options: DecodeOptions,
+    budget: &mut Budget,
     mut visit: impl FnMut(FieldSpan) -> Result<(), DecodeError>,
 ) -> Result<(), DecodeError> {
-    let scan_options = DecodeOptions {
-        max_message_bytes: source.len(),
-        max_fields: usize::MAX,
-        max_work_bytes: usize::MAX,
-        max_output_bytes: usize::MAX,
-        max_title_bytes: usize::MAX,
-        ..options
-    };
-    let mut scan_budget = Budget::new(source, scan_options)?;
+    budget.message(source.len(), ROOT_DEPTH)?;
     let mut remaining = source;
     while !remaining.is_empty() {
         let start = source.len() - remaining.len();
-        let item = parse_strict_field(&mut remaining, &mut scan_budget, ROOT_DEPTH)?;
+        let item = parse_strict_field(&mut remaining, budget, ROOT_DEPTH)?;
         let end = source.len() - remaining.len();
         match item {
             Some(ParseItem::Field(field)) => visit(FieldSpan {
@@ -1021,11 +1064,12 @@ fn measure_rewrite_output(
     source: &[u8],
     write: ChartTitleWrite<'_>,
     options: DecodeOptions,
+    budget: &mut Budget,
 ) -> Result<usize, DecodeError> {
     let mut length = 0usize;
     let mut saw_visible = false;
     let mut saw_title = false;
-    visit_field_spans(source, options, |span| {
+    visit_field_spans(source, budget, |span| {
         let replacement = match span.number {
             CHART_TITLE_VISIBLE_FIELD => {
                 saw_visible = true;
@@ -1078,6 +1122,9 @@ fn reserve_output(amount: usize) -> Result<Vec<u8>, DecodeError> {
     output
         .try_reserve_exact(amount)
         .map_err(|_allocation_error| DecodeError::allocation(amount))?;
+    if output.capacity() != amount {
+        return Err(DecodeError::allocation(amount));
+    }
     Ok(output)
 }
 
@@ -1666,6 +1713,133 @@ mod tests {
     }
 
     #[test]
+    fn rewrite_replaces_selected_fields_in_place_and_keeps_unknown_order() {
+        let source = [
+            field_varint(4000, 7),
+            field_text(23, b"old"),
+            field_varint(4001, 8),
+            field_varint(21, 0),
+            field_varint(4002, 9),
+        ]
+        .concat();
+        let options = DecodeOptions::new(1024, 128, 8192, 8)
+            .with_max_output_bytes(1024)
+            .with_max_title_bytes(128);
+
+        let rewritten = super::rewrite_chart_title(
+            &source,
+            ChartTitleWrite::new(Some(true), Some("new")),
+            options,
+        )
+        .expect("replace selected fields in place");
+        let expected = [
+            field_varint(4000, 7),
+            field_text(23, b"new"),
+            field_varint(4001, 8),
+            field_varint(21, 1),
+            field_varint(4002, 9),
+        ]
+        .concat();
+        assert_eq!(rewritten, expected);
+    }
+
+    #[test]
+    fn rewrite_does_not_guess_removed_field_positions() {
+        // These two distinct source layouts intentionally collapse to the same
+        // clear result. No source-local rewrite can know whether field 23 used
+        // to precede or follow field 21 after it has been removed.
+        let before_visible = [
+            field_text(23, b"old"),
+            field_varint(4000, 7),
+            field_varint(21, 1),
+        ]
+        .concat();
+        let after_visible = [
+            field_varint(4000, 7),
+            field_varint(21, 1),
+            field_text(23, b"old"),
+        ]
+        .concat();
+        let options = DecodeOptions::new(1024, 128, 8192, 8)
+            .with_max_output_bytes(1024)
+            .with_max_title_bytes(128);
+
+        let cleared_before = super::rewrite_chart_title(
+            &before_visible,
+            ChartTitleWrite::new(Some(false), None),
+            options,
+        )
+        .expect("clear title from before-visible layout");
+        let cleared_after = super::rewrite_chart_title(
+            &after_visible,
+            ChartTitleWrite::new(Some(false), None),
+            options,
+        )
+        .expect("clear title from after-visible layout");
+        assert_eq!(cleared_before, cleared_after);
+        assert_eq!(
+            cleared_before,
+            [field_varint(4000, 7), field_varint(21, 0)].concat()
+        );
+
+        let restored = super::rewrite_chart_title(
+            &cleared_before,
+            ChartTitleWrite::new(Some(true), Some("old")),
+            options,
+        )
+        .expect("restore selected semantics");
+        // Missing fields append after the source spans in field-number order;
+        // they must not be guessed back into one of the historical layouts.
+        assert_eq!(restored, after_visible);
+        assert_ne!(restored, before_visible);
+    }
+
+    #[test]
+    fn rewrite_clear_hidden_or_absent_stale_title_is_exact_noop() {
+        let options = DecodeOptions::new(1024, 128, 8192, 8)
+            .with_max_output_bytes(1024)
+            .with_max_title_bytes(128);
+        for source in [
+            field_varint(21, 0),
+            [field_varint(21, 0), field_text(23, b"stale")].concat(),
+            field_text(23, b"stale"),
+            Vec::new(),
+        ] {
+            let (rewritten, report) = super::rewrite_chart_title_with_report(
+                &source,
+                ChartTitleWrite::new(Some(false), None),
+                options,
+            )
+            .expect("hidden/absent clear");
+            assert_eq!(rewritten, source);
+            assert!(!report.changed());
+        }
+
+        // A visible empty title is semantically present even when field 23 is
+        // absent. Clearing and restoring that pair must retain the absence.
+        let source = field_varint(21, 1);
+        let cleared =
+            super::rewrite_chart_title(&source, ChartTitleWrite::new(Some(false), None), options)
+                .expect("clear visible title");
+        let restored =
+            super::rewrite_chart_title(&cleared, ChartTitleWrite::new(Some(true), None), options)
+                .expect("restore visible empty title");
+        assert_eq!(restored, source);
+        assert_eq!(
+            decode_chart_title(&restored, options)
+                .expect("restored title")
+                .visible_title(),
+            Some("")
+        );
+        assert_eq!(
+            decode_chart_title(&restored, options)
+                .expect("restored title")
+                .title(),
+            None
+        );
+    }
+
+    #[test]
     fn rewrite_limits_are_inclusive_and_title_limit_precedes_output_allocation() {
         let source = field_varint(4000, 7);
         let write = ChartTitleWrite::new(Some(true), Some("new"));
@@ -1695,6 +1869,80 @@ mod tests {
         let title_error = super::rewrite_chart_title(&source, write, base.with_max_title_bytes(2))
             .expect_err("title limit");
         assert_eq!(title_error.title_limit_values(), Some((3, 2)));
+    }
+
+    #[test]
+    fn rewrite_readback_accepts_larger_title_when_output_cap_allows_it() {
+        let source = field_varint(21, 1);
+        let title = "a title larger than the source";
+        let write = ChartTitleWrite::new(Some(true), Some(title));
+        let expected_output = [source.clone(), field_text(23, title.as_bytes())].concat();
+        let options = DecodeOptions::new(source.len(), 128, 8192, 8)
+            .with_max_output_bytes(expected_output.len())
+            .with_max_title_bytes(title.len());
+
+        let (rewritten, report) = super::rewrite_chart_title_with_report(&source, write, options)
+            .expect("candidate larger than source fits output cap");
+        assert_eq!(rewritten, expected_output);
+        assert_eq!(report.output_bytes(), expected_output.len());
+        let readback_options = DecodeOptions::new(expected_output.len(), 128, 8192, 8)
+            .with_max_output_bytes(expected_output.len())
+            .with_max_title_bytes(title.len());
+        assert_eq!(
+            decode_chart_title(&rewritten, readback_options)
+                .expect("larger candidate readback")
+                .title(),
+            Some(title)
+        );
+
+        let capped = options.with_max_output_bytes(expected_output.len() - 1);
+        let error = super::rewrite_chart_title(&source, write, capped)
+            .expect_err("independent output cap must remain enforced");
+        assert_eq!(
+            error.output_limit_values(),
+            Some((expected_output.len(), expected_output.len() - 1))
+        );
+    }
+
+    #[test]
+    fn rewrite_work_budget_covers_sizing_emission_and_readback() {
+        let source = [field_varint(21, 1), field_text(23, b"old")].concat();
+        let write = ChartTitleWrite::new(Some(true), Some("new title"));
+        let unconstrained = DecodeOptions::new(1024, usize::MAX, usize::MAX, 8)
+            .with_max_output_bytes(1024)
+            .with_max_title_bytes(128);
+        let (output, report) =
+            super::rewrite_chart_title_with_report(&source, write, unconstrained)
+                .expect("rewrite with an unconstrained work budget");
+
+        // A flat payload is charged once for source decode, once for sizing,
+        // once for emission, and once for candidate readback. Each pass
+        // charges two bytes per source byte for strict plus Buffa traversal.
+        let expected_work = source.len() * 6 + output.len() * 2;
+        assert_eq!(report.work_bytes(), expected_work);
+        assert_eq!(report.fields(), 8);
+
+        let exact = DecodeOptions::new(1024, usize::MAX, expected_work, 8)
+            .with_max_output_bytes(output.len())
+            // Source and candidate title bytes each fit this per-pass cap;
+            // they must not be accumulated as one semantic title.
+            .with_max_title_bytes(9);
+        super::rewrite_chart_title_with_report(&source, write, exact)
+            .expect("the exact aggregate work ceiling is inclusive");
+
+        let below = DecodeOptions::new(1024, usize::MAX, expected_work - 1, 8)
+            .with_max_output_bytes(output.len())
+            .with_max_title_bytes(9);
+        let error = super::rewrite_chart_title_with_report(&source, write, below)
+            .expect_err("one byte below aggregate work must fail");
+        assert_eq!(
+            error.work_limit_values(),
+            Some((expected_work, expected_work - 1))
+        );
+        assert_eq!(
+            source,
+            [field_varint(21, 1), field_text(23, b"old")].concat()
+        );
     }
 
     #[test]
@@ -1732,7 +1980,10 @@ mod tests {
         source.extend(field_varint(4000, 7));
         source.push(0x54); // field 10, end group
         source.extend(field_varint(21, 1));
-        let options = DecodeOptions::new(source.len(), 8, source.len() * 8, 2)
+        // A rewrite charges the source preflight, sizing scan, emission scan,
+        // and candidate readback against one aggregate field budget. The
+        // group contributes three visits plus the selected field per pass.
+        let options = DecodeOptions::new(source.len(), 16, source.len() * 8, 2)
             .with_max_output_bytes(1024)
             .with_max_title_bytes(128);
 
@@ -1764,6 +2015,14 @@ mod tests {
     fn output_reservation_reports_capacity_overflow_without_partial_output() {
         let error = super::reserve_output(usize::MAX).expect_err("capacity overflow");
         assert_eq!(error.allocation_amount(), Some(usize::MAX));
+    }
+
+    #[test]
+    fn output_reservation_enforces_exact_capacity_or_typed_allocation_error() {
+        match super::reserve_output(17) {
+            Ok(output) => assert_eq!(output.capacity(), 17),
+            Err(error) => assert_eq!(error.allocation_amount(), Some(17)),
+        }
     }
 
     #[test]

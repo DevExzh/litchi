@@ -224,6 +224,26 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
     )?)
 }
 
+fn rootless_fallback_package(fragments: &[&str]) -> TestResult<Vec<u8>> {
+    let root = tp::DocumentArchive::default();
+    let storage = tswp::StorageArchive {
+        text: fragments.iter().map(|text| (*text).to_owned()).collect(),
+        ..tswp::StorageArchive::default()
+    };
+    let document = component(vec![
+        object(1, 10_000, root.encode_to_vec())?,
+        object(
+            BODY_IDENTIFIER,
+            STORAGE_MESSAGE_TYPE,
+            storage.encode_to_vec(),
+        )?,
+    ])?;
+    Ok(litchi_iwa_archive::package::to_bytes(
+        [(DOCUMENT_MEMBER, document.as_slice())],
+        Limits::default(),
+    )?)
+}
+
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(flat)?;
     let inner_entries = catalog
@@ -593,6 +613,47 @@ fn single_section_body_convenience_resolves_without_native_identity() -> TestRes
 }
 
 #[test]
+fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult<()> {
+    let bytes = rootless_fallback_package(&["Fallback", "", "body"])?;
+    let package = Package::from_bytes(&bytes)?;
+    assert_eq!(package.sections().len(), 1);
+    assert_eq!(
+        package.section_text(SectionSelector::index(0))?,
+        "Fallback\n\nbody"
+    );
+
+    let original = package.section_text(SectionSelector::index(0))?.to_owned();
+    let mut no_op = package.edit_body_text()?;
+    no_op.set(&original)?;
+    let no_op_commit = no_op.commit()?;
+    assert!(no_op_commit.patch().is_noop());
+    assert_eq!(no_op_commit.package().source_bytes(), bytes);
+
+    let mut changed = package.edit_body_text()?;
+    changed.set("replacement")?;
+    assert!(matches!(
+        changed.commit(),
+        Err(SectionTextError::UnsupportedSource)
+    ));
+    assert_eq!(package.source_bytes(), bytes);
+
+    let empty_bytes = rootless_fallback_package(&[""])?;
+    let empty = Package::from_bytes(&empty_bytes)?;
+    assert!(empty.sections().is_empty());
+    assert_eq!(empty.text()?, "");
+    assert!(matches!(
+        empty.edit_body_text(),
+        Err(SectionTextError::BodySectionCount { actual: 0 })
+    ));
+    assert!(matches!(
+        empty.section_text(SectionSelector::index(0)),
+        Err(SectionTextError::PositionNotFound { position })
+            if position == Position::new(0)
+    ));
+    Ok(())
+}
+
+#[test]
 fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let package = Package::from_bytes(&bytes)?;
@@ -893,9 +954,7 @@ fn set_clear_and_delete_preserve_neighboring_sections() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let package = Package::from_bytes(&bytes)?;
 
-    let mut set_edit = package.edit_section_text(SectionSelector::index(2))?;
-    set_edit.set("尾😀")?;
-    let set_commit = set_edit.commit()?;
+    let set_commit = package.set_section_text(SectionSelector::index(2), "尾😀")?;
     assert_eq!(
         set_commit
             .package()
@@ -916,9 +975,7 @@ fn set_clear_and_delete_preserve_neighboring_sections() -> TestResult<()> {
     );
 
     let set_package = set_commit.into_package();
-    let mut clear_edit = set_package.edit_section_text(SectionSelector::index(0))?;
-    clear_edit.clear()?;
-    let clear_commit = clear_edit.commit()?;
+    let clear_commit = set_package.clear_section_text(SectionSelector::name("First"))?;
     assert_eq!(
         clear_commit
             .package()
@@ -930,6 +987,13 @@ fn set_clear_and_delete_preserve_neighboring_sections() -> TestResult<()> {
             .package()
             .section_text(SectionSelector::index(1))?,
         "Second東京"
+    );
+
+    let clear_inverse = clear_commit.patch().inverse();
+    let restored = clear_commit.package().apply_section_text(&clear_inverse)?;
+    assert_eq!(
+        restored.package().section_text(SectionSelector::index(0))?,
+        "First😀"
     );
 
     let clear_package = clear_commit.into_package();

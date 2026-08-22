@@ -36,10 +36,13 @@ fuzz_target!(|data: &[u8]| {
     // ZIP checksums make arbitrary bytes unlikely to reach the body text
     // codec. Replay the same bounded prefix against a native package so every
     // input also exercises rooted body decoding and section-text publishing.
-    exercise_package(native_package(), data);
-    exercise_staging_errors(native_package());
+    let package = native_package();
+    exercise_package(package, data);
+    exercise_direct_set_clear(package, data);
+    exercise_staging_errors(package);
     exercise_redacted_malformed_ingress();
     exercise_input_limit();
+    exercise_resource_limits();
 });
 
 fn fuzz_limits() -> Limits {
@@ -110,6 +113,41 @@ fn exercise_package(package: &Package, data: &[u8]) {
     exercise_operation(package, data);
 }
 
+fn exercise_direct_set_clear(package: &Package, data: &[u8]) {
+    let source_before = package.source_bytes().to_vec();
+    let source_pointer = package.source_bytes().as_ptr();
+    let current = match package.section_text(SectionSelector::index(0)) {
+        Ok(text) => text,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+
+    // Keep the convenience wrappers on the same one-operation model as the
+    // edit API. A matching set is an intentional exact no-op; the other
+    // choices reach the changed set and clear paths without writing files.
+    let replacement = replacement(data);
+    let result = match control(data, 1) % 3 {
+        0 => package.set_section_text(SectionSelector::index(0), current),
+        1 => package.set_section_text(SectionSelector::index(0), replacement.as_ref()),
+        _ => package.clear_section_text(SectionSelector::index(0)),
+    };
+    assert_eq!(package.source_bytes(), source_before.as_slice());
+    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+
+    match result {
+        Ok(commit) => {
+            if commit.patch().is_noop() {
+                assert_eq!(commit.package().source_bytes(), source_before.as_slice());
+                assert_eq!(commit.package().source_bytes().as_ptr(), source_pointer);
+            }
+            publish_and_reverse(package, Ok(commit));
+        },
+        Err(error) => observe_error(error),
+    }
+}
+
 fn exercise_operation(package: &Package, data: &[u8]) {
     let Ok(mut edit) = package.edit_section_text(SectionSelector::index(0)) else {
         return;
@@ -150,15 +188,21 @@ fn exercise_operation(package: &Package, data: &[u8]) {
 }
 
 fn publish_and_reverse(package: &Package, result: Result<SectionTextCommit, SectionTextError>) {
+    let source_before = package.source_bytes().to_vec();
+    let source_pointer = package.source_bytes().as_ptr();
     let commit = match result {
         Ok(commit) => commit,
         Err(error) => {
             observe_error(error);
+            assert_eq!(package.source_bytes(), source_before.as_slice());
+            assert_eq!(package.source_bytes().as_ptr(), source_pointer);
             return;
         },
     };
     let patch = commit.patch().clone();
     let diagnostics = *commit.diagnostics();
+    assert_eq!(package.source_bytes(), source_before.as_slice());
+    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
     assert_eq!(diagnostics.changed(), !patch.is_noop());
     assert_eq!(
         diagnostics.touched_components(),
@@ -166,9 +210,7 @@ fn publish_and_reverse(package: &Package, result: Result<SectionTextCommit, Sect
     );
     assert_eq!(diagnostics.full_reparse_performed(), !patch.is_noop());
     assert_eq!(patch.position(), Position::new(0));
-    assert!(
-        patch.span().start().utf16_index() <= patch.span().end().utf16_index(),
-    );
+    assert!(patch.span().start().utf16_index() <= patch.span().end().utf16_index(),);
     assert_eq!(
         commit
             .package()
@@ -219,6 +261,7 @@ fn publish_and_reverse(package: &Package, result: Result<SectionTextCommit, Sect
         .apply_section_text(&inverse)
         .unwrap_or_else(|error| panic!("fresh section-text inverse must apply: {error}"));
     assert_eq!(restored.package().source_bytes(), package.source_bytes());
+    assert_eq!(restored.package().source_bytes(), source_before.as_slice());
     assert_eq!(
         restored
             .package()
@@ -272,9 +315,29 @@ fn exercise_staging_errors(package: &Package) {
 }
 
 fn exercise_redacted_malformed_ingress() {
-    match Package::from_bytes_with_limits(PRIVATE_MALFORMED_INPUT, fuzz_limits()) {
-        Err(error) => observe_redacted(error, PRIVATE_MALFORMED_INPUT),
-        Ok(_) => panic!("a private malformed sentinel must not parse as Pages"),
+    // These are deliberately tiny, malformed physical/wire recipes rather
+    // than generated corpus files. They must be rejected before any caller
+    // owned bytes could be changed, and diagnostics must not echo the private
+    // sentinel through either Display or Debug.
+    let malformed = [
+        PRIVATE_MALFORMED_INPUT,
+        b"PK\x03\x04",
+        b"\x0a\x80",
+        b"\xff\x00",
+    ];
+    for input in malformed {
+        let before = input.to_vec();
+        match Package::from_bytes_with_limits(input, fuzz_limits()) {
+            Err(error) => {
+                if input == PRIVATE_MALFORMED_INPUT {
+                    observe_redacted(error, PRIVATE_MALFORMED_INPUT);
+                } else {
+                    observe_error(error);
+                }
+            },
+            Ok(_) => panic!("a malformed Pages sentinel unexpectedly parsed"),
+        }
+        assert_eq!(input, before.as_slice());
     }
 }
 
@@ -285,6 +348,120 @@ fn exercise_input_limit() {
         Err(error) => observe_error(error),
         Ok(_) => panic!("an oversized Pages input must be rejected"),
     }
+}
+
+fn exercise_resource_limits() {
+    static ONCE: OnceLock<()> = OnceLock::new();
+    ONCE.get_or_init(|| {
+        let source_bytes = u64::try_from(NATIVE_PAGES.len())
+            .unwrap_or_else(|error| unreachable!("native Pages size fits u64: {error}"));
+        let defaults = fuzz_limits();
+
+        // The source itself is one byte above this profile, so the ingress
+        // limit is deterministic and reached before semantic projection.
+        let input_limited = Limits::new(
+            source_bytes.saturating_sub(1),
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )
+        .unwrap_or_else(|error| unreachable!("valid input-limit profile: {error}"));
+        observe_limited_ingress(input_limited);
+
+        // These profiles keep the source-byte ceiling open but tighten each
+        // physical subordinate budget. They are observed independently so a
+        // malformed native member cannot suppress later limit coverage.
+        let profiles = [
+            Limits::new(
+                defaults.max_input_bytes(),
+                1,
+                defaults.max_entry_bytes(),
+                defaults.max_total_bytes(),
+                defaults.max_iwa_stream_bytes(),
+            ),
+            Limits::new(
+                defaults.max_input_bytes(),
+                defaults.max_entries(),
+                1,
+                defaults.max_total_bytes(),
+                defaults.max_iwa_stream_bytes(),
+            ),
+            Limits::new(
+                defaults.max_input_bytes(),
+                defaults.max_entries(),
+                defaults.max_entry_bytes(),
+                1,
+                defaults.max_iwa_stream_bytes(),
+            ),
+            Limits::new(
+                defaults.max_input_bytes(),
+                defaults.max_entries(),
+                defaults.max_entry_bytes(),
+                defaults.max_total_bytes(),
+                1,
+            ),
+        ];
+        for limits in profiles {
+            let limits =
+                limits.unwrap_or_else(|error| unreachable!("valid subordinate profile: {error}"));
+            observe_limited_ingress(limits);
+        }
+
+        // Admit the exact native source but cap candidate output at the
+        // source size. A bounded pseudo-random replacement makes compression
+        // unlikely to hide the output ceiling; success is still accepted and
+        // must satisfy the same exact-source inverse checks.
+        let exact_source_limits = Limits::new(
+            source_bytes,
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )
+        .unwrap_or_else(|error| unreachable!("valid exact-source profile: {error}"));
+        let package = match Package::from_bytes_with_limits(NATIVE_PAGES, exact_source_limits) {
+            Ok(package) => package,
+            Err(error) => {
+                observe_error(error);
+                return;
+            },
+        };
+        let before = package.source_bytes().to_vec();
+        let replacement = resource_replacement();
+        match package.set_section_text(SectionSelector::index(0), &replacement) {
+            Ok(commit) => publish_and_reverse(&package, Ok(commit)),
+            Err(error) => observe_error(error),
+        }
+        assert_eq!(package.source_bytes(), before.as_slice());
+    });
+}
+
+fn observe_limited_ingress(limits: Limits) {
+    let before = NATIVE_PAGES.to_vec();
+    match Package::from_bytes_with_limits(&before, limits) {
+        Ok(package) => {
+            // A profile may reject only a later semantic layer; keep that
+            // successful branch observable without retaining the package.
+            black_box((package.stats(), package.sections().len()));
+        },
+        Err(error) => observe_error(error),
+    }
+    assert_eq!(before.as_slice(), NATIVE_PAGES);
+}
+
+fn resource_replacement() -> String {
+    // A deterministic bounded alphabet avoids invalid UTF-8 while retaining
+    // enough entropy to make the candidate's ZIP member materially larger.
+    const BYTES: usize = 128 * 1024;
+    let mut state = 0x9e37_79b9_u32;
+    let mut text = String::with_capacity(BYTES);
+    for _ in 0..BYTES {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let character = b'a' + ((state >> 24) as u8 % 26);
+        text.push(char::from(character));
+    }
+    text
 }
 
 fn scalar_boundary(text: &str, candidate: usize) -> usize {

@@ -8,6 +8,10 @@
 //! appropriate `litchi-pages`, `litchi-keynote`, `litchi-numbers`, or
 //! `litchi-iwa-archive` crate instead.
 
+#[cfg(test)]
+#[path = "production_codec_guard.rs"]
+mod production_codec_guard;
+
 /// Generated source is kept behind one audited boundary so workspace lints
 /// continue to apply to every hand-written item in this crate.
 #[doc(hidden)]
@@ -757,6 +761,162 @@ mod buffa_pages_body_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the selected Pages media
+/// discriminator. The complete MovieArchive graph and unknown source fields
+/// remain caller-owned and outside generated storage.
+#[doc(hidden)]
+mod buffa_pages_media_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated projection is private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-pages-media/iwa_pages_media_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa lazy-view projection for the Pages movie caption metadata
+/// edge. The strict codec validates selected fields before forcing this view;
+/// caller-owned source bytes remain the preservation representation.
+#[doc(hidden)]
+mod buffa_pages_movie_caption_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated projection is private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-pages-movie-caption/iwa_pages_movie_caption_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa lazy-view projection for the Pages footnote reference edge.
+///
+/// The strict footnote codec validates selected known fields before forcing
+/// this view. Unknown source bytes remain caller-owned and are never retained
+/// by the generated projection.
+#[doc(hidden)]
+mod buffa_pages_footnote_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-pages-footnote/iwa_pages_footnote_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa lazy-view projection for one Pages footnote marker.
+///
+/// The marker codec validates the selected scalar fields before forcing this
+/// view. Unknown source bytes remain caller-owned and are never retained by
+/// the generated projection.
+#[doc(hidden)]
+mod buffa_pages_footnote_marker_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build generated projection is private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-pages-footnote-marker/iwa_pages_footnote_marker_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for Numbers sheet, form, and table names.
 #[doc(hidden)]
 mod buffa_numbers_names_generated {
@@ -856,6 +1016,10 @@ pub mod archive_codec;
 #[doc(hidden)]
 pub mod text_storage_codec;
 
+/// Internal strict raw-preserving codec for complete TSWP hyperlink fields.
+#[doc(hidden)]
+pub mod hyperlink_codec;
+
 /// Internal strict Numbers comment-storage projection. Generated types remain
 /// private, and replies are streamed from caller-owned source bytes.
 #[doc(hidden)]
@@ -902,6 +1066,11 @@ pub mod keynote_slide_number_codec;
 #[doc(hidden)]
 pub mod keynote_soundtrack_settings_codec;
 
+/// Internal strict Keynote movie-media data-reference projection. Generated
+/// values remain private and caller-owned source bytes remain authoritative.
+#[doc(hidden)]
+pub mod keynote_media_codec;
+
 /// Internal Numbers TableInfo model-reference projection implemented by a
 /// private strict Buffa lazy-view sidecar. Generated types remain inaccessible
 /// to downstream crates.
@@ -926,6 +1095,26 @@ pub mod pages_section_background_codec;
 /// lazy-view adapter. Generated types remain inaccessible downstream.
 #[doc(hidden)]
 pub mod pages_body_codec;
+
+/// Internal strict Pages media discriminator projection. Generated types
+/// remain private and caller-owned raw bytes remain authoritative.
+#[doc(hidden)]
+pub mod pages_media_codec;
+
+/// Internal strict Pages movie-caption metadata projection. Generated types
+/// remain private and caller-owned raw bytes remain authoritative.
+#[doc(hidden)]
+pub mod pages_movie_caption_codec;
+
+/// Internal strict Pages footnote-reference projection. Generated types
+/// remain private and caller-owned raw bytes remain authoritative.
+#[doc(hidden)]
+pub mod pages_footnote_codec;
+
+/// Internal strict raw-preserving Pages footnote-marker projection. Generated
+/// types remain private and caller-owned source bytes remain authoritative.
+#[doc(hidden)]
+pub mod pages_footnote_marker_codec;
 
 /// Internal strict Pages document page-layout projection. Generated types stay
 /// private and caller-owned raw bytes remain authoritative.

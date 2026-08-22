@@ -183,7 +183,7 @@ impl EntryStore {
     }
 
     /// Iterate over ordered entries without allocating.
-    pub fn iter(&self) -> impl Iterator<Item = &Entry> {
+    pub fn iter(&self) -> impl Iterator<Item = &Entry> + Clone {
         self.state.entries.iter()
     }
 
@@ -281,7 +281,7 @@ impl FrozenEntryStore {
     }
 
     /// Iterate over entries in their preserved order without allocating.
-    pub fn iter(&self) -> impl Iterator<Item = &Entry> {
+    pub fn iter(&self) -> impl Iterator<Item = &Entry> + Clone {
         self.state.entries.iter()
     }
 

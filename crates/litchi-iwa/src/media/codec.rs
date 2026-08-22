@@ -217,12 +217,8 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
         .transpose()?;
     let mut data_metadata_ids = HashSet::new();
     let mut metadata_map_payloads = 0usize;
-    let iwa_names = package
-        .iwa_entry_names()
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
-    for name in iwa_names {
-        let archive = package.archive(&name)?;
+    for name in package.iwa_entry_names() {
+        let archive = package.archive(name)?;
         for object in archive.objects {
             let object_identifier = object.archive_info.identifier.ok_or_else(|| {
                 Error::InvalidFormat(format!("Object in {name} has no identifier"))

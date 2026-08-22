@@ -3,6 +3,9 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use litchi_iwa_protos::pages_movie_caption_codec::{
+    self as pages_movie_caption_codec, DecodeOptions as PagesMovieCaptionDecodeOptions,
+};
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
@@ -284,38 +287,32 @@ pub(crate) fn drawable_caption_slot(
             "{drawable_label} title/caption object {reference_id} has multiple CaptionInfo payloads"
         )));
     };
-    let info = tsa::CaptionInfoArchive::decode(message.data.as_slice())?;
-    if info.child_info_kind != Some(kind.native_kind()) {
+    let info = pages_movie_caption_codec::decode_caption_info(
+        message.data.as_slice(),
+        PagesMovieCaptionDecodeOptions::for_source(message.data.as_slice()),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "{drawable_label} title/caption object {reference_id} has malformed CaptionInfo payload: {error}"
+        ))
+    })?;
+    if info.child_info_kind() != Some(kind.native_kind()) {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} title/caption object {reference_id} has the wrong native kind"
         )));
     }
-    if info
-        .super_
-        .super_
-        .super_
-        .parent
-        .as_ref()
-        .map(|parent| parent.identifier)
-        != Some(drawable_object_id)
-    {
+    if info.parent_identifier() != drawable_object_id {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} title/caption object {reference_id} has the wrong parent drawable"
         )));
     }
     let storage_id = required_caption_reference(
         reference_id,
-        info.super_.owned_storage.as_ref(),
+        info.owned_storage_identifier(),
         "text storage",
         drawable_label,
     )?;
-    if info
-        .super_
-        .deprecated_storage
-        .as_ref()
-        .map(|storage| storage.identifier)
-        != Some(storage_id)
-        || info.super_.is_text_box != Some(true)
+    if info.deprecated_storage_identifier() != Some(storage_id) || info.is_text_box() != Some(true)
     {
         return Err(Error::InvalidFormat(format!(
             "{drawable_label} title/caption object {reference_id} has inconsistent text storage"
@@ -323,13 +320,13 @@ pub(crate) fn drawable_caption_slot(
     }
     let style_id = required_caption_reference(
         reference_id,
-        info.super_.super_.style.as_ref(),
+        info.style_identifier(),
         "shape style",
         drawable_label,
     )?;
     let placement_id = required_caption_reference(
         reference_id,
-        info.placement.as_ref(),
+        info.placement_identifier(),
         "placement",
         drawable_label,
     )?;
@@ -654,12 +651,11 @@ pub(crate) fn replace_object_reference(references: &mut Vec<u64>, old: u64, new:
 
 fn required_caption_reference(
     reference_id: u64,
-    reference: Option<&tsp::Reference>,
+    reference: Option<u64>,
     label: &str,
     drawable_label: &str,
 ) -> Result<u64> {
     reference
-        .map(|reference| reference.identifier)
         .filter(|identifier| *identifier != 0)
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -960,6 +956,61 @@ enum CaptionAnchorLocation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn caption_info_ingress_uses_the_bounded_projection() {
+        let source = include_str!("image_caption.rs");
+        let production = source
+            .split("#[cfg(test)]")
+            .next()
+            .expect("image caption production source");
+        assert_eq!(
+            production
+                .matches("pages_movie_caption_codec::decode_caption_info(")
+                .count(),
+            1
+        );
+        assert!(!production.contains("CaptionInfoArchive::decode"));
+    }
+
+    #[test]
+    fn caption_info_projection_matches_native_caption_graph() {
+        let ids = CaptionObjectIds {
+            style: 351,
+            info: 352,
+            storage: 353,
+            placement: 354,
+        };
+        let [_style, info, _storage, _placement] = caption_objects(
+            ids,
+            149,
+            480.0,
+            "Native caption",
+            DrawableCaptionKind::Caption,
+            CaptionThemeStyle {
+                stylesheet_id: 5,
+                paragraph_style_id: 41,
+            },
+            Some("en"),
+        )
+        .expect("caption graph");
+        let source = info.messages[0].data.as_slice();
+        let snapshot = pages_movie_caption_codec::decode_caption_info(
+            source,
+            PagesMovieCaptionDecodeOptions::for_source(source),
+        )
+        .expect("bounded caption projection");
+        assert_eq!(snapshot.parent_identifier(), 149);
+        assert_eq!(snapshot.deprecated_storage_identifier(), Some(353));
+        assert_eq!(snapshot.owned_storage_identifier(), Some(353));
+        assert_eq!(snapshot.is_text_box(), Some(true));
+        assert_eq!(snapshot.style_identifier(), Some(351));
+        assert_eq!(snapshot.placement_identifier(), Some(354));
+        assert_eq!(
+            snapshot.child_info_kind(),
+            Some(DrawableCaptionKind::Caption.native_kind())
+        );
+    }
 
     #[test]
     fn componentized_caption_matches_current_numbers_metadata() {

@@ -4,42 +4,236 @@
 //! `litchi_numbers`. Native object identifiers are resolved once here and are
 //! kept below the semantic API.
 
-use super::{NumbersEditor, NumbersSheetInfo};
+use std::collections::HashSet;
+
+use super::NumbersEditor;
 use crate::{Error, Result};
-use litchi_numbers::{SheetSelector, TableSelector};
+use litchi_numbers::{Dimensions, Document, Sheet, SheetSelector, Table, TableSelector};
+
+/// A private semantic sheet catalog used only at the legacy archive boundary.
+///
+/// The focused Numbers selector is intentionally archive-free.  The host still
+/// has to hand a selected native object to its existing writer, so this adapter
+/// keeps the native IDs in a parallel private vector and delegates the actual
+/// name/index match to `litchi_numbers::Document::sheet`.
+struct SheetSelectorAdapter {
+    semantic: Document,
+    source_names: Vec<String>,
+    native_ids: Vec<u64>,
+}
+
+impl SheetSelectorAdapter {
+    fn from_editor(editor: &NumbersEditor) -> Result<Self> {
+        let source = editor.sheets()?;
+        let source_names = source
+            .iter()
+            .map(|sheet| sheet.name.clone())
+            .collect::<Vec<_>>();
+        let semantic_sheets = selector_safe_names(&source_names, "sheet")
+            .into_iter()
+            .enumerate()
+            .map(|(index, name)| Sheet::new(name, index))
+            .collect::<Vec<_>>();
+        let semantic = Document::from_sheets(semantic_sheets).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Numbers sheet selector catalog is invalid: {error}"
+            ))
+        })?;
+        let native_ids = source
+            .into_iter()
+            .map(|sheet| sheet.native_id())
+            .collect::<Vec<_>>();
+        Ok(Self {
+            semantic,
+            source_names,
+            native_ids,
+        })
+    }
+
+    fn native_id(&self, selector: SheetSelector<'_>) -> Result<u64> {
+        ensure_unique_sheet_name(&self.source_names, selector)?;
+        let index = self
+            .semantic
+            .sheet(selector)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("Numbers sheet selector failed: {error}"))
+            })?
+            .map(Sheet::index)
+            .ok_or_else(|| sheet_selector_error(selector))?;
+        self.native_ids.get(index).copied().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers sheet selector catalog lost native entry at index {index}"
+            ))
+        })
+    }
+}
+
+/// A private semantic table catalog used only at the legacy archive boundary.
+///
+/// `TableSelector` is scoped to one focused semantic sheet.  The historical
+/// editor API predates that scope and exposes one workbook-wide table catalog,
+/// so the adapter presents that catalog as one synthetic semantic sheet.  Its
+/// source-name preflight retains the host's cross-sheet ambiguity rule.
+struct TableSelectorAdapter {
+    semantic: Sheet,
+    source_names: Vec<String>,
+    native_ids: Vec<u64>,
+}
+
+impl TableSelectorAdapter {
+    fn from_editor(editor: &NumbersEditor) -> Result<Self> {
+        let descriptors = super::table_models(&editor.package)?;
+        let source_names = descriptors
+            .iter()
+            .map(|table| table.model.table_name.clone())
+            .collect::<Vec<_>>();
+        let semantic_tables = selector_safe_names(&source_names, "table")
+            .into_iter()
+            .zip(&descriptors)
+            .map(|(name, descriptor)| {
+                Table::new(
+                    name,
+                    Dimensions::new(
+                        descriptor.model.number_of_rows,
+                        descriptor.model.number_of_columns,
+                    ),
+                )
+            })
+            .collect::<Vec<_>>();
+        let semantic = Sheet::try_from_tables("Numbers table selector catalog", 0, semantic_tables)
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Numbers table selector catalog is invalid: {error}"
+                ))
+            })?;
+        let native_ids = descriptors
+            .into_iter()
+            .map(|table| table.object_id)
+            .collect::<Vec<_>>();
+        Ok(Self {
+            semantic,
+            source_names,
+            native_ids,
+        })
+    }
+
+    fn native_id(&self, selector: TableSelector<'_>) -> Result<u64> {
+        ensure_unique_table_name(&self.source_names, selector)?;
+        let selected = self
+            .semantic
+            .select(selector)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("Numbers table selector failed: {error}"))
+            })?
+            .ok_or_else(|| table_selector_error(selector))?;
+        let index = self
+            .semantic
+            .tables()
+            .position(|table| std::ptr::eq(table, selected))
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Numbers table selector catalog lost semantic entry".to_owned(),
+                )
+            })?;
+        self.native_ids.get(index).copied().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table selector catalog lost native entry at index {index}"
+            ))
+        })
+    }
+}
+
+/// Make a source catalog safe to pass through focused immutable constructors.
+///
+/// Native malformed packages can repeat a visible name.  The requested name
+/// is checked against the original names before this list is used, while
+/// duplicate entries that are irrelevant to an index lookup receive private
+/// labels so they cannot make the focused catalog reject an otherwise valid
+/// positional selection.  Matching remains exact and case-sensitive.
+fn selector_safe_names(source_names: &[String], kind: &str) -> Vec<String> {
+    let mut used = source_names.iter().cloned().collect::<HashSet<_>>();
+    let mut seen = HashSet::new();
+    source_names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            if seen.insert(name.as_str()) {
+                return name.clone();
+            }
+            let mut replacement = format!("\0litchi-selector-{kind}-{index}");
+            while used.contains(&replacement) {
+                replacement.push('_');
+            }
+            used.insert(replacement.clone());
+            replacement
+        })
+        .collect()
+}
+
+fn ensure_unique_sheet_name(source_names: &[String], selector: SheetSelector<'_>) -> Result<()> {
+    let SheetSelector::Name(name) = selector else {
+        return Ok(());
+    };
+    let matches = source_names
+        .iter()
+        .filter(|candidate| candidate.as_str() == name)
+        .count();
+    match matches {
+        0 => Err(sheet_selector_error(selector)),
+        1 => Ok(()),
+        _ => Err(Error::ParseError(format!(
+            "Numbers sheet name {name:?} is ambiguous"
+        ))),
+    }
+}
+
+fn ensure_unique_table_name(source_names: &[String], selector: TableSelector<'_>) -> Result<()> {
+    let TableSelector::Name(name) = selector else {
+        return Ok(());
+    };
+    let matches = source_names
+        .iter()
+        .filter(|candidate| candidate.as_str() == name)
+        .count();
+    match matches {
+        0 => Err(table_selector_error(selector)),
+        1 => Ok(()),
+        _ => Err(Error::ParseError(format!(
+            "Numbers table name {name:?} is ambiguous"
+        ))),
+    }
+}
+
+fn sheet_selector_error(selector: SheetSelector<'_>) -> Error {
+    match selector {
+        SheetSelector::Name(name) => {
+            Error::ParseError(format!("Numbers sheet named {name:?} not found"))
+        },
+        SheetSelector::Index(index) => Error::ParseError(format!(
+            "Numbers sheet catalog index {index} is out of bounds"
+        )),
+    }
+}
+
+fn table_selector_error(selector: TableSelector<'_>) -> Error {
+    match selector {
+        TableSelector::Name(name) => {
+            Error::ParseError(format!("Numbers table named {name:?} not found"))
+        },
+        TableSelector::Index(index) => Error::ParseError(format!(
+            "Numbers table catalog index {index} is out of bounds"
+        )),
+    }
+}
 
 /// Resolve a semantic sheet selector to its native object identifier.
 pub(super) fn sheet_id(editor: &NumbersEditor, selector: SheetSelector<'_>) -> Result<u64> {
-    let sheets = editor.sheets()?;
-    match selector {
-        SheetSelector::Name(name) => unique_named_sheet(&sheets, name),
-        SheetSelector::Index(index) => sheets
-            .get(index)
-            .map(NumbersSheetInfo::native_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!(
-                    "Numbers sheet catalog index {index} is out of bounds"
-                ))
-            }),
-    }
+    SheetSelectorAdapter::from_editor(editor)?.native_id(selector)
 }
 
 /// Resolve a semantic table selector to its native model object identifier.
 pub(super) fn table_id(editor: &NumbersEditor, selector: TableSelector<'_>) -> Result<u64> {
-    let tables = super::table_models(&editor.package)?;
-    match selector {
-        TableSelector::Name(name) => unique_named_table(&tables, name),
-        TableSelector::Index(index) => {
-            tables
-                .get(index)
-                .map(|table| table.object_id)
-                .ok_or_else(|| {
-                    Error::ParseError(format!(
-                        "Numbers table catalog index {index} is out of bounds"
-                    ))
-                })
-        },
-    }
+    TableSelectorAdapter::from_editor(editor)?.native_id(selector)
 }
 
 /// Return the semantic catalog position of a native table identifier for
@@ -49,36 +243,6 @@ pub(super) fn table_index(editor: &NumbersEditor, native_id: u64) -> Result<usiz
         .iter()
         .position(|table| table.object_id == native_id)
         .ok_or_else(|| Error::ParseError(format!("Numbers table {native_id} not found")))
-}
-
-fn unique_named_sheet(sheets: &[NumbersSheetInfo], name: &str) -> Result<u64> {
-    let mut matches = sheets.iter().filter(|sheet| sheet.name == name);
-    let Some(sheet) = matches.next() else {
-        return Err(Error::ParseError(format!(
-            "Numbers sheet named {name:?} not found"
-        )));
-    };
-    if matches.next().is_some() {
-        return Err(Error::ParseError(format!(
-            "Numbers sheet name {name:?} is ambiguous"
-        )));
-    }
-    Ok(sheet.native_id())
-}
-
-fn unique_named_table(tables: &[super::model::TableDescriptor], name: &str) -> Result<u64> {
-    let mut matches = tables.iter().filter(|table| table.model.table_name == name);
-    let Some(table) = matches.next() else {
-        return Err(Error::ParseError(format!(
-            "Numbers table named {name:?} not found"
-        )));
-    };
-    if matches.next().is_some() {
-        return Err(Error::ParseError(format!(
-            "Numbers table name {name:?} is ambiguous"
-        )));
-    }
-    Ok(table.object_id)
 }
 
 #[cfg(test)]
@@ -136,5 +300,30 @@ mod tests {
             .unwrap();
 
         assert!(table_id(&editor, TableSelector::name("Revenue")).is_err());
+    }
+
+    #[test]
+    fn selectors_keep_exact_case_and_ambiguous_operations_atomic() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Summary")
+            .table_name("Revenue")
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+
+        assert!(sheet_id(&editor, SheetSelector::name("summary")).is_err());
+        assert!(table_id(&editor, TableSelector::name("revenue")).is_err());
+
+        editor.add_empty_sheet("Archive").unwrap();
+        editor
+            .add_empty_table(SheetSelector::name("Archive"), "Revenue", 2, 2)
+            .unwrap();
+        let before = editor.to_bytes().unwrap();
+        assert!(
+            editor
+                .duplicate_table(TableSelector::name("Revenue"))
+                .is_err()
+        );
+        assert_eq!(editor.to_bytes().unwrap(), before);
     }
 }

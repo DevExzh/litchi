@@ -26,6 +26,39 @@ impl<'a> SheetSelector<'a> {
     pub const fn index(index: usize) -> Self {
         Self::Index(index)
     }
+
+    /// Creates a selector from a typed zero-based collection position.
+    #[must_use]
+    pub const fn position(position: litchi_core::Position) -> Self {
+        Self::index(position.get())
+    }
+
+    /// Borrows the selected exact name, if present.
+    #[must_use]
+    pub const fn as_name(self) -> Option<&'a str> {
+        match self {
+            Self::Name(name) => Some(name),
+            Self::Index(_) => None,
+        }
+    }
+
+    /// Returns the selected zero-based index, if present.
+    #[must_use]
+    pub const fn as_index(self) -> Option<usize> {
+        match self {
+            Self::Name(_) => None,
+            Self::Index(index) => Some(index),
+        }
+    }
+
+    /// Returns the selected typed zero-based collection position, if present.
+    #[must_use]
+    pub const fn as_position(self) -> Option<litchi_core::Position> {
+        match self {
+            Self::Name(_) => None,
+            Self::Index(index) => Some(litchi_core::Position::new(index)),
+        }
+    }
 }
 
 impl<'a> From<&'a str> for SheetSelector<'a> {
@@ -43,6 +76,12 @@ impl<'a> From<&'a String> for SheetSelector<'a> {
 impl From<usize> for SheetSelector<'_> {
     fn from(index: usize) -> Self {
         Self::index(index)
+    }
+}
+
+impl From<litchi_core::Position> for SheetSelector<'_> {
+    fn from(position: litchi_core::Position) -> Self {
+        Self::position(position)
     }
 }
 
@@ -72,6 +111,39 @@ impl<'a> TableSelector<'a> {
     pub const fn index(index: usize) -> Self {
         Self::Index(index)
     }
+
+    /// Creates a selector from a typed zero-based collection position.
+    #[must_use]
+    pub const fn position(position: litchi_core::Position) -> Self {
+        Self::index(position.get())
+    }
+
+    /// Borrows the selected exact name, if present.
+    #[must_use]
+    pub const fn as_name(self) -> Option<&'a str> {
+        match self {
+            Self::Name(name) => Some(name),
+            Self::Index(_) => None,
+        }
+    }
+
+    /// Returns the selected zero-based index, if present.
+    #[must_use]
+    pub const fn as_index(self) -> Option<usize> {
+        match self {
+            Self::Name(_) => None,
+            Self::Index(index) => Some(index),
+        }
+    }
+
+    /// Returns the selected typed zero-based collection position, if present.
+    #[must_use]
+    pub const fn as_position(self) -> Option<litchi_core::Position> {
+        match self {
+            Self::Name(_) => None,
+            Self::Index(index) => Some(litchi_core::Position::new(index)),
+        }
+    }
 }
 
 impl<'a> From<&'a str> for TableSelector<'a> {
@@ -89,6 +161,12 @@ impl<'a> From<&'a String> for TableSelector<'a> {
 impl From<usize> for TableSelector<'_> {
     fn from(index: usize) -> Self {
         Self::index(index)
+    }
+}
+
+impl From<litchi_core::Position> for TableSelector<'_> {
+    fn from(position: litchi_core::Position) -> Self {
+        Self::position(position)
     }
 }
 
@@ -135,5 +213,44 @@ mod tests {
 
         assert_eq!(sheet, SheetSelector::Name("Summary"));
         assert_eq!(table, TableSelector::Name("Revenue"));
+    }
+
+    #[test]
+    fn selectors_expose_typed_position_and_variant_accessors() {
+        let position = litchi_core::Position::new(3);
+        let sheet = SheetSelector::position(position);
+        let table = TableSelector::position(position);
+
+        assert_eq!(sheet, SheetSelector::Index(3));
+        assert_eq!(sheet.as_index(), Some(3));
+        assert_eq!(sheet.as_position(), Some(position));
+        assert_eq!(sheet.as_name(), None);
+        assert_eq!(table, TableSelector::Index(3));
+        assert_eq!(table.as_index(), Some(3));
+        assert_eq!(table.as_position(), Some(position));
+        assert_eq!(table.as_name(), None);
+    }
+
+    #[test]
+    fn names_expose_only_the_name_accessor() {
+        let sheet = SheetSelector::name("Summary");
+        let table = TableSelector::name("Revenue");
+
+        assert_eq!(sheet.as_name(), Some("Summary"));
+        assert_eq!(sheet.as_index(), None);
+        assert_eq!(sheet.as_position(), None);
+        assert_eq!(table.as_name(), Some("Revenue"));
+        assert_eq!(table.as_index(), None);
+        assert_eq!(table.as_position(), None);
+    }
+
+    #[test]
+    fn core_positions_convert_without_changing_selector_variants() {
+        let position = litchi_core::Position::new(7);
+        let sheet: SheetSelector<'_> = position.into();
+        let table: TableSelector<'_> = position.into();
+
+        assert_eq!(sheet, SheetSelector::Index(7));
+        assert_eq!(table, TableSelector::Index(7));
     }
 }

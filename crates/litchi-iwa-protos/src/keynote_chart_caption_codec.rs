@@ -409,7 +409,19 @@ pub fn decode_chart_caption(
 ) -> Result<ChartCaptionSnapshot, DecodeError> {
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
-    let strict = preflight_chart_caption(source, options, &mut budget)?;
+    decode_chart_caption_with_budget(source, options, &mut budget)
+}
+
+/// Decode one chart-caption payload while charging an existing aggregate
+/// budget. Rewrites use this entry point for both their source and readback
+/// passes so a work/field ceiling applies to the complete transaction rather
+/// than independently to each pass.
+fn decode_chart_caption_with_budget(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<ChartCaptionSnapshot, DecodeError> {
+    let strict = preflight_chart_caption(source, options, budget)?;
     let view: projection::ChartDrawableArchiveLazyView<'_> = options
         .buffa()
         .decode_lazy_view(source)
@@ -464,7 +476,12 @@ pub fn rewrite_chart_caption_with_report(
     write: ChartCaptionWrite,
     options: DecodeOptions,
 ) -> Result<(Vec<u8>, RewriteReport), DecodeError> {
-    let current = decode_chart_caption(source, options)?;
+    validate_decode_input(source, options)?;
+    // One budget spans source validation, sizing, emission, and candidate
+    // readback so a rewrite cannot multiply the configured work ceiling by
+    // the number of internal passes.
+    let mut budget = Budget::new(options);
+    let current = decode_chart_caption_with_budget(source, options, &mut budget)?;
     let current_identifier = current
         .caption_identifier()
         .ok_or_else(|| DecodeError::missing_required("TSP.Reference.identifier"))?;
@@ -485,8 +502,7 @@ pub fn rewrite_chart_caption_with_report(
         ));
     }
 
-    let mut measure_budget = Budget::new(options);
-    let output_bytes = measure_rewrite_root(source, options, write, &mut measure_budget)?;
+    let output_bytes = measure_rewrite_root(source, options, write, &mut budget)?;
     if output_bytes > options.max_output_bytes {
         return Err(DecodeError::output_limit(
             output_bytes,
@@ -494,8 +510,7 @@ pub fn rewrite_chart_caption_with_report(
         ));
     }
     let mut output = reserve_output(output_bytes)?;
-    let mut write_budget = Budget::new(options);
-    rewrite_root_into(source, options, write, &mut write_budget, &mut output)?;
+    rewrite_root_into(source, options, write, &mut budget, &mut output)?;
     debug_assert_eq!(output.len(), output_bytes);
 
     let readback_options = DecodeOptions {
@@ -503,7 +518,8 @@ pub fn rewrite_chart_caption_with_report(
         max_output_bytes: options.max_output_bytes.max(output.len()),
         ..options
     };
-    let readback = decode_chart_caption(&output, readback_options)?;
+    validate_decode_input(&output, readback_options)?;
+    let readback = decode_chart_caption_with_budget(&output, readback_options, &mut budget)?;
     if readback.caption_identifier() != Some(write.identifier) {
         return Err(DecodeError::projection());
     }
@@ -821,6 +837,9 @@ fn reserve_output(amount: usize) -> Result<Vec<u8>, DecodeError> {
     output
         .try_reserve_exact(amount)
         .map_err(|_allocation_error| DecodeError::allocation(amount))?;
+    if output.capacity() != amount {
+        return Err(DecodeError::allocation(amount));
+    }
     Ok(output)
 }
 
@@ -1239,9 +1258,11 @@ fn take_exact<'source>(
 )]
 mod tests {
     use super::{
-        CHART_DRAWABLE_SUPER_FIELD, ChartCaptionSnapshot, ChartCaptionWrite,
+        Budget, CHART_DRAWABLE_SUPER_FIELD, ChartCaptionSnapshot, ChartCaptionWrite,
         DRAWABLE_CAPTION_FIELD, DecodeOptions, WireResourceLimit, decode_chart_caption,
-        decode_chart_caption_identifier, rewrite_chart_caption_with_report,
+        decode_chart_caption_identifier, decode_chart_caption_with_budget, measure_rewrite_root,
+        reserve_output, rewrite_chart_caption_with_report, rewrite_root_into,
+        validate_decode_input,
     };
 
     fn options(source: &[u8]) -> DecodeOptions {
@@ -1257,6 +1278,26 @@ mod tests {
         let reference = [vec![0x08], varint(identifier)].concat();
         let drawable = [vec![0x5a], varint(reference.len() as u64), reference].concat();
         [vec![0x0a], varint(drawable.len() as u64), drawable].concat()
+    }
+
+    fn aggregate_rewrite_work(source: &[u8], write: ChartCaptionWrite) -> (usize, usize) {
+        let options = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 8)
+            .with_max_output_bytes(source.len() + 32);
+        let mut budget = Budget::new(options);
+        decode_chart_caption_with_budget(source, options, &mut budget).expect("source decode");
+        let output_bytes =
+            measure_rewrite_root(source, options, write, &mut budget).expect("rewrite measure");
+        let mut output = reserve_output(output_bytes).expect("rewrite allocation");
+        rewrite_root_into(source, options, write, &mut budget, &mut output).expect("rewrite pass");
+        let readback_options = DecodeOptions {
+            max_message_bytes: options.max_message_bytes.max(output.len()),
+            max_output_bytes: options.max_output_bytes.max(output.len()),
+            ..options
+        };
+        validate_decode_input(&output, readback_options).expect("readback input");
+        decode_chart_caption_with_budget(&output, readback_options, &mut budget)
+            .expect("rewrite readback");
+        (output_bytes, budget.work_bytes)
     }
 
     fn varint(mut value: u64) -> Vec<u8> {
@@ -1439,7 +1480,18 @@ mod tests {
             field_varint(17, 4),
         ]
         .concat();
-        let rewrite_options = options(&source).with_max_output_bytes(source.len() + 32);
+        // Rewrites charge source validation, sizing, emission, and candidate
+        // readback through one aggregate budget. The decode helper's
+        // source-relative work profile is intentionally per-pass and is too
+        // small for this nested rewrite; the exact inclusive aggregate
+        // boundary is covered below.
+        let rewrite_options = DecodeOptions::new(
+            source.len(),
+            source.len().saturating_mul(4).max(1),
+            usize::MAX,
+            8,
+        )
+        .with_max_output_bytes(source.len() + 32);
         let (rewritten, report) = rewrite_chart_caption_with_report(
             &source,
             ChartCaptionWrite::new(300),
@@ -1487,5 +1539,34 @@ mod tests {
                 .expect("no-op");
         assert_eq!(rewritten, source);
         assert!(!report.changed());
+    }
+
+    #[test]
+    fn output_reservation_enforces_exact_capacity_or_typed_allocation_error() {
+        match reserve_output(17) {
+            Ok(output) => assert_eq!(output.capacity(), 17),
+            Err(error) => assert_eq!(error.allocation_amount(), Some(17)),
+        }
+    }
+
+    #[test]
+    fn rewrite_work_budget_is_aggregate_and_exactly_inclusive() {
+        let source = chart_with_caption(7);
+        let write = ChartCaptionWrite::new(300);
+        let (output_bytes, exact_work) = aggregate_rewrite_work(&source, write);
+
+        let exact_options = DecodeOptions::new(source.len(), usize::MAX, exact_work, 8)
+            .with_max_output_bytes(output_bytes);
+        rewrite_chart_caption_with_report(&source, write, exact_options)
+            .expect("the exact aggregate work ceiling is inclusive");
+
+        let below_options = DecodeOptions::new(source.len(), usize::MAX, exact_work - 1, 8)
+            .with_max_output_bytes(output_bytes);
+        let error = rewrite_chart_caption_with_report(&source, write, below_options)
+            .expect_err("one byte below aggregate work must fail");
+        assert_eq!(
+            error.work_limit_values(),
+            Some((exact_work, exact_work - 1))
+        );
     }
 }

@@ -11,7 +11,10 @@ use crate::charts::series_style::{
     ChartSeriesStyleSlot, GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
     effective_chart_series_style_slots, generated_chart_series_style_extension,
 };
-use crate::charts::style::replace_known_wire_fields_preserving_unknown;
+use crate::charts::style::{
+    KnownWireField, KnownWireFieldKind, copy_wire_bytes,
+    replace_known_wire_fields_preserving_unknown_with_schema, validate_known_wire_fields,
+};
 use crate::protobuf::tsd;
 use crate::shapes::{
     Join, Pattern, RgbaColor, Stroke, Width, empty_stroke_archive, stroke_from_native,
@@ -27,6 +30,214 @@ const LINE_STROKE_FIELD: u32 = 48;
 const PIE_STROKE_FIELD: u32 = 52;
 const SCATTER_STROKE_FIELD: u32 = 53;
 const RADAR_AREA_STROKE_FIELD: u32 = 172;
+
+const COLOR_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 4,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 5,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 6,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 7,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 8,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 9,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 10,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 11,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 12,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+];
+
+const REFERENCE_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+];
+
+const REFERENCE_DICTIONARY_ENTRY_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Message(REFERENCE_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Message(REFERENCE_FIELDS),
+        repeated: false,
+    },
+];
+
+const REFERENCE_DICTIONARY_FIELDS: &[KnownWireField] = &[KnownWireField {
+    number: 1,
+    kind: KnownWireFieldKind::Message(REFERENCE_DICTIONARY_ENTRY_FIELDS),
+    repeated: true,
+}];
+
+const STROKE_PATTERN_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 4,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: true,
+    },
+];
+
+const SMART_STROKE_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::LengthDelimited,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 4,
+        kind: KnownWireFieldKind::Message(REFERENCE_DICTIONARY_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 5,
+        kind: KnownWireFieldKind::Fixed64,
+        repeated: false,
+    },
+];
+
+const FRAME_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::LengthDelimited,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+];
+
+const PATTERNED_STROKE_FIELDS: &[KnownWireField] = &[KnownWireField {
+    number: 2,
+    kind: KnownWireFieldKind::LengthDelimited,
+    repeated: false,
+}];
+
+const STROKE_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Message(COLOR_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 4,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 5,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 6,
+        kind: KnownWireFieldKind::Message(STROKE_PATTERN_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 7,
+        kind: KnownWireFieldKind::Message(SMART_STROKE_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 8,
+        kind: KnownWireFieldKind::Message(FRAME_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 9,
+        kind: KnownWireFieldKind::Message(PATTERNED_STROKE_FIELDS),
+        repeated: false,
+    },
+];
 
 /// Stroke patterns exposed by the native chart-series inspector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -278,20 +489,24 @@ fn patch_local_stroke(
     let existing_extension = generated_chart_series_style_extension(data)?;
     let extension = existing_extension.unwrap_or_default();
     let present = read_stroke_field(data, field_number)?.is_some();
-    let native = stroke.map(|stroke| {
-        stroke
-            .map_or_else(empty_stroke_archive, ChartSeriesStroke::to_native)
-            .encode_to_vec()
-    });
+    let native = stroke
+        .map(|stroke| {
+            encode_stroke(stroke.map_or_else(empty_stroke_archive, ChartSeriesStroke::to_native))
+        })
+        .transpose()?;
     let native = native
         .map(|replacement| {
             strict_optional_message(extension, field_number)?.map_or_else(
-                || Ok(replacement.clone()),
+                || {
+                    validate_known_wire_fields(&replacement, STROKE_FIELDS, "chart series stroke")?;
+                    copy_wire_bytes(&replacement, "chart series stroke replacement")
+                },
                 |existing| {
-                    replace_known_wire_fields_preserving_unknown(
+                    replace_known_wire_fields_preserving_unknown_with_schema(
                         existing,
                         &replacement,
-                        &[1, 2, 3, 4, 5, 6, 7, 8, 9],
+                        STROKE_FIELDS,
+                        "chart series stroke",
                     )
                 },
             )
@@ -311,6 +526,23 @@ fn patch_local_stroke(
         ));
     }
     Ok(patched)
+}
+
+fn encode_stroke(stroke: tsd::StrokeArchive) -> Result<Vec<u8>> {
+    let mut encoded = Vec::new();
+    encoded
+        .try_reserve_exact(stroke.encoded_len())
+        .map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "chart series stroke payload",
+                amount: stroke.encoded_len(),
+            })
+        })?;
+    stroke.encode(&mut encoded).map_err(|error| {
+        Error::InvalidFormat(format!("chart series stroke encode failed: {error}"))
+    })?;
+    validate_known_wire_fields(&encoded, STROKE_FIELDS, "chart series stroke")?;
+    Ok(encoded)
 }
 
 /// Project one selected stroke field without materializing the wide generated
@@ -350,7 +582,9 @@ fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8
         )));
     }
     field.validate_canonical_framing(data)?;
-    Ok(Some(field.payload(data)?))
+    let payload = field.checked_payload(data)?;
+    validate_known_wire_fields(payload, STROKE_FIELDS, "chart series stroke")?;
+    Ok(Some(payload))
 }
 
 #[cfg(test)]
@@ -539,6 +773,36 @@ mod tests {
         )
         .unwrap();
         assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn series_stroke_rejects_wrong_wire_type_in_nested_known_field() {
+        let outer = style_with_unknown_fields();
+        let extension = generated_chart_series_style_extension(&outer)
+            .unwrap()
+            .unwrap();
+        let stroke_payload = stroke(0.1, 0.3, 0.8).to_native().encode_to_vec();
+        let mut malformed_stroke = stroke_payload;
+        append_varint_field(&mut malformed_stroke, 2, 77).unwrap();
+        let mut extension = extension.to_vec();
+        append_length_delimited_field(&mut extension, BAR_STROKE_FIELD, &malformed_stroke).unwrap();
+        let malformed = patch_length_delimited_field(
+            &outer,
+            GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&extension),
+        )
+        .unwrap();
+
+        assert!(read_stroke_field(&malformed, BAR_STROKE_FIELD).is_err());
+        assert!(
+            patch_local_stroke(
+                &malformed,
+                ChartSeriesStrokeKind::BarOrColumn2d,
+                Some(Some(stroke(0.8, 0.2, 0.1))),
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -11,6 +11,10 @@ use litchi_iwa_common::comment::{
 use litchi_iwa_protos::pages_body_codec::{
     self as pages_body_codec, DecodeOptions as PagesBodyDecodeOptions, DocumentBodySnapshot,
 };
+use litchi_iwa_protos::pages_movie_caption_codec::{
+    self as pages_movie_caption_codec, CaptionInfoWrite,
+    DecodeOptions as PagesMovieCaptionDecodeOptions,
+};
 use litchi_iwa_protos::pages_section_codec::{
     DecodeOptions, SectionSettingsSnapshot, decode_section_name, decode_section_settings,
 };
@@ -71,6 +75,7 @@ const SECTION_TEMPLATE_MESSAGE_TYPE: u32 = 10143;
 const USER_DEFINED_GUIDE_MAP_MESSAGE_TYPE: u32 = 10016;
 const GUIDE_STORAGE_MESSAGE_TYPE: u32 = 3047;
 const STORAGE_MESSAGE_TYPES: &[u32] = &[2001, 2022];
+const BODY_FOOTNOTE_TABLE_FIELD: u32 = 16;
 const PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2011;
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
@@ -134,11 +139,6 @@ impl PagesEditor {
         let body_storage_id = body_storage_id(&package)?;
         let (sections, header_footers) = discover_structure(&package, body_storage_id.get())?;
         let text = IWorkTextEditor::from_package(package);
-        if text.storage(body_storage_id).is_err() {
-            return Err(Error::InvalidFormat(format!(
-                "Pages body object {body_storage_id} has no writable text storage"
-            )));
-        }
         Ok(Self {
             text,
             body_storage_id,
@@ -3282,28 +3282,37 @@ fn remap_pages_attachment_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result
 
 #[allow(deprecated)]
 fn remap_pages_caption_info_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
-    const REFERENCE_PATHS: &[&[u32]] = &[
-        &[1, 1, 1, 2],
-        &[1, 1, 1, 6],
-        &[1, 1, 1, 9],
-        &[1, 1, 1, 10],
-        &[1, 1, 1, 11],
-        &[1, 1, 2],
-        &[1, 2],
-        &[1, 3],
-        &[1, 4],
-        &[2],
-    ];
-    let mut expected = crate::protobuf::tsa::CaptionInfoArchive::decode(data)?;
-    remap_pages_shape(&mut expected.super_, remap);
-    remap_optional_pages_reference(&mut expected.placement, remap);
-    let data = remap_pages_reference_paths(data, REFERENCE_PATHS, remap)?;
-    if crate::protobuf::tsa::CaptionInfoArchive::decode(data.as_slice())? != expected {
-        return Err(Error::InvalidFormat(
-            "Pages CaptionInfoArchive wire remap failed validation".to_owned(),
-        ));
-    }
-    Ok(data)
+    let pairs = remap
+        .iter()
+        .map(|(&old, &new)| (old, new))
+        .collect::<Vec<_>>();
+    let output_limit = data.len().saturating_mul(10).max(data.len());
+    let limits = WireLimits::default()
+        .with_input_bytes(data.len().clamp(1, WireLimits::MAX_INPUT_BYTES))
+        .and_then(|limits| limits.with_fields(data.len().clamp(1, WireLimits::MAX_FIELDS)))
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                data.len()
+                    .saturating_mul(64)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })?;
+    pages_movie_caption_codec::rewrite_caption_info(
+        data,
+        CaptionInfoWrite::new(&pairs),
+        PagesMovieCaptionDecodeOptions::new(
+            limits.max_input_bytes(),
+            limits.max_fields(),
+            limits.max_rewrite_work(),
+            8,
+        )
+        .with_max_output_bytes(output_limit),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Pages CaptionInfoArchive wire remap failed validation: {error}"
+        ))
+    })
 }
 
 fn clone_pages_drawable_graph_object(
@@ -4240,13 +4249,57 @@ fn pages_section_name(payload: &[u8]) -> Result<Option<&str>> {
     .map_err(|error| Error::InvalidFormat(format!("Invalid Pages section name: {error}")))
 }
 
+/// Qualify one native text storage for Pages graph discovery.
+///
+/// Discovery only needs to know whether the payload is a writable text
+/// storage.  Keep the generated archive value out of this hot path: the
+/// existing bounded text-wire owner performs strict known-tree validation and
+/// one private Buffa text projection, while the caller-owned payload remains
+/// untouched.  The body storage is still decoded below when its section table
+/// is required for host graph checks.
+fn is_valid_pages_text_storage(payload: &[u8]) -> bool {
+    litchi_pages::__is_valid_pages_text_storage(payload)
+}
+
+/// Decode the body storage needed for Pages graph discovery.
+///
+/// Body footnote entries are retained as opaque source bytes and validated by
+/// the footnote editor when they are read or rewritten.  Consequently, a
+/// malformed field-16 payload must not prevent discovery of the body's text
+/// and section table.  Remove that one optional table only from the temporary
+/// discovery copy; the package payload is never changed.
+fn body_storage_for_discovery(payload: &[u8]) -> Option<StorageArchive> {
+    if is_valid_pages_text_storage(payload) {
+        return StorageArchive::decode(payload).ok();
+    }
+    let without_footnotes =
+        patch_length_delimited_field(payload, BODY_FOOTNOTE_TABLE_FIELD, true, None).ok()?;
+    if !is_valid_pages_text_storage(&without_footnotes) {
+        return None;
+    }
+    StorageArchive::decode(without_footnotes.as_slice()).ok()
+}
+
 fn pages_section_settings(payload: &[u8]) -> Result<SectionSettingsSnapshot<'_>> {
+    // The aggregate projection scans the complete envelope twice (strict
+    // router plus Buffa view) and revisits each of the four selected nested
+    // references through its lazy view.  Every selected reference is a
+    // length-delimited sub-slice of the source, so 4 * source.len() is a
+    // checked finite upper bound for the two full scans plus two nested
+    // passes.  A saturating budget would turn arithmetic overflow into an
+    // accidental unbounded allowance on narrower platforms.
+    let work_bytes = payload.len().checked_mul(4).ok_or_else(|| {
+        Error::InvalidFormat("Pages section settings work budget overflows".to_owned())
+    })?;
+    let max_payload_bytes = payload.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let max_fields = payload.len().clamp(1, WireLimits::MAX_FIELDS);
+    let max_work_bytes = work_bytes.clamp(1, WireLimits::MAX_REWRITE_WORK);
     decode_section_settings(
         payload,
-        DecodeOptions::new(payload.len(), 64)
-            .with_max_fields(payload.len())
-            .with_max_work_bytes(payload.len().saturating_mul(2))
-            .with_max_name_bytes(payload.len()),
+        DecodeOptions::new(max_payload_bytes, 64)
+            .with_max_fields(max_fields)
+            .with_max_work_bytes(max_work_bytes)
+            .with_max_name_bytes(max_payload_bytes),
     )
     .map_err(|error| Error::InvalidFormat(format!("Invalid Pages section settings: {error}")))
 }
@@ -4488,12 +4541,15 @@ fn discover_structure(
             for message in object.messages {
                 match message.type_ {
                     message_type if STORAGE_MESSAGE_TYPES.contains(&message_type) => {
-                        let Ok(storage) = StorageArchive::decode(message.data.as_slice()) else {
-                            continue;
-                        };
-                        writable_storages.insert(identifier);
                         if identifier == body_storage_id {
+                            let Some(storage) = body_storage_for_discovery(message.data.as_slice())
+                            else {
+                                continue;
+                            };
+                            writable_storages.insert(identifier);
                             body = Some(storage);
+                        } else if is_valid_pages_text_storage(message.data.as_slice()) {
+                            writable_storages.insert(identifier);
                         }
                     },
                     SECTION_MESSAGE_TYPE => {

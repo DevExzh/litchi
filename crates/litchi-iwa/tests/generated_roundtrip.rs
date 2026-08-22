@@ -87,8 +87,8 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
                 .stats()
                 .expect("a Pages snapshot retains ingress statistics");
             assert_eq!(
-                snapshot_stats.total_objects(),
-                specialized_stats.total_objects()
+                snapshot_stats.section_count(),
+                specialized_stats.section_count()
             );
             specialized.validate()?;
             assert_eq!(
@@ -110,8 +110,8 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
                 directory_document
                     .stats()
                     .expect("a directory-backed Pages document has ingress statistics")
-                    .total_objects(),
-                specialized_stats.total_objects()
+                    .section_count(),
+                specialized_stats.section_count()
             );
         },
         Application::Numbers => {

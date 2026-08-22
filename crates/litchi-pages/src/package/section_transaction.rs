@@ -1,4 +1,4 @@
-//! Shared exact-source machinery for settings stored on a Pages section.
+//! Shared exact-source machinery for Pages section-owned transactions.
 
 use std::num::NonZeroU64;
 
@@ -29,6 +29,7 @@ pub(super) struct Target {
     pub(super) component_index: usize,
     pub(super) object_index: usize,
     pub(super) message_index: usize,
+    pub(super) message_type: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -221,6 +222,7 @@ pub(super) fn resolve_position<'selector>(
         .semantic_document()
         .select_section(selector)
         .map_err(|selection_error| match selection_error {
+            crate::SelectorError::EmptySectionName => Error::NameNotFound,
             crate::SelectorError::AmbiguousSectionName {
                 first, duplicate, ..
             } => Error::AmbiguousSelector {
@@ -302,6 +304,7 @@ pub(super) fn resolve_target(
             component_index,
             object_index,
             message_index,
+            message_type: SECTION_MESSAGE_TYPE,
         });
     }
     found.ok_or(Error::InvalidSource { path })
@@ -315,6 +318,75 @@ fn message_field_count(payload: &[u8], limits: WireLimits) -> Result<usize, Erro
 
 pub(super) fn selected_payload(package: &Package, target: Target) -> Result<&[u8], Error> {
     Ok(&selected_message(package, target)?.data)
+}
+
+/// Resolve the rooted body-storage message that owns existing section text.
+///
+/// A body target carries the same physical ownership proof as a section
+/// target: the root body reference, component slot, object slot, message slot,
+/// message type, and selected semantic position are all captured together.
+/// Keeping this proof in the shared transaction seam prevents a text rewrite
+/// from rediscovering a body by identifier after a source/catalog boundary.
+pub(super) fn resolve_body_target(
+    package: &Package,
+    position: Position,
+    budget: &mut TransactionBudget,
+) -> Result<Target, Error> {
+    let path = Path::section(position);
+    let components = package.state.source.components();
+    let limits = package.state.source.limits();
+    budget.charge_transaction_work(components.len(), Path::Package)?;
+    let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
+    let identifier = root.body.ok_or(Error::UnsupportedSource {
+        path: Path::Package,
+    })?;
+
+    let mut found = None;
+    for (component_index, component) in components.iter().enumerate() {
+        budget.charge_transaction_work(component.archive().objects.len(), Path::Package)?;
+        let Some((object_index, object)) = component
+            .archive()
+            .objects
+            .iter()
+            .enumerate()
+            .find(|(_index, object)| object.archive_info.identifier == Some(identifier.get()))
+        else {
+            continue;
+        };
+        if found.is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+        budget.charge_transaction_work(object.messages.len(), Path::Package)?;
+        let (message_index, message) = unique_text_message(object, path)?;
+        validate_selected_metadata(object, message_index, path)?;
+        budget.charge_fields(
+            message_field_count(&message.data, wire_limits(package)?)?,
+            path,
+        )?;
+        budget.charge_work(message.data.len(), path)?;
+        found = Some(Target {
+            position,
+            identifier,
+            component_index,
+            object_index,
+            message_index,
+            message_type: message.type_,
+        });
+    }
+    found.ok_or(Error::InvalidSource { path })
+}
+
+fn unique_text_message(object: &ArchiveObject, path: Path) -> Result<(usize, &RawMessage), Error> {
+    let mut selected = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        if !STORAGE_MESSAGE_TYPES.contains(&message.type_) {
+            continue;
+        }
+        if selected.replace((index, message)).is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    selected.ok_or(Error::InvalidSource { path })
 }
 
 /// Resolve the exact message captured by [`Target`].
@@ -342,7 +414,7 @@ fn selected_message(package: &Package, target: Target) -> Result<&RawMessage, Er
     object
         .messages
         .get(target.message_index)
-        .filter(|message| message.type_ == SECTION_MESSAGE_TYPE)
+        .filter(|message| message.type_ == target.message_type)
         .ok_or(Error::InvalidSource { path })
 }
 
@@ -386,7 +458,7 @@ pub(super) fn rewrite_package(
         let message = object
             .messages
             .get(target.message_index)
-            .filter(|message| message.type_ == SECTION_MESSAGE_TYPE)
+            .filter(|message| message.type_ == target.message_type)
             .ok_or(Error::InvalidSource { path })?;
         if message.data.as_slice() == rewritten_payload.as_slice() {
             return Err(Error::Verification { path });
@@ -395,7 +467,7 @@ pub(super) fn rewrite_package(
             .replace_message_preserving_header_with_limits(
                 target.message_index,
                 RawMessage {
-                    type_: SECTION_MESSAGE_TYPE,
+                    type_: target.message_type,
                     data: rewritten_payload,
                 },
                 archive_limits,
@@ -1004,7 +1076,7 @@ mod tests {
                 small.references,
                 small.transaction_work
             ),
-            (86, 564, 4, 292_154),
+            (86, 600, 4, 292_154),
         );
         assert_eq!(
             (
@@ -1013,7 +1085,7 @@ mod tests {
                 large.references,
                 large.transaction_work
             ),
-            (86, 564, 4, 587_222),
+            (86, 600, 4, 587_222),
         );
         for (small_counter, large_counter) in [
             (small.fields, large.fields),

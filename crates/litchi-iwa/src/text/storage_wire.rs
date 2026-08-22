@@ -10,6 +10,7 @@ use crate::wire::repeated_length_delimited_payloads;
 use crate::{Error, IWorkPackage, Result};
 
 pub(super) const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
+const PAGES_FOOTNOTE_TABLE_FIELD: u32 = 16;
 
 pub(super) struct StorageLocation {
     pub object_id: u64,
@@ -209,9 +210,30 @@ fn decode_storage_payload(
             // be rejected by a package-wide storage discovery pass.
             Ok(None)
         },
-        Err(error) => Err(Error::InvalidFormat(format!(
-            "iWork text storage {object_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
-        ))),
+        Err(error) => {
+            // Pages body storage may carry an optional footnote table whose
+            // attachment entries are deliberately retained as opaque source
+            // bytes by the Pages editor. Keep text discovery/read access
+            // available when only that optional field is malformed; the
+            // source payload remains authoritative and write paths still run
+            // strict text-wire validation before any commit.
+            let without_footnotes = crate::wire::patch_length_delimited_field(
+                data,
+                PAGES_FOOTNOTE_TABLE_FIELD,
+                true,
+                None,
+            )
+            .ok();
+            if let Some(without_footnotes) = without_footnotes
+                && without_footnotes != data
+                && let Ok(storage) = StorageArchive::decode(without_footnotes.as_slice())
+            {
+                return Ok(Some(storage));
+            }
+            Err(Error::InvalidFormat(format!(
+                "iWork text storage {object_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
+            )))
+        },
     }
 }
 
@@ -393,5 +415,31 @@ mod tests {
         package.insert_entry("Index/Z-Broken.iwa", vec![0]).unwrap();
 
         assert!(locate_text_storage_with_archive(&package, 45).is_err());
+    }
+
+    #[test]
+    fn malformed_pages_footnote_table_stays_opaque_for_text_read() {
+        let mut source = crate::protobuf::tswp::StorageArchive {
+            text: vec!["Body".to_owned()],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        // TSWP.StorageArchive.table_footnote = 16, with an invalid nested
+        // ObjectAttributeTable payload. The text projection remains valid.
+        source.extend_from_slice(&[0x82, 0x01, 0x01, 0xff]);
+        let before = source.clone();
+        assert!(StorageArchive::decode(source.as_slice()).is_err());
+
+        let storage = decode_storage_payload(46, "Index/Body.iwa", 0, 2_001, &source)
+            .expect("opaque footnote fallback")
+            .expect("text storage");
+        assert_eq!(storage.text, ["Body"]);
+        assert_eq!(source, before);
+    }
+
+    #[test]
+    fn malformed_non_footnote_storage_is_still_rejected() {
+        let source = [0x1a, 0x01, 0xff];
+        assert!(decode_storage_payload(47, "Index/Body.iwa", 0, 2_001, &source).is_err());
     }
 }

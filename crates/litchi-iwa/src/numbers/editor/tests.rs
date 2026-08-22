@@ -2332,32 +2332,40 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
 fn focused_cell_edit_round_trips_through_legacy_host_reader() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut editor = NumbersEditor::open(fixture).unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
+    let editor = NumbersEditor::open(fixture).unwrap();
+    let source_bytes = editor.to_bytes().unwrap();
+    let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
+    let position = litchi_numbers::table::CellPosition::new(1, 2);
+    let commit = source
+        .set_table_cell(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position,
+            litchi_numbers::table::cells::Input::text("Focused host interop").unwrap(),
+        )
+        .unwrap();
+    let mut edited_bytes = Vec::new();
+    commit.package().write_to(&mut edited_bytes).unwrap();
+    let _legacy_reader = NumbersEditor::from_bytes(&edited_bytes).unwrap();
+    assert_ne!(edited_bytes, source_bytes);
 
-    crate::numbers::editor::test_set_cell(
-        &mut editor,
-        table_id,
-        1,
-        2,
-        CellValue::Text("Focused host interop".to_owned()),
-    )
-    .unwrap();
-
-    assert_eq!(editor.tables().unwrap()[0].object_id, table_id);
-    let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let focused = FocusedNumbersPackage::from_bytes(&edited_bytes).unwrap();
     assert_eq!(
         focused
-            .table_cell(
-                SheetSelector::index(0),
-                TableSelector::index(0),
-                litchi_numbers::table::CellPosition::new(1, 2),
-            )
+            .table_cell(SheetSelector::index(0), TableSelector::index(0), position)
             .unwrap()
             .storage()
             .value(),
         Some(&CellValue::Text("Focused host interop".to_owned()))
     );
+
+    let restored = commit
+        .package()
+        .apply_table_cells(&commit.patch().inverse())
+        .unwrap();
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes).unwrap();
+    assert_eq!(restored_bytes, source_bytes);
 }
 
 #[test]

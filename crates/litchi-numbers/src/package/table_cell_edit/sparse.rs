@@ -10,6 +10,8 @@
 
 use core::{fmt, mem::size_of};
 
+use litchi_iwa_protos::numbers_table_cell_storage_codec as storage_codec;
+
 #[cfg(test)]
 use std::cell::Cell as TestCell;
 
@@ -1993,6 +1995,67 @@ struct HeaderBucketRows {
     rows: Vec<u32>,
 }
 
+struct HeaderStorageVisitor {
+    bucket_ids: Vec<u64>,
+}
+
+impl storage_codec::StorageVisitor for HeaderStorageVisitor {
+    fn visit_header_bucket(
+        &mut self,
+        reference: storage_codec::ReferenceRecord<'_>,
+    ) -> Result<(), storage_codec::DecodeError> {
+        self.bucket_ids.push(reference.reference().identifier());
+        Ok(())
+    }
+}
+
+struct HeaderBucketVisitor {
+    rows: Vec<u32>,
+}
+
+impl storage_codec::StorageVisitor for HeaderBucketVisitor {
+    fn visit_header_record(
+        &mut self,
+        header: storage_codec::HeaderRecord<'_>,
+    ) -> Result<(), storage_codec::DecodeError> {
+        self.rows.push(header.snapshot().index());
+        Ok(())
+    }
+}
+
+fn storage_decode_options(
+    source: &[u8],
+    max_fields: usize,
+) -> Result<storage_codec::DecodeOptions, SparseError> {
+    let max_work = source.len().checked_mul(8).ok_or(SparseError::Overflow)?;
+    Ok(storage_codec::DecodeOptions::new(
+        source.len(),
+        max_fields,
+        max_work,
+        64,
+        max_fields,
+        source.len(),
+    ))
+}
+
+fn map_storage_decode_error(error: storage_codec::DecodeError) -> SparseError {
+    match error.resource_limit() {
+        Some(storage_codec::DecodeLimit::Allocation { requested }) => {
+            SparseError::Allocation { requested }
+        },
+        Some(storage_codec::DecodeLimit::Bytes { observed, maximum })
+        | Some(storage_codec::DecodeLimit::Fields { observed, maximum })
+        | Some(storage_codec::DecodeLimit::References { observed, maximum })
+        | Some(storage_codec::DecodeLimit::Text { observed, maximum })
+        | Some(storage_codec::DecodeLimit::Work { observed, maximum }) => {
+            SparseError::LimitExceeded { observed, maximum }
+        },
+        Some(storage_codec::DecodeLimit::Nesting { .. }) | Some(_) | None => {
+            SparseError::InvalidSource
+        },
+    }
+}
+
 fn parse_data_store(source: &[u8], max: usize) -> Result<DataStore<'_>, SparseError> {
     let fields = parse_fields(source, max)?;
     let next_row_strip_id =
@@ -2045,37 +2108,44 @@ fn parse_row_tree(source: &[u8], max: usize) -> Result<Vec<RowStrip>, SparseErro
 }
 
 fn parse_header_storage(source: &[u8], max: usize) -> Result<HeaderStorage, SparseError> {
-    let fields = parse_fields(source, max)?;
-    let hash_function =
-        u32::try_from(unique_varint(&fields, 1)?.ok_or(SparseError::InvalidSource)?)
-            .map_err(|_| SparseError::InvalidSource)?;
-    let mut bucket_ids = Vec::new();
-    reserve(&mut bucket_ids, fields.len())?;
-    for field in fields.into_iter().filter(|field| field.number == 2) {
-        bucket_ids.push(parse_local_reference(field.value, max)?);
+    let bucket_count = count_numbered_fields(source, 2, max)?;
+    let mut visitor = HeaderStorageVisitor {
+        bucket_ids: Vec::new(),
+    };
+    reserve(&mut visitor.bucket_ids, bucket_count)?;
+    let (snapshot, _report) = storage_codec::decode_header_storage_with_visitor(
+        source,
+        storage_decode_options(source, max)?,
+        &mut visitor,
+    )
+    .map_err(map_storage_decode_error)?;
+    if visitor.bucket_ids.len() != bucket_count {
+        return Err(SparseError::InconsistentSource);
     }
+    let bucket_ids = visitor.bucket_ids;
     let bucket_count = u32::try_from(bucket_ids.len()).map_err(|_| SparseError::Overflow)?;
     Ok(HeaderStorage {
-        hash_function,
+        hash_function: snapshot.bucket_hash_function(),
         bucket_ids,
         bucket_count,
     })
 }
 
 fn parse_header_bucket(source: &[u8], max: usize) -> Result<HeaderBucketRows, SparseError> {
-    let fields = parse_fields(source, max)?;
-    let hash_function =
-        u32::try_from(unique_varint(&fields, 1)?.ok_or(SparseError::InvalidSource)?)
-            .map_err(|_| SparseError::InvalidSource)?;
-    let mut rows = Vec::new();
-    reserve(&mut rows, fields.len())?;
-    for field in fields.into_iter().filter(|field| field.number == 2) {
-        let fields = parse_fields(field.value, max)?;
-        validate_header_fields(&fields)?;
-        let row = u32::try_from(unique_varint(&fields, 1)?.ok_or(SparseError::InvalidSource)?)
-            .map_err(|_| SparseError::InvalidSource)?;
-        rows.push(row);
+    let header_count = count_numbered_fields(source, 2, max)?;
+    let mut visitor = HeaderBucketVisitor { rows: Vec::new() };
+    reserve(&mut visitor.rows, header_count)?;
+    let (snapshot, _report) = storage_codec::decode_header_storage_bucket_with_visitor(
+        source,
+        storage_decode_options(source, max)?,
+        &mut visitor,
+    )
+    .map_err(map_storage_decode_error)?;
+    if visitor.rows.len() != header_count {
+        return Err(SparseError::InconsistentSource);
     }
+    let hash_function = snapshot.bucket_hash_function();
+    let mut rows = visitor.rows;
     rows.sort_unstable();
     if rows.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err(SparseError::AmbiguousSource);
@@ -3137,6 +3207,99 @@ mod tests {
         append_varint_field(&mut data_store, 7, 1).expect("next strip");
         append_length(&mut data_store, 9, &[]).expect("row tree");
         (data_store, bucket)
+    }
+
+    #[test]
+    fn strict_header_projections_keep_unknowns_and_reject_malformed_records() {
+        let mut header_storage = Vec::new();
+        append_varint_field(&mut header_storage, 1, 17).expect("hash");
+        append_varint_field(&mut header_storage, 91, 23).expect("unknown storage field");
+        append_length(&mut header_storage, 2, &reference(77)).expect("bucket ref");
+        let parsed_storage = parse_header_storage(&header_storage, usize::MAX)
+            .expect("strict header-storage projection");
+        assert_eq!(parsed_storage.hash_function, 17);
+        assert_eq!(parsed_storage.bucket_ids, [77]);
+
+        let mut malformed_storage = Vec::new();
+        append_varint_field(&mut malformed_storage, 1, 17).expect("hash");
+        append_length(&mut malformed_storage, 2, &[8]).expect("truncated reference");
+        assert!(matches!(
+            parse_header_storage(&malformed_storage, usize::MAX),
+            Err(SparseError::InvalidSource)
+        ));
+
+        let mut header_bucket = Vec::new();
+        append_varint_field(&mut header_bucket, 1, 17).expect("bucket hash");
+        append_varint_field(&mut header_bucket, 91, 29).expect("unknown bucket field");
+        append_length(
+            &mut header_bucket,
+            2,
+            &encode_header(NewRowHeader {
+                row: 3,
+                bucket_index: 0,
+                number_of_cells: 1,
+            })
+            .expect("header"),
+        )
+        .expect("header record");
+        let parsed_bucket =
+            parse_header_bucket(&header_bucket, usize::MAX).expect("strict bucket projection");
+        assert_eq!(parsed_bucket.hash_function, 17);
+        assert_eq!(parsed_bucket.rows, [3]);
+    }
+
+    #[test]
+    fn strict_header_projection_no_op_and_inverse_are_byte_exact() {
+        let mut bucket = Vec::new();
+        append_varint_field(&mut bucket, 1, 0).expect("bucket hash");
+        append_varint_field(&mut bucket, 91, 31).expect("unknown bucket field");
+        append_length(
+            &mut bucket,
+            2,
+            &encode_header(NewRowHeader {
+                row: 0,
+                bucket_index: 0,
+                number_of_cells: 1,
+            })
+            .expect("header"),
+        )
+        .expect("header record");
+
+        let (no_op, no_op_report) = rewrite_existing_header_bucket_final_rows_with_report(
+            &bucket,
+            0,
+            2,
+            &[],
+            SparseLimits::default(),
+        )
+        .expect("no-op header rewrite");
+        assert!(no_op.is_none());
+        assert_eq!(no_op_report.header_writes, 0);
+
+        let (updated, _) = rewrite_existing_header_bucket_final_rows_with_report(
+            &bucket,
+            0,
+            2,
+            &[FinalRowCount {
+                row: 0,
+                number_of_cells: 2,
+            }],
+            SparseLimits::default(),
+        )
+        .expect("header update");
+        let updated = updated.expect("updated payload");
+        let (restored, _) = rewrite_existing_header_bucket_final_rows_with_report(
+            &updated,
+            0,
+            2,
+            &[FinalRowCount {
+                row: 0,
+                number_of_cells: 1,
+            }],
+            SparseLimits::default(),
+        )
+        .expect("inverse header update");
+        assert_eq!(restored.as_deref(), Some(bucket.as_slice()));
     }
 
     #[test]

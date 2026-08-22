@@ -28,6 +28,7 @@ pub mod title;
 pub mod topology;
 
 use crate::cell::Value;
+use crate::selector::TableSelector;
 use std::fmt;
 
 pub use coordinate::{AddressError, CellPosition, CellRange, Error as CoordinateError};
@@ -485,6 +486,16 @@ impl Table {
         &self.name
     }
 
+    /// Returns an exact-name selector for this table.
+    ///
+    /// Table names are matched case-sensitively within their owning sheet.
+    /// The selector intentionally contains only the borrowed semantic name;
+    /// native table or archive identifiers are not part of the value model.
+    #[must_use]
+    pub fn selector(&self) -> TableSelector<'_> {
+        TableSelector::name(self.name())
+    }
+
     /// Returns the declared extent.
     #[must_use]
     pub const fn dimensions(&self) -> Dimensions {
@@ -529,6 +540,26 @@ impl Table {
             });
         }
         Ok(self.get(position))
+    }
+
+    /// Looks up the presence-preserving view for a checked A1 selector.
+    ///
+    /// Unlike [`Self::get_a1`], this method distinguishes a missing cell from
+    /// a materialized [`Value::Empty`] cell. A syntactically valid but
+    /// out-of-grid selector is an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed address error or [`Error::OutOfBounds`].
+    pub fn view_a1(&self, address: &str) -> Result<View<'_>> {
+        let position = CellPosition::from_a1(address)?;
+        if !self.dimensions.contains(position) {
+            return Err(Error::OutOfBounds {
+                position,
+                dimensions: self.dimensions,
+            });
+        }
+        Ok(self.view(position))
     }
 
     /// Returns the compact stored/missing view for a coordinate.
@@ -608,6 +639,11 @@ impl Table {
             csv.push('\n');
         }
 
+        // Finished tables retain cells in row-major order. Advancing one
+        // cursor through that sparse slice avoids a binary search for every
+        // addressable cell while preserving the distinction between a
+        // missing cell and an explicitly stored empty value.
+        let mut next_cell = 0;
         for row in 0..self.row_count() {
             let row_index = row as usize;
             if let Some(header) = self.row_headers.get(row_index)
@@ -621,8 +657,12 @@ impl Table {
                 if column > 0 {
                     csv.push(',');
                 }
-                if let Some(value) = self.get(Position::new(row, column)) {
-                    csv.push_str(&value.to_string());
+                let position = Position::new(row, column);
+                if let Some(cell) = self.cells.get(next_cell)
+                    && cell.position() == position
+                {
+                    csv.push_str(&cell.value().to_string());
+                    next_cell += 1;
                 }
             }
             csv.push('\n');
@@ -1049,6 +1089,14 @@ mod tests {
     }
 
     #[test]
+    fn table_selector_is_an_exact_case_sensitive_semantic_name() {
+        let table = Table::new("Revenue", Dimensions::new(1, 1));
+
+        assert_eq!(table.selector(), TableSelector::name("Revenue"));
+        assert_ne!(table.selector(), TableSelector::name("revenue"));
+    }
+
+    #[test]
     fn rectangular_sparse_cells_skip_off_column_values_without_stopping() {
         let mut builder = Builder::new("Test", Dimensions::new(4, 5));
         assert!(builder.set(Position::new(0, 1), number(1.0)).is_ok());
@@ -1182,6 +1230,95 @@ mod tests {
         );
     }
 
+    fn csv_projection_via_lookup(table: &Table) -> String {
+        let mut csv = String::new();
+        if !table.column_headers.is_empty() {
+            for (index, header) in table.column_headers.iter().enumerate() {
+                if index > 0 {
+                    csv.push(',');
+                }
+                write_csv_field(&mut csv, header);
+            }
+            csv.push('\n');
+        }
+
+        for row in 0..table.row_count() {
+            let row_index = row as usize;
+            if let Some(header) = table.row_headers.get(row_index)
+                && !header.is_empty()
+            {
+                write_csv_field(&mut csv, header);
+                csv.push(',');
+            }
+
+            for column in 0..table.column_count() {
+                if column > 0 {
+                    csv.push(',');
+                }
+                if let Some(value) = table.get(Position::new(row, column)) {
+                    csv.push_str(&value.to_string());
+                }
+            }
+            csv.push('\n');
+        }
+        csv
+    }
+
+    #[test]
+    fn csv_projection_cursor_matches_lookup_for_sparse_out_of_order_cells() {
+        let mut builder = Builder::new("Test", Dimensions::new(3, 4));
+        assert!(
+            builder
+                .set_column_headers(["Col 1", "Col,2", "Col\"3", "Col4"])
+                .is_ok()
+        );
+        assert!(builder.set_row_headers(["row0", "", "r,2"]).is_ok());
+        for cell in [
+            Cell::new(Position::new(2, 3), Value::Text("tail".to_owned())),
+            Cell::new(Position::new(0, 2), Value::Text("first, value".to_owned())),
+            Cell::new(Position::new(1, 1), Value::Empty),
+            Cell::new(Position::new(0, 0), Value::Text("first".to_owned())),
+            Cell::new(Position::new(2, 0), Value::Text("last\nline".to_owned())),
+        ] {
+            assert!(builder.push(cell).is_ok());
+        }
+        let table = builder
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+
+        assert_eq!(table.to_csv(), csv_projection_via_lookup(&table));
+        assert_eq!(
+            table.to_csv(),
+            "Col 1,\"Col,2\",\"Col\"\"3\",Col4\nrow0,first,,\"first, value\",\n,,,\n\"r,2\",\"last\nline\",,,tail\n"
+        );
+    }
+
+    #[test]
+    fn csv_projection_cursor_matches_lookup_for_dense_cells() {
+        let mut builder = Builder::new("Test", Dimensions::new(2, 3));
+        assert!(builder.set_column_headers(["A", "B", "C"]).is_ok());
+        assert!(builder.set_row_headers(["R1", "R2"]).is_ok());
+        for (position, value) in [
+            (Position::new(0, 0), number(1.0)),
+            (Position::new(0, 1), Value::Text("two".to_owned())),
+            (Position::new(0, 2), Value::Text("three,".to_owned())),
+            (Position::new(1, 0), Value::Text("line\nbreak".to_owned())),
+            (Position::new(1, 1), Value::Boolean(true)),
+            (Position::new(1, 2), number(4.0)),
+        ] {
+            assert!(builder.set(position, value).is_ok());
+        }
+        let table = builder
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+
+        assert_eq!(table.to_csv(), csv_projection_via_lookup(&table));
+        assert_eq!(
+            table.to_csv(),
+            "A,B,C\nR1,1,two,\"three,\"\nR2,\"line\nbreak\",true,4\n"
+        );
+    }
+
     #[test]
     fn coordinates_and_ranges_are_checked() {
         let dimensions = Dimensions::new(2, 2);
@@ -1221,6 +1358,30 @@ mod tests {
             .unwrap_or_else(|error| panic!("unexpected cell range error: {error}"));
         assert_eq!(cells.count(), 1);
         assert!(matches!(table.get_a1("D1"), Err(Error::OutOfBounds { .. })));
+    }
+
+    #[test]
+    fn a1_views_preserve_explicit_empty_presence() {
+        let mut builder = Builder::new("Test", Dimensions::new(1, 2));
+        assert!(builder.set_a1("A1", Value::Empty).is_ok());
+        let table = builder
+            .finish()
+            .unwrap_or_else(|error| panic!("unexpected table error: {error}"));
+
+        assert!(matches!(
+            table.view_a1("A1"),
+            Ok(View::Stored(&Value::Empty))
+        ));
+        assert!(matches!(table.view_a1("B1"), Ok(View::Missing)));
+        assert!(matches!(
+            table.view_a1("C1"),
+            Err(Error::OutOfBounds { .. })
+        ));
+        assert!(matches!(
+            table.view_a1("A0"),
+            Err(Error::InvalidAddress { .. })
+        ));
+        assert_eq!(table.cell_count(), 1);
     }
 
     #[test]

@@ -67,10 +67,14 @@ pub struct UnknownText(Box<str>);
 
 impl UnknownText {
     /// Construct a bounded unknown value.
-    pub fn new(value: impl Into<Box<str>>) -> Result<Self> {
-        let value = value.into();
-        validate_text(&value)?;
-        Ok(Self(value))
+    ///
+    /// The borrowed view is validated before converting the input into owned
+    /// storage. This keeps rejected oversized or NUL-containing borrowed
+    /// values from allocating owned semantic storage at the boundary.
+    pub fn new(value: impl AsRef<str> + Into<Box<str>>) -> Result<Self> {
+        let borrowed: &str = value.as_ref();
+        validate_text(borrowed)?;
+        Ok(Self(value.into()))
     }
 
     /// Borrow the preserved producer value.
@@ -170,7 +174,7 @@ impl Effect {
 
     /// Construct an unknown effect for a value that is not a named simple
     /// effect.
-    pub fn unknown(value: impl Into<Box<str>>) -> Result<Self> {
+    pub fn unknown(value: impl AsRef<str> + Into<Box<str>>) -> Result<Self> {
         let value = UnknownText::new(value)?;
         if is_simple_effect_identifier(value.as_str()) {
             return Err(Error::NonCanonicalEffect);
@@ -250,7 +254,7 @@ pub enum Action {
 
 impl Action {
     /// Construct an unknown action identifier.
-    pub fn unknown(value: impl Into<Box<str>>) -> Result<Self> {
+    pub fn unknown(value: impl AsRef<str> + Into<Box<str>>) -> Result<Self> {
         let value = UnknownText::new(value)?;
         if is_action_identifier(value.as_str()) {
             return Err(Error::NonCanonicalEffect);
@@ -789,7 +793,7 @@ impl Emphasis {
     }
 
     /// Construct a future emphasis action while preserving its identifier.
-    pub fn unknown(value: impl Into<Box<str>>) -> Result<Self> {
+    pub fn unknown(value: impl AsRef<str> + Into<Box<str>>) -> Result<Self> {
         let value = UnknownText::new(value)?;
         if is_emphasis_identifier(value.as_str()) {
             return Err(Error::NonCanonicalEffect);
@@ -1352,6 +1356,20 @@ mod tests {
     use super::*;
     use std::mem::size_of;
 
+    struct PanicOnConvert(String);
+
+    impl AsRef<str> for PanicOnConvert {
+        fn as_ref(&self) -> &str {
+            &self.0
+        }
+    }
+
+    impl From<PanicOnConvert> for Box<str> {
+        fn from(_value: PanicOnConvert) -> Self {
+            panic!("an invalid value must not be converted into owned storage");
+        }
+    }
+
     #[test]
     fn unknown_text_is_bounded_and_nul_free() {
         assert_eq!(UnknownText::new(""), Err(Error::EmptyIdentifier));
@@ -1363,6 +1381,19 @@ mod tests {
         assert_eq!(
             UnknownText::new("future.effect").unwrap().as_str(),
             "future.effect"
+        );
+    }
+
+    #[test]
+    fn unknown_text_validates_before_owned_conversion() {
+        let oversized = "x".repeat(MAX_IDENTIFIER_BYTES + 1);
+        assert_eq!(
+            UnknownText::new(PanicOnConvert(oversized)),
+            Err(Error::IdentifierTooLarge)
+        );
+        assert_eq!(
+            UnknownText::new(PanicOnConvert("future\0effect".to_owned())),
+            Err(Error::NulString)
         );
     }
 

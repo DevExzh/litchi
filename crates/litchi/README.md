@@ -72,6 +72,36 @@ Macros, VBA, ActiveX, controls, OLE objects, and embedded code are only ever
 retained as inert blobs when exposed or preserved. Litchi never executes or
 activates them.
 
+## Numbers semantic values
+
+With the `numbers` feature enabled, the focused reader vocabulary is also
+available below `litchi::numbers::semantic`. It keeps selectors and values
+typed at the facade boundary: use `CellPosition`/`CellRange` for A1
+coordinates, `Value` for cell values, and `Storage` to distinguish a missing
+cell from an explicitly stored empty value. The semantic namespace does not
+re-export package objects, native identifiers, or wire records.
+
+```rust,no_run
+use litchi::numbers::semantic::{
+    cell::Value,
+    table::{CellPosition, cells::Storage},
+};
+
+let coordinate = CellPosition::from_a1("B2")?;
+let value = Value::number(42.0)?;
+assert_eq!(value.as_number(), Some(42.0));
+
+fn describe(storage: Storage) -> &'static str {
+    match storage {
+        Storage::Missing => "not materialized",
+        Storage::Stored(_) => "materialized",
+    }
+}
+
+let _ = (coordinate, describe(Storage::Stored(value)));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## Focused Pages section-settings edits
 
 Enable the `pages` feature to use the selector-first Pages package API through

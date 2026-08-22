@@ -623,7 +623,8 @@ struct BoundFormulaList {
 }
 
 fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
-    let (source, path, dimensions, changes, _owned_value_bytes, staging_usage) = plan.into_parts();
+    let (source, path, dimensions, mut changes, _owned_value_bytes, staging_usage) =
+        plan.into_parts();
     for change in &changes {
         let position = change.position();
         if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
@@ -678,19 +679,12 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
             Diagnostics::unchanged(requested),
         ));
     }
-    let mut changed = Vec::new();
-    changed
-        .try_reserve_exact(changed_count)
-        .map_err(|_error| Error::Allocation {
-            kind: crate::package::table_cells::LimitKind::Updates,
-            amount: changed_count,
-        })?;
-    for change in changes {
-        if !semantic_change_is_noop(selected.table, &change) {
-            changed.push(change);
-        }
-    }
-    if changed.len() != changed_count {
+    // The staged vector already owns every validated change. Retain the
+    // effective scalar subset in that allocation instead of copying changed
+    // values into a second vector; this keeps text/formula ownership attached
+    // to the original batch while preserving its sorted order.
+    retain_effective_changes(&mut changes, selected.table);
+    if changes.len() != changed_count {
         return Err(Error::Verification { path });
     }
 
@@ -700,11 +694,18 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
         path,
         sheet_position,
         table_position,
-        changed,
+        changes,
         changed_owned_value_bytes,
         staging_usage,
         requested,
     )
+}
+
+fn retain_effective_changes(
+    changes: &mut Vec<crate::table::cells::Change>,
+    table: &crate::table::Table,
+) {
+    changes.retain(|change| !semantic_change_is_noop(table, change));
 }
 
 fn semantic_change_is_noop(
@@ -1531,16 +1532,25 @@ fn commit_existing_scalar_tiles(
                 let cache = match cache_cell.map(|cell| &cell.value) {
                     None => None,
                     Some(litchi_iwa_common::formula::FormulaCachedValue::Number(value)) => {
-                        Some(tile::ScalarInput::Number(*value))
+                        Some(tile::ScalarInput::Number(
+                            crate::cell::FiniteF64::new(value.get())
+                                .expect("formula cache scalar is finite"),
+                        ))
                     },
                     Some(litchi_iwa_common::formula::FormulaCachedValue::Boolean(value)) => {
                         Some(tile::ScalarInput::Boolean(*value))
                     },
                     Some(litchi_iwa_common::formula::FormulaCachedValue::Date(value)) => {
-                        Some(tile::ScalarInput::Date(*value))
+                        Some(tile::ScalarInput::Date(
+                            crate::cell::FiniteF64::new(value.get())
+                                .expect("formula cache scalar is finite"),
+                        ))
                     },
                     Some(litchi_iwa_common::formula::FormulaCachedValue::Duration(value)) => {
-                        Some(tile::ScalarInput::Duration(*value))
+                        Some(tile::ScalarInput::Duration(
+                            crate::cell::FiniteF64::new(value.get())
+                                .expect("formula cache scalar is finite"),
+                        ))
                     },
                     Some(litchi_iwa_common::formula::FormulaCachedValue::Text(_)) => {
                         formula_text_change_indices.push(change_index);
@@ -5158,25 +5168,24 @@ fn caller_staging_usage(
     owned_value_bytes: usize,
     staging_usage: crate::table::cells::StagingUsage,
 ) -> Result<budget::Usage, Error> {
-    let retained_elements = staging_usage
-        .change_capacity()
-        .checked_add(updates)
-        .and_then(|elements| elements.checked_add(updates))
-        .ok_or(Error::LimitExceeded {
-            kind: crate::package::table_cells::LimitKind::RetainedElements,
-            observed: u64::MAX,
-            maximum: budget.limits().max_retained_elements,
-            path: crate::package::table_cells::Path::Package,
-        })?;
+    // The effective changes reuse the caller's staged vector; only the
+    // compact position cache is a new batch allocation at this boundary.
+    let retained_elements =
+        staging_usage
+            .change_capacity()
+            .checked_add(updates)
+            .ok_or(Error::LimitExceeded {
+                kind: crate::package::table_cells::LimitKind::RetainedElements,
+                observed: u64::MAX,
+                maximum: budget.limits().max_retained_elements,
+                path: crate::package::table_cells::Path::Package,
+            })?;
     let retained_bytes = staging_usage
         .change_capacity()
         .checked_mul(size_of::<crate::table::cells::Change>())
         .and_then(|bytes| {
             updates
-                .checked_mul(
-                    size_of::<crate::table::cells::Change>()
-                        .checked_add(size_of::<crate::table::CellPosition>())?,
-                )
+                .checked_mul(size_of::<crate::table::CellPosition>())
                 .and_then(|live| bytes.checked_add(live))
         })
         .and_then(|bytes| bytes.checked_add(owned_value_bytes))
@@ -5191,7 +5200,7 @@ fn caller_staging_usage(
         input_value_bytes: usize_u64(owned_value_bytes),
         retained_elements: usize_u64(retained_elements),
         retained_bytes: usize_u64(retained_bytes),
-        allocation_events: usize_u64(staging_usage.allocation_events().checked_add(2).ok_or(
+        allocation_events: usize_u64(staging_usage.allocation_events().checked_add(1).ok_or(
             Error::LimitExceeded {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: u64::MAX,
@@ -6480,7 +6489,10 @@ mod tests {
         },
         formula::{BinaryOperator, CachedValue, CellReference, Expression},
         package::table_cells::{DependencyKind, Error, Path},
-        table::{CellPosition, cells::Input},
+        table::{
+            CellPosition,
+            cells::{Change, Input},
+        },
     };
 
     use super::{PhysicalLocation, preview_mask, rewrite, verify_evidence_locality};
@@ -6490,6 +6502,39 @@ mod tests {
     fn fixture() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/numbers/basic.numbers")
+    }
+
+    #[test]
+    fn scalar_effective_filter_reuses_staged_change_capacity() {
+        let source = Package::open(fixture()).expect("native basic fixture opens");
+        let table = super::resolve_table(&source, 0usize.into(), 0usize.into())
+            .expect("basic table resolves")
+            .table;
+        let mut changes = Vec::new();
+        changes
+            .try_reserve_exact(3)
+            .expect("staged change capacity");
+        changes.push(Change::set(
+            CellPosition::from_a1("B3").expect("B3 parses"),
+            Input::number(42.0).expect("finite no-op number"),
+        ));
+        changes.push(Change::clear(
+            CellPosition::from_a1("A1").expect("A1 parses"),
+        ));
+        changes.push(Change::set(
+            CellPosition::from_a1("G22").expect("G22 parses"),
+            Input::number(43.0).expect("finite changed number"),
+        ));
+        let capacity = changes.capacity();
+
+        super::retain_effective_changes(&mut changes, table);
+
+        assert_eq!(changes.capacity(), capacity);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(
+            changes[0].position(),
+            CellPosition::from_a1("G22").expect("G22 parses")
+        );
     }
 
     fn synthetic_513_row_source() -> Package {
@@ -6643,13 +6688,14 @@ mod tests {
         assert!(columns > target.native.columns);
 
         let model_route = target.storage.model;
-        let mut model = tst::TableModelArchive::decode(
+        let model_payload = patch_varint_field(
             super::message_payload(&source, model_route, Path::Package)
                 .expect("source model payload"),
+            7,
+            true,
+            Some(u64::from(columns)),
         )
-        .expect("source model decodes");
-        model.number_of_columns = columns;
-        let model_payload = model.encode_to_vec();
+        .expect("raw-preserving column-count seed patch");
 
         let tile_route = target.storage.tiles.first().expect("basic has tile zero");
         let mut tile = tst::Tile::decode(
@@ -7101,11 +7147,12 @@ mod tests {
         entries.push(tst::table_data_list::ListEntry {
             key: 1,
             refcount: u32::try_from(formulas).expect("formula refcount fits"),
-            formula: Some(formula(vec![
-                absolute_reference_node(1, 7),
-                number_node(1.0),
-                operator_node(tsce::ast_node_array_archive::AstNodeType::AdditionNode),
-            ])),
+            // Keep the fanout fixture's shared formula at the smallest
+            // dependency-preserving shape. The source and authored tests
+            // exercise thousands of hosts; carrying an avoidable arithmetic
+            // pair here makes candidate reopen semantic render work dominate
+            // the bounded fanout assertion without adding coverage.
+            formula: Some(formula(vec![absolute_reference_node(1, 7)])),
             ..Default::default()
         });
         let tile_payload = tile.encode_to_vec();

@@ -1,0 +1,33 @@
+// Wire-only Buffa projection for the Pages movie caption metadata edge:
+// TP/TSA.CaptionInfoArchive -> TSWP.ShapeInfoArchive -> TSD.ShapeArchive ->
+// TSD.DrawableArchive, plus the selected references and scalar metadata.
+// Caller-owned IWA bytes remain the sole preservation representation.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+}
+
+message DrawableArchive {
+  optional .LitchiIwaProjection.Reference parent = 2;
+}
+
+message ShapeArchive {
+  required .LitchiIwaProjection.DrawableArchive super = 1;
+  optional .LitchiIwaProjection.Reference style = 2;
+}
+
+message ShapeInfoArchive {
+  required .LitchiIwaProjection.ShapeArchive super = 1;
+  optional .LitchiIwaProjection.Reference deprecated_storage = 2;
+  optional .LitchiIwaProjection.Reference owned_storage = 4;
+  optional bool is_text_box = 6;
+}
+
+message CaptionInfoArchive {
+  required .LitchiIwaProjection.ShapeInfoArchive super = 1;
+  optional .LitchiIwaProjection.Reference placement = 2;
+  optional int32 child_info_kind = 3;
+}

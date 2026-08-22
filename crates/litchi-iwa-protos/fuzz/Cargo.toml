@@ -36,8 +36,36 @@ doc = false
 bench = false
 
 [[bin]]
+name = "pages_body_footnote_codec"
+path = "fuzz_targets/pages_body_footnote_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_footnote_codec"
+path = "fuzz_targets/pages_footnote_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_movie_caption_codec"
+path = "fuzz_targets/pages_movie_caption_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_data_list"
 path = "fuzz_targets/numbers_table_data_list.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_model"
+path = "fuzz_targets/numbers_table_model.rs"
 test = false
 doc = false
 bench = false

@@ -7,6 +7,13 @@ use std::{
 
 use sha2::{Digest, Sha256};
 
+#[path = "src/production_codec_guard.rs"]
+mod production_codec_guard;
+
+use production_codec_guard::{
+    FORBIDDEN_BUFFA_OWNERSHIP_MARKERS, FORBIDDEN_PROST_CODEC_MARKERS, production_codec_source,
+};
+
 fn main() -> Result<(), Box<dyn Error>> {
     const PROTO_DIRECTORY: &str = "src/protos";
     const BUFFA_PROJECTION_DIRECTORY: &str = "src/buffa-projections";
@@ -15,6 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rerun-if-changed={PROTO_DIRECTORY}");
     println!("cargo:rerun-if-changed={BUFFA_PROJECTION_DIRECTORY}");
+    println!("cargo:rerun-if-changed=src/archive_codec.rs");
     println!("cargo:rerun-if-changed=src/group_node_category_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_document_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_caption_codec.rs");
@@ -24,7 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_speaker_notes_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_number_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_media_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
+    println!("cargo:rerun-if-changed=src/hyperlink_codec.rs");
     println!("cargo:rerun-if-changed=src/comment_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_sheet_order_codec.rs");
@@ -32,14 +42,41 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
+    // Keep the native Numbers and Pages message-ID routes tied to their schema
+    // projections when this crate is built from the workspace. Published
+    // standalone copies do not contain these sibling sources, so the
+    // provenance checks below are intentionally conditional on their presence.
+    for path in [
+        "../litchi-iwa/src/protobuf.rs",
+        "../litchi-numbers/src/package/extractor.rs",
+        "../litchi-iwa/src/pages/editor.rs",
+        "../litchi-iwa/src/pages/editor/movies/graph.rs",
+        "../litchi-iwa/src/pages/editor/movies/caption.rs",
+        "../litchi-iwa/src/image_caption.rs",
+        "../litchi-iwa/src/pages/editor/footnotes.rs",
+        "../litchi-pages/src/package.rs",
+        "../litchi-pages/src/package/document_settings.rs",
+        "../litchi-pages/src/package/page_layout.rs",
+        "../litchi-pages/src/package/table_lock.rs",
+    ] {
+        if Path::new(path).is_file() {
+            println!("cargo:rerun-if-changed={path}");
+        }
+    }
     println!("cargo:rerun-if-changed=src/package_metadata_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_formula_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_media_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_movie_caption_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_footnote_codec.rs");
+    println!("cargo:rerun-if-changed=src/pages_footnote_marker_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_background_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_document_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_page_layout_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
+    println!("cargo:rerun-if-changed=src/production_codec_guard.rs");
     println!("cargo:rerun-if-changed=src/table_info_codec.rs");
+    println!("cargo:rerun-if-changed=src/text_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/lib.rs");
 
     let mut proto_files = fs::read_dir(proto_directory)?
@@ -94,9 +131,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     enforce_table_title_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_table_cell_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_numbers_table_data_list_provenance(proto_directory, buffa_projection_directory)?;
     enforce_package_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_formula_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_native_message_provenance(proto_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_media_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_movie_caption_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_footnote_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_pages_footnote_marker_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_pages_section_background_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -607,6 +653,88 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile()?;
     enforce_pages_body_projection_budget(&buffa_pages_body_out_directory)?;
 
+    // Pages media discovery needs only the audio-only discriminator from the
+    // shared MovieArchive. Keep the complete media graph and every unrelated
+    // field on the caller-owned raw/prost compatibility path.
+    let buffa_pages_media_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-media");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSDMovieAudioFlagArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_media_out_directory)
+        .include_file("iwa_pages_media_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_media_projection_budget(&buffa_pages_media_out_directory)?;
+
+    // Pages movie captions need only the bounded caption-info inheritance
+    // chain, its private graph references, and the native kind/text-box
+    // scalars. Strict raw routing remains the source-preservation authority.
+    let buffa_pages_movie_caption_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-movie-caption");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TPMovieCaptionArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_movie_caption_out_directory)
+        .include_file("iwa_pages_movie_caption_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_movie_caption_projection_budget(&buffa_pages_movie_caption_out_directory)?;
+
+    // Pages footnote references need only the textual-attachment envelope,
+    // contained-storage reference, and custom marker. The strict handwritten
+    // codec validates these selected fields before forcing this private lazy
+    // view; unknown source bytes remain outside generated code.
+    let buffa_pages_footnote_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-footnote");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSWPFootnoteReferenceAttachmentArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_footnote_out_directory)
+        .include_file("iwa_pages_footnote_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_footnote_projection_budget(&buffa_pages_footnote_out_directory)?;
+
+    // Pages footnote markers need only the two scalar fields from one
+    // TextualAttachmentArchive. Keep this projection separate from the
+    // footnote-reference closure so marker validation cannot materialize
+    // references or any unrelated TSWP archive fields.
+    let buffa_pages_footnote_marker_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-pages-footnote-marker");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSWPTextualAttachmentArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_pages_footnote_marker_out_directory)
+        .include_file("iwa_pages_footnote_marker_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_pages_footnote_marker_projection_budget(&buffa_pages_footnote_marker_out_directory)?;
+
     Ok(())
 }
 
@@ -667,6 +795,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "3461ea3c1165a3fd82fba1aebbcd239a604dd56e8ea1052014e59900a3db0d7b",
         ),
         (
+            "TPMovieCaptionArchive.proto",
+            1055,
+            "c1c8f7131f4362794811e0ce396769a37c61175d10befb63886b4a76109c6e7c",
+        ),
+        (
             "TPSectionArchive.proto",
             1653,
             "4f284cd2403ade092ae8e8105924e15c34f69e203307fd0aabc90e5d705041d7",
@@ -702,6 +835,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "396d98fd78f6a417a57af4a1e7f3830362e3174753687aef2fe49aaf7a88087d",
         ),
         (
+            "TSDMovieAudioFlagArchive.proto",
+            251,
+            "e4306fa9440c13f2f77587f2edfb25c81eab639087d217bf88f5738ce416c2a9",
+        ),
+        (
             "TSPPackageMetadataArchive.proto",
             858,
             "f33fc54b7382231d9b8ece89390928cf634bd9a8108e5a929a30563e2d693a60",
@@ -713,8 +851,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "TSTTableCellStorageArchive.proto",
-            3607,
-            "b2017f2f7e40581ca85410f1bb2cbb793571c29b51f63314acd060f945370081",
+            3641,
+            "17d1cd1afd6f59c46d29f2c481744ead27568ffe937a2b9d9633ce376cb754c9",
         ),
         (
             "TSTTableHeaderSettingsArchive.proto",
@@ -735,6 +873,16 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "TSWPStorageArchive.proto",
             587,
             "54be1aea50f7e6a211ccb2e19b4abbf9b7ab9c9748a99941dad3e68b7cfa37ba",
+        ),
+        (
+            "TSWPFootnoteReferenceAttachmentArchive.proto",
+            954,
+            "6a8b19d679e9cb331764f537b9e342943f1e08860784284ad176016b4fcddde4",
+        ),
+        (
+            "TSWPTextualAttachmentArchive.proto",
+            470,
+            "12cd2d1186d8c0241c6439085c5d0b911fde6ecd5dec759626a2d94dceca3c15",
         ),
     ];
 
@@ -866,6 +1014,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_keynote_soundtrack_settings_generated {",
         ),
         (
+            "src/keynote_media_codec.rs",
+            "crate::buffa_generated::TSP::",
+            "mod buffa_generated {",
+        ),
+        (
             "src/keynote_slide_transition_codec.rs",
             "crate::buffa_keynote_slide_transition_generated::",
             "mod buffa_keynote_slide_transition_generated {",
@@ -936,6 +1089,26 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_pages_body_generated {",
         ),
         (
+            "src/pages_media_codec.rs",
+            "crate::buffa_pages_media_generated::",
+            "mod buffa_pages_media_generated {",
+        ),
+        (
+            "src/pages_movie_caption_codec.rs",
+            "crate::buffa_pages_movie_caption_generated::",
+            "mod buffa_pages_movie_caption_generated {",
+        ),
+        (
+            "src/pages_footnote_codec.rs",
+            "crate::buffa_pages_footnote_generated::",
+            "mod buffa_pages_footnote_generated {",
+        ),
+        (
+            "src/pages_footnote_marker_codec.rs",
+            "crate::buffa_pages_footnote_marker_generated::",
+            "mod buffa_pages_footnote_marker_generated {",
+        ),
+        (
             "src/pages_page_layout_codec.rs",
             "crate::buffa_pages_body_generated::",
             "mod buffa_pages_body_generated {",
@@ -946,27 +1119,56 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_pages_body_generated {",
         ),
     ];
-    const FORBIDDEN_PROST_INGRESS: &[&str] = &[
-        "prost::",
-        "prost ::",
-        "Message::decode",
-        "Message::merge",
-        "decode_length_delimited",
-    ];
+    // Not every focused codec needs a generated view.  Keep those raw-only
+    // paths explicit as well, so adding a new `*_codec.rs` cannot silently
+    // bypass the production ingress review.  Raw entries are checked below
+    // for the same forbidden Prost/owned-view markers and for accidental
+    // Buffa usage.
+    const RAW_CODECS: &[&str] = &["src/hyperlink_codec.rs"];
+
+    let mut expected_paths = CODECS
+        .iter()
+        .map(|(path, _generated_marker, _private_module_marker)| *path)
+        .chain(RAW_CODECS.iter().copied())
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    expected_paths.sort_unstable();
+    let mut actual_paths = fs::read_dir("src")?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|path| {
+            path.is_file()
+                && path.extension().is_some_and(|extension| extension == "rs")
+                && path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .is_some_and(|stem| stem.ends_with("_codec"))
+        })
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .collect::<Vec<_>>();
+    actual_paths.sort_unstable();
+    if actual_paths != expected_paths {
+        return Err(format!(
+            "production codec inventory drifted: found {actual_paths:?}, expected {expected_paths:?}"
+        )
+        .into());
+    }
 
     let lib = fs::read_to_string("src/lib.rs")?;
     for (path, generated_marker, private_module_marker) in CODECS {
         let source = fs::read_to_string(path)?;
-        // A few codecs have cfg(test) allocation probes near their imports;
-        // remove the trailing test module instead of truncating production at
-        // the first test-only item.
-        let production = source
-            .rsplit_once("#[cfg(test)]")
-            .map_or(source.as_str(), |(body, _tests)| body);
+        // Some codecs have cfg(test) allocation probes near their imports;
+        // the shared source slicer removes every test-only item without
+        // truncating production at the first such probe.
+        let production = production_codec_source(&source);
         if !production.contains("decode_lazy_view")
             || !production.contains(generated_marker)
-            || !lib.contains(private_module_marker)
-            || FORBIDDEN_PROST_INGRESS
+            || !has_exact_private_module_declaration(&lib, private_module_marker)
+            || FORBIDDEN_PROST_CODEC_MARKERS
+                .iter()
+                .any(|fragment| production.contains(fragment))
+            || FORBIDDEN_BUFFA_OWNERSHIP_MARKERS
                 .iter()
                 .any(|fragment| production.contains(fragment))
         {
@@ -976,7 +1178,440 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             .into());
         }
     }
+
+    for path in RAW_CODECS {
+        let source = fs::read_to_string(path)?;
+        let production = production_codec_source(&source);
+        if production.contains("decode_lazy_view")
+            || production.contains("buffa::")
+            || production.contains("buffa_generated")
+            || FORBIDDEN_PROST_CODEC_MARKERS
+                .iter()
+                .any(|fragment| production.contains(fragment))
+            || FORBIDDEN_BUFFA_OWNERSHIP_MARKERS
+                .iter()
+                .any(|fragment| production.contains(fragment))
+        {
+            return Err(format!(
+                "raw production codec {path} unexpectedly uses Buffa or a forbidden generated ingress marker"
+            )
+            .into());
+        }
+    }
     Ok(())
+}
+
+/// Return whether `source` contains exactly one private declaration for the
+/// generated module and no published declaration for the same module.
+///
+/// A plain substring search is insufficient here: `pub mod foo {` contains
+/// `mod foo {` and would otherwise satisfy the generated-boundary ratchet.
+fn has_exact_private_module_declaration(source: &str, declaration: &str) -> bool {
+    let private_count = source
+        .lines()
+        .filter(|line| line.trim() == declaration)
+        .count();
+    let published_count = source
+        .lines()
+        .filter(|line| {
+            let line = line.trim();
+            (line.starts_with("pub ") || line.starts_with("pub(")) && line.ends_with(declaration)
+        })
+        .count();
+    private_count == 1 && published_count == 0
+}
+
+/// Count a route marker only when it starts in production Rust code and does
+/// not cross a comment. String literals remain searchable because a few route
+/// markers intentionally include a literal type name; a marker that starts
+/// inside a literal is rejected. `production_codec_source` removes complete
+/// `#[cfg(test)]` items before the lexical pass.
+fn rust_code_marker_count(source: &str, marker: &str) -> usize {
+    if marker.is_empty() {
+        return 0;
+    }
+
+    let production = production_codec_source(source);
+    let source = production.as_ref();
+    let bytes = source.as_bytes();
+    let mut code = vec![false; bytes.len()];
+    let mut marker_start = vec![false; bytes.len()];
+    let mut cursor = 0usize;
+
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            cursor += 2;
+            while cursor < bytes.len() && bytes[cursor] != b'\n' {
+                cursor += 1;
+            }
+            continue;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            let mut depth = 1usize;
+            cursor += 2;
+            while cursor < bytes.len() && depth != 0 {
+                if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+                    depth = depth.saturating_add(1);
+                    cursor += 2;
+                } else if bytes.get(cursor) == Some(&b'*') && bytes.get(cursor + 1) == Some(&b'/') {
+                    depth = depth.saturating_sub(1);
+                    cursor += 2;
+                } else {
+                    cursor += 1;
+                }
+            }
+            continue;
+        }
+
+        if let Some(end) = rust_route_literal_end(bytes, cursor) {
+            for position in cursor..end {
+                code[position] = true;
+            }
+            cursor = end;
+            continue;
+        }
+
+        code[cursor] = true;
+        marker_start[cursor] = true;
+        cursor += 1;
+    }
+
+    source
+        .match_indices(marker)
+        .filter(|(start, _)| {
+            let Some(end) = start.checked_add(marker.len()) else {
+                return false;
+            };
+            marker_start.get(*start).copied().unwrap_or(false)
+                && code
+                    .get(*start..end)
+                    .is_some_and(|span| span.iter().all(|is_code| *is_code))
+        })
+        .count()
+}
+
+/// Return the end of a Rust string, byte string, raw string, character, or
+/// byte-character literal beginning at `cursor`. Lifetimes are left in normal
+/// code so a `'name` token cannot hide a route marker.
+fn rust_route_literal_end(bytes: &[u8], cursor: usize) -> Option<usize> {
+    let (quote, raw_hashes) = if bytes.get(cursor) == Some(&b'r')
+        || (bytes.get(cursor) == Some(&b'b') && bytes.get(cursor + 1) == Some(&b'r'))
+    {
+        let prefix = if bytes[cursor] == b'b' {
+            cursor + 2
+        } else {
+            cursor + 1
+        };
+        let mut quote = prefix;
+        while bytes.get(quote) == Some(&b'#') {
+            quote += 1;
+        }
+        (bytes.get(quote) == Some(&b'"')).then_some((quote, quote - prefix))?
+    } else if bytes.get(cursor) == Some(&b'"') {
+        (cursor, 0)
+    } else if bytes.get(cursor) == Some(&b'b') && bytes.get(cursor + 1) == Some(&b'"') {
+        (cursor + 1, 0)
+    } else if bytes.get(cursor) == Some(&b'\'') {
+        let end = rust_route_char_end(bytes, cursor)?;
+        return Some(end);
+    } else if bytes.get(cursor) == Some(&b'b') && bytes.get(cursor + 1) == Some(&b'\'') {
+        let end = rust_route_char_end(bytes, cursor + 1)?;
+        return Some(end);
+    } else {
+        return None;
+    };
+
+    if raw_hashes != 0 || bytes.get(quote) == Some(&b'"') && cursor != quote {
+        let mut probe = quote + 1;
+        while probe < bytes.len() {
+            if bytes[probe] == b'"'
+                && bytes
+                    .get(probe + 1..probe + 1 + raw_hashes)
+                    .is_some_and(|tail| tail.iter().all(|byte| *byte == b'#'))
+            {
+                return Some(probe + 1 + raw_hashes);
+            }
+            probe += 1;
+        }
+        return Some(bytes.len());
+    }
+
+    let mut probe = quote + 1;
+    while probe < bytes.len() {
+        if bytes[probe] == b'\\' {
+            probe = probe.saturating_add(2);
+        } else if bytes[probe] == b'"' {
+            return Some(probe + 1);
+        } else {
+            probe += 1;
+        }
+    }
+    Some(bytes.len())
+}
+
+fn rust_route_char_end(bytes: &[u8], quote: usize) -> Option<usize> {
+    let first = *bytes.get(quote + 1)?;
+    if (first.is_ascii_alphanumeric() || first == b'_') && bytes.get(quote + 2) != Some(&b'\'') {
+        return None;
+    }
+
+    let mut probe = quote + 1;
+    while probe < bytes.len() {
+        if bytes[probe] == b'\n' || bytes[probe] == b'\r' {
+            return None;
+        }
+        if bytes[probe] == b'\\' {
+            probe = probe.saturating_add(2);
+        } else if bytes[probe] == b'\'' {
+            return Some(probe + 1);
+        } else {
+            probe += 1;
+        }
+    }
+    None
+}
+
+fn proto_identifier_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+fn skip_proto_space(bytes: &[u8], mut index: usize) -> usize {
+    loop {
+        while bytes
+            .get(index)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            index += 1;
+        }
+        let Some(next) = skip_proto_comment(bytes, index) else {
+            break;
+        };
+        index = next;
+    }
+    index
+}
+
+fn skip_proto_comment(bytes: &[u8], index: usize) -> Option<usize> {
+    if bytes.get(index) == Some(&b'/') && bytes.get(index.saturating_add(1)) == Some(&b'/') {
+        let mut cursor = index.saturating_add(2);
+        while cursor < bytes.len() && bytes[cursor] != b'\n' {
+            cursor += 1;
+        }
+        return Some(cursor);
+    }
+    if bytes.get(index) == Some(&b'/') && bytes.get(index.saturating_add(1)) == Some(&b'*') {
+        let mut cursor = index.saturating_add(2);
+        while cursor.saturating_add(1) < bytes.len() {
+            if bytes[cursor] == b'*' && bytes[cursor.saturating_add(1)] == b'/' {
+                return Some(cursor.saturating_add(2));
+            }
+            cursor += 1;
+        }
+        return None;
+    }
+    None
+}
+
+fn skip_proto_string(bytes: &[u8], index: usize) -> Option<usize> {
+    let quote = *bytes.get(index)?;
+    if quote != b'"' && quote != b'\'' {
+        return None;
+    }
+    let mut cursor = index.saturating_add(1);
+    while cursor < bytes.len() {
+        if bytes[cursor] == b'\\' {
+            cursor = cursor.saturating_add(2);
+        } else if bytes[cursor] == quote {
+            return Some(cursor.saturating_add(1));
+        } else {
+            cursor += 1;
+        }
+    }
+    None
+}
+
+fn proto_keyword_at(bytes: &[u8], index: usize, keyword: &[u8]) -> bool {
+    bytes
+        .get(index..index.saturating_add(keyword.len()))
+        .is_some_and(|tail| tail == keyword)
+        && (index == 0 || !proto_identifier_byte(bytes[index - 1]))
+        && bytes
+            .get(index.saturating_add(keyword.len()))
+            .is_none_or(|byte| !proto_identifier_byte(*byte))
+}
+
+fn proto_balanced_end(bytes: &[u8], opening_brace: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut index = opening_brace;
+    while index < bytes.len() {
+        if let Some(next) = skip_proto_comment(bytes, index) {
+            index = next;
+            continue;
+        }
+        if let Some(next) = skip_proto_string(bytes, index) {
+            index = next;
+            continue;
+        }
+        match bytes[index] {
+            b'{' => depth = depth.checked_add(1)?,
+            b'}' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return index.checked_add(1);
+                }
+            },
+            _ => {},
+        }
+        index += 1;
+    }
+    None
+}
+
+/// Return one complete proto message at exactly `target_depth`, including
+/// nested declarations. Comments, strings, and messages at another nesting
+/// depth are lexical context rather than declarations for this lookup; this
+/// prevents a commented or unrelated nested message from satisfying a
+/// provenance ratchet.
+fn proto_message_block_at_depth<'source>(
+    source: &'source str,
+    name: &str,
+    target_depth: usize,
+) -> Option<&'source str> {
+    let bytes = source.as_bytes();
+    let name_bytes = name.as_bytes();
+    let mut depth = 0usize;
+    let mut index = 0usize;
+    let mut found = None;
+    while index < bytes.len() {
+        if let Some(next) = skip_proto_comment(bytes, index) {
+            index = next;
+            continue;
+        }
+        if let Some(next) = skip_proto_string(bytes, index) {
+            index = next;
+            continue;
+        }
+        if depth == target_depth && proto_keyword_at(bytes, index, b"message") {
+            let mut cursor = skip_proto_space(bytes, index.saturating_add(b"message".len()));
+            if bytes
+                .get(cursor..cursor.saturating_add(name_bytes.len()))
+                .is_some_and(|candidate| candidate == name_bytes)
+                && (cursor == 0 || !proto_identifier_byte(bytes[cursor - 1]))
+                && bytes
+                    .get(cursor.saturating_add(name_bytes.len()))
+                    .is_none_or(|byte| !proto_identifier_byte(*byte))
+            {
+                cursor = skip_proto_space(bytes, cursor.saturating_add(name_bytes.len()));
+                if bytes.get(cursor) == Some(&b'{') {
+                    let end = proto_balanced_end(bytes, cursor)?;
+                    if found.is_some() {
+                        return None;
+                    }
+                    found = Some((index, end));
+                    index = end;
+                    continue;
+                }
+            }
+        }
+        match bytes[index] {
+            b'{' => depth = depth.checked_add(1)?,
+            b'}' => depth = depth.checked_sub(1)?,
+            _ => {},
+        }
+        index += 1;
+    }
+    found.and_then(|(start, end)| source.get(start..end))
+}
+
+fn proto_message_block<'source>(source: &'source str, name: &str) -> Option<&'source str> {
+    proto_message_block_at_depth(source, name, 0)
+}
+
+fn proto_nested_message_block<'source>(source: &'source str, name: &str) -> Option<&'source str> {
+    proto_message_block_at_depth(source, name, 1)
+}
+
+/// Count one direct field declaration in a message block.
+///
+/// The search ignores comments and strings and only accepts declarations at
+/// the message body's own brace depth. Nested enums/messages and similarly
+/// named fields elsewhere therefore cannot satisfy the check.
+fn proto_field(message_block: &str, declaration: &str) -> usize {
+    let bytes = message_block.as_bytes();
+    let declaration_bytes = declaration.as_bytes();
+    let mut opening_brace = None;
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if let Some(next) = skip_proto_comment(bytes, index) {
+            index = next;
+            continue;
+        }
+        if let Some(next) = skip_proto_string(bytes, index) {
+            index = next;
+            continue;
+        }
+        if bytes[index] == b'{' {
+            opening_brace = Some(index);
+            break;
+        }
+        index += 1;
+    }
+    let Some(opening_brace) = opening_brace else {
+        return 0;
+    };
+
+    let mut nested_depth = 0usize;
+    let mut matches = 0usize;
+    index = opening_brace.saturating_add(1);
+    while index < bytes.len() {
+        if let Some(next) = skip_proto_comment(bytes, index) {
+            index = next;
+            continue;
+        }
+        if let Some(next) = skip_proto_string(bytes, index) {
+            index = next;
+            continue;
+        }
+        match bytes[index] {
+            b'{' => {
+                nested_depth = match nested_depth.checked_add(1) {
+                    Some(depth) => depth,
+                    None => return matches,
+                };
+                index += 1;
+                continue;
+            },
+            b'}' => {
+                if nested_depth == 0 {
+                    break;
+                }
+                nested_depth -= 1;
+                index += 1;
+                continue;
+            },
+            _ => {},
+        }
+        if nested_depth == 0
+            && bytes
+                .get(index..index.saturating_add(declaration_bytes.len()))
+                .is_some_and(|candidate| candidate == declaration_bytes)
+            && (index == 0 || !proto_identifier_byte(bytes[index - 1]))
+            && bytes
+                .get(index.saturating_add(declaration_bytes.len()))
+                .is_none_or(|byte| !proto_identifier_byte(*byte))
+        {
+            matches = matches.saturating_add(1);
+        }
+        index += 1;
+    }
+    matches
+}
+
+fn sha256_hex(source: &str) -> String {
+    Sha256::digest(source.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn enforce_text_projection_provenance(
@@ -1074,9 +1709,7 @@ optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;\n\
         .collect::<Vec<_>>()
         .join("\n");
     let codec = fs::read_to_string("src/comment_storage_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if !TSD_FIELDS
         .iter()
@@ -1102,7 +1735,7 @@ optional .LitchiIwaCommentStorageProjection.Uuid storage_uuid = 5;\n\
         || production_codec.contains("pub fn encode_comment_storage_archive")
         || production_codec.contains("pub fn to_owned_comment_storage")
         || production_codec_has_forbidden_public_function(
-            production_codec,
+            production_codec.as_ref(),
             &FORBIDDEN_PUBLIC_FUNCTION_FRAGMENTS,
         )
     {
@@ -1238,9 +1871,7 @@ fn enforce_keynote_document_projection_provenance(
     .collect::<Vec<_>>()
     .join("\n");
     let codec = fs::read_to_string("src/keynote_document_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if tsp.matches(TSP_REFERENCE).count() != 1
         || keynote.matches(KN_DOCUMENT).count() != 1
@@ -1310,9 +1941,7 @@ optional .LitchiIwaProjection.DrawableArchive super = 1;\n\
             .join("\n")
     };
     let codec = fs::read_to_string("src/keynote_chart_caption_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if tsp.matches(TSP_REFERENCE).count() != 1
         || tsch.matches(TSCH_DRAWABLE).count() != 1
@@ -1385,9 +2014,7 @@ optional string tschchartinfodefaulttitle = 23;\n\
     };
     let expected_projection = normalize(PROJECTION_SCHEMA);
     let codec = fs::read_to_string("src/keynote_chart_title_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if !TSCH_NON_STYLE_FIELDS
         .iter()
@@ -1450,9 +2077,7 @@ required .LitchiIwaProjection.TableModelReference table_model = 2;\n\
         .collect::<Vec<_>>()
         .join("\n");
     let codec = fs::read_to_string("src/table_info_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     if tsp.matches(TSP_REFERENCE).count() != 1
         || tsd.matches(TSD_DRAWABLE).count() != 1
         || tsd.matches(TSD_DRAWABLE_LOCKED).count() != 1
@@ -1517,9 +2142,7 @@ required string table_name = 8;\n\
         .collect::<Vec<_>>()
         .join("\n");
     let codec = fs::read_to_string("src/numbers_names_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if numbers.matches(TN_SHEET_NAME).count() != 1
         || numbers.matches(TN_FORM_SHEET_SUPER).count() != 1
@@ -1590,9 +2213,7 @@ optional bool deprecated_is_external = 3;\n\
         .collect::<Vec<_>>()
         .join("\n");
     let codec = fs::read_to_string("src/numbers_sheet_order_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if tsp.matches(REFERENCE).count() != 1
         || tn.matches("repeated .TSP.Reference sheets = 1;").count() != 1
@@ -1677,9 +2298,7 @@ optional bool repeating_header_columns_enabled = 32;\n\
         .collect::<Vec<_>>()
         .join("\n");
     let codec = fs::read_to_string("src/numbers_table_header_settings_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if !TST_FIELDS
         .iter()
@@ -1758,9 +2377,7 @@ optional bool table_name_border_enabled = 37;\n\
         .collect::<Vec<_>>()
         .join("\n");
     let codec = fs::read_to_string("src/numbers_table_title_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if tsp.matches(TSP_REFERENCE).count() != 1
         || !TST_FIELDS
@@ -1819,6 +2436,7 @@ fn enforce_table_cell_projection_provenance(
         "required .TST.DataStore base_data_store = 4;",
         "required uint32 number_of_rows = 6;",
         "required uint32 number_of_columns = 7;",
+        "required string table_name = 8;",
         "optional .TSP.Reference hidden_state_formula_owner_for_columns = 34;",
         "optional .TSP.Reference hidden_state_formula_owner_for_rows = 35;",
         "optional .TSP.CFUUIDArchive conditional_style_formula_owner_id = 39;",
@@ -2026,11 +2644,7 @@ fn enforce_table_cell_projection_provenance(
     let lib = fs::read_to_string("src/lib.rs")?;
     let production = [storage_codec.as_str(), dependency_codec.as_str()]
         .into_iter()
-        .map(|codec| {
-            codec
-                .split_once("#[cfg(test)]")
-                .map_or(codec, |split| split.0)
-        })
+        .map(production_codec_source)
         .collect::<Vec<_>>()
         .join("\n");
     if !REQUIRED_CANONICAL
@@ -2066,6 +2680,236 @@ fn enforce_table_cell_projection_provenance(
         || production.contains(".encode(")
     {
         return Err("Numbers table-cell projections/codecs drifted from canonical TST/TSCE envelopes, exceeded source budgets, exposed repeated generated storage, or introduced production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_data_list_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    // These are the native TST routes that reach the two strict list codecs:
+    // 6005/6201 carry TableDataList and 6011 carries TableDataListSegment.
+    // Keep the IDs explicit here even though the wire schema itself has no
+    // archive-type field; the workspace route checks below tie those IDs to
+    // the application adapters when their sibling sources are present.
+    const TABLE_DATA_LIST_NATIVE_IDS: [u32; 2] = [6005, 6201];
+    const TABLE_DATA_LIST_SEGMENT_NATIVE_ID: u32 = 6011;
+
+    const TST_TABLE_DATA_LIST_DIGEST: &str =
+        "679dfddf38cfaf6164586de3fa1730e9c32793158db9cc5ccab882393bc4d26b";
+    const TST_TABLE_DATA_LIST_SEGMENT_DIGEST: &str =
+        "55134c3152ac35abbbd4b52bd737708bd23c9ea663fe8fd8edf25ada9585d8b0";
+    const TSP_RANGE_DIGEST: &str =
+        "98a79cc93228d486c83088884c21bcb2180ec18d58feba907516dc12f81bca24";
+    const PROJECTION_TABLE_DATA_LIST_DIGEST: &str =
+        "2aeff27e1e4284310c2bd88566eac5fdb754e62584f1f81df47a9741197225cc";
+    const PROJECTION_TABLE_DATA_LIST_ENTRY_DIGEST: &str =
+        "4d5af02897609de02ecaa66b48518d35467cb3f4209e195779530eb19102e0b7";
+    const PROJECTION_TABLE_DATA_LIST_SEGMENT_DIGEST: &str =
+        "81c497d1902a3f07684d753c28760c7ac5faf82ca0c70efb4eed78db483a7af6";
+
+    const TST_TABLE_DATA_LIST_FIELDS: [&str; 5] = [
+        "required .TST.TableDataList.ListType listType = 1;",
+        "required uint32 nextListID = 2;",
+        "repeated .TST.TableDataList.ListEntry entries = 3;",
+        "repeated .TSP.Reference segments = 4;",
+        "optional bool is_new_for_bnc = 5;",
+    ];
+    const TST_TABLE_DATA_LIST_ENTRY_FIELDS: [&str; 11] = [
+        "required uint32 key = 1;",
+        "required uint32 refcount = 2;",
+        "optional string string = 3;",
+        "optional .TSP.Reference reference = 4;",
+        "optional .TSCE.FormulaArchive formula = 5;",
+        "optional .TSK.FormatStructArchive format = 6;",
+        "optional .TSK.CustomFormatArchive custom_format = 8;",
+        "optional .TSP.Reference rich_text_payload = 9;",
+        "optional .TSP.Reference comment_storage = 10;",
+        "optional .TST.ImportWarningSetArchive import_warning_set = 11;",
+        "optional .TST.CellSpecArchive cell_spec = 12;",
+    ];
+    const TST_TABLE_DATA_LIST_SEGMENT_FIELDS: [&str; 3] = [
+        "required .TST.TableDataList.ListType list_type = 1;",
+        "required .TSP.Range key_range = 2;",
+        "repeated .TST.TableDataList.ListEntry entries = 3;",
+    ];
+    const TSP_RANGE_FIELDS: [&str; 2] = [
+        "required uint32 location = 1;",
+        "required uint32 length = 2;",
+    ];
+    const PROJECTION_TABLE_DATA_LIST_FIELDS: [&str; 3] = [
+        "required int32 list_type = 1;",
+        "required uint32 next_list_id = 2;",
+        "optional bool is_new_for_bnc = 5;",
+    ];
+    const PROJECTION_TABLE_DATA_LIST_ENTRY_FIELDS: [&str; 11] = [
+        "required uint32 key = 1;",
+        "required uint32 ref_count = 2;",
+        "optional string string_value = 3;",
+        "optional bytes reference = 4;",
+        "optional bytes formula = 5;",
+        "optional bytes format = 6;",
+        "optional bytes custom_format = 8;",
+        "optional bytes rich_text_payload = 9;",
+        "optional bytes comment_storage = 10;",
+        "optional bytes import_warning_set = 11;",
+        "optional bytes cell_spec = 12;",
+    ];
+    const PROJECTION_TABLE_DATA_LIST_SEGMENT_FIELDS: [&str; 2] = [
+        "required int32 list_type = 1;",
+        "required bytes key_range = 2;",
+    ];
+    const SEGMENT_CODEC_FIELDS: [&str; 13] = [
+        "pub struct TableDataListSegmentSnapshot<'source> {",
+        "key_range_location: u32,",
+        "key_range_length: u32,",
+        "pub fn decode_table_data_list_segment_with_visitor<'source>(",
+        "fn decode_table_data_list_segment_in<'source>(",
+        "let mut key_range = None;",
+        "let mut key_range_location = None;",
+        "let mut key_range_length = None;",
+        "let (location, length) = decode_range(raw, budget, child_depth)?;",
+        "key_range = Some(raw);",
+        "3 => visitor.visit_list_entry(decode_table_data_list_entry_in(",
+        "key_range_location: key_range_location.ok_or_else(DecodeError::invalid)?,",
+        "key_range_length: key_range_length.ok_or_else(DecodeError::invalid)?,",
+    ];
+    const SEGMENT_CODEC_PARITY: &str =
+        "if view.list_type != snapshot.list_type || view.key_range != snapshot.key_range {";
+
+    let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableCellStorageArchive.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_cell_storage_codec.rs")?;
+    let Some(table_data_list) = proto_message_block(&tst, "TableDataList") else {
+        return Err("Numbers TableDataList provenance lost its canonical message block".into());
+    };
+    let Some(table_data_list_entry) = proto_nested_message_block(table_data_list, "ListEntry")
+    else {
+        return Err("Numbers TableDataList provenance lost its nested ListEntry block".into());
+    };
+    let Some(table_data_list_segment) = proto_message_block(&tst, "TableDataListSegment") else {
+        return Err(
+            "Numbers TableDataListSegment provenance lost its canonical message block".into(),
+        );
+    };
+    let Some(range) = proto_message_block(&tsp, "Range") else {
+        return Err("Numbers TableDataList provenance lost TSP.Range".into());
+    };
+    let Some(projection_table_data_list) = proto_message_block(&projection, "TableDataListArchive")
+    else {
+        return Err("Numbers TableDataList provenance lost its projection block".into());
+    };
+    let Some(projection_table_data_list_entry) =
+        proto_message_block(&projection, "TableDataListEntryArchive")
+    else {
+        return Err("Numbers TableDataList provenance lost its entry projection block".into());
+    };
+    let Some(projection_table_data_list_segment) =
+        proto_message_block(&projection, "TableDataListSegmentArchive")
+    else {
+        return Err("Numbers TableDataListSegment provenance lost its projection block".into());
+    };
+
+    let canonical_scope_ok = TST_TABLE_DATA_LIST_FIELDS
+        .iter()
+        .all(|field| proto_field(table_data_list, field) == 1)
+        && TST_TABLE_DATA_LIST_ENTRY_FIELDS
+            .iter()
+            .all(|field| proto_field(table_data_list_entry, field) == 1)
+        && TST_TABLE_DATA_LIST_SEGMENT_FIELDS
+            .iter()
+            .all(|field| proto_field(table_data_list_segment, field) == 1)
+        && TSP_RANGE_FIELDS
+            .iter()
+            .all(|field| proto_field(range, field) == 1)
+        && sha256_hex(table_data_list) == TST_TABLE_DATA_LIST_DIGEST
+        && sha256_hex(table_data_list_segment) == TST_TABLE_DATA_LIST_SEGMENT_DIGEST
+        && sha256_hex(range) == TSP_RANGE_DIGEST;
+    let projection_scope_ok = PROJECTION_TABLE_DATA_LIST_FIELDS
+        .iter()
+        .all(|field| proto_field(projection_table_data_list, field) == 1)
+        && PROJECTION_TABLE_DATA_LIST_ENTRY_FIELDS
+            .iter()
+            .all(|field| proto_field(projection_table_data_list_entry, field) == 1)
+        && PROJECTION_TABLE_DATA_LIST_SEGMENT_FIELDS
+            .iter()
+            .all(|field| proto_field(projection_table_data_list_segment, field) == 1)
+        && !projection_table_data_list_segment.contains("repeated ")
+        && sha256_hex(projection_table_data_list) == PROJECTION_TABLE_DATA_LIST_DIGEST
+        && sha256_hex(projection_table_data_list_entry) == PROJECTION_TABLE_DATA_LIST_ENTRY_DIGEST
+        && sha256_hex(projection_table_data_list_segment)
+            == PROJECTION_TABLE_DATA_LIST_SEGMENT_DIGEST;
+    let codec_scope_ok = SEGMENT_CODEC_FIELDS
+        .iter()
+        .all(|field| codec.contains(field))
+        && codec.contains(SEGMENT_CODEC_PARITY);
+
+    let route_paths = [
+        Path::new("../litchi-iwa/src/protobuf.rs"),
+        Path::new("../litchi-numbers/src/package/extractor.rs"),
+    ];
+    let registry_table_data_list_markers = [
+        format!(
+            "{}u32 => decode_table_data_list,",
+            TABLE_DATA_LIST_NATIVE_IDS[0]
+        ),
+        format!(
+            "{}u32 => decode_table_data_list,",
+            TABLE_DATA_LIST_NATIVE_IDS[1]
+        ),
+    ];
+    let registry_table_data_list_segment_marker = format!(
+        "{}u32 => decode_table_data_list_segment,",
+        TABLE_DATA_LIST_SEGMENT_NATIVE_ID
+    );
+    let extractor_table_data_list_marker = format!(
+        ".filter(|message| message.type_ == {} || message.type_ == {})",
+        TABLE_DATA_LIST_NATIVE_IDS[0], TABLE_DATA_LIST_NATIVE_IDS[1]
+    );
+    let extractor_table_data_list_segment_marker = format!(
+        ".filter(|message| message.type_ == {})",
+        TABLE_DATA_LIST_SEGMENT_NATIVE_ID
+    );
+    let route_sources = route_paths
+        .iter()
+        .filter(|path| path.is_file())
+        .map(fs::read_to_string)
+        .collect::<Result<Vec<_>, _>>()?;
+    let route_scope_ok = if route_sources.is_empty() {
+        true
+    } else if route_sources.len() != route_paths.len() {
+        false
+    } else {
+        route_sources[0]
+            .matches(registry_table_data_list_markers[0].as_str())
+            .count()
+            == 1
+            && route_sources[0]
+                .matches(registry_table_data_list_markers[1].as_str())
+                .count()
+                == 1
+            && route_sources[0]
+                .matches(registry_table_data_list_segment_marker.as_str())
+                .count()
+                == 1
+            && route_sources[1]
+                .matches(extractor_table_data_list_marker.as_str())
+                .count()
+                == 1
+            && route_sources[1]
+                .matches(extractor_table_data_list_segment_marker.as_str())
+                .count()
+                == 1
+    };
+
+    if !canonical_scope_ok || !projection_scope_ok || !codec_scope_ok || !route_scope_ok {
+        return Err(
+            "Numbers TableDataList/TableDataListSegment provenance drifted: native 6005/6201/6011 routes, message-scoped fields/digests, entries=3, key_range, or parsed segment fields no longer match"
+                .into(),
+        );
     }
     Ok(())
 }
@@ -2159,7 +3003,7 @@ required uint64 upper = 2;
         "try_reserve_exact",
     ];
     let codec = fs::read_to_string("src/package_metadata_codec.rs")?;
-    let production = codec.as_str();
+    let production = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if !CANONICAL
         .iter()
@@ -2341,6 +3185,7 @@ required uint32 begin = 1;
 optional uint32 end = 2;
 }"#;
     let codec = fs::read_to_string("src/numbers_formula_codec.rs")?;
+    let production = production_codec_source(&codec);
     let lib = fs::read_to_string("src/lib.rs")?;
     if !CANONICAL.iter().all(|item| canonical.contains(item))
         || projection_schema != EXPECTED_SCHEMA
@@ -2350,12 +3195,12 @@ optional uint32 end = 2;
         || lib.matches("pub mod numbers_formula_codec;").count() != 1
         || lib.contains("pub mod buffa_formula_generated")
         || !SYMBOLS.iter().all(|symbol| codec.contains(symbol))
-        || codec.contains("prost::")
-        || codec.contains("to_owned_message")
-        || codec.contains("encode_to_vec")
-        || codec.contains("try_encode")
-        || codec.contains("RepeatedView")
-        || codec.contains("LazyRepeatedView")
+        || production.contains("prost::")
+        || production.contains("to_owned_message")
+        || production.contains("encode_to_vec")
+        || production.contains("try_encode")
+        || production.contains("RepeatedView")
+        || production.contains("LazyRepeatedView")
     {
         return Err("FormulaArchive projection/codec drifted from canonical TSCE fields, exposed generated repeated storage, or introduced owned/generated decoding".into());
     }
@@ -2427,9 +3272,7 @@ fn enforce_keynote_show_projection_provenance(
     .collect::<Vec<_>>()
     .join("\n");
     let router = fs::read_to_string("src/keynote_show_codec.rs")?;
-    let production_router = router
-        .split_once("#[cfg(test)]")
-        .map_or(router.as_str(), |(production, _tests)| production);
+    let production_router = production_codec_source(&router);
     let lib = fs::read_to_string("src/lib.rs")?;
     if tsp.matches(TSP_REFERENCE).count() != 1
         || tsp.matches(TSP_SIZE).count() != 1
@@ -2504,9 +3347,7 @@ fn enforce_pages_section_projection_provenance(
     let pages = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
     let projection = fs::read_to_string(projection_directory.join("TPSectionArchive.proto"))?;
     let codec = fs::read_to_string("src/pages_section_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     if !CANONICAL_FIELDS
         .iter()
         .all(|declaration| pages.matches(declaration).count() == 1)
@@ -2569,9 +3410,7 @@ fn enforce_pages_section_background_projection_provenance(
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     let codec = fs::read_to_string("src/pages_section_background_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     if pages.matches(SECTION_FIELD).count() != 1
         || !FILL_FIELDS.iter().all(|field| drawing.contains(field))
         || !COLOR_FIELDS
@@ -2687,17 +3526,11 @@ fn enforce_pages_body_projection_provenance(
     let text = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
     let projection = fs::read_to_string(projection_directory.join("TPDocumentBodyArchive.proto"))?;
     let codec = fs::read_to_string("src/pages_body_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let settings_codec = fs::read_to_string("src/pages_document_settings_codec.rs")?;
-    let production_settings_codec = settings_codec
-        .split_once("#[cfg(test)]")
-        .map_or(settings_codec.as_str(), |(production, _tests)| production);
+    let production_settings_codec = production_codec_source(&settings_codec);
     let layout_codec = fs::read_to_string("src/pages_page_layout_codec.rs")?;
-    let production_layout_codec = layout_codec
-        .split_once("#[cfg(test)]")
-        .map_or(layout_codec.as_str(), |(production, _tests)| production);
+    let production_layout_codec = production_codec_source(&layout_codec);
     if tsp.matches(TSP_REFERENCE).count() != 1
         || !TP_FIELDS
             .iter()
@@ -2738,6 +3571,501 @@ fn enforce_pages_body_projection_provenance(
             "derived Pages body/layout/settings projection or codec drifted from canonical TP/TSWP/TSP fields, exceeded its 3 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_pages_media_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const MOVIE_AUDIO_ONLY: &str = "optional bool audioOnly = 9;";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage MovieAudioFlagArchive {\noptional bool audio_only = 9;\n}";
+    const CODEC_MARKERS: [&str; 7] = [
+        "const AUDIO_ONLY_FIELD: u32 = 9;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "pub struct MovieAudioFlagSnapshot",
+        "pub fn decode_movie_audio_only(",
+        "decode_lazy_view",
+        "crate::buffa_pages_media_generated::",
+        "Unknown source fields are never materialized or",
+    ];
+
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSDMovieAudioFlagArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let codec = fs::read_to_string("src/pages_media_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    if tsd.matches(MOVIE_AUDIO_ONLY).count() != 1
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 1024
+        || projection.contains("repeated ")
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || FORBIDDEN_PROST_CODEC_MARKERS
+            .iter()
+            .any(|fragment| production_codec.contains(fragment))
+    {
+        return Err("Pages media projection/codec drifted from TSD.MovieArchive.audioOnly, exceeded its source budget, introduced repeated storage, or added production Prost/encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(), Box<dyn Error>> {
+    // Native IWA object type numbers are not part of the protobuf schemas.
+    // Keep their workspace routes private and check them only as a build-time
+    // provenance seam. The canonical message blocks below are the authority
+    // for what each number means; no ID is added to the public codec API.
+    const ROUTE_DECLARATIONS: [(&str, &str, &str); 12] = [
+        (
+            "../litchi-iwa/src/pages/editor.rs",
+            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
+            "MOVIE_MESSAGE_TYPE => remap_pages_movie_wire",
+        ),
+        (
+            "../litchi-iwa/src/pages/editor.rs",
+            "const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
+            "CAPTION_INFO_MESSAGE_TYPE => remap_pages_caption_info_wire",
+        ),
+        (
+            "../litchi-iwa/src/pages/editor/movies/graph.rs",
+            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
+            "decode_typed_package_object(package, identifier, MOVIE_MESSAGE_TYPE",
+        ),
+        (
+            "../litchi-iwa/src/pages/editor/movies/caption.rs",
+            "const MOVIE_MESSAGE_TYPE: u32 = 3_007;",
+            "MOVIE_MESSAGE_TYPE,\n        \"TSD.MovieArchive\",",
+        ),
+        (
+            "../litchi-iwa/src/image_caption.rs",
+            "pub(crate) const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;",
+            ".filter(|message| message.type_ == CAPTION_INFO_MESSAGE_TYPE)",
+        ),
+        (
+            "../litchi-iwa/src/pages/editor/footnotes.rs",
+            "const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;",
+            "pages_footnote_codec::decode_footnote_reference(",
+        ),
+        (
+            "../litchi-iwa/src/pages/editor/footnotes.rs",
+            "const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;",
+            "pages_footnote_marker_codec::decode_textual_attachment(",
+        ),
+        (
+            "../litchi-pages/src/package.rs",
+            "const SECTION_MESSAGE_TYPE: u32 = 10_011;",
+            "unique_message_payload(&object.messages, SECTION_MESSAGE_TYPE",
+        ),
+        (
+            "../litchi-pages/src/package/document_settings.rs",
+            "const DOCUMENT_MESSAGE_TYPE: u32 = 10_000;",
+            "page_layout::unique_message(root, DOCUMENT_MESSAGE_TYPE)",
+        ),
+        (
+            "../litchi-pages/src/package/document_settings.rs",
+            "const SETTINGS_MESSAGE_TYPE: u32 = 10_012;",
+            "RawMessage {\n                    type_: SETTINGS_MESSAGE_TYPE,",
+        ),
+        (
+            "../litchi-pages/src/package/page_layout.rs",
+            "const DOCUMENT_MESSAGE_TYPE: u32 = 10_000;",
+            "unique_message(document_object, DOCUMENT_MESSAGE_TYPE)?",
+        ),
+        (
+            "../litchi-pages/src/package/table_lock.rs",
+            "const ROOT_MESSAGE_TYPE: u32 = 10_000;",
+            "ROOT_MESSAGE_TYPE,\n        budget,",
+        ),
+    ];
+    const REGISTRY_DECLARATIONS: [&str; 3] = [
+        "3007u32 => decode_shape_archive,",
+        "2004u32 => decode_storage_archive,",
+        "2008u32 => decode_storage_archive,",
+    ];
+    const MOVIE_FIELDS: [&str; 2] = [
+        "required .TSD.DrawableArchive super = 1;",
+        "optional bool audioOnly = 9;",
+    ];
+    const CAPTION_FIELDS: [&str; 3] = [
+        "required .TSWP.ShapeInfoArchive super = 1;",
+        "optional .TSP.Reference placement = 2;",
+        "optional .TSD.CaptionOrTitleKind childInfoKind = 3;",
+    ];
+    const FOOTNOTE_FIELDS: [&str; 3] = [
+        "optional .TSWP.TextualAttachmentArchive super = 1;",
+        "optional .TSP.Reference contained_storage = 2;",
+        "optional string custom_mark_string = 3;",
+    ];
+    const TEXTUAL_FIELDS: [&str; 2] = [
+        "optional string string_equivalent = 1;",
+        "optional .TSWP.TextualAttachmentArchive.Kind kind = 2;",
+    ];
+    const DOCUMENT_FIELDS: [&str; 15] = [
+        "required .TSA.DocumentArchive super = 15;",
+        "optional .TSP.Reference body_storage = 4;",
+        "optional .TSP.Reference section = 5;",
+        "optional .TSP.Reference settings = 7;",
+        "optional float page_width = 30;",
+        "optional float page_height = 31;",
+        "optional float left_margin = 32;",
+        "optional float right_margin = 33;",
+        "optional float top_margin = 34;",
+        "optional float bottom_margin = 35;",
+        "optional float header_margin = 36;",
+        "optional float footer_margin = 37;",
+        "optional float page_scale = 38;",
+        "optional bool lays_out_body_vertically = 39;",
+        "optional uint32 orientation = 42 [default = 0];",
+    ];
+    const SETTINGS_FIELDS: [&str; 10] = [
+        "optional bool body = 1 [default = true];",
+        "optional bool headers = 2 [default = true];",
+        "optional bool footers = 3 [default = true];",
+        "optional bool hyphenation = 9 [default = false];",
+        "optional bool use_ligatures = 10 [default = false];",
+        "optional .TP.SettingsArchive.FootnoteKind footnote_kind = 30;",
+        "optional .TP.SettingsArchive.FootnoteFormat footnote_format = 31;",
+        "optional .TP.SettingsArchive.FootnoteNumbering footnote_numbering = 32;",
+        "optional int32 footnote_gap = 33;",
+        "optional bool facing_pages = 34 [default = false];",
+    ];
+    const SECTION_FIELDS: [&str; 12] = [
+        "optional bool inherit_previous_header_footer = 17;",
+        "optional bool section_template_first_page_different = 18;",
+        "optional bool section_template_even_odd_pages_different = 19;",
+        "optional uint32 section_start_kind = 20;",
+        "optional uint32 section_page_number_kind = 21;",
+        "optional uint32 section_page_number_start = 22;",
+        "optional .TSP.Reference first_section_template_page = 23;",
+        "optional .TSP.Reference even_section_template_page = 24;",
+        "optional .TSP.Reference odd_section_template_page = 25;",
+        "optional string name = 26;",
+        "optional bool section_template_first_page_hides_header_footer = 28;",
+        "optional .TSP.Reference user_defined_guide_storage = 29;",
+    ];
+
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let tsa = fs::read_to_string(proto_directory.join("TSAArchives.proto"))?;
+    let tswp = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
+    let tp = fs::read_to_string(proto_directory.join("TPArchives.proto"))?;
+    let Some(movie) = proto_message_block(&tsd, "MovieArchive") else {
+        return Err("Pages native-ID provenance lost TSD.MovieArchive".into());
+    };
+    let Some(caption) = proto_message_block(&tsa, "CaptionInfoArchive") else {
+        return Err("Pages native-ID provenance lost TSA.CaptionInfoArchive".into());
+    };
+    let Some(footnote) = proto_message_block(&tswp, "FootnoteReferenceAttachmentArchive") else {
+        return Err(
+            "Pages native-ID provenance lost TSWP.FootnoteReferenceAttachmentArchive".into(),
+        );
+    };
+    let Some(textual) = proto_message_block(&tswp, "TextualAttachmentArchive") else {
+        return Err("Pages native-ID provenance lost TSWP.TextualAttachmentArchive".into());
+    };
+    let Some(document) = proto_message_block(&tp, "DocumentArchive") else {
+        return Err("Pages native-ID provenance lost TP.DocumentArchive".into());
+    };
+    let Some(settings) = proto_message_block(&tp, "SettingsArchive") else {
+        return Err("Pages native-ID provenance lost TP.SettingsArchive".into());
+    };
+    let Some(section) = proto_message_block(&tp, "SectionArchive") else {
+        return Err("Pages native-ID provenance lost TP.SectionArchive".into());
+    };
+
+    let canonical_scope_ok = MOVIE_FIELDS
+        .iter()
+        .all(|field| proto_field(movie, field) == 1)
+        && CAPTION_FIELDS
+            .iter()
+            .all(|field| proto_field(caption, field) == 1)
+        && FOOTNOTE_FIELDS
+            .iter()
+            .all(|field| proto_field(footnote, field) == 1)
+        && TEXTUAL_FIELDS
+            .iter()
+            .all(|field| proto_field(textual, field) == 1)
+        && DOCUMENT_FIELDS
+            .iter()
+            .all(|field| proto_field(document, field) == 1)
+        && SETTINGS_FIELDS
+            .iter()
+            .all(|field| proto_field(settings, field) == 1)
+        && SECTION_FIELDS
+            .iter()
+            .all(|field| proto_field(section, field) == 1);
+
+    // A standalone publication of litchi-iwa-protos has no sibling editor
+    // sources. In that layout the schema-side guard still runs, while the
+    // workspace-only numeric route check is intentionally skipped. A partial
+    // sibling checkout is an error so one missing route cannot weaken this
+    // seam silently.
+    let any_route_present = ROUTE_DECLARATIONS
+        .iter()
+        .any(|(path, _, _)| Path::new(path).is_file());
+    let all_routes_present = ROUTE_DECLARATIONS
+        .iter()
+        .all(|(path, _, _)| Path::new(path).is_file());
+    let route_scope_ok = if !any_route_present {
+        true
+    } else if !all_routes_present {
+        false
+    } else {
+        ROUTE_DECLARATIONS
+            .iter()
+            .map(|(path, declaration, use_marker)| {
+                fs::read_to_string(path).map(|source| {
+                    rust_code_marker_count(&source, declaration) == 1
+                        && rust_code_marker_count(&source, use_marker) == 1
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .all(|matches| matches)
+    };
+
+    let registry_scope_ok = if !any_route_present {
+        true
+    } else {
+        let registry = fs::read_to_string("../litchi-iwa/src/protobuf.rs")?;
+        REGISTRY_DECLARATIONS
+            .iter()
+            .all(|declaration| rust_code_marker_count(&registry, declaration) == 1)
+    };
+
+    if !canonical_scope_ok || !route_scope_ok || !registry_scope_ok {
+        return Err(
+            "Pages native message provenance drifted: private Movie 3007, Caption 633, FootnoteReference 2008, TextualAttachment 2004, or package Document/Section/Settings (10000/10011/10012) and table-lock root (10000) routes no longer match their message-scoped canonical declarations"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_pages_movie_caption_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = r#"message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}"#;
+    const DRAWABLE_FIELDS: [&str; 1] = ["optional .TSP.Reference parent = 2;"];
+    const SHAPE_FIELDS: [&str; 2] = [
+        "required .TSD.DrawableArchive super = 1;",
+        "optional .TSP.Reference style = 2;",
+    ];
+    const SHAPE_INFO_FIELDS: [&str; 4] = [
+        "required .TSD.ShapeArchive super = 1;",
+        "optional .TSP.Reference deprecated_storage = 2 [deprecated = true];",
+        "optional .TSP.Reference owned_storage = 4;",
+        "optional bool is_text_box = 6;",
+    ];
+    const CAPTION_INFO_FIELDS: [&str; 3] = [
+        "required .TSWP.ShapeInfoArchive super = 1;",
+        "optional .TSP.Reference placement = 2;",
+        "optional .TSD.CaptionOrTitleKind childInfoKind = 3;",
+    ];
+    const PROJECTION_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n}";
+    const PROJECTION_DRAWABLE: &str =
+        "message DrawableArchive {\n  optional .LitchiIwaProjection.Reference parent = 2;\n}";
+    const PROJECTION_SHAPE: &str = "message ShapeArchive {\n  required .LitchiIwaProjection.DrawableArchive super = 1;\n  optional .LitchiIwaProjection.Reference style = 2;\n}";
+    const PROJECTION_SHAPE_INFO: &str = "message ShapeInfoArchive {\n  required .LitchiIwaProjection.ShapeArchive super = 1;\n  optional .LitchiIwaProjection.Reference deprecated_storage = 2;\n  optional .LitchiIwaProjection.Reference owned_storage = 4;\n  optional bool is_text_box = 6;\n}";
+    const PROJECTION_CAPTION_INFO: &str = "message CaptionInfoArchive {\n  required .LitchiIwaProjection.ShapeInfoArchive super = 1;\n  optional .LitchiIwaProjection.Reference placement = 2;\n  optional int32 child_info_kind = 3;\n}";
+    const CODEC_MARKERS: [&str; 13] = [
+        "const CAPTION_INFO_SUPER_FIELD: u32 = 1;",
+        "const CAPTION_INFO_PLACEMENT_FIELD: u32 = 2;",
+        "const CAPTION_INFO_KIND_FIELD: u32 = 3;",
+        "const SHAPE_INFO_SUPER_FIELD: u32 = 1;",
+        "const SHAPE_INFO_DEPRECATED_STORAGE_FIELD: u32 = 2;",
+        "const SHAPE_INFO_OWNED_STORAGE_FIELD: u32 = 4;",
+        "const SHAPE_INFO_IS_TEXT_BOX_FIELD: u32 = 6;",
+        "const SHAPE_SUPER_FIELD: u32 = 1;",
+        "const SHAPE_STYLE_FIELD: u32 = 2;",
+        "const DRAWABLE_PARENT_FIELD: u32 = 2;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "pub fn decode_caption_info(",
+    ];
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let tsd_commands = fs::read_to_string(proto_directory.join("TSDCommandArchives.proto"))?;
+    let tswp = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
+    let tsa = fs::read_to_string(proto_directory.join("TSAArchives.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TPMovieCaptionArchive.proto"))?;
+    let drawable_block = tsd
+        .split_once("message DrawableArchive {")
+        .and_then(|(_, remainder)| remainder.split_once("\n}"))
+        .map_or("", |(body, _)| body);
+    let shape_block = tsd
+        .split_once("message ShapeArchive {")
+        .and_then(|(_, remainder)| remainder.split_once("\n}"))
+        .map_or("", |(body, _)| body);
+    let projection_digest = Sha256::digest(projection.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let codec = fs::read_to_string("src/pages_movie_caption_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || tsd.matches("message DrawableArchive {").count() != 1
+        || !DRAWABLE_FIELDS
+            .iter()
+            .all(|field| drawable_block.matches(field).count() == 1)
+        || tsd.matches("message ShapeArchive {").count() != 1
+        || !SHAPE_FIELDS
+            .iter()
+            .all(|field| shape_block.matches(field).count() == 1)
+        || !SHAPE_INFO_FIELDS
+            .iter()
+            .all(|field| tswp.matches(field).count() == 1)
+        || !CAPTION_INFO_FIELDS
+            .iter()
+            .all(|field| tsa.matches(field).count() == 1)
+        || tsd_commands.matches("enum CaptionOrTitleKind {").count() != 1
+        || projection.matches(PROJECTION_REFERENCE).count() != 1
+        || projection.matches(PROJECTION_DRAWABLE).count() != 1
+        || projection.matches(PROJECTION_SHAPE).count() != 1
+        || projection.matches(PROJECTION_SHAPE_INFO).count() != 1
+        || projection.matches(PROJECTION_CAPTION_INFO).count() != 1
+        || projection.len() > 4 * 1024
+        || projection.contains("repeated ")
+        || projection_digest != "c1c8f7131f4362794811e0ce396769a37c61175d10befb63886b4a76109c6e7c"
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err("Pages movie-caption projection/codec drifted from TSA/TSWP/TSD/TSP fields, exceeded its source budget, introduced repeated storage, Prost, or generated production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_footnote_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_PROJECTION_DIGEST: &str =
+        "6a8b19d679e9cb331764f537b9e342943f1e08860784284ad176016b4fcddde4";
+    const TEXTUAL_FIELDS: [&str; 2] = [
+        "optional string string_equivalent = 1;",
+        "optional .TSWP.TextualAttachmentArchive.Kind kind = 2;",
+    ];
+    const TSP_REFERENCE: &str = r#"message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}"#;
+    const TSWP_TEXTUAL: &str = "message TextualAttachmentArchive {\n  enum Kind {\n    kKindPageNumber = 0;\n    kKindPageCount = 1;\n    kKindFootnoteMark = 2;\n  }\n  optional string string_equivalent = 1;\n  optional .TSWP.TextualAttachmentArchive.Kind kind = 2;\n}";
+    const TSWP_FOOTNOTE: &str = "message FootnoteReferenceAttachmentArchive {\n  optional .TSWP.TextualAttachmentArchive super = 1;\n  optional .TSP.Reference contained_storage = 2;\n  optional string custom_mark_string = 3;\n}";
+    const PROJECTION_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const PROJECTION_TEXTUAL: &str = "message TextualAttachmentArchive {\n  optional string string_equivalent = 1;\n  optional int32 kind = 2;\n}";
+    const PROJECTION_FOOTNOTE: &str = "message FootnoteReferenceAttachmentArchive {\n  optional .LitchiIwaProjection.TextualAttachmentArchive super = 1;\n  optional .LitchiIwaProjection.Reference contained_storage = 2;\n  optional string custom_mark_string = 3;\n}";
+    const CODEC_MARKERS: [&str; 11] = [
+        "const FOOTNOTE_SUPER_FIELD: u32 = 1;",
+        "const FOOTNOTE_CONTAINED_STORAGE_FIELD: u32 = 2;",
+        "const FOOTNOTE_CUSTOM_MARK_FIELD: u32 = 3;",
+        "const TEXTUAL_STRING_EQUIVALENT_FIELD: u32 = 1;",
+        "const TEXTUAL_KIND_FIELD: u32 = 2;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;",
+        "const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "pub fn decode_footnote_reference",
+        "decode_lazy_view",
+    ];
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let text = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
+    let projection = fs::read_to_string(
+        projection_directory.join("TSWPFootnoteReferenceAttachmentArchive.proto"),
+    )?;
+    let projection_digest = Sha256::digest(projection.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let codec = fs::read_to_string("src/pages_footnote_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    if tsp.matches(TSP_REFERENCE).count() != 1
+        || text.matches(TSWP_TEXTUAL).count() != 1
+        || !TEXTUAL_FIELDS
+            .iter()
+            .all(|field| text.matches(field).count() == 1)
+        || text.matches(TSWP_FOOTNOTE).count() != 1
+        || projection.matches(PROJECTION_REFERENCE).count() != 1
+        || projection.matches(PROJECTION_TEXTUAL).count() != 1
+        || projection.matches(PROJECTION_FOOTNOTE).count() != 1
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection_digest != EXPECTED_PROJECTION_DIGEST
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err("Pages footnote projection/codec drifted from TSWP textual-attachment/reference fields, exceeded its source budget, introduced repeated storage, Prost, or generated production encoding".into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_footnote_marker_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_PROJECTION_DIGEST: &str =
+        "12cd2d1186d8c0241c6439085c5d0b911fde6ecd5dec759626a2d94dceca3c15";
+    const TSWP_TEXTUAL: &str = "message TextualAttachmentArchive {\n  enum Kind {\n    kKindPageNumber = 0;\n    kKindPageCount = 1;\n    kKindFootnoteMark = 2;\n  }\n  optional string string_equivalent = 1;\n  optional .TSWP.TextualAttachmentArchive.Kind kind = 2;\n}";
+    const PROJECTION: &str = "syntax = \"proto2\";\n\npackage LitchiIwaProjection;\n\nmessage TextualAttachmentArchive {\n  optional string string_equivalent = 1;\n  optional int32 kind = 2;\n}";
+    const CODEC_MARKERS: [&str; 6] = [
+        "const TEXTUAL_STRING_EQUIVALENT_FIELD: u32 = 1;",
+        "const TEXTUAL_KIND_FIELD: u32 = 2;",
+        "const MAX_RECURSION_LIMIT: u32 = 64;",
+        "pub fn decode_textual_attachment",
+        "decode_lazy_view",
+        "pub const fn raw(self)",
+    ];
+
+    let text = fs::read_to_string(proto_directory.join("TSWPArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSWPTextualAttachmentArchive.proto"))?;
+    let projection_digest = Sha256::digest(projection.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let codec = fs::read_to_string("src/pages_footnote_marker_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    if text.matches(TSWP_TEXTUAL).count() != 1
+        || projection.matches(PROJECTION).count() != 1
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection_digest != EXPECTED_PROJECTION_DIGEST
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err("Pages footnote-marker projection/codec drifted from TSWP TextualAttachmentArchive fields, exceeded its source budget, introduced repeated storage, Prost, or generated production encoding".into());
     }
     Ok(())
 }
@@ -2796,9 +4124,7 @@ optional int32 kind = 2 [default = 0];\n\
         })
         .map_or("", |(block, _suffix)| block);
     let codec = fs::read_to_string("src/keynote_placeholder_text_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     if reference_schema.matches(TSP_REFERENCE).count() != 1
         || drawable_schema.matches(TSD_DRAWABLE).count() != 1
         || shape_block.matches(TSD_SHAPE_SUPER).count() != 1
@@ -2881,9 +4207,7 @@ required .LitchiIwaProjection.Reference contained_storage = 1;\n\
         .and_then(|(_prefix, remainder)| remainder.split_once("\n}\n\nmessage SlideNodeArchive"))
         .map_or("", |(block, _suffix)| block);
     let codec = fs::read_to_string("src/keynote_speaker_notes_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     if tsp.matches(TSP_REFERENCE).count() != 1
         || keynote.matches(KN_TRANSITION).count() != 1
         || keynote.matches(KN_NOTE).count() != 1
@@ -2938,9 +4262,7 @@ fn enforce_keynote_slide_number_projection_provenance(
         .collect::<Vec<_>>()
         .join("\n");
     let codec = fs::read_to_string("src/keynote_slide_number_codec.rs")?;
-    let production = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(body, _)| body);
+    let production = production_codec_source(&codec);
     if keynote.matches(NODE).count() != 1
         || !STORAGE.iter().all(|field| text.matches(field).count() == 1)
         || !TEXTUAL.iter().all(|field| text.matches(field).count() == 1)
@@ -2975,9 +4297,7 @@ fn enforce_keynote_soundtrack_settings_projection_provenance(
     let projection =
         fs::read_to_string(projection_directory.join("KNSoundtrackSettingsArchive.proto"))?;
     let codec = fs::read_to_string("src/keynote_soundtrack_settings_codec.rs")?;
-    let production = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(body, _)| body);
+    let production = production_codec_source(&codec);
     if keynote.matches(SHOW).count() != 1
         || !SOUNDTRACK
             .iter()
@@ -3077,9 +4397,7 @@ fn enforce_keynote_slide_transition_projection_provenance(
     let projection =
         fs::read_to_string(projection_directory.join("KNSlideTransitionArchive.proto"))?;
     let codec = fs::read_to_string("src/keynote_slide_transition_codec.rs")?;
-    let production_codec = codec
-        .split_once("#[cfg(test)]")
-        .map_or(codec.as_str(), |(production, _tests)| production);
+    let production_codec = production_codec_source(&codec);
     let animation_block = keynote
         .split_once("message AnimationAttributesArchive {")
         .and_then(|(_prefix, remainder)| {
@@ -3618,8 +4936,8 @@ fn enforce_table_cell_storage_projection_budget(directory: &Path) -> Result<(), 
         directory,
         "Numbers table-cell storage",
         EXPECTED_FILES,
-        465_932,
-        "1a894fd5d22b004db664bc7c348d9591a4608ab9263a8122c726c8a1ecb0c3b3",
+        469_001,
+        "a4ad92afd34f6f276ad8fcd34e249a0738b8adc1b0477aa3e86fc447cf074776",
     )
 }
 
@@ -4139,6 +5457,181 @@ fn enforce_pages_body_projection_budget(directory: &Path) -> Result<(), Box<dyn 
     {
         return Err(format!(
             "Pages body/layout/settings projection generated {files} files/{bytes} bytes/{generated_repeated_view_mentions} RepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_media_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // The selected media discriminator is one scalar with no generated
+    // repeated closure. Keep a finite ceiling on generated output width.
+    const MAX_GENERATED_BYTES: u64 = 64 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("Pages media generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("Pages media generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated_views = repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("Pages media repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("Pages media lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Pages media projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_movie_caption_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // The caption-info inheritance chain is intentionally narrow and has no
+    // repeated native fields. Keep a finite ceiling on generated closure
+    // width so a future schema edit cannot silently widen this seam.
+    const MAX_GENERATED_BYTES: u64 = 176 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("Pages movie-caption generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("Pages movie-caption generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated_views = repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("Pages movie-caption repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("Pages movie-caption lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Pages movie-caption projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_footnote_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // The attachment envelope plus one Reference closure is intentionally
+    // kept below this ceiling; a repeated native table must not enter this
+    // private projection by accident.
+    const MAX_GENERATED_BYTES: u64 = 128 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("Pages footnote generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("Pages footnote generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated_views = repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("Pages footnote repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("Pages footnote lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Pages footnote projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_pages_footnote_marker_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // A marker has only two scalar fields. Keep a finite ceiling on the
+    // generated closure so a future projection edit cannot silently import
+    // the wider footnote-reference graph.
+    const MAX_GENERATED_BYTES: u64 = 64 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("Pages footnote-marker generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("Pages footnote-marker generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated_views = repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("Pages footnote-marker repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("Pages footnote-marker lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "Pages footnote-marker projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

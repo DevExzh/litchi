@@ -7,12 +7,292 @@
 
 /// Checked, archive-free cell display formats.
 pub mod data_format;
-pub(crate) use litchi_numbers_wire as wire;
+/// Native BNC adapters stay crate-private.  Their wire/common finite scalar
+/// is converted to the Numbers-owned [`FiniteF64`] at this boundary.
+pub(crate) mod wire {
+    use core::ops::{Deref, DerefMut};
+
+    use litchi_numbers_wire as native;
+
+    use super::FiniteF64;
+
+    #[cfg(test)]
+    pub(crate) use native::decimal128_le;
+    pub(crate) use native::{ClearValue, Error, RewritePlan, StoredValue};
+
+    /// A finite scalar accepted by the private BNC rewrite adapter.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub(crate) enum ScalarValue {
+        String(u32),
+        RichText(u32),
+        Number(FiniteF64),
+        Boolean(bool),
+        Date(FiniteF64),
+        Duration(FiniteF64),
+    }
+
+    impl ScalarValue {
+        fn into_native(self) -> native::ScalarValue {
+            match self {
+                Self::String(identifier) => native::ScalarValue::String(identifier),
+                Self::RichText(identifier) => native::ScalarValue::RichText(identifier),
+                Self::Number(value) => native::ScalarValue::Number(to_native(value)),
+                Self::Boolean(value) => native::ScalarValue::Boolean(value),
+                Self::Date(value) => native::ScalarValue::Date(to_native(value)),
+                Self::Duration(value) => native::ScalarValue::Duration(to_native(value)),
+            }
+        }
+    }
+
+    /// A decoded BNC scalar represented in the Numbers semantic vocabulary.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub(crate) enum CachedScalar {
+        Number(FiniteF64),
+        Boolean(bool),
+        Date(FiniteF64),
+        Duration(FiniteF64),
+        Unsupported(u8),
+    }
+
+    impl CachedScalar {
+        fn from_native(value: native::CachedScalar) -> Self {
+            match value {
+                native::CachedScalar::Number(value) => Self::Number(from_native(value)),
+                native::CachedScalar::Boolean(value) => Self::Boolean(value),
+                native::CachedScalar::Date(value) => Self::Date(from_native(value)),
+                native::CachedScalar::Duration(value) => Self::Duration(from_native(value)),
+                native::CachedScalar::Unsupported(value) => Self::Unsupported(value),
+            }
+        }
+
+        fn into_native(self) -> native::CachedScalar {
+            match self {
+                Self::Number(value) => native::CachedScalar::Number(to_native(value)),
+                Self::Boolean(value) => native::CachedScalar::Boolean(value),
+                Self::Date(value) => native::CachedScalar::Date(to_native(value)),
+                Self::Duration(value) => native::CachedScalar::Duration(to_native(value)),
+                Self::Unsupported(value) => native::CachedScalar::Unsupported(value),
+            }
+        }
+    }
+
+    /// Owned BNC cell adapter with semantic scalar conversion at the seam.
+    pub(crate) struct BncCell(native::BncCell);
+
+    impl Deref for BncCell {
+        type Target = native::BncCell;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for BncCell {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+
+    impl BncCell {
+        pub(crate) fn parse(data: &[u8]) -> Result<Self, Error> {
+            native::BncCell::parse(data).map(Self)
+        }
+
+        #[cfg(test)]
+        #[must_use]
+        pub(crate) fn minimal() -> Self {
+            Self(native::BncCell::minimal())
+        }
+
+        #[cfg(test)]
+        pub(crate) fn cached_scalar(&self) -> Result<Option<CachedScalar>, Error> {
+            self.0
+                .cached_scalar()
+                .map(|value| value.map(CachedScalar::from_native))
+        }
+    }
+
+    /// Borrowed BNC view adapter with semantic scalar conversion at the seam.
+    pub(crate) struct BncCellView<'a>(native::BncCellView<'a>);
+
+    impl<'a> BncCellView<'a> {
+        pub(crate) fn parse(data: &'a [u8]) -> Result<Self, Error> {
+            native::BncCellView::parse(data).map(Self)
+        }
+
+        #[must_use]
+        pub(crate) fn stored_value(&self) -> StoredValue {
+            self.0.stored_value()
+        }
+
+        #[must_use]
+        pub(crate) fn cached_scalar(&self) -> Option<CachedScalar> {
+            self.0.cached_scalar().map(CachedScalar::from_native)
+        }
+
+        #[must_use]
+        pub(crate) fn formula_text_key(&self) -> Option<u32> {
+            self.0.formula_text_key()
+        }
+
+        #[must_use]
+        pub(crate) fn scalar_equals(&self, value: ScalarValue) -> bool {
+            self.0.scalar_equals(value.into_native())
+        }
+
+        pub(crate) fn plan_scalar_rewrite(&self, value: ScalarValue) -> Result<RewritePlan, Error> {
+            self.0.plan_scalar_rewrite(value.into_native())
+        }
+
+        pub(crate) fn plan_formula_rewrite(
+            &self,
+            identifier: u32,
+            cache: Option<ScalarValue>,
+        ) -> Result<RewritePlan, Error> {
+            self.0
+                .plan_formula_rewrite(identifier, cache.map(ScalarValue::into_native))
+        }
+
+        pub(crate) fn plan_formula_cache_rewrite(
+            &self,
+            cache: CachedScalar,
+        ) -> Result<RewritePlan, Error> {
+            self.0.plan_formula_cache_rewrite(cache.into_native())
+        }
+
+        pub(crate) fn plan_clear_value(&self, retain_empty: bool) -> Result<RewritePlan, Error> {
+            self.0.plan_clear_value(retain_empty)
+        }
+
+        pub(crate) fn rewrite_scalar_with_limit(
+            &self,
+            value: ScalarValue,
+            max_output_bytes: usize,
+        ) -> Result<Vec<u8>, Error> {
+            self.0
+                .rewrite_scalar_with_limit(value.into_native(), max_output_bytes)
+        }
+
+        pub(crate) fn clear_value_with_limit(
+            &self,
+            max_output_bytes: usize,
+        ) -> Result<ClearValue, Error> {
+            self.0.clear_value_with_limit(max_output_bytes)
+        }
+
+        pub(crate) fn formula_cache_equals(&self, value: CachedScalar) -> bool {
+            self.0.formula_cache_equals(value.into_native())
+        }
+
+        pub(crate) fn formula_value_equals(
+            &self,
+            identifier: u32,
+            value: ScalarValue,
+        ) -> Result<bool, Error> {
+            self.0.formula_value_equals(identifier, value.into_native())
+        }
+
+        pub(crate) fn rewrite_formula_with_limit(
+            &self,
+            identifier: u32,
+            cache: ScalarValue,
+            max_output_bytes: usize,
+        ) -> Result<Vec<u8>, Error> {
+            self.0
+                .rewrite_formula_with_limit(identifier, cache.into_native(), max_output_bytes)
+        }
+
+        pub(crate) fn rewrite_formula_without_cache_with_limit(
+            &self,
+            identifier: u32,
+            max_output_bytes: usize,
+        ) -> Result<Vec<u8>, Error> {
+            self.0
+                .rewrite_formula_without_cache_with_limit(identifier, max_output_bytes)
+        }
+
+        pub(crate) fn rewrite_formula_cache_with_limit(
+            &self,
+            cache: CachedScalar,
+            max_output_bytes: usize,
+        ) -> Result<Vec<u8>, Error> {
+            self.0
+                .rewrite_formula_cache_with_limit(cache.into_native(), max_output_bytes)
+        }
+
+        #[must_use]
+        pub(crate) fn formula_error_identifier(&self) -> Option<u32> {
+            self.0.formula_error_identifier()
+        }
+
+        #[must_use]
+        pub(crate) fn comment_identifier(&self) -> Option<u32> {
+            self.0.comment_identifier()
+        }
+    }
+
+    fn from_native(value: litchi_iwa_common::formula::FiniteF64) -> FiniteF64 {
+        FiniteF64::new(value.get()).expect("wire parser guarantees finite scalar")
+    }
+
+    fn to_native(value: FiniteF64) -> litchi_iwa_common::formula::FiniteF64 {
+        litchi_iwa_common::formula::FiniteF64::new(value.get())
+            .expect("Numbers scalar invariant guarantees finite value")
+    }
+}
 
 use std::fmt;
 
-use litchi_iwa_common::formula::FormulaCachedValue;
-pub use litchi_iwa_common::formula::{FiniteF64, FiniteF64Error};
+/// Failure returned when a Numbers semantic scalar is not finite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("semantic scalar must be finite")]
+pub struct FiniteF64Error;
+
+/// A compact finite `f64` owned by the Numbers semantic API.
+///
+/// The inner value is private so public cell and formula values cannot be
+/// constructed with NaN or infinity. Use [`FiniteF64::new`] or
+/// [`TryFrom::try_from`] at an input boundary, and [`FiniteF64::get`] when a
+/// native `f64` is required. Native Numbers adapters convert this value to
+/// their private wire/common representation only at the archive boundary.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[repr(transparent)]
+pub struct FiniteF64(f64);
+
+impl FiniteF64 {
+    /// Construct a finite Numbers semantic scalar.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FiniteF64Error`] for NaN or either infinity.
+    pub const fn new(value: f64) -> Result<Self, FiniteF64Error> {
+        if value.is_finite() {
+            Ok(Self(value))
+        } else {
+            Err(FiniteF64Error)
+        }
+    }
+
+    /// Return the finite scalar as a native `f64`.
+    #[must_use]
+    pub const fn get(self) -> f64 {
+        self.0
+    }
+}
+
+impl TryFrom<f64> for FiniteF64 {
+    type Error = FiniteF64Error;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<FiniteF64> for f64 {
+    fn from(value: FiniteF64) -> Self {
+        value.get()
+    }
+}
 
 /// Seconds between the Unix epoch and Apple's 2001-01-01 UTC epoch.
 pub const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
@@ -46,7 +326,9 @@ impl Value {
     ///
     /// Returns [`FiniteF64Error`] when `value` is NaN or infinite.
     pub fn number(value: f64) -> Result<Self, FiniteF64Error> {
-        FiniteF64::new(value).map(Self::Number)
+        FiniteF64::new(value)
+            .map(Self::Number)
+            .map_err(|_error| FiniteF64Error)
     }
 
     /// Constructs a finite Apple-epoch date value.
@@ -55,7 +337,9 @@ impl Value {
     ///
     /// Returns [`FiniteF64Error`] when `value` is NaN or infinite.
     pub fn date(value: f64) -> Result<Self, FiniteF64Error> {
-        FiniteF64::new(value).map(Self::Date)
+        FiniteF64::new(value)
+            .map(Self::Date)
+            .map_err(|_error| FiniteF64Error)
     }
 
     /// Constructs a finite duration measured in seconds.
@@ -64,7 +348,9 @@ impl Value {
     ///
     /// Returns [`FiniteF64Error`] when `value` is NaN or infinite.
     pub fn duration(value: f64) -> Result<Self, FiniteF64Error> {
-        FiniteF64::new(value).map(Self::Duration)
+        FiniteF64::new(value)
+            .map(Self::Duration)
+            .map_err(|_error| FiniteF64Error)
     }
 
     /// Constructs a Numbers date from Unix epoch seconds.
@@ -168,18 +454,6 @@ impl Value {
             Self::Empty | Self::Date(_) | Self::Duration(_) | Self::Formula(_) | Self::Error(_) => {
                 None
             },
-        }
-    }
-}
-
-impl From<FormulaCachedValue> for Value {
-    fn from(value: FormulaCachedValue) -> Self {
-        match value {
-            FormulaCachedValue::Number(number) => Self::Number(number),
-            FormulaCachedValue::Text(text) => Self::Text(text),
-            FormulaCachedValue::Boolean(boolean) => Self::Boolean(boolean),
-            FormulaCachedValue::Date(date) => Self::Date(date),
-            FormulaCachedValue::Duration(duration) => Self::Duration(duration),
         }
     }
 }
@@ -312,5 +586,15 @@ mod tests {
             assert!(Value::duration(value).is_err());
             assert!(Value::date_from_unix_seconds(value).is_err());
         }
+    }
+
+    #[test]
+    fn finite_scalar_round_trips_through_owned_conversions() {
+        use std::mem::size_of;
+
+        let scalar = FiniteF64::try_from(3.5).expect("finite scalar should construct");
+        assert_eq!(scalar.get(), 3.5);
+        assert_eq!(f64::from(scalar), 3.5);
+        assert_eq!(size_of::<FiniteF64>(), size_of::<f64>());
     }
 }

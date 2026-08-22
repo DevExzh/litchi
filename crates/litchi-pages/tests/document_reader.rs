@@ -5,7 +5,7 @@ use litchi_iwa_archive::{Limits as ArchiveLimits, package::Catalog};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsp, tswp};
 use litchi_pages::{
-    DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimits,
+    DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimits, DocumentStats,
     MAX_DOCUMENT_PROPERTIES_BYTES, MAX_SECTIONS, Package, PackageError, ReadError, ReadLimitKind,
     SemanticLimits, Stats,
 };
@@ -193,6 +193,7 @@ fn storage_message(type_: u32, text: &[&str]) -> RawMessage {
 #[test]
 fn archive_free_document_has_zip_directory_and_package_parity() -> TestResult {
     assert_send_sync::<Document>();
+    assert_send_sync::<DocumentStats>();
     assert_send_sync::<Stats>();
     assert_send_sync::<DocumentReadOptions>();
     assert_send_sync::<SemanticLimits>();
@@ -233,7 +234,10 @@ fn archive_free_document_has_zip_directory_and_package_parity() -> TestResult {
         section_summary(&zipped),
         section_summary(package.semantic_document())
     );
-    assert_eq!(zipped.stats(), Some(package.stats()));
+    assert_eq!(
+        zipped.stats().map(DocumentStats::section_count),
+        Some(package.stats().section_count())
+    );
     assert_eq!(directory.stats(), zipped.stats());
     assert_eq!(borrowed.stats(), zipped.stats());
     assert_eq!(shared.stats(), zipped.stats());
@@ -424,7 +428,7 @@ fn frozen_directory_survives_source_removal_and_limits_are_inclusive() -> TestRe
     std::fs::remove_dir_all(&source)?;
     document.validate()?;
     assert_eq!(document.plain_text(), EXPECTED_TEXT);
-    assert_eq!(document.stats().map(Stats::section_count), Some(1));
+    assert_eq!(document.stats().map(DocumentStats::section_count), Some(1));
     assert_eq!(
         document
             .metadata()

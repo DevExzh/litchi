@@ -1072,7 +1072,7 @@ fn source_backed_real_producer_rk_fixture_reopens_and_inverts() {
         commit
             .patch()
             .inverse()
-            .apply(&commit.snapshot())
+            .apply(commit.snapshot())
             .unwrap()
             .bytes(),
         source.bytes()

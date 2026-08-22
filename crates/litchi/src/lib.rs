@@ -438,18 +438,200 @@ pub mod formula {
 #[cfg(feature = "pages")]
 pub mod pages {
     pub use litchi_pages::*;
+
+    /// Archive-free, immutable Pages values.
+    ///
+    /// This namespace is the strict semantic reader surface. Package
+    /// preservation and editing remain available from [`super::Package`] but
+    /// are not part of this contract; no native archive, generated message, or
+    /// compatibility projection is re-exported here. The checked source and
+    /// semantic limit profiles are re-exported alongside
+    /// [`DocumentReadOptions`] so a caller can keep the complete reader API in
+    /// this namespace.
+    pub mod semantic {
+        pub use litchi_pages::{
+            Body, Document, DocumentReadOptions, DocumentSourceLimitKind, DocumentSourceLimits,
+            DocumentSourceLimitsError, DocumentStats, Error, IoKind, Position, ReadError,
+            ReadLimitKind, Result, Root, Section, SectionSelector, SectionType, SelectorError,
+            SelectorResult, SemanticLimitKind, SemanticLimits, SemanticLimitsError, TextPosition,
+            TextSpan,
+        };
+
+        /// Result returned by the archive-free Pages source readers.
+        ///
+        /// This is separate from [`Result`], which is the leaf crate's
+        /// semantic-construction result. Keeping the source error visible at
+        /// this boundary preserves typed wrong-format, limit, and malformed
+        /// input failures for callers.
+        pub type ReadResult<T> = std::result::Result<T, ReadError>;
+
+        /// Read one immutable Pages snapshot from a complete package or
+        /// app-authored package directory.
+        ///
+        /// The returned document contains only archive-free semantic values;
+        /// package members and native object identifiers remain below the
+        /// package API. A source belonging to another iWork family is
+        /// reported as [`ReadError::NotPages`].
+        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Document> {
+            Document::open(path)
+        }
+
+        /// Read one immutable Pages snapshot from package bytes.
+        ///
+        /// The source is detected and routed by the Pages owner, so callers
+        /// do not need to inspect package markers or native identifiers.
+        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {
+            Document::from_bytes(bytes)
+        }
+    }
 }
 
 /// Apple Keynote package and semantic APIs.
 #[cfg(feature = "keynote")]
 pub mod keynote {
     pub use litchi_keynote::*;
+
+    /// Archive-free, immutable Keynote values.
+    ///
+    /// This namespace intentionally excludes the package adapter and its
+    /// editing transactions. Use [`super::Package`] when exact package
+    /// preservation or editing is required. The source and semantic limit
+    /// profiles, selector errors, and immutable value errors are available
+    /// here as well, so no package-layer type is needed to configure a read.
+    pub mod semantic {
+        pub use litchi_keynote::show::{Mode, Settings, Show, Size};
+        pub use litchi_keynote::{
+            Build, Document, DocumentIoKind, DocumentReadError, DocumentReadLimitKind,
+            DocumentReadOptions, DocumentSemanticLimitKind, DocumentSemanticLimits,
+            DocumentSemanticLimitsError, DocumentSourceLimitKind, DocumentSourceLimits,
+            DocumentSourceLimitsError, DocumentStats, Error, Position, Result, Seconds, Slide,
+            SlideSelector, SlideSelectorError, SlideSelectorResult, TextPosition, TextSpan,
+            Transition,
+        };
+
+        /// Result returned by the archive-free Keynote source readers.
+        ///
+        /// This is separate from [`Result`], which remains the focused
+        /// semantic-operation result. The source reader keeps Keynote's
+        /// typed I/O, limit, malformed-input, allocation, and wrong-format
+        /// errors available to callers.
+        pub type ReadResult<T> = std::result::Result<T, DocumentReadError>;
+
+        /// Read one immutable Keynote snapshot from a complete package or
+        /// app-authored package directory.
+        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Document> {
+            Document::open(path)
+        }
+
+        /// Read one immutable Keynote snapshot from package bytes.
+        ///
+        /// Format detection and semantic projection stay owned by the
+        /// Keynote reader; no native identifiers enter this facade.
+        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {
+            Document::from_bytes(bytes)
+        }
+    }
 }
 
 /// Apple Numbers package and semantic APIs.
 #[cfg(feature = "numbers")]
 pub mod numbers {
-    pub use litchi_numbers::*;
+    // Keep the format facade explicit: a leaf-package glob would silently
+    // publish any future package, generated, or physical helper module.
+    // Package operations remain available by their established names, while
+    // the archive-free reader surface below is deliberately allowlisted.
+    pub use litchi_numbers::{
+        AddressError, Cell, CellPosition, CellRange, ColumnDeletion, CoordinateError,
+        DEFAULT_MAX_TEXT_BYTES, Dimension, Dimensions, Document, DocumentError, DocumentLimitKind,
+        DocumentLimits, DocumentLimitsError, DocumentReadError, DocumentReadLimitKind,
+        DocumentReadOptions, DocumentResult, DocumentSourceLimitKind, DocumentSourceLimits,
+        DocumentSourceLimitsError, DocumentStats, Grid, GridBudget, InsertError, InsertResult,
+        IoKind, MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
+        Package, PackageError, PackageLimits, PackagePayloadLimitKind, PackageReadOptions,
+        PackageResourceError, PackageResult, PackageSemanticLimits, PackageSemanticLimitsError,
+        PackageSemanticPath, Points, Position, Range, RowDeletion, SemanticLimitKind, Sheet,
+        SheetBuilder, SheetSelector, Size, Table, TableBuilder, TableCellComment,
+        TableCellCommentCommit, TableCellCommentDiagnostics, TableCellCommentEdit,
+        TableCellCommentError, TableCellCommentLimitKind, TableCellCommentPatch,
+        TableCellCommentPath, TableError, TableLockCommit, TableLockDiagnostics, TableLockEdit,
+        TableLockError, TableLockLimitKind, TableLockPatch, TableSelector, TableSelectorError,
+        View, WriteError, compatibility_tables_from_bytes,
+        compatibility_tables_from_bytes_with_options,
+    };
+    pub use litchi_numbers::{cell, document, formula, names, package, selector, sheet, table};
+
+    /// Archive-free, immutable Numbers values.
+    ///
+    /// This namespace intentionally excludes the package adapter and the
+    /// global compatibility-table projection. Use [`super`] when exact
+    /// package preservation or editing is required via [`super::Package`].
+    /// The checked source and semantic limit profiles and their errors remain
+    /// in this namespace for a complete immutable-reader boundary.
+    pub mod semantic {
+        /// Archive-free typed Numbers cell values.
+        ///
+        /// These values describe what a caller can observe or stage at a
+        /// semantic cell boundary. They contain no package objects, native
+        /// identifiers, protobuf messages, or wire payloads.
+        pub mod cell {
+            pub use litchi_numbers::cell::{FiniteF64, FiniteF64Error, Type, Value};
+        }
+
+        /// Archive-free, dependency-free Numbers formula vocabulary.
+        ///
+        /// These are the small typed building blocks that do not retain a
+        /// package snapshot. Formula expressions and source-bound formula
+        /// handles remain in the focused package API.
+        pub mod formula {
+            pub use litchi_numbers::formula::{
+                AxisReference, BinaryOperator, CachedValue, CellReference, Error as FormulaError,
+            };
+        }
+
+        /// Archive-free Numbers table coordinates and cell presence values.
+        ///
+        /// The nested `cells` module mirrors the focused format crate so a
+        /// caller can use typed A1 coordinates and presence-preserving values
+        /// without importing the package adapter.
+        pub mod table {
+            pub use litchi_numbers::{
+                AddressError, CellPosition, CellRange, CoordinateError, Dimensions, View,
+            };
+
+            pub mod cells {
+                pub use litchi_numbers::table::cells::{State, Storage};
+            }
+        }
+
+        pub use litchi_numbers::{
+            Document, DocumentError as Error, DocumentLimitKind as LimitKind,
+            DocumentLimits as Limits, DocumentLimitsError as LimitsError, DocumentReadError,
+            DocumentReadLimitKind as ReadLimitKind, DocumentReadOptions, DocumentResult as Result,
+            DocumentSourceLimitKind, DocumentSourceLimits, DocumentSourceLimitsError,
+            DocumentStats, Sheet, SheetSelector, Table, TableSelector, TableSelectorError,
+        };
+
+        /// Result returned by the archive-free Numbers source readers.
+        ///
+        /// This is separate from [`Result`], which is the semantic document
+        /// construction result. The source reader's typed error retains
+        /// format routing and bounded-ingress diagnostics.
+        pub type ReadResult<T> = std::result::Result<T, DocumentReadError>;
+
+        /// Read one immutable Numbers snapshot from a complete package or
+        /// app-authored package directory.
+        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Document> {
+            Document::open(path)
+        }
+
+        /// Read one immutable Numbers snapshot from package bytes.
+        ///
+        /// The Numbers owner performs family detection and semantic
+        /// projection, so callers never need native identifiers or wire data.
+        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {
+            Document::from_bytes(bytes)
+        }
+    }
 }
 
 /// Format-neutral, bounded Apple iWork reading APIs.

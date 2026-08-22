@@ -22,7 +22,7 @@ litchi-iwa-text-wire = { workspace = true }
 litchi-keynote = { workspace = true }
 litchi-numbers = { workspace = true }
 litchi-numbers-wire = { workspace = true }
-litchi-pages = { workspace = true }
+litchi-pages = { workspace = true, features = ["internal-iwork-source"] }
 phf           = { workspace = true }
 plist         = { workspace = true }
 prost         = { workspace = true }

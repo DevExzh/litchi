@@ -1,10 +1,11 @@
 use std::collections::HashSet;
+use std::fmt;
 use std::ops::Range;
 
 use litchi_iwa_graph::{ObjectId, ObjectIdIter, ReferenceGraph, ReferenceGraphSnapshot};
 
-use crate::error::{AllocationKind, IndexError};
-use crate::{FragmentId, ObjectRecord, Reference};
+use crate::error::{AllocationKind, FragmentTraversalError, IndexError};
+use crate::{FragmentId, FragmentSummary, FragmentTraversalLimit, ObjectRecord, Reference};
 
 #[derive(Debug, Clone)]
 struct FragmentEntry {
@@ -26,6 +27,7 @@ pub struct IndexBuilder {
     object_catalog: HashSet<ObjectId>,
     references: Vec<Reference>,
     reference_catalog: HashSet<Reference>,
+    ordered_reference_sources: HashSet<ObjectId>,
 }
 
 impl IndexBuilder {
@@ -150,7 +152,38 @@ impl IndexBuilder {
         Ok(true)
     }
 
+    /// Opt one source into insertion-order outgoing references.
+    ///
+    /// References are sorted by source and target when the builder is frozen
+    /// by default. Some compatibility adapters need to retain the source
+    /// order of repeated fields, while still using the same deduplicating
+    /// builder and deterministic ordering for every other source. Calling
+    /// this method before [`Self::build`] or
+    /// [`Self::build_allow_missing_targets`] opts only `source` into that
+    /// compatibility behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IndexError::Allocation`] when the source-order catalog cannot
+    /// reserve its next entry.
+    pub fn preserve_reference_order(&mut self, source: ObjectId) -> Result<(), IndexError> {
+        if self.ordered_reference_sources.contains(&source) {
+            return Ok(());
+        }
+        self.ordered_reference_sources
+            .try_reserve(1)
+            .map_err(|_error| IndexError::Allocation {
+                kind: AllocationKind::ReferenceOrderCatalog,
+                requested: self.ordered_reference_sources.len().saturating_add(1),
+            })?;
+        self.ordered_reference_sources.insert(source);
+        Ok(())
+    }
+
     /// Finish the builder as a deterministic immutable index.
+    ///
+    /// References are sorted by source and target unless a source was opted
+    /// into insertion order with [`Self::preserve_reference_order`].
     ///
     /// # Errors
     ///
@@ -203,7 +236,32 @@ impl IndexBuilder {
 
         self.fragments.sort_unstable();
         self.objects.sort_unstable_by_key(ObjectRecord::id);
-        self.references.sort_unstable();
+        if self.ordered_reference_sources.is_empty() {
+            self.references.sort_unstable();
+        } else {
+            // A stable source sort keeps insertion order among references
+            // belonging to an opted-in source. Non-opted sources are sorted
+            // by target within their source group to retain the builder's
+            // normal deterministic graph order.
+            self.references.sort_by_key(|reference| reference.source());
+            let mut group_start = 0;
+            while let Some(first) = self.references.get(group_start) {
+                let source = first.source();
+                let mut group_end = group_start.saturating_add(1);
+                while self
+                    .references
+                    .get(group_end)
+                    .is_some_and(|reference| reference.source() == source)
+                {
+                    group_end = group_end.saturating_add(1);
+                }
+                if !self.ordered_reference_sources.contains(&source) {
+                    self.references[group_start..group_end]
+                        .sort_unstable_by_key(|reference| reference.target());
+                }
+                group_start = group_end;
+            }
+        }
 
         let mut fragment_pairs =
             try_snapshot_buffer(self.objects.len(), AllocationKind::FragmentObjectPairs)?;
@@ -234,6 +292,7 @@ impl IndexBuilder {
 
         drop(fragment_pairs);
         drop(self.fragments);
+        drop(self.ordered_reference_sources);
 
         // Builder vectors deliberately grow geometrically. Moving records into
         // an exactly reserved buffer when needed makes final immutable
@@ -266,13 +325,31 @@ impl IndexBuilder {
 ///
 /// The index stores sorted boxed slices rather than exposing mutable maps.
 /// Lookups are binary searches; iteration is stable across processes and does
-/// not depend on hash-map order. The graph is also frozen at build time.
-#[derive(Debug, Clone)]
+/// not depend on hash-map order. The graph is also frozen at build time, with
+/// insertion order retained only for sources explicitly opted in by the
+/// builder.
+#[derive(Clone)]
 pub struct ObjectIndex {
     objects: Box<[ObjectRecord]>,
     fragments: Box<[FragmentEntry]>,
     fragment_object_ids: Box<[ObjectId]>,
     graph: ReferenceGraphSnapshot,
+}
+
+impl fmt::Debug for ObjectIndex {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Keep the graph snapshot an implementation detail even through the
+        // otherwise useful public Debug implementation. In particular, do
+        // not delegate to `ReferenceGraphSnapshot` here: its derived output
+        // includes adjacency state that is intentionally absent from this
+        // crate's public API.
+        formatter
+            .debug_struct("ObjectIndex")
+            .field("object_count", &self.len())
+            .field("fragment_count", &self.fragment_count())
+            .field("reference_count", &self.reference_count())
+            .finish()
+    }
 }
 
 impl Default for ObjectIndex {
@@ -336,10 +413,41 @@ impl ObjectIndex {
         self.objects.get(position).map(|record| (position, record))
     }
 
+    /// Borrow an object by its immutable snapshot position.
+    ///
+    /// This is crate-private so archive-free semantic adapters can derive
+    /// their own opaque handles without publishing the native identity or
+    /// making the neutral object slice part of their public contract.
+    pub(crate) fn object_at_position(&self, position: usize) -> Option<&ObjectRecord> {
+        self.objects.get(position)
+    }
+
     /// Borrow registered fragments in deterministic ordinal order.
     #[must_use]
     pub fn fragments(&self) -> impl ExactSizeIterator<Item = FragmentId> + '_ {
         self.fragments.iter().map(|fragment| fragment.id)
+    }
+
+    /// Borrow archive-free metadata for every registered fragment.
+    ///
+    /// Summaries are returned in deterministic adapter-local ordinal order.
+    /// They intentionally contain no archive entry names, native identifiers,
+    /// source positions, graph state, or payload bytes.
+    #[must_use]
+    pub fn fragment_summaries(&self) -> impl ExactSizeIterator<Item = FragmentSummary> + '_ {
+        self.fragments
+            .iter()
+            .map(|fragment| FragmentSummary::new(fragment.id, fragment.object_range.len()))
+    }
+
+    /// Borrow archive-free metadata for one registered fragment.
+    #[must_use]
+    pub fn fragment_summary(&self, fragment: FragmentId) -> Option<FragmentSummary> {
+        self.fragments
+            .binary_search_by_key(&fragment, |entry| entry.id)
+            .ok()
+            .and_then(|position| self.fragments.get(position))
+            .map(|entry| FragmentSummary::new(entry.id, entry.object_range.len()))
     }
 
     /// Borrow object identities belonging to one fragment.
@@ -353,10 +461,114 @@ impl ObjectIndex {
         self.fragment_object_ids.get(entry.object_range.clone())
     }
 
-    /// Borrow the immutable graph snapshot used for reference queries.
+    /// Borrow the object identities for one fragment under an explicit limit.
+    ///
+    /// The query fails when the complete fragment contains more records than
+    /// the supplied limit; it never returns a silently truncated view. The
+    /// returned identities are typed and remain owned by this immutable
+    /// snapshot. A missing fragment returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FragmentTraversalError::LimitExceeded`] when the fragment is
+    /// larger than `limit`.
+    #[must_use = "the bounded fragment query result must be checked"]
+    pub fn fragment_object_ids_bounded(
+        &self,
+        fragment: FragmentId,
+        limit: FragmentTraversalLimit,
+    ) -> Result<Option<&[ObjectId]>, FragmentTraversalError> {
+        let Some(entry) = self
+            .fragments
+            .binary_search_by_key(&fragment, |entry| entry.id)
+            .ok()
+            .and_then(|position| self.fragments.get(position))
+        else {
+            return Ok(None);
+        };
+
+        let observed = entry.object_range.len();
+        if observed > limit.max_objects() {
+            return Err(FragmentTraversalError::LimitExceeded {
+                fragment,
+                observed,
+                maximum: limit.max_objects(),
+            });
+        }
+
+        Ok(self.fragment_object_ids.get(entry.object_range.clone()))
+    }
+
+    /// Traverse one fragment's neutral object records under an explicit
+    /// object-count limit.
+    ///
+    /// Records are yielded in deterministic object-identity order and the
+    /// iterator allocates no collection. The complete fragment is checked
+    /// before iteration begins, so callers either receive every record or a
+    /// typed limit error. Missing fragments return `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FragmentTraversalError::LimitExceeded`] when the fragment is
+    /// larger than `limit`.
+    #[must_use = "the bounded fragment query result must be checked"]
+    pub fn fragment_objects_bounded(
+        &self,
+        fragment: FragmentId,
+        limit: FragmentTraversalLimit,
+    ) -> Result<Option<impl Iterator<Item = &ObjectRecord> + '_>, FragmentTraversalError> {
+        let Some(object_ids) = self.fragment_object_ids_bounded(fragment, limit)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(object_ids.iter().filter_map(|object_id| {
+            self.objects
+                .binary_search_by_key(object_id, ObjectRecord::id)
+                .ok()
+                .and_then(|position| self.objects.get(position))
+        })))
+    }
+
+    /// Borrow the immutable graph snapshot used for low-level reference queries.
+    ///
+    /// This method is retained for source compatibility with the original
+    /// index API. It exposes the graph-identity view and is therefore not part
+    /// of the archive-free semantic projection; new semantic callers should
+    /// use [`crate::SemanticIndex`] and its opaque handles.
+    #[deprecated(
+        note = "use ObjectIndex::references, outgoing, incoming, reachable, or has_cycle; the graph snapshot is a low-level compatibility view"
+    )]
     #[must_use]
     pub fn reference_graph(&self) -> &ReferenceGraphSnapshot {
         &self.graph
+    }
+
+    /// Return the number of indexed directed references.
+    ///
+    /// The count is read from the immutable graph snapshot without exposing
+    /// that graph or its adjacency representation to callers.
+    #[must_use]
+    pub fn reference_count(&self) -> usize {
+        self.graph.edge_count()
+    }
+
+    /// Borrow every indexed edge as a typed reference in deterministic order.
+    ///
+    /// Sources are visited in ascending object-identity order. Their outgoing
+    /// order is the order frozen by the builder: targets are ascending for
+    /// ordinary sources, while sources opted into
+    /// [`IndexBuilder::preserve_reference_order`] retain their insertion
+    /// order. The iterator allocates no collection and does not expose the
+    /// graph's internal adjacency representation.
+    #[must_use = "iterating references is required to inspect the indexed edges"]
+    pub fn references(&self) -> impl Iterator<Item = Reference> + '_ {
+        self.graph.iter_object_ids().flat_map(|source| {
+            self.graph
+                .outgoing(source)
+                .into_iter()
+                .flatten()
+                .map(move |target| Reference::new(source, target))
+        })
     }
 
     /// Borrow outgoing references for one object without allocating.
@@ -401,7 +613,10 @@ mod tests {
     use std::num::NonZeroU32;
 
     use super::*;
-    use crate::{ByteSpan, ByteSpanError, FragmentIdError, ReferenceError};
+    use crate::{
+        ByteSpan, ByteSpanError, FragmentIdError, FragmentTraversalError, FragmentTraversalLimit,
+        ReferenceError,
+    };
 
     fn fragment(value: u32) -> FragmentId {
         FragmentId::new(NonZeroU32::new(value).expect("test fragment is non-zero"))
@@ -449,6 +664,18 @@ mod tests {
         );
         assert_eq!(index.fragments().collect::<Vec<_>>(), [first, second]);
         assert_eq!(
+            index.fragment_summaries().collect::<Vec<_>>(),
+            [
+                FragmentSummary::new(first, 2),
+                FragmentSummary::new(second, 2),
+            ]
+        );
+        assert_eq!(
+            index.fragment_summary(first),
+            Some(FragmentSummary::new(first, 2))
+        );
+        assert_eq!(index.fragment_summary(fragment(3)), None);
+        assert_eq!(
             index.object_with_position(one).map(|(position, record)| (
                 position,
                 record.id(),
@@ -479,6 +706,14 @@ mod tests {
         assert_eq!(
             index.outgoing(three).map(Iterator::collect::<Vec<_>>),
             Some(vec![one, four])
+        );
+        assert_eq!(
+            index.references().collect::<Vec<_>>(),
+            [
+                Reference::new(two, three),
+                Reference::new(three, one),
+                Reference::new(three, four),
+            ]
         );
         assert_eq!(
             index.incoming(one).map(Iterator::collect::<Vec<_>>),
@@ -551,6 +786,66 @@ mod tests {
     }
 
     #[test]
+    fn opted_in_reference_sources_retain_insertion_order() {
+        let fragment = fragment(1);
+        let ordered_source = object(1);
+        let sorted_source = object(2);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment).expect("fragment");
+        builder
+            .add_object(ObjectRecord::new(ordered_source, fragment, span(0, 1)))
+            .expect("ordered source");
+        builder
+            .add_object(ObjectRecord::new(sorted_source, fragment, span(1, 1)))
+            .expect("sorted source");
+
+        builder
+            .preserve_reference_order(ordered_source)
+            .expect("reference-order source");
+        for target in [20, 40, 30] {
+            assert_eq!(
+                builder.add_reference_if_absent(ordered_source, object(target)),
+                Ok(true)
+            );
+        }
+        assert_eq!(
+            builder.add_reference_if_absent(ordered_source, object(40)),
+            Ok(false)
+        );
+        for target in [4, 2] {
+            builder
+                .add_reference(sorted_source, object(target))
+                .expect("sorted reference");
+        }
+
+        let index = builder
+            .build_allow_missing_targets()
+            .expect("reference-order index");
+        assert_eq!(
+            index
+                .outgoing(ordered_source)
+                .map(Iterator::collect::<Vec<_>>),
+            Some(vec![object(20), object(40), object(30)])
+        );
+        assert_eq!(
+            index.references().collect::<Vec<_>>(),
+            [
+                Reference::new(ordered_source, object(20)),
+                Reference::new(ordered_source, object(40)),
+                Reference::new(ordered_source, object(30)),
+                Reference::new(sorted_source, object(2)),
+                Reference::new(sorted_source, object(4)),
+            ]
+        );
+        assert_eq!(
+            index
+                .outgoing(sorted_source)
+                .map(Iterator::collect::<Vec<_>>),
+            Some(vec![object(2), object(4)])
+        );
+    }
+
+    #[test]
     fn builder_rejects_unregistered_fragments_and_reference_sources() {
         let registered_fragment = fragment(1);
         let unregistered_fragment = fragment(2);
@@ -619,9 +914,9 @@ mod tests {
         builder.add_reference(one, two).expect("first edge");
         builder.add_reference(two, one).expect("second edge");
         let index = builder.build().expect("valid index");
-        let graph = index.reference_graph().clone();
-        assert!(graph.has_cycle_from(one));
-        assert_eq!(graph.object_ids(), [one, two]);
+        assert!(index.has_cycle(one));
+        assert_eq!(index.reference_count(), 2);
+        assert_eq!(index.references().count(), 2);
         assert_eq!(
             index
                 .object(one)
@@ -629,6 +924,58 @@ mod tests {
                 .map(ByteSpan::length),
             Some(2)
         );
+    }
+
+    #[test]
+    #[allow(
+        deprecated,
+        reason = "the test exercises the documented compatibility bridge"
+    )]
+    fn legacy_graph_snapshot_bridge_retains_the_original_view() {
+        let fragment = fragment(1);
+        let source = object(1);
+        let target = object(2);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment).expect("fragment");
+        builder
+            .add_object(ObjectRecord::new(source, fragment, span(0, 1)))
+            .expect("source");
+        builder
+            .add_object(ObjectRecord::new(target, fragment, span(1, 1)))
+            .expect("target");
+        builder.add_reference(source, target).expect("reference");
+
+        let index = builder.build().expect("valid index");
+        let snapshot: ReferenceGraphSnapshot = index.reference_graph().clone();
+        assert_eq!(snapshot.object_ids(), [source, target]);
+        assert_eq!(
+            snapshot.outgoing(source).map(Iterator::collect),
+            Some(vec![target])
+        );
+    }
+
+    #[test]
+    fn debug_output_does_not_publish_private_graph_state() {
+        let fragment = fragment(1);
+        let source = object(1);
+        let target = object(2);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment).expect("fragment");
+        builder
+            .add_object(ObjectRecord::new(source, fragment, span(0, 1)))
+            .expect("source");
+        builder
+            .add_object(ObjectRecord::new(target, fragment, span(1, 1)))
+            .expect("target");
+        builder.add_reference(source, target).expect("reference");
+
+        let debug = format!("{:?}", builder.build().expect("index"));
+        assert_eq!(
+            debug,
+            "ObjectIndex { object_count: 2, fragment_count: 1, reference_count: 1 }"
+        );
+        assert!(!debug.contains("ReferenceGraph"));
+        assert!(!debug.contains("outgoing_refs"));
     }
 
     #[test]
@@ -677,6 +1024,98 @@ mod tests {
         assert!(matches!(
             builder.build_allow_missing_targets(),
             Err(IndexError::UnknownSource(actual)) if actual == source
+        ));
+    }
+
+    #[test]
+    fn bounded_fragment_traversal_is_complete_or_refused() {
+        let first = fragment(1);
+        let second = fragment(2);
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(second).expect("second fragment");
+        builder.add_fragment(first).expect("first fragment");
+        builder
+            .add_object(ObjectRecord::new(three, first, span(30, 3)))
+            .expect("third object");
+        builder
+            .add_object(ObjectRecord::new(one, first, span(10, 1)))
+            .expect("first object");
+        builder
+            .add_object(ObjectRecord::new(two, second, span(20, 2)))
+            .expect("second object");
+
+        let index = builder.build().expect("valid index");
+        assert_eq!(
+            index.fragment_object_ids_bounded(first, FragmentTraversalLimit::new(1)),
+            Err(FragmentTraversalError::LimitExceeded {
+                fragment: first,
+                observed: 2,
+                maximum: 1,
+            })
+        );
+        assert_eq!(
+            index.fragment_object_ids_bounded(first, FragmentTraversalLimit::new(0)),
+            Err(FragmentTraversalError::LimitExceeded {
+                fragment: first,
+                observed: 2,
+                maximum: 0,
+            })
+        );
+        assert_eq!(
+            index
+                .fragment_objects_bounded(first, FragmentTraversalLimit::new(2))
+                .expect("bounded fragment")
+                .expect("registered fragment")
+                .map(ObjectRecord::id)
+                .collect::<Vec<_>>(),
+            [one, three]
+        );
+        assert_eq!(
+            index
+                .fragment_objects_bounded(second, FragmentTraversalLimit::new(1))
+                .expect("bounded fragment")
+                .expect("registered fragment")
+                .map(ObjectRecord::id)
+                .collect::<Vec<_>>(),
+            [two]
+        );
+        assert!(
+            index
+                .fragment_objects_bounded(fragment(99), FragmentTraversalLimit::new(0))
+                .expect("missing fragments are not errors")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn zero_fragment_limit_accepts_only_empty_fragments() {
+        let empty = fragment(1);
+        let populated = fragment(2);
+        let object_id = object(1);
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(populated).expect("populated fragment");
+        builder.add_fragment(empty).expect("empty fragment");
+        builder
+            .add_object(ObjectRecord::new(object_id, populated, span(0, 1)))
+            .expect("object");
+
+        let index = builder.build().expect("valid index");
+        assert_eq!(
+            index
+                .fragment_object_ids_bounded(empty, FragmentTraversalLimit::new(0))
+                .expect("empty fragment fits"),
+            Some([].as_slice())
+        );
+        assert!(matches!(
+            index.fragment_object_ids_bounded(populated, FragmentTraversalLimit::new(0)),
+            Err(FragmentTraversalError::LimitExceeded {
+                fragment: actual,
+                observed: 1,
+                maximum: 0,
+            }) if actual == populated
         ));
     }
 

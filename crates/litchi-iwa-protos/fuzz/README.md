@@ -5,19 +5,25 @@
 `keynote_chart_title` sends one bounded, caller-owned generated
 `TSCH.ChartNonStyleArchive` extension through strict chart-title reads and
 wire-local rewrites. A successful input covers borrowed field-21/23 reads,
-title-only and visible-title helpers, exact no-op/set/clear behavior, unknown
-wire-span preservation, and a semantic inverse that must restore the original
-bytes exactly. Malformed mutations are required to remain rejected without
-modifying their source. Error formatting is checked against a private
-sentinel, so malformed content cannot be reflected in `Display` or `Debug`.
+title-only and visible-title helpers, every proto2 presence/value combination,
+exact no-op/set/clear behavior, unknown wire-span preservation, and a semantic
+inverse that restores the selected values and unknown spans. Exact source bytes
+are required when selected wire spans remain positionally recoverable; removing
+selected spans can lose their original interleaving, so those inverse cases are
+checked semantically while retaining every unknown span. Failed title- and
+output-capped rewrites must not publish a partial candidate or modify their
+source. Malformed mutations are required to remain rejected without modifying
+their source. Error formatting is checked against a private sentinel, so
+malformed content cannot be reflected in `Display` or `Debug`.
 
 The target accepts raw inputs up to 64 KiB and uses finite limits of 8,192
 fields, 256 KiB of aggregate work, 128 KiB of rewrite output, 64 KiB of title
 text, and nesting depth 64. The checked-in recipes under
-`corpus/keynote_chart_title/` cover empty and missing-visible states, Unicode,
-unknown scalar/group spans, duplicate selected fields, non-canonical wire,
-invalid UTF-8, and truncation. They are hand-authored `hex:` protobuf wire
-recipes rather than copied native package bytes.
+`corpus/keynote_chart_title/` cover empty and missing-visible states,
+visible-empty, hidden-present and hidden-empty title states, unknown-only
+payloads, Unicode, unknown scalar/group spans, duplicate selected fields,
+non-canonical wire, invalid UTF-8, and truncation. They are hand-authored
+`hex:` protobuf wire recipes rather than copied native package bytes.
 
 List and type-check the target from this directory:
 
@@ -192,6 +198,121 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 The checked-in files are `hex:` recipes rather than generated corpus output,
 so they remain reviewable and the target feeds the exact decoded bytes to both
 strict entry points. Invalid or oversized recipes are skipped.
+
+## Numbers table-model and data-store codec
+
+`numbers_table_model` exercises the next table-model migration seam with one
+bounded, caller-owned source. It compares strict and historical compatibility
+model/data-store report paths with their visitor counterparts, checks every
+borrowed model/store payload remains inside the unchanged source, and probes
+the dense-native recovery route. Failed wire parses are observed independently
+so a partial visitor prefix is never published as a model or store result.
+
+The target accepts at most 64 KiB and uses the finite profile of 8,192 fields,
+256 KiB of work, 1,024 references, 64 KiB of text, and depth 64. The checked-in
+recipes under `corpus/numbers_table_model/` include canonical model/store
+envelopes, a sparse compatibility model, duplicate and wrong-wire model
+fields, and malformed-group storage. They are hand-authored `hex:` recipes,
+not copied native package bytes.
+
+List and type-check this target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_model
+```
+
+Run a bounded AddressSanitizer/libFuzzer smoke with all mutable corpus,
+artifact, and build locations outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-model-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_model/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_model "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
+artifacts, and build output stay in the temporary root; set
+`KEEP_FUZZ_CORPUS=1` to retain it for review.
+
+## Pages footnote reference and marker codecs
+
+`pages_footnote_codec` drives both strict, caller-owned Pages footnote
+projections from one bounded source. Successful marker reads must retain the
+exact raw source and successful reference reads must preserve the same
+source-owned no-op candidate. Optional textual fields are checked for source
+borrowing, and a generated Prost decode is used as a semantic oracle when it
+accepts the complete wire payload. Every read and no-op candidate is checked
+for source atomicity.
+
+Arbitrary byte mutations are observed independently for the marker and
+reference shapes. Fixed recipes cover duplicate singular fields, missing and
+zero required identities, invalid UTF-8, wrong wire types, non-canonical
+varints, truncation, unknown scalar/group spans, and Unicode text. The target
+also probes finite input, output, field, work, and nesting ceilings. The
+codec has no production encoding path, so output is modeled as the exact raw
+no-op candidate and is capped explicitly in the harness.
+
+The target accepts at most 64 KiB and uses 8,192 fields, 256 KiB of aggregate
+work, 128 KiB of no-op output, and recursion depth 64. Corpus entries under
+`corpus/pages_footnote_codec/` are hand-authored `hex:` recipes; they are not
+copied from native Pages packages.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check pages_footnote_codec
+```
+
+## Pages movie-caption inheritance and rewrite codec
+
+`pages_movie_caption_codec` drives the selected `TSA.CaptionInfoArchive`
+inheritance chain through strict borrowed reads and raw-preserving reference
+remaps. Successful inputs cover the required drawable/shape/shape-info chain,
+optional placement and storage references, unknown fields, proto2 boolean and
+enum presence, exact no-op writes, wide identifier rewrites, source
+atomicity, and candidate readback. Malformed and finite-limit recipes are
+checked independently before any candidate is published.
+
+The target accepts at most 64 KiB and uses 8,192 fields, 256 KiB of aggregate
+work, 128 KiB of candidate output, and recursion depth 64. Corpus entries under
+`corpus/pages_movie_caption_codec/` are hand-authored `hex:` recipes; they are
+not copied from native Pages packages.
+
+List and type-check this target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check pages_movie_caption_codec
+```
+
+Run a bounded AddressSanitizer/libFuzzer smoke with all mutable corpus,
+artifact, and build locations outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-pages-movie-caption-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/pages_movie_caption_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  pages_movie_caption_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
 
 ## Numbers comment-storage codec
 

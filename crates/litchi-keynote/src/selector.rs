@@ -27,6 +27,24 @@ impl<'a> SlideSelector<'a> {
         Self::Name(name)
     }
 
+    /// Create an exact-name selector after checking that the name is usable.
+    ///
+    /// This checked constructor is useful at input boundaries where an empty
+    /// navigator name should be reported as invalid rather than treated as a
+    /// valid exact-name lookup. [`Self::name`] remains available for callers
+    /// that intentionally preserve the historical empty-name behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SlideSelectorError::EmptySlideName`] when `name` is empty.
+    pub const fn try_name(name: &'a str) -> Result<Self, SlideSelectorError> {
+        if name.is_empty() {
+            Err(SlideSelectorError::EmptySlideName)
+        } else {
+            Ok(Self::Name(name))
+        }
+    }
+
     /// Create a selector from a typed zero-based source position.
     #[must_use]
     pub const fn position(position: Position) -> Self {
@@ -90,6 +108,8 @@ impl From<usize> for SlideSelector<'_> {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SlideSelectorError {
+    /// A checked selector was requested for an empty navigator name.
+    EmptySlideName,
     /// More than one slide carries the requested exact navigator name.
     DuplicateSlideName {
         /// The ambiguous developer-facing name.
@@ -100,6 +120,7 @@ pub enum SlideSelectorError {
 impl std::fmt::Display for SlideSelectorError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::EmptySlideName => formatter.write_str("Keynote slide name must not be empty"),
             Self::DuplicateSlideName { name } => {
                 write!(formatter, "show contains duplicate slide name {name:?}")
             },
@@ -114,7 +135,7 @@ pub type SlideSelectorResult<T> = Result<T, SlideSelectorError>;
 
 #[cfg(test)]
 mod tests {
-    use super::SlideSelector;
+    use super::{SlideSelector, SlideSelectorError};
     use litchi_core::Position;
 
     #[test]
@@ -145,5 +166,18 @@ mod tests {
         let selector: SlideSelector<'_> = (&slide_name).into();
 
         assert_eq!(selector, SlideSelector::Name("Agenda"));
+    }
+
+    #[test]
+    fn checked_name_rejects_empty_input_without_changing_legacy_constructor() {
+        assert_eq!(
+            SlideSelector::try_name(""),
+            Err(SlideSelectorError::EmptySlideName)
+        );
+        assert_eq!(
+            SlideSelector::try_name("Agenda"),
+            Ok(SlideSelector::name("Agenda"))
+        );
+        assert_eq!(SlideSelector::name(""), SlideSelector::Name(""));
     }
 }

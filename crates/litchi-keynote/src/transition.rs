@@ -1091,7 +1091,16 @@ fn bounded_payload(candidate: Option<&[u8]>) -> Result<Option<Box<[u8]>>> {
     if bytes.len() > MAX_OPAQUE_PAYLOAD_BYTES {
         return Err(crate::Error::PayloadTooLarge);
     }
-    Ok(Some(bytes.to_vec().into_boxed_slice()))
+    // Keep this semantic copy fallible even after the size ceiling check. A
+    // bounded input can still fail to reserve under memory pressure, and the
+    // public setter already has the typed payload-size error available for
+    // that failure path.
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(bytes.len())
+        .map_err(|_allocation| crate::Error::PayloadTooLarge)?;
+    owned.extend_from_slice(bytes);
+    Ok(Some(owned.into_boxed_slice()))
 }
 
 fn bounded_text(candidate: Option<&str>) -> Result<Option<Box<str>>> {
@@ -1225,6 +1234,22 @@ mod tests {
                 .animation_parameters()
                 .timing_curve_theme_name(TimingCurveSlot::First),
             Some("Future Curve")
+        );
+    }
+
+    #[test]
+    fn bounded_payload_is_owned_before_source_changes() {
+        let mut source = [0x11, 0x22, 0x33];
+        let mut animation_parameters = AnimationParameters::new();
+        animation_parameters
+            .set_color_payload(Some(&source))
+            .unwrap();
+
+        source[0] = 0xff;
+        assert_eq!(source[0], 0xff);
+        assert_eq!(
+            animation_parameters.color_payload(),
+            Some(&[0x11, 0x22, 0x33][..])
         );
     }
 

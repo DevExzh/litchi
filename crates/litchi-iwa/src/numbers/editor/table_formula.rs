@@ -2,6 +2,25 @@
 
 use super::*;
 
+fn formula_cached_value_to_cell_value(cached_value: FormulaCachedValue) -> CellValue {
+    match cached_value {
+        FormulaCachedValue::Number(value) => CellValue::Number(
+            litchi_numbers::cell::FiniteF64::new(value.get())
+                .expect("formula cache scalar is finite"),
+        ),
+        FormulaCachedValue::Text(value) => CellValue::Text(value),
+        FormulaCachedValue::Boolean(value) => CellValue::Boolean(value),
+        FormulaCachedValue::Date(value) => CellValue::Date(
+            litchi_numbers::cell::FiniteF64::new(value.get())
+                .expect("formula cache scalar is finite"),
+        ),
+        FormulaCachedValue::Duration(value) => CellValue::Duration(
+            litchi_numbers::cell::FiniteF64::new(value.get())
+                .expect("formula cache scalar is finite"),
+        ),
+    }
+}
+
 pub(super) fn set_attached_table_formula(
     package: &mut IWorkPackage,
     table_id: u64,
@@ -51,7 +70,13 @@ pub(super) fn set_attached_table_formula(
         (formula, error)
     };
     if let Some(cached_value) = cached_value {
-        set_attached_cell_in_package(package, table_id, row, column, cached_value.into_value())?;
+        set_attached_cell_in_package(
+            package,
+            table_id,
+            row,
+            column,
+            formula_cached_value_to_cell_value(cached_value),
+        )?;
     } else {
         if old_formula.is_some()
             && let Some(identifier) = old_formula_error

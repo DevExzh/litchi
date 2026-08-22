@@ -6,11 +6,13 @@ use super::*;
 use crate::Error;
 
 fn source(rect: Rect) -> Vec<u8> {
-    let mut chart = Chart::default();
-    chart.x = rect.x;
-    chart.y = rect.y;
-    chart.width = rect.width;
-    chart.height = rect.height;
+    let chart = Chart {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        ..Default::default()
+    };
     serialize_chart(&chart, Limits::default()).expect("valid chart fixture")
 }
 
