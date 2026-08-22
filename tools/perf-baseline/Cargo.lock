@@ -917,6 +917,7 @@ dependencies = [
  "litchi-opc",
  "litchi-pptx",
  "litchi-sheet",
+ "litchi-xlsb",
  "litchi-xlsx",
 ]
 
@@ -1217,6 +1218,7 @@ dependencies = [
  "litchi-pptx",
  "litchi-rtf",
  "litchi-xls",
+ "litchi-xlsb",
  "litchi-xlsx",
  "rustix",
  "serde",
@@ -1352,6 +1354,22 @@ dependencies = [
  "serde_json",
  "zerocopy",
  "zeroize",
+]
+
+[[package]]
+name = "litchi-xlsb"
+version = "0.0.1"
+dependencies = [
+ "bitflags",
+ "chrono",
+ "litchi-core",
+ "litchi-drawingml",
+ "litchi-ooxml-common",
+ "litchi-opc",
+ "litchi-sheet",
+ "litchi-spreadsheet-drawing",
+ "quick-xml",
+ "thiserror",
 ]
 
 [[package]]

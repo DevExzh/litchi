@@ -35,6 +35,7 @@ def policy():
         "required_cases": ["opc_open"],
         "require_clean_worktree": True,
         "require_distinct_revisions": True,
+        "require_binary_identity": True,
         "tool_identity": copy.deepcopy(TOOL),
         "build_identity_fields": [
             "rustc_version",
@@ -71,9 +72,18 @@ def policy():
 
 def report(value=100, revision="baseline", corpus_sha="abc"):
     samples = [value] * 5
+    candidate = revision != "baseline"
     return {
         "schema_version": 1,
         "tool": copy.deepcopy(TOOL),
+        "binary_identity": {
+            "path": "/tmp/litchi-perf-candidate" if candidate else "/tmp/litchi-perf-baseline",
+            "binary_sha256": "b" * 64 if candidate else "a" * 64,
+            "binary_bytes": 200 if candidate else 100,
+            "mode_bits": 0o755,
+            "executable": True,
+            "profile": "release",
+        },
         "environment": {
             "rustc_version": "rustc 1.95.0",
             "git_revision": revision,
@@ -352,6 +362,15 @@ def allocator_report(value=100, revision="baseline"):
     result = report(value=value, revision=revision)
     result["tool"]["binary"] = "litchi-perf-baseline-alloc"
     result["tool"]["instrumentation"] = "system_allocator_operation_scoped"
+    result["binary_identity"]["path"] = (
+        "/tmp/litchi-perf-alloc-candidate"
+        if revision != "baseline"
+        else "/tmp/litchi-perf-alloc-baseline"
+    )
+    result["binary_identity"]["binary_sha256"] = (
+        "d" * 64 if revision != "baseline" else "c" * 64
+    )
+    result["binary_identity"]["binary_bytes"] = 220 if revision != "baseline" else 210
     result["environment"]["allocator"] = "CountingSystemAllocator(std::alloc::System)"
     result["configuration"]["cases"] = ["opc_file_eager_open"]
     result["configuration"]["filesystem_cache_states"] = ["warm", "cold-requested"]
@@ -559,6 +578,68 @@ class PerfCompareTests(unittest.TestCase):
         current = report(revision="current")
         comparison = perf_compare.compare_reports(baseline, current, policy())
         self.assertEqual(comparison["status"], "pass")
+
+    def test_schema_one_descriptorless_reports_require_explicit_legacy_policy_opt_out(self):
+        legacy_policy = policy()
+        legacy_policy.pop("require_binary_identity")
+        baseline = report()
+        current = report(revision="current")
+        baseline.pop("binary_identity")
+        current.pop("binary_identity")
+        comparison = perf_compare.compare_reports(baseline, current, legacy_policy)
+        self.assertEqual(comparison["status"], "pass")
+
+    def test_binary_identity_is_required_validated_and_not_equal_across_reports(self):
+        baseline = report()
+        current = report(revision="current")
+        comparison = perf_compare.compare_reports(baseline, current, policy())
+        self.assertEqual(comparison["status"], "pass")
+        self.assertNotEqual(
+            comparison["baseline_binary_sha256"], comparison["current_binary_sha256"]
+        )
+
+        missing = copy.deepcopy(current)
+        missing.pop("binary_identity")
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "binary_identity"
+        ):
+            perf_compare.compare_reports(baseline, missing, policy())
+
+        malformed = copy.deepcopy(current)
+        malformed["binary_identity"]["binary_sha256"] = "z" * 64
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "binary_sha256"
+        ):
+            perf_compare.compare_reports(baseline, malformed, policy())
+
+        non_executable_mode = copy.deepcopy(current)
+        non_executable_mode["binary_identity"]["mode_bits"] = 0o644
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "executable permission bits"
+        ):
+            perf_compare.compare_reports(baseline, non_executable_mode, policy())
+
+        missing_unix_mode = copy.deepcopy(current)
+        missing_unix_mode["binary_identity"]["mode_bits"] = None
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "present for Unix targets"
+        ):
+            perf_compare.compare_reports(baseline, missing_unix_mode, policy())
+
+        oversized = copy.deepcopy(current)
+        oversized["binary_identity"]["binary_bytes"] = 1 << 64
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "positive unsigned integer"
+        ):
+            perf_compare.compare_reports(baseline, oversized, policy())
+
+        drift = copy.deepcopy(current)
+        drift["binary_identity"]["mode_bits"] = 0o700
+        # Baseline/current binaries are allowed to differ in every descriptor
+        # identity field, provided each descriptor remains syntactically valid.
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, drift, policy())["status"], "pass"
+        )
 
     def test_allocator_policy_accepts_only_allocator_binary_identity(self):
         repository = Path(__file__).resolve().parents[1]

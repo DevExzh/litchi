@@ -19,7 +19,7 @@ import json
 import math
 import statistics
 import sys
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Iterable
 
 
@@ -67,7 +67,22 @@ _FILESYSTEM_CASE_PREFIXES = (
     "ods_file_",
     "odp_file_",
 )
-_OPTIONAL_POLICY_KEYS = {"result_key_fields", "expected_build_identity"}
+_OPTIONAL_POLICY_KEYS = {
+    "result_key_fields",
+    "expected_build_identity",
+    "require_binary_identity",
+}
+_BINARY_IDENTITY_FIELDS = frozenset(
+    {"path", "binary_sha256", "binary_bytes", "mode_bits", "executable", "profile"}
+)
+_BINARY_IDENTITY_OPTIONAL_FIELDS = frozenset({"label"})
+_UNIX_TARGET_OSES = frozenset(
+    {
+        "aix", "android", "dragonfly", "freebsd", "fuchsia", "haiku",
+        "hurd", "illumos", "ios", "linux", "macos", "netbsd", "openbsd",
+        "tvos", "visionos", "watchos",
+    }
+)
 
 
 class ComparisonInputError(ValueError):
@@ -90,6 +105,84 @@ def _require_object(value: Any, location: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ComparisonInputError(f"{location} must be an object")
     return value
+
+
+def _validate_binary_identity(
+    value: Any, location: str, *, tool: dict[str, Any]
+) -> dict[str, Any]:
+    """Validate a report's untimed current-executable descriptor.
+
+    The descriptor is intentionally validated independently for baseline and
+    current reports.  A comparison is allowed to use different binaries; the
+    descriptor is provenance/syntax evidence, not a field that must match
+    across those two reports.
+    """
+
+    identity = _require_object(value, location)
+    missing = _BINARY_IDENTITY_FIELDS - set(identity)
+    if missing:
+        raise ComparisonInputError(
+            f"{location} is missing required keys: {sorted(missing)}"
+        )
+    unknown = set(identity) - _BINARY_IDENTITY_FIELDS - _BINARY_IDENTITY_OPTIONAL_FIELDS
+    if unknown:
+        raise ComparisonInputError(f"{location} has unknown keys: {sorted(unknown)}")
+    path = identity["path"]
+    if not isinstance(path, str) or not path:
+        raise ComparisonInputError(f"{location}.path must be a non-empty string")
+    if not (Path(path).is_absolute() or PureWindowsPath(path).is_absolute()):
+        raise ComparisonInputError(f"{location}.path must be absolute")
+    digest = identity["binary_sha256"]
+    if (
+        not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdefABCDEF" for character in digest)
+    ):
+        raise ComparisonInputError(
+            f"{location}.binary_sha256 must contain exactly 64 hexadecimal characters"
+        )
+    binary_bytes = identity["binary_bytes"]
+    if (
+        isinstance(binary_bytes, bool)
+        or not isinstance(binary_bytes, int)
+        or binary_bytes <= 0
+        or binary_bytes > (1 << 64) - 1
+    ):
+        raise ComparisonInputError(
+            f"{location}.binary_bytes must be a positive unsigned integer"
+        )
+    mode_bits = identity["mode_bits"]
+    if mode_bits is not None and (
+        isinstance(mode_bits, bool)
+        or not isinstance(mode_bits, int)
+        or mode_bits < 0
+        or mode_bits > 0o7777
+        or mode_bits & 0o111 == 0
+    ):
+        raise ComparisonInputError(
+            f"{location}.mode_bits must be null or executable permission bits"
+        )
+    if tool["target_os"] in _UNIX_TARGET_OSES and mode_bits is None:
+        raise ComparisonInputError(
+            f"{location}.mode_bits must be present for Unix targets"
+        )
+    if identity["executable"] is not True:
+        raise ComparisonInputError(f"{location}.executable must be true")
+    profile = identity["profile"]
+    if not isinstance(profile, str) or not profile:
+        raise ComparisonInputError(f"{location}.profile must be a non-empty string")
+    if profile != tool["profile"]:
+        raise ComparisonInputError(
+            f"{location}.profile does not match report tool.profile"
+        )
+    if "label" in identity and (
+        not isinstance(identity["label"], str) or not identity["label"]
+    ):
+        raise ComparisonInputError(f"{location}.label must be a non-empty string")
+    return {
+        **identity,
+        "binary_sha256": digest.lower(),
+    }
 
 
 def _require_schema_version(value: Any, location: str, expected: int) -> None:
@@ -201,6 +294,10 @@ def validate_policy(raw: Any) -> dict[str, Any]:
         raise ComparisonInputError("policy.require_clean_worktree must be boolean")
     if not isinstance(policy["require_distinct_revisions"], bool):
         raise ComparisonInputError("policy.require_distinct_revisions must be boolean")
+    if "require_binary_identity" in policy and not isinstance(
+        policy["require_binary_identity"], bool
+    ):
+        raise ComparisonInputError("policy.require_binary_identity must be boolean")
     tool = _require_object(policy["tool_identity"], "policy.tool_identity")
     for field in (
         "name",
@@ -1162,6 +1259,12 @@ def _validate_report_identity(
             raise ComparisonInputError(
                 f"{label}.tool does not match the policy tool identity"
             )
+        if policy.get("require_binary_identity", False) or "binary_identity" in report:
+            _validate_binary_identity(
+                report.get("binary_identity"),
+                f"{label}.binary_identity",
+                tool=report["tool"],
+            )
         _require_object(report.get("environment"), f"{label}.environment")
         configuration = _require_object(
             report.get("configuration"), f"{label}.configuration"
@@ -1184,6 +1287,10 @@ def _validate_report_identity(
                 )
     if baseline["tool"] != current["tool"]:
         raise ComparisonInputError("tool identity mismatch between reports")
+    if ("binary_identity" in baseline) != ("binary_identity" in current):
+        raise ComparisonInputError(
+            "baseline and current must either both emit binary_identity or both omit it"
+        )
     if baseline["configuration"] != current["configuration"]:
         raise ComparisonInputError("benchmark configuration mismatch between reports")
     revisions = []
@@ -2438,6 +2545,24 @@ def compare_reports(
     baseline = _require_object(baseline_raw, "baseline")
     current = _require_object(current_raw, "current")
     _validate_report_identity(baseline, current, policy)
+    baseline_binary_identity = (
+        _validate_binary_identity(
+            baseline["binary_identity"],
+            "baseline.binary_identity",
+            tool=baseline["tool"],
+        )
+        if "binary_identity" in baseline
+        else None
+    )
+    current_binary_identity = (
+        _validate_binary_identity(
+            current["binary_identity"],
+            "current.binary_identity",
+            tool=current["tool"],
+        )
+        if "binary_identity" in current
+        else None
+    )
     allocator_mode = _allocator_policy(policy)
     baseline_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
     current_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
@@ -2651,6 +2776,16 @@ def compare_reports(
         },
         "baseline_revision": baseline["environment"].get("git_revision"),
         "current_revision": current["environment"].get("git_revision"),
+        "baseline_binary_sha256": (
+            baseline_binary_identity["binary_sha256"]
+            if baseline_binary_identity is not None
+            else None
+        ),
+        "current_binary_sha256": (
+            current_binary_identity["binary_sha256"]
+            if current_binary_identity is not None
+            else None
+        ),
         "comparisons": comparisons,
         "regressions": regressions,
         "errors": [],

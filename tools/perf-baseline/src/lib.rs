@@ -2513,6 +2513,10 @@ struct XlsxCoordinate {
 struct Report {
     schema_version: u32,
     tool: Tool,
+    /// Content-addressed identity of the executable that produced this
+    /// report.  The descriptor is collected after all measured work has
+    /// completed, so hashing the executable can never enter a timed scope.
+    binary_identity: BinaryIdentity,
     environment: Environment,
     configuration: Configuration,
     parallel_metrics: parallel_metrics::ReportMetrics,
@@ -2521,6 +2525,22 @@ struct Report {
     filesystem_evidence: Option<Vec<filesystem::Evidence>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     corpus_catalog: Option<corpus_manifest::CatalogReferenceV2>,
+}
+
+/// Untimed identity of the currently running benchmark executable.
+///
+/// The field names intentionally mirror the descriptor emitted by
+/// `tools/perf_resource_profile.py`.  `mode_bits` is explicit but nullable on
+/// platforms whose executable metadata has no portable Unix permission-bit
+/// equivalent; `profile` remains available on every platform.
+#[derive(Debug, Serialize)]
+pub struct BinaryIdentity {
+    path: String,
+    binary_sha256: String,
+    binary_bytes: u64,
+    mode_bits: Option<u32>,
+    executable: bool,
+    profile: &'static str,
 }
 
 #[derive(Serialize)]
@@ -8129,6 +8149,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         options.filesystem_root.as_deref(),
         !filesystem_evidence.is_empty(),
     ));
+    let profile = executable_profile();
+    let binary_identity = current_executable_identity()?;
     let corpus_catalog = if options.corpus_manifest.is_some() {
         let records = results
             .iter()
@@ -8159,15 +8181,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             name: env!("CARGO_PKG_NAME"),
             version: env!("CARGO_PKG_VERSION"),
             binary: allocation_metrics::binary_identity(),
-            profile: if cfg!(debug_assertions) {
-                "debug"
-            } else {
-                "release"
-            },
+            profile,
             target_os: std::env::consts::OS,
             target_arch: std::env::consts::ARCH,
             instrumentation: allocation_metrics::instrumentation_identity(),
         },
+        binary_identity,
         environment: report_environment,
         configuration,
         parallel_metrics,
@@ -40679,6 +40698,107 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
+fn executable_profile() -> &'static str {
+    if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    }
+}
+
+#[cfg(unix)]
+fn executable_mode_bits(metadata: &fs::Metadata) -> Option<u32> {
+    use std::os::unix::fs::PermissionsExt;
+
+    Some(metadata.permissions().mode() & 0o7777)
+}
+
+#[cfg(not(unix))]
+fn executable_mode_bits(_metadata: &fs::Metadata) -> Option<u32> {
+    None
+}
+
+/// Capture the exact executable identity outside all benchmark timing.
+///
+/// This intentionally reads the current process executable only once, after
+/// all measured cases have finished.  A missing/unreadable executable is an
+/// error rather than an omitted identity: consumers must never mistake a
+/// report with unknown executable provenance for a valid comparison.
+pub fn current_executable_identity() -> io::Result<BinaryIdentity> {
+    let path = std::env::current_exe()?.canonicalize()?;
+    let mut file = File::open(&path)?;
+    let metadata_before = file.metadata()?;
+    if !metadata_before.is_file() {
+        return Err(io::Error::other(format!(
+            "current executable is not a regular file: {}",
+            path.display()
+        )));
+    }
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = loop {
+            match file.read(&mut buffer) {
+                Ok(count) => break count,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(error.into()),
+            }
+        };
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    let metadata_after = file.metadata()?;
+    let path_metadata = fs::metadata(&path)?;
+    if metadata_identity(&metadata_before) != metadata_identity(&metadata_after)
+        || metadata_before.len() != metadata_after.len()
+        || metadata_identity(&metadata_before) != metadata_identity(&path_metadata)
+        || metadata_before.len() != path_metadata.len()
+    {
+        return Err(io::Error::other(format!(
+            "current executable changed while being read: before={} bytes, after={} bytes",
+            metadata_before.len(),
+            metadata_after.len()
+        )));
+    }
+    let digest = hasher.finalize();
+    let mut binary_sha256 = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(binary_sha256, "{byte:02x}");
+    }
+    let executable =
+        executable_mode_bits(&metadata_before).map_or(true, |mode_bits| mode_bits & 0o111 != 0);
+    Ok(BinaryIdentity {
+        path: path.to_string_lossy().into_owned(),
+        binary_sha256,
+        binary_bytes: metadata_before.len(),
+        mode_bits: executable_mode_bits(&metadata_before),
+        executable,
+        profile: executable_profile(),
+    })
+}
+
+#[cfg(unix)]
+fn metadata_identity(metadata: &fs::Metadata) -> (u64, u64, i64, i64, i64, i64) {
+    use std::os::unix::fs::MetadataExt;
+
+    (
+        metadata.dev(),
+        metadata.ino(),
+        metadata.mtime(),
+        metadata.mtime_nsec(),
+        metadata.ctime(),
+        metadata.ctime_nsec(),
+    )
+}
+
+#[cfg(not(unix))]
+fn metadata_identity(metadata: &fs::Metadata) -> (u64, Option<SystemTime>) {
+    (metadata.len(), metadata.modified().ok())
+}
+
 fn environment(host: filesystem::HostEvidence) -> Environment {
     Environment {
         rustc_version: command_output(
@@ -46930,5 +47050,27 @@ mod tests {
         summary.write_size_buckets.bytes_0 = u64::MAX;
         summary.write_size_buckets.bytes_1_to_512 = 1;
         assert_eq!(summary.write_size_buckets.total(), None);
+    }
+
+    #[test]
+    fn current_executable_identity_is_content_addressed_and_profile_explicit() {
+        let identity = super::current_executable_identity().unwrap();
+        assert!(identity.executable);
+        #[cfg(unix)]
+        assert!(identity.path.starts_with('/'));
+        #[cfg(not(unix))]
+        assert!(std::path::Path::new(&identity.path).is_absolute());
+        assert_eq!(identity.binary_sha256.len(), 64);
+        assert!(
+            identity
+                .binary_sha256
+                .as_bytes()
+                .iter()
+                .all(u8::is_ascii_hexdigit)
+        );
+        assert!(identity.binary_bytes > 0);
+        assert_eq!(identity.profile, super::executable_profile());
+        #[cfg(unix)]
+        assert!(identity.mode_bits.is_some());
     }
 }

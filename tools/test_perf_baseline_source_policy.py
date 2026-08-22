@@ -25,6 +25,9 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.allocator = (
             PERF_BASELINE / "src" / "bin" / "litchi-perf-baseline-alloc.rs"
         ).read_text(encoding="utf-8")
+        cls.xlsb_crud = (
+            PERF_BASELINE / "src" / "bin" / "xlsb_crud.rs"
+        ).read_text(encoding="utf-8")
         cls.metrics = (
             PERF_BASELINE / "src" / "allocation_metrics.rs"
         ).read_text(encoding="utf-8")
@@ -68,6 +71,28 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertNotIn(
             'path = "src/main.rs"\nrequired-features = ["allocator-metrics"]',
             self.manifest,
+        )
+
+    def test_xlsb_crud_target_is_opt_in_and_consumes_timed_outcomes(self):
+        self.assertIn('xlsb-crud = ["dep:litchi-xlsb", "litchi/xlsb"]', self.manifest)
+        self.assertIn('path = "src/bin/xlsb_crud.rs"', self.manifest)
+        self.assertIn('required-features = ["xlsb-crud"]', self.manifest)
+        self.assertIn(
+            'litchi-xlsb = { path = "../../crates/litchi-xlsb", optional = true }',
+            self.manifest,
+        )
+        self.assertNotRegex(
+            self.manifest,
+            r'features = \[[^\]]*"xlsb"[^\]]*\]\s*\}',
+        )
+        self.assertIn("let outcome = std::hint::black_box(outcome);", self.xlsb_crud)
+        self.assertIn(
+            "binary_identity: litchi_perf_baseline::BinaryIdentity",
+            self.xlsb_crud,
+        )
+        self.assertIn(
+            "litchi_perf_baseline::current_executable_identity()?",
+            self.xlsb_crud,
         )
 
     def test_allocator_target_is_built_and_tested_by_ci(self):
