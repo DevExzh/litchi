@@ -230,6 +230,82 @@ fn reclaim_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
     std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
 }
 
+/// Result of the private source-backed PPTX bytes probe.
+#[cfg(feature = "pptx")]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the valid PPTX handoff moves the existing source-backed package without an extra allocation"
+)]
+pub(crate) enum PresentationSourceBytesDetection {
+    /// A validated source-retaining PPTX owner whose catalog identifies PPTX.
+    Pptx(crate::pptx::SourceBackedPresentation),
+    /// A validated PPTX catalog whose PresentationML semantic opening failed.
+    /// The caller reports this typed owner error without reopening eagerly.
+    PptxError(crate::pptx::Error),
+    /// The original bytes for the established byte-backed detector.
+    Fallback(Vec<u8>),
+}
+
+/// Probe owned bytes through the source-backed OPC catalog, retaining the
+/// original allocation for every non-PPTX or failed fallback.
+///
+/// The public smart-detector result remains source-compatible and eager. The
+/// unified presentation facade uses this narrower handoff so an owned PPTX
+/// can retain its source identity and defer ordinary slide/media payloads.
+/// The normal `from_bytes` caller performs the ODP preparation step before
+/// this probe. The explicit-limits caller runs this probe before the existing
+/// fallback detector; both preserve OOXML-before-ODF/iWork precedence.
+#[cfg(feature = "pptx")]
+pub(crate) fn detect_presentation_source_bytes(
+    bytes: Vec<u8>,
+    limits: crate::opc::ReadLimits,
+) -> PresentationSourceBytesDetection {
+    use litchi_core::ReadAt;
+    use std::sync::Arc;
+
+    if bytes.len() < 4
+        || !litchi_core::detection::simd_utils::signature_matches(
+            &bytes,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        )
+    {
+        return PresentationSourceBytesDetection::Fallback(bytes);
+    }
+
+    // Keep a reclaimable shared owner so a non-PPTX package or source-catalog
+    // failure can continue through the historical detector without copying
+    // its input. The package is dropped before every fallback reclaim;
+    // matching PresentationML semantic failures are returned directly.
+    let shared = Arc::new(bytes);
+    let package_result = {
+        let source: Arc<dyn ReadAt> =
+            Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
+        crate::opc::SourceBackedPackage::from_read_at_with_limits(source, limits)
+    };
+    let Ok(package) = package_result else {
+        return PresentationSourceBytesDetection::Fallback(reclaim_presentation_source_bytes(
+            shared,
+        ));
+    };
+
+    if crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
+        == Some(litchi_core::detection::FileFormat::Pptx)
+    {
+        return match crate::pptx::SourceBackedPresentation::from_source_backed_package(package) {
+            Ok(presentation) => PresentationSourceBytesDetection::Pptx(presentation),
+            Err(error) => PresentationSourceBytesDetection::PptxError(error),
+        };
+    }
+
+    drop(package);
+    PresentationSourceBytesDetection::Fallback(reclaim_presentation_source_bytes(shared))
+}
+
+#[cfg(feature = "pptx")]
+fn reclaim_presentation_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
+    std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
+}
+
 #[cfg(all(any(feature = "ods", feature = "xlsx"), any(unix, windows)))]
 const UNIFIED_WORKBOOK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
@@ -1380,6 +1456,8 @@ fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedForma
 #[cfg(test)]
 mod short_signature_tests {
     use super::detect_format_smart;
+    #[cfg(feature = "pptx")]
+    use std::io::{Cursor, Write};
 
     #[cfg(feature = "odt")]
     #[test]
@@ -1480,6 +1558,70 @@ mod short_signature_tests {
             panic!("non-XLSX bytes unexpectedly selected the source owner");
         };
         assert_eq!(retained, bytes);
+    }
+
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn source_pptx_probe_preserves_non_pptx_zip_allocation_for_fallback() {
+        let mut output = Cursor::new(Vec::with_capacity(256));
+        let mut writer = zip::ZipWriter::new(&mut output);
+        writer
+            .start_file(
+                "plain.txt",
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Stored),
+            )
+            .unwrap();
+        writer.write_all(b"not a PPTX package").unwrap();
+        writer.finish().unwrap();
+        let bytes = output.into_inner();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+
+        let detected =
+            super::detect_presentation_source_bytes(bytes, crate::opc::ReadLimits::default());
+        let super::PresentationSourceBytesDetection::Fallback(retained) = detected else {
+            panic!("non-PPTX ZIP unexpectedly selected the source owner");
+        };
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
+    }
+
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn source_pptx_probe_preserves_valid_non_pptx_opc_allocation_for_fallback() {
+        use crate::opc::constants::{content_type as ct, relationship_type as rt};
+        use crate::opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
+
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/word/document.xml").unwrap(),
+                ct::WML_DOCUMENT_MAIN.to_owned(),
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+                    .to_vec(),
+            )))
+            .unwrap();
+        package
+            .rels_mut()
+            .try_add_relationship(
+                rt::OFFICE_DOCUMENT.to_owned(),
+                "word/document.xml".to_owned(),
+                "rId1".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+
+        let detected =
+            super::detect_presentation_source_bytes(bytes, crate::opc::ReadLimits::default());
+        let super::PresentationSourceBytesDetection::Fallback(retained) = detected else {
+            panic!("non-PPTX OPC unexpectedly selected the presentation owner");
+        };
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
     }
 
     #[cfg(feature = "rtf")]

@@ -39,8 +39,8 @@ pub(super) enum PresentationImpl {
     /// Modern .pptx format
     #[cfg(feature = "pptx")]
     Pptx(Box<crate::pptx::Package>),
-    /// Filesystem-backed modern .pptx format with deferred slide payloads.
-    #[cfg(all(feature = "pptx", any(unix, windows)))]
+    /// Source-backed modern .pptx format with deferred slide payloads.
+    #[cfg(feature = "pptx")]
     PptxSource(crate::pptx::SourceBackedPresentation),
     /// Apple Keynote format
     #[cfg(feature = "keynote")]
