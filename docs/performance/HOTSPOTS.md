@@ -823,8 +823,11 @@ process.
   disk-I/O claim.
 - The existing bounded RTF stream retained zero output bytes and a 37-byte
   authoring window in the harness.  Heaptrack still observed 450,852 process
-  allocation calls, so any further RTF work should separate authoring from
-  corpus setup before changing the streaming path.
+  allocation calls. Change 0256 now brackets each timed RTF creation sample
+  with aligned allocator/procfs observations while keeping corpus setup and
+  correctness checks outside the interval. A pinned release resource report
+  is still required before treating those counters as accepted evidence or
+  changing the streaming path.
 - Explicit 1/2/4/8/available execution-context runs on many-small OPC and CFB
   corpora were classified `nonideal_or_measurement_noise`: raw p50 showed no
   measured speedup and out-of-range Amdahl fractions are invalidated rather
