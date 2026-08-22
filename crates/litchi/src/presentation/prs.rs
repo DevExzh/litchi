@@ -557,7 +557,8 @@ impl Presentation {
     ///
     /// # Performance Notes
     ///
-    /// - OLE2 and OOXML detection return parsed owners that their loaders reuse
+    /// - PPTX detection retains a source-backed owner and defers ordinary slide/media payloads
+    /// - OLE2 and other OOXML detection return parsed owners that their loaders reuse
     /// - Other detection results retain the moved buffer for loaders that may parse it afterward
     /// - Ideal for network data, streams, or in-memory content
     /// - No temporary files created
@@ -654,12 +655,26 @@ impl Presentation {
     /// policy. The policy is consulted only while probing an OOXML ZIP candidate.
     #[cfg(feature = "pptx")]
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::pptx::ReadLimits) -> Result<Self> {
+        let bytes =
+            match crate::detection_smart::detected::detect_presentation_source_bytes(bytes, limits)
+            {
+                crate::detection_smart::detected::PresentationSourceBytesDetection::Pptx(
+                    presentation,
+                ) => return Self::from_source_backed_pptx(presentation),
+                crate::detection_smart::detected::PresentationSourceBytesDetection::PptxError(
+                    error,
+                ) => return Err(crate::map_ooxml_error(error)),
+                crate::detection_smart::detected::PresentationSourceBytesDetection::Fallback(
+                    bytes,
+                ) => bytes,
+            };
+
         let detected = crate::detection_smart::detect_format_smart_with_limits(bytes, limits)
             .ok_or(Error::NotOfficeFile)?;
         Self::from_detected(detected)
     }
 
-    #[cfg(all(feature = "pptx", any(unix, windows)))]
+    #[cfg(feature = "pptx")]
     fn from_source_backed_pptx(
         presentation: crate::pptx::SourceBackedPresentation,
     ) -> Result<Self> {
@@ -795,7 +810,7 @@ impl Presentation {
                 }
                 Ok(texts.join("\n\n"))
             },
-            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            #[cfg(feature = "pptx")]
             PresentationImpl::PptxSource(presentation) => {
                 presentation
                     .check_source()
@@ -846,7 +861,7 @@ impl Presentation {
                 .map_err(crate::map_ooxml_error)?
                 .slide_count()
                 .map_err(crate::map_ooxml_error),
-            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            #[cfg(feature = "pptx")]
             PresentationImpl::PptxSource(presentation) => {
                 presentation
                     .check_source()
@@ -920,7 +935,7 @@ impl Presentation {
                     })
                     .collect()
             },
-            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            #[cfg(feature = "pptx")]
             PresentationImpl::PptxSource(presentation) => {
                 use super::types::SlideData;
                 presentation
@@ -980,7 +995,7 @@ impl Presentation {
     /// their existing `slides()` projection as a compatibility fallback.
     pub fn slide(&self, position: usize) -> Result<Option<Slide>> {
         match &self.inner {
-            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            #[cfg(feature = "pptx")]
             PresentationImpl::PptxSource(presentation) => {
                 presentation
                     .check_source()
@@ -1090,7 +1105,7 @@ impl Presentation {
                 .slide_size()
                 .map(|(width, _)| Some(width))
                 .map_err(crate::map_ooxml_error),
-            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            #[cfg(feature = "pptx")]
             PresentationImpl::PptxSource(presentation) => presentation
                 .slide_size()
                 .map(|(width, _)| Some(width))
@@ -1135,7 +1150,7 @@ impl Presentation {
                 .slide_size()
                 .map(|(_, height)| Some(height))
                 .map_err(crate::map_ooxml_error),
-            #[cfg(all(feature = "pptx", any(unix, windows)))]
+            #[cfg(feature = "pptx")]
             PresentationImpl::PptxSource(presentation) => presentation
                 .slide_size()
                 .map(|(_, height)| Some(height))
@@ -1177,7 +1192,7 @@ impl Presentation {
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
     pub fn metadata(&self) -> Result<Option<litchi_core::Metadata>> {
-        #[cfg(all(feature = "pptx", any(unix, windows)))]
+        #[cfg(feature = "pptx")]
         if let PresentationImpl::PptxSource(presentation) = &self.inner {
             presentation
                 .check_source()
@@ -1195,7 +1210,7 @@ impl Presentation {
             return Ok(cached.clone());
         }
 
-        #[cfg(all(feature = "pptx", any(unix, windows)))]
+        #[cfg(feature = "pptx")]
         if let PresentationImpl::PptxSource(presentation) = &self.inner {
             // Do not publish a failed read into the OnceLock: a caller can
             // retry after a transient source/version or XML failure.
@@ -1826,18 +1841,112 @@ mod source_pptx_path_tests {
         assert!(presentation.slide(1).is_err());
         assert!(presentation.slides().is_err());
 
-        // Byte-backed callers keep their eager package owner and observable
-        // deferred semantic validation behavior; this test only changes the
-        // filesystem handoff, not `from_bytes` ownership.
-        let eager = Presentation::from_bytes(bytes).expect("eager PPTX control");
-        assert_eq!(eager.slide_count().unwrap(), 2);
-        assert!(eager.slide(2).expect("eager out-of-range query").is_none());
-        assert!(eager.slide(1).is_err());
+        let bytes_presentation = Presentation::from_bytes(bytes).expect("source-backed PPTX");
+        assert!(matches!(
+            &bytes_presentation.inner,
+            PresentationImpl::PptxSource(_)
+        ));
+        assert_eq!(bytes_presentation.slide_count().unwrap(), 2);
+        assert!(
+            bytes_presentation
+                .slide(2)
+                .expect("bytes out-of-range query")
+                .is_none()
+        );
+        assert!(bytes_presentation.slide(1).is_err());
     }
 
     #[test]
-    fn source_text_matches_eager_text_without_name_projection() {
+    fn bytes_source_routes_to_private_owner_and_caches_selected_payloads() {
+        let bytes = corrupt_unselected_slide_package();
+        let presentation = Presentation::from_bytes(bytes).expect("source-backed PPTX bytes");
+        assert!(matches!(
+            &presentation.inner,
+            PresentationImpl::PptxSource(_)
+        ));
+
+        let opening = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("bytes PPTX must retain source owner"),
+        };
+        assert_eq!(presentation.slide_count().unwrap(), 2);
+        let after_catalog = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("bytes PPTX must retain source owner"),
+        };
+        assert_eq!(after_catalog.cold_loads, opening.cold_loads);
+
+        assert!(
+            presentation
+                .metadata()
+                .expect("source-backed metadata")
+                .is_some()
+        );
+        let after_metadata = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("bytes PPTX must retain source owner"),
+        };
+        assert!(after_metadata.cold_loads > after_catalog.cold_loads);
+        assert!(presentation.metadata().expect("cached metadata").is_some());
+        let after_cached_metadata = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("bytes PPTX must retain source owner"),
+        };
+        assert_eq!(after_cached_metadata.cold_loads, after_metadata.cold_loads);
+
+        let first = presentation
+            .slide(0)
+            .expect("first source-backed slide query")
+            .expect("first slide exists");
+        assert!(first.text().is_ok());
+        let after_first = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("bytes PPTX must retain source owner"),
+        };
+        assert!(after_first.cold_loads > after_cached_metadata.cold_loads);
+
+        let first_again = presentation
+            .slide(0)
+            .expect("cached source-backed slide query")
+            .expect("first slide exists");
+        assert!(first_again.text().is_ok());
+        let after_cached_first = match &presentation.inner {
+            PresentationImpl::PptxSource(source) => source.cache_diagnostics(),
+            _ => unreachable!("bytes PPTX must retain source owner"),
+        };
+        assert_eq!(after_cached_first.cold_loads, after_first.cold_loads);
+
+        // The second slide body is corrupt, but source-backed opening and
+        // catalog queries do not materialize it. Selecting that slide is the
+        // first operation that reports the deferred semantic error.
+        assert!(presentation.slide(1).is_err());
+    }
+
+    #[test]
+    fn bytes_limits_keep_source_probe_bounded() {
+        let bytes = corrupt_unselected_slide_package();
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_input_bytes(
+                u64::try_from(bytes.len() - 1).expect("fixture length fits the limit type"),
+            )
+            .expect("positive input limit")
+            .build()
+            .expect("valid input limit");
+
+        let error = match Presentation::from_bytes_with_limits(bytes, limits) {
+            Ok(_) => panic!("input limit must reject the PPTX"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, litchi_core::Error::NotOfficeFile));
+    }
+
+    #[test]
+    fn source_text_matches_bytes_text_without_name_projection() {
         let bytes = late_reserved_namespace_slide_package();
+        let eager = Presentation::from_detected(crate::detection_smart::DetectedFormat::Pptx(
+            crate::opc::OpcPackage::from_bytes(&bytes).expect("eager OPC control"),
+        ))
+        .expect("eager PPTX facade control");
         let temporary = tempfile::Builder::new()
             .suffix(".pptx")
             .tempfile()
@@ -1846,13 +1955,18 @@ mod source_pptx_path_tests {
 
         let source = Presentation::open(temporary.path()).expect("source-backed PPTX");
         assert!(matches!(&source.inner, PresentationImpl::PptxSource(_)));
-        let eager = Presentation::from_bytes(bytes).expect("eager PPTX control");
+        let bytes_presentation = Presentation::from_bytes(bytes).expect("bytes PPTX control");
 
         assert_eq!(
             source.text().expect("source text"),
+            bytes_presentation.text().expect("bytes text")
+        );
+        assert_eq!(
+            source.text().expect("source text replay"),
             eager.text().expect("eager text")
         );
         assert!(source.slide(0).is_err());
+        assert!(eager.slide(0).is_err());
     }
 
     #[test]
