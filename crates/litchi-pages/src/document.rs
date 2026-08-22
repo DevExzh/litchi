@@ -414,6 +414,25 @@ pub enum ReadError {
     Allocation { amount: usize },
 }
 
+/// Deterministic semantic measurements retained for a source-backed Pages
+/// document.
+///
+/// Native object counts are intentionally omitted: they describe the
+/// physical package representation rather than this archive-free projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DocumentStats {
+    /// Number of semantic Pages sections.
+    pub section_count: usize,
+}
+
+impl DocumentStats {
+    /// Return the number of semantic Pages sections.
+    #[must_use]
+    pub const fn section_count(self) -> usize {
+        self.section_count
+    }
+}
+
 impl DocumentReadOptions {
     /// Combine checked source-capture and semantic resource profiles.
     #[must_use]
@@ -555,7 +574,7 @@ struct State {
     sections: Arc<[Section]>,
     text_len: usize,
     metadata: Option<litchi_core::Metadata>,
-    stats: Option<crate::Stats>,
+    stats: Option<DocumentStats>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -792,7 +811,9 @@ impl Document {
     ) -> Self {
         if let Some(state) = Arc::get_mut(&mut document.state) {
             state.metadata = Some(metadata);
-            state.stats = Some(stats);
+            state.stats = Some(DocumentStats {
+                section_count: stats.section_count(),
+            });
             return document;
         }
         Self {
@@ -800,7 +821,9 @@ impl Document {
                 sections: Arc::clone(&document.state.sections),
                 text_len: document.state.text_len,
                 metadata: Some(metadata),
-                stats: Some(stats),
+                stats: Some(DocumentStats {
+                    section_count: stats.section_count(),
+                }),
             }),
         }
     }
@@ -939,7 +962,7 @@ impl Document {
     /// Documents built from semantic values have no source diagnostics and
     /// return `None`.
     #[must_use]
-    pub fn stats(&self) -> Option<crate::Stats> {
+    pub fn stats(&self) -> Option<DocumentStats> {
         self.state.stats
     }
 

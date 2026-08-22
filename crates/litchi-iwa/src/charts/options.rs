@@ -221,9 +221,8 @@ fn chart_title_decode_options(source: &[u8], replacement: Option<&str>) -> Decod
         .saturating_add(title_bytes)
         .saturating_add(32)
         .max(1);
-    let source_bytes = source.len().max(1);
     DecodeOptions::new(
-        source_bytes,
+        output_bytes,
         output_bytes.saturating_mul(8).max(1),
         output_bytes.saturating_mul(16).max(1),
         8,

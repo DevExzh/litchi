@@ -552,6 +552,42 @@ fn slide_text_transaction_is_available_through_the_root_facade()
 }
 
 #[test]
+fn slide_text_roles_are_focused_and_selector_first_through_root_facade()
+-> Result<(), Box<dyn std::error::Error>> {
+    let package = Package::open(fixture_path())?;
+    let slide = package
+        .slides()?
+        .first()
+        .ok_or_else(|| io::Error::other("native Keynote file has no slide"))?;
+    let selector = slide.selector();
+    let source = package.exact_bytes();
+
+    let title = package
+        .slide_title(selector)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no title"))?;
+    let body = package
+        .slide_body(selector)?
+        .ok_or_else(|| io::Error::other("native Keynote file has no body"))?;
+    assert_eq!(title, "Litchi native Keynote fixture");
+    assert_eq!(body, "Buffa lazy-view migration verification");
+    assert_eq!(package.slide_notes(selector)?, Some(String::new()));
+
+    let mut edit = package.edit_slide_title(selector)?;
+    let edit_debug = format!("{edit:?}");
+    assert!(!edit_debug.contains("identifier"));
+    assert!(!edit_debug.contains(".iwa"));
+    edit.set(&title)?;
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().exact_bytes(), source);
+    assert_eq!(commit.package().slide_title(selector)?, Some(title));
+    assert_eq!(commit.package().slide_body(selector)?, Some(body));
+    assert_eq!(commit.package().slide_notes(selector)?, Some(String::new()));
+    Ok(())
+}
+
+#[test]
 fn slide_body_span_edit_uses_only_public_semantic_facade_types()
 -> Result<(), Box<dyn std::error::Error>> {
     let package = Package::open(fixture_path())?;

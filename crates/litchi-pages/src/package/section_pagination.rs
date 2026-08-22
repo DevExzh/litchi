@@ -946,6 +946,7 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, SectionPaginationError> {
 )]
 fn map_selector_error(selection_error: crate::SelectorError) -> SectionPaginationError {
     match selection_error {
+        crate::SelectorError::EmptySectionName => SectionPaginationError::NameNotFound,
         crate::SelectorError::AmbiguousSectionName {
             first, duplicate, ..
         } => SectionPaginationError::AmbiguousSelector {

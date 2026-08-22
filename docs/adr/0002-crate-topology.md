@@ -3424,3 +3424,33 @@ setters, examples, pivot compatibility vocabulary, tests, and its manifest edge
 remain migration debt. The host imports the legacy `Formula*` names directly
 from neutral `litchi-iwa-common` so pivot compatibility does not force the
 focused semantic API to retain `PivotCategory` or raw identity aliases.
+
+## 2026-08-23 superseding amendment: Keynote soundtrack-reference order ownership
+
+This amendment supersedes only the earlier current-state assignment of
+soundtrack item ordering. Earlier dated soundtrack passages remain historical
+records and are not rewritten. The concrete Keynote package now owns the
+bounded order transaction at
+`soundtrack::order::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` and
+`Package::{edit_soundtrack_order, apply_soundtrack_order}`.
+
+The transaction selects the existing rooted Document-to-Show-to-Soundtrack
+chain, validates the bounded field-3 media-reference closure and its ownership,
+and changes only the order of existing references. It preserves media payloads,
+data members, reference metadata, unknown fields, and unrelated package
+components; it does not create, delete, replace, allocate, reclaim, or otherwise
+CRUD soundtrack media, and it does not change playback settings. The previously
+recorded focused `soundtrack::{Mode, Settings}` path remains the owner of only
+playback mode and volume.
+
+`litchi-iwa` remains the owner of the remaining soundtrack media/settings CRUD
+outside those focused package seams, together with the legacy host compatibility
+surface. In particular, soundtrack item and asset add/insert/replace/remove,
+creation, allocation/reclamation, and compatibility readers/editors remain host
+responsibilities. This bounded order capability does not remove or alias those
+APIs.
+
+The order cases provide bounded package-level ownership and preservation
+evidence only. No native Keynote open/save gate is admitted, no
+`litchi-iwa -> litchi-keynote` host edge or ordered debt is retired, and no
+monolith-exit or host-deletion claim follows.

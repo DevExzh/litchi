@@ -1,7 +1,12 @@
 //! Native body-footnote CRUD for Pages documents.
 
 use std::collections::HashSet;
+use std::hash::Hash;
 
+use litchi_iwa_common::{LimitKind, WireLimits};
+use litchi_iwa_protos::pages_body_codec;
+use litchi_iwa_protos::pages_footnote_codec;
+use litchi_iwa_protos::pages_footnote_marker_codec;
 use prost::Message;
 
 use super::text_box_create::body_text_storage;
@@ -27,6 +32,8 @@ use litchi_pages::footnote::body::{Footnote, Position, Selector};
 
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
 const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;
+#[cfg(test)]
+const FOOTNOTE_SUPER_FIELD: u32 = 1;
 const FOOTNOTE_TABLE_FIELD: u32 = 16;
 const TABLE_ENTRIES_FIELD: u32 = 1;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
@@ -35,6 +42,7 @@ const FOOTNOTE_ANCHOR_TEXT: &str = "\u{000e}";
 const FOOTNOTE_ANCHOR_UNIT: u16 = 0x000e;
 const FOOTNOTE_MARK: char = '\u{fffc}';
 const FOOTNOTE_CONTENT_PREFIX: &str = "\u{fffc} ";
+const FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT: u32 = 64;
 
 /// Native Pages footnote data plus the private objects it owns.
 #[derive(Debug, Clone)]
@@ -221,7 +229,20 @@ pub(super) fn body_footnote_graphs(
     let (_, body, body_data) = storage_at_with_data(package, body_storage_id, "Pages body")?;
     let entries = footnote_table_entries(body_storage_id, &body_data, &body)?;
     let mut seen = HashSet::new();
-    let mut footnotes = Vec::with_capacity(entries.len());
+    let limits = footnote_wire_limits(body_data.len())?;
+    reserve_footnote_set(
+        &mut seen,
+        entries.len(),
+        limits,
+        "Pages body footnote references",
+    )?;
+    let mut footnotes = Vec::new();
+    reserve_footnote_collection(
+        &mut footnotes,
+        entries.len(),
+        limits,
+        "Pages body footnote graphs",
+    )?;
     for entry in entries {
         if !seen.insert(entry.reference_id) {
             return Err(Error::InvalidFormat(format!(
@@ -312,27 +333,30 @@ fn decode_footnote_graph(
     let reference_object = reference_archive_data.object(reference_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Pages footnote object {reference_id} is missing"))
     })?;
-    let reference = tswp::FootnoteReferenceAttachmentArchive::decode(object_message_data(
+    let reference_data = object_message_data(
         reference_object,
         FOOTNOTE_REFERENCE_MESSAGE_TYPE,
         "Pages footnote reference",
-    )?)?;
-    if reference
-        .super_
-        .as_ref()
-        .and_then(|value| value.kind)
-        .is_some_and(|kind| {
-            kind != tswp::textual_attachment_archive::Kind::KKindFootnoteMark as i32
-        })
-    {
+    )?;
+    let reference = pages_footnote_codec::decode_footnote_reference(
+        reference_data,
+        footnote_reference_decode_options(reference_data),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Pages footnote reference object {reference_id} failed strict validation: {error}"
+        ))
+    })?;
+    if reference.super_kind().is_some_and(|kind| {
+        kind != tswp::textual_attachment_archive::Kind::KKindFootnoteMark as i32
+    }) {
         return Err(Error::InvalidFormat(format!(
             "Pages footnote object {reference_id} has the wrong attachment kind"
         )));
     }
     let storage_id = reference
-        .contained_storage
-        .as_ref()
-        .map(|value| value.identifier)
+        .contained_storage()
+        .map(|value| value.identifier().get())
         .filter(|identifier| *identifier != 0)
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -360,15 +384,109 @@ fn decode_footnote_graph(
         Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
     })?)
     .map_err(|error| Error::ParseError(format!("invalid Pages footnote position: {error}")))?;
-    let footnote =
-        Footnote::with_custom_mark(position, text, reference.custom_mark_string.map(Into::into))
-            .map_err(|error| Error::ParseError(format!("invalid Pages footnote value: {error}")))?;
+    let footnote = Footnote::with_custom_mark(
+        position,
+        text,
+        reference
+            .custom_mark_string()
+            .map(str::to_owned)
+            .map(Into::into),
+    )
+    .map_err(|error| Error::ParseError(format!("invalid Pages footnote value: {error}")))?;
 
     Ok(BodyFootnoteGraph {
         footnote,
         reference_id,
         storage_id,
         marker_id,
+    })
+}
+
+fn footnote_reference_decode_options(source: &[u8]) -> pages_footnote_codec::DecodeOptions {
+    pages_footnote_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(16)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT,
+    )
+}
+
+fn footnote_body_attachment_decode_options(source: &[u8]) -> pages_body_codec::DecodeOptions {
+    pages_body_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(16)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT,
+    )
+}
+
+fn footnote_wire_limits(source_len: usize) -> Result<WireLimits> {
+    WireLimits::default()
+        .with_input_bytes(source_len.clamp(1, WireLimits::MAX_INPUT_BYTES))
+        .and_then(|limits| limits.with_fields(source_len.clamp(1, WireLimits::MAX_FIELDS)))
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                source_len
+                    .saturating_mul(16)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(Into::into)
+}
+
+fn reserve_footnote_collection<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    limits: WireLimits,
+    resource: &'static str,
+) -> Result<()> {
+    let requested = values
+        .len()
+        .checked_add(additional)
+        .ok_or_else(|| Error::InvalidFormat(format!("{resource} size overflows usize")))?;
+    if requested > limits.max_fields() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::Fields,
+            observed: requested,
+            limit: limits.max_fields(),
+        }));
+    }
+    values.try_reserve_exact(additional).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource,
+            amount: requested,
+        })
+    })
+}
+
+fn reserve_footnote_set<T: Eq + Hash>(
+    values: &mut HashSet<T>,
+    additional: usize,
+    limits: WireLimits,
+    resource: &'static str,
+) -> Result<()> {
+    let requested = values
+        .len()
+        .checked_add(additional)
+        .ok_or_else(|| Error::InvalidFormat(format!("{resource} size overflows usize")))?;
+    if requested > limits.max_fields() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::Fields,
+            observed: requested,
+            limit: limits.max_fields(),
+        }));
+    }
+    values.try_reserve(additional).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource,
+            amount: requested,
+        })
     })
 }
 
@@ -380,17 +498,38 @@ fn validate_footnote_marker(package: &IWorkPackage, marker_id: u64) -> Result<()
             "Pages footnote marker object {marker_id} is missing"
         ))
     })?;
-    let marker = tswp::TextualAttachmentArchive::decode(object_message_data(
+    let marker_data = object_message_data(
         object,
         TEXTUAL_ATTACHMENT_MESSAGE_TYPE,
         "Pages footnote marker",
-    )?)?;
-    if marker.kind != Some(tswp::textual_attachment_archive::Kind::KKindFootnoteMark as i32) {
+    )?;
+    let marker = pages_footnote_marker_codec::decode_textual_attachment(
+        marker_data,
+        footnote_marker_decode_options(marker_data),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Pages footnote marker object {marker_id} failed strict validation: {error}"
+        ))
+    })?;
+    if marker.kind() != Some(tswp::textual_attachment_archive::Kind::KKindFootnoteMark as i32) {
         return Err(Error::InvalidFormat(format!(
             "Pages footnote marker object {marker_id} has the wrong attachment kind"
         )));
     }
     Ok(())
+}
+
+fn footnote_marker_decode_options(source: &[u8]) -> pages_footnote_marker_codec::DecodeOptions {
+    pages_footnote_marker_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(16)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT,
+    )
 }
 
 fn footnote_marker_id(storage_id: u64, storage: &tswp::StorageArchive) -> Result<u64> {
@@ -538,13 +677,11 @@ fn insert_footnote_reference(
                 TABLE_ENTRIES_FIELD,
                 &encoded_entries,
             )?,
-            None => tswp::ObjectAttributeTable {
-                entries: encoded_entries
-                    .iter()
-                    .map(|entry| tswp::object_attribute_table::ObjectAttribute::decode(entry.as_slice()))
-                    .collect::<std::result::Result<Vec<_>, _>>()?,
-            }
-            .encode_to_vec(),
+            None => rewrite_repeated_length_delimited_fields(
+                &[],
+                TABLE_ENTRIES_FIELD,
+                &encoded_entries,
+            )?,
         };
         let data = patch_length_delimited_field(
             original.data.as_slice(),
@@ -604,10 +741,20 @@ fn footnote_table_entries(
     let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?
         .into_iter()
         .map(|raw| {
-            let entry = tswp::object_attribute_table::ObjectAttribute::decode(raw)?;
+            let entry = pages_body_codec::decode_section_boundary(
+                raw,
+                footnote_body_attachment_decode_options(raw),
+            )
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Pages body storage {storage_id} footnote attachment failed strict validation: {error}"
+                ))
+            })?;
             Ok(FootnoteTableEntry {
-                index: entry.character_index,
-                reference_id: entry.object.map_or(0, |value| value.identifier),
+                index: entry.character_index(),
+                reference_id: entry
+                    .section()
+                    .map_or(0, |value| value.identifier().get()),
                 raw: raw.to_vec(),
             })
         })
@@ -853,6 +1000,24 @@ mod tests {
     use litchi_pages::footnote::body::Footnote;
 
     #[test]
+    fn footnote_collection_respects_wire_field_limit_before_reserving() {
+        let limits = WireLimits::default().with_fields(1).unwrap();
+        let mut graphs = Vec::<()>::new();
+        let error =
+            reserve_footnote_collection(&mut graphs, 2, limits, "Pages body footnote graphs")
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+        assert!(graphs.is_empty());
+    }
+
+    #[test]
     fn body_footnote_crud_round_trips_and_restores_a_source_document() {
         let mut editor = PagesEditor::create_with_text("A😀B").unwrap();
         let baseline = editor.to_bytes().unwrap();
@@ -943,14 +1108,17 @@ mod tests {
             .update_archive(&archive_name, |archive| {
                 let object = archive.object_mut(reference_id).unwrap();
                 let message = &object.messages[0];
-                let mut attachment =
-                    tswp::FootnoteReferenceAttachmentArchive::decode(message.data.as_slice())?;
-                attachment.super_ = None;
+                let data = patch_length_delimited_field(
+                    message.data.as_slice(),
+                    FOOTNOTE_SUPER_FIELD,
+                    false,
+                    None,
+                )?;
                 object.replace_message(
                     0,
                     RawMessage {
                         type_: FOOTNOTE_REFERENCE_MESSAGE_TYPE,
-                        data: attachment.encode_to_vec(),
+                        data,
                     },
                 )?;
                 Ok(())
@@ -959,5 +1127,302 @@ mod tests {
 
         let parsed = PagesEditor::from_package(package).unwrap();
         assert_eq!(parsed.body_footnotes().unwrap(), vec![footnote]);
+    }
+
+    #[test]
+    fn footnote_marker_unknown_fields_survive_an_atomic_text_rewrite() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        editor
+            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
+            .unwrap();
+        let graph = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
+            .unwrap()
+            .pop()
+            .unwrap();
+        let unknown = [0xa0, 0x06, 0x01, 0xaa, 0x06, 0x03, b'o', b'p', b'a'];
+        let mut package = editor.package().clone();
+        let archive_name = find_object_archive(&package, graph.marker_id).unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(graph.marker_id).unwrap();
+                let message = &object.messages[0];
+                let mut data = message.data.clone();
+                data.extend_from_slice(&unknown);
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let mut edited = PagesEditor::from_package(package).unwrap();
+        assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
+        edited
+            .set_body_footnote_text(Selector::Index(0), "Updated")
+            .unwrap();
+        let marker_archive = find_object_archive(edited.package(), graph.marker_id).unwrap();
+        let marker_archive_data = edited.package().archive(&marker_archive).unwrap();
+        let marker = marker_archive_data.object(graph.marker_id).unwrap();
+        assert!(marker.messages[0].data.ends_with(&unknown));
+    }
+
+    #[test]
+    fn malformed_footnote_marker_rewrite_is_failure_atomic() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        editor
+            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
+            .unwrap();
+        let marker_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
+            .unwrap()[0]
+            .marker_id;
+        let mut package = editor.package().clone();
+        let archive_name = find_object_archive(&package, marker_id).unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(marker_id).unwrap();
+                let message = &object.messages[0];
+                let mut data = message.data.clone();
+                data.extend_from_slice(&[0xa0, 0x06, 0x80]);
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let mut malformed = PagesEditor::from_package(package).unwrap();
+        let baseline = malformed.to_bytes().unwrap();
+        assert!(
+            malformed
+                .set_body_footnote_text(Selector::Index(0), "Updated")
+                .is_err()
+        );
+        assert_eq!(malformed.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn footnote_reference_unknown_fields_survive_an_atomic_text_rewrite() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        editor
+            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
+            .unwrap();
+        let reference_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
+            .unwrap()[0]
+            .reference_id;
+        let unknown = [0xa0, 0x06, 0x01, 0xaa, 0x06, 0x03, b'o', b'p', b'a'];
+        let mut package = editor.package().clone();
+        let archive_name = find_object_archive(&package, reference_id).unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(reference_id).unwrap();
+                let message = &object.messages[0];
+                let mut data = message.data.clone();
+                data.extend_from_slice(&unknown);
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let mut edited = PagesEditor::from_package(package).unwrap();
+        assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
+        edited
+            .set_body_footnote_text(Selector::Index(0), "Updated")
+            .unwrap();
+        let reference_archive = find_object_archive(edited.package(), reference_id).unwrap();
+        let reference_archive_data = edited.package().archive(&reference_archive).unwrap();
+        let reference = reference_archive_data.object(reference_id).unwrap();
+        assert!(reference.messages[0].data.ends_with(&unknown));
+    }
+
+    #[test]
+    fn malformed_footnote_reference_rewrite_is_failure_atomic() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        editor
+            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
+            .unwrap();
+        let reference_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
+            .unwrap()[0]
+            .reference_id;
+        let mut package = editor.package().clone();
+        let archive_name = find_object_archive(&package, reference_id).unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(reference_id).unwrap();
+                let message = &object.messages[0];
+                let mut data = message.data.clone();
+                data.extend_from_slice(&[0xa0, 0x06, 0x80]);
+                object.replace_message(
+                    0,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let mut malformed = PagesEditor::from_package(package).unwrap();
+        let baseline = malformed.to_bytes().unwrap();
+        assert!(
+            malformed
+                .set_body_footnote_text(Selector::Index(0), "Updated")
+                .is_err()
+        );
+        assert_eq!(malformed.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn footnote_body_attachment_unknown_fields_survive_an_atomic_text_rewrite() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        editor
+            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
+            .unwrap();
+        let body_storage_id = editor.body_storage_id.get();
+        let unknown = [0xa0, 0x06, 0x01, 0xaa, 0x06, 0x03, b'o', b'p', b'a'];
+        let mut package = editor.package().clone();
+        let archive_name = find_object_archive(&package, body_storage_id).unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(body_storage_id).unwrap();
+                let message_index = unique_storage_message_index(object, body_storage_id)?;
+                let message = &object.messages[message_index];
+                let tables = repeated_length_delimited_payloads(
+                    message.data.as_slice(),
+                    FOOTNOTE_TABLE_FIELD,
+                )?;
+                let [table] = tables.as_slice() else {
+                    return Err(Error::InvalidFormat(
+                        "Pages body footnote test requires one attachment table".to_owned(),
+                    ));
+                };
+                let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?;
+                let [entry] = entries.as_slice() else {
+                    return Err(Error::InvalidFormat(
+                        "Pages body footnote test requires one attachment entry".to_owned(),
+                    ));
+                };
+                let mut replacement = entry.to_vec();
+                replacement.extend_from_slice(&unknown);
+                let table = rewrite_repeated_length_delimited_fields(
+                    table,
+                    TABLE_ENTRIES_FIELD,
+                    &[replacement],
+                )?;
+                let data = patch_length_delimited_field(
+                    message.data.as_slice(),
+                    FOOTNOTE_TABLE_FIELD,
+                    true,
+                    Some(&table),
+                )?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let mut edited = PagesEditor::from_package(package).unwrap();
+        assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
+        edited
+            .set_body_footnote_text(Selector::Index(0), "Updated")
+            .unwrap();
+        let body_archive = find_object_archive(edited.package(), body_storage_id).unwrap();
+        let body_archive_data = edited.package().archive(&body_archive).unwrap();
+        let body = body_archive_data.object(body_storage_id).unwrap();
+        let message_index = unique_storage_message_index(body, body_storage_id).unwrap();
+        let tables = repeated_length_delimited_payloads(
+            body.messages[message_index].data.as_slice(),
+            FOOTNOTE_TABLE_FIELD,
+        )
+        .unwrap();
+        let [table] = tables.as_slice() else {
+            panic!("updated body has one attachment table");
+        };
+        let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD).unwrap();
+        let [entry] = entries.as_slice() else {
+            panic!("updated body has one attachment entry");
+        };
+        assert!(entry.ends_with(&unknown));
+    }
+
+    #[test]
+    fn malformed_footnote_body_attachment_rewrite_is_failure_atomic() {
+        let mut editor = PagesEditor::create_with_text("Body").unwrap();
+        editor
+            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
+            .unwrap();
+        let body_storage_id = editor.body_storage_id.get();
+        let mut package = editor.package().clone();
+        let archive_name = find_object_archive(&package, body_storage_id).unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive.object_mut(body_storage_id).unwrap();
+                let message_index = unique_storage_message_index(object, body_storage_id)?;
+                let message = &object.messages[message_index];
+                let tables = repeated_length_delimited_payloads(
+                    message.data.as_slice(),
+                    FOOTNOTE_TABLE_FIELD,
+                )?;
+                let [table] = tables.as_slice() else {
+                    return Err(Error::InvalidFormat(
+                        "Pages body footnote test requires one attachment table".to_owned(),
+                    ));
+                };
+                let entries = repeated_length_delimited_payloads(table, TABLE_ENTRIES_FIELD)?;
+                let [entry] = entries.as_slice() else {
+                    return Err(Error::InvalidFormat(
+                        "Pages body footnote test requires one attachment entry".to_owned(),
+                    ));
+                };
+                let mut replacement = entry.to_vec();
+                replacement.extend_from_slice(&[0xa0, 0x06, 0x80]);
+                let table = rewrite_repeated_length_delimited_fields(
+                    table,
+                    TABLE_ENTRIES_FIELD,
+                    &[replacement],
+                )?;
+                let data = patch_length_delimited_field(
+                    message.data.as_slice(),
+                    FOOTNOTE_TABLE_FIELD,
+                    true,
+                    Some(&table),
+                )?;
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: message.type_,
+                        data,
+                    },
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let mut malformed = PagesEditor::from_package(package).unwrap();
+        let baseline = malformed.to_bytes().unwrap();
+        assert!(
+            malformed
+                .set_body_footnote_text(Selector::Index(0), "Updated")
+                .is_err()
+        );
+        assert_eq!(malformed.to_bytes().unwrap(), baseline);
     }
 }

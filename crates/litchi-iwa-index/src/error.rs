@@ -2,6 +2,37 @@ use std::fmt;
 
 use crate::{FragmentId, ObjectId, Reference};
 
+/// Failure while traversing the neutral records belonging to one fragment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FragmentTraversalError {
+    /// The query would visit more records than its explicit limit permits.
+    LimitExceeded {
+        /// The adapter-local fragment whose records were queried.
+        fragment: FragmentId,
+        /// The number of records registered in the fragment.
+        observed: usize,
+        /// The caller-supplied maximum number of records to visit.
+        maximum: usize,
+    },
+}
+
+impl fmt::Display for FragmentTraversalError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LimitExceeded {
+                fragment,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "fragment {fragment:?} contains {observed} records, exceeding traversal limit {maximum}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for FragmentTraversalError {}
+
 /// The builder storage that could not reserve its next item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -18,6 +49,9 @@ pub enum AllocationKind {
     ObjectCatalog,
     /// The temporary reference duplicate catalog.
     ReferenceCatalog,
+    /// The temporary catalog of sources whose outgoing references retain
+    /// insertion order.
+    ReferenceOrderCatalog,
     /// The immutable object-record storage assembled at build time.
     SnapshotObjects,
     /// The temporary `(fragment, object)` ordering pairs assembled at build time.
@@ -37,6 +71,7 @@ impl fmt::Display for AllocationKind {
             Self::FragmentCatalog => "fragment duplicate catalog",
             Self::ObjectCatalog => "object duplicate catalog",
             Self::ReferenceCatalog => "reference duplicate catalog",
+            Self::ReferenceOrderCatalog => "reference-order source catalog",
             Self::SnapshotObjects => "immutable object record storage",
             Self::FragmentObjectPairs => "fragment/object ordering pairs",
             Self::FragmentObjectIds => "fragment object identity storage",

@@ -9,7 +9,9 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
-use litchi_iwa_protos::{keynote_document_codec, keynote_show_codec};
+use litchi_iwa_protos::{
+    keynote_document_codec, keynote_show_codec, keynote_slide_transition_codec,
+};
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
@@ -51,10 +53,10 @@ use crate::text::{
 use crate::wire::{
     append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
     patch_fixed64_field, patch_length_delimited_field, patch_nested_fixed32_field,
-    patch_nested_fixed64_field, patch_nested_length_delimited_field, patch_nested_varint_field,
-    patch_varint_field, remove_repeated_length_delimited_field_where,
-    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
-    transform_length_delimited_field, transform_length_delimited_fields_at_path,
+    patch_nested_length_delimited_field, patch_nested_varint_field, patch_varint_field,
+    remove_repeated_length_delimited_field_where, repeated_length_delimited_payloads,
+    rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
+    transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 use litchi_iwa_index::ObjectId;
@@ -1541,6 +1543,43 @@ impl KeynoteOperation {
         })
     }
 
+    /// Project one slide transition through the strict, borrowed codec.
+    ///
+    /// The editor still materializes the complete slide archive for the
+    /// unrelated slide graph fields it exposes. Transition semantics are
+    /// selected before that broad decode, however, so duplicate or
+    /// non-canonical transition fields cannot be accepted by Prost's eager
+    /// last-one-wins behavior. The projection borrows the graph-owned payload;
+    /// only the semantic adapter allocates settings, and unknown source fields
+    /// remain in the original graph for any later rewrite.
+    fn transition_snapshot(
+        &self,
+        identifier: u64,
+    ) -> Result<keynote_slide_transition_codec::SlideTransitionSnapshot<'_>> {
+        let payload = self
+            .graph
+            .message_data_type(identifier, 5, "KN.SlideArchive")?;
+        let max_payload_bytes = payload.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+        let max_fields = payload.len().clamp(1, WireLimits::MAX_FIELDS);
+        let max_work_bytes = payload
+            .len()
+            .saturating_mul(8)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK);
+        let recursion_limit = u32::try_from(WireLimits::MAX_NESTING).map_err(|_error| {
+            Error::InvalidFormat("Keynote transition nesting limit does not fit u32".to_owned())
+        })?;
+        keynote_slide_transition_codec::decode_slide_transition(
+            payload,
+            keynote_slide_transition_codec::DecodeOptions::new(max_payload_bytes, recursion_limit)
+                .with_resource_limits(max_fields, max_work_bytes),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote transition projection is malformed: {error}"
+            ))
+        })
+    }
+
     fn remember_slide(&mut self, identifier: u64, slide: &kn::SlideArchive) {
         if self.slide_cache.len() >= MAX_OPERATION_CACHED_SLIDES
             || slide.owned_drawables.len() > MAX_OPERATION_CACHED_DRAWABLES_PER_SLIDE
@@ -1623,6 +1662,10 @@ impl KeynoteEditor {
                     node_identifier
                 ))
             })?;
+            let transition = {
+                let snapshot = operation.transition_snapshot(slide_reference.identifier)?;
+                settings_from_projection(&snapshot.settings)?
+            };
             let slide = operation.decode_slide(slide_reference.identifier)?;
             operation.remember_slide(slide_reference.identifier, &slide);
             let layout = match slide.template_slide.as_ref() {
@@ -1694,19 +1737,6 @@ impl KeynoteEditor {
             let notes = notes_storage_id
                 .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
-            let transition = if slide.transition.attributes.animation_attributes.is_some() {
-                let original = operation.graph.message_data_type(
-                    slide_reference.identifier,
-                    5,
-                    "KN.SlideArchive",
-                )?;
-                let transition =
-                    transition_settings_from_wire(original, &slide.transition.attributes)?;
-                validate_transition_wire(original, &slide.transition.attributes)?;
-                transition
-            } else {
-                None
-            };
             slides.push(KeynoteSlideInfo {
                 index,
                 node_id: node_identifier,
@@ -5280,7 +5310,6 @@ mod soundtrack_items;
 mod soundtrack_wire;
 mod text_box_create;
 mod transition;
-mod transition_wire;
 
 use builds::*;
 pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
@@ -5319,7 +5348,7 @@ pub use slide_tables::{
     RemovedKeynoteSlideTable,
 };
 pub use soundtrack_items::KeynoteSoundtrackItemInfo;
-use transition_wire::{transition_settings_from_wire, validate_transition_wire};
+use transition::settings_from_projection;
 #[cfg(test)]
 mod operation_cache_tests;
 #[cfg(test)]

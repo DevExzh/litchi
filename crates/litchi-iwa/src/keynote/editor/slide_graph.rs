@@ -8,6 +8,19 @@ const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 const STORAGELESS_PLACEHOLDER_STORAGE_ID: u64 = 0;
 
+fn decode_storage_text_payload(
+    source: &[u8],
+    limits: litchi_iwa_text_wire::Limits,
+) -> Result<String> {
+    litchi_iwa_text_wire::from_bytes_with_limits(source, limits)
+        .map(litchi_iwa_text::storage::Storage::into_text)
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote text storage failed bounded projection: {error}"
+            ))
+        })
+}
+
 pub(super) struct ObjectGraph {
     pub(super) objects: HashMap<u64, Vec<RawMessage>>,
     pub(super) archives: HashMap<u64, String>,
@@ -116,8 +129,25 @@ impl ObjectGraph {
     }
 
     pub(super) fn storage_text(&self, identifier: u64) -> Result<String> {
-        let storage: tswp::StorageArchive = self.decode(identifier, "TSWP.StorageArchive")?;
-        Ok(storage.text.concat())
+        let messages = self
+            .objects
+            .get(&identifier)
+            .ok_or_else(|| Error::InvalidFormat(format!("Object {identifier} is missing")))?;
+        let mut matches = messages
+            .iter()
+            .filter(|message| matches!(message.type_, 2_001 | 2_022));
+        let message = matches.next().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Object {identifier} has no TSWP.StorageArchive payload"
+            ))
+        })?;
+        if matches.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {identifier} repeats its TSWP.StorageArchive payload"
+            )));
+        }
+        let source = message.data.as_slice();
+        decode_storage_text_payload(source, litchi_iwa_text_wire::Limits::default())
     }
 
     pub(super) fn archive_name(&self, identifier: u64) -> Result<&str> {
@@ -1008,4 +1038,62 @@ pub(super) fn remove_object(
         })?;
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_storage_text_payload;
+    use litchi_iwa_protos::tswp::StorageArchive;
+    use litchi_iwa_text_wire::Limits;
+    use prost::Message as _;
+
+    #[test]
+    fn storage_text_projection_matches_the_prost_text_oracle_and_keeps_unknowns_opaque() {
+        let source_archive = StorageArchive {
+            text: vec!["title ".to_owned(), "😀body".to_owned(), String::new()],
+            ..Default::default()
+        };
+        let mut source = source_archive.encode_to_vec();
+        source.extend_from_slice(&[0x98, 0x06, 0x87, 0x06]);
+
+        let projected = decode_storage_text_payload(&source, Limits::default())
+            .expect("valid storage text should project");
+        assert_eq!(projected, source_archive.text.concat());
+        assert_eq!(source_archive.text.concat(), "title 😀body");
+    }
+
+    #[test]
+    fn storage_text_projection_rejects_malformed_text_wire() {
+        for malformed in [[0x18, 0x01].as_slice(), [0x1a, 0x01, 0xff].as_slice()] {
+            assert!(
+                decode_storage_text_payload(malformed, Limits::default()).is_err(),
+                "malformed storage text must fail closed"
+            );
+        }
+    }
+
+    #[test]
+    fn storage_text_projection_accepts_exact_limits_and_rejects_one_over() {
+        let source = StorageArchive {
+            text: vec!["ab".to_owned()],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let exact =
+            Limits::new(source.len(), 64, 1, 2).expect("exact storage text limits should be valid");
+        assert!(decode_storage_text_payload(&source, exact).is_ok());
+
+        let one_over_text =
+            Limits::new(source.len(), 64, 1, 1).expect("one-over text limit should be valid");
+        assert!(decode_storage_text_payload(&source, one_over_text).is_err());
+
+        let two_fragments = StorageArchive {
+            text: vec!["a".to_owned(), "b".to_owned()],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let one_over_fragments =
+            Limits::new(two_fragments.len(), 64, 1, 2).expect("fragment limit should be valid");
+        assert!(decode_storage_text_payload(&two_fragments, one_over_fragments).is_err());
+    }
 }

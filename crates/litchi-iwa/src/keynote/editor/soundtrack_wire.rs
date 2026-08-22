@@ -1,5 +1,7 @@
 //! Strict native object lookup and wire patching for Keynote soundtracks.
 
+use litchi_iwa_protos::keynote_media_codec;
+
 use super::*;
 use crate::archive::FieldType;
 
@@ -96,14 +98,17 @@ pub(super) fn rewrite_soundtrack_media(original: &[u8], payloads: &[Vec<u8>]) ->
 }
 
 fn decode_media_reference_payload(payload: &[u8]) -> Result<u64> {
-    let reference = tsp::DataReference::decode(payload)?;
-    let _ = patch_varint_field(payload, 1, true, Some(reference.identifier))?;
-    if reference.identifier == 0 {
-        return Err(Error::InvalidFormat(
-            "Keynote soundtrack data reference has identifier zero".to_owned(),
-        ));
-    }
-    Ok(reference.identifier)
+    let reference = keynote_media_codec::decode_data_reference(
+        payload,
+        keynote_media_codec::DecodeOptions::for_source(payload),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote soundtrack data reference is malformed: {error}"
+        ))
+    })?;
+    let _ = patch_varint_field(payload, 1, true, Some(reference.identifier()))?;
+    Ok(reference.identifier())
 }
 
 pub(super) fn replace_soundtrack_message(
@@ -210,4 +215,36 @@ fn validate_soundtrack_wire(data: &[u8]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_media_reference_payload;
+    use prost::Message as _;
+
+    #[test]
+    fn soundtrack_data_reference_projection_preserves_unknown_wire() {
+        let source = [0x08, 0x96, 0x01, 0x1a, 0x01, 0xff, 0x25, 1, 2, 3, 4];
+        assert_eq!(decode_media_reference_payload(&source).unwrap(), 150);
+    }
+
+    #[test]
+    fn soundtrack_data_reference_projection_rejects_noncanonical_selected_wire() {
+        for source in [
+            &[0x08, 0x81, 0x00][..],
+            &[0x08, 0x01, 0x08, 0x02][..],
+            &[0x08, 0x00][..],
+        ] {
+            assert!(
+                decode_media_reference_payload(source).is_err(),
+                "{source:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn soundtrack_data_reference_fixture_matches_native_encoding() {
+        let source = crate::protobuf::tsp::DataReference { identifier: 9 }.encode_to_vec();
+        assert_eq!(decode_media_reference_payload(&source).unwrap(), 9);
+    }
 }

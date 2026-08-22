@@ -56,8 +56,10 @@ fn bounds_workbook_read_before_stream_materialization() {
         .write_to(&mut output)
         .expect("test compound file should be written");
 
-    let mut limits = Limits::default();
-    limits.max_stream_size = 64;
+    let limits = Limits {
+        max_stream_size: 64,
+        ..Default::default()
+    };
     let error = read_workbook(&output.into_inner(), limits)
         .expect_err("oversized Workbook must be rejected before reading");
     assert!(matches!(error, Error::InvalidData(message) if message.contains("read limit")));

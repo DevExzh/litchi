@@ -96,6 +96,21 @@ LOCAL_CANONICAL_SHEET_VIEW_TYPE = re.compile(
 FACADE_PACKAGE = "litchi"
 FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
 RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
+# The umbrella's iWork examples are semantic-reader examples. Keep the
+# compatibility host's old editor examples from becoming an accidental
+# recommendation for callers, even though the legacy crate itself remains
+# available for source compatibility.
+IWORK_EXAMPLE_SOURCES = (
+    Path("crates/litchi/examples/read_iwork.rs"),
+    Path("crates/litchi-iwa/examples/inspect_numbers_document.rs"),
+)
+IWORK_EXAMPLE_LEGACY_API = re.compile(
+    r"(?<![A-Za-z0-9_])(?:litchi_iwa|NumbersEditor|PagesEditor|KeynoteEditor|"
+    r"IWorkPackage)(?![A-Za-z0-9_])"
+)
+IWORK_EXAMPLE_NATIVE_ID_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:id|object_id|native_id)[ \t\r\n]*\("
+)
 IWA_KEYNOTE_SOURCE_ROOT = Path("crates/litchi-iwa/src/keynote")
 IWA_KEYNOTE_EDITOR_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
 RETIRED_IWA_KEYNOTE_METHODS = (
@@ -157,6 +172,13 @@ IWA_KEYNOTE_DOCUMENT_LOCAL_REEXPORT = re.compile(
     r"(?:r#)?(?P<module>document)\b",
     re.MULTILINE,
 )
+IWA_KEYNOTE_FOCUSED_DOCUMENT_REEXPORT = re.compile(
+    r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+use[ \t\r\n]+"
+    r"litchi_keynote[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:(?:r#)?document[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:r#)?Document\b",
+    re.MULTILINE,
+)
 IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS = (
     Path("crates/litchi-iwa/src"),
     Path("crates/litchi-iwa/tests"),
@@ -165,6 +187,18 @@ IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS = (
 KEYNOTE_SOURCE_ROOT = Path("crates/litchi-keynote/src")
 KEYNOTE_PACKAGE_MANIFEST = Path("crates/litchi-keynote/Cargo.toml")
 KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES = (KEYNOTE_SOURCE_ROOT / "document.rs",)
+# These are semantic resource ceilings, not native-object vocabulary. Keep the
+# allowlist exact so similarly named physical identifiers remain forbidden.
+KEYNOTE_DOCUMENT_SEMANTIC_LIMIT_PARAMETERS = frozenset(
+    {
+        "max_objects",
+        "max_slides",
+        "max_references",
+        "max_text_storages",
+        "max_text_fragments",
+        "max_text_bytes",
+    }
+)
 # `perf_tests.rs` is included only from a `#[cfg(test)]` module in its parent
 # source file. Keep the production audit from treating that test-only module
 # body as a reachable crate item when walking the source tree.
@@ -219,6 +253,13 @@ KEYNOTE_NO_EAGER_PROST_SOURCE_PATTERNS = (
             r"(?:[ \t\r\n]*::)?[ \t\r\n]*(?:<|\()"
         ),
     ),
+)
+# The focused package owns selector-first chart-title transactions.  Keep its
+# production source from calling the compatibility host's raw-ID mutation
+# methods while allowing the selector-suffixed near names used by adapters.
+KEYNOTE_CHART_TITLE_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_chart_title|"
+    r"remove_slide_chart_title)(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
@@ -321,6 +362,26 @@ IWA_KEYNOTE_SOUNDTRACK_SETTINGS_MODULE = re.compile(
     r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
     r"mod[ \t\r\n]+(?:r#)?(soundtrack)\b[ \t\r\n]*(?:;|\{)",
     re.MULTILINE,
+)
+
+# Playback-order ownership follows soundtrack playback settings into the
+# focused Keynote package owner. Media CRUD remains in the migration host, so
+# this retirement is deliberately limited to the old move operation and its
+# callers.
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_ORDER_METHODS = ("move_soundtrack_item",)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_ORDER_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SOUNDTRACK_ORDER_METHODS
+)
+IWA_KEYNOTE_SOUNDTRACK_ORDER_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "soundtrack_items.rs"
+)
+IWA_KEYNOTE_SOUNDTRACK_ORDER_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?move_soundtrack_item\b"
+    r"[ \t\r\n]*\("
+)
+IWA_KEYNOTE_SOUNDTRACK_ORDER_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_keynote_soundtrack_items.rs"
 )
 IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLS = (
     re.compile(
@@ -1885,6 +1946,30 @@ NUMBERS_EXTRACTOR_NO_EAGER_COMMENT_STORAGE_SOURCE_PATTERNS = (
         ),
     ),
 )
+NUMBERS_EXTRACTOR_NO_EAGER_FORMULA_SOURCE_PATTERNS = (
+    (
+        "FormulaArchive::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])FormulaArchive[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+)
+# The lossless formula renderer still needs the generated archive for AST
+# shapes outside the compact visitor.  This one call is a compatibility
+# fallback, not eager ingress: `FormulaArchiveBytes::from_wire` has already
+# preflighted and copied the bounded source bytes before the referenced cell
+# reaches this method.  Keep the exception exact (source-backed `self.bytes`)
+# so a new generated decode with an arbitrary payload remains a ratchet
+# violation.
+NUMBERS_EXTRACTOR_FORMULA_COMPATIBILITY_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:tsce[ \t\r\n]*::|"
+    r"litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*tsce[ \t\r\n]*::)"
+    r"FormulaArchive[ \t\r\n]*::"
+    r"[ \t\r\n]*decode[ \t\r\n]*\([ \t\r\n]*"
+    r"self[ \t\r\n]*\.[ \t\r\n]*bytes[ \t\r\n]*\.[ \t\r\n]*"
+    r"as_ref[ \t\r\n]*\([ \t\r\n]*\)[ \t\r\n]*\)"
+)
 NUMBERS_NAMES_GENERATED_PROTO_MODULES = ("tn", "tsce", "tst", "tswp")
 NUMBERS_NAMES_NO_EAGER_PROST_SOURCE_PATTERNS = (
     (
@@ -2190,6 +2275,49 @@ RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS = ("page_layout", "set_page_layout")
 RETIRED_IWA_PAGES_PAGE_LAYOUT_METHOD_SET = frozenset(
     RETIRED_IWA_PAGES_PAGE_LAYOUT_METHODS
 )
+RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "lock.rs"
+)
+RETIRED_IWA_PAGES_TABLE_LOCK_METHODS = (
+    "body_table_lock_state",
+    "set_body_table_lock_state",
+)
+RETIRED_IWA_PAGES_TABLE_LOCK_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_TABLE_LOCK_METHODS
+)
+IWA_PAGES_TABLES_MODULE_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "mod.rs"
+IWA_PAGES_TABLE_LOCK_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?lock\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+RETIRED_IWA_PAGES_TABLE_LOCK_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/create_iwork_table_locks.rs"
+)
+IWA_PAGES_README_TABLE_LOCK_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor)[ \t\r\n]*\."
+        r"[ \t\r\n]*(?:r#)?(?P<method>body_table_lock_state|"
+        r"set_body_table_lock_state)\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])"
+        r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+        r"(?:r#)?PagesEditor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?(?P<method>body_table_lock_state|set_body_table_lock_state)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+        r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
+        r"(?P<method>body_table_lock_state|set_body_table_lock_state)"
+        r"\b[ \t\r\n]*\("
+    ),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?P<method>body_table_lock_state|"
+        r"set_body_table_lock_state)\b[ \t\r\n]*\("
+    ),
+)
 PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
 PAGES_DOCUMENT_PUBLIC_API_SOURCES = (
     PAGES_SOURCE_ROOT / "document.rs",
@@ -2278,6 +2406,125 @@ PAGES_PAGE_LAYOUT_PUBLIC_MARKERS = frozenset(
         "PageLayoutLimitKind",
         "PageLayoutPatch",
     }
+)
+PAGES_TABLE_LOCK_SEMANTIC_SOURCE = PAGES_SOURCE_ROOT / "table" / "lock.rs"
+PAGES_TABLE_LOCK_OWNER_SOURCE = PAGES_SOURCE_ROOT / "package" / "table_lock.rs"
+PAGES_TABLE_LOCK_OWNER_HELPER_ROOT = PAGES_SOURCE_ROOT / "package" / "table_lock"
+PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
+PAGES_TABLE_LOCK_IMPLEMENTATION_SOURCES = (
+    PAGES_TABLE_LOCK_OWNER_SOURCE,
+    PAGES_TABLE_LOCK_SEMANTIC_SOURCE,
+)
+PAGES_TABLE_LOCK_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE,
+    PAGES_SOURCE_ROOT / "table" / "mod.rs",
+)
+PAGES_TABLE_LOCK_SEMANTIC_TYPES = ("State", "BodyTableLockState")
+PAGES_TABLE_LOCK_CANONICAL_TYPES = (
+    "BodyTableLockEdit",
+    "BodyTableLockPatch",
+    "BodyTableLockCommit",
+    "BodyTableLockDiagnostics",
+    "BodyTableLockError",
+    "BodyTableLockLimitKind",
+)
+PAGES_TABLE_LOCK_VALUE_TYPE = "State"
+PAGES_TABLE_LOCK_SHORT_NAMES = frozenset(PAGES_TABLE_LOCK_CANONICAL_TYPES)
+PAGES_TABLE_LOCK_PUBLIC_NAMES = (
+    PAGES_TABLE_LOCK_SHORT_NAMES | frozenset(PAGES_TABLE_LOCK_SEMANTIC_TYPES)
+)
+PAGES_TABLE_LOCK_PACKAGE_METHODS = (
+    "body_table_lock",
+    "edit_body_table_lock",
+    "apply_body_table_lock",
+)
+PAGES_TABLE_LOCK_FLAT_METHODS = frozenset(
+    {
+        "table_lock",
+        "edit_table_lock",
+        "apply_table_lock",
+    }
+)
+PAGES_TABLE_LOCK_FLAT_ALIASES = frozenset(
+    {
+        "TableLock",
+        "PagesTableLock",
+        "TableLockEdit",
+        "TableLockPatch",
+        "TableLockCommit",
+        "TableLockDiagnostics",
+        "TableLockError",
+        "TableLockLimitKind",
+        "TableLockState",
+        "TableSelector",
+    }
+)
+# Keep the export-scope matcher focused.  Short semantic names such as
+# ``State`` and ``Error`` occur throughout ``package.rs``; only the
+# application-owned spellings (or the compatibility aliases above) identify
+# a table-lock declaration outside its dedicated owner source.
+PAGES_TABLE_LOCK_FOCUSED_MARKERS = frozenset(
+    PAGES_TABLE_LOCK_SHORT_NAMES | {"BodyTableLockState"}
+)
+PAGES_TABLE_LOCK_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_lock|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?lock)"
+    r"(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_TABLE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_LOCK_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?lock\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_PACKAGE_TABLE_LOCK_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_lock\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_TABLE_LOCK_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?table_lock\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_TABLE_LOCK_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "DrawableArchive",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableInfoArchive",
+        "TableLockSnapshot",
+    }
+)
+PAGES_TABLE_LOCK_WIRE_TYPES = frozenset(
+    {
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_TABLE_LOCK_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "tsd", "tsp", "tst", "tswp"}
 )
 RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
     "document_options",
@@ -2647,6 +2894,132 @@ RUST_BYTE_SLICE = re.compile(
 FACADE_DEFAULT_FEATURE = "default"
 FACADE_ALL_FEATURE = "all"
 FACADE_SOURCE_ROOT = Path("crates/litchi/src")
+# The umbrella keeps package-preserving owners under ``pages``, ``keynote``,
+# and ``numbers`` while exposing a deliberately smaller immutable reader under
+# each ``semantic`` child module.  Keep this allowlist source-local: the leaf
+# rustdoc gate checks resolved types, while this gate protects the umbrella's
+# re-export shape and prevents a package alias from being hidden behind a
+# semantic namespace.
+SEMANTIC_FACADE_REQUIRED_EXPORTS = {
+    "pages": frozenset(
+        {
+            "Body",
+            "Document",
+            "DocumentReadOptions",
+            "DocumentSourceLimitKind",
+            "DocumentSourceLimits",
+            "DocumentSourceLimitsError",
+            "DocumentStats",
+            "Error",
+            "IoKind",
+            "Position",
+            "ReadError",
+            "ReadLimitKind",
+            "Result",
+            "Root",
+            "Section",
+            "SectionSelector",
+            "SectionType",
+            "SemanticLimitKind",
+            "SemanticLimits",
+            "SemanticLimitsError",
+            "SelectorError",
+            "SelectorResult",
+            "TextPosition",
+            "TextSpan",
+        }
+    ),
+    "keynote": frozenset(
+        {
+            "Build",
+            "Document",
+            "DocumentIoKind",
+            "DocumentReadError",
+            "DocumentReadLimitKind",
+            "DocumentReadOptions",
+            "DocumentSemanticLimitKind",
+            "DocumentSemanticLimits",
+            "DocumentSemanticLimitsError",
+            "DocumentSourceLimitKind",
+            "DocumentSourceLimits",
+            "DocumentSourceLimitsError",
+            "DocumentStats",
+            "Error",
+            "Mode",
+            "Position",
+            "Result",
+            "Seconds",
+            "Settings",
+            "Show",
+            "Size",
+            "Slide",
+            "SlideSelector",
+            "SlideSelectorError",
+            "SlideSelectorResult",
+            "TextPosition",
+            "TextSpan",
+            "Transition",
+        }
+    ),
+    "numbers": frozenset(
+        {
+            "Document",
+            "DocumentReadError",
+            "DocumentReadOptions",
+            "DocumentSourceLimitKind",
+            "DocumentSourceLimits",
+            "DocumentSourceLimitsError",
+            "DocumentStats",
+            "Error",
+            "LimitKind",
+            "Limits",
+            "LimitsError",
+            "ReadLimitKind",
+            "Result",
+            "Sheet",
+            "SheetSelector",
+            "Table",
+            "TableSelector",
+            "TableSelectorError",
+        }
+    ),
+}
+SEMANTIC_FACADE_FORBIDDEN_NAMES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ArchiveView",
+        "ComponentId",
+        "Generated",
+        "IWorkPackage",
+        "NativeId",
+        "ObjectId",
+        "Package",
+        "PackageError",
+        "PackageResult",
+        "RawId",
+        "RawMessage",
+        "SourceCatalog",
+        "Wire",
+        "WireDescent",
+        "WireFieldView",
+        "WireLimits",
+        "WireView",
+    }
+)
+SEMANTIC_FACADE_FORBIDDEN_PATH = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"(?:litchi_iwa(?:_(?:archive|common|core|detect|index|package|protos|"
+    r"structured|text_wire))?|litchi_numbers_wire|buffa|prost|prost_types)"
+    r"[ \t\r\n]*::[ \t\r\n]*[A-Za-z_]"
+    r"[A-Za-z0-9_]*"
+    r"|(?:litchi_pages|litchi_keynote|litchi_numbers)[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:package|archive|wire|protos?)(?:[ \t\r\n]*::|\b)"
+    r")",
+)
+SEMANTIC_FACADE_GLOB_REEXPORT = re.compile(
+    r"\bpub[ \t\r\n]+use[\s\S]*?\*[ \t\r\n]*;",
+)
 PUBLIC_FACADE_IWA_MODULE = re.compile(
     r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+iwa\b",
     re.MULTILINE,
@@ -3444,6 +3817,173 @@ def audit_litchi_facade_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_litchi_semantic_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the umbrella's semantic iWork namespaces package-free.
+
+    The leaf rustdoc gate follows resolved public types.  This complementary
+    source check covers the umbrella's local re-export shape, where a broad
+    glob or a package alias could otherwise hide behind ``pages::semantic``,
+    ``keynote::semantic``, or ``numbers::semantic`` without changing a leaf's
+    own rustdoc graph.
+    """
+
+    path = root / FACADE_SOURCE_ROOT / "lib.rs"
+    if not path.is_file():
+        return []
+
+    source = path.read_text(encoding="utf-8")
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+
+    def balanced_body(opening: int) -> tuple[str, int] | None:
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth:
+            return None
+        return code[opening + 1 : cursor - 1], opening + 1
+
+    for owner, required in sorted(SEMANTIC_FACADE_REQUIRED_EXPORTS.items()):
+        owner_match = re.search(
+            rf"(?m)^\s*pub[ \t]+mod[ \t]+{re.escape(owner)}\b",
+            code,
+        )
+        if owner_match is None:
+            # Feature-gated modules are absent from a source-only fixture or
+            # an intentionally reduced facade; the normal manifest/features
+            # audit reports missing owners separately.
+            continue
+        owner_opening = code.find("{", owner_match.end())
+        owner_semicolon = code.find(";", owner_match.end())
+        if owner_opening < 0 or (
+            owner_semicolon >= 0 and owner_semicolon < owner_opening
+        ):
+            violations.append(
+                f"litchi {owner} semantic facade must be an inline module: "
+                f"{path.relative_to(root)}:{source.count(chr(10), 0, owner_match.start()) + 1}"
+            )
+            continue
+        owner_result = balanced_body(owner_opening)
+        if owner_result is None:
+            violations.append(
+                f"litchi {owner} semantic facade has an unbalanced module: "
+                f"{path.relative_to(root)}:{source.count(chr(10), 0, owner_match.start()) + 1}"
+            )
+            continue
+        owner_body, owner_body_offset = owner_result
+        semantic_match = re.search(
+            r"(?m)^\s*pub[ \t]+mod[ \t]+semantic\b",
+            owner_body,
+        )
+        if semantic_match is None:
+            violations.append(
+                f"litchi {owner} semantic facade is missing `semantic`: "
+                f"{path.relative_to(root)}:{source.count(chr(10), 0, owner_match.start()) + 1}"
+            )
+            continue
+        semantic_opening = owner_body.find("{", semantic_match.end())
+        semantic_semicolon = owner_body.find(";", semantic_match.end())
+        semantic_line = source.count(
+            chr(10),
+            0,
+            owner_body_offset + semantic_match.start(),
+        ) + 1
+        if semantic_opening < 0 or (
+            semantic_semicolon >= 0 and semantic_semicolon < semantic_opening
+        ):
+            violations.append(
+                f"litchi {owner} semantic facade must be an inline module: "
+                f"{path.relative_to(root)}:{semantic_line}"
+            )
+            continue
+
+        # Balance relative to the owner body; use the same scanner with an
+        # offset into the full masked source to catch nested braces correctly.
+        semantic_start = owner_body_offset + semantic_opening
+        semantic_result = balanced_body(semantic_start)
+        if semantic_result is None:
+            violations.append(
+                f"litchi {owner} semantic facade has an unbalanced module: "
+                f"{path.relative_to(root)}:{semantic_line}"
+            )
+            continue
+        semantic_body, semantic_body_offset = semantic_result
+        identifiers = {
+            match.group(1) for match in RUST_IDENTIFIER.finditer(semantic_body)
+        }
+        missing = required - identifiers
+        if missing:
+            violations.append(
+                f"litchi {owner} semantic facade is missing exports: "
+                + ", ".join(sorted(missing))
+                + f": {path.relative_to(root)}:{semantic_line}"
+            )
+
+        for identifier in sorted(identifiers & SEMANTIC_FACADE_FORBIDDEN_NAMES):
+            violations.append(
+                f"litchi {owner} semantic facade exposes forbidden `{identifier}`: "
+                f"{path.relative_to(root)}:{semantic_line}"
+            )
+        for match in SEMANTIC_FACADE_FORBIDDEN_PATH.finditer(semantic_body):
+            line = source.count(
+                chr(10),
+                0,
+                semantic_body_offset + match.start(),
+            ) + 1
+            violations.append(
+                f"litchi {owner} semantic facade exposes physical path: "
+                f"{path.relative_to(root)}:{line}"
+            )
+        for match in SEMANTIC_FACADE_GLOB_REEXPORT.finditer(semantic_body):
+            line = source.count(
+                chr(10),
+                0,
+                semantic_body_offset + match.start(),
+            ) + 1
+            violations.append(
+                f"litchi {owner} semantic facade exposes a glob re-export: "
+                f"{path.relative_to(root)}:{line}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwork_example_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep user-facing iWork examples on semantic, selector-first APIs.
+
+    ``litchi-iwa`` remains a compatibility crate, so its implementation and
+    public symbols are intentionally not removed here.  Its Numbers document
+    example is also published as workspace documentation, though, and must
+    not teach callers to import the retired editor host or print native object
+    handles.  The aggregate ``litchi`` example is checked by the same narrow
+    gate so a future example cannot accidentally bypass the facade.
+    """
+
+    violations: list[str] = []
+    for relative in IWORK_EXAMPLE_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        for pattern, label in (
+            (IWORK_EXAMPLE_LEGACY_API, "legacy litchi-iwa API"),
+            (IWORK_EXAMPLE_NATIVE_ID_CALL, "native object identifier call"),
+        ):
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    f"iWork example exposes {label}: "
+                    f"{relative}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def _mask_rust_non_code(source: str) -> str:
     """Mask Rust comments and literals while preserving offsets and newlines."""
 
@@ -4210,6 +4750,56 @@ def _is_pages_page_layout_public_declaration(
     )
 
 
+def _pages_table_lock_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in Pages table locks."""
+
+    if identifier in PAGES_TABLE_LOCK_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_TABLE_LOCK_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_TABLE_LOCK_WIRE_TYPES:
+        return "wire type"
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_table_lock_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_TABLE_LOCK_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_TABLE_LOCK_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_table_lock_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return (
+        bool(identifiers & PAGES_TABLE_LOCK_FLAT_ALIASES)
+        or bool(identifiers & PAGES_TABLE_LOCK_FOCUSED_MARKERS)
+        or _pages_table_lock_owner_declaration(declaration)
+    )
+
+
 def _is_pages_document_settings_public_declaration(
     declaration: str, *, dedicated_source: bool
 ) -> bool:
@@ -4636,6 +5226,12 @@ def audit_iwa_keynote_document_source_topology(
                 "retired litchi-iwa Keynote document reader local re-export "
                 f"{match.group('module')}: {IWA_KEYNOTE_MODULE_SOURCE}:{line_number}"
             )
+        for match in IWA_KEYNOTE_FOCUSED_DOCUMENT_REEXPORT.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote focused Document re-export: "
+                f"{IWA_KEYNOTE_MODULE_SOURCE}:{line_number}"
+            )
 
     caller_paths: set[Path] = set()
     for caller_root in IWA_KEYNOTE_DOCUMENT_CALLER_ROOTS:
@@ -4925,6 +5521,43 @@ def audit_iwa_keynote_soundtrack_settings_source_topology(
                 "retired litchi-iwa Keynote soundtrack settings README example "
                 f"reference {match.group('example')}: "
                 f"{IWA_KEYNOTE_README}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_soundtrack_order_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep soundtrack playback-order mutation out of the migration host."""
+
+    violations: list[str] = []
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_KEYNOTE_SOUNDTRACK_ORDER_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote soundtrack-order method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    scan_paths = [
+        root / IWA_KEYNOTE_SOUNDTRACK_ORDER_EXAMPLE,
+        root / IWA_KEYNOTE_EDITOR_TEST_SOURCE,
+    ]
+    for path in scan_paths:
+        if not path.is_file():
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw_source)
+        for match in IWA_KEYNOTE_SOUNDTRACK_ORDER_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote soundtrack-order caller "
+                f"move_soundtrack_item: {path.relative_to(root)}:{line_number}"
             )
 
     return sorted(set(violations))
@@ -8088,6 +8721,65 @@ def audit_iwa_pages_page_layout_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_iwa_pages_table_lock_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the retired Pages table-lock API and raw-ID calls out of the host."""
+
+    violations: list[str] = []
+    retired_source = root / RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE
+    if retired_source.exists():
+        violations.append(
+            "retired litchi-iwa Pages table-lock source returned: "
+            + str(RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE)
+        )
+
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_PAGES_TABLE_LOCK_METHOD_SET:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Pages table-lock method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    module_path = root / IWA_PAGES_TABLES_MODULE_SOURCE
+    if module_path.is_file():
+        source = _mask_rust_non_code(module_path.read_text(encoding="utf-8"))
+        for match in IWA_PAGES_TABLE_LOCK_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Pages table-lock module declaration: "
+                f"{IWA_PAGES_TABLES_MODULE_SOURCE}:{line_number}"
+            )
+
+    example_path = root / RETIRED_IWA_PAGES_TABLE_LOCK_EXAMPLE
+    if example_path.is_file():
+        source = _mask_rust_non_code(example_path.read_text(encoding="utf-8"))
+        for pattern in IWA_PAGES_README_TABLE_LOCK_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-lock example call "
+                    f"{match.group('method')}: "
+                    f"{RETIRED_IWA_PAGES_TABLE_LOCK_EXAMPLE}:{line_number}"
+                )
+
+    readme_path = root / IWA_PAGES_README
+    if readme_path.is_file():
+        source = readme_path.read_text(encoding="utf-8")
+        for pattern in IWA_PAGES_README_TABLE_LOCK_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages table-lock README call "
+                    f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_pages_document_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -8657,6 +9349,8 @@ def audit_pages_document_public_api(root: Path = ROOT) -> list[str]:
 def _keynote_document_public_leak(identifier: str) -> str | None:
     """Classify physical vocabulary forbidden by the archive-free reader."""
 
+    if identifier in KEYNOTE_DOCUMENT_SEMANTIC_LIMIT_PARAMETERS:
+        return None
     if identifier == "wire" or identifier.startswith("Wire") or identifier.endswith("Wire"):
         return "wire type"
     return _iwork_public_leak(identifier)
@@ -8902,6 +9596,51 @@ def audit_numbers_extractor_no_eager_comment_storage_source_topology(
     return sorted(set(violations))
 
 
+def audit_numbers_extractor_no_eager_formula_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the Numbers formula sidecar free of generated archive reads.
+
+    Formula entries are strictly preflighted and retained as bounded source
+    bytes before the compatibility renderer lazily reconstructs a generated
+    ``FormulaArchive`` for a referenced cell.  Reintroducing
+    ``FormulaArchive::decode`` in the extractor's production prefix would make
+    every formula entry eagerly materialize its repeated AST representation.
+    Test-only generated builders and decodes remain available below the first
+    ``cfg(test)`` module as differential fixture material.
+    """
+
+    violations: list[str] = []
+    source_path = root / NUMBERS_EXTRACTOR_SOURCE
+    if not source_path.is_file():
+        return violations
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    masked_source = _mask_rust_non_code(raw_source)
+    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
+    production_source = (
+        raw_source[: test_module.start()] if test_module is not None else raw_source
+    )
+    production_code = _mask_rust_non_code(production_source)
+    compatibility_fallback = NUMBERS_EXTRACTOR_FORMULA_COMPATIBILITY_FALLBACK.search(
+        production_code
+    )
+    for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_FORMULA_SOURCE_PATTERNS:
+        for match in pattern.finditer(production_code):
+            if (
+                compatibility_fallback is not None
+                and compatibility_fallback.start() <= match.start() < compatibility_fallback.end()
+            ):
+                continue
+            line_number = production_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-numbers extractor production source uses "
+                f"{label}: {NUMBERS_EXTRACTOR_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_names_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -9041,6 +9780,27 @@ def audit_keynote_package_no_eager_prost_source_topology(
     return sorted(set(violations))
 
 
+def audit_keynote_chart_title_legacy_calls(root: Path = ROOT) -> list[str]:
+    """Keep focused chart-title code off the legacy host mutation calls."""
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        raw_source = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw_source)
+        for match in KEYNOTE_CHART_TITLE_LEGACY_CALL.finditer(source):
+            line_number = source.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "focused litchi-keynote chart-title source retains legacy call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -9093,6 +9853,227 @@ def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[st
                 violations.append(
                     "focused litchi-pages page-layout public API exposes "
                     f"raw byte slice {byte_slice}: "
+                    f"{path.relative_to(root)}:{byte_slice_line}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_pages_table_lock_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Enforce the nested, archive-free Pages table-lock owner API."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_TABLE_LOCK_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    export_sources = {
+        root / path
+        for path in PAGES_TABLE_LOCK_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    violations: list[str] = []
+
+    semantic_path = root / PAGES_TABLE_LOCK_SEMANTIC_SOURCE
+    semantic_source = (
+        semantic_path.read_text(encoding="utf-8")
+        if semantic_path.is_file()
+        else ""
+    )
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, frozenset(PAGES_TABLE_LOCK_SEMANTIC_TYPES)
+    )
+    for name in PAGES_TABLE_LOCK_SEMANTIC_TYPES:
+        if name in semantic_exports:
+            continue
+        violations.append(
+            "focused litchi-pages table-lock public API is missing "
+            f"canonical table::lock type {name}: {PAGES_TABLE_LOCK_SEMANTIC_SOURCE}"
+        )
+
+    package_path = root / PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    owner_path = root / PAGES_TABLE_LOCK_OWNER_SOURCE
+    owner_present = owner_path.is_file() or (
+        PAGES_PACKAGE_TABLE_LOCK_MODULE.search(package_source) is not None
+    )
+    if owner_present:
+        owner_helper_root = root / PAGES_TABLE_LOCK_OWNER_HELPER_ROOT
+        if owner_helper_root.is_dir():
+            dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+        if owner_path.is_file():
+            dedicated_sources.add(owner_path)
+        export_sources.add(package_path)
+        canonical_exports = _rust_canonical_exports(
+            owner_path.read_text(encoding="utf-8") if owner_path.is_file() else "",
+            frozenset(PAGES_TABLE_LOCK_CANONICAL_TYPES),
+        )
+    else:
+        canonical_exports = frozenset()
+    for name in PAGES_TABLE_LOCK_CANONICAL_TYPES:
+        if not owner_present or name in canonical_exports:
+            continue
+        violations.append(
+            "focused litchi-pages table-lock public API is missing "
+            f"canonical package table-lock type {name}: {PAGES_TABLE_LOCK_OWNER_SOURCE}"
+        )
+
+    lib_path = root / PAGES_TABLE_LOCK_EXPORT_SOURCES[0]
+    lib_source = (
+        _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_MODULE.search(lib_source) is None:
+        violations.append(
+            "focused litchi-pages table-lock public API is missing canonical "
+            f"root table module: {PAGES_TABLE_LOCK_EXPORT_SOURCES[0]}"
+        )
+
+    table_path = root / PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+    table_source = (
+        _mask_rust_non_code(table_path.read_text(encoding="utf-8"))
+        if table_path.is_file()
+        else ""
+    )
+    if PUBLIC_PAGES_TABLE_LOCK_MODULE.search(table_source) is None:
+        violations.append(
+            "focused litchi-pages table-lock public API is missing "
+            "canonical table::lock module: "
+            f"{PAGES_TABLE_LOCK_EXPORT_SOURCES[2]}"
+        )
+    if table_path.is_file():
+        for declaration, line_number in _rust_public_declarations(table_source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                identifiers[:2] == ["pub", "use"]
+                and "lock" in identifiers
+                and "*" in declaration
+            ):
+                violations.append(
+                    "focused litchi-pages table-lock public API retains root aliases "
+                    "via table::lock glob: "
+                    f"{PAGES_TABLE_LOCK_EXPORT_SOURCES[2]}:{line_number}"
+                )
+
+    if owner_present:
+        if PAGES_PACKAGE_TABLE_LOCK_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-pages table-lock public API is missing "
+                f"private package owner module: {PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE}"
+            )
+        for match in PUBLIC_PAGES_PACKAGE_TABLE_LOCK_MODULE.finditer(package_source):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-pages table-lock public API exposes duplicate "
+                "package::table_lock module: "
+                f"{PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE}:{line_number}"
+            )
+        if not owner_path.is_file():
+            violations.append(
+                "focused litchi-pages table-lock public API is missing private "
+                f"package owner source: {PAGES_TABLE_LOCK_OWNER_SOURCE}"
+            )
+        owner_source = (
+            owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
+        )
+        owner_methods = {
+            name
+            for declaration, _line_number in _rust_public_declarations(owner_source)
+            for name, _nested_line in _rust_function_declarations(declaration)
+        }
+        for method in PAGES_TABLE_LOCK_PACKAGE_METHODS:
+            if method in owner_methods:
+                continue
+            violations.append(
+                "focused litchi-pages table-lock public API is missing Package "
+                f"method {method}: {PAGES_TABLE_LOCK_OWNER_SOURCE}"
+            )
+        for method in sorted(PAGES_TABLE_LOCK_FLAT_METHODS & owner_methods):
+            violations.append(
+                "focused litchi-pages table-lock public API retains flat Package "
+                f"method {method}: {PAGES_TABLE_LOCK_OWNER_SOURCE}"
+            )
+
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = path.read_text(encoding="utf-8")
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for (
+            declaration,
+            line_number,
+            public_declaration,
+            complete_source_scope,
+        ) in declarations:
+            if not _is_pages_table_lock_public_declaration(
+                declaration, dedicated_source=complete_source_scope
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                path == semantic_path
+                and tuple(identifiers)
+                == ("pub", "use", "litchi_iwa_common", "table", "lock", "State")
+            ):
+                continue
+            public_use_or_type = identifiers[:2] in (["pub", "type"], ["pub", "use"])
+            if (
+                public_declaration
+                and public_use_or_type
+                and "*" in declaration
+                and path in export_sources
+            ):
+                violations.append(
+                    "focused litchi-pages table-lock public API retains root aliases "
+                    "via table::lock glob: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, match.start(1)
+                )
+                if public_declaration and identifier in PAGES_TABLE_LOCK_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages table-lock public API "
+                        f"retains flat alias {identifier}: "
+                        f"{path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _pages_table_lock_public_leak(identifier)
+                if reason is None:
+                    continue
+                violations.append(
+                    "focused litchi-pages table-lock public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                byte_slice_line = line_number + declaration.count(
+                    "\n", 0, match.start()
+                )
+                violations.append(
+                    "focused litchi-pages table-lock public API exposes raw "
+                    f"byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
                 )
 
@@ -10045,11 +11026,14 @@ def main(argv: list[str] | None = None) -> int:
         audit_manifest_inventory(snapshot)
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
+        + audit_litchi_semantic_facade_source_topology()
+        + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()
         + audit_iwa_keynote_document_source_topology()
         + audit_iwa_keynote_show_settings_source_topology()
         + audit_keynote_show_settings_facade_source_topology()
         + audit_iwa_keynote_soundtrack_settings_source_topology()
+        + audit_iwa_keynote_soundtrack_order_source_topology()
         + audit_keynote_soundtrack_settings_facade_source_topology()
         + audit_iwa_keynote_slide_transition_source_topology()
         + audit_keynote_slide_transition_facade_source_topology()
@@ -10059,12 +11043,14 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_slide_number_visibility_source_topology()
         + audit_keynote_placeholder_visibility_facade_source_topology()
         + audit_keynote_package_no_eager_prost_source_topology()
+        + audit_keynote_chart_title_legacy_calls()
         + audit_keynote_document_public_api()
         + audit_numbers_package_no_eager_prost_source_topology()
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
+        + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()
@@ -10089,6 +11075,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_package_no_eager_prost_source_topology()
         + audit_iwa_pages_page_layout_source_topology()
         + audit_pages_page_layout_facade_source_topology()
+        + audit_iwa_pages_table_lock_source_topology()
+        + audit_pages_table_lock_facade_source_topology()
         + audit_iwa_pages_document_settings_source_topology()
         + audit_pages_document_settings_facade_source_topology()
         + audit_iwa_pages_section_settings_source_topology()

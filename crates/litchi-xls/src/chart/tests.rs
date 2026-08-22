@@ -12,7 +12,7 @@ use super::*;
 use crate::Error;
 
 #[cfg(test)]
-mod tests {
+mod chart_tests {
     use super::*;
 
     fn area_link(role: Role, first_row: u16, last_row: u16) -> DataLink {

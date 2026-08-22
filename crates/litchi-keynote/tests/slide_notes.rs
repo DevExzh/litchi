@@ -17,6 +17,7 @@ const NOTE_OBJECT: u64 = 8;
 const NOTE_STORAGE: u64 = 13;
 const NOTE_MESSAGE_TYPE: u32 = 15;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
+const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 const PRIVATE_MARKER: &[u8] = b"private-keynote-notes-marker-2147483647";
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -271,6 +272,47 @@ fn rewrite_document(
     )?)
 }
 
+fn with_movie_drawable(
+    package: &[u8],
+    slide_identifier: u64,
+    drawable_identifier: u64,
+    payload: Vec<u8>,
+) -> TestResult<Vec<u8>> {
+    rewrite_document(package, |archive| {
+        let slide = archive
+            .object_mut(slide_identifier)
+            .ok_or_else(|| io::Error::other("missing synthetic slide"))?;
+        let index = slide
+            .messages
+            .iter()
+            .position(|message| message.type_ == 5)
+            .ok_or_else(|| io::Error::other("missing synthetic slide message"))?;
+        let mut value = kn::SlideArchive::decode(slide.messages[index].data.as_slice())?;
+        value.owned_drawables.push(reference(drawable_identifier));
+        slide.replace_message_preserving_header(
+            index,
+            RawMessage {
+                type_: 5,
+                data: value.encode_to_vec(),
+            },
+        )?;
+        archive.objects.push(ArchiveObject::new(
+            drawable_identifier,
+            vec![RawMessage {
+                type_: MOVIE_MESSAGE_TYPE,
+                data: payload,
+            }],
+        )?);
+        Ok(())
+    })
+}
+
+fn minimal_movie_payload() -> Vec<u8> {
+    // KN.MovieArchive.superArchive -> KN.DrawableArchive.geometry. The
+    // geometry envelope may be empty while still being a valid movie summary.
+    vec![0x0a, 0x02, 0x0a, 0x00]
+}
+
 fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
     let archive = Archive::parse(&stream)?;
@@ -375,6 +417,88 @@ fn synthetic_notes_fixture_reads_semantically() -> TestResult<()> {
     assert_eq!(show.slides()[1].name(), Some("No Notes"));
     assert_eq!(show.slides()[1].notes(), None);
     assert!(package.text()?.ends_with("Speaker 🚀 notes"));
+    Ok(())
+}
+
+#[test]
+fn notes_snapshot_strictly_rejects_malformed_known_table_and_keeps_source_immutable()
+-> TestResult<()> {
+    let bytes = synthetic_package(false)?;
+    let malformed = rewrite_document(&bytes, |archive| {
+        let object = archive
+            .object_mut(NOTE_STORAGE)
+            .ok_or_else(|| io::Error::other("missing synthetic note storage"))?;
+        let index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == STORAGE_MESSAGE_TYPE)
+            .ok_or_else(|| io::Error::other("missing synthetic storage message"))?;
+        let mut data = object.messages[index].data.clone();
+        // Field 9 is a recognized object-attribute table. Its malformed
+        // child must be rejected by the strict schema pass even though the
+        // lazy text projection itself only needs field 3.
+        litchi_iwa_common::wire::append_length_delimited_field(&mut data, 9, &[0x0a])?;
+        object.replace_message_preserving_header(
+            index,
+            RawMessage {
+                type_: STORAGE_MESSAGE_TYPE,
+                data,
+            },
+        )?;
+        Ok(())
+    })?;
+    let package = Package::from_bytes(&malformed)?;
+
+    assert!(matches!(
+        package.slide_notes("Agenda"),
+        Err(SlideNotesError::InvalidSource)
+    ));
+    assert_eq!(package.exact_bytes(), malformed);
+    Ok(())
+}
+
+#[test]
+fn notes_transaction_is_disjoint_from_unselected_movie_validation() -> TestResult<()> {
+    let bytes = with_movie_drawable(&synthetic_package(false)?, SECOND_SLIDE, 600, vec![0x00])?;
+    let package = Package::from_bytes(&bytes)?;
+    let mut edit = package.edit_slide_notes(SlideSelector::index(0))?;
+    edit.set("selected slide notes remain writable")?;
+    let commit = edit.commit()?;
+
+    assert_eq!(
+        commit.package().slide_notes(SlideSelector::index(0))?,
+        Some("selected slide notes remain writable".to_owned())
+    );
+    assert_eq!(package.exact_bytes(), bytes);
+    Ok(())
+}
+
+#[test]
+fn notes_transaction_validates_selected_movies_and_preserves_media() -> TestResult<()> {
+    let bytes = with_movie_drawable(
+        &synthetic_package(false)?,
+        FIRST_SLIDE,
+        600,
+        minimal_movie_payload(),
+    )?;
+    let package = Package::from_bytes(&bytes)?;
+    let before_movies = package.show()?.slides()[0].media().to_vec();
+    assert_eq!(before_movies.len(), 1);
+
+    let mut edit = package.edit_slide_notes(SlideSelector::index(0))?;
+    edit.set("notes beside a movie")?;
+    let commit = edit.commit()?;
+    assert_eq!(
+        commit.package().show()?.slides()[0].movies(),
+        before_movies.as_slice()
+    );
+
+    let malformed = with_movie_drawable(&synthetic_package(false)?, FIRST_SLIDE, 600, vec![0x00])?;
+    let package = Package::from_bytes(&malformed)?;
+    let mut edit = package.edit_slide_notes(SlideSelector::index(0))?;
+    edit.set("malformed selected media must refuse")?;
+    assert!(matches!(edit.commit(), Err(SlideNotesError::InvalidSource)));
+    assert_eq!(package.exact_bytes(), malformed);
     Ok(())
 }
 

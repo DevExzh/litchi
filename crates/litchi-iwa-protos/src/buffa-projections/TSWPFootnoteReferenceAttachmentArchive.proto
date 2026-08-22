@@ -1,0 +1,27 @@
+// Wire-only projection derived from `TSWPArchives.proto`:
+// `TextualAttachmentArchive` -> `FootnoteReferenceAttachmentArchive`.
+//
+// The Pages footnote adapter reads only the attachment kind, contained-storage
+// reference, and custom marker.  The selected textual string is retained in
+// this projection so the strict ingress still validates every canonical known
+// field; caller-owned IWA bytes remain the preservation authority.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message TextualAttachmentArchive {
+  optional string string_equivalent = 1;
+  optional int32 kind = 2;
+}
+
+message FootnoteReferenceAttachmentArchive {
+  optional .LitchiIwaProjection.TextualAttachmentArchive super = 1;
+  optional .LitchiIwaProjection.Reference contained_storage = 2;
+  optional string custom_mark_string = 3;
+}

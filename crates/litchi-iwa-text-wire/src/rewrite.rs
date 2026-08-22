@@ -642,6 +642,12 @@ impl<'source> RawField<'source> {
                 self.number
             )));
         }
+        if length != varint_len(value) {
+            return Err(RewriteError::InvalidFormat(format!(
+                "{label} field {} contains a noncanonical varint",
+                self.number
+            )));
+        }
         Ok(value)
     }
 

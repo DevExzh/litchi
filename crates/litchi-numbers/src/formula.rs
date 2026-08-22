@@ -10,7 +10,7 @@ use std::fmt;
 
 use crate::{
     Package, SheetSelector, TableSelector,
-    cell::{FiniteF64, FiniteF64Error},
+    cell::FiniteF64,
     package::table_cells::{Error as CellError, Path},
     table::{Dimensions, cells::Error as TableCellError},
 };
@@ -99,12 +99,6 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl From<FiniteF64Error> for Error {
-    fn from(_error: FiniteF64Error) -> Self {
-        Self::NonFinite
-    }
-}
-
 /// A typed cached result stored beside an authored formula.
 #[derive(Clone, PartialEq)]
 pub struct CachedValue(CachedKind);
@@ -121,7 +115,9 @@ pub(crate) enum CachedKind {
 impl CachedValue {
     /// Construct a finite numeric result.
     pub fn number(value: f64) -> Result<Self, Error> {
-        Ok(Self(CachedKind::Number(FiniteF64::new(value)?)))
+        Ok(Self(CachedKind::Number(
+            FiniteF64::new(value).map_err(|_error| Error::NonFinite)?,
+        )))
     }
 
     /// Fallibly copy a bounded textual result.
@@ -137,12 +133,16 @@ impl CachedValue {
 
     /// Construct a finite Apple-epoch date result.
     pub fn date(value: f64) -> Result<Self, Error> {
-        Ok(Self(CachedKind::Date(FiniteF64::new(value)?)))
+        Ok(Self(CachedKind::Date(
+            FiniteF64::new(value).map_err(|_error| Error::NonFinite)?,
+        )))
     }
 
     /// Construct a finite duration result.
     pub fn duration(value: f64) -> Result<Self, Error> {
-        Ok(Self(CachedKind::Duration(FiniteF64::new(value)?)))
+        Ok(Self(CachedKind::Duration(
+            FiniteF64::new(value).map_err(|_error| Error::NonFinite)?,
+        )))
     }
 
     pub(crate) const fn owned_bytes(&self) -> usize {
@@ -358,7 +358,9 @@ struct Metrics {
 impl Expression {
     /// Construct a finite numeric literal.
     pub fn number(value: f64) -> Result<Self, Error> {
-        Ok(Self::leaf(Node::Number(FiniteF64::new(value)?)))
+        Ok(Self::leaf(Node::Number(
+            FiniteF64::new(value).map_err(|_error| Error::NonFinite)?,
+        )))
     }
 
     /// Fallibly copy a bounded text literal.

@@ -28,7 +28,16 @@ use crate::shapes::{
     ShapeImageFillTechnique, Stroke, Width,
 };
 use litchi_iwa_common::shape::shadow::{Angle, Opacity};
-use litchi_keynote::ChartSelector;
+use litchi_keynote::{ChartSelector, Package as FocusedKeynotePackage};
+
+use crate::archive::RawMessage;
+use crate::charts::non_style::{
+    GENERATED_CHART_NON_STYLE_EXTENSION_FIELD, generated_chart_non_style_extension,
+};
+use crate::wire::{
+    append_length_delimited_field, append_varint_field, parse_wire_fields,
+    patch_length_delimited_field, patch_varint_field,
+};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 240.0, y: 260.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -104,6 +113,168 @@ fn chart_shadow() -> ChartShadow {
 fn fixture(relative: &str) -> Vec<u8> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     fs::read(root.join(relative)).unwrap()
+}
+
+/// Apply a deliberately malformed generated title payload while retaining the
+/// complete chart graph. The public title APIs must reject it before staging a
+/// package mutation, which keeps graph validation and codec validation as
+/// separate transaction gates.
+fn mutate_keynote_chart_non_style(
+    editor: &mut KeynoteEditor,
+    drawable_object_id: u64,
+    mutate: impl FnOnce(&mut Vec<u8>),
+) {
+    let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
+    let archive_name = graph.archive_name.clone();
+    let non_style_id = {
+        let archive = editor.package().archive(&archive_name).unwrap();
+        let object = archive.object(drawable_object_id).unwrap();
+        let message = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .unwrap();
+        IWorkChartArchive::decode(&message.data)
+            .unwrap()
+            .chart
+            .unwrap()
+            .chart_non_style
+            .unwrap()
+            .identifier
+    };
+    let mut package = editor.package().clone();
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(non_style_id).unwrap();
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == CHART_NON_STYLE_MESSAGE_TYPE)
+                .unwrap();
+            let message = object.messages[message_index].clone();
+            let mut data = message.data;
+            mutate(&mut data);
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: CHART_NON_STYLE_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    *editor = KeynoteEditor::from_package(package).unwrap();
+}
+
+fn keynote_chart_non_style_data(editor: &KeynoteEditor, drawable_object_id: u64) -> Vec<u8> {
+    let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
+    let archive = editor.package().archive(&graph.archive_name).unwrap();
+    let chart_object = archive.object(drawable_object_id).unwrap();
+    let chart_message = chart_object
+        .messages
+        .iter()
+        .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+        .unwrap();
+    let non_style_id = IWorkChartArchive::decode(&chart_message.data)
+        .unwrap()
+        .chart
+        .unwrap()
+        .chart_non_style
+        .unwrap()
+        .identifier;
+    archive
+        .object(non_style_id)
+        .unwrap()
+        .messages
+        .iter()
+        .find(|message| message.type_ == CHART_NON_STYLE_MESSAGE_TYPE)
+        .unwrap()
+        .data
+        .clone()
+}
+
+fn raw_fields(data: &[u8], number: u32) -> Vec<Vec<u8>> {
+    parse_wire_fields(data)
+        .unwrap()
+        .into_iter()
+        .filter(|field| field.number() == number)
+        .map(|field| data[field.start()..field.end()].to_vec())
+        .collect()
+}
+
+fn assert_only_title_fields_changed(before: &[u8], after: &[u8]) {
+    let before_fields = parse_wire_fields(before).unwrap();
+    let after_fields = parse_wire_fields(after).unwrap();
+    assert_eq!(before_fields.len(), after_fields.len());
+    for (before_field, after_field) in before_fields.iter().zip(&after_fields) {
+        assert_eq!(before_field.number(), after_field.number());
+        if before_field.number() != GENERATED_CHART_NON_STYLE_EXTENSION_FIELD {
+            assert_eq!(
+                &before[before_field.start()..before_field.end()],
+                &after[after_field.start()..after_field.end()]
+            );
+            continue;
+        }
+        let before_extension = &before[before_field.payload_start()..before_field.end()];
+        let after_extension = &after[after_field.payload_start()..after_field.end()];
+        let before_extension_fields = parse_wire_fields(before_extension).unwrap();
+        let after_extension_fields = parse_wire_fields(after_extension).unwrap();
+        let before_unselected = before_extension_fields
+            .iter()
+            .filter(|field| field.number() != 21 && field.number() != 23)
+            .map(|field| before_extension[field.start()..field.end()].to_vec())
+            .collect::<Vec<_>>();
+        let after_unselected = after_extension_fields
+            .iter()
+            .filter(|field| field.number() != 21 && field.number() != 23)
+            .map(|field| after_extension[field.start()..field.end()].to_vec())
+            .collect::<Vec<_>>();
+        assert_eq!(before_unselected, after_unselected);
+    }
+}
+
+fn mutate_keynote_chart_title_standin(editor: &mut KeynoteEditor, drawable_object_id: u64) {
+    let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
+    let archive_name = graph.archive_name.clone();
+    let title_id = {
+        let archive = editor.package().archive(&archive_name).unwrap();
+        let object = archive.object(drawable_object_id).unwrap();
+        let message = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .unwrap();
+        IWorkChartArchive::decode(&message.data)
+            .unwrap()
+            .drawable
+            .super_
+            .unwrap()
+            .title
+            .unwrap()
+            .identifier
+    };
+    let mut package = editor.package().clone();
+    package
+        .update_archive(&archive_name, |archive| {
+            let object = archive.object_mut(title_id).unwrap();
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == STANDIN_MESSAGE_TYPE)
+                .unwrap();
+            let message = object.messages[message_index].clone();
+            object.replace_message(
+                message_index,
+                RawMessage {
+                    type_: CHART_NON_STYLE_MESSAGE_TYPE,
+                    data: message.data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    *editor = KeynoteEditor::from_package(package).unwrap();
 }
 
 #[test]
@@ -570,6 +741,263 @@ fn scratch_presentation_supports_native_chart_title_crud() {
             .iter()
             .all(|chart| chart.drawable_object_id != duplicate.drawable_object_id)
     );
+}
+
+#[test]
+fn keynote_chart_title_rewrite_is_field_local_and_lossless() {
+    const UNKNOWN_OUTER_FIELD: u32 = 4_096;
+    const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
+
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    mutate_keynote_chart_non_style(&mut editor, chart.drawable_object_id, |data| {
+        let extension = generated_chart_non_style_extension(data).unwrap().unwrap();
+        let mut replacement = extension.to_vec();
+        append_varint_field(&mut replacement, UNKNOWN_GENERATED_FIELD, 42).unwrap();
+        let mut patched = patch_length_delimited_field(
+            data,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&replacement),
+        )
+        .unwrap();
+        append_varint_field(&mut patched, UNKNOWN_OUTER_FIELD, 84).unwrap();
+        *data = patched;
+    });
+
+    let before = keynote_chart_non_style_data(&editor, chart.drawable_object_id);
+    let before_extension = generated_chart_non_style_extension(&before)
+        .unwrap()
+        .unwrap()
+        .to_vec();
+    let before_outer_unknown = raw_fields(&before, UNKNOWN_OUTER_FIELD);
+    let before_generated_unknown = raw_fields(&before_extension, UNKNOWN_GENERATED_FIELD);
+
+    editor
+        .set_slide_chart_title(0, chart.drawable_object_id, "Revenue by region")
+        .unwrap();
+    assert_eq!(
+        editor
+            .slide_chart_title(0, chart.drawable_object_id)
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+    let after = keynote_chart_non_style_data(&editor, chart.drawable_object_id);
+    let after_extension = generated_chart_non_style_extension(&after)
+        .unwrap()
+        .unwrap()
+        .to_vec();
+    assert_only_title_fields_changed(&before, &after);
+    assert_eq!(
+        raw_fields(&after, UNKNOWN_OUTER_FIELD),
+        before_outer_unknown
+    );
+    assert_eq!(
+        raw_fields(&after_extension, UNKNOWN_GENERATED_FIELD),
+        before_generated_unknown
+    );
+
+    let no_op = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_title(0, chart.drawable_object_id, "Revenue by region")
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), no_op);
+}
+
+#[test]
+fn keynote_chart_title_rejects_duplicate_selected_field_without_publication() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    mutate_keynote_chart_non_style(&mut editor, chart.drawable_object_id, |data| {
+        let extension = generated_chart_non_style_extension(data).unwrap().unwrap();
+        let mut replacement = extension.to_vec();
+        append_varint_field(&mut replacement, 21, 1).unwrap();
+        *data = patch_length_delimited_field(
+            data,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&replacement),
+        )
+        .unwrap();
+    });
+
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .slide_chart_title(0, chart.drawable_object_id)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .set_slide_chart_title(0, chart.drawable_object_id, "rejected")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn keynote_chart_title_clear_hidden_stale_value_is_an_exact_no_op() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    mutate_keynote_chart_non_style(&mut editor, chart.drawable_object_id, |data| {
+        let extension = generated_chart_non_style_extension(data).unwrap().unwrap();
+        let mut replacement = patch_varint_field(extension, 21, true, Some(0)).unwrap();
+        append_length_delimited_field(&mut replacement, 23, b"stale hidden title").unwrap();
+        *data = patch_length_delimited_field(
+            data,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&replacement),
+        )
+        .unwrap();
+    });
+
+    assert_eq!(
+        editor
+            .slide_chart_title(0, chart.drawable_object_id)
+            .unwrap(),
+        None
+    );
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        !editor
+            .remove_slide_chart_title(0, chart.drawable_object_id)
+            .unwrap()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn keynote_chart_title_rejects_non_standin_title_graph_without_publication() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    mutate_keynote_chart_title_standin(&mut editor, chart.drawable_object_id);
+
+    let before = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .slide_chart_title(0, chart.drawable_object_id)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .set_slide_chart_title(0, chart.drawable_object_id, "rejected")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn selector_chart_title_rejects_non_standin_title_graph_without_publication() {
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    mutate_keynote_chart_title_standin(&mut editor, chart.drawable_object_id);
+
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.slide_chart_title_by_selector(0, 0usize).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .set_slide_chart_title_by_selector(0, 0usize, "rejected")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(
+        editor
+            .remove_slide_chart_title_by_selector(0, 0usize)
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn selector_chart_title_host_paths_interoperate_with_focused_package() {
+    const UNKNOWN_OUTER_FIELD: u32 = 4_096;
+    const UNKNOWN_GENERATED_FIELD: u32 = 4_097;
+
+    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
+    let chart = editor
+        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
+        .unwrap();
+    mutate_keynote_chart_non_style(&mut editor, chart.drawable_object_id, |data| {
+        let extension = generated_chart_non_style_extension(data).unwrap().unwrap();
+        let mut replacement = extension.to_vec();
+        append_varint_field(&mut replacement, UNKNOWN_GENERATED_FIELD, 42).unwrap();
+        let mut patched = patch_length_delimited_field(
+            data,
+            GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&replacement),
+        )
+        .unwrap();
+        append_varint_field(&mut patched, UNKNOWN_OUTER_FIELD, 84).unwrap();
+        *data = patched;
+    });
+
+    let source = editor.to_bytes().unwrap();
+    let before_non_style = keynote_chart_non_style_data(&editor, chart.drawable_object_id);
+    assert_eq!(
+        FocusedKeynotePackage::from_bytes(&source)
+            .unwrap()
+            .slide_chart_title(0usize, 0usize)
+            .unwrap(),
+        None
+    );
+
+    editor
+        .set_slide_chart_title_by_selector(0, ChartSelector::index(0), "Revenue by region")
+        .unwrap();
+    let set_bytes = editor.to_bytes().unwrap();
+    assert_only_title_fields_changed(
+        &before_non_style,
+        &keynote_chart_non_style_data(&editor, chart.drawable_object_id),
+    );
+    assert_eq!(
+        FocusedKeynotePackage::from_bytes(&set_bytes)
+            .unwrap()
+            .slide_chart_title(0usize, "Revenue by region")
+            .unwrap(),
+        Some("Revenue by region".to_owned())
+    );
+
+    let no_op = editor.to_bytes().unwrap();
+    editor
+        .set_slide_chart_title_by_selector(0, "Revenue by region", "Revenue by region")
+        .unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), no_op);
+
+    assert!(
+        editor
+            .remove_slide_chart_title_by_selector(0, "Revenue by region")
+            .unwrap()
+    );
+    let cleared = editor.to_bytes().unwrap();
+    assert_eq!(
+        FocusedKeynotePackage::from_bytes(&cleared)
+            .unwrap()
+            .slide_chart_title(0usize, 0usize)
+            .unwrap(),
+        None
+    );
+    let clear_no_op = editor.to_bytes().unwrap();
+    assert!(
+        !editor
+            .remove_slide_chart_title_by_selector(0, ChartSelector::index(0))
+            .unwrap()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), clear_no_op);
 }
 
 #[test]

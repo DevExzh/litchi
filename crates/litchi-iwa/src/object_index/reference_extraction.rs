@@ -3,13 +3,22 @@
 use crate::Result;
 use crate::archive::ArchiveObject;
 use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::varint::{decode_varint_from_bytes, encoded_len};
 use litchi_iwa_index::{IndexBuilder, ObjectId};
-use litchi_iwa_protos::comment_storage_codec;
+use litchi_iwa_protos::{
+    comment_storage_codec, keynote_show_codec, numbers_table_cell_storage_codec,
+};
 
-use super::add_reference_if_absent;
+use super::{add_reference_if_absent, index_error};
 
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+const KEYNOTE_SHOW_CODEC_RECURSION_LIMIT: u32 = 64;
+const TSWP_STORAGE_STYLE_SHEET_FIELD: u32 = 2;
+const TSP_REFERENCE_IDENTIFIER_FIELD: u32 = 1;
+const TSP_REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;
+const TSP_REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;
+const TSCH_CHART_MEDIATOR_INFO_FIELD: u32 = 1;
 
 fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::DecodeOptions {
     comment_storage_codec::DecodeOptions::new(
@@ -25,6 +34,461 @@ fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::Decod
             .len()
             .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
     )
+}
+
+const TST_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+
+fn tst_storage_decode_options(source: &[u8]) -> numbers_table_cell_storage_codec::DecodeOptions {
+    numbers_table_cell_storage_codec::DecodeOptions::new(
+        source.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        source.len().clamp(1, WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(32)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        TST_STORAGE_CODEC_RECURSION_LIMIT,
+        source.len().clamp(1, litchi_numbers::MAX_REFERENCES),
+        source
+            .len()
+            .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+    )
+}
+
+fn keynote_show_decode_options(source: &[u8]) -> keynote_show_codec::DecodeOptions {
+    let source_bytes = source.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
+    keynote_show_codec::DecodeOptions::new(
+        source_bytes,
+        source_bytes,
+        KEYNOTE_SHOW_CODEC_RECURSION_LIMIT,
+    )
+    .with_max_fields(source_bytes.min(WireLimits::MAX_FIELDS))
+    .with_max_work_bytes(
+        source_bytes
+            .saturating_mul(8)
+            .min(WireLimits::MAX_REWRITE_WORK),
+    )
+}
+
+/// Establish a finite parser profile from the exact caller-owned payload.
+///
+/// The compatibility extractor does not rewrite this message, so unknown
+/// fields stay byte-authoritative. The profile only bounds the structural
+/// field vector and never asks a generated decoder to materialize the whole
+/// `TSWP.StorageArchive`.
+fn storage_reference_wire_limits(source: &[u8]) -> Result<WireLimits> {
+    let source_bytes = source.len().max(1);
+    WireLimits::default()
+        .with_input_bytes(source_bytes)
+        .and_then(|limits| limits.with_fields(source_bytes.min(WireLimits::MAX_FIELDS)))
+        .map_err(Into::into)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StorageWireField {
+    number: u32,
+    wire_type: u8,
+    start: usize,
+    key_end: usize,
+    payload_start: usize,
+    end: usize,
+}
+
+impl StorageWireField {
+    const fn number(self) -> u32 {
+        self.number
+    }
+
+    const fn wire_type(self) -> u8 {
+        self.wire_type
+    }
+}
+
+fn storage_wire_error(message: impl Into<String>) -> crate::Error {
+    crate::Error::InvalidFormat(message.into())
+}
+
+fn read_storage_varint(source: &[u8], offset: usize) -> Result<(u64, usize)> {
+    let input = source
+        .get(offset..)
+        .ok_or_else(|| storage_wire_error("protobuf varint offset exceeds source"))?;
+    let (value, width) = decode_varint_from_bytes(input).map_err(|error| {
+        storage_wire_error(format!("invalid protobuf varint at byte {offset}: {error}"))
+    })?;
+    let end = offset
+        .checked_add(width)
+        .ok_or_else(|| storage_wire_error("protobuf varint offset overflows usize"))?;
+    if end > source.len() {
+        return Err(storage_wire_error("protobuf varint extends beyond source"));
+    }
+    Ok((value, width))
+}
+
+fn charge_storage_field(count: &mut usize, limits: WireLimits) -> Result<()> {
+    let observed = count.saturating_add(1);
+    if observed > limits.max_fields() {
+        return Err(crate::Error::IwaCommon(
+            litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit: limits.max_fields(),
+            },
+        ));
+    }
+    *count = observed;
+    Ok(())
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The bounded scanner carries source, group state, limits, and its output accumulator explicitly."
+)]
+fn scan_storage_fields(
+    source: &[u8],
+    start: usize,
+    end: usize,
+    expected_group: Option<u32>,
+    depth: usize,
+    limits: WireLimits,
+    collect: bool,
+    fields: &mut Vec<StorageWireField>,
+    count: &mut usize,
+) -> Result<usize> {
+    let mut offset = start;
+    while offset < end {
+        let field_start = offset;
+        let (key, key_width) = read_storage_varint(source, offset)?;
+        offset = offset
+            .checked_add(key_width)
+            .ok_or_else(|| storage_wire_error("protobuf field key offset overflows usize"))?;
+        if offset > end {
+            return Err(storage_wire_error(
+                "protobuf field key extends beyond its containing message",
+            ));
+        }
+        let number = u32::try_from(key >> 3)
+            .map_err(|_| storage_wire_error("protobuf field number exceeds u32"))?;
+        if number == 0 || number > 0x1fff_ffff {
+            return Err(storage_wire_error(format!(
+                "invalid protobuf field number {number}"
+            )));
+        }
+        let wire_type = u8::try_from(key & 7)
+            .map_err(|_| storage_wire_error("protobuf wire type exceeds u8"))?;
+        charge_storage_field(count, limits)?;
+        let key_end = offset;
+
+        if wire_type == 4 {
+            if expected_group == Some(number) {
+                return Ok(offset);
+            }
+            return Err(storage_wire_error("unexpected protobuf end-group"));
+        }
+        if wire_type == 3 {
+            if depth >= limits.max_nesting() {
+                return Err(crate::Error::IwaCommon(
+                    litchi_iwa_common::Error::LimitExceeded {
+                        kind: litchi_iwa_common::LimitKind::Nesting,
+                        observed: depth.saturating_add(1),
+                        limit: limits.max_nesting(),
+                    },
+                ));
+            }
+            let group_end = scan_storage_fields(
+                source,
+                offset,
+                end,
+                Some(number),
+                depth.saturating_add(1),
+                limits,
+                false,
+                fields,
+                count,
+            )?;
+            if collect {
+                fields.try_reserve(1).map_err(|_| {
+                    crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                        resource: "IWA TSWP reference extraction fields",
+                        amount: fields.len().saturating_add(1),
+                    })
+                })?;
+                fields.push(StorageWireField {
+                    number,
+                    wire_type,
+                    start: field_start,
+                    key_end,
+                    payload_start: key_end,
+                    end: group_end,
+                });
+            }
+            offset = group_end;
+            continue;
+        }
+
+        let mut payload_start = offset;
+        let field_end = match wire_type {
+            0 => {
+                let (_, width) = read_storage_varint(source, offset)?;
+                offset
+                    .checked_add(width)
+                    .ok_or_else(|| storage_wire_error("protobuf varint offset overflows usize"))?
+            },
+            1 => offset
+                .checked_add(8)
+                .ok_or_else(|| storage_wire_error("protobuf fixed64 offset overflows usize"))?,
+            2 => {
+                let (length, width) = read_storage_varint(source, offset)?;
+                let payload = offset.checked_add(width).ok_or_else(|| {
+                    storage_wire_error("protobuf length prefix offset overflows usize")
+                })?;
+                payload_start = payload;
+                let length = usize::try_from(length)
+                    .map_err(|_| storage_wire_error("protobuf field length exceeds usize"))?;
+                payload.checked_add(length).ok_or_else(|| {
+                    storage_wire_error("protobuf length-delimited field overflows usize")
+                })?
+            },
+            5 => offset
+                .checked_add(4)
+                .ok_or_else(|| storage_wire_error("protobuf fixed32 offset overflows usize"))?,
+            _ => {
+                return Err(storage_wire_error(format!(
+                    "invalid protobuf wire type {wire_type}"
+                )));
+            },
+        };
+        if field_end > end {
+            return Err(storage_wire_error(
+                "protobuf field extends beyond its containing message",
+            ));
+        }
+        offset = field_end;
+        if collect {
+            fields.try_reserve(1).map_err(|_| {
+                crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "IWA TSWP reference extraction fields",
+                    amount: fields.len().saturating_add(1),
+                })
+            })?;
+            fields.push(StorageWireField {
+                number,
+                wire_type,
+                start: field_start,
+                key_end,
+                payload_start,
+                end: field_end,
+            });
+        }
+    }
+    if expected_group.is_some() {
+        return Err(storage_wire_error(
+            "protobuf group is missing its end-group",
+        ));
+    }
+    Ok(offset)
+}
+
+fn parse_storage_fields(source: &[u8], limits: WireLimits) -> Result<Vec<StorageWireField>> {
+    if source.len() > limits.max_input_bytes() {
+        return Err(crate::Error::IwaCommon(
+            litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::InputBytes,
+                observed: source.len(),
+                limit: limits.max_input_bytes(),
+            },
+        ));
+    }
+    let mut fields = Vec::new();
+    let mut count = 0;
+    let parsed = scan_storage_fields(
+        source,
+        0,
+        source.len(),
+        None,
+        0,
+        limits,
+        true,
+        &mut fields,
+        &mut count,
+    )?;
+    if parsed != source.len() {
+        return Err(storage_wire_error(
+            "protobuf scanner did not consume source",
+        ));
+    }
+    Ok(fields)
+}
+
+fn storage_field_payload(source: &[u8], field: StorageWireField) -> Result<&[u8]> {
+    if field.start > field.key_end
+        || field.key_end > field.payload_start
+        || field.payload_start > field.end
+    {
+        return Err(storage_wire_error(
+            "protobuf field has invalid byte offsets",
+        ));
+    }
+    source
+        .get(field.payload_start..field.end)
+        .ok_or_else(|| storage_wire_error("protobuf field extends beyond source"))
+}
+
+fn validate_storage_field_key(source: &[u8], field: StorageWireField) -> Result<()> {
+    let key = source
+        .get(field.start..field.key_end)
+        .ok_or_else(|| storage_wire_error("protobuf field key extends beyond source"))?;
+    let (encoded, width) = decode_varint_from_bytes(key)
+        .map_err(|error| storage_wire_error(format!("invalid protobuf field key: {error}")))?;
+    let expected = (u64::from(field.number) << 3) | u64::from(field.wire_type);
+    if encoded != expected || width != key.len() || width != encoded_len(expected) {
+        return Err(storage_wire_error(format!(
+            "protobuf field {} has a noncanonical key",
+            field.number
+        )));
+    }
+    Ok(())
+}
+
+fn validate_storage_field_framing(source: &[u8], field: StorageWireField) -> Result<()> {
+    validate_storage_field_key(source, field)?;
+    if field.wire_type() != 2 {
+        return Ok(());
+    }
+    let length_prefix = source
+        .get(field.key_end..field.payload_start)
+        .ok_or_else(|| storage_wire_error("protobuf length prefix extends beyond source"))?;
+    let payload = storage_field_payload(source, field)?;
+    let (length, width) = decode_varint_from_bytes(length_prefix)
+        .map_err(|error| storage_wire_error(format!("invalid protobuf length prefix: {error}")))?;
+    let payload_len = u64::try_from(payload.len())
+        .map_err(|_| storage_wire_error("protobuf payload length exceeds u64"))?;
+    if length != payload_len || width != length_prefix.len() || width != encoded_len(length) {
+        return Err(storage_wire_error(format!(
+            "protobuf field {} has a noncanonical length prefix",
+            field.number
+        )));
+    }
+    Ok(())
+}
+
+fn canonical_reference_varint(source: &[u8], field: StorageWireField, name: &str) -> Result<u64> {
+    if field.wire_type() != 0 {
+        return Err(crate::Error::InvalidFormat(format!(
+            "{name} is not a varint"
+        )));
+    }
+    validate_storage_field_key(source, field)?;
+    let payload = storage_field_payload(source, field)?;
+    let (value, width) = decode_varint_from_bytes(payload).map_err(|error| {
+        crate::Error::InvalidFormat(format!("{name} contains an invalid varint: {error}"))
+    })?;
+    if width != payload.len() || width != encoded_len(value) {
+        return Err(crate::Error::InvalidFormat(format!(
+            "{name} contains a noncanonical varint"
+        )));
+    }
+    Ok(value)
+}
+
+/// Read only the required identifier from one schema-directed `TSP.Reference`.
+///
+/// Known fields use strict canonical framing and duplicate checks. Unknown
+/// fields are structurally scanned but otherwise ignored, preserving the raw
+/// source as the authority and matching the compatibility extractor's
+/// unknown-field behavior.
+fn decode_reference_identifier(source: &[u8]) -> Result<u64> {
+    let fields = parse_storage_fields(source, storage_reference_wire_limits(source)?)?;
+    let mut identifier = None;
+    let mut deprecated_type = false;
+    let mut deprecated_external = false;
+    for field in fields {
+        match field.number() {
+            TSP_REFERENCE_IDENTIFIER_FIELD => {
+                if identifier.is_some() {
+                    return Err(crate::Error::InvalidFormat(
+                        "TSP.Reference.identifier is duplicated".to_owned(),
+                    ));
+                }
+                identifier = Some(canonical_reference_varint(
+                    source,
+                    field,
+                    "TSP.Reference.identifier",
+                )?);
+            },
+            TSP_REFERENCE_DEPRECATED_TYPE_FIELD => {
+                if deprecated_type {
+                    return Err(crate::Error::InvalidFormat(
+                        "TSP.Reference.deprecated_type is duplicated".to_owned(),
+                    ));
+                }
+                let _ = canonical_reference_varint(source, field, "TSP.Reference.deprecated_type")?;
+                deprecated_type = true;
+            },
+            TSP_REFERENCE_DEPRECATED_EXTERNAL_FIELD => {
+                if deprecated_external {
+                    return Err(crate::Error::InvalidFormat(
+                        "TSP.Reference.deprecated_is_external is duplicated".to_owned(),
+                    ));
+                }
+                let value = canonical_reference_varint(
+                    source,
+                    field,
+                    "TSP.Reference.deprecated_is_external",
+                )?;
+                if value > 1 {
+                    return Err(crate::Error::InvalidFormat(
+                        "TSP.Reference.deprecated_is_external is not a canonical bool".to_owned(),
+                    ));
+                }
+                deprecated_external = true;
+            },
+            _ => {},
+        }
+    }
+    identifier.ok_or_else(|| {
+        crate::Error::InvalidFormat("TSP.Reference is missing its required identifier".to_owned())
+    })
+}
+
+/// Extract the stylesheet edge from `TSWP.StorageArchive` without a generated
+/// Prost allocation. A malformed payload is ignored by this compatibility
+/// path, but no edge is published until both the complete root scan and its
+/// nested reference scan have succeeded.
+fn extract_tswp_storage_reference(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    source: &[u8],
+) -> Result<()> {
+    let Ok(limits) = storage_reference_wire_limits(source) else {
+        return Ok(());
+    };
+    let Ok(fields) = parse_storage_fields(source, limits) else {
+        return Ok(());
+    };
+    let mut style_sheet = None;
+    for field in fields {
+        if field.number() != TSWP_STORAGE_STYLE_SHEET_FIELD {
+            continue;
+        }
+        if style_sheet.is_some() || field.wire_type() != 2 {
+            return Ok(());
+        }
+        if validate_storage_field_framing(source, field).is_err() {
+            return Ok(());
+        }
+        let Ok(payload) = storage_field_payload(source, field) else {
+            return Ok(());
+        };
+        let Ok(identifier) = decode_reference_identifier(payload) else {
+            return Ok(());
+        };
+        style_sheet = Some(identifier);
+    }
+    if let Some(identifier) = style_sheet
+        && let Some(target_id) = ObjectId::new(identifier)
+    {
+        add_reference_if_absent(builder, source_id, target_id)?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Default)]
@@ -65,6 +529,220 @@ impl comment_storage_codec::CommentStorageVisitor for CommentStorageReferences {
     }
 }
 
+#[derive(Debug, Default)]
+struct TstReferences {
+    references: Vec<u64>,
+    allocation_failed: Option<usize>,
+}
+
+impl TstReferences {
+    fn push(&mut self, identifier: u64) {
+        if self.allocation_failed.is_some() {
+            return;
+        }
+        if self.references.try_reserve(1).is_err() {
+            // Keep strict traversal going so malformed input still suppresses
+            // every staged edge and wins over this candidate-local failure.
+            self.allocation_failed = Some(self.references.len().saturating_add(1));
+            return;
+        }
+        self.references.push(identifier);
+    }
+
+    fn into_references(self) -> Result<Vec<u64>> {
+        self.allocation_failed
+            .map_or(Ok(self.references), |amount| {
+                Err(crate::Error::IwaCommon(
+                    litchi_iwa_common::Error::Allocation {
+                        resource: "IWA table reference extraction references",
+                        amount,
+                    },
+                ))
+            })
+    }
+}
+
+#[derive(Debug, Default)]
+struct TstListReferences {
+    segments: TstReferences,
+    entries: TstReferences,
+}
+
+impl TstListReferences {
+    fn into_references(self) -> Result<Vec<u64>> {
+        let mut segments = self.segments.into_references()?;
+        let mut entries = self.entries.into_references()?;
+        segments.try_reserve(entries.len()).map_err(|_error| {
+            crate::Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "IWA table reference extraction references",
+                amount: segments.len().saturating_add(entries.len()),
+            })
+        })?;
+        segments.append(&mut entries);
+        Ok(segments)
+    }
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for TstListReferences {
+    fn visit_list_entry(
+        &mut self,
+        entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        for reference in [
+            entry.reference(),
+            entry.rich_text_payload(),
+            entry.comment_storage(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            self.entries.push(reference.identifier());
+        }
+        Ok(())
+    }
+
+    fn visit_list_segment(
+        &mut self,
+        reference: numbers_table_cell_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        self.segments.push(reference.reference().identifier());
+        Ok(())
+    }
+}
+
+fn publish_tst_references(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    references: Vec<u64>,
+) -> Result<()> {
+    for identifier in references {
+        if let Some(target_id) = ObjectId::new(identifier) {
+            add_reference_if_absent(builder, source_id, target_id)?;
+        }
+    }
+    Ok(())
+}
+
+fn publish_tst_list_references(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    references: Vec<u64>,
+) -> Result<()> {
+    // TST list segments precede entries in the legacy extractor even though
+    // both are repeated protobuf fields. Keep that source-specific order in
+    // the neutral graph while retaining its normal edge deduplication.
+    builder
+        .preserve_reference_order(source_id)
+        .map_err(index_error)?;
+    publish_tst_references(source_id, builder, references)
+}
+
+fn extract_tst_table_model_references(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    source: &[u8],
+) -> Result<()> {
+    let options = tst_storage_decode_options(source);
+    let Ok((table, _report)) =
+        numbers_table_cell_storage_codec::decode_table_model_with_report(source, options)
+    else {
+        // Compatibility reference extraction has always ignored malformed
+        // payloads. No edge is published until both the model and its
+        // selected data-store projection have completed.
+        return Ok(());
+    };
+    let data_store_source = table.base_data_store();
+    let Ok((data_store, _report)) = numbers_table_cell_storage_codec::decode_data_store_with_report(
+        data_store_source,
+        tst_storage_decode_options(data_store_source),
+    ) else {
+        return Ok(());
+    };
+
+    let mut staged = TstReferences::default();
+    for reference in [
+        table.table_style(),
+        table.body_text_style(),
+        table.header_row_text_style(),
+        table.header_column_text_style(),
+        table.footer_row_text_style(),
+        table.body_cell_style(),
+        table.header_row_style(),
+        table.header_column_style(),
+        table.footer_row_style(),
+        table.table_name_style(),
+        table.table_name_shape_style(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        staged.push(reference.identifier());
+    }
+    for reference in [
+        Some(data_store.column_headers()),
+        Some(data_store.string_table()),
+        Some(data_store.style_table()),
+        Some(data_store.formula_table()),
+        Some(data_store.format_table_pre_bnc()),
+        data_store.format_table(),
+        data_store.formula_error_table(),
+        data_store.multiple_choice_list_format_table(),
+        data_store.merge_region_map(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        staged.push(reference.identifier());
+    }
+    publish_tst_references(source_id, builder, staged.into_references()?)
+}
+
+fn extract_tst_table_data_list_references(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    source: &[u8],
+) -> Result<()> {
+    let mut staged = TstListReferences::default();
+    let Ok((_list, report)) = numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
+        source,
+        tst_storage_decode_options(source),
+        &mut staged,
+    ) else {
+        // Do not publish segment or entry edges visited before a later
+        // malformed field, duplicate, or reference parity failure.
+        return Ok(());
+    };
+    let references = staged.into_references()?;
+    if references.len() != report.references() {
+        return Ok(());
+    }
+    // `into_references` retains the legacy segment-before-entry traversal
+    // order while preserving duplicate edge idempotence.
+    publish_tst_list_references(source_id, builder, references)
+}
+
+fn extract_tst_table_data_list_segment_references(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    source: &[u8],
+) -> Result<()> {
+    let mut staged = TstListReferences::default();
+    let Ok((_segment, report)) =
+        numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+            source,
+            tst_storage_decode_options(source),
+            &mut staged,
+        )
+    else {
+        return Ok(());
+    };
+    let references = staged.into_references()?;
+    if references.len() != report.references() {
+        return Ok(());
+    }
+    publish_tst_list_references(source_id, builder, references)
+}
+
 fn extract_comment_storage_references(
     source_id: ObjectId,
     builder: &mut IndexBuilder,
@@ -102,6 +780,96 @@ fn extract_comment_storage_references(
     Ok(())
 }
 
+/// Extract the direct reference edges from one Keynote show through the
+/// bounded generated-free projection.
+///
+/// The show codec strictly validates the complete known envelope before its
+/// private Buffa view is forced. The returned snapshot owns only scalar
+/// identifiers; the original message bytes stay in the archive as the
+/// preservation representation, including unknown fields.
+fn extract_keynote_show_references(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    source: &[u8],
+) -> Result<()> {
+    let Ok(show) =
+        keynote_show_codec::decode_references(source, keynote_show_decode_options(source))
+    else {
+        // This compatibility fallback historically ignored any payload that
+        // Prost could not decode. Keep the same candidate-atomic behavior for
+        // malformed or context-conflicting low-numbered messages.
+        return Ok(());
+    };
+
+    // Preserve the legacy edge order: theme, stylesheet, UI state, recording.
+    for identifier in [
+        Some(show.theme_identifier()),
+        Some(show.stylesheet_identifier()),
+        show.ui_state_identifier(),
+        show.recording_identifier(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if let Some(target_id) = ObjectId::new(identifier) {
+            add_reference_if_absent(builder, source_id, target_id)?;
+        }
+    }
+    Ok(())
+}
+
+/// Extract the optional `info` edge from `TSCH.ChartMediatorArchive` without
+/// materializing the generated chart mediator. The source bytes remain the
+/// preservation representation: the bounded scanner validates the complete
+/// envelope, while unknown fields stay opaque and therefore do not affect the
+/// projected edge.
+fn extract_tsch_chart_mediator_reference(
+    source_id: ObjectId,
+    builder: &mut IndexBuilder,
+    source: &[u8],
+) -> Result<()> {
+    let Ok(limits) = storage_reference_wire_limits(source) else {
+        return Ok(());
+    };
+    let Ok(fields) = parse_storage_fields(source, limits) else {
+        // Compatibility extraction ignores malformed candidates, but it must
+        // not publish an edge visited before a later malformed field.
+        return Ok(());
+    };
+
+    let mut info = None;
+    for field in fields {
+        if field.number() != TSCH_CHART_MEDIATOR_INFO_FIELD {
+            continue;
+        }
+        if info.is_some() || field.wire_type() != 2 {
+            // `info` is singular in the schema. Treat duplicate or
+            // wire-incompatible occurrences as a malformed candidate rather
+            // than choosing one while silently dropping the other.
+            return Ok(());
+        }
+        if validate_storage_field_framing(source, field).is_err() {
+            return Ok(());
+        }
+        let Ok(payload) = storage_field_payload(source, field) else {
+            return Ok(());
+        };
+        let Ok(identifier) = decode_reference_identifier(payload) else {
+            return Ok(());
+        };
+        info = Some(identifier);
+    }
+
+    if let Some(identifier) = info
+        && let Some(target_id) = ObjectId::new(identifier)
+    {
+        // Publication happens only after the root and nested reference scans
+        // have both completed, preserving candidate atomicity.
+        add_reference_if_absent(builder, source_id, target_id)?;
+    }
+    Ok(())
+}
+
 pub(super) fn extract(
     source_id: ObjectId,
     object: &ArchiveObject,
@@ -118,85 +886,22 @@ pub(super) fn extract(
         match msg_type {
             // TST (Table) types
             6000 | 6001 => {
-                // TST.TableModelArchive contains multiple style and data references
-                if let Ok(table) = crate::protobuf::tst::TableModelArchive::decode(&*raw_msg.data) {
-                    // Extract style references
-                    extract_reference(source_id, builder, &table.table_style)?;
-                    extract_reference(source_id, builder, &table.body_text_style)?;
-                    extract_reference(source_id, builder, &table.header_row_text_style)?;
-                    extract_reference(source_id, builder, &table.header_column_text_style)?;
-                    extract_reference(source_id, builder, &table.footer_row_text_style)?;
-                    extract_reference(source_id, builder, &table.body_cell_style)?;
-                    extract_reference(source_id, builder, &table.header_row_style)?;
-                    extract_reference(source_id, builder, &table.header_column_style)?;
-                    extract_reference(source_id, builder, &table.footer_row_style)?;
-
-                    // Extract optional style references
-                    if let Some(ref table_name_style) = table.table_name_style {
-                        extract_reference(source_id, builder, table_name_style)?;
-                    }
-                    if let Some(ref table_name_shape_style) = table.table_name_shape_style {
-                        extract_reference(source_id, builder, table_name_shape_style)?;
-                    }
-
-                    // Extract data store sub-references
-                    // DataStore contains references to column_headers, string_table, style_table, etc.
-                    let data_store = &table.base_data_store;
-                    extract_reference(source_id, builder, &data_store.column_headers)?;
-                    extract_reference(source_id, builder, &data_store.string_table)?;
-                    extract_reference(source_id, builder, &data_store.style_table)?;
-                    extract_reference(source_id, builder, &data_store.formula_table)?;
-                    extract_reference(source_id, builder, &data_store.format_table_pre_bnc)?;
-                    if let Some(format_table) = &data_store.format_table {
-                        extract_reference(source_id, builder, format_table)?;
-                    }
-
-                    // Optional references
-                    if let Some(ref formula_error_table) = data_store.formula_error_table {
-                        extract_reference(source_id, builder, formula_error_table)?;
-                    }
-                    if let Some(ref choice_list) = data_store.multiple_choice_list_format_table {
-                        extract_reference(source_id, builder, choice_list)?;
-                    }
-                    if let Some(ref merge_map) = data_store.merge_region_map {
-                        extract_reference(source_id, builder, merge_map)?;
-                    }
-                }
+                extract_tst_table_model_references(source_id, builder, &raw_msg.data)?;
             },
 
             6005 | 6201 => {
-                if let Ok(list) = crate::protobuf::tst::TableDataList::decode(&*raw_msg.data) {
-                    for segment in &list.segments {
-                        extract_reference(source_id, builder, segment)?;
-                    }
-                    for entry in &list.entries {
-                        extract_table_data_list_entry_references(builder, source_id, entry)?;
-                    }
-                }
+                extract_tst_table_data_list_references(source_id, builder, &raw_msg.data)?;
             },
 
             6011 => {
-                if let Ok(segment) =
-                    crate::protobuf::tst::TableDataListSegment::decode(&*raw_msg.data)
-                {
-                    for entry in &segment.entries {
-                        extract_table_data_list_entry_references(builder, source_id, entry)?;
-                    }
-                }
+                extract_tst_table_data_list_segment_references(source_id, builder, &raw_msg.data)?;
             },
 
             // TSWP (Word Processing/Text) types
             2001..=2022 => {
-                // TSWP.StorageArchive contains text content and may reference styles
-                if let Ok(storage) = crate::protobuf::tswp::StorageArchive::decode(&*raw_msg.data) {
-                    // Extract stylesheet reference if present
-                    if let Some(ref style_sheet) = storage.style_sheet {
-                        extract_reference(source_id, builder, style_sheet)?;
-                    }
-
-                    // Note: Attachments are stored in separate fields in the attribute tables
-                    // They're not directly accessible as simple references in StorageArchive
-                }
+                // Only the schema-directed stylesheet edge is needed here;
+                // text and attribute tables remain opaque source bytes.
+                extract_tswp_storage_reference(source_id, builder, &raw_msg.data)?;
             },
 
             // KN (Keynote) types
@@ -242,25 +947,7 @@ pub(super) fn extract(
 
             2 => {
                 // KN.ShowArchive (conflicts with TSP.MessageInfo, handle by context)
-                // Try to decode as ShowArchive for Keynote documents
-                if let Ok(show) = crate::protobuf::kn::ShowArchive::decode(&*raw_msg.data) {
-                    // Extract theme and stylesheet references
-                    extract_reference(source_id, builder, &show.theme)?;
-                    extract_reference(source_id, builder, &show.stylesheet)?;
-
-                    // Extract UI state reference
-                    if let Some(ref ui_state) = show.ui_state {
-                        extract_reference(source_id, builder, ui_state)?;
-                    }
-
-                    // Extract recording reference if present
-                    if let Some(ref recording) = show.recording {
-                        extract_reference(source_id, builder, recording)?;
-                    }
-
-                    // Note: Slide references are in the slide_tree structure
-                    // which is not a simple Reference type
-                }
+                extract_keynote_show_references(source_id, builder, &raw_msg.data)?;
             },
 
             // TN (Numbers) types
@@ -431,16 +1118,10 @@ pub(super) fn extract(
             },
             5004 => {
                 // TSCH.ChartMediatorArchive - mediator between chart and data
-                if let Ok(mediator) =
-                    crate::protobuf::tsch::ChartMediatorArchive::decode(&*raw_msg.data)
-                {
-                    // Extract info reference (points to the chart drawable)
-                    if let Some(ref info) = mediator.info {
-                        extract_reference(source_id, builder, info)?;
-                    }
-                    // Note: local_series_indexes and remote_series_indexes are
-                    // indices, not references to objects
-                }
+                // Extract info reference (points to the chart drawable) from
+                // the bounded neutral wire projection. `local_series_indexes`
+                // and `remote_series_indexes` are indices, not object refs.
+                extract_tsch_chart_mediator_reference(source_id, builder, &raw_msg.data)?;
             },
             5020 => {
                 // TSCH.ChartStylePreset - preset styles for charts
@@ -618,34 +1299,20 @@ fn extract_legacy_sheet_headers(
     Ok(())
 }
 
-fn extract_table_data_list_entry_references(
-    builder: &mut IndexBuilder,
-    source_id: ObjectId,
-    entry: &crate::protobuf::tst::table_data_list::ListEntry,
-) -> Result<()> {
-    for reference in [
-        entry.reference.as_ref(),
-        entry.rich_text_payload.as_ref(),
-        entry.comment_storage.as_ref(),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        extract_reference(source_id, builder, reference)?;
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::archive::{ArchiveObject, RawMessage};
-    use crate::protobuf::{tsd, tsp};
+    use crate::protobuf::{kn, tsch, tsd, tsp, tst, tswp};
     use litchi_iwa_index::{ByteSpan, FragmentId, ObjectRecord};
     use prost::Message;
     use std::num::NonZeroU32;
 
     fn index_for_comment_payload(data: Vec<u8>) -> litchi_iwa_index::ObjectIndex {
+        index_for_payload(COMMENT_STORAGE_MESSAGE_TYPE, data)
+    }
+
+    fn index_for_payload(message_type: u32, data: Vec<u8>) -> litchi_iwa_index::ObjectIndex {
         let source_id = ObjectId::new(10).expect("non-zero source");
         let fragment = FragmentId::new(NonZeroU32::new(1).expect("non-zero fragment"));
         let mut builder = IndexBuilder::new();
@@ -660,7 +1327,7 @@ mod tests {
         let object = ArchiveObject::new(
             source_id.get(),
             vec![RawMessage {
-                type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                type_: message_type,
                 data,
             }],
         )
@@ -669,6 +1336,86 @@ mod tests {
         builder
             .build_allow_missing_targets()
             .expect("reference index")
+    }
+
+    fn reference(identifier: u64) -> tsp::Reference {
+        tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn outgoing(index: &litchi_iwa_index::ObjectIndex) -> Vec<ObjectId> {
+        index
+            .outgoing(ObjectId::new(10).expect("source"))
+            .map(|targets| targets.collect())
+            .unwrap_or_default()
+    }
+
+    fn keynote_show() -> kn::ShowArchive {
+        kn::ShowArchive {
+            ui_state: Some(reference(20)),
+            theme: reference(21),
+            slide_tree: kn::SlideTreeArchive {
+                slides: vec![reference(22)],
+                ..Default::default()
+            },
+            size: tsp::Size {
+                width: 1_024.0,
+                height: 768.0,
+            },
+            stylesheet: reference(23),
+            recording: Some(reference(24)),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn keynote_show_ingress_stays_on_scalar_wire_projection() {
+        let source = include_str!("reference_extraction.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map_or(source, |(production, _tests)| production);
+        assert!(!production.contains("ShowArchive::decode"));
+        assert_eq!(
+            production
+                .matches("keynote_show_codec::decode_references(")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn keynote_show_projection_preserves_direct_edges_and_unknowns() {
+        let mut data = keynote_show().encode_to_vec();
+        // The source remains the preservation representation; this unknown
+        // field must be accepted without entering the projected snapshot.
+        data.extend_from_slice(&[0x9a, 0x06, 0x01, 0x7f]);
+
+        let index = index_for_payload(2, data);
+        // The neutral graph exposes outgoing IDs in deterministic numeric
+        // order, independent of source-field traversal order.
+        assert_eq!(
+            outgoing(&index),
+            vec![
+                ObjectId::new(20).expect("ui state"),
+                ObjectId::new(21).expect("theme"),
+                ObjectId::new(23).expect("stylesheet"),
+                ObjectId::new(24).expect("recording"),
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_keynote_show_projection_publishes_no_staged_edges() {
+        let mut duplicate_theme = keynote_show().encode_to_vec();
+        // A duplicate singular field is rejected by the strict projection
+        // after the valid references have already been visited. No edge may
+        // leak into the neutral graph from this candidate.
+        duplicate_theme.extend_from_slice(&[0x12, 0x02, 0x08, 0x63]);
+
+        let index = index_for_payload(2, duplicate_theme);
+        assert!(outgoing(&index).is_empty());
     }
 
     #[test]
@@ -734,5 +1481,235 @@ mod tests {
             let index = index_for_comment_payload(data);
             assert!(index.outgoing(ObjectId::new(10).expect("source")).is_none());
         }
+    }
+
+    #[test]
+    fn strict_tswp_storage_reference_preserves_unknowns_and_dangling_targets() {
+        let storage = tswp::StorageArchive {
+            style_sheet: Some(reference(20)),
+            ..Default::default()
+        };
+        let mut data = storage.encode_to_vec();
+        // Unknown source bytes stay outside the projection and the missing
+        // target remains visible through the neutral graph's dangling edge.
+        data.extend_from_slice(&[0x78, 0x01]);
+        // A well-formed unknown group is also opaque to the projection.
+        data.extend_from_slice(&[0xa3, 0x06, 0xa8, 0x06, 0x08, 0xa4, 0x06]);
+
+        let index = index_for_payload(2001, data);
+        assert_eq!(outgoing(&index), vec![ObjectId::new(20).expect("style")]);
+        assert!(index.object(ObjectId::new(20).expect("style")).is_none());
+    }
+
+    #[test]
+    fn malformed_tswp_storage_reference_does_not_publish_a_staged_edge() {
+        let storage = tswp::StorageArchive {
+            style_sheet: Some(reference(20)),
+            ..Default::default()
+        };
+        let mut duplicate_style = storage.encode_to_vec();
+        // A second singular stylesheet field is rejected after the first one
+        // has been read; publication must remain candidate-atomic.
+        duplicate_style.extend_from_slice(&[0x12, 0x02, 0x08, 0x01]);
+
+        let index = index_for_payload(2001, duplicate_style);
+        assert!(outgoing(&index).is_empty());
+    }
+
+    #[test]
+    fn malformed_tswp_unknown_group_does_not_publish_a_staged_edge() {
+        let storage = tswp::StorageArchive {
+            style_sheet: Some(reference(20)),
+            ..Default::default()
+        };
+        let mut malformed_group = storage.encode_to_vec();
+        // The unknown group never closes, so the already scanned stylesheet
+        // edge must remain unpublished.
+        malformed_group.extend_from_slice(&[0xa3, 0x06, 0xa8, 0x06, 0x08]);
+
+        let index = index_for_payload(2001, malformed_group);
+        assert!(outgoing(&index).is_empty());
+    }
+
+    #[test]
+    fn strict_tsch_chart_mediator_reference_preserves_unknowns_and_dangling_targets() {
+        let mediator = tsch::ChartMediatorArchive {
+            info: Some(reference(20)),
+            local_series_indexes: vec![1, 2],
+            remote_series_indexes: vec![3],
+        };
+        let mut data = mediator.encode_to_vec();
+        // Unknown source bytes remain opaque to the scalar projection, while
+        // the missing target remains visible as a dangling neutral edge.
+        data.extend_from_slice(&[0x78, 0x01]);
+
+        let index = index_for_payload(5004, data);
+        assert_eq!(outgoing(&index), vec![ObjectId::new(20).expect("info")]);
+        assert!(index.object(ObjectId::new(20).expect("info")).is_none());
+    }
+
+    #[test]
+    fn malformed_tsch_chart_mediator_does_not_publish_a_staged_edge() {
+        let mediator = tsch::ChartMediatorArchive {
+            info: Some(reference(20)),
+            ..Default::default()
+        };
+        let mut malformed = mediator.encode_to_vec();
+        // An unterminated unknown group follows the valid info field. The
+        // complete root scan must fail before the staged edge is published.
+        malformed.extend_from_slice(&[0xa3, 0x06, 0xa8, 0x06, 0x08]);
+
+        let index = index_for_payload(5004, malformed);
+        assert!(outgoing(&index).is_empty());
+    }
+
+    #[test]
+    fn strict_tst_list_extraction_preserves_segment_order_duplicates_and_missing_targets() {
+        let list = tst::TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            next_list_id: 2,
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 1,
+                refcount: 1,
+                reference: Some(reference(30)),
+                rich_text_payload: Some(reference(20)),
+                comment_storage: Some(reference(30)),
+                ..Default::default()
+            }],
+            segments: vec![reference(20), reference(40), reference(20)],
+            is_new_for_bnc: Some(true),
+        };
+
+        let index = index_for_payload(6005, list.encode_to_vec());
+        assert_eq!(
+            outgoing(&index),
+            vec![
+                ObjectId::new(20).expect("segment target"),
+                ObjectId::new(40).expect("missing target"),
+                ObjectId::new(30).expect("entry target"),
+            ]
+        );
+    }
+
+    #[test]
+    fn malformed_tst_list_and_segment_do_not_publish_visited_edges() {
+        let list = tst::TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            next_list_id: 2,
+            segments: vec![reference(20)],
+            ..Default::default()
+        };
+        let mut malformed_list = list.encode_to_vec();
+        // A ListEntry with key but no required refcount follows a valid
+        // segment; strict traversal must suppress the segment edge too.
+        malformed_list.extend_from_slice(&[0x1a, 0x02, 0x08, 0x01]);
+        let list_index = index_for_payload(6005, malformed_list);
+        assert!(outgoing(&list_index).is_empty());
+
+        let segment = tst::TableDataListSegment {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            key_range: tsp::Range {
+                location: 1,
+                length: 1,
+            },
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 1,
+                refcount: 1,
+                rich_text_payload: Some(reference(30)),
+                ..Default::default()
+            }],
+        };
+        let mut malformed_segment = segment.encode_to_vec();
+        malformed_segment.extend_from_slice(&[0x1a, 0x02, 0x08, 0x01]);
+        let segment_index = index_for_payload(6011, malformed_segment);
+        assert!(outgoing(&segment_index).is_empty());
+    }
+
+    #[test]
+    fn strict_tst_table_extraction_matches_style_and_data_store_edges() {
+        let store = tst::DataStore {
+            row_headers: tst::HeaderStorage {
+                bucket_hash_function: 1,
+                buckets: Vec::new(),
+            },
+            column_headers: reference(12),
+            tiles: tst::TileStorage {
+                tiles: Vec::new(),
+                ..Default::default()
+            },
+            string_table: reference(13),
+            style_table: reference(14),
+            formula_table: reference(15),
+            format_table_pre_bnc: reference(16),
+            next_row_strip_id: 1,
+            next_column_strip_id: 1,
+            row_tile_tree: tst::TableRbTree { nodes: Vec::new() },
+            column_tile_tree: tst::TableRbTree { nodes: Vec::new() },
+            ..Default::default()
+        };
+        let table = tst::TableModelArchive {
+            table_id: "table".to_owned(),
+            table_style: reference(20),
+            body_text_style: reference(21),
+            header_row_text_style: reference(22),
+            header_column_text_style: reference(23),
+            footer_row_text_style: reference(24),
+            body_cell_style: reference(25),
+            header_row_style: reference(26),
+            header_column_style: reference(27),
+            footer_row_style: reference(28),
+            table_name_style: Some(reference(29)),
+            table_name_shape_style: Some(reference(30)),
+            base_data_store: store,
+            number_of_rows: 1,
+            number_of_columns: 1,
+            table_name: "name".to_owned(),
+            default_row_height: 0.0,
+            default_column_width: 0.0,
+            ..Default::default()
+        };
+
+        let index = index_for_payload(6000, table.encode_to_vec());
+        let expected = (12..=16)
+            .chain(20..=30)
+            .map(|identifier| ObjectId::new(identifier).expect("non-zero target"))
+            .collect::<Vec<_>>();
+        assert_eq!(outgoing(&index), expected);
+    }
+
+    #[test]
+    fn duplicate_tst_table_style_suppresses_all_staged_edges() {
+        let store = tst::DataStore {
+            row_headers: tst::HeaderStorage {
+                bucket_hash_function: 1,
+                buckets: Vec::new(),
+            },
+            column_headers: reference(12),
+            tiles: tst::TileStorage {
+                tiles: Vec::new(),
+                ..Default::default()
+            },
+            string_table: reference(13),
+            style_table: reference(14),
+            formula_table: reference(15),
+            format_table_pre_bnc: reference(16),
+            next_row_strip_id: 1,
+            next_column_strip_id: 1,
+            row_tile_tree: tst::TableRbTree { nodes: Vec::new() },
+            column_tile_tree: tst::TableRbTree { nodes: Vec::new() },
+            ..Default::default()
+        };
+        let table = tst::TableModelArchive {
+            table_id: "table".to_owned(),
+            table_style: reference(20),
+            base_data_store: store,
+            number_of_rows: 1,
+            number_of_columns: 1,
+            ..Default::default()
+        };
+        let mut malformed = table.encode_to_vec();
+        malformed.extend_from_slice(&[0x1a, 0x02, 0x08, 0x63]);
+        let index = index_for_payload(6000, malformed);
+        assert!(outgoing(&index).is_empty());
     }
 }

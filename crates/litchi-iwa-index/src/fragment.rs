@@ -42,6 +42,58 @@ impl From<NonZeroU32> for FragmentId {
     }
 }
 
+/// A strict upper bound for object records visited in one fragment query.
+///
+/// The limit counts records, not bytes or native/archive identifiers. A zero
+/// limit is useful for callers that want to assert that a fragment is empty;
+/// every non-empty fragment is refused rather than truncated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FragmentTraversalLimit(usize);
+
+impl FragmentTraversalLimit {
+    /// Construct a record-count limit.
+    #[must_use]
+    pub const fn new(max_objects: usize) -> Self {
+        Self(max_objects)
+    }
+
+    /// Return the maximum number of records a query may visit.
+    #[must_use]
+    pub const fn max_objects(self) -> usize {
+        self.0
+    }
+}
+
+/// Archive-free metadata for one indexed fragment.
+///
+/// A summary deliberately contains only the adapter-local fragment identity
+/// and the number of neutral object records assigned to it. Archive entry
+/// names, native identifiers, source handles, and payload bytes remain owned
+/// by the concrete format adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FragmentSummary {
+    id: FragmentId,
+    object_count: usize,
+}
+
+impl FragmentSummary {
+    pub(crate) const fn new(id: FragmentId, object_count: usize) -> Self {
+        Self { id, object_count }
+    }
+
+    /// Return the adapter-local fragment identity.
+    #[must_use]
+    pub const fn id(self) -> FragmentId {
+        self.id
+    }
+
+    /// Return the number of neutral object records in this fragment.
+    #[must_use]
+    pub const fn object_count(self) -> usize {
+        self.object_count
+    }
+}
+
 /// Failure while constructing a fragment identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FragmentIdError {

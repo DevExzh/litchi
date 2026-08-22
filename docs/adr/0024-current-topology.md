@@ -473,6 +473,10 @@ archive metadata), `litchi-iwa-detect`, `litchi-iwa-index`,
 owners. `litchi-numbers-wire` is a low-level BNC adapter excluded from the
 supported format and root facades.
 
+Historical 2026-08-06 snapshot (superseded by the 2026-08-23 current-topology
+amendment, which records 64 workspace packages, 239 internal dependency
+declarations, and 13 ordered migration debts):
+
 `litchi-iwa` still exists only as the migration host for editors and
 compatibility tests that have not reached the concrete packages. Its 17
 internal workspace dependencies are all explicit ordered debt, with no
@@ -502,7 +506,8 @@ does not make Markdown a document-format owner or a bidirectional conversion
 layer. Rendering, pagination, external retrieval, and active-content execution
 remain outside this helper crate.
 
-### 2026-08-08 Keynote ordering continuation
+### 2026-08-08 Keynote ordering continuation (historical snapshot; superseded by
+the 2026-08-23 current-topology amendment)
 
 The root prepared-source coordinator now also admits validated frozen logical
 entries through an internal, semantic-only route; the preceding reference to
@@ -522,9 +527,10 @@ source compatible.
 
 The migration host's move method, focused example, and move-specific tests have
 moved to `litchi-keynote`, but no host dependency edge is removed by that
-vertical capability. The current boundary ledger therefore still contains all
-17 ordered `litchi-iwa` debts. Remaining editor, Prost graph, example, test,
-fuzz, durable-patch, and atomic-save ownership prevents host deletion.
+vertical capability. At this historical snapshot, the boundary ledger
+contained all 17 ordered `litchi-iwa` debts; later debt-retirement amendments
+supersede that count. Remaining editor, Prost graph, example, test, fuzz,
+durable-patch, and atomic-save ownership prevents host deletion.
 
 ## Historical terminology
 
@@ -2285,3 +2291,39 @@ The legacy host still contains production readers, setters, examples, pivot
 compatibility vocabulary, tests, and a manifest dependency. This cut removes
 the focused facade's dependency on that public vocabulary; it does not remove
 the host, its edge, or its ordered debt.
+
+## 2026-08-23 current-topology amendment
+
+The authoritative current inventory is 64 workspace packages and 239 internal
+dependency declarations. The ordered migration-debt ledger has 13 entries:
+001, 002, 004, 005, 008, 009, 010, 012, 013, 014, 015, 016, and 017. Earlier
+inventory and debt entries remain historical records and are not rewritten by
+this current-state amendment.
+
+## 2026-08-23 superseding amendment: Keynote soundtrack-reference order ownership
+
+This current-state amendment supersedes the earlier soundtrack-order wording;
+those dated passages remain historical records. The Keynote package now owns
+the bounded `soundtrack::order::{Edit, Patch, Commit, Diagnostics, Error,
+LimitKind}` transaction through
+`Package::{edit_soundtrack_order, apply_soundtrack_order}`. It selects the
+existing rooted Document -> Show -> Soundtrack chain, validates the field-3
+reference closure and ownership, and changes only the order of existing media
+references.
+
+Media payloads/assets, data-reference metadata, unknown fields, and unrelated
+components remain preserved. The order transaction does not create, delete,
+replace, allocate, reclaim, or otherwise CRUD soundtrack media, and it does not
+change playback settings. The focused `soundtrack::{Mode, Settings}` playback
+transaction remains the package owner for mode and volume.
+
+`litchi-iwa` remains the owner for the remaining soundtrack media/settings CRUD
+and host compatibility, including soundtrack item/asset creation,
+add/insert/replace/remove/lifecycle operations, and retained host readers and
+editors outside the focused package seams. The current inventory remains 64
+workspace packages, 239 internal declarations, and 13 ordered debts; debt 014
+and the `litchi-iwa -> litchi-keynote` edge remain open.
+
+This is bounded package-level ownership evidence only. No native Keynote
+open/save gate is admitted, no host-edge retirement is claimed, and no
+monolith-exit or host-deletion claim follows.

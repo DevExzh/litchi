@@ -268,7 +268,14 @@ pub fn rewrite_section_background_with_report(
     };
     let output_bytes = candidate.len();
     let readback = inspect_section(&candidate, &mut budget)?;
-    cross_check_buffa(&candidate, options, readback.snapshot, &mut budget)?;
+    // The source and candidate have independent ceilings. A rewrite is allowed
+    // to grow up to `max_output_bytes`, so the Buffa readback must admit the
+    // candidate even when the source was subject to a tighter input bound.
+    let readback_options = DecodeOptions {
+        max_input_bytes: options.max_input_bytes.max(candidate.len()),
+        ..options
+    };
+    cross_check_buffa(&candidate, readback_options, readback.snapshot, &mut budget)?;
     let actual = readback.snapshot;
     if actual != desired {
         return Err(Error {
@@ -1564,6 +1571,20 @@ mod tests {
                 .limit(),
             Some(LimitKind::WorkBytes { .. })
         ));
+    }
+
+    #[test]
+    fn candidate_readback_uses_output_ceiling_independently_of_input() {
+        let source = encode_varint_field(17, 1);
+        let (candidate, _) =
+            rewrite_section_background_with_report(&source, solid(RgbSpace::Srgb), options())
+                .unwrap();
+        let limits = DecodeOptions::new(source.len(), candidate.len(), 1 << 16, 1 << 24, 16);
+        let (rewritten, report) =
+            rewrite_section_background_with_report(&source, solid(RgbSpace::Srgb), limits)
+                .expect("candidate may exceed the source input ceiling");
+        assert_eq!(rewritten, candidate);
+        assert!(report.changed);
     }
 
     #[test]

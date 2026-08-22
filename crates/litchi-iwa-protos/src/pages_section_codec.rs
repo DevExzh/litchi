@@ -189,7 +189,18 @@ pub fn decode_pagination(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<PaginationSnapshot, DecodeError> {
-    validate_options(source, options)?;
+    let mut budget = Budget::new(source, options)?;
+    // Keep the strict wire pass even though pagination only projects three
+    // scalar fields.  Besides accounting every encoded field, this pass
+    // bounds opaque unknown records and groups before Buffa sees the source.
+    budget.charge_work(source.len())?;
+    strict_pagination(source, &mut budget)?;
+
+    // The generated view is intentionally retained as the value projection;
+    // the strict pass above only establishes finite traversal and wire
+    // framing.  Charge its root traversal separately, matching the aggregate
+    // settings decoder's exact work accounting.
+    budget.charge_work(source.len())?;
     let view: projection::PagesSectionPaginationArchiveLazyView<'_> =
         options.buffa().decode_lazy_view(source)?;
     Ok(PaginationSnapshot {
@@ -355,7 +366,7 @@ impl DecodeReport {
         self.fields
     }
 
-    /// Bytes visited by the strict and Buffa root passes.
+    /// Bytes visited by the strict and Buffa root/reference passes.
     #[must_use]
     pub const fn work_bytes(self) -> usize {
         self.work_bytes
@@ -396,6 +407,26 @@ pub fn decode_section_settings_with_report<'source>(
         .buffa()
         .decode_lazy_view(source)
         .map_err(|_error| DecodeError::invalid())?;
+    let first_section_template_page = {
+        charge_nested_reference_work(strict.first_section_template_page, &mut budget)?;
+        let nested_view = view.first_section_template_page.get()?;
+        nested_view.as_ref().map(project_reference).transpose()?
+    };
+    let even_section_template_page = {
+        charge_nested_reference_work(strict.even_section_template_page, &mut budget)?;
+        let nested_view = view.even_section_template_page.get()?;
+        nested_view.as_ref().map(project_reference).transpose()?
+    };
+    let odd_section_template_page = {
+        charge_nested_reference_work(strict.odd_section_template_page, &mut budget)?;
+        let nested_view = view.odd_section_template_page.get()?;
+        nested_view.as_ref().map(project_reference).transpose()?
+    };
+    let user_defined_guide_storage = {
+        charge_nested_reference_work(strict.user_defined_guide_storage, &mut budget)?;
+        let nested_view = view.user_defined_guide_storage.get()?;
+        nested_view.as_ref().map(project_reference).transpose()?
+    };
     let projected = SectionSettingsSnapshot {
         inherit_previous_header_footer: view.inherit_previous_header_footer,
         section_template_first_page_different: view.section_template_first_page_different,
@@ -403,38 +434,18 @@ pub fn decode_section_settings_with_report<'source>(
         section_start_kind: view.section_start_kind,
         section_page_number_kind: view.section_page_number_kind,
         section_page_number_start: view.section_page_number_start,
-        first_section_template_page: view
-            .first_section_template_page
-            .get()?
-            .as_ref()
-            .map(project_reference)
-            .transpose()?,
-        even_section_template_page: view
-            .even_section_template_page
-            .get()?
-            .as_ref()
-            .map(project_reference)
-            .transpose()?,
-        odd_section_template_page: view
-            .odd_section_template_page
-            .get()?
-            .as_ref()
-            .map(project_reference)
-            .transpose()?,
+        first_section_template_page,
+        even_section_template_page,
+        odd_section_template_page,
         name: view.name,
         section_template_first_page_hides_header_footer: view
             .section_template_first_page_hides_header_footer,
-        user_defined_guide_storage: view
-            .user_defined_guide_storage
-            .get()?
-            .as_ref()
-            .map(project_reference)
-            .transpose()?,
+        user_defined_guide_storage,
     };
-    if projected != strict {
+    if projected != strict.snapshot {
         return Err(DecodeError::invalid());
     }
-    Ok((strict, budget.report()))
+    Ok((strict.snapshot, budget.report()))
 }
 
 const INHERIT_HEADER_FOOTER_FIELD: u32 = 17;
@@ -480,11 +491,29 @@ fn validate_options(source: &[u8], options: DecodeOptions) -> Result<(), DecodeE
     Ok(())
 }
 
+struct StrictSectionSettings<'source> {
+    snapshot: SectionSettingsSnapshot<'source>,
+    first_section_template_page: Option<&'source [u8]>,
+    even_section_template_page: Option<&'source [u8]>,
+    odd_section_template_page: Option<&'source [u8]>,
+    user_defined_guide_storage: Option<&'source [u8]>,
+}
+
+fn strict_pagination(source: &[u8], budget: &mut Budget) -> Result<(), DecodeError> {
+    let mut remaining = source;
+    while let Some(_field) = next_root_field(&mut remaining, budget, 1)? {}
+    Ok(())
+}
+
 fn strict_section_settings<'source>(
     source: &'source [u8],
     budget: &mut Budget,
-) -> Result<SectionSettingsSnapshot<'source>, DecodeError> {
+) -> Result<StrictSectionSettings<'source>, DecodeError> {
     let mut snapshot = SectionSettingsSnapshot::default();
+    let mut first_section_template_page = None;
+    let mut even_section_template_page = None;
+    let mut odd_section_template_page = None;
+    let mut user_defined_guide_storage = None;
     let mut remaining = source;
     while let Some(field) = next_root_field(&mut remaining, budget, 1)? {
         match field.number {
@@ -534,22 +563,28 @@ fn strict_section_settings<'source>(
                 if snapshot.first_section_template_page.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                snapshot.first_section_template_page =
-                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+                let payload = field.length_delimited()?;
+                budget.charge_work(payload.len())?;
+                snapshot.first_section_template_page = Some(strict_reference(payload, budget, 2)?);
+                first_section_template_page = Some(payload);
             },
             EVEN_TEMPLATE_FIELD => {
                 if snapshot.even_section_template_page.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                snapshot.even_section_template_page =
-                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+                let payload = field.length_delimited()?;
+                budget.charge_work(payload.len())?;
+                snapshot.even_section_template_page = Some(strict_reference(payload, budget, 2)?);
+                even_section_template_page = Some(payload);
             },
             ODD_TEMPLATE_FIELD => {
                 if snapshot.odd_section_template_page.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                snapshot.odd_section_template_page =
-                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+                let payload = field.length_delimited()?;
+                budget.charge_work(payload.len())?;
+                snapshot.odd_section_template_page = Some(strict_reference(payload, budget, 2)?);
+                odd_section_template_page = Some(payload);
             },
             SECTION_NAME_FIELD => {
                 if snapshot.name.is_some() {
@@ -577,13 +612,21 @@ fn strict_section_settings<'source>(
                 if snapshot.user_defined_guide_storage.is_some() {
                     return Err(DecodeError::invalid());
                 }
-                snapshot.user_defined_guide_storage =
-                    Some(strict_reference(field.length_delimited()?, budget, 2)?);
+                let payload = field.length_delimited()?;
+                budget.charge_work(payload.len())?;
+                snapshot.user_defined_guide_storage = Some(strict_reference(payload, budget, 2)?);
+                user_defined_guide_storage = Some(payload);
             },
             _ => {},
         }
     }
-    Ok(snapshot)
+    Ok(StrictSectionSettings {
+        snapshot,
+        first_section_template_page,
+        even_section_template_page,
+        odd_section_template_page,
+        user_defined_guide_storage,
+    })
 }
 
 fn strict_reference(
@@ -647,6 +690,20 @@ fn project_reference(
         deprecated_type: view.deprecated_type,
         deprecated_is_external: view.deprecated_is_external,
     })
+}
+
+fn charge_nested_reference_work(
+    source: Option<&[u8]>,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    if let Some(source) = source {
+        // The private lazy `.get()` below traverses this selected nested
+        // message. Charge the same payload once for the Buffa pass as the
+        // strict pass charged before parsing it. Unselected root payloads
+        // remain covered only by each full-root pass.
+        budget.charge_work(source.len())?;
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -1160,6 +1217,55 @@ mod tests {
     }
 
     #[test]
+    fn aggregate_reference_work_is_exact_and_inclusive() {
+        let reference = crate::tsp::Reference {
+            identifier: 41,
+            deprecated_type: Some(-7),
+            deprecated_is_external: Some(false),
+        }
+        .encode_to_vec();
+        let mut source = Vec::new();
+        for field in [
+            FIRST_TEMPLATE_FIELD,
+            EVEN_TEMPLATE_FIELD,
+            ODD_TEMPLATE_FIELD,
+            GUIDE_STORAGE_FIELD,
+        ] {
+            push_length_field(&mut source, field, &reference);
+        }
+        // The large unknown payload is scanned by each full-root pass, but it
+        // is not a selected nested view and must not receive a nested charge.
+        push_length_field(&mut source, 99, &[0xff; 257]);
+
+        let (_, report) = decode_section_settings_with_report(&source, generous(&source))
+            .expect("valid aggregate references");
+        let expected_work = source.len() * 2 + reference.len() * 4 * 2;
+        assert_eq!(report.work_bytes(), expected_work);
+        assert_eq!(report.fields(), 5 + 4 * 3);
+        assert_eq!(report.max_depth(), 2);
+
+        let exact = DecodeOptions::new(source.len(), report.max_depth())
+            .with_max_fields(report.fields())
+            .with_max_work_bytes(expected_work)
+            .with_max_name_bytes(source.len());
+        assert!(decode_section_settings(&source, exact).is_ok());
+
+        let over_limit = DecodeOptions::new(source.len(), report.max_depth())
+            .with_max_fields(report.fields())
+            .with_max_work_bytes(expected_work - 1)
+            .with_max_name_bytes(source.len());
+        let error = decode_section_settings(&source, over_limit)
+            .expect_err("one byte below nested aggregate work must fail");
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Work {
+                observed: expected_work,
+                maximum: expected_work - 1,
+            })
+        );
+    }
+
+    #[test]
     fn name_projection_routes_only_field_26_and_preserves_name_guards() {
         let mut source = Vec::new();
         // These records are valid wire values but intentionally malformed for
@@ -1304,6 +1410,49 @@ mod tests {
             }
         );
         assert!(decode_section_settings(&source, generous(&source)).is_err());
+    }
+
+    #[test]
+    fn pagination_projection_enforces_inclusive_field_and_work_limits() {
+        let mut source = Vec::new();
+        push_varint_field(&mut source, 99, 1);
+        push_varint_field(&mut source, 100, 2);
+        let work = source.len() * 2;
+
+        let exact = DecodeOptions::new(source.len(), 1)
+            .with_max_fields(2)
+            .with_max_work_bytes(work);
+        assert!(decode_pagination(&source, exact).is_ok());
+
+        let field_error = decode_pagination(
+            &source,
+            DecodeOptions::new(source.len(), 1)
+                .with_max_fields(1)
+                .with_max_work_bytes(work),
+        )
+        .expect_err("the second field exceeds the strict field budget");
+        assert_eq!(
+            field_error.resource_limit(),
+            Some(DecodeLimit::Fields {
+                observed: 2,
+                maximum: 1,
+            })
+        );
+
+        let work_error = decode_pagination(
+            &source,
+            DecodeOptions::new(source.len(), 1)
+                .with_max_fields(2)
+                .with_max_work_bytes(work - 1),
+        )
+        .expect_err("the strict-plus-projection scan exceeds work");
+        assert_eq!(
+            work_error.resource_limit(),
+            Some(DecodeLimit::Work {
+                observed: work,
+                maximum: work - 1,
+            })
+        );
     }
 
     #[test]

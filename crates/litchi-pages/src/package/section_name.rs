@@ -450,6 +450,48 @@ impl Package {
         Ok(selected.name())
     }
 
+    /// Set one semantically selected section's producer-visible name.
+    ///
+    /// This is the one-section convenience form of
+    /// [`Self::edit_section_name`]. Selector resolution, name validation,
+    /// exact-source preservation, and atomic publication remain owned by the
+    /// section-name transaction; this method does not introduce a second
+    /// native rewrite path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, source, limit, preservation, or verification
+    /// error without modifying this package when publication is rejected.
+    pub fn set_section_name<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+        name: Option<&str>,
+    ) -> Result<SectionNameCommit, SectionNameError> {
+        let mut edit = self.edit_section_name(selector)?;
+        edit.set_name(name)?;
+        edit.commit()
+    }
+
+    /// Remove one semantically selected section's producer-visible name.
+    ///
+    /// Existing section text, boundaries, and unrelated native records remain
+    /// subject to the same exact-source transaction rules as
+    /// [`Self::set_section_name`]. Clearing an already absent name is an
+    /// exact semantic no-op and reuses the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, source, limit, preservation, or verification
+    /// error before publication.
+    pub fn clear_section_name<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<SectionNameCommit, SectionNameError> {
+        let mut edit = self.edit_section_name(selector)?;
+        edit.clear_name();
+        edit.commit()
+    }
+
     /// Start a selector-first edit of one producer-visible section name.
     ///
     /// The selector is resolved immediately against this immutable semantic
@@ -872,6 +914,7 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, SectionNameError> {
 )]
 fn map_selector_error(selection_error: crate::SelectorError) -> SectionNameError {
     match selection_error {
+        crate::SelectorError::EmptySectionName => SectionNameError::NameNotFound,
         crate::SelectorError::AmbiguousSectionName {
             first, duplicate, ..
         } => SectionNameError::AmbiguousSelector {

@@ -10,7 +10,7 @@
 )]
 
 use crate::{Error, Result};
-use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::{WireLimits, varint::encoded_len};
 use phf::phf_map;
 use prost::Message;
 
@@ -20,6 +20,300 @@ use prost::Message;
 pub use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsch, tsd, tsk, tsp, tss, tst, tswp};
 
 const ARCHIVE_CODEC_RECURSION_LIMIT: u32 = 16;
+const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+const TEXT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+const STORAGE_TEXT_FIELD: u32 = 3;
+
+/// One allocation-free wire summary for the text projection.
+///
+/// The generated Buffa lazy view is deliberately only a projection.  It can
+/// borrow text, but it cannot establish an aggregate budget for the source
+/// message before it starts growing its repeated view.  Keep the raw scan in
+/// this crate's adapter so the public trait object never depends on the
+/// generated representation or on unbounded source-derived limits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct StorageTextPreflight {
+    fields: usize,
+    unknown_fields: usize,
+    text_fragments: usize,
+    text_bytes: usize,
+    work_bytes: usize,
+    output_bytes: usize,
+}
+
+impl StorageTextPreflight {
+    fn buffa_options(
+        self,
+        input_bytes: usize,
+    ) -> Result<litchi_iwa_protos::text_storage_codec::DecodeOptions> {
+        let element_memory = self
+            .text_fragments
+            .checked_mul(std::mem::size_of::<&str>())
+            .ok_or_else(|| storage_wire_error("StorageArchive text element work overflow"))?;
+        Ok(litchi_iwa_protos::text_storage_codec::DecodeOptions::new(
+            input_bytes.max(1),
+            self.unknown_fields,
+            element_memory,
+            TEXT_STORAGE_CODEC_RECURSION_LIMIT,
+        ))
+    }
+}
+
+fn storage_text_work_bytes(input_bytes: usize, summary: &StorageTextPreflight) -> Result<usize> {
+    let field_work = summary
+        .fields
+        .checked_mul(16)
+        .ok_or_else(|| storage_wire_error("StorageArchive field work overflow"))?;
+    let element_work = summary
+        .text_fragments
+        .checked_mul(std::mem::size_of::<&str>())
+        .ok_or_else(|| storage_wire_error("StorageArchive text element work overflow"))?;
+
+    // The raw schema-directed pass and the private Buffa projection each walk
+    // the complete source envelope. Charge both passes before allowing the
+    // projection to allocate or borrow repeated elements.
+    let source_pass_work = input_bytes
+        .checked_mul(2)
+        .ok_or_else(|| storage_wire_error("StorageArchive source work overflow"))?;
+    source_pass_work
+        .checked_add(field_work)
+        .and_then(|work| work.checked_add(element_work))
+        .and_then(|work| work.checked_add(summary.text_bytes))
+        .ok_or_else(|| storage_wire_error("StorageArchive work budget overflow"))
+}
+
+/// Perform the schema-directed raw wire pass for `TSWP.StorageArchive`.
+///
+/// Only top-level field 3 is selected by the private Buffa projection.  All
+/// other fields, including fields nested inside an unknown group, stay opaque;
+/// nevertheless their complete wire framing is checked and charged against
+/// the finite field/work budgets.  This keeps truncation, malformed groups,
+/// and invalid UTF-8 from reaching a lazy view that would otherwise defer or
+/// silently skip them.
+fn preflight_storage_text(data: &[u8]) -> Result<StorageTextPreflight> {
+    if data.len() > WireLimits::MAX_INPUT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "iWork StorageArchive input exceeds {} bytes",
+            WireLimits::MAX_INPUT_BYTES
+        )));
+    }
+
+    let mut summary = StorageTextPreflight {
+        fields: 0,
+        unknown_fields: 0,
+        text_fragments: 0,
+        text_bytes: 0,
+        work_bytes: 0,
+        output_bytes: 0,
+    };
+    let mut cursor = 0usize;
+    scan_storage_text_fields(
+        data,
+        &mut cursor,
+        None,
+        TEXT_STORAGE_CODEC_RECURSION_LIMIT,
+        true,
+        &mut summary,
+    )?;
+    if cursor != data.len() {
+        return Err(storage_wire_error("trailing bytes after a closed group"));
+    }
+
+    // Charge both complete source passes, the repeated-view element pointers,
+    // and the owned String text copy. Every arithmetic step is checked before
+    // it becomes a Buffa or Vec reservation.
+    summary.work_bytes = storage_text_work_bytes(data.len(), &summary)?;
+    if summary.work_bytes > WireLimits::MAX_REWRITE_WORK {
+        return Err(storage_wire_error(&format!(
+            "StorageArchive work exceeds {} units",
+            WireLimits::MAX_REWRITE_WORK
+        )));
+    }
+
+    // The public wrapper owns one String header per selected element and the
+    // UTF-8 bytes copied into those strings.  Count both before any reserve so
+    // an input made from millions of empty strings is bounded as well.
+    summary.output_bytes = summary
+        .text_fragments
+        .checked_mul(std::mem::size_of::<String>())
+        .and_then(|headers| headers.checked_add(summary.text_bytes))
+        .ok_or_else(|| storage_wire_error("StorageArchive output size overflow"))?;
+    if summary.output_bytes > WireLimits::MAX_OUTPUT_BYTES {
+        return Err(storage_wire_error(&format!(
+            "StorageArchive output exceeds {} bytes",
+            WireLimits::MAX_OUTPUT_BYTES
+        )));
+    }
+
+    Ok(summary)
+}
+
+fn storage_wire_error(message: &str) -> Error {
+    Error::InvalidFormat(format!(
+        "iWork StorageArchive text wire preflight failed: {message}"
+    ))
+}
+
+/// Scan one protobuf message or unknown group without retaining field spans.
+///
+/// `end_group` is the field number whose end-group tag closes this invocation;
+/// the root call passes `None`.  `select_text` is false while walking an
+/// unknown group, because field 3 inside that opaque value is not a selected
+/// `StorageArchive.text` occurrence.
+fn scan_storage_text_fields(
+    data: &[u8],
+    cursor: &mut usize,
+    end_group: Option<u32>,
+    depth_remaining: u32,
+    select_text: bool,
+    summary: &mut StorageTextPreflight,
+) -> Result<bool> {
+    while *cursor < data.len() {
+        let tag = read_storage_varint(data, cursor)?;
+        let field_number = u32::try_from(tag >> 3)
+            .map_err(|_| storage_wire_error("field number does not fit u32"))?;
+        if field_number == 0 || field_number > 0x1fff_ffff {
+            return Err(storage_wire_error("invalid field number"));
+        }
+        let wire_type =
+            u8::try_from(tag & 7).map_err(|_| storage_wire_error("wire type does not fit u8"))?;
+        summary.fields = summary
+            .fields
+            .checked_add(1)
+            .ok_or_else(|| storage_wire_error("field count overflow"))?;
+        if summary.fields > WireLimits::MAX_FIELDS {
+            return Err(storage_wire_error(&format!(
+                "field count exceeds {}",
+                WireLimits::MAX_FIELDS
+            )));
+        }
+        if select_text && field_number == STORAGE_TEXT_FIELD && wire_type != 2 {
+            return Err(storage_wire_error(
+                "selected field 3 must use length-delimited wire type",
+            ));
+        }
+
+        match wire_type {
+            0 => {
+                read_storage_varint(data, cursor)?;
+                summary.unknown_fields = summary
+                    .unknown_fields
+                    .checked_add(1)
+                    .ok_or_else(|| storage_wire_error("unknown field count overflow"))?;
+            },
+            1 => {
+                take_storage_bytes(data, cursor, 8)?;
+                summary.unknown_fields = summary
+                    .unknown_fields
+                    .checked_add(1)
+                    .ok_or_else(|| storage_wire_error("unknown field count overflow"))?;
+            },
+            2 => {
+                let length = read_storage_varint(data, cursor)?;
+                let length = usize::try_from(length)
+                    .map_err(|_| storage_wire_error("length-delimited field is too large"))?;
+                let payload = take_storage_bytes(data, cursor, length)?;
+                if select_text && field_number == STORAGE_TEXT_FIELD {
+                    let text = std::str::from_utf8(payload)
+                        .map_err(|_| storage_wire_error("field 3 is not valid UTF-8"))?;
+                    let _ = text;
+                    summary.text_fragments = summary
+                        .text_fragments
+                        .checked_add(1)
+                        .ok_or_else(|| storage_wire_error("text fragment count overflow"))?;
+                    summary.text_bytes = summary
+                        .text_bytes
+                        .checked_add(payload.len())
+                        .ok_or_else(|| storage_wire_error("text byte count overflow"))?;
+                } else {
+                    summary.unknown_fields = summary
+                        .unknown_fields
+                        .checked_add(1)
+                        .ok_or_else(|| storage_wire_error("unknown field count overflow"))?;
+                }
+            },
+            3 => {
+                if depth_remaining == 0 {
+                    return Err(storage_wire_error("group nesting exceeds recursion limit"));
+                }
+                summary.unknown_fields = summary
+                    .unknown_fields
+                    .checked_add(1)
+                    .ok_or_else(|| storage_wire_error("unknown field count overflow"))?;
+                let closed = scan_storage_text_fields(
+                    data,
+                    cursor,
+                    Some(field_number),
+                    depth_remaining - 1,
+                    false,
+                    summary,
+                )?;
+                if !closed {
+                    return Err(storage_wire_error("truncated protobuf group"));
+                }
+            },
+            4 => {
+                if end_group == Some(field_number) {
+                    return Ok(true);
+                }
+                return Err(storage_wire_error("unexpected or mismatched end group"));
+            },
+            5 => {
+                take_storage_bytes(data, cursor, 4)?;
+                summary.unknown_fields = summary
+                    .unknown_fields
+                    .checked_add(1)
+                    .ok_or_else(|| storage_wire_error("unknown field count overflow"))?;
+            },
+            _ => return Err(storage_wire_error("invalid protobuf wire type")),
+        }
+    }
+
+    Ok(end_group.is_none())
+}
+
+fn read_storage_varint(data: &[u8], cursor: &mut usize) -> Result<u64> {
+    let start = *cursor;
+    let mut value = 0u64;
+    for index in 0..10usize {
+        let byte = *data
+            .get(*cursor)
+            .ok_or_else(|| storage_wire_error("truncated protobuf varint"))?;
+        *cursor = cursor
+            .checked_add(1)
+            .ok_or_else(|| storage_wire_error("protobuf varint cursor overflow"))?;
+        if index == 9 && byte > 1 {
+            return Err(storage_wire_error("protobuf varint is too long"));
+        }
+        value |= u64::from(byte & 0x7f) << (index * 7);
+        if byte & 0x80 == 0 {
+            let consumed = cursor
+                .checked_sub(start)
+                .ok_or_else(|| storage_wire_error("protobuf varint cursor underflow"))?;
+            if consumed != encoded_len(value) {
+                return Err(storage_wire_error("protobuf varint is noncanonical"));
+            }
+            return Ok(value);
+        }
+    }
+    Err(storage_wire_error("protobuf varint is too long"))
+}
+
+fn take_storage_bytes<'source>(
+    data: &'source [u8],
+    cursor: &mut usize,
+    length: usize,
+) -> Result<&'source [u8]> {
+    let end = cursor
+        .checked_add(length)
+        .ok_or_else(|| storage_wire_error("protobuf field range overflow"))?;
+    if end > data.len() {
+        return Err(storage_wire_error("truncated protobuf field"));
+    }
+    let payload = &data[*cursor..end];
+    *cursor = end;
+    Ok(payload)
+}
 
 fn archive_codec_decode_options(data: &[u8]) -> litchi_iwa_protos::archive_codec::DecodeOptions {
     litchi_iwa_protos::archive_codec::DecodeOptions::new(
@@ -62,8 +356,55 @@ fn decode_message_info(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
 
 /// Static decoder function for StorageArchive messages
 fn decode_storage_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tswp::StorageArchive::decode(data)?;
-    Ok(Box::new(StorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+    let preflight = preflight_storage_text(data)?;
+    let view = litchi_iwa_protos::text_storage_codec::decode_storage_text(
+        data,
+        preflight.buffa_options(data.len())?,
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "iWork StorageArchive text payload failed strict validation: {error}"
+        ))
+    })?;
+
+    if view.len() != preflight.text_fragments {
+        return Err(storage_wire_error(
+            "private Buffa projection disagrees with raw field-3 count",
+        ));
+    }
+
+    // The neutral trait object outlives the source slice passed to this
+    // registry. Copy only the public text projection, with fallible
+    // reservations bounded by the raw preflight's output ceiling.
+    let mut text = Vec::new();
+    text.try_reserve_exact(preflight.text_fragments)
+        .map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "iWork StorageArchive text fragments",
+                amount: preflight.text_fragments,
+            })
+        })?;
+    let mut observed_bytes = 0usize;
+    for fragment in view.fragments() {
+        let mut owned = String::new();
+        owned.try_reserve_exact(fragment.len()).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "iWork StorageArchive text fragment",
+                amount: fragment.len(),
+            })
+        })?;
+        owned.push_str(fragment);
+        text.push(owned);
+        observed_bytes = observed_bytes
+            .checked_add(fragment.len())
+            .ok_or_else(|| storage_wire_error("owned text byte count overflow"))?;
+    }
+    if observed_bytes != preflight.text_bytes {
+        return Err(storage_wire_error(
+            "private Buffa projection disagrees with raw text byte count",
+        ));
+    }
+    Ok(Box::new(StorageArchiveWrapper { text }) as Box<dyn DecodedMessage>)
 }
 
 /// Static decoder function for TableModelArchive messages
@@ -96,9 +437,36 @@ fn decode_drawable_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
     Ok(Box::new(DrawableArchiveWrapper) as Box<dyn DecodedMessage>)
 }
 
+fn comment_storage_codec_decode_options(
+    data: &[u8],
+) -> litchi_iwa_protos::comment_storage_codec::DecodeOptions {
+    litchi_iwa_protos::comment_storage_codec::DecodeOptions::new(
+        data.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        data.len().clamp(1, WireLimits::MAX_FIELDS),
+        data.len()
+            .saturating_mul(32)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
+        data.len().clamp(1, WireLimits::MAX_FIELDS),
+        data.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+    )
+}
+
 fn decode_comment_storage_archive(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
-    let msg = tsd::CommentStorageArchive::decode(data)?;
-    Ok(Box::new(CommentStorageArchiveWrapper(msg)) as Box<dyn DecodedMessage>)
+    let comment = litchi_iwa_protos::comment_storage_codec::decode_comment_storage_archive(
+        data,
+        comment_storage_codec_decode_options(data),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "iWork CommentStorageArchive payload failed strict validation: {error}"
+        ))
+    })?;
+    // The strict codec borrows the caller-owned payload. Stage the complete
+    // scalar projection and own its optional text before publishing a trait
+    // object whose lifetime is independent of the source bytes.
+    let text = comment.text().map(str::to_owned);
+    Ok(Box::new(CommentStorageArchiveWrapper { text }) as Box<dyn DecodedMessage>)
 }
 
 fn decode_legacy_chart(data: &[u8]) -> Result<Box<dyn DecodedMessage>> {
@@ -239,11 +607,13 @@ impl DecodedMessage for MessageInfoWrapper {
 
 /// Wrapper for StorageArchive message (text content)
 #[derive(Debug)]
-pub struct StorageArchiveWrapper(pub tswp::StorageArchive);
+pub struct StorageArchiveWrapper {
+    text: Vec<String>,
+}
 
 impl DecodedMessage for StorageArchiveWrapper {
     fn extract_text(&self) -> Vec<String> {
-        self.0.text.clone()
+        self.text.clone()
     }
 }
 
@@ -347,12 +717,13 @@ impl DecodedMessage for DrawableArchiveWrapper {
 
 /// Wrapper for TSD comment storage used by cell and drawable comments.
 #[derive(Debug)]
-pub struct CommentStorageArchiveWrapper(pub tsd::CommentStorageArchive);
+pub struct CommentStorageArchiveWrapper {
+    text: Option<String>,
+}
 
 impl DecodedMessage for CommentStorageArchiveWrapper {
     fn extract_text(&self) -> Vec<String> {
-        self.0
-            .text
+        self.text
             .iter()
             .filter(|text| !text.is_empty())
             .cloned()
@@ -490,6 +861,124 @@ mod tests {
     }
 
     #[test]
+    fn shared_storage_projection_preserves_fragment_order_and_unknowns() {
+        // Field 99 is outside the narrow Buffa projection. It must remain
+        // opaque while the selected repeated text stays source ordered.
+        let data = [
+            0x1a, 0x01, b'a', // text = "a"
+            0x98, 0x06, 0x01, // unknown field 99 = 1
+            0x1a, 0x01, b'b', // text = "b"
+        ];
+        assert_eq!(
+            decode_common(2001, &data).unwrap().extract_text(),
+            ["a", "b"]
+        );
+    }
+
+    #[test]
+    fn shared_storage_projection_rejects_truncated_text_before_publication() {
+        // Prost would not expose a partial string either, but this assertion
+        // fixes the production route to the bounded lazy projection rather
+        // than relying on generated-message error behavior.
+        let malformed = [0x1a, 0x02, b'x'];
+        assert!(decode_common(2001, &malformed).is_err());
+    }
+
+    #[test]
+    fn shared_storage_preflight_rejects_noncanonical_varints() {
+        // The raw pass owns the framing contract for the private projection:
+        // keys, lengths, and opaque wire-type-0 values must all use their
+        // shortest varint representation.
+        let overlong_key = [0x9a, 0x80, 0x00, 0x01, b'a'];
+        let overlong_length = [0x1a, 0x81, 0x00, b'a'];
+        let overlong_varint_value = [0x08, 0x80, 0x00];
+
+        assert!(preflight_storage_text(&overlong_key).is_err());
+        assert!(preflight_storage_text(&overlong_length).is_err());
+        assert!(preflight_storage_text(&overlong_varint_value).is_err());
+    }
+
+    #[test]
+    fn shared_storage_preflight_rejects_wrong_wire_for_top_level_text_only() {
+        for wire_type in [0u8, 1, 3, 4, 5] {
+            let wrong_wire = [(STORAGE_TEXT_FIELD as u8) << 3 | wire_type];
+            let error = preflight_storage_text(&wrong_wire).expect_err("wrong field-3 wire");
+            assert!(
+                error
+                    .to_string()
+                    .contains("selected field 3 must use length-delimited wire type")
+            );
+        }
+
+        // A field 3 nested in an unknown group is opaque and must not be
+        // mistaken for the selected top-level text field.
+        let opaque_group = [0x3b, 0x18, 0x01, 0x3c];
+        assert!(preflight_storage_text(&opaque_group).is_ok());
+    }
+
+    #[test]
+    fn shared_storage_work_ceiling_charges_both_source_passes() {
+        let summary = StorageTextPreflight {
+            fields: 1,
+            unknown_fields: 1,
+            text_fragments: 0,
+            text_bytes: 0,
+            work_bytes: 0,
+            output_bytes: 0,
+        };
+        let field_work = 16;
+        let exact_input = (WireLimits::MAX_REWRITE_WORK - field_work) / 2;
+
+        assert_eq!(
+            storage_text_work_bytes(exact_input, &summary).unwrap(),
+            WireLimits::MAX_REWRITE_WORK
+        );
+        assert!(
+            storage_text_work_bytes(exact_input + 1, &summary).unwrap()
+                > WireLimits::MAX_REWRITE_WORK
+        );
+        assert!(storage_text_work_bytes(usize::MAX, &summary).is_err());
+    }
+
+    #[test]
+    fn shared_storage_preflight_rejects_aggregate_work_over_ceiling() {
+        // A single opaque length-delimited field is enough to exceed the
+        // aggregate work budget once both complete source passes are charged.
+        // Keep the payload valid so this exercises the work ceiling rather
+        // than truncation or a malformed length.
+        let input_len = WireLimits::MAX_REWRITE_WORK / 2;
+        let key = [0x9a, 0x06]; // field 99, length-delimited
+        let body_len = input_len - key.len() - 4;
+        let encoded_body_len = litchi_iwa_common::varint::encode_varint(body_len as u64);
+        assert_eq!(encoded_body_len.len(), 4);
+
+        let mut data = Vec::with_capacity(input_len);
+        data.extend_from_slice(&key);
+        data.extend_from_slice(&encoded_body_len);
+        data.resize(input_len, 0);
+
+        assert_eq!(data.len(), input_len);
+        assert!(preflight_storage_text(&data).is_err());
+    }
+
+    #[test]
+    fn shared_storage_route_has_no_production_generated_decode() {
+        let source = include_str!("protobuf.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map(|(production, _)| production)
+            .expect("test module marker is present");
+        let body = production
+            .split_once("fn decode_storage_archive")
+            .and_then(|(_, rest)| rest.split_once("fn decode_table_model"))
+            .map(|(body, _)| body)
+            .expect("storage decoder body is present");
+        assert!(body.contains("text_storage_codec::decode_storage_text"));
+        assert!(body.contains("try_reserve_exact"));
+        assert!(!body.contains("StorageArchive::decode"));
+    }
+
+    #[test]
     fn table_data_list_segments_use_their_concrete_decoder() {
         let segment = tst::TableDataListSegment {
             list_type: tst::table_data_list::ListType::String as i32,
@@ -516,6 +1005,26 @@ mod tests {
         };
         let decoded = decode_common(3056, &comment.encode_to_vec()).unwrap();
         assert_eq!(decoded.extract_text(), ["Review this"]);
+    }
+
+    #[test]
+    fn comment_storage_route_rejects_malformed_payload() {
+        // The declared text length exceeds the remaining payload. The route
+        // must fail before publishing a decoded message.
+        let malformed = [0x0a, 0x02, b'x'];
+        assert!(decode_common(3056, &malformed).is_err());
+    }
+
+    #[test]
+    fn comment_storage_route_rejects_invalid_utf8() {
+        let invalid_utf8 = [0x0a, 0x01, 0xff];
+        assert!(decode_common(3056, &invalid_utf8).is_err());
+    }
+
+    #[test]
+    fn comment_storage_route_rejects_duplicate_text() {
+        let duplicate_text = [0x0a, 0x01, b'a', 0x0a, 0x01, b'b'];
+        assert!(decode_common(3056, &duplicate_text).is_err());
     }
 
     #[test]

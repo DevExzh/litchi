@@ -7,11 +7,11 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::{
-    append_varint_field, repeated_length_delimited_payloads,
-    rewrite_repeated_length_delimited_fields,
+    append_varint_field, patch_varint_field, repeated_length_delimited_payloads,
+    rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
-use litchi_iwa_protos::{tsp, tst};
+use litchi_iwa_protos::{numbers_names_codec, tsp, tst};
 use litchi_numbers::{
     Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
     TableSelector,
@@ -132,9 +132,71 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
+fn table_one_model(data: &[u8]) -> bool {
+    let options = numbers_names_codec::DecodeOptions::new(
+        data.len().max(1),
+        data.len().max(1),
+        data.len().saturating_mul(4).max(1),
+        2,
+    );
+    numbers_names_codec::decode_table_names(data, options)
+        .is_ok_and(|names| names.table_name() == "Table 1")
+}
+
+fn mutate_row_buckets(
+    model: &mut Vec<u8>,
+    mutate: impl FnOnce(&mut Vec<Vec<u8>>) -> TestResult,
+) -> TestResult {
+    let rewritten = transform_length_delimited_field(model, 4, |data_store| {
+        transform_length_delimited_field(data_store, 1, |row_headers| {
+            let payloads = repeated_length_delimited_payloads(row_headers, 2)?;
+            let mut buckets = payloads
+                .into_iter()
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>();
+            mutate(&mut buckets)?;
+            Ok::<_, Box<dyn std::error::Error>>(rewrite_repeated_length_delimited_fields(
+                row_headers,
+                2,
+                &buckets,
+            )?)
+        })
+    })?;
+    *model = rewritten;
+    Ok(())
+}
+
+fn append_row_bucket(model: &mut Vec<u8>, identifier: u64) -> TestResult {
+    mutate_row_buckets(model, |buckets| {
+        buckets.push(reference(identifier).encode_to_vec());
+        Ok(())
+    })
+}
+
+fn replace_row_bucket(model: &mut Vec<u8>, index: usize, replacement: Vec<u8>) -> TestResult {
+    mutate_row_buckets(model, |buckets| {
+        let bucket = buckets
+            .get_mut(index)
+            .ok_or_else(|| std::io::Error::other("native row bucket is missing"))?;
+        *bucket = replacement;
+        Ok(())
+    })
+}
+
+fn set_model_row_count(model: &mut Vec<u8>, rows: u32) -> TestResult {
+    *model = patch_varint_field(model, 6, true, Some(u64::from(rows)))?;
+    Ok(())
+}
+
+fn external_reference(identifier: u64) -> TestResult<Vec<u8>> {
+    let mut payload = reference(identifier).encode_to_vec();
+    append_varint_field(&mut payload, 3, 1)?;
+    Ok(payload)
+}
+
 fn rewrite_native_table_model(
     source: &[u8],
-    mutate: impl FnOnce(&mut ArchiveObject, usize, &mut tst::TableModelArchive) -> TestResult,
+    mutate: impl FnOnce(&mut ArchiveObject, usize, &mut Vec<u8>) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(source)?;
     let mut selected = None;
@@ -145,11 +207,10 @@ fn rewrite_native_table_model(
         let stream = SnappyStream::decompress(entry.data())?;
         let archive = Archive::parse(stream.as_bytes())?;
         if archive.objects.iter().any(|object| {
-            object.messages.iter().any(|message| {
-                message.type_ == 6_001
-                    && tst::TableModelArchive::decode(message.data.as_slice())
-                        .is_ok_and(|model| model.table_name == "Table 1")
-            })
+            object
+                .messages
+                .iter()
+                .any(|message| message.type_ == 6_001 && table_one_model(message.data.as_slice()))
         }) {
             selected = Some((entry.name().to_owned(), archive));
             break;
@@ -167,21 +228,19 @@ fn rewrite_native_table_model(
                 .iter()
                 .enumerate()
                 .find_map(|(message_index, message)| {
-                    (message.type_ == 6_001
-                        && tst::TableModelArchive::decode(message.data.as_slice())
-                            .is_ok_and(|model| model.table_name == "Table 1"))
-                    .then_some((object_index, message_index))
+                    (message.type_ == 6_001 && table_one_model(message.data.as_slice()))
+                        .then_some((object_index, message_index))
                 })
         })
         .ok_or_else(|| std::io::Error::other("native Table 1 payload is missing"))?;
     let object = &mut archive.objects[object_index];
-    let mut model = tst::TableModelArchive::decode(object.messages[message_index].data.as_slice())?;
+    let mut model = object.messages[message_index].data.clone();
     mutate(object, message_index, &mut model)?;
     object.replace_message_preserving_header(
         message_index,
         RawMessage {
             type_: 6_001,
-            data: model.encode_to_vec(),
+            data: model,
         },
     )?;
     let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
@@ -217,12 +276,8 @@ fn native_table_model(source: &[u8]) -> TestResult<tst::TableModelArchive> {
 
 fn expand_native_to_second_row_bucket(source: &[u8], rows: u32) -> TestResult<Vec<u8>> {
     rewrite_native_table_model(source, |object, message_index, model| {
-        model.number_of_rows = rows;
-        model
-            .base_data_store
-            .row_headers
-            .buckets
-            .push(reference(904_937));
+        set_model_row_count(model, rows)?;
+        append_row_bucket(model, 904_937)?;
         let info = &mut object.archive_info.message_infos[message_index];
         info.object_references
             .retain(|identifier| *identifier != 904_937);
@@ -920,16 +975,10 @@ fn changed_commit_preserves_unknown_header_bytes_and_existing_source_order() -> 
 fn row_bucket_authority_and_declared_reference_contradictions_refuse() -> TestResult {
     let source = std::fs::read(fixture_path())?;
     let duplicate = rewrite_native_table_model(&source, |_object, _message, model| {
-        model
-            .base_data_store
-            .row_headers
-            .buckets
-            .push(reference(904_855));
-        Ok(())
+        append_row_bucket(model, 904_855)
     })?;
     let mismatched = rewrite_native_table_model(&source, |_object, _message, model| {
-        model.base_data_store.row_headers.buckets[0] = reference(904_899);
-        Ok(())
+        replace_row_bucket(model, 0, reference(904_899).encode_to_vec())
     })?;
     let missing_declaration =
         rewrite_native_table_model(&source, |object, message_index, _model| {
@@ -967,12 +1016,10 @@ fn row_bucket_authority_and_declared_reference_contradictions_refuse() -> TestRe
             Ok(())
         })?;
     let zero_reference = rewrite_native_table_model(&source, |_object, _message, model| {
-        model.base_data_store.row_headers.buckets[0] = reference(0);
-        Ok(())
+        replace_row_bucket(model, 0, reference(0).encode_to_vec())
     })?;
     let external_reference = rewrite_native_table_model(&source, |_object, _message, model| {
-        model.base_data_store.row_headers.buckets[0].deprecated_is_external = Some(true);
-        Ok(())
+        replace_row_bucket(model, 0, external_reference(904_855)?)
     })?;
     assert_eq!(
         native_table_model(&duplicate)?

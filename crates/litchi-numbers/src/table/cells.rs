@@ -92,7 +92,9 @@ impl Input {
 
     /// Construct a finite numeric scalar.
     pub fn number(value: f64) -> Result<Self, FiniteF64Error> {
-        FiniteF64::new(value).map(Self::Number)
+        FiniteF64::new(value)
+            .map(Self::Number)
+            .map_err(|_error| FiniteF64Error)
     }
 
     /// Construct a Boolean scalar.
@@ -103,12 +105,16 @@ impl Input {
 
     /// Construct a finite Apple-epoch date in seconds.
     pub fn date(value: f64) -> Result<Self, FiniteF64Error> {
-        FiniteF64::new(value).map(Self::Date)
+        FiniteF64::new(value)
+            .map(Self::Date)
+            .map_err(|_error| FiniteF64Error)
     }
 
     /// Construct a finite duration in seconds.
     pub fn duration(value: f64) -> Result<Self, FiniteF64Error> {
-        FiniteF64::new(value).map(Self::Duration)
+        FiniteF64::new(value)
+            .map(Self::Duration)
+            .map_err(|_error| FiniteF64Error)
     }
 
     /// Construct an authored formula without a supplied display cache.

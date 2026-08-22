@@ -10,6 +10,7 @@ use prost::Message;
 use crate::archive::RawMessage;
 use crate::charts::IWorkChartArchive;
 use crate::charts::source::{CHART_MESSAGE_TYPE, LEGEND_STYLE_MESSAGE_TYPE};
+use crate::charts::style::{clone_vec_fallible, copy_wire_bytes, encode_wire_message};
 use crate::charts::unique_chart_object_archive_name;
 use crate::package_metadata::{
     next_object_identifier, release_package_identifier_suffix, set_package_last_object_identifier,
@@ -191,7 +192,8 @@ impl LegendStyleSlot {
         })?;
         let mut archive_info = source.archive_info.clone();
         archive_info.identifier = Some(style_id);
-        let mut variation = crate::archive::ArchiveObject::new(style_id, source.messages.clone())?;
+        let messages = clone_vec_fallible(&source.messages, "legend style variation messages")?;
+        let mut variation = crate::archive::ArchiveObject::new(style_id, messages)?;
         variation.archive_info = archive_info;
         let message = variation.messages.get(self.message_index).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -298,7 +300,9 @@ impl LegendStyleSlot {
         chart_archive_name: &str,
         drawable_object_id: u64,
     ) -> Result<bool> {
-        let child_data = self.read(package, |data| Ok(data.to_vec()))?;
+        let child_data = self.read(package, |data| {
+            copy_wire_bytes(data, "legend style child payload")
+        })?;
         let child = tsch::LegendStyleArchive::decode(child_data.as_slice())?;
         let Some(style) = child.super_.as_ref() else {
             return Ok(false);
@@ -328,17 +332,21 @@ impl LegendStyleSlot {
         let parent = parent_archive.object(parent_style_id).ok_or_else(|| {
             Error::InvalidFormat(format!("legend style parent {parent_style_id} is missing"))
         })?;
-        let parent_data = parent
+        let mut parent_messages = parent
             .messages
             .iter()
             .filter(|message| message.type_ == LEGEND_STYLE_MESSAGE_TYPE)
-            .map(|message| message.data.as_slice())
-            .collect::<Vec<_>>();
-        let [parent_data] = parent_data.as_slice() else {
+            .map(|message| message.data.as_slice());
+        let Some(parent_data) = parent_messages.next() else {
             return Err(Error::InvalidFormat(format!(
                 "legend style parent {parent_style_id} must have exactly one payload"
             )));
         };
+        if parent_messages.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "legend style parent {parent_style_id} must have exactly one payload"
+            )));
+        }
         if without_style_archive(&child_data)? != without_style_archive(parent_data)? {
             return Ok(false);
         }
@@ -451,13 +459,13 @@ fn make_style_variation(
     let parent = tsp::Reference {
         identifier: parent_style_id,
         ..Default::default()
-    }
-    .encode_to_vec();
+    };
+    let parent = encode_wire_message(&parent, "legend style parent reference")?;
     let stylesheet = tsp::Reference {
         identifier: stylesheet_id,
         ..Default::default()
-    }
-    .encode_to_vec();
+    };
+    let stylesheet = encode_wire_message(&stylesheet, "legend style stylesheet reference")?;
     transform_length_delimited_field(data, LEGEND_STYLE_SUPER_FIELD, |super_data| {
         let super_data = patch_length_delimited_field(
             super_data,
@@ -491,19 +499,22 @@ fn patch_chart_legend_style(
         let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
             Error::InvalidFormat(format!("chart {drawable_object_id} is missing"))
         })?;
-        let indexes = object
+        let mut chart_messages = object
             .messages
             .iter()
             .enumerate()
-            .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE)
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-        let [index] = indexes.as_slice() else {
+            .filter(|(_, message)| message.type_ == CHART_MESSAGE_TYPE);
+        let Some((index, _)) = chart_messages.next() else {
             return Err(Error::InvalidFormat(format!(
                 "chart {drawable_object_id} must have exactly one chart payload"
             )));
         };
-        let original = &object.messages[*index];
+        if chart_messages.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "chart {drawable_object_id} must have exactly one chart payload"
+            )));
+        }
+        let original = &object.messages[index];
         let data = transform_length_delimited_field(
             original.data.as_slice(),
             CHART_ARCHIVE_EXTENSION_FIELD,
@@ -520,13 +531,21 @@ fn patch_chart_legend_style(
             },
         )?;
         object.replace_message(
-            *index,
+            index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
                 data,
             },
         )?;
-        let info = &mut object.archive_info.message_infos[*index];
+        let info = object
+            .archive_info
+            .message_infos
+            .get_mut(index)
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "chart {drawable_object_id} chart payload metadata is missing"
+                ))
+            })?;
         let mut replaced = 0usize;
         for reference in &mut info.object_references {
             if *reference == old_style_id {
@@ -570,5 +589,40 @@ pub(crate) fn generated_legend_style_extension(data: &[u8]) -> Result<Option<&[u
             "legend style extension {GENERATED_LEGEND_STYLE_EXTENSION_FIELD} is not length-delimited"
         )));
     }
-    Ok(Some(&data[extension.payload_start()..extension.end()]))
+    extension.validate_canonical_framing(data)?;
+    Ok(Some(extension.checked_payload(data)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protobuf::tsch;
+    use crate::wire::{append_length_delimited_field, parse_wire_fields};
+
+    #[test]
+    fn legend_style_extension_requires_canonical_outer_framing() {
+        let mut original = tsch::LegendStyleArchive::default().encode_to_vec();
+        append_length_delimited_field(
+            &mut original,
+            GENERATED_LEGEND_STYLE_EXTENSION_FIELD,
+            b"opaque",
+        )
+        .unwrap();
+        let field = parse_wire_fields(&original)
+            .unwrap()
+            .into_iter()
+            .find(|field| field.number() == GENERATED_LEGEND_STYLE_EXTENSION_FIELD)
+            .unwrap();
+        let mut malformed = original[..field.key_end()].to_vec();
+        let mut length = original[field.key_end()..field.payload_start()].to_vec();
+        let last = length.pop().unwrap();
+        length.push(last | 0x80);
+        length.push(0);
+        malformed.extend_from_slice(&length);
+        malformed.extend_from_slice(&original[field.payload_start()..field.end()]);
+        malformed.extend_from_slice(&original[field.end()..]);
+
+        let error = generated_legend_style_extension(&malformed).unwrap_err();
+        assert!(error.to_string().contains("noncanonical length prefix"));
+    }
 }

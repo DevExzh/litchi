@@ -40,6 +40,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_chart_title"
+path = "fuzz_targets/keynote_chart_title.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_lock"
 path = "fuzz_targets/numbers_table_lock.rs"
 test = false
@@ -68,6 +75,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_table_cell_api"
+path = "fuzz_targets/numbers_table_cell_api.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "pages_page_layout"
 path = "fuzz_targets/pages_page_layout.rs"
 test = false
@@ -84,6 +98,13 @@ bench = false
 [[bin]]
 name = "pages_section_text"
 path = "fuzz_targets/pages_section_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_section_pagination"
+path = "fuzz_targets/pages_section_pagination.rs"
 test = false
 doc = false
 bench = false

@@ -2239,3 +2239,31 @@ Text and Boolean where Numbers semantics require it; direct Text remains a
 typed formula error. Arrays, spills, deferred or volatile state, pivots, raw
 formula identities, ambiguous owners, and unsupported native host shapes fail
 closed rather than entering the public model.
+
+## 2026-08-23 superseding amendment: Keynote soundtrack-reference order ownership
+
+This amendment supersedes the earlier current-state wording that assigned
+soundtrack item ordering to the migration host; those earlier dated passages
+remain historical. `litchi-keynote::soundtrack::order` now owns the bounded
+`Edit`/`Patch`/`Commit` transaction exposed through
+`Package::{edit_soundtrack_order, apply_soundtrack_order}`.
+
+The semantic operation is one checked move of an existing soundtrack media
+reference. It validates the rooted Document field 2 -> Show field 17 -> type-21
+Soundtrack chain, streams the bounded field-3 reference sequence, and preserves
+the referenced assets, data-reference metadata, unknown fields, and all
+unrelated package bytes. No media payload or asset is created, removed,
+replaced, allocated, reclaimed, or otherwise edited by this seam. The existing
+focused `soundtrack::{Mode, Settings}` API remains the separate owner for
+playback mode and volume only.
+
+The remaining soundtrack media/settings CRUD and legacy host compatibility stay
+with `litchi-iwa`, including item/asset creation and add/insert/replace/remove
+operations, lifecycle/reclamation, and host-facing readers/editors outside the
+two focused package seams. The order transaction is therefore a bounded
+semantic ownership slice, not a general soundtrack facade or compatibility
+alias.
+
+Its package-level bounded cases do not constitute a native Keynote open/save
+gate. No `litchi-iwa` host edge or ordered debt is retired, and this amendment
+makes no host-exit or monolith-exit claim.

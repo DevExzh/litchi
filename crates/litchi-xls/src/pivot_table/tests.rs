@@ -77,7 +77,7 @@ mod worksheet_view_record_tests {
 }
 
 #[cfg(test)]
-mod tests {
+mod parse_tests {
     use super::*;
 
     #[test]

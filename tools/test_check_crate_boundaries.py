@@ -483,6 +483,53 @@ def add_pages_section_background_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_pages_table_lock_canonical_scaffold(root: Path) -> None:
+    semantic = root / boundaries.PAGES_TABLE_LOCK_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use litchi_iwa_common::table::lock::State;\n"
+        "pub type BodyTableLockState = State;\n",
+        encoding="utf-8",
+    )
+    owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        + "".join(
+            f"pub fn {method}() {{}}\n"
+            for method in boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS
+        )
+        + "}\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[0]
+    table_export = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+    package_export = root / boundaries.PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text(
+        "pub mod table;\n"
+        "pub use package::{BodyTableLockCommit, BodyTableLockDiagnostics, "
+        "BodyTableLockEdit, BodyTableLockError, BodyTableLockLimitKind, "
+        "BodyTableLockPatch};\n",
+        encoding="utf-8",
+    )
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod table_lock;\n"
+        "pub use table_lock::{BodyTableLockCommit, BodyTableLockDiagnostics, "
+        "BodyTableLockEdit, BodyTableLockError, BodyTableLockLimitKind, "
+        "BodyTableLockPatch};\n",
+        encoding="utf-8",
+    )
+    table_export.write_text(
+        "pub mod lock;\n", encoding="utf-8"
+    )
+
+
 class BoundaryPolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -996,6 +1043,104 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_litchi_facade_source_topology(root), [])
 
+    def test_litchi_semantic_facades_require_complete_checked_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            facade.parent.mkdir(parents=True)
+            source = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
+            source = source.replace(
+                "Body, Document, DocumentReadOptions",
+                "Body, Document, RemovedReadOptions",
+                1,
+            )
+            facade.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_litchi_semantic_facade_source_topology(root)
+
+            self.assertTrue(
+                any(
+                    "pages semantic facade is missing exports" in violation
+                    and "DocumentReadOptions" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+
+    def test_litchi_semantic_facades_reject_package_aliases_and_globs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            facade.parent.mkdir(parents=True)
+            source = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
+            source = source.replace(
+                "        pub use litchi_pages::{\n            Body, Document,",
+                "        pub use litchi_pages::{\n            Package, Body, Document,",
+                1,
+            )
+            source = source.replace(
+                "        pub use litchi_numbers::{\n            Document, DocumentError as Error,",
+                "        pub use litchi_numbers::*;\n"
+                "        pub use litchi_numbers::{\n"
+                "            Document, DocumentError as Error,",
+                1,
+            )
+            facade.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_litchi_semantic_facade_source_topology(root)
+
+            self.assertTrue(
+                any("pages semantic facade exposes forbidden `Package`" in violation
+                    for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("numbers semantic facade exposes a glob re-export" in violation
+                    for violation in violations),
+                violations,
+            )
+
+    def test_iwork_examples_reject_legacy_editor_and_native_id_calls(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            example = root / boundaries.IWORK_EXAMPLE_SOURCES[1]
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "use litchi_iwa::numbers::NumbersEditor;\n"
+                "fn main() { let _ = table.id(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwork_example_source_topology(root)
+
+            self.assertTrue(
+                any("legacy litchi-iwa API" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("native object identifier call" in violation for violation in violations),
+                violations,
+            )
+
+    def test_iwork_examples_allow_semantic_readers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, source in (
+                (
+                    boundaries.IWORK_EXAMPLE_SOURCES[0],
+                    "use litchi::iwork::Document;\nfn main() {}\n",
+                ),
+                (
+                    boundaries.IWORK_EXAMPLE_SOURCES[1],
+                    "use litchi_numbers::Document;\nfn main() {}\n",
+                ),
+            ):
+                example = root / relative
+                example.parent.mkdir(parents=True, exist_ok=True)
+                example.write_text(source, encoding="utf-8")
+
+            self.assertEqual(boundaries.audit_iwork_example_source_topology(root), [])
+
     def test_litchi_facade_requires_an_empty_default_feature(self) -> None:
         snapshot = valid_snapshot(self.policy)
         definitions = dict(snapshot.feature_definitions)
@@ -1416,7 +1561,6 @@ class BoundaryPolicyTests(unittest.TestCase):
             module.parent.mkdir(parents=True)
             module.write_text(
                 "pub use creation::KeynoteDocumentBuilder;\n"
-                "pub use litchi_keynote::document::Document;\n"
                 "pub use litchi_keynote::Package;\n",
                 encoding="utf-8",
             )
@@ -1444,6 +1588,26 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(
                 boundaries.audit_iwa_keynote_document_source_topology(root), []
+            )
+
+    def test_iwa_keynote_document_reader_cannot_reexport_focused_document(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / boundaries.IWA_KEYNOTE_MODULE_SOURCE
+            module.parent.mkdir(parents=True)
+            module.write_text(
+                "pub use litchi_keynote::document::Document;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_document_source_topology(root),
+                [
+                    "retired litchi-iwa Keynote focused Document re-export: "
+                    "crates/litchi-iwa/src/keynote/mod.rs:1",
+                ],
             )
 
     def test_retired_iwa_keynote_show_settings_inventory_is_exact(self) -> None:
@@ -2383,6 +2547,31 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_keynote_soundtrack_settings_source_topology(root),
                 [],
+            )
+
+    def test_iwa_keynote_soundtrack_order_policy_rejects_exact_sibling_method_and_ignores_near_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sibling = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/other.rs"
+            sibling.parent.mkdir(parents=True)
+            sibling.write_text(
+                "// pub fn move_soundtrack_item() {}\n"
+                'const NOTE: &str = "fn move_soundtrack_item() {}";\n'
+                "pub fn move_soundtrack_items() {}\n"
+                "pub fn move_soundtrack_item_for_test() {}\n"
+                "pub fn move_soundtrack_item() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_soundtrack_order_source_topology(root),
+                [
+                    "retired litchi-iwa Keynote soundtrack-order method "
+                    "move_soundtrack_item: "
+                    "crates/litchi-iwa/src/keynote/editor/other.rs:5"
+                ],
             )
 
     def test_focused_keynote_soundtrack_settings_requires_each_canonical_type(
@@ -8762,6 +8951,51 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_keynote_document_public_api(root), [])
 
+    def test_focused_keynote_document_reader_public_api_allows_semantic_limits(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct DocumentSemanticLimits;\n"
+                "impl DocumentSemanticLimits {\n"
+                "pub const fn new(\n"
+                "max_objects: usize,\n"
+                "max_slides: usize,\n"
+                "max_references: usize,\n"
+                "max_text_storages: usize,\n"
+                "max_text_fragments: usize,\n"
+                "max_text_bytes: usize,\n"
+                ") -> Result<Self, DocumentSemanticLimitsError> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_keynote_document_public_api(root), [])
+
+    def test_focused_keynote_document_reader_public_api_keeps_physical_object_detection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn inspect(max_object_count: usize) {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_document_public_api(root)
+            self.assertTrue(
+                any(
+                    "native object max_object_count" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+
     def test_focused_keynote_package_no_eager_prost_allows_test_only_usage(
         self,
     ) -> None:
@@ -8929,6 +9163,55 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_keynote_package_no_eager_prost_source_topology(root),
                 [],
             )
+
+    def test_focused_keynote_chart_title_rejects_legacy_calls_and_ignores_near_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package/chart_title.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// editor.set_slide_chart_title(0, id, title);\n"
+                'const NOTE: &str = "editor.remove_slide_chart_title(0, id)";\n'
+                "fn set_slide_chart_title_by_selector() {}\n"
+                "fn remove_slide_chart_title_for_test() {}\n"
+                "fn set_slide_chart_title() {}\n"
+                "fn remove_slide_chart_title() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_chart_title_legacy_calls(root),
+                [
+                    "focused litchi-keynote chart-title source retains legacy call "
+                    "remove_slide_chart_title: "
+                    "crates/litchi-keynote/src/package/chart_title.rs:6",
+                    "focused litchi-keynote chart-title source retains legacy call "
+                    "set_slide_chart_title: "
+                    "crates/litchi-keynote/src/package/chart_title.rs:5",
+                ],
+            )
+
+    def test_focused_keynote_chart_title_allows_semantic_transaction_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package/chart_title.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "impl Package {\n"
+                "    pub fn slide_chart_title() {}\n"
+                "    pub fn edit_slide_chart_title() {}\n"
+                "    pub fn apply_slide_chart_title() {}\n"
+                "    pub fn set_slide_chart_title_by_selector() {}\n"
+                "    pub fn remove_slide_chart_title_by_selector() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_keynote_chart_title_legacy_calls(root), [])
 
     def test_focused_numbers_package_no_eager_prost_allows_test_only_usage(
         self,
@@ -9586,6 +9869,114 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_extractor_no_eager_formula_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = decode_formula_archive(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tsce::FormulaArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = FormulaArchive::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_formula_rejects_production_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = litchi_iwa_protos::tsce::FormulaArchive\n"
+                "        ::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "FormulaArchive::decode: "
+                    "crates/litchi-numbers/src/package/extractor.rs:2",
+                ],
+            )
+
+    def test_focused_numbers_extractor_allows_bounded_formula_compatibility_fallback(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct FormulaArchiveBytes { bytes: Box<[u8]> }\n"
+                "impl FormulaArchiveBytes {\n"
+                "    fn decode(&self) -> Result<tsce::FormulaArchive> {\n"
+                "        tsce::FormulaArchive::decode(self.bytes.as_ref())\n"
+                "    }\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_formula_fallback_requires_source_bytes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct FormulaArchiveBytes { bytes: Box<[u8]> }\n"
+                "impl FormulaArchiveBytes {\n"
+                "    fn decode(&self, bytes: &[u8]) -> Result<tsce::FormulaArchive> {\n"
+                "        tsce::FormulaArchive::decode(bytes)\n"
+                "    }\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("FormulaArchive::decode", violations[0])
+
     def test_focused_numbers_names_package_no_eager_prost_rejects_production_markers(
         self,
     ) -> None:
@@ -10075,6 +10466,341 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(
                 boundaries.audit_pages_page_layout_facade_source_topology(root), []
+            )
+
+    def test_pages_table_lock_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_METHODS,
+            ("body_table_lock_state", "set_body_table_lock_state"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE,
+            Path("crates/litchi-iwa/src/pages/editor/tables/lock.rs"),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_LOCK_IMPLEMENTATION_SOURCES,
+            (
+                Path("crates/litchi-pages/src/package/table_lock.rs"),
+                Path("crates/litchi-pages/src/table/lock.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES,
+            (
+                Path("crates/litchi-pages/src/lib.rs"),
+                Path("crates/litchi-pages/src/package.rs"),
+                Path("crates/litchi-pages/src/table/mod.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES,
+            (
+                "BodyTableLockEdit",
+                "BodyTableLockPatch",
+                "BodyTableLockCommit",
+                "BodyTableLockDiagnostics",
+                "BodyTableLockError",
+                "BodyTableLockLimitKind",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS,
+            (
+                "body_table_lock",
+                "edit_body_table_lock",
+                "apply_body_table_lock",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_LOCK_FLAT_METHODS,
+            {"table_lock", "edit_table_lock", "apply_table_lock"},
+        )
+        self.assertTrue(
+            {
+                "TableLockEdit",
+                "TableLockPatch",
+                "TableLockCommit",
+            }
+            <= boundaries.PAGES_TABLE_LOCK_FLAT_ALIASES
+        )
+
+    def test_retired_iwa_pages_table_lock_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lock_source = root / boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_SOURCE
+            lock_source.parent.mkdir(parents=True)
+            lock_source.write_text(
+                "pub fn body_table_lock_state(model_object_id: u64) {}\n"
+                "pub fn set_body_table_lock_state(model_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            module = root / boundaries.IWA_PAGES_TABLES_MODULE_SOURCE
+            module.parent.mkdir(parents=True, exist_ok=True)
+            module.write_text("pub(crate) mod lock;\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "pages.set_body_table_lock_state(pages_table.model_object_id, state);\n",
+                encoding="utf-8",
+            )
+            readme = root / boundaries.IWA_PAGES_README
+            readme.parent.mkdir(parents=True, exist_ok=True)
+            readme.write_text(
+                "PagesEditor::body_table_lock_state(model_object_id);\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_pages_table_lock_source_topology(root)
+
+            self.assertEqual(len(violations), 6)
+            self.assertTrue(
+                any("table-lock source returned" in item for item in violations),
+                violations,
+            )
+            for method in boundaries.RETIRED_IWA_PAGES_TABLE_LOCK_METHODS:
+                self.assertTrue(any(f"method {method}:" in item for item in violations))
+            self.assertTrue(any("module declaration" in item for item in violations))
+            self.assertTrue(any("example call" in item for item in violations))
+            self.assertTrue(any("README call" in item for item in violations))
+
+    def test_iwa_pages_table_lock_policy_ignores_non_code_near_names_and_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/old.rs"
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "\n".join(
+                    [
+                        "// pub fn body_table_lock_state() {}",
+                        'const NOTE: &str = "fn set_body_table_lock_state() {}";',
+                        "/* fn body_table_lock_state() {} */",
+                        "pub fn body_table_lock_state_snapshot() {}",
+                        "pub fn reset_body_table_lock_state() {}",
+                        "pub fn set_body_table_lock_states() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            module = root / boundaries.IWA_PAGES_TABLES_MODULE_SOURCE
+            module.parent.mkdir(parents=True, exist_ok=True)
+            module.write_text(
+                "// mod lock;\n"
+                'const NOTE: &str = "mod lock;";\n'
+                "mod lock_legacy;\n"
+                "use crate::table_lock;\n",
+                encoding="utf-8",
+            )
+            for relative in (
+                Path("crates/litchi-pages/src/package/table_lock.rs"),
+                Path("crates/litchi-keynote/src/package/table_lock.rs"),
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "pub fn body_table_lock_state(model_object_id: u64) {}\n",
+                    encoding="utf-8",
+                )
+            non_rust = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/tables/lock.txt"
+            non_rust.write_text(
+                "pub fn body_table_lock_state() {}\n", encoding="utf-8"
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_lock_source_topology(root), []
+            )
+
+    def test_focused_pages_table_lock_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_lock_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_table_lock_facade_source_topology(root),
+                        [
+                            "focused litchi-pages table-lock public API is missing "
+                            f"canonical package table-lock type {missing}: "
+                            "crates/litchi-pages/src/package/table_lock.rs"
+                        ],
+                    )
+
+    def test_focused_pages_table_lock_requires_each_package_method(self) -> None:
+        for missing in boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_lock_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_table_lock_facade_source_topology(root),
+                        [
+                            "focused litchi-pages table-lock public API is missing "
+                            f"Package method {missing}: "
+                            "crates/litchi-pages/src/package/table_lock.rs"
+                        ],
+                    )
+
+    def test_focused_pages_table_lock_rejects_physical_leaks_and_globs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_lock(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n"
+                "pub fn edit_body_table_lock() {}\n"
+                "pub fn apply_body_table_lock() {}\n"
+                "}\n"
+                "pub type TableLockPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableLockArchive as TableLockPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+            table.write_text("pub mod lock;\npub use lock::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::lock glob",
+                "retains flat alias TableLockPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_lock_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_lock() {}\n"
+                "pub fn edit_body_table_lock() {}\n"
+                "pub fn apply_body_table_lock() {}\n"
+                "}\n"
+                "fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            helper = root / boundaries.PAGES_TABLE_LOCK_OWNER_HELPER_ROOT / "resolve.rs"
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "pub(crate) fn resolve_object_id(object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod lock;\n"
+                "pub use lock::State;\n"
+                "pub struct Table;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_lock_facade_source_topology(root), []
+            )
+
+    def test_focused_pages_table_lock_rejects_flat_methods(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_lock() {}\n"
+                "pub fn edit_body_table_lock() {}\n"
+                "pub fn apply_body_table_lock() {}\n"
+                "pub fn table_lock() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("retains flat Package method table_lock", violations[0])
+
+    def test_focused_pages_table_lock_ignores_unrelated_package_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            package = root / boundaries.PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE
+            with package.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub enum PackageError { Archive, ObjectLimit }\n"
+                    "pub struct PackageResult;\n"
+                )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_lock_facade_source_topology(root), []
             )
 
     def test_retired_iwa_pages_document_settings_method_inventory_is_exact(

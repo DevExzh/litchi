@@ -22,7 +22,9 @@ use crate::{Error, Limits, Result};
     clippy::module_name_repetitions,
     reason = "PackageState is the explicit cache-coherent state for physical package snapshots."
 )]
-pub use crate::package_state::{GetOrInsertError, PackageState, ParseError};
+pub use crate::package_state::{
+    GetOrInsertError, PackageState, ParseError, is_legacy_operation_storage,
+};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 /// An immutable, clone-cheap owner for exact package bytes.

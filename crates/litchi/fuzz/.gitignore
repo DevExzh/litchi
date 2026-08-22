@@ -1,4 +1,11 @@
 target
-corpus
+/corpus/*
+!/corpus/keynote_chart_title/
+/corpus/keynote_chart_title/*
+!/corpus/keynote_chart_title/valid.hex
+!/corpus/keynote_chart_title/visible_empty.hex
+!/corpus/keynote_chart_title/hidden_stale.hex
+!/corpus/keynote_chart_title/malformed_parent.hex
+!/corpus/keynote_chart_title/malformed_wire.hex
 artifacts
 coverage

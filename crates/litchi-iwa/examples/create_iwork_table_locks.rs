@@ -1,14 +1,16 @@
 //! Create Pages, Numbers, and Keynote files with locked native tables.
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::NumbersDocumentBuilder;
-use litchi_iwa::pages::{PagesDocumentBuilder, PagesEditor};
+use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::table::lock::State as LegacyTableLockState;
 use litchi_numbers::table::lock::State as NumbersLockState;
 use litchi_numbers::{Package as NumbersPackage, SheetSelector, TableSelector};
+use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -41,15 +43,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         NumbersLockState::Locked
     );
     let pages_path = output.join("table-lock.pages");
-    let mut pages = PagesDocumentBuilder::new()
+    let pages = PagesDocumentBuilder::new()
         .body_text("Created from scratch with litchi-iwa.\n")
         .body_table("Locked Table", 4, 3)
         .build()?;
-    let pages_table = pages.tables()?.remove(0);
-    pages.set_body_table_lock_state(pages_table.model_object_id, LegacyTableLockState::Locked)?;
-    pages.save(&pages_path)?;
+    let focused_pages = PagesPackage::from_bytes(&pages.to_bytes()?)?;
+    let mut pages_lock =
+        focused_pages.edit_body_table_lock(BodyTableSelector::name("Locked Table"))?;
+    pages_lock.lock();
+    let locked_pages = pages_lock.commit()?;
+    write_bytes_new(&pages_path, locked_pages.package().source_bytes())?;
     assert_eq!(
-        PagesEditor::open(&pages_path)?.body_table_lock_state(pages_table.model_object_id)?,
+        PagesPackage::open(&pages_path)?
+            .body_table_lock(BodyTableSelector::name("Locked Table"))?,
         LegacyTableLockState::Locked
     );
 
@@ -89,6 +95,20 @@ fn write_new(path: &Path, package: &NumbersPackage) -> Result<(), Box<dyn std::e
         .unwrap_or_else(|| Path::new("."));
     let mut temporary = NamedTempFile::new_in(parent)?;
     package.write_to(temporary.as_file_mut())?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .persist_noclobber(path)
+        .map_err(|error| error.error)?;
+    Ok(())
+}
+
+fn write_bytes_new(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut temporary = NamedTempFile::new_in(parent)?;
+    temporary.as_file_mut().write_all(bytes)?;
     temporary.as_file().sync_all()?;
     temporary
         .persist_noclobber(path)

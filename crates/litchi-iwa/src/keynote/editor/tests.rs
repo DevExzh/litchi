@@ -3150,13 +3150,6 @@ fn soundtrack_item_crud_is_ordered_transactional_and_wire_exact() {
     assert_eq!(items[0].asset.component_reference_count, 1);
     assert_eq!(items[0].asset.message_reference_count, 1);
 
-    editor.move_soundtrack_item(0, 1).unwrap();
-    let moved = editor.soundtrack_items().unwrap();
-    assert_eq!(moved[0].asset.data_identifier, first.asset.data_identifier);
-    assert_eq!(moved[1].asset.data_identifier, second.asset.data_identifier);
-    editor.move_soundtrack_item(1, 0).unwrap();
-    assert_eq!(editor.soundtrack_items().unwrap(), items);
-
     let replaced = editor
         .replace_soundtrack_item(1, "replacement.aif", REPLACEMENT)
         .unwrap();
@@ -3176,7 +3169,6 @@ fn soundtrack_item_crud_is_ordered_transactional_and_wire_exact() {
             .insert_soundtrack_item(3, "bad.aiff", SECOND)
             .is_err()
     );
-    assert!(editor.move_soundtrack_item(0, 2).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
     editor.remove_soundtrack_item(1).unwrap();

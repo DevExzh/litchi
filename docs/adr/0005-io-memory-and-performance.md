@@ -74,10 +74,14 @@ Limit failures retain the resource kind and exact observed and maximum values.
 This layer does not yet promise a semantic object path in every physical ZIP
 diagnostic.
 
-Buffa lazy decoding of untrusted IWA bytes is always preceded by a
-schema-directed common wire-tree preflight. One aggregate policy bounds scanned
-bytes, fields, nesting, repeated metadata items, deferred-message occurrences,
-and a conservative decoded-memory envelope before a lazy view is constructed.
+Buffa lazy decoding of untrusted IWA bytes in focused format-owned and
+`litchi-iwa-core` ingress paths is preceded by a schema-directed common
+wire-tree preflight. Legacy host compatibility decoders remain migration debt:
+the `litchi-iwa` registry calls `archive_codec::decode_archive_info` and
+`decode_message_info` directly with bounded options, without this common
+preflight. One aggregate policy bounds scanned bytes, fields, nesting, repeated
+metadata items, deferred-message occurrences, and a conservative decoded-memory
+envelope before a lazy view is constructed.
 The adapter then visits every deferred archive-header child exactly once,
 checks proto2 required presence, and projects directly into the existing
 physical metadata with fallible destination reservations; generated
@@ -453,16 +457,28 @@ type-6011 Segment proof was established. This is bounded correctness evidence
 only: it makes no native segment or save-mutation, performance, host-exit, or
 complete-monolith-retirement claim.
 
+## 2026-08-23 amendment: Keynote plain-text allocation shape
+
+`Slide::plain_text` now computes a checked aggregate UTF-8 length for its
+semantic text values, reserves one output `String` when representable, and
+appends directly in source order without first constructing the intermediate
+`Vec<String>` used by `all_text()`. Empty text storages remain filtered, while
+empty modeled values retain their separators. This is structural allocation
+shape and ordering evidence only; it makes no allocation-count, latency, RSS,
+throughput, or peak-memory claim and is not a measured performance result.
+
 ## Current present status
 
-The current boundary checker reports 64 workspace packages, 239 internal
-dependency declarations, and 13 ordered migration debts. The focused protocol
-codec check records 33 passed tests; the full `litchi-iwa-protos` suite is
-verified at 267 passed and 0 failed. The current Numbers library run records
-356 passed tests with four ignored. The current `litchi-iwa` library gate
-records 1,442 passed tests; the Pages all-target gate records 149 passed tests,
-and the current Keynote all-target gate is passing. The prior XLS certification
-gate remains at 2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
+The recorded detached baseline reports 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered migration debts; its commit/tree
+provenance is unavailable in this checkout. Its focused protocol codec check
+records 33 passed tests; the full `litchi-iwa-protos` suite records 267 passed
+and 0 failed. The baseline Numbers library gate records 356 passed tests with
+four ignored. The baseline `litchi-iwa` library gate records 1,442 passed
+tests; the Pages all-target gate records 149 passed tests, and the Keynote
+all-target gate passes. These detached-baseline metrics are historical
+evidence, not current-wave gate results. The prior XLS certification gate
+remains at 2,146 passed across BIFF15/CFB254/XLSB603/XLS1274.
 
 Native no-repair reopen evidence covers Keynote transition/title and Pages
 body/background paths. A native Numbers rich/formula/comment reopen retained

@@ -14,7 +14,9 @@ use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
 use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
-use litchi_numbers::{Document, Package, PackageError, PackageSemanticPath};
+use litchi_numbers::{
+    CellPosition, Document, Package, TableCellCommentError, TableCellCommentPath,
+};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -41,6 +43,8 @@ const TILE_ID: u64 = 6;
 const RICH_TEXT_PAYLOAD_ID: u64 = 101;
 const RICH_TEXT_STORAGE_ID: u64 = 102;
 const COMMENT_STORAGE_ID: u64 = 111;
+const ISOLATED_COMMENT_STORAGE_ID: u64 = 114;
+const SEGMENT_COMMENT_STORAGE_ID: u64 = 115;
 const COMMENT_REPLY_ID: u64 = 112;
 const COMMENT_REPLY_TWO_ID: u64 = 113;
 const COMMENT_AUTHOR_ID: u64 = 121;
@@ -144,10 +148,14 @@ fn rich_text_entry(key: u32) -> tst::table_data_list::ListEntry {
 }
 
 fn comment_entry(key: u32) -> tst::table_data_list::ListEntry {
+    comment_entry_for_storage(key, COMMENT_STORAGE_ID)
+}
+
+fn comment_entry_for_storage(key: u32, storage_identifier: u64) -> tst::table_data_list::ListEntry {
     tst::table_data_list::ListEntry {
         key,
         refcount: 1,
-        comment_storage: Some(reference(COMMENT_STORAGE_ID)),
+        comment_storage: Some(reference(storage_identifier)),
         ..Default::default()
     }
 }
@@ -181,7 +189,14 @@ fn segment_entries(
         tst::table_data_list::ListType::Formula => vec![formula_entry(key)],
         tst::table_data_list::ListType::FormulaError => vec![formula_error_entry(key)],
         tst::table_data_list::ListType::RichTextPayload => vec![rich_text_entry(key)],
-        tst::table_data_list::ListType::CommentStorage => vec![comment_entry(key)],
+        tst::table_data_list::ListType::CommentStorage => vec![comment_entry_for_storage(
+            key,
+            if key == 12 {
+                SEGMENT_COMMENT_STORAGE_ID
+            } else {
+                COMMENT_STORAGE_ID
+            },
+        )],
         _ => Vec::new(),
     }
 }
@@ -325,7 +340,13 @@ fn sidecar_object(corruption: Corruption) -> TestResult<ArchiveObject> {
     );
     let comment_list = list_message(
         tst::table_data_list::ListType::CommentStorage,
-        bounded([comment_entry(50), comment_entry(2)], 2)?,
+        bounded(
+            [
+                comment_entry_for_storage(50, ISOLATED_COMMENT_STORAGE_ID),
+                comment_entry(2),
+            ],
+            2,
+        )?,
         bounded([reference(92), reference(91)], 2)?,
     );
 
@@ -455,10 +476,9 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
                     },
                     RawMessage {
                         type_: COMMENT_STORAGE_MESSAGE_TYPE,
-                        // Keep the valid candidate first: legacy extraction
-                        // decoded every candidate before applying cardinality,
-                        // so this malformed second candidate must win over the
-                        // duplicate-payload diagnostic.
+                        // Keep the valid candidate first so this fixture
+                        // exercises duplicate handling independently of
+                        // candidate ordering.
                         data: vec![0xff],
                     },
                 ],
@@ -467,6 +487,38 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
         )?);
     }
     object(COMMENT_STORAGE_ID, COMMENT_STORAGE_MESSAGE_TYPE, data)
+}
+
+fn isolated_comment_storage_object() -> TestResult<ArchiveObject> {
+    object(
+        ISOLATED_COMMENT_STORAGE_ID,
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        tsd::CommentStorageArchive {
+            text: Some("Comment retained by Package".to_owned()),
+            storage_uuid: Some(tsp::Uuid {
+                lower: ISOLATED_COMMENT_STORAGE_ID,
+                upper: 0x6973_6f6c_6174_6564,
+            }),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )
+}
+
+fn segmented_comment_storage_object() -> TestResult<ArchiveObject> {
+    object(
+        SEGMENT_COMMENT_STORAGE_ID,
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        tsd::CommentStorageArchive {
+            text: Some("Comment retained by Package".to_owned()),
+            storage_uuid: Some(tsp::Uuid {
+                lower: SEGMENT_COMMENT_STORAGE_ID,
+                upper: 0x7365_676d_656e_7464,
+            }),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )
 }
 
 fn comment_reply_storage_object(identifier: u64, text: &str) -> TestResult<ArchiveObject> {
@@ -626,6 +678,8 @@ fn synthetic_table_data_list_package(
     objects.push(rich_text_payload_object()?);
     objects.push(rich_text_storage_object()?);
     objects.push(comment_storage_object(corruption)?);
+    objects.push(isolated_comment_storage_object()?);
+    objects.push(segmented_comment_storage_object()?);
     objects.push(comment_reply_storage_object(
         COMMENT_REPLY_ID,
         "First reply",
@@ -860,30 +914,129 @@ fn duplicate_comment_storage_payload_is_atomic_in_package_and_skipped_by_documen
 }
 
 #[test]
-fn malformed_duplicate_comment_payload_preserves_legacy_decode_precedence() -> TestResult {
-    let bytes =
-        synthetic_table_data_list_package(Corruption::CommentDuplicateMalformedPayload, 12)?;
-    let original = bytes.clone();
+fn malformed_duplicate_comment_payload_is_rejected_atomically() -> TestResult {
+    assert_package_rejects_comment_but_document_skips_it(
+        Corruption::CommentDuplicateMalformedPayload,
+    )
+}
 
-    let error = Package::from_bytes(&bytes).expect_err("malformed duplicate must be rejected");
-    let message = error.to_string();
-    assert!(
-        matches!(
-            &error,
-            PackageError::MalformedPayload {
-                path: PackageSemanticPath::StructuredTables
-            }
-        ),
-        "expected the malformed candidate error, got {message}"
-    );
-    assert!(
-        !message.contains("multiple TSD comment-storage payloads"),
-        "malformed candidate must win over cardinality, got {message}"
-    );
-    assert_eq!(bytes, original, "Package rejection mutated its source");
+#[test]
+fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResult {
+    // A5 points at the isolated root entry when the fixture uses key 50, so
+    // the replacement and inverse assertions exercise the supported seam.
+    let bytes = synthetic_table_data_list_package(Corruption::None, 50)?;
+    let original_bytes = bytes.clone();
+    let package = Package::from_bytes(&bytes)?;
+    let position = CellPosition::from_a1("A5")?;
+    let sheet = "Mixed table-data-list sheet";
+    let table = "Mixed table-data-list table";
 
-    let document = Document::from_bytes(&bytes)?;
-    assert_semantics(&document)?;
-    assert_eq!(bytes, original, "Document parsing mutated its source");
+    let original = package
+        .table_cell_comment(sheet, table, position)?
+        .ok_or_else(|| std::io::Error::other("synthetic comment is missing"))?;
+    assert_eq!(original.text(), "Comment retained by Package");
+
+    let noop = package
+        .edit_table_cell_comment(sheet, table, position)?
+        .set(original.text())
+        .commit()?;
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
+
+    let changed = package.set_table_cell_comment(
+        sheet,
+        table,
+        position,
+        "Comment changed through Package",
+    )?;
+    assert_eq!(
+        changed
+            .package()
+            .table_cell_comment(sheet, table, position)?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("Comment changed through Package")
+    );
+    let restored = changed
+        .package()
+        .apply_table_cell_comment(&changed.patch().inverse())?;
+    assert_eq!(
+        restored
+            .package()
+            .table_cell_comment(sheet, table, position)?,
+        Some(original.clone())
+    );
+
+    let clear_error = package
+        .clear_table_cell_comment(sheet, table, position)
+        .expect_err("changed clear must be refused without graph cleanup");
+    assert!(matches!(
+        clear_error,
+        TableCellCommentError::UnsupportedDependency {
+            path: TableCellCommentPath::Cell {
+                sheet: 0,
+                table: 0,
+                row: 4,
+                column: 0,
+            },
+        }
+    ));
+    assert_eq!(bytes, original_bytes, "clear refusal mutated source bytes");
+    assert_eq!(
+        package.table_cell_comment(sheet, table, position)?,
+        Some(original.clone()),
+    );
+
+    // The same fixture also has a uniquely owned, segment-backed comment at
+    // key 12. Text replacement is supported for this shape, while changed
+    // clear remains refused until graph cleanup is implemented.
+    let segmented_bytes = synthetic_table_data_list_package(Corruption::None, 12)?;
+    let segmented_original_bytes = segmented_bytes.clone();
+    let segmented_package = Package::from_bytes(&segmented_bytes)?;
+    let segmented_original = segmented_package
+        .table_cell_comment(sheet, table, position)?
+        .ok_or_else(|| std::io::Error::other("segmented synthetic comment is missing"))?;
+    let segmented_changed = segmented_package.set_table_cell_comment(
+        sheet,
+        table,
+        position,
+        "Segment-backed comment changed through Package",
+    )?;
+    assert_eq!(
+        segmented_changed
+            .package()
+            .table_cell_comment(sheet, table, position)?
+            .as_ref()
+            .map(|comment| comment.text()),
+        Some("Segment-backed comment changed through Package")
+    );
+    assert!(segmented_changed.diagnostics().changed());
+    let segmented_error = segmented_package
+        .clear_table_cell_comment(sheet, table, position)
+        .expect_err("segmented changed clear must be refused");
+    assert!(matches!(
+        segmented_error,
+        TableCellCommentError::UnsupportedDependency {
+            path: TableCellCommentPath::Cell {
+                sheet: 0,
+                table: 0,
+                row: 4,
+                column: 0,
+            },
+        }
+    ));
+    assert_eq!(
+        segmented_bytes, segmented_original_bytes,
+        "segmented clear refusal mutated source bytes"
+    );
+    assert_eq!(
+        segmented_package.table_cell_comment(sheet, table, position)?,
+        Some(segmented_original.clone()),
+    );
+    let reopened = Package::from_bytes(&segmented_bytes)?;
+    assert_eq!(
+        reopened.table_cell_comment(sheet, table, position)?,
+        Some(segmented_original),
+    );
     Ok(())
 }

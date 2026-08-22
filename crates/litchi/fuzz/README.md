@@ -32,6 +32,17 @@ prefix as no-op, set, or clear commands for the first slide in native
 locality, exact-source application and conflicts, inversion, typed limits,
 redaction, and exact restoration using only the public package writer.
 
+`keynote_chart_title` is the focused selector-first chart-title target. It
+drives tiny source-built packages through positional and exact-name chart
+selectors, visible-empty and hidden-stale title states, set/clear/no-op
+commands (including an exact source-byte no-op for hidden/absent clears), exact
+patch application and inverse replay, duplicate-name ambiguity, and
+source/candidate publication checks. Separate malformed-parent
+and malformed-wire packages must fail closed without changing their source.
+The checked-in seeds are small ZIP/IWA packages under
+`corpus/keynote_chart_title/`; they contain no native fixture data. Arbitrary
+bytes still exercise bounded Keynote ingress before each transaction batch.
+
 `numbers_table_lock` is the focused interactive table-lock target. It offers
 arbitrary bytes to checked Numbers package ingress and also interprets them as
 bounded selector and lock-state commands against the native `basic.numbers`
@@ -62,6 +73,16 @@ name, local row/column references, bounded deep formula trees near the
 aggregate work ceiling, exact-source patch application and conflicts,
 inversion, and content-redacted failures.
 
+`numbers_table_cell_api` is the focused presence-preserving table-cell target.
+It offers arbitrary bytes to bounded Numbers ingress and reuses the native
+`basic.numbers` seed for checked and A1 reads, dense row-major ranges,
+`Storage::Missing` versus stored-empty observations, finite scalar set/clear
+shortcuts, exact no-op and inverse replay, and typed coordinate, selector, and
+resource failures. The harness imports only the public `litchi::numbers`
+facade; its shared fuzz manifest still enables the package's `iwork` feature,
+so Cargo builds the same complete root iWork dependency graph as the other
+focused targets.
+
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
 layout commands against the native `basic.pages` seed. It covers public layout
@@ -75,6 +96,14 @@ and reuses a fixed prefix for bounded option and footnote commands against the
 native `basic.pages` seed. It covers strict reads, exact no-ops, combined
 changes, exact-source conflicts, inversion, typed limits, content-redacted
 failures, and exact restoration without writing a package to disk.
+
+`pages_section_pagination` is the focused section-pagination target. It offers
+arbitrary bytes to checked Pages package ingress and reuses them as bounded
+selector and pagination commands against the native `basic.pages` seed. It
+covers presence-preserving start/numbering/page values, canonical and invalid
+enum aliases, exact no-op and changed commits, exact-source patch conflicts,
+inverse replay, failed-commit source atomicity, tightened output/resource
+profiles, and content-redacted failures without writing a package to disk.
 
 `parse_iwork` uses tighter limits than the public defaults: 2 MiB of source
 bytes, 512 package entries, 8 MiB per expanded entry and decoded IWA item,
@@ -100,6 +129,11 @@ transition, and validation commands consume at most 512 input bytes; keep
 `-max_len` at 512 so malformed ingress remains bounded while every input also
 reaches the native transition transaction.
 
+`keynote_chart_title` uses the same finite Keynote physical and semantic
+profile. Chart-title command bytes consume at most 1 KiB; keep `-max_len` at
+1 KiB so malformed ingress and every source-built chart transaction receive
+the same input.
+
 `numbers_table_lock` accepts at most 512 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
 expanded bytes. Its semantic profile admits at most 4,096 objects, 128 sheets,
@@ -123,6 +157,11 @@ at most a 5,461-node bounded formula tree; keep `-max_len` at 1 KiB so
 arbitrary ingress remains bounded while native transaction commands receive
 every input.
 
+`numbers_table_cell_api` uses the same finite Numbers physical and semantic
+profile. Table-cell commands consume only a small fixed prefix and replacement
+text is capped at 128 bytes; keep `-max_len` at 512 bytes so malformed ingress
+and native read/edit commands both receive every input.
+
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
 expanded bytes. Layout commands consume only a small fixed prefix; keep
@@ -133,6 +172,11 @@ every input also reaches the fixed native seed.
 Settings commands consume only a fixed prefix, so keep `-max_len` at 512 bytes
 to combine malformed-ingress mutations with deterministic native transaction
 coverage.
+
+`pages_section_pagination` reuses the same finite Pages physical profile.
+Pagination commands consume only a fixed prefix, so keep `-max_len` at 512
+bytes to combine malformed-ingress mutations with deterministic native
+transaction and resource-limit coverage.
 
 All targets currently share this package's single `litchi` dependency with
 the `iwork` feature. Cargo unifies dependency features for the package, so the
@@ -194,6 +238,14 @@ cargo +nightly fuzz run keynote_slide_transition -- \
   -max_len=512 -timeout=10 -rss_limit_mb=2048
 ```
 
+Run the focused chart-title target with its reviewable package seeds:
+
+```sh
+cargo +nightly fuzz run keynote_chart_title \
+  corpus/keynote_chart_title -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
 The `cargo +nightly fuzz run` commands are required for sanitizer-instrumented
 coverage. A stable `cargo run --bin <target> -- -runs=...` invocation is only
 a control-flow smoke test; on platforms without linked sanitizer runtimes it
@@ -227,6 +279,14 @@ cargo +nightly fuzz run numbers_formula_cells -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
+Run the focused Numbers table-cell API target without a checked-in duplicate
+corpus:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_api -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
+```
+
 Run the focused Pages target without a checked-in duplicate corpus:
 
 ```sh
@@ -238,6 +298,14 @@ Run the focused Pages document-settings target:
 
 ```sh
 cargo +nightly fuzz run pages_document_settings -- \
+  -max_len=512 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Pages section-pagination target with its checked-in command
+seeds:
+
+```sh
+cargo +nightly fuzz run pages_section_pagination corpus/pages_section_pagination -- \
   -max_len=512 -timeout=10 -rss_limit_mb=2048
 ```
 

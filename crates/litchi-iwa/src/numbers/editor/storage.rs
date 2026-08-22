@@ -1,8 +1,35 @@
 //! Table-data storage, rich-text, dependency, and tile wire updates.
 
 use super::*;
+use litchi_iwa_protos::numbers_table_cell_storage_codec as table_cell_storage_codec;
 
 const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6011;
+const TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+
+/// Give the generated-free table-cell projection the same finite profile used
+/// by the other Numbers readers.  This helper is intentionally local to the
+/// read-only list-message routing seam below; mutation still decodes the
+/// admitted payload into its existing owned Prost model before applying the
+/// source-preserving wire patchers.
+fn table_cell_storage_decode_options(source: &[u8]) -> table_cell_storage_codec::DecodeOptions {
+    table_cell_storage_codec::DecodeOptions::new(
+        source
+            .len()
+            .clamp(1, litchi_iwa_common::WireLimits::MAX_INPUT_BYTES),
+        source
+            .len()
+            .clamp(1, litchi_iwa_common::WireLimits::MAX_FIELDS),
+        source
+            .len()
+            .saturating_mul(32)
+            .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
+        TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT,
+        source.len().clamp(1, litchi_numbers::MAX_REFERENCES),
+        source
+            .len()
+            .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+    )
+}
 
 #[derive(Debug)]
 pub(super) struct RichTextEntryLocation {
@@ -2007,8 +2034,11 @@ pub(super) fn table_data_list_message_index(
 ) -> Option<usize> {
     object.messages.iter().position(|message| {
         (message.type_ == 6005 || message.type_ == 6201)
-            && TableDataList::decode(message.data.as_slice())
-                .is_ok_and(|list| list.list_type == list_type as i32)
+            && table_cell_storage_codec::decode_table_data_list_with_report(
+                message.data.as_slice(),
+                table_cell_storage_decode_options(message.data.as_slice()),
+            )
+            .is_ok_and(|(list, _report)| list.list_type() == list_type as i32)
     })
 }
 
@@ -3403,4 +3433,75 @@ pub(super) fn row_offset_capacity(tile: &Tile, table_columns: usize) -> usize {
         .max()
         .unwrap_or(table_columns)
         .max(table_columns)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn table_data_list_message_index_matches_prost_for_valid_payload() {
+        let mut payload = TableDataList {
+            list_type: tst::table_data_list::ListType::String as i32,
+            next_list_id: 3,
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 2,
+                refcount: 1,
+                string: Some("hello".to_owned()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        // Unknown fields are part of the source contract and must not make a
+        // candidate diverge from the generated decoder's admission result.
+        payload.extend_from_slice(&[0x98, 0x06, 0x01]);
+        assert!(TableDataList::decode(payload.as_slice()).is_ok());
+        let object = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 6005,
+                data: payload,
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(
+            table_data_list_message_index(&object, tst::table_data_list::ListType::String,),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn table_data_list_message_index_skips_invalid_candidate_without_mutation() {
+        let valid_payload = TableDataList {
+            list_type: tst::table_data_list::ListType::String as i32,
+            next_list_id: 1,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let object = ArchiveObject::new(
+            1,
+            vec![
+                RawMessage {
+                    type_: 6005,
+                    // Required next_list_id is absent, so the strict raw/Buffa
+                    // projection rejects this candidate.
+                    data: vec![0x08, tst::table_data_list::ListType::String as u8],
+                },
+                RawMessage {
+                    type_: 6005,
+                    data: valid_payload,
+                },
+            ],
+        )
+        .unwrap();
+        let before = object.messages.clone();
+
+        assert_eq!(
+            table_data_list_message_index(&object, tst::table_data_list::ListType::String,),
+            Some(1)
+        );
+        assert_eq!(object.messages, before);
+    }
 }

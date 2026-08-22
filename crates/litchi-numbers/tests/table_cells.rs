@@ -187,6 +187,62 @@ fn native_a1_read_helpers_match_checked_coordinate_reads() -> TestResult {
 }
 
 #[test]
+fn native_scalar_shortcuts_share_selector_atomic_and_inverse_paths() -> TestResult {
+    let package = Package::open(fixture_path())?;
+    let source = package.exact_bytes();
+    let b3 = CellPosition::from_a1("B3")?;
+
+    let no_op = package.set_table_cell(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        b3,
+        Input::number(42.0)?,
+    )?;
+    assert!(no_op.patch().is_noop());
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().exact_bytes(), source);
+
+    let changed = package.set_table_cell_a1(
+        SheetSelector::name("Sheet 1"),
+        TableSelector::name("Table 1"),
+        "B3",
+        Input::number(43.0)?,
+    )?;
+    assert_eq!(changed.diagnostics().requested_cells(), 1);
+    assert_eq!(changed.diagnostics().changed_cells(), 1);
+    assert!(matches!(
+        changed.package().table_cell(0usize, 0usize, b3)?.storage(),
+        Storage::Stored(Value::Number(value)) if value.get() == 43.0
+    ));
+
+    let cleared = changed.package().clear_table_cell(0usize, 0usize, b3)?;
+    assert!(matches!(
+        cleared.package().table_cell(0usize, 0usize, b3)?.storage(),
+        Storage::Stored(Value::Empty)
+    ));
+    assert_eq!(
+        cleared
+            .package()
+            .apply_table_cells(&cleared.patch().inverse())?
+            .package()
+            .exact_bytes(),
+        changed.package().exact_bytes()
+    );
+
+    let restored = changed
+        .package()
+        .apply_table_cells(&changed.patch().inverse())?;
+    assert_eq!(restored.package().exact_bytes(), source);
+
+    assert!(matches!(
+        package.clear_table_cell_a1(0usize, 0usize, "A0"),
+        Err(Error::InvalidAddress)
+    ));
+    assert_eq!(package.exact_bytes(), source);
+    Ok(())
+}
+
+#[test]
 fn native_dense_range_is_row_major_and_presence_preserving() -> TestResult {
     let package = Package::open(fixture_path())?;
     let states = package.table_cells(

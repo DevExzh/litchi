@@ -64,7 +64,6 @@ use theme::{chart_theme_context, patch_theme_chart_preset};
 
 use super::*;
 use crate::IWorkThemeArchive;
-use crate::charts::options::chart_title;
 use crate::charts::reference_line::chart_reference_line_objects;
 use crate::charts::source::{
     AXIS_NON_STYLE_MESSAGE_TYPE, AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE,
@@ -88,6 +87,7 @@ use crate::shapes::{
     remove_orphaned_image_asset,
 };
 use litchi_keynote::{ChartCatalog, ChartSelector, ChartSelectorError};
+use title::{focused_chart_catalog, slide_chart_title};
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
@@ -689,23 +689,9 @@ impl KeynoteEditor {
     fn slide_chart_catalog_from_charts(
         &self,
         slide_index: usize,
-        charts: &[KeynoteSlideChartInfo],
+        _charts: &[KeynoteSlideChartInfo],
     ) -> Result<ChartCatalog> {
-        let graph = ObjectGraph::read(self.package())?;
-        let context = text_box_create::text_box_context(&graph, slide_index)?;
-        let archive_name = graph.archive_name(context.slide_id)?;
-        let titles = charts
-            .iter()
-            .map(|chart| {
-                chart_title(
-                    self.package(),
-                    archive_name,
-                    chart.drawable_object_id,
-                    "Keynote",
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
-        Ok(ChartCatalog::from_owned_titles(titles))
+        focused_chart_catalog(self, slide_index)
     }
 
     fn update_slide_chart(

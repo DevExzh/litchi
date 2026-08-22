@@ -207,12 +207,12 @@ fn rich_text_projection_budget_is_inclusive_for_fields_and_work() {
 
     let mut exact = ProjectionBudget::new(SemanticLimits::default());
     exact.payload_fields = crate::MAX_REFERENCES - report.fields();
-    exact.payload_work = super::MAX_PAYLOAD_WORK - report.scanned_bytes();
+    exact.payload_work = MAX_PAYLOAD_WORK - report.scanned_bytes();
     exact
         .charge_wire_preflight(report)
         .unwrap_or_else(|error| panic!("inclusive rich-text budget rejected: {error}"));
     assert_eq!(exact.payload_fields, crate::MAX_REFERENCES);
-    assert_eq!(exact.payload_work, super::MAX_PAYLOAD_WORK);
+    assert_eq!(exact.payload_work, MAX_PAYLOAD_WORK);
 
     let mut fields_over = ProjectionBudget::new(SemanticLimits::default());
     fields_over.payload_fields = crate::MAX_REFERENCES - report.fields() + 1;
@@ -229,15 +229,15 @@ fn rich_text_projection_budget_is_inclusive_for_fields_and_work() {
     assert_eq!(fields_over.payload_fields, before_fields);
 
     let mut work_over = ProjectionBudget::new(SemanticLimits::default());
-    work_over.payload_work = super::MAX_PAYLOAD_WORK - report.scanned_bytes() + 1;
+    work_over.payload_work = MAX_PAYLOAD_WORK - report.scanned_bytes() + 1;
     assert!(matches!(
         work_over.charge_wire_preflight(report),
         Err(Error::SemanticLimit {
             kind: SemanticLimitKind::FormulaWork,
             observed,
-            maximum: super::MAX_PAYLOAD_WORK,
+            maximum: MAX_PAYLOAD_WORK,
             ..
-        }) if observed == super::MAX_PAYLOAD_WORK + 1
+        }) if observed == MAX_PAYLOAD_WORK + 1
     ));
 }
 

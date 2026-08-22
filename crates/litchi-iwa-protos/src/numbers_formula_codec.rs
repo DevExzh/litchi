@@ -26,6 +26,8 @@ pub struct DecodeOptions {
     recursion_limit: u32,
     max_nodes: usize,
     max_text_bytes: usize,
+    allow_opaque_unknown_fields: bool,
+    allow_unknown_functions: bool,
 }
 
 impl DecodeOptions {
@@ -45,7 +47,27 @@ impl DecodeOptions {
             recursion_limit,
             max_nodes,
             max_text_bytes,
+            allow_opaque_unknown_fields: false,
+            allow_unknown_functions: false,
         }
+    }
+
+    /// Permit unknown, canonically framed fields to remain opaque while the
+    /// known scalar formula projection is evaluated. Strict callers keep the
+    /// default rejection behavior; compatibility adapters opt in explicitly.
+    #[must_use]
+    pub const fn with_opaque_unknown_fields(mut self, allow: bool) -> Self {
+        self.allow_opaque_unknown_fields = allow;
+        self
+    }
+
+    /// Permit unknown function identifiers to reach the caller's bounded
+    /// compatibility renderer. Strict dependency/evaluator callers retain
+    /// the default refusal behavior.
+    #[must_use]
+    pub const fn with_unknown_functions(mut self, allow: bool) -> Self {
+        self.allow_unknown_functions = allow;
+        self
     }
     fn buffa(self) -> BuffaDecodeOptions {
         BuffaDecodeOptions::new()
@@ -120,6 +142,16 @@ impl FormulaWriteOwnerUid {
     #[must_use]
     pub const fn from_halves(lower: u64, upper: u64) -> Self {
         Self { lower, upper }
+    }
+
+    #[must_use]
+    pub const fn lower(self) -> u64 {
+        self.lower
+    }
+
+    #[must_use]
+    pub const fn upper(self) -> u64 {
+        self.upper
     }
 }
 
@@ -697,8 +729,31 @@ pub enum FormulaNode {
         row_is_sticky: u32,
         column_is_sticky: u32,
     },
+    /// A local `CELL_REFERENCE_NODE` carries the same resolved coordinate as
+    /// [`FormulaNode::LocalCell`], but stores its sticky bits in the nested
+    /// row/column coordinate messages.  Keeping a distinct variant preserves
+    /// the existing `CellReference` shape for callers while allowing the
+    /// generated-free renderer to retain `$` markers losslessly.
+    LocalCellReference {
+        coordinate: CellCoordinate,
+        row_is_sticky: bool,
+        column_is_sticky: bool,
+    },
     CellReference {
         coordinate: CellCoordinate,
+    },
+    /// One table-local colon tract after bounded coordinate resolution.
+    LocalRange {
+        top: u32,
+        left: u32,
+        bottom: u32,
+        right: u32,
+        begin_row_is_sticky: bool,
+        begin_column_is_sticky: bool,
+        end_row_is_sticky: bool,
+        end_column_is_sticky: bool,
+        whole_rows: bool,
+        whole_columns: bool,
     },
     ResolvedCellReference {
         owner: u32,
@@ -710,6 +765,8 @@ pub enum FormulaNode {
         left: u32,
         bottom: u32,
         right: u32,
+        whole_rows: bool,
+        whole_columns: bool,
     },
     Colon,
     ColonWithUids,
@@ -719,11 +776,13 @@ pub enum FormulaNode {
 
 /// Return whether a node kind is representable by the compact scalar visitor.
 ///
-/// The Numbers package renderer has a broader generated compatibility path;
-/// this predicate deliberately describes only nodes whose source-order
-/// semantics are fully represented by [`FormulaNode`]. In particular,
-/// absolute-coordinate, string/date/array/thunk, and owner-bearing nodes stay
-/// on that compatibility path until a lossless visitor shape exists.
+/// The scalar path is intentionally limited to table-local expression shapes.
+/// Text, date/duration metadata, arrays/lists/thunks, and owner-bearing or
+/// cross-axis references stay on the generated compatibility path until their
+/// complete native shape has a lossless visitor representation. In particular,
+/// this predicate must agree with the Numbers extractor's admission gate: a
+/// `true` result promises that the compact visitor can render every node in
+/// the archive without asking the generated AST decoder for a fallback.
 #[must_use]
 pub const fn is_scalar_visitor_node_type(node_type: u32) -> bool {
     matches!(node_type, 1..=18 | 22 | 23 | 27 | 29 | 32 | 33 | 45)
@@ -734,6 +793,7 @@ pub const fn is_scalar_visitor_node_type(node_type: u32) -> bool {
 pub struct LocalPrecedent {
     owner: u32,
     coordinate: CellCoordinate,
+    uid: Option<FormulaWriteOwnerUid>,
 }
 
 /// Canonical table-local node that the scalar evaluator cannot execute.
@@ -762,6 +822,13 @@ impl LocalPrecedent {
     #[must_use]
     pub const fn coordinate(self) -> CellCoordinate {
         self.coordinate
+    }
+
+    /// The cross-table owner UID when this precedent came from a mapped
+    /// owner-bearing archive node. Local precedents return `None`.
+    #[must_use]
+    pub const fn uid(self) -> Option<FormulaWriteOwnerUid> {
+        self.uid
     }
 }
 
@@ -2974,16 +3041,22 @@ fn validate_cross_extra(
         (Some(source), Some(expected)) => {
             budget.message(source, 4)?;
             let mut remaining = source;
-            let table = next_field(&mut remaining, budget, 4)?
-                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
-            if table.number != 1 || !remaining.is_empty() {
-                return Err(malformed());
+            let mut table = None;
+            while let Some(field) = next_field(&mut remaining, budget, 4)? {
+                match field.number {
+                    1 => set_once(&mut table, field.bytes()?)?,
+                    _ if options.allow_opaque_unknown_fields => continue,
+                    _ => return Err(malformed()),
+                }
             }
-            let uuid = table.bytes()?;
+            let uuid = table.ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
             let mut words = [None; 4];
             let mut uuid_remaining = uuid;
             while let Some(field) = next_field(&mut uuid_remaining, budget, 5)? {
                 if !(2..=5).contains(&field.number) {
+                    if options.allow_opaque_unknown_fields {
+                        continue;
+                    }
                     return Err(malformed());
                 }
                 set_once(&mut words[field.number as usize - 2], field.varint_u32()?)?;
@@ -3078,6 +3151,9 @@ fn validate_sticky(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 4)? {
         if !(1..=4).contains(&field.number) {
+            if options.allow_opaque_unknown_fields {
+                continue;
+            }
             return Err(malformed());
         }
         set_once(&mut values[field.number as usize - 1], field.boolean()?)?;
@@ -3126,7 +3202,14 @@ fn validate_colon_bytes(
     let mut remaining = source;
     let mut seen = [EMPTY_RANGE_FIELD; MAX_RANGE_FIELDS];
     let mut seen_len = 0usize;
+    let mut preserve_seen = false;
     while let Some(field) = next_field(&mut remaining, budget, 4)? {
+        if !matches!(field.number, 1..=5) {
+            if options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(malformed());
+        }
         let value = match field.number {
             1..=4 => {
                 let bytes = field.bytes()?;
@@ -3157,10 +3240,21 @@ fn validate_colon_bytes(
                 }
                 (field.number, pair)
             },
-            5 if field.boolean()? => (5, (0, None)),
+            5 => {
+                if !field.boolean()? {
+                    return Err(malformed());
+                }
+                if preserve_seen {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                preserve_seen = true;
+                (5, (0, None))
+            },
             _ => return Err(malformed()),
         };
-        push_range_field(&mut seen, &mut seen_len, value)?;
+        if value.0 != 5 {
+            push_range_field(&mut seen, &mut seen_len, value)?;
+        }
     }
     let mut expected = [EMPTY_RANGE_FIELD; MAX_RANGE_FIELDS];
     let mut expected_len = 0usize;
@@ -3210,7 +3304,6 @@ fn validate_colon_bytes(
             (sentinel_field, (i64::from(sentinel), None)),
         )?;
     }
-    push_range_field(&mut expected, &mut expected_len, (5, (0, None)))?;
     if seen_len != expected_len || seen[..seen_len] != expected[..expected_len] {
         return Err(malformed());
     }
@@ -3237,6 +3330,12 @@ fn decode_range_pair(
     let mut end = None;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 5)? {
+        if !matches!(field.number, 1 | 2) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(malformed());
+        }
         let value = field.varint()?;
         let value = if relative {
             i64::from(value as i32)
@@ -3353,6 +3452,9 @@ fn decode_formula<V: FormulaVisitor + ?Sized>(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 1)? {
         if !(1..=9).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
             return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
         }
         singular(&mut selected, field.number as usize - 1)?;
@@ -3404,6 +3506,9 @@ fn decode_node_array<V: FormulaVisitor + ?Sized>(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         if field.number != 1 {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
             return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
         }
         if !emit {
@@ -3448,6 +3553,10 @@ struct NodeFields<'source> {
     present: u64,
 }
 
+const fn is_schema_known_node_field(number: u32) -> bool {
+    matches!(number, 1..=30 | 33..=47)
+}
+
 fn decode_node<V: FormulaVisitor + ?Sized>(
     source: &[u8],
     context: FormulaContext,
@@ -3464,10 +3573,15 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         if field.number == 0 || field.number > 47 {
+            if budget.options.allow_opaque_unknown_fields && field.number > 47 {
+                continue;
+            }
             return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
         }
         singular(&mut seen, field.number as usize)?;
-        fields.present |= field_bit(field.number);
+        if is_schema_known_node_field(field.number) {
+            fields.present |= field_bit(field.number);
+        }
         match field.number {
             1 => fields.kind = Some(field.varint_u32()?),
             2 => fields.function = Some(field.varint_u32()?),
@@ -3500,6 +3614,14 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
             40 => fields.colon = Some(field.bytes()?),
             42 => fields.decimal_low = Some(field.varint()?),
             43 => fields.decimal_high = Some(field.varint()?),
+            // Fields 31 and 32 are not present in the current TSCE schema;
+            // they are the only in-range gaps and therefore genuinely
+            // unknown here.  Schema-known but evaluator-unmodeled fields
+            // (date/duration/array/category/etc.) must still be validated and
+            // marked unsupported rather than being silently ignored by the
+            // compatibility mode.
+            _ if budget.options.allow_opaque_unknown_fields
+                && !is_schema_known_node_field(field.number) => {},
             _ => {
                 validate_unmodeled_field(field, budget)?;
                 fields.unmodeled = true;
@@ -3544,38 +3666,47 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
     if fields.cross.is_some()
         || fields.uid.is_some()
         || matches!(kind, 28 | 48 | 63..=66 | 68)
-        || (resolution.is_none() && (fields.cross_extra.is_some() || kind == 67))
+        || (resolution.is_none() && fields.cross_extra.is_some() && !matches!(kind, 36 | 67))
     {
         return Err(DecodeError::invalid(InvalidReason::ExternalOwner));
     }
-    if resolution.is_none() && (fields.decimal_low.is_some() || fields.decimal_high.is_some()) {
-        fields.unmodeled = true;
-    }
-    if resolution.is_some() {
-        match (fields.decimal_low, fields.decimal_high) {
-            (None, None) => {},
-            (Some(low), Some(high))
-                if fields
-                    .number
-                    .map(f64::from_bits)
-                    .and_then(|value| formula_decimal128_parts(value).ok())
-                    == Some((low, high)) => {},
-            _ => return Err(DecodeError::invalid(InvalidReason::InvalidScalar)),
+    // The writer emits a decimal128 sidecar alongside fixed64 numbers. A
+    // matching sidecar is a valid scalar shape in both raw and resolved
+    // archives; a mismatched raw sidecar is retained as an unsupported native
+    // shape, while a resolved writer archive fails strict scalar validation.
+    let decimal_shape_valid = match (fields.decimal_low, fields.decimal_high) {
+        (None, None) => true,
+        (Some(low), Some(high)) => {
+            fields
+                .number
+                .map(f64::from_bits)
+                .and_then(|value| formula_decimal128_parts(value).ok())
+                == Some((low, high))
+        },
+        _ => false,
+    };
+    if resolution.is_none() {
+        if !decimal_shape_valid {
+            fields.unmodeled = true;
         }
+    } else if !decimal_shape_valid {
+        return Err(DecodeError::invalid(InvalidReason::InvalidScalar));
     }
-    if resolution.is_some() && kind == 19 {
-        if fields.present != field_bit(1) | field_bit(6) {
-            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
-        }
+    if mode == DecodeMode::Evaluator && kind == 19 && fields.present == field_bit(1) | field_bit(6)
+    {
         if emit {
             visitor.visit_text(required(fields.text)?)?;
         }
         return Ok(());
     }
     let unsupported_function = kind == 16
+        && !budget.options.allow_unknown_functions
         && fields
             .function
             .is_some_and(|identifier| !matches!(identifier, 15 | 30 | 84 | 88 | 168));
+    if resolution.is_some() && mode == DecodeMode::Dependencies && unsupported_function {
+        budget.unsupported_evaluator();
+    }
     let present = fields.present;
     if fields.unmodeled || (fields.tract.is_some() && kind != 45) || unsupported_function {
         if mode == DecodeMode::Dependencies
@@ -3610,11 +3741,73 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
     };
     if emit {
         visitor.visit_node(node)?;
-        if let Some(precedent) = precedent {
+        if let FormulaNode::LocalRange {
+            top,
+            left,
+            bottom,
+            right,
+            ..
+        } = node
+        {
+            // A range already emits one precedent for every covered cell.
+            // Carry the optional cross-owner UID on those facts so a raw
+            // compatibility visitor can retain the prefix without emitting
+            // a duplicate top-left precedent below.
+            let range_uid = precedent.and_then(|value| value.uid);
+            let range = FormulaWriteRange {
+                internal_owner: context.owner,
+                top,
+                left,
+                bottom,
+                right,
+            };
+            let cells = usize::try_from(bottom - top + 1)
+                .ok()
+                .and_then(|rows| {
+                    usize::try_from(right - left + 1)
+                        .ok()
+                        .and_then(|columns| rows.checked_mul(columns))
+                })
+                .ok_or_else(malformed)?;
+            budget.work(cells.checked_add(1).ok_or_else(malformed)?)?;
+            visitor.visit_range(range)?;
+            for row in top..=bottom {
+                for column in left..=right {
+                    visitor.visit_precedent(LocalPrecedent {
+                        owner: context.owner,
+                        coordinate: CellCoordinate { row, column },
+                        uid: range_uid,
+                    })?;
+                }
+            }
+        } else if let Some(precedent) = precedent {
             visitor.visit_precedent(precedent)?;
         }
-    } else if precedent.is_some() {
-        budget.precedent()?;
+    } else {
+        if let FormulaNode::LocalRange {
+            top,
+            left,
+            bottom,
+            right,
+            ..
+        } = node
+        {
+            let cells = usize::try_from(bottom - top + 1)
+                .ok()
+                .and_then(|rows| {
+                    usize::try_from(right - left + 1)
+                        .ok()
+                        .and_then(|columns| rows.checked_mul(columns))
+                })
+                .ok_or_else(malformed)?;
+            budget.work(cells.checked_add(1).ok_or_else(malformed)?)?;
+            budget.range()?;
+            for _ in 0..cells {
+                budget.precedent()?;
+            }
+        } else if precedent.is_some() {
+            budget.precedent()?;
+        }
     }
     Ok(())
 }
@@ -3712,6 +3905,7 @@ fn classify_resolved_node<V: FormulaVisitor + ?Sized>(
         let precedent = LocalPrecedent {
             owner: target.internal_owner,
             coordinate,
+            uid: target.uid,
         };
         if emit {
             visitor.visit_precedent(precedent)?;
@@ -3738,7 +3932,7 @@ fn classify_resolved_node<V: FormulaVisitor + ?Sized>(
         return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
     }
     let target = read_target(fields.cross_extra, resolution, budget)?;
-    let (top, left, bottom, right) = decode_resolved_colon(
+    let decoded = decode_resolved_colon(
         required(fields.sticky)?,
         required(fields.colon)?,
         resolution.context,
@@ -3747,15 +3941,15 @@ fn classify_resolved_node<V: FormulaVisitor + ?Sized>(
     )?;
     let range = FormulaWriteRange {
         internal_owner: target.internal_owner,
-        top,
-        left,
-        bottom,
-        right,
+        top: decoded.top,
+        left: decoded.left,
+        bottom: decoded.bottom,
+        right: decoded.right,
     };
-    let cells = usize::try_from(bottom - top + 1)
+    let cells = usize::try_from(decoded.bottom - decoded.top + 1)
         .ok()
         .and_then(|rows| {
-            usize::try_from(right - left + 1)
+            usize::try_from(decoded.right - decoded.left + 1)
                 .ok()
                 .and_then(|columns| rows.checked_mul(columns))
         })
@@ -3763,11 +3957,12 @@ fn classify_resolved_node<V: FormulaVisitor + ?Sized>(
     budget.work(cells.checked_add(1).ok_or_else(malformed)?)?;
     if emit {
         visitor.visit_range(range)?;
-        for row in top..=bottom {
-            for column in left..=right {
+        for row in decoded.top..=decoded.bottom {
+            for column in decoded.left..=decoded.right {
                 visitor.visit_precedent(LocalPrecedent {
                     owner: target.internal_owner,
                     coordinate: CellCoordinate { row, column },
+                    uid: target.uid,
                 })?;
             }
         }
@@ -3779,10 +3974,12 @@ fn classify_resolved_node<V: FormulaVisitor + ?Sized>(
     }
     Ok(Some(FormulaNode::ResolvedRange {
         owner: target.internal_owner,
-        top,
-        left,
-        bottom,
-        right,
+        top: decoded.top,
+        left: decoded.left,
+        bottom: decoded.bottom,
+        right: decoded.right,
+        whole_rows: decoded.whole_rows,
+        whole_columns: decoded.whole_columns,
     }))
 }
 
@@ -3833,16 +4030,22 @@ fn decode_cross_uid(
 ) -> Result<FormulaWriteOwnerUid, DecodeError> {
     budget.message(source, 4)?;
     let mut remaining = source;
-    let table = next_field(&mut remaining, budget, 4)?
-        .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
-    if table.number != 1 || !remaining.is_empty() {
-        return Err(malformed());
+    let mut table = None;
+    while let Some(field) = next_field(&mut remaining, budget, 4)? {
+        match field.number {
+            1 => set_once(&mut table, field.bytes()?)?,
+            _ if options.allow_opaque_unknown_fields => continue,
+            _ => return Err(malformed()),
+        }
     }
-    let uuid = table.bytes()?;
+    let uuid = table.ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
     let mut words = [None; 4];
     let mut uuid_remaining = uuid;
     while let Some(field) = next_field(&mut uuid_remaining, budget, 5)? {
         if !(2..=5).contains(&field.number) {
+            if options.allow_opaque_unknown_fields {
+                continue;
+            }
             return Err(malformed());
         }
         set_once(&mut words[field.number as usize - 2], field.varint_u32()?)?;
@@ -3878,7 +4081,7 @@ fn decode_resolved_colon(
     context: FormulaWriteContext,
     target: WriteTarget,
     budget: &mut Budget,
-) -> Result<(u32, u32, u32, u32), DecodeError> {
+) -> Result<DecodedColon, DecodeError> {
     let bits = decode_sticky_bits(sticky, budget, budget.options)?;
     let mut pairs = [None; 4];
     let mut preserve = None;
@@ -3895,10 +4098,15 @@ fn decode_resolved_colon(
                 )?;
             },
             5 => set_once(&mut preserve, field.boolean()?)?,
+            _ if budget.options.allow_opaque_unknown_fields => continue,
             _ => return Err(malformed()),
         }
     }
-    if preserve != Some(true) {
+    // `preserve_rectangular` is an optional proto2 bool whose native default
+    // is true.  Prost therefore presents an omitted field and an explicit
+    // `true` identically; reject only an explicit false rather than requiring
+    // a noncanonical physical field that native archives commonly omit.
+    if preserve == Some(false) {
         return Err(malformed());
     }
     let column_sentinel = pairs[2] == Some((i64::from(i16::MAX as u32), None));
@@ -3931,7 +4139,15 @@ fn decode_resolved_colon(
             budget,
             budget.options,
         )?;
-        return Ok((top, left, bottom, right));
+        return Ok(DecodedColon {
+            top,
+            left,
+            bottom,
+            right,
+            sticky: bits,
+            whole_rows: false,
+            whole_columns: false,
+        });
     }
     if column_sentinel && row_sentinel {
         return Err(malformed());
@@ -3957,7 +4173,15 @@ fn decode_resolved_colon(
             budget,
             budget.options,
         )?;
-        return Ok((top, 0, bottom, target.columns - 1));
+        return Ok(DecodedColon {
+            top,
+            left: 0,
+            bottom,
+            right: target.columns - 1,
+            sticky: bits,
+            whole_rows: true,
+            whole_columns: false,
+        });
     }
     let (left, right) = resolved_axis_bounds(
         pairs[0],
@@ -3979,7 +4203,25 @@ fn decode_resolved_colon(
         budget,
         budget.options,
     )?;
-    Ok((0, left, target.rows - 1, right))
+    Ok(DecodedColon {
+        top: 0,
+        left,
+        bottom: target.rows - 1,
+        right,
+        sticky: bits,
+        whole_rows: false,
+        whole_columns: true,
+    })
+}
+
+struct DecodedColon {
+    top: u32,
+    left: u32,
+    bottom: u32,
+    right: u32,
+    sticky: [bool; 4],
+    whole_rows: bool,
+    whole_columns: bool,
 }
 
 fn resolved_axis_bounds(
@@ -4044,6 +4286,9 @@ fn decode_sticky_bits(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, 4)? {
         if !(1..=4).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
             return Err(malformed());
         }
         set_once(&mut values[field.number as usize - 1], field.boolean()?)?;
@@ -4074,6 +4319,12 @@ fn classify_node(
     const COLUMN: u16 = 1 << 6;
     const ROW: u16 = 1 << 7;
     const TRACT: u16 = 1 << 8;
+    const STICKY: u16 = 1 << 9;
+    const COLON: u16 = 1 << 10;
+    let cross_uid = fields
+        .cross_extra
+        .map(|cross| decode_cross_uid(cross, budget, budget.options))
+        .transpose()?;
     let payload = present(fields.function.is_some(), FUNCTION)
         | present(fields.arguments.is_some(), ARGUMENTS)
         | present(fields.number.is_some(), NUMBER)
@@ -4082,7 +4333,9 @@ fn classify_node(
         | present(fields.local.is_some(), LOCAL)
         | present(fields.column.is_some(), COLUMN)
         | present(fields.row.is_some(), ROW)
-        | present(fields.tract.is_some(), TRACT);
+        | present(fields.tract.is_some(), TRACT)
+        | present(fields.sticky.is_some(), STICKY)
+        | present(fields.colon.is_some(), COLON);
     let no_payload = || payload == 0;
     let binary = match kind {
         1 => Some(BinaryOperator::Add),
@@ -4183,11 +4436,64 @@ fn classify_node(
                 row: resolve(context.host_row, row.0, row.1)?,
                 column: resolve(context.host_column, column.0, column.1)?,
             };
-            validate_coordinate(coordinate, context)?;
-            (FormulaNode::CellReference { coordinate }, Some(coordinate))
+            if cross_uid.is_none() {
+                validate_coordinate(coordinate, context)?;
+            }
+            (
+                FormulaNode::LocalCellReference {
+                    coordinate,
+                    row_is_sticky: row.1,
+                    column_is_sticky: column.1,
+                },
+                Some(coordinate),
+            )
         },
         45 if fields.tract.is_none() => (FormulaNode::ColonWithUids, None),
-        28 | 48 | 63..=68 => return Err(DecodeError::invalid(InvalidReason::ExternalOwner)),
+        67 => {
+            let sticky = fields
+                .sticky
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
+            let colon = fields
+                .colon
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
+            let target = WriteTarget {
+                internal_owner: context.owner,
+                uid: cross_uid,
+                // A raw FormulaArchive has no owner geometry registry. Use
+                // the bounded host geometry for this compatibility visitor;
+                // the package-level owner graph remains authoritative for
+                // dependency/evaluator decoding.
+                rows: context.rows,
+                columns: context.columns,
+            };
+            let write_context = FormulaWriteContext::new(
+                context.owner,
+                context.host_row,
+                context.host_column,
+                context.rows,
+                context.columns,
+            );
+            let decoded = decode_resolved_colon(sticky, colon, write_context, target, budget)?;
+            (
+                FormulaNode::LocalRange {
+                    top: decoded.top,
+                    left: decoded.left,
+                    bottom: decoded.bottom,
+                    right: decoded.right,
+                    begin_row_is_sticky: decoded.sticky[0],
+                    begin_column_is_sticky: decoded.sticky[1],
+                    end_row_is_sticky: decoded.sticky[2],
+                    end_column_is_sticky: decoded.sticky[3],
+                    whole_rows: decoded.whole_rows,
+                    whole_columns: decoded.whole_columns,
+                },
+                Some(CellCoordinate {
+                    row: decoded.top,
+                    column: decoded.left,
+                }),
+            )
+        },
+        28 | 48 | 63..=66 | 68 => return Err(DecodeError::invalid(InvalidReason::ExternalOwner)),
         _ => return Err(DecodeError::invalid(InvalidReason::UnsupportedFormula)),
     };
     let allowed = match kind {
@@ -4198,12 +4504,17 @@ fn classify_node(
         27 => LOCAL,
         36 => COLUMN | ROW,
         45 => TRACT,
+        67 => STICKY | COLON,
         _ => 0,
     };
+    if fields.cross_extra.is_some() && !matches!(kind, 36 | 67) {
+        return Err(DecodeError::invalid(InvalidReason::ExternalOwner));
+    }
     require(payload & !allowed == 0)?;
     let precedent = coordinate.map(|coordinate| LocalPrecedent {
         owner: context.owner,
         coordinate,
+        uid: cross_uid,
     });
     Ok((node, precedent))
 }
@@ -4219,6 +4530,9 @@ fn decode_local(
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         if !(1..=4).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
             return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
         }
         let slot = &mut values[field.number as usize - 1];
@@ -4265,6 +4579,7 @@ fn decode_axis(
         match field.number {
             1 => set_once(&mut coordinate, zigzag32(field.varint_u32()?))?,
             2 => set_once(&mut absolute, field.boolean()?)?,
+            _ if budget.options.allow_opaque_unknown_fields => continue,
             _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
         }
     }
@@ -4562,7 +4877,7 @@ struct Field<'source> {
 
 #[derive(Clone, Copy)]
 enum Value<'source> {
-    Varint(u64),
+    Varint { value: u64, canonical: bool },
     Fixed64(u64),
     Bytes(&'source [u8]),
     Fixed32,
@@ -4571,7 +4886,10 @@ enum Value<'source> {
 impl Field<'_> {
     fn varint(self) -> Result<u64, DecodeError> {
         match self.value {
-            Value::Varint(value) if self.wire == 0 => Ok(value),
+            Value::Varint {
+                value,
+                canonical: true,
+            } if self.wire == 0 => Ok(value),
             _ => Err(malformed()),
         }
     }
@@ -4619,7 +4937,10 @@ fn next_field<'source>(
         return Err(malformed());
     }
     let value = match wire {
-        0 => Value::Varint(take_varint(source)?),
+        0 => {
+            let (value, canonical) = take_varint_with_canonical(source)?;
+            Value::Varint { value, canonical }
+        },
         1 => {
             let raw = take(source, 8)?;
             Value::Fixed64(u64::from_le_bytes(
@@ -4653,6 +4974,14 @@ fn take<'source>(source: &mut &'source [u8], amount: usize) -> Result<&'source [
 }
 
 fn take_varint(source: &mut &[u8]) -> Result<u64, DecodeError> {
+    let (value, canonical) = take_varint_with_canonical(source)?;
+    if !canonical {
+        return Err(malformed());
+    }
+    Ok(value)
+}
+
+fn take_varint_with_canonical(source: &mut &[u8]) -> Result<(u64, bool), DecodeError> {
     let original = *source;
     let mut value = 0u64;
     for index in 0..10usize {
@@ -4663,11 +4992,8 @@ fn take_varint(source: &mut &[u8]) -> Result<u64, DecodeError> {
         value |= u64::from(byte & 0x7f) << (index * 7);
         if byte & 0x80 == 0 {
             let consumed = index + 1;
-            if varint_len(value) != consumed {
-                return Err(malformed());
-            }
             *source = &original[consumed..];
-            return Ok(value);
+            return Ok((value, varint_len(value) == consumed));
         }
     }
     Err(malformed())
@@ -4820,11 +5146,13 @@ mod tests {
             vec![
                 LocalPrecedent {
                     owner: 7,
-                    coordinate: CellCoordinate { row: 2, column: 3 }
+                    coordinate: CellCoordinate { row: 2, column: 3 },
+                    uid: None,
                 },
                 LocalPrecedent {
                     owner: 7,
-                    coordinate: CellCoordinate { row: 3, column: 7 }
+                    coordinate: CellCoordinate { row: 3, column: 7 },
+                    uid: None,
                 }
             ]
         );
@@ -4835,6 +5163,183 @@ mod tests {
                 argument_count: 2
             })
         );
+    }
+
+    #[test]
+    fn raw_local_range_streams_each_precedent_once() {
+        let nodes = [FormulaWriteNode::ResolvedRange {
+            owner: None,
+            start: FormulaWriteCellReference::new(1, 2, false, false),
+            end: FormulaWriteCellReference::new(2, 3, false, false),
+        }];
+        let write_options = options(&[0; 4_096]);
+        let plan = plan_resolved_formula_archive(
+            &nodes,
+            FormulaWriteContext::new(7, 4, 5, 20, 20),
+            &[],
+            FormulaWriteDependencyLimits::new(100, 1),
+            write_options,
+        )
+        .expect("local range writer plan");
+        let (source, _) =
+            execute_formula_archive_plan(plan, write_options).expect("local range bytes");
+
+        let mut facts = Facts::default();
+        let report =
+            decode_formula_archive_with_visitor(&source, context(), options(&source), &mut facts)
+                .expect("raw local range decode");
+        assert_eq!(report.node_count(), 1);
+        assert_eq!(report.range_count(), 1);
+        assert_eq!(report.precedent_count(), 4);
+        assert_eq!(facts.precedents.len(), 4);
+    }
+
+    fn relative_range(begin: i32, end: Option<i32>) -> Vec<u8> {
+        let mut range = Vec::new();
+        varint(&mut range, 1, begin as u64);
+        if let Some(end) = end {
+            varint(&mut range, 2, end as u64);
+        }
+        range
+    }
+
+    fn local_colon_tract(
+        include_default: bool,
+        include_unknown: bool,
+        include_duplicate_column: bool,
+        malformed_begin: bool,
+    ) -> Vec<u8> {
+        let mut sticky = Vec::new();
+        for field in 1..=4 {
+            varint(&mut sticky, field, 0);
+        }
+
+        let mut tract = Vec::new();
+        if !malformed_begin {
+            bytes(&mut tract, 1, &relative_range(-3, Some(-2)));
+        }
+        bytes(&mut tract, 2, &relative_range(-3, Some(-2)));
+        if include_duplicate_column {
+            bytes(&mut tract, 1, &relative_range(-1, Some(-1)));
+        }
+        if include_default {
+            varint(&mut tract, 5, 1);
+        }
+        if include_unknown {
+            varint(&mut tract, 6, 1);
+        }
+
+        formula(&[node(67, |node| {
+            bytes(node, 33, &sticky);
+            bytes(node, 40, &tract);
+        })])
+    }
+
+    #[test]
+    fn raw_colon_tract_accepts_proto2_default_and_matches_prost_oracle() {
+        use prost::Message as _;
+
+        let source = local_colon_tract(false, false, false, false);
+        let oracle = crate::tsce::FormulaArchive::decode(source.as_slice())
+            .expect("native colon tract should decode through Prost oracle");
+        assert_eq!(oracle.ast_node_array.ast_node.len(), 1);
+        assert_eq!(
+            oracle.ast_node_array.ast_node[0].ast_node_type(),
+            crate::tsce::ast_node_array_archive::AstNodeType::ColonTractNode
+        );
+
+        let mut facts = Facts::default();
+        let report =
+            decode_formula_archive_with_visitor(&source, context(), options(&source), &mut facts)
+                .expect("strict raw colon tract should accept omitted default");
+        assert_eq!(report.node_count(), 1);
+        assert_eq!(report.range_count(), 1);
+        assert_eq!(report.precedent_count(), 4);
+        assert_eq!(
+            facts.nodes,
+            vec![FormulaNode::LocalRange {
+                top: 1,
+                left: 2,
+                bottom: 2,
+                right: 3,
+                begin_row_is_sticky: false,
+                begin_column_is_sticky: false,
+                end_row_is_sticky: false,
+                end_column_is_sticky: false,
+                whole_rows: false,
+                whole_columns: false,
+            }]
+        );
+    }
+
+    #[test]
+    fn raw_colon_tract_rejects_malformed_repeated_and_false_default_forms() {
+        for source in [
+            local_colon_tract(false, false, false, true),
+            local_colon_tract(false, false, true, false),
+        ] {
+            let error =
+                decode_formula_archive_with_visitor(&source, context(), options(&source), &mut ())
+                    .expect_err("malformed colon tract should fail closed");
+            assert!(error.invalid_reason().is_some());
+        }
+
+        // An explicit false is not equivalent to the proto2 default and must
+        // remain rejected by both the handwritten reader and the Buffa oracle.
+        let mut sticky = Vec::new();
+        for field in 1..=4 {
+            varint(&mut sticky, field, 0);
+        }
+        let mut colon = Vec::new();
+        bytes(&mut colon, 1, &relative_range(-3, Some(-2)));
+        bytes(&mut colon, 2, &relative_range(-3, Some(-2)));
+        varint(&mut colon, 5, 0);
+        let source = formula(&[node(67, |node| {
+            bytes(node, 33, &sticky);
+            bytes(node, 40, &colon);
+        })]);
+        assert!(
+            decode_formula_archive_with_visitor(&source, context(), options(&source), &mut ())
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn raw_colon_tract_unknown_is_opaque_only_when_opted_in_and_work_is_bounded() {
+        let source = local_colon_tract(false, true, false, false);
+        assert!(
+            decode_formula_archive_with_visitor(&source, context(), options(&source), &mut ())
+                .is_err()
+        );
+        let report = decode_formula_archive_with_visitor(
+            &source,
+            context(),
+            options(&source).with_opaque_unknown_fields(true),
+            &mut (),
+        )
+        .expect("opaque nested extension should remain bounded");
+        assert_eq!(report.node_count(), 1);
+        let probe = inspect_formula_archive(
+            &source,
+            context(),
+            options(&source).with_opaque_unknown_fields(true),
+        )
+        .expect("opaque nested extension should inspect");
+        let one_below = DecodeOptions::new(
+            source.len(),
+            2_000_000,
+            probe.work().saturating_sub(1),
+            16,
+            100_000,
+            1_000_000,
+        )
+        .with_opaque_unknown_fields(true);
+        assert!(matches!(
+            inspect_formula_archive(&source, context(), one_below)
+                .unwrap_err()
+                .resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
     }
 
     fn reason(error: DecodeError) -> InvalidReason {
@@ -4923,6 +5428,119 @@ mod tests {
                 .unwrap_err()
             ),
             InvalidReason::UnsupportedFormula
+        );
+    }
+
+    #[test]
+    fn scalar_admission_predicate_excludes_native_only_shapes() {
+        for node_type in 1..=18 {
+            assert!(is_scalar_visitor_node_type(node_type));
+        }
+        for node_type in [22, 23, 27, 29, 32, 33, 45] {
+            assert!(is_scalar_visitor_node_type(node_type));
+        }
+        for node_type in [
+            19_u32, // string
+            20,     // date
+            21,     // duration
+            24,     // array
+            25,     // list
+            26,     // thunk
+            28,     // cross-table cell reference
+            31,     // unknown function
+            36,     // coordinate-based cell reference
+            67,     // colon tract / cross-axis range
+        ] {
+            assert!(!is_scalar_visitor_node_type(node_type));
+        }
+    }
+
+    #[test]
+    fn opaque_unknown_fields_accept_noncanonical_value_varints_only_when_opted_in() {
+        let number = node(17, |node| fixed64(node, 4, 1.0f64.to_bits()));
+        let mut source = formula(&[number]);
+        // Field 48 has a canonical key, but its zero value is intentionally
+        // overlong.  The compatibility path must preserve this opaque value;
+        // known scalar accessors remain canonical-only.
+        source.extend_from_slice(&[0x80, 0x03, 0x80, 0x00]);
+
+        assert_eq!(
+            reason(
+                decode_formula_archive_with_visitor(&source, context(), options(&source), &mut ())
+                    .unwrap_err()
+            ),
+            InvalidReason::UnexpectedField
+        );
+        let report = decode_formula_archive_with_visitor(
+            &source,
+            context(),
+            options(&source).with_opaque_unknown_fields(true),
+            &mut (),
+        )
+        .expect("opted-in opaque unknown field");
+        assert_eq!(report.node_count(), 1);
+    }
+
+    #[test]
+    fn opaque_mode_does_not_hide_schema_known_unmodeled_node_fields() {
+        let source = formula(&[node(17, |node| {
+            fixed64(node, 4, 1.0f64.to_bits());
+            // ASTNode field 8 is the schema-known duration payload, not an
+            // extension field.  A number carrying it must not be rendered as
+            // a plain scalar merely because opaque mode is enabled.
+            fixed64(node, 8, 2.0f64.to_bits());
+        })]);
+
+        for options in [
+            options(&source),
+            options(&source).with_opaque_unknown_fields(true),
+        ] {
+            assert_eq!(
+                reason(
+                    decode_formula_archive_with_visitor(&source, context(), options, &mut ())
+                        .unwrap_err()
+                ),
+                InvalidReason::UnsupportedFormula
+            );
+        }
+    }
+
+    #[test]
+    fn opaque_unknown_fields_are_allowed_in_nested_validation_envelopes() {
+        let mut sticky = Vec::new();
+        for field in 1..=4 {
+            varint(&mut sticky, field, 0);
+        }
+        varint(&mut sticky, 6, 1);
+        let strict = options(&sticky);
+        let mut strict_budget = Budget::new(&sticky, strict).unwrap();
+        assert!(validate_sticky(&sticky, [false; 4], &mut strict_budget, strict,).is_err());
+        let opaque = strict.with_opaque_unknown_fields(true);
+        let mut opaque_budget = Budget::new(&sticky, opaque).unwrap();
+        validate_sticky(&sticky, [false; 4], &mut opaque_budget, opaque).unwrap();
+
+        let uid = FormulaWriteOwnerUid::from_halves(0x0000_0002_0000_0001, 0x0000_0004_0000_0003);
+        let words = [1_u32, 2, 3, 4];
+        let mut uuid = Vec::new();
+        for (field, word) in (2..=5).zip(words) {
+            varint(&mut uuid, field, u64::from(word));
+        }
+        varint(&mut uuid, 6, 1);
+        let mut extra = Vec::new();
+        bytes(&mut extra, 1, &uuid);
+        varint(&mut extra, 2, 1);
+        let strict = options(&extra);
+        let mut strict_budget = Budget::new(&extra, strict).unwrap();
+        assert!(
+            validate_cross_extra(Some(&extra), Some(uid), &mut strict_budget, strict,).is_err()
+        );
+        let opaque = strict.with_opaque_unknown_fields(true);
+        let mut opaque_budget = Budget::new(&extra, opaque).unwrap();
+        validate_cross_extra(Some(&extra), Some(uid), &mut opaque_budget, opaque).unwrap();
+        let mut opaque_budget = Budget::new(&extra, opaque).unwrap();
+        assert_eq!(
+            decode_cross_uid(&extra, &mut opaque_budget, opaque).unwrap(),
+            uid
         );
     }
 

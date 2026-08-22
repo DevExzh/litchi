@@ -1,0 +1,9 @@
+// Wire-only Buffa projection for the selected Pages media discriminator.
+// The complete TSD.MovieArchive payload stays caller-owned.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message MovieAudioFlagArchive {
+  optional bool audio_only = 9;
+}

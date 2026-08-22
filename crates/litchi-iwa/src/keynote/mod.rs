@@ -66,7 +66,6 @@ pub use editor::{
 };
 pub use litchi_keynote::Seconds;
 pub use litchi_keynote::build::{AnimationType, Build};
-pub use litchi_keynote::document::Document;
 pub use litchi_keynote::show::{Mode, Settings, Show, Size};
 pub use litchi_keynote::slide::{Slide, Transition};
 pub use litchi_keynote::transition::{

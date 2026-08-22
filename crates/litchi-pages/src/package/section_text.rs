@@ -6,17 +6,17 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
-use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
+use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_text::{TextPosition, TextSpan};
 use thiserror::Error;
 
+use super::section_transaction as transaction;
 use super::{
     MAX_SECTIONS, NativeSectionReference, Package, PackageError, StorageWireLimitsError,
-    decode_body_storage, effective_text_limit, find_object, is_body_text_message_type,
-    native_section_references, root_references_with_limits, storage_rewrite_limits,
+    decode_body_storage, effective_text_limit, find_object, native_section_references,
+    root_references_with_limits, storage_rewrite_limits,
 };
-use crate::SectionSelector;
+use crate::{SectionSelector, section::settings::Path};
 
 /// A finite resource governed while section text is rewritten or published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -593,6 +593,50 @@ impl Package {
         section_text_at(self, position)
     }
 
+    /// Replace all text owned by one semantically selected existing section.
+    ///
+    /// This is the one-section convenience form of
+    /// [`Self::edit_section_text`]. Selector resolution, UTF-16 boundary
+    /// validation, native dependency checks, exact-source preservation, and
+    /// atomic publication remain owned by the section-text transaction; this
+    /// method does not introduce a second rewrite path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, source, dependency, limit, preservation, or
+    /// verification error without modifying this package when publication is
+    /// rejected.
+    pub fn set_section_text<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+        text: &str,
+    ) -> Result<SectionTextCommit, SectionTextError> {
+        let mut edit = self.edit_section_text(selector)?;
+        edit.set(text)?;
+        edit.commit()
+    }
+
+    /// Remove all text owned by one semantically selected existing section.
+    ///
+    /// This is the one-section convenience form of
+    /// [`Self::edit_section_text`]. Existing section boundaries and unrelated
+    /// native records remain subject to the same exact-source transaction
+    /// rules as [`Self::set_section_text`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SectionTextError::DependentContent`] when the selected
+    /// section owns content that cannot be removed by this plain-text
+    /// capability, or another typed transaction error before publication.
+    pub fn clear_section_text<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<SectionTextCommit, SectionTextError> {
+        let mut edit = self.edit_section_text(selector)?;
+        edit.clear()?;
+        edit.commit()
+    }
+
     /// Start one selector-first section-relative body-text edit.
     ///
     /// The selector is resolved immediately against this immutable semantic
@@ -805,58 +849,18 @@ fn rewrite_package_text(
         return Err(SectionTextError::InvalidSource);
     }
 
-    let source_catalog = &source.state.source;
-    let mut matching_components = source_catalog.components().iter().filter(|component| {
-        component
-            .archive()
-            .object(source_body.identifier.get())
-            .is_some()
-    });
-    let component = matching_components
-        .next()
-        .ok_or(SectionTextError::InvalidSource)?;
-    if matching_components.next().is_some() {
+    let mut budget = transaction::TransactionBudget::new(source).map_err(map_transaction_error)?;
+    let target = transaction::resolve_body_target(source, position, &mut budget)
+        .map_err(map_transaction_error)?;
+    if target.identifier != source_body.identifier {
         return Err(SectionTextError::InvalidSource);
     }
-    let component_name = component.name();
-    let entry = source_catalog
-        .package()
-        .iter()
-        .find(|entry| entry.name() == component_name)
-        .ok_or(SectionTextError::InvalidSource)?;
-    if entry.is_opaque() {
-        return Err(SectionTextError::InvalidSource);
-    }
-
-    let physical_limits = source_catalog.limits();
-    let archive_limits = physical_limits
-        .effective_archive_limits()
-        .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
-        entry.data(),
-        physical_limits.snappy_limits().map_err(map_archive_error)?,
-    )
-    .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
-    let object = archive
-        .object(source_body.identifier.get())
-        .ok_or(SectionTextError::InvalidSource)?;
-    let mut messages = object
-        .messages
-        .iter()
-        .enumerate()
-        .filter(|(_index, message)| is_body_text_message_type(message.type_));
-    let (message_index, message) = messages.next().ok_or(SectionTextError::InvalidSource)?;
-    if messages.next().is_some() {
-        return Err(SectionTextError::InvalidSource);
-    }
-    let message_type = message.type_;
+    let payload = transaction::selected_payload(source, target).map_err(map_transaction_error)?;
 
     let rewrite_limits = storage_rewrite_limits(source.state.source.limits())
         .map_err(map_storage_wire_limits_error)?;
     let rewritten = litchi_iwa_text_wire::rewrite_storage_text_with_limits(
-        &message.data,
+        payload,
         absolute_start..absolute_end,
         replacement,
         rewrite_limits,
@@ -886,36 +890,22 @@ fn rewrite_package_text(
     if !rewritten.changed() {
         return Err(SectionTextError::Verification);
     }
+    let rewrite_work = rewritten.execution_report().work;
     let rewritten_payload = rewritten.into_bytes();
-
-    archive
-        .object_mut(source_body.identifier.get())
-        .ok_or(SectionTextError::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
-            message_index,
-            RawMessage {
-                type_: message_type,
-                data: rewritten_payload,
-            },
-            archive_limits,
-        )
-        .map_err(map_core_error)?;
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&rewritten_archive).map_err(map_core_error)?;
-    let output = source_catalog
-        .package()
-        .reassemble_to_bytes(
-            &[EntryEdit::new(component_name, &compressed)],
-            physical_limits,
-        )
-        .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
-    let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
-    candidate.validate().map_err(map_package_error)?;
+    budget
+        .charge_work(rewrite_work, Path::section(position))
+        .map_err(map_transaction_error)?;
+    let (candidate, stats) =
+        transaction::rewrite_package(source, target, rewritten_payload, false, &mut budget)
+            .map_err(map_transaction_error)?;
+    if stats.touched_components != 1
+        || stats.deleted_previews != 0
+        || stats.source_layout_state.is_some()
+        || stats.target_layout_state.is_some()
+        || stats.source_preview_count != stats.target_preview_count
+    {
+        return Err(SectionTextError::Verification);
+    }
     verify_candidate(source, &candidate, position, expected)?;
     verify_native_topology(
         source,
@@ -924,6 +914,7 @@ fn rewrite_package_text(
         absolute_start..absolute_end,
         replacement,
     )?;
+    budget.settle_transaction_reservation();
     Ok(candidate)
 }
 
@@ -1189,12 +1180,64 @@ fn utf16_len(text: &str) -> Result<u32, SectionTextError> {
 #[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
 fn map_selector_error(selection_error: crate::SelectorError) -> SectionTextError {
     match selection_error {
+        crate::SelectorError::EmptySectionName => SectionTextError::NameNotFound,
         crate::SelectorError::AmbiguousSectionName {
             first, duplicate, ..
         } => SectionTextError::AmbiguousSelector {
             first: Position::new(first),
             duplicate: Position::new(duplicate),
         },
+    }
+}
+
+#[allow(clippy::needless_pass_by_value, reason = "Result::map_err conversion")]
+fn map_transaction_error(transaction_error: crate::section::settings::Error) -> SectionTextError {
+    use crate::section::settings::{Error, LimitKind};
+
+    match transaction_error {
+        Error::AmbiguousSelector { first, duplicate } => {
+            SectionTextError::AmbiguousSelector { first, duplicate }
+        },
+        Error::NameNotFound => SectionTextError::NameNotFound,
+        Error::PositionNotFound { position } => SectionTextError::PositionNotFound { position },
+        Error::InvalidSettings(_)
+        | Error::UnsupportedDependency { .. }
+        | Error::UnsupportedSource { .. } => SectionTextError::UnsupportedSource,
+        Error::InvalidSource { .. } => SectionTextError::InvalidSource,
+        Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => SectionTextError::LimitExceeded {
+            kind: match kind {
+                LimitKind::InputBytes => SectionTextLimitKind::InputBytes,
+                LimitKind::OutputBytes => SectionTextLimitKind::OutputBytes,
+                LimitKind::Entries
+                | LimitKind::PayloadObjects
+                | LimitKind::PayloadMessages
+                | LimitKind::PayloadItems
+                | LimitKind::References => SectionTextLimitKind::Entries,
+                LimitKind::EntryBytes | LimitKind::PackageBytes | LimitKind::PayloadBytes => {
+                    SectionTextLimitKind::EntryBytes
+                },
+                LimitKind::TotalEntryBytes | LimitKind::TotalPayloadBytes => {
+                    SectionTextLimitKind::TotalBytes
+                },
+                LimitKind::RetainedBytes => SectionTextLimitKind::TextBytes,
+                LimitKind::WireInputBytes | LimitKind::WireOutputBytes => {
+                    SectionTextLimitKind::WireBytes
+                },
+                LimitKind::WireFields => SectionTextLimitKind::WireFields,
+                LimitKind::WireNesting => SectionTextLimitKind::WireNesting,
+                LimitKind::WireWork | LimitKind::TransactionWork => SectionTextLimitKind::WireWork,
+            },
+            observed,
+            maximum,
+        },
+        Error::Allocation { amount } => SectionTextError::Allocation { amount },
+        Error::Verification { .. } => SectionTextError::Verification,
+        Error::PatchConflict => SectionTextError::PatchConflict,
     }
 }
 

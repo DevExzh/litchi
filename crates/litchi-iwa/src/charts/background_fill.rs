@@ -11,8 +11,9 @@ use litchi_iwa_common::media::Type as MediaType;
 use litchi_iwa_common::shape::fill::{Angle, Gradient};
 
 use crate::charts::style::{
-    ChartStyleSlot, GENERATED_CHART_STYLE_EXTENSION_FIELD, chart_style_slot,
-    generated_chart_style_extension, replace_known_wire_fields_preserving_unknown,
+    ChartStyleSlot, GENERATED_CHART_STYLE_EXTENSION_FIELD, KnownWireField, KnownWireFieldKind,
+    chart_style_slot, copy_wire_bytes, generated_chart_style_extension,
+    replace_known_wire_fields_preserving_unknown_with_schema, validate_known_wire_fields,
 };
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
@@ -180,6 +181,244 @@ mod codec {
 
 /// `tschchartinfodefaultgridbackgroundfill` in `TSCH.Generated.ChartStyleArchive`.
 const CHART_BACKGROUND_FILL_FIELD: u32 = 14;
+const FILL_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Message(COLOR_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Message(GRADIENT_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Message(IMAGE_FILL_FIELDS),
+        repeated: false,
+    },
+];
+
+const COLOR_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 4,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 5,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 6,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 7,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 8,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 9,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 10,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 11,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 12,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+];
+
+const DATA_REFERENCE_FIELDS: &[KnownWireField] = &[KnownWireField {
+    number: 1,
+    kind: KnownWireFieldKind::Varint,
+    repeated: false,
+}];
+
+const REFERENCE_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+];
+
+const POINT_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+];
+
+const SIZE_FIELDS: &[KnownWireField] = POINT_FIELDS;
+
+const GRADIENT_STOP_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Message(COLOR_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+];
+
+const ANGLE_GRADIENT_FIELDS: &[KnownWireField] = &[KnownWireField {
+    number: 2,
+    kind: KnownWireFieldKind::Fixed32,
+    repeated: false,
+}];
+
+const TRANSFORM_GRADIENT_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Message(POINT_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Message(POINT_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Message(SIZE_FIELDS),
+        repeated: false,
+    },
+];
+
+const GRADIENT_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Message(GRADIENT_STOP_FIELDS),
+        repeated: true,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Fixed32,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 4,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 5,
+        kind: KnownWireFieldKind::Message(ANGLE_GRADIENT_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 6,
+        kind: KnownWireFieldKind::Message(TRANSFORM_GRADIENT_FIELDS),
+        repeated: false,
+    },
+];
+
+const IMAGE_FILL_FIELDS: &[KnownWireField] = &[
+    KnownWireField {
+        number: 1,
+        kind: KnownWireFieldKind::Message(REFERENCE_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 2,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 3,
+        kind: KnownWireFieldKind::Message(COLOR_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 4,
+        kind: KnownWireFieldKind::Message(SIZE_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 5,
+        kind: KnownWireFieldKind::Message(REFERENCE_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 6,
+        kind: KnownWireFieldKind::Message(DATA_REFERENCE_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 7,
+        kind: KnownWireFieldKind::Message(DATA_REFERENCE_FIELDS),
+        repeated: false,
+    },
+    KnownWireField {
+        number: 8,
+        kind: KnownWireFieldKind::Varint,
+        repeated: false,
+    },
+    KnownWireField {
+        number: 9,
+        kind: KnownWireFieldKind::Message(COLOR_FIELDS),
+        repeated: false,
+    },
+];
+
 /// Gray channel shown as 67% by a newly inserted native chart.
 const DEFAULT_BACKGROUND_GRAY_CHANNEL: f32 = 2.0 / 3.0;
 /// Native inspector angle for the default top-to-bottom background gradient.
@@ -311,6 +550,7 @@ fn read_chart_background_fill(data: &[u8]) -> Result<ShapeFill> {
     let Some(payload) = projection.payload() else {
         return native_default_chart_background_fill();
     };
+    validate_known_wire_fields(payload, FILL_FIELDS, "chart background fill")?;
     let fill = crate::protobuf::tsd::FillArchive::decode(payload)?;
     fill_from_native(&fill)
 }
@@ -319,9 +559,9 @@ fn patch_chart_background_fill(data: &[u8], fill: &ShapeFill) -> Result<Vec<u8>>
     let default = native_default_chart_background_fill()?;
     let Some(extension) = generated_chart_style_extension(data)? else {
         if fill == &default {
-            return Ok(data.to_vec());
+            return copy_wire_bytes(data, "chart background fill wire output");
         }
-        let encoded = fill_to_native(fill).encode_to_vec();
+        let encoded = encode_fill(fill)?;
         let extension = codec::rewrite(&[], Some(encoded.as_slice()))?;
         let patched = patch_length_delimited_field(
             data,
@@ -333,17 +573,21 @@ fn patch_chart_background_fill(data: &[u8], fill: &ShapeFill) -> Result<Vec<u8>>
         return Ok(patched);
     };
 
-    let native = (fill != &default).then(|| fill_to_native(fill).encode_to_vec());
+    if let Some(existing) = codec::project(extension)?.payload() {
+        validate_known_wire_fields(existing, FILL_FIELDS, "chart background fill")?;
+    }
+    let native = (fill != &default).then(|| encode_fill(fill)).transpose()?;
     let native = native
         .map(|replacement| {
             codec::project(extension).and_then(|projection| {
                 projection.payload().map_or_else(
-                    || Ok(replacement.clone()),
+                    || copy_wire_bytes(&replacement, "chart background fill replacement"),
                     |existing| {
-                        replace_known_wire_fields_preserving_unknown(
+                        replace_known_wire_fields_preserving_unknown_with_schema(
                             existing,
                             &replacement,
-                            &[1, 2, 3],
+                            FILL_FIELDS,
+                            "chart background fill",
                         )
                     },
                 )
@@ -359,6 +603,24 @@ fn patch_chart_background_fill(data: &[u8], fill: &ShapeFill) -> Result<Vec<u8>>
     )?;
     validate_patched_chart_background_fill(&patched, fill)?;
     Ok(patched)
+}
+
+fn encode_fill(fill: &ShapeFill) -> Result<Vec<u8>> {
+    let native = fill_to_native(fill);
+    let mut encoded = Vec::new();
+    encoded
+        .try_reserve_exact(native.encoded_len())
+        .map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "chart background fill payload",
+                amount: native.encoded_len(),
+            })
+        })?;
+    native.encode(&mut encoded).map_err(|error| {
+        Error::InvalidFormat(format!("chart background fill encode failed: {error}"))
+    })?;
+    validate_known_wire_fields(&encoded, FILL_FIELDS, "chart background fill")?;
+    Ok(encoded)
 }
 
 fn adjust_chart_style_data_reference(
@@ -563,6 +825,30 @@ mod tests {
 
         let restored = patch_chart_background_fill(&patched, &original_fill).unwrap();
         assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn background_fill_rejects_duplicate_nested_known_fields() {
+        let style = style_with_unknown_fields(tsch::generated::ChartStyleArchive {
+            tschchartinfodefaultgridbackgroundfill: Some(fill_to_native(&solid_fill())),
+            ..Default::default()
+        });
+        let extension = generated_chart_style_extension(&style).unwrap().unwrap();
+        let selected = codec::project(extension).unwrap().payload().unwrap();
+        let mut duplicate = selected.to_vec();
+        let color = fill_to_native(&solid_fill()).color.unwrap().encode_to_vec();
+        append_length_delimited_field(&mut duplicate, 1, &color).unwrap();
+        let extension = codec::rewrite(extension, Some(&duplicate)).unwrap();
+        let malformed = patch_length_delimited_field(
+            &style,
+            GENERATED_CHART_STYLE_EXTENSION_FIELD,
+            true,
+            Some(&extension),
+        )
+        .unwrap();
+
+        assert!(read_chart_background_fill(&malformed).is_err());
+        assert!(patch_chart_background_fill(&malformed, &solid_fill()).is_err());
     }
 
     #[test]

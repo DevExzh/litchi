@@ -3543,7 +3543,9 @@ fn validate_disjoint_changes(scalar: &[TileChange], cache: &[CacheChange]) -> Re
 
 fn cache_scalar(value: &FormulaCachedValue, change: &CacheChange) -> Result<CacheScalarInput> {
     match value {
-        FormulaCachedValue::Number(value) => Ok(CacheScalarInput::Number(*value)),
+        FormulaCachedValue::Number(value) => Ok(CacheScalarInput::Number(
+            FiniteF64::new(value.get()).expect("formula cache scalar is finite"),
+        )),
         FormulaCachedValue::Boolean(value) => Ok(CacheScalarInput::Boolean(*value)),
         FormulaCachedValue::Text(_) => Err(TileError::UnsupportedValue {
             row: change.row,

@@ -94,7 +94,9 @@ pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,
     FormulaExpression, FormulaPivotCategoryReference, FormulaUuid,
 };
-pub use litchi_numbers::cell::{APPLE_EPOCH_UNIX_OFFSET_SECONDS, Type, Update, Value};
+pub use litchi_numbers::cell::{
+    APPLE_EPOCH_UNIX_OFFSET_SECONDS, FiniteF64, FiniteF64Error, Type, Update, Value,
+};
 pub use table::NumbersTable;
 pub use table_extractor::TableDataExtractor;
 

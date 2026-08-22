@@ -881,6 +881,144 @@ fn storage_updates_and_copy_on_write_preserve_unknown_fields() {
 }
 
 #[test]
+fn drawable_reference_updates_preserve_unknown_leaf_fields() {
+    let mut package = keynote_package(true);
+    let unknown = {
+        let mut field = Vec::new();
+        append_unknown_varint(&mut field, 99, 999);
+        field
+    };
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let drawable = archive.object_mut(5).unwrap();
+            let source = drawable.messages[0].data.clone();
+            let data = crate::wire::transform_length_delimited_fields_at_path(
+                &source,
+                &[1, 1, 1, 6],
+                |reference| {
+                    let mut reference = reference.to_vec();
+                    reference.extend_from_slice(&unknown);
+                    Ok(reference)
+                },
+            )?;
+            drawable.replace_message(0, RawMessage { type_: 7, data })?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    editor
+        .set_comment(drawable(5), "copy with extension")
+        .unwrap();
+
+    let payload = object_payload(editor.package(), 5);
+    assert!(
+        payload
+            .windows(unknown.len())
+            .any(|window| window == unknown.as_slice())
+    );
+    assert_eq!(
+        editor.comment(drawable(5)).unwrap().unwrap().comment.text,
+        "copy with extension"
+    );
+}
+
+#[test]
+fn annotation_author_storage_projection_preserves_unknown_fields() {
+    let mut package = keynote_package_with_empty_author_storage();
+    let mut unknown = Vec::new();
+    append_unknown_varint(&mut unknown, 99, 999);
+    package
+        .update_archive("Index/AnnotationAuthorStorage.iwa", |archive| {
+            let storage = archive.object_mut(40).unwrap();
+            let mut data = storage.messages[0].data.clone();
+            data.extend_from_slice(&unknown);
+            storage.replace_message(
+                0,
+                RawMessage {
+                    type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    editor
+        .set_comment(drawable(5), "author projection")
+        .unwrap();
+    let storage = object_payload(editor.package(), 40);
+    assert!(
+        storage
+            .windows(unknown.len())
+            .any(|window| window == unknown)
+    );
+}
+
+#[test]
+fn malformed_annotation_author_metadata_is_rejected_before_mutation() {
+    let mut package = keynote_package_with_empty_author_storage();
+    package
+        .update_archive("Index/AnnotationAuthorStorage.iwa", |archive| {
+            let storage = archive.object_mut(40).unwrap();
+            storage.replace_message(
+                0,
+                RawMessage {
+                    type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
+                    data: tsk::AnnotationAuthorStorageArchive {
+                        annotation_author: vec![reference(30)],
+                    }
+                    .encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let author = archive.object_mut(30).unwrap();
+            author.replace_message(
+                0,
+                RawMessage {
+                    type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
+                    data: vec![0x0a, 0x01, 0xff],
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_comment(drawable(5), "must fail").is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn malformed_annotation_author_reference_is_rejected_strictly() {
+    let mut package = keynote_package_with_empty_author_storage();
+    package
+        .update_archive("Index/AnnotationAuthorStorage.iwa", |archive| {
+            let storage = archive.object_mut(40).unwrap();
+            storage.replace_message(
+                0,
+                RawMessage {
+                    type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
+                    data: vec![0x0a, 0x00],
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_comment(drawable(5), "must fail").is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn wire_patcher_rejects_duplicate_and_truncated_fields() {
     let reference = reference(7).encode_to_vec();
     let mut duplicate = Vec::new();
@@ -930,6 +1068,28 @@ fn malformed_storage_fails_transactionally() {
     assert!(editor.set_comment(drawable(5), "No").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
     assert!(editor.clear_comment(drawable(5)).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn malformed_drawable_comment_reference_fails_transactionally() {
+    let mut editor = IWorkDrawableCommentEditor::from_package(keynote_package(false)).unwrap();
+    editor
+        .package
+        .update_archive("Index/Document.iwa", |archive| {
+            let drawable = archive.object_mut(5).unwrap();
+            let source = drawable.messages[0].data.clone();
+            let data = crate::wire::transform_length_delimited_fields_at_path(
+                &source,
+                &[1, 1, 1, 6],
+                |_reference| Ok(vec![0x08]),
+            )?;
+            drawable.replace_message(0, RawMessage { type_: 7, data })?;
+            Ok(())
+        })
+        .unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.set_comment(drawable(5), "must fail").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
 

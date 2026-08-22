@@ -11,8 +11,8 @@ use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
 use crate::{Error, Result};
 use litchi_iwa_index::{
-    ByteSpan, FragmentId, IndexBuilder, IndexError, ObjectId, ObjectIdIter,
-    ObjectIndex as NeutralObjectIndex, ObjectRecord, ReferenceGraphSnapshot,
+    ByteSpan, FragmentId, IndexBuilder, IndexError, ObjectId, ObjectIndex as NeutralObjectIndex,
+    ObjectRecord, Reference,
 };
 
 mod reference_extraction;
@@ -204,13 +204,10 @@ impl ObjectIndex {
         for record in self.snapshot.locations.objects() {
             builder.add_object(*record).map_err(index_error)?;
         }
-        let graph = self.snapshot.locations.reference_graph();
-        for source in graph.iter_object_ids() {
-            if let Some(targets) = graph.outgoing(source) {
-                for target in targets {
-                    builder.add_reference(source, target).map_err(index_error)?;
-                }
-            }
+        for reference in self.snapshot.locations.references() {
+            builder
+                .add_reference(reference.source(), reference.target())
+                .map_err(index_error)?;
         }
 
         let fragment_id = fragment_id(self.snapshot.fragments.len())?;
@@ -327,43 +324,22 @@ impl ObjectIndex {
         self.iter_entries_by_type(object_type).collect()
     }
 
-    /// Get the reference graph for advanced queries
-    ///
-    /// The reference graph contains bidirectional relationships between objects,
-    /// enabling queries like:
-    /// - What objects does this reference? (outgoing edges)
-    /// - What objects reference this? (incoming edges)
-    /// - Find all dependencies of an object
-    /// - Detect circular references
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let index = ObjectIndex::from_bundle(&bundle)?;
-    /// let graph = index.reference_graph();
-    ///
-    /// // Find what a table references
-    /// if let Some(refs) = graph.outgoing(table_id) {
-    ///     println!("Table references {} objects", refs.len());
-    /// }
-    ///
-    /// // Find what references a style
-    /// if let Some(refs) = graph.incoming(style_id) {
-    ///     println!("{} objects use this style", refs.len());
-    /// }
-    /// ```
-    pub fn reference_graph(&self) -> &ReferenceGraphSnapshot {
-        self.snapshot.locations.reference_graph()
-    }
-
     /// Get typed dependencies without exposing raw sentinel IDs.
-    pub fn dependencies(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+    pub fn dependencies(&self, object_id: ObjectId) -> Option<impl Iterator<Item = ObjectId> + '_> {
         self.snapshot.locations.outgoing(object_id)
     }
 
     /// Get typed dependents without exposing raw sentinel IDs.
-    pub fn dependents(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+    pub fn dependents(&self, object_id: ObjectId) -> Option<impl Iterator<Item = ObjectId> + '_> {
         self.snapshot.locations.incoming(object_id)
+    }
+
+    /// Borrow every indexed edge as a validated typed reference.
+    ///
+    /// Graph storage and native identifiers remain private to the adapter and
+    /// neutral index; callers receive only the stable semantic edge values.
+    pub fn references(&self) -> impl Iterator<Item = Reference> + '_ {
+        self.snapshot.locations.references()
     }
 
     /// Check for a cycle through the validated identity API.
@@ -603,7 +579,7 @@ impl ObjectIndex {
     pub fn stats(&self) -> ObjectIndexStats {
         let total_objects = self.snapshot.locations.len();
         let total_fragments = self.snapshot.locations.fragment_count();
-        let total_references = self.snapshot.locations.reference_graph().edge_count();
+        let total_references = self.snapshot.locations.reference_count();
         let avg_refs_per_object = if total_objects > 0 {
             total_references as f64 / total_objects as f64
         } else {
@@ -1125,11 +1101,11 @@ mod tests {
     }
 
     #[test]
-    fn test_object_index_with_reference_graph() {
+    fn test_object_index_with_typed_graph_queries() {
         let index = ObjectIndex::new();
         let object_id = ObjectId::try_from(1).unwrap();
 
-        assert!(index.reference_graph().is_empty());
+        assert_eq!(index.references().next(), None);
         assert!(index.dependencies(object_id).is_none());
         assert!(index.dependents(object_id).is_none());
         assert!(!index.has_cycle_from(object_id));

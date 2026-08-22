@@ -15,6 +15,7 @@
     reason = "The public error contracts and their state-machine helpers are kept together for auditability."
 )]
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -311,6 +312,17 @@ where
     K: Eq + Hash,
 {
     fn touch(&mut self, key: &K) {
+        let recency = self.next_recency();
+        if let Some(entry) = self.entries.get_mut(key) {
+            entry.last_used = recency;
+        }
+    }
+
+    fn touch_borrowed<Q>(&mut self, key: &Q)
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
         let recency = self.next_recency();
         if let Some(entry) = self.entries.get_mut(key) {
             entry.last_used = recency;
@@ -689,6 +701,72 @@ where
         }
     }
 
+    /// Return a cached value or run one fallible parser whose retained weight
+    /// is known only after parsing, borrowing the lookup key.
+    ///
+    /// The owned cache key is created by `make_key` only after an initial
+    /// lookup finds neither a completed value nor an active parser flight.
+    /// Cache hits therefore avoid a temporary key allocation while retaining
+    /// the same single-flight, weight, and eviction behavior as
+    /// [`Self::get_or_try_insert_with_weight`]. A concurrent miss may race
+    /// between the probe and insertion; in that case the newly built key is
+    /// discarded and the caller joins the already active flight.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GetOrInsertError::Parse`] for a parser error,
+    /// [`GetOrInsertError::Cache`] for a cache error, or
+    /// [`GetOrInsertError::ParserPanicked`] to a waiter when the initiating
+    /// parser panics.
+    pub fn get_or_try_insert_with_weight_borrowed<Q, M, F>(
+        &self,
+        key: &Q,
+        make_key: M,
+        parse: F,
+    ) -> Result<Arc<V>, GetOrInsertError>
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+        M: FnOnce() -> K,
+        F: FnOnce() -> Result<(V, usize), ParseError>,
+    {
+        let lookup = match self.lookup_borrowed(key)? {
+            Some(lookup) => lookup,
+            None => {
+                // The factory runs outside the cache mutex. Besides avoiding
+                // a lock-held user callback, this keeps a factory panic from
+                // poisoning the cache state.
+                self.begin_lookup(make_key(), None)?
+            },
+        };
+        match lookup {
+            Lookup::Cached(value) => Ok(value),
+            Lookup::Wait(flight) => flight.wait().into_result(),
+            Lookup::Parse {
+                key: parse_key,
+                flight,
+            } => self.run_weighted_parser(parse_key, &flight, parse),
+        }
+    }
+
+    /// Invalidate a completed value and active parser using a borrowed key.
+    ///
+    /// This is the allocation-free counterpart to [`Self::invalidate`] for
+    /// caches whose owned key type implements [`Borrow`] for the caller's
+    /// lookup type.
+    pub fn invalidate_borrowed<Q>(&self, key: &Q) -> bool
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
+        let mut state = lock(&self.state);
+        let removed_value = state.entries.remove(key).map(|entry| {
+            state.total_weight -= entry.weight;
+        });
+        let removed_flight = state.flights.remove(key);
+        removed_value.is_some() || removed_flight.is_some()
+    }
+
     fn begin_lookup(
         &self,
         key: K,
@@ -734,6 +812,33 @@ where
         state.flights.insert(key.clone(), Arc::clone(&flight));
         state.active_flights += 1;
         Ok(Lookup::Parse { key, flight })
+    }
+
+    fn lookup_borrowed<Q>(&self, key: &Q) -> Result<Option<Lookup<K, V>>, GetOrInsertError>
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
+        let mut state = lock(&self.state);
+        if let Some(value) = state.entries.get(key).map(|entry| Arc::clone(&entry.value)) {
+            state.touch_borrowed(key);
+            return Ok(Some(Lookup::Cached(value)));
+        }
+
+        if let Some(flight) = state.flights.get(key) {
+            return Ok(Some(Lookup::Wait(Arc::clone(flight))));
+        }
+        if state.active_flights >= self.max_flights {
+            return Err(CacheError::FlightsLimit {
+                active: state.active_flights,
+                limit: self.max_flights,
+            }
+            .into());
+        }
+        if state.flights.try_reserve(1).is_err() {
+            return Err(allocation_error(AllocationKind::Flights).into());
+        }
+        Ok(None)
     }
 
     fn run_parser<F>(

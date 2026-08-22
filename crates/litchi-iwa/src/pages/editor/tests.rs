@@ -91,6 +91,20 @@ fn semantic_body_update_and_clear_are_transactional() {
 }
 
 #[test]
+fn plain_section_text_rejects_inline_object_markers_atomically() {
+    let mut editor = PagesEditor::create_with_text("Body").unwrap();
+    let before = editor.to_bytes().unwrap();
+    let section_id = editor.sections()[0].object_id;
+
+    assert!(
+        editor
+            .set_section_text(section_id, "bad\u{fffc}object")
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn root_body_projection_preserves_unknowns_and_rejects_duplicate_references() {
     let mut package = test_package("Body");
     package
@@ -114,6 +128,83 @@ fn root_body_projection_preserves_unknowns_and_rejects_duplicate_references() {
         })
         .unwrap();
     assert!(PagesEditor::from_package(duplicate).is_err());
+}
+
+#[test]
+fn storage_discovery_uses_strict_projection_without_mutating_source() {
+    let canonical = StorageArchive {
+        kind: Some(1),
+        text: vec!["Body".to_owned()],
+        ..StorageArchive::default()
+    }
+    .encode_to_vec();
+    assert!(is_valid_pages_text_storage(&canonical));
+
+    let mut unknown = canonical.clone();
+    append_unknown_varint(&mut unknown, 98, 980);
+    let original_unknown = unknown.clone();
+    assert!(is_valid_pages_text_storage(&unknown));
+    assert_eq!(unknown, original_unknown);
+
+    let noncanonical = [0x08, 0x80, 0x00, 0x1a, 0x04, b'B', b'o', b'd', b'y'];
+    assert!(!is_valid_pages_text_storage(&noncanonical));
+}
+
+#[test]
+fn generated_section_settings_accept_nested_template_references() {
+    let package = crate::pages::PagesDocumentBuilder::new()
+        .build_package()
+        .unwrap();
+    let document = package.archive("Index/Document.iwa").unwrap();
+    let section = document
+        .object(105)
+        .expect("scratch package section object")
+        .messages
+        .iter()
+        .find(|message| message.type_ == SECTION_MESSAGE_TYPE)
+        .expect("scratch package section message");
+
+    let settings = pages_section_settings(&section.data).unwrap();
+    assert_eq!(settings.name(), Some("Blank"));
+    assert_eq!(
+        settings
+            .first_section_template_page()
+            .map(|reference| reference.identifier().get()),
+        Some(106)
+    );
+    assert_eq!(
+        settings
+            .even_section_template_page()
+            .map(|reference| reference.identifier().get()),
+        Some(106)
+    );
+    assert_eq!(
+        settings
+            .odd_section_template_page()
+            .map(|reference| reference.identifier().get()),
+        Some(106)
+    );
+}
+
+#[test]
+fn body_text_storage_keeps_malformed_optional_footnotes_opaque() {
+    let mut package = test_package("Body");
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let body = archive.object_mut(42).unwrap();
+            // TSWP.StorageArchive.table_footnote = 16. Keep the malformed
+            // optional table in the source while exercising text-only read.
+            body.messages[0]
+                .data
+                .extend_from_slice(&[0x82, 0x01, 0x01, 0xff]);
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+
+    let editor = PagesEditor::from_package(package).unwrap();
+    assert_eq!(editor.body_text().unwrap(), "Body");
+    assert_eq!(editor.to_bytes().unwrap(), before);
 }
 
 #[test]
@@ -969,7 +1060,7 @@ fn ambiguous_text_box_anchor_and_zorder_fail_transactionally() {
                 .unwrap()
                 .entries
                 .push(ObjectAttribute {
-                    character_index: 6,
+                    character_index: 7,
                     object: Some(reference(67)),
                 });
             body.replace_message(

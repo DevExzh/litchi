@@ -910,6 +910,7 @@ impl<'values> StreamingFormula<'values> {
             },
             FormulaNode::Empty => self.push(StreamingValue::Scalar(StreamingScalar::Empty)),
             FormulaNode::LocalCell { coordinate, .. }
+            | FormulaNode::LocalCellReference { coordinate, .. }
             | FormulaNode::CellReference { coordinate } => {
                 self.push(StreamingValue::Reference(FormulaKey {
                     owner: self.owner,
@@ -934,8 +935,24 @@ impl<'values> StreamingFormula<'values> {
                 left,
                 bottom,
                 right,
+                ..
             } => self.push(StreamingValue::Range {
                 owner,
+                rect: StreamingRange {
+                    top,
+                    left,
+                    bottom,
+                    right,
+                },
+            }),
+            FormulaNode::LocalRange {
+                top,
+                left,
+                bottom,
+                right,
+                ..
+            } => self.push(StreamingValue::Range {
+                owner: self.owner,
                 rect: StreamingRange {
                     top,
                     left,
@@ -3977,10 +3994,10 @@ fn retain_supplied_cache(
     limits: CacheLimits,
 ) -> Result<FormulaCachedValue, Failure> {
     match supplied.kind() {
-        CachedKind::Number(value) => Ok(FormulaCachedValue::Number(*value)),
+        CachedKind::Number(value) => Ok(FormulaCachedValue::Number(to_native(*value))),
         CachedKind::Boolean(value) => Ok(FormulaCachedValue::Boolean(*value)),
-        CachedKind::Date(value) => Ok(FormulaCachedValue::Date(*value)),
-        CachedKind::Duration(value) => Ok(FormulaCachedValue::Duration(*value)),
+        CachedKind::Date(value) => Ok(FormulaCachedValue::Date(to_native(*value))),
+        CachedKind::Duration(value) => Ok(FormulaCachedValue::Duration(to_native(*value))),
         CachedKind::Text(value) => {
             charge(
                 &mut usage.retained_bytes,
@@ -4003,6 +4020,10 @@ fn retain_supplied_cache(
             Ok(FormulaCachedValue::Text(copied))
         },
     }
+}
+
+fn to_native(value: crate::cell::FiniteF64) -> FiniteF64 {
+    FiniteF64::new(value.get()).expect("Numbers scalar invariant guarantees finite value")
 }
 
 fn cache_values_equal(left: &FormulaCachedValue, right: &FormulaCachedValue) -> bool {

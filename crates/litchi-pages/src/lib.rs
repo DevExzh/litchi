@@ -56,12 +56,13 @@ mod package;
 pub mod page_layout;
 pub mod section;
 pub mod selector;
+pub mod table;
 
 pub use document::{
     Body, DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimitKind,
-    DocumentSourceLimits, DocumentSourceLimitsError, Error, IoKind, MAX_BODY_STORAGES,
-    MAX_SECTIONS, ReadError, ReadLimitKind, Result, Root, SemanticLimitKind, SemanticLimits,
-    SemanticLimitsError,
+    DocumentSourceLimits, DocumentSourceLimitsError, DocumentStats, Error, IoKind,
+    MAX_BODY_STORAGES, MAX_SECTIONS, ReadError, ReadLimitKind, Result, Root, SemanticLimitKind,
+    SemanticLimits, SemanticLimitsError,
 };
 pub use litchi_core::Position;
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
@@ -69,7 +70,16 @@ pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES
 pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use package::__semantic_document_from_prepared_source;
+pub use package::{__is_valid_pages_text_storage, __semantic_document_from_prepared_source};
+pub use package::{
+    BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
+    BodyTableLockLimitKind, BodyTableLockPatch, TableLockCommit, TableLockDiagnostics,
+    TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
+};
+pub use package::{
+    FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,
+    FootnoteTextLimitKind, FootnoteTextPatch,
+};
 pub use package::{Limits, MAX_OBJECTS, Package, PackageError, PackageResult, Stats};
 pub use package::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
@@ -88,4 +98,6 @@ pub use package::{
     SectionTextLimitKind, SectionTextPatch,
 };
 pub use section::{Section, SectionType};
+pub use selector::{BodyTableSelector, TableSelector};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
+pub use table::lock::{BodyTableLockState, State as TableLockState};

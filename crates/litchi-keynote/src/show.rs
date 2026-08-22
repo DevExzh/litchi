@@ -422,11 +422,57 @@ impl Show {
         text
     }
 
+    /// Fallibly copy all show and slide text in presentation order.
+    ///
+    /// [`Self::all_text`] is retained as the historical infallible helper.
+    /// Callers at a resource-bounded boundary can use this variant to make
+    /// both the result-vector and each owned text value reserve explicitly;
+    /// no partially populated result is returned after an allocation error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TryReserveError`] when either the result vector or an owned
+    /// text value cannot reserve its required storage.
+    pub fn try_all_text(&self) -> Result<Vec<String>, TryReserveError> {
+        let mut text = Vec::new();
+        if let Some(title) = &self.title {
+            try_push_text(&mut text, title)?;
+        }
+        for slide in &self.slides {
+            if let Some(title) = slide.title() {
+                try_push_text(&mut text, title)?;
+            }
+            for value in slide.text_content() {
+                try_push_text(&mut text, value)?;
+            }
+            for storage in slide
+                .text_storages()
+                .iter()
+                .filter(|storage| !storage.is_empty())
+            {
+                try_push_text(&mut text, storage.text())?;
+            }
+            if let Some(notes) = slide.notes() {
+                try_push_text(&mut text, notes)?;
+            }
+        }
+        Ok(text)
+    }
+
     /// Return whether the show contains no slides.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.slides.is_empty()
     }
+}
+
+fn try_push_text(output: &mut Vec<String>, source: &str) -> Result<(), TryReserveError> {
+    output.try_reserve(1)?;
+    let mut owned = String::new();
+    owned.try_reserve_exact(source.len())?;
+    owned.push_str(source);
+    output.push(owned);
+    Ok(())
 }
 
 /// A detached, mutable show builder.
@@ -522,6 +568,7 @@ mod tests {
         let show = builder.build();
         assert_eq!(show.title(), Some("Deck"));
         assert_eq!(show.slide_count(), 1);
+        assert_eq!(show.try_all_text().unwrap(), show.all_text());
         assert_eq!(show.slide(0).map(Slide::index), Some(0));
         assert_eq!(
             show.select_slide(SlideSelector::index(0))
@@ -530,6 +577,29 @@ mod tests {
         );
         assert!(show.slide(1).is_none());
         assert_eq!(show.select_slide(SlideSelector::index(1)), Ok(None));
+    }
+
+    #[test]
+    fn fallible_all_text_matches_legacy_order_and_empty_storage_filter() {
+        let mut slide = Slide::builder(0);
+        slide.set_title(Some("Title".to_owned()));
+        slide.push_text("Body".to_owned());
+        slide.push_text_storage(litchi_iwa_text::storage::Storage::new());
+        slide.push_text_storage(litchi_iwa_text::storage::Storage::from_text(
+            "Rich".to_owned(),
+        ));
+        slide.set_notes(Some("Notes".to_owned()));
+
+        let mut builder = Show::builder();
+        builder.set_title(Some("Deck".to_owned()));
+        builder.push_slide(slide.build());
+        let show = builder.build();
+
+        assert_eq!(show.try_all_text().unwrap(), show.all_text());
+        assert_eq!(
+            show.try_all_text().unwrap(),
+            ["Deck", "Title", "Body", "Rich", "Notes"]
+        );
     }
 
     #[test]

@@ -1120,11 +1120,11 @@ pub(super) fn prepare_final_cache(
         for change in changes {
             let value = match change.input_ref() {
                 None => cache::FinalValue::clear(),
-                Some(Input::Number(value)) => cache::FinalValue::number(*value),
+                Some(Input::Number(value)) => cache::FinalValue::number(to_native(*value)),
                 Some(Input::Boolean(value)) => cache::FinalValue::boolean(*value),
                 Some(Input::Text(_)) => cache::FinalValue::aggregate_ignored(),
-                Some(Input::Date(value)) => cache::FinalValue::date(*value),
-                Some(Input::Duration(value)) => cache::FinalValue::duration(*value),
+                Some(Input::Date(value)) => cache::FinalValue::date(to_native(*value)),
+                Some(Input::Duration(value)) => cache::FinalValue::duration(to_native(*value)),
                 Some(Input::Formula { .. }) => return Err(cache_refusal(path)),
             };
             overlay.push(cache::FinalCell {
@@ -1218,11 +1218,11 @@ pub(super) fn prepare_final_overlay(
             let value = match change.input_ref() {
                 Some(Input::Formula { .. }) => continue,
                 None => cache::FinalValue::clear(),
-                Some(Input::Number(value)) => cache::FinalValue::number(*value),
+                Some(Input::Number(value)) => cache::FinalValue::number(to_native(*value)),
                 Some(Input::Boolean(value)) => cache::FinalValue::boolean(*value),
                 Some(Input::Text(_)) => cache::FinalValue::aggregate_ignored(),
-                Some(Input::Date(value)) => cache::FinalValue::date(*value),
-                Some(Input::Duration(value)) => cache::FinalValue::duration(*value),
+                Some(Input::Date(value)) => cache::FinalValue::date(to_native(*value)),
+                Some(Input::Duration(value)) => cache::FinalValue::duration(to_native(*value)),
             };
             overlay.push(cache::FinalCell {
                 table: identity,
@@ -1423,14 +1423,16 @@ impl SemanticBaseline {
             match cell.value() {
                 Value::Empty => {},
                 Value::Number(value) => {
-                    values.push((coordinate, cache::ScalarValue::Number(*value)))
+                    values.push((coordinate, cache::ScalarValue::Number(to_native(*value))))
                 },
                 Value::Boolean(value) => {
                     values.push((coordinate, cache::ScalarValue::Boolean(*value)))
                 },
-                Value::Date(value) => values.push((coordinate, cache::ScalarValue::Date(*value))),
+                Value::Date(value) => {
+                    values.push((coordinate, cache::ScalarValue::Date(to_native(*value))))
+                },
                 Value::Duration(value) => {
-                    values.push((coordinate, cache::ScalarValue::Duration(*value)))
+                    values.push((coordinate, cache::ScalarValue::Duration(to_native(*value))))
                 },
                 Value::Text(_) => aggregate_ignored.push(coordinate),
                 Value::Formula(_) | Value::Error(_) => unsupported.push(coordinate),
@@ -1540,6 +1542,11 @@ impl cache::CacheBaseline for SemanticBaseline {
     }
 }
 
+fn to_native(value: crate::cell::FiniteF64) -> litchi_iwa_common::formula::FiniteF64 {
+    litchi_iwa_common::formula::FiniteF64::new(value.get())
+        .expect("Numbers scalar invariant guarantees finite value")
+}
+
 struct FinalBaseline<'source> {
     selected: &'source SemanticBaseline,
     external: &'source [ExternalBaselineTable<'source>],
@@ -1578,16 +1585,16 @@ impl cache::CacheBaseline for FinalBaseline<'_> {
             )) {
             crate::table::View::Missing | crate::table::View::Stored(Value::Empty) => Ok(None),
             crate::table::View::Stored(Value::Number(value)) => {
-                Ok(Some(cache::ScalarValue::Number(*value)))
+                Ok(Some(cache::ScalarValue::Number(to_native(*value))))
             },
             crate::table::View::Stored(Value::Boolean(value)) => {
                 Ok(Some(cache::ScalarValue::Boolean(*value)))
             },
             crate::table::View::Stored(Value::Date(value)) => {
-                Ok(Some(cache::ScalarValue::Date(*value)))
+                Ok(Some(cache::ScalarValue::Date(to_native(*value))))
             },
             crate::table::View::Stored(Value::Duration(value)) => {
-                Ok(Some(cache::ScalarValue::Duration(*value)))
+                Ok(Some(cache::ScalarValue::Duration(to_native(*value))))
             },
             crate::table::View::Stored(Value::Text(_)) => Err(
                 cache::Failure::UnsupportedDependency(cache::Unsupported::TextScalar),

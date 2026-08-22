@@ -242,6 +242,23 @@ pub fn from_bytes(source: &[u8]) -> Result<Storage> {
 /// invalid semantic text/range relation.
 pub fn from_bytes_with_limits(source: &[u8], limits: Limits) -> Result<Storage> {
     let preflight = preflight_storage(source, limits)?;
+
+    // The derived projection has no work to do when the raw message contains
+    // no text occurrences.  The common-wire preflight above is still
+    // mandatory: it has already charged the complete root framing, enforced
+    // the caller's byte/field limits, and rejected malformed field-3 wire
+    // kinds.  Returning here therefore only skips Buffa's borrowed repeated
+    // view (and its element bookkeeping); it does not turn this adapter into
+    // a permissive protobuf parser or inspect any opaque nested payload.
+    //
+    // This is particularly useful for style/attachment-only storage
+    // envelopes.  Their unknown fields remain source-owned and no generated
+    // `StorageArchive` is eagerly materialized merely to discover that the
+    // semantic text projection is empty.
+    if preflight.fragments == 0 {
+        return Ok(Storage::new());
+    }
+
     let options = text_storage_codec::DecodeOptions::new(
         limits.max_message_bytes(),
         0,
@@ -582,6 +599,25 @@ mod tests {
             StorageArchive::decode(encoded.as_slice()).is_err(),
             "the full Prost schema eagerly interprets the malformed field-5 child"
         );
+    }
+
+    #[test]
+    fn empty_raw_projection_skips_eager_generated_decode() {
+        // Field 5 is a known nested native table in the full schema, but its
+        // malformed child is intentionally opaque to this text-only adapter.
+        // The root framing remains valid, so an empty semantic projection is
+        // still a successful read and the caller-owned bytes are untouched.
+        let mut encoded = field(5, &[0x0a]);
+        // field 99, length-delimited, with a source-owned opaque payload.
+        encoded.extend_from_slice(&[0x9a, 0x06, 0x06, b'o', b'p', b'a', b'q', b'u', b'e']);
+        let before = encoded.clone();
+
+        let storage = from_bytes(&encoded)
+            .unwrap_or_else(|error| panic!("empty text projection should decode: {error}"));
+
+        assert!(storage.is_empty());
+        assert_eq!(encoded, before);
+        assert!(StorageArchive::decode(encoded.as_slice()).is_err());
     }
 
     #[test]

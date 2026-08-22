@@ -6,7 +6,6 @@ mod conditional_highlight;
 mod formula;
 mod hidden_axes;
 mod layout;
-mod lock;
 mod semantic;
 mod sort;
 mod storage;

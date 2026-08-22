@@ -1,10 +1,6 @@
 //! Native title CRUD for Keynote slide charts.
 
 use super::*;
-use crate::charts::options::{
-    chart_title as read_native_chart_title, remove_chart_title as remove_native_chart_title,
-    set_chart_title as set_native_chart_title,
-};
 
 impl KeynoteEditor {
     /// Read the chart title shown by Keynote for one slide chart.
@@ -37,60 +33,122 @@ impl KeynoteEditor {
         remove_slide_chart_title(self, slide_index, drawable_object_id)
     }
 
-    /// Read the chart title shown by Keynote for the chart selected on one slide.
+    /// Read the chart title for a chart selected on one slide.
     ///
-    /// The selector is resolved against the slide's owned chart graph. Name
-    /// selectors therefore retain exact, case-sensitive matching and reject
-    /// ambiguous titles just like the other selector-facing chart APIs.
+    /// The host graph is checked first so malformed ownership or title
+    /// stand-ins fail before the focused selector transaction is entered.
     pub fn slide_chart_title_by_selector<'selector>(
         &self,
         slide_index: usize,
         selector: impl Into<ChartSelector<'selector>>,
     ) -> Result<Option<String>> {
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector.into())?;
-        slide_chart_title(self, slide_index, drawable_object_id)
+        let selector = selector.into();
+        self.resolve_chart_selector(slide_index, selector)?;
+        focused_chart_title_package(self)?
+            .slide_chart_title(litchi_core::Position::new(slide_index), selector)
+            .map_err(map_focused_chart_title_error)
     }
 
-    /// Create or replace the native title for the chart selected on one slide.
-    ///
-    /// The selector is resolved before the existing graph-aware title update,
-    /// so ownership, stand-in, and non-style validation remain unchanged.
+    /// Set the chart title for a chart selected on one slide through the
+    /// focused selector-first transaction.
     pub fn set_slide_chart_title_by_selector<'selector>(
         &mut self,
         slide_index: usize,
         selector: impl Into<ChartSelector<'selector>>,
         title: &str,
     ) -> Result<()> {
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector.into())?;
-        set_slide_chart_title(self, slide_index, drawable_object_id, title)
+        let selector = selector.into();
+        self.resolve_chart_selector(slide_index, selector)?;
+        let package = focused_chart_title_package(self)?;
+        let edit = package
+            .edit_slide_chart_title(litchi_core::Position::new(slide_index), selector)
+            .map_err(map_focused_chart_title_error)?
+            .set(title)
+            .map_err(map_focused_chart_title_error)?;
+        let commit = edit.commit().map_err(map_focused_chart_title_error)?;
+        if commit.patch().is_noop() {
+            return Ok(());
+        }
+        replace_from_focused_chart_title_commit(self, commit)
     }
 
-    /// Remove the native title for the chart selected on one slide.
-    ///
-    /// Returns whether a visible title was present. The selector is resolved
-    /// with the same exact-name and ambiguity rules as other chart edits.
+    /// Remove the chart title for a chart selected on one slide through the
+    /// focused selector-first transaction.
     pub fn remove_slide_chart_title_by_selector<'selector>(
         &mut self,
         slide_index: usize,
         selector: impl Into<ChartSelector<'selector>>,
     ) -> Result<bool> {
-        let drawable_object_id = self.resolve_chart_selector(slide_index, selector.into())?;
-        remove_slide_chart_title(self, slide_index, drawable_object_id)
+        let selector = selector.into();
+        self.resolve_chart_selector(slide_index, selector)?;
+        let package = focused_chart_title_package(self)?;
+        let edit = package
+            .edit_slide_chart_title(litchi_core::Position::new(slide_index), selector)
+            .map_err(map_focused_chart_title_error)?;
+        let had_visible_title = edit.before().is_some();
+        let commit = edit
+            .clear()
+            .map_err(map_focused_chart_title_error)?
+            .commit()
+            .map_err(map_focused_chart_title_error)?;
+        if commit.patch().is_noop() {
+            return Ok(false);
+        }
+        replace_from_focused_chart_title_commit(self, commit)?;
+        Ok(had_visible_title)
     }
 }
 
-fn slide_chart_title(
+fn focused_chart_title_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
+    let bytes = editor.to_bytes()?;
+    litchi_keynote::Package::from_bytes(&bytes).map_err(map_focused_chart_title_read_error)
+}
+
+pub(super) fn focused_chart_catalog(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+) -> Result<ChartCatalog> {
+    focused_chart_title_package(editor)?
+        .slide_chart_catalog(litchi_core::Position::new(slide_index))
+        .map_err(map_focused_chart_title_error)
+}
+
+fn replace_from_focused_chart_title_commit(
+    editor: &mut KeynoteEditor,
+    commit: litchi_keynote::ChartTitleCommit,
+) -> Result<()> {
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote chart title write failed: {error}"))
+    })?;
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    Ok(())
+}
+
+fn map_focused_chart_title_error(error: litchi_keynote::ChartTitleError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Keynote chart title operation failed: {error}"
+    ))
+}
+
+fn map_focused_chart_title_read_error(error: litchi_keynote::ReadError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Keynote chart title source failed: {error}"
+    ))
+}
+
+pub(super) fn slide_chart_title(
     editor: &KeynoteEditor,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Option<String>> {
-    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
-    read_native_chart_title(
-        editor.package(),
-        &graph.archive_name,
-        drawable_object_id,
-        "Keynote",
-    )
+    let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
+    focused_chart_title_package(editor)?
+        .slide_chart_title(
+            litchi_core::Position::new(slide_index),
+            ChartSelector::index(chart_position),
+        )
+        .map_err(map_focused_chart_title_error)
 }
 
 fn set_slide_chart_title(
@@ -99,27 +157,21 @@ fn set_slide_chart_title(
     drawable_object_id: u64,
     title: &str,
 ) -> Result<()> {
-    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
-    let mut staged = editor.package().clone();
-    set_native_chart_title(
-        &mut staged,
-        &graph.archive_name,
-        drawable_object_id,
-        "Keynote",
-        title,
-    )?;
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if verified
-        .slide_chart_title(slide_index, drawable_object_id)?
-        .as_deref()
-        != Some(title)
-    {
-        return Err(Error::InvalidFormat(
-            "Keynote chart title update failed validation".to_owned(),
-        ));
+    let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
+    let package = focused_chart_title_package(editor)?;
+    let edit = package
+        .edit_slide_chart_title(
+            litchi_core::Position::new(slide_index),
+            ChartSelector::index(chart_position),
+        )
+        .map_err(map_focused_chart_title_error)?
+        .set(title)
+        .map_err(map_focused_chart_title_error)?;
+    let commit = edit.commit().map_err(map_focused_chart_title_error)?;
+    if commit.patch().is_noop() {
+        return Ok(());
     }
-    *editor = verified;
-    Ok(())
+    replace_from_focused_chart_title_commit(editor, commit)
 }
 
 fn remove_slide_chart_title(
@@ -127,26 +179,39 @@ fn remove_slide_chart_title(
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<bool> {
-    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
-    let mut staged = editor.package().clone();
-    let removed = remove_native_chart_title(
-        &mut staged,
-        &graph.archive_name,
-        drawable_object_id,
-        "Keynote",
-    )?;
-    if !removed {
+    let chart_position = chart_position_for_identifier(editor, slide_index, drawable_object_id)?;
+    let package = focused_chart_title_package(editor)?;
+    let edit = package
+        .edit_slide_chart_title(
+            litchi_core::Position::new(slide_index),
+            ChartSelector::index(chart_position),
+        )
+        .map_err(map_focused_chart_title_error)?;
+    let had_visible_title = edit.before().is_some();
+    let commit = edit
+        .clear()
+        .map_err(map_focused_chart_title_error)?
+        .commit()
+        .map_err(map_focused_chart_title_error)?;
+    if commit.patch().is_noop() {
         return Ok(false);
     }
-    let verified = KeynoteEditor::from_bytes(&staged.to_bytes()?)?;
-    if verified
-        .slide_chart_title(slide_index, drawable_object_id)?
-        .is_some()
-    {
-        return Err(Error::InvalidFormat(
-            "Keynote chart title removal failed validation".to_owned(),
-        ));
-    }
-    *editor = verified;
-    Ok(true)
+    replace_from_focused_chart_title_commit(editor, commit)?;
+    Ok(had_visible_title)
+}
+
+fn chart_position_for_identifier(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    drawable_object_id: u64,
+) -> Result<usize> {
+    editor
+        .slide_charts(slide_index)?
+        .iter()
+        .position(|chart| chart.drawable_object_id == drawable_object_id)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Keynote slide {slide_index} has no chart {drawable_object_id}"
+            ))
+        })
 }

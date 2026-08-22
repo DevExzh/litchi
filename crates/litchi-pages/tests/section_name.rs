@@ -408,6 +408,54 @@ fn native_fixture_renames_by_position_and_name_with_clear_and_empty() -> TestRes
 }
 
 #[test]
+fn selector_first_name_convenience_methods_share_transaction_boundaries() -> TestResult<()> {
+    let bytes = synthetic_package("Alpha", "Beta")?;
+    let package = Package::from_bytes(&bytes)?;
+    let source_pointer = package.source_bytes().as_ptr();
+
+    let renamed = package.set_section_name(SectionSelector::name("Alpha"), Some("Renamed"))?;
+    assert_eq!(
+        renamed.package().section_name(SectionSelector::index(0))?,
+        Some("Renamed")
+    );
+    assert_eq!(
+        renamed.package().section_name(SectionSelector::index(1))?,
+        Some("Beta")
+    );
+    assert_eq!(package.source_bytes(), bytes);
+    assert_eq!(package.source_bytes().as_ptr(), source_pointer);
+    assert!(!renamed.patch().is_noop());
+
+    let cleared = renamed
+        .package()
+        .clear_section_name(SectionSelector::name("Renamed"))?;
+    assert_eq!(
+        cleared.package().section_name(SectionSelector::index(0))?,
+        None
+    );
+
+    let noop = cleared
+        .package()
+        .clear_section_name(SectionSelector::index(0))?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(
+        noop.package().source_bytes().as_ptr(),
+        cleared.package().source_bytes().as_ptr()
+    );
+
+    assert!(matches!(
+        package.set_section_name(SectionSelector::name("Missing"), Some("x")),
+        Err(SectionNameError::NameNotFound)
+    ));
+    assert!(matches!(
+        package.set_section_name(SectionSelector::name("Alpha"), Some("bad\0name")),
+        Err(SectionNameError::InvalidName(_))
+    ));
+    assert_eq!(package.source_bytes(), bytes);
+    Ok(())
+}
+
+#[test]
 fn selector_and_name_validation_fail_before_publication() -> TestResult<()> {
     let bytes = synthetic_package("Same", "Same")?;
     let package = Package::from_bytes(&bytes)?;

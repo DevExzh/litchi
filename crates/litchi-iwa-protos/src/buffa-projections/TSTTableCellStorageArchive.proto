@@ -12,6 +12,7 @@ message TableModelArchive {
   required bytes base_data_store = 4;
   required uint32 number_of_rows = 6;
   required uint32 number_of_columns = 7;
+  required string table_name = 8;
   optional bytes hidden_state_formula_owner_for_columns = 34;
   optional bytes hidden_state_formula_owner_for_rows = 35;
   optional bytes conditional_style_formula_owner_id = 39;

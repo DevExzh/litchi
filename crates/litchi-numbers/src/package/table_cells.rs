@@ -6,7 +6,7 @@ use crate::{
     SheetSelector, TableSelector,
     table::{
         CellPosition, CellRange, Dimensions, Table,
-        cells::{State, Storage},
+        cells::{Commit, Input, State, Storage},
     },
 };
 
@@ -221,6 +221,67 @@ impl Package {
     ) -> Result<State, Error> {
         let position = CellPosition::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
         self.table_cell(sheet, table, position)
+    }
+
+    /// Set one bounded scalar cell through the exact-source transaction path.
+    ///
+    /// This is the one-cell convenience form of [`Self::edit_table_cells`].
+    /// Selector resolution, finite scalar validation, source binding,
+    /// dependency checks, unknown-wire preservation, and atomic publication
+    /// remain owned by the batch editor; this method does not introduce a
+    /// second native rewrite path.
+    pub fn set_table_cell<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: CellPosition,
+        input: Input,
+    ) -> Result<Commit, Error> {
+        self.edit_table_cells(sheet, table)?
+            .set(position, input)?
+            .commit()
+    }
+
+    /// Set one bounded scalar cell using a relative or absolute A1 address.
+    ///
+    /// The address is parsed before selector resolution, and all publication
+    /// guarantees are the same as [`Self::set_table_cell`].
+    pub fn set_table_cell_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+        input: Input,
+    ) -> Result<Commit, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        self.set_table_cell(sheet, table, position, input)
+    }
+
+    /// Clear one cell through the exact-source transaction path.
+    ///
+    /// Clearing retains the native cell envelope's comments, formulas/styles
+    /// separation, and opaque bytes according to the same rules as a clear in
+    /// [`Self::edit_table_cells`].
+    pub fn clear_table_cell<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: CellPosition,
+    ) -> Result<Commit, Error> {
+        self.edit_table_cells(sheet, table)?
+            .clear(position)?
+            .commit()
+    }
+
+    /// Clear one cell using a relative or absolute A1 address.
+    pub fn clear_table_cell_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+    ) -> Result<Commit, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        self.clear_table_cell(sheet, table, position)
     }
 
     /// Read a bounded dense row-major range from a selected table.

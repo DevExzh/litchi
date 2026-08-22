@@ -2,6 +2,10 @@
 
 use std::collections::HashSet;
 
+use litchi_iwa_common::WireLimits;
+use litchi_iwa_protos::pages_movie_caption_codec::{
+    self as pages_movie_caption_codec, DecodeOptions as PagesMovieCaptionDecodeOptions,
+};
 use prost::Message;
 
 use super::*;
@@ -164,49 +168,55 @@ pub(super) fn movie_caption_slot_from_reference(
             "Pages movie title/caption object {reference_id} has multiple CaptionInfo payloads"
         )));
     };
-    let info = crate::protobuf::tsa::CaptionInfoArchive::decode(message.data.as_slice())?;
-    if info.child_info_kind != Some(kind.native_kind()) {
+    let payload = message.data.as_slice();
+    let info = pages_movie_caption_codec::decode_caption_info(
+        payload,
+        PagesMovieCaptionDecodeOptions::new(
+            payload.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+            payload.len().clamp(1, WireLimits::MAX_FIELDS),
+            payload
+                .len()
+                .saturating_mul(32)
+                .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            8,
+        ),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Pages movie title/caption object {reference_id} has malformed CaptionInfo payload: {error}"
+        ))
+    })?;
+    if info.child_info_kind() != Some(kind.native_kind()) {
         return Err(Error::InvalidFormat(format!(
             "Pages movie title/caption object {reference_id} has the wrong native kind"
         )));
     }
-    if info
-        .super_
-        .super_
-        .super_
-        .parent
-        .as_ref()
-        .map(|parent| parent.identifier)
-        != Some(drawable_object_id)
-    {
+    if info.parent_identifier() != drawable_object_id {
         return Err(Error::InvalidFormat(format!(
             "Pages movie title/caption object {reference_id} has the wrong parent drawable"
         )));
     }
-    let storage_id = required_caption_reference(
-        reference_id,
-        info.super_.owned_storage.as_ref(),
-        "text storage",
-    )?;
-    if info
-        .super_
-        .deprecated_storage
-        .as_ref()
-        .map(|storage| storage.identifier)
-        != Some(storage_id)
-        || info.super_.is_text_box != Some(true)
+    let storage_id = info.owned_storage_identifier().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Pages movie title/caption object {reference_id} has no text storage reference"
+        ))
+    })?;
+    if info.deprecated_storage_identifier() != Some(storage_id) || info.is_text_box() != Some(true)
     {
         return Err(Error::InvalidFormat(format!(
             "Pages movie title/caption object {reference_id} has inconsistent text storage"
         )));
     }
-    let style_id = required_caption_reference(
-        reference_id,
-        info.super_.super_.style.as_ref(),
-        "shape style",
-    )?;
-    let placement_id =
-        required_caption_reference(reference_id, info.placement.as_ref(), "placement")?;
+    let style_id = info.style_identifier().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Pages movie title/caption object {reference_id} has no shape style reference"
+        ))
+    })?;
+    let placement_id = info.placement_identifier().ok_or_else(|| {
+        Error::InvalidFormat(format!(
+            "Pages movie title/caption object {reference_id} has no placement reference"
+        ))
+    })?;
     for (identifier, message_type, label) in [
         (style_id, SHAPE_STYLE_MESSAGE_TYPE, "shape style"),
         (storage_id, STORAGE_MESSAGE_TYPE, "text storage"),
@@ -488,20 +498,6 @@ fn replace_body_movie_caption_reference(
     Ok(())
 }
 
-fn required_caption_reference(
-    reference_id: u64,
-    reference: Option<&tsp::Reference>,
-    label: &str,
-) -> Result<u64> {
-    reference
-        .map(|reference| reference.identifier)
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Pages movie title/caption object {reference_id} has no {label} reference"
-            ))
-        })
-}
-
 fn require_exact_message_count(
     package: &IWorkPackage,
     object_id: u64,
@@ -527,4 +523,23 @@ fn require_exact_message_count(
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn movie_caption_info_ingress_stays_on_private_wire_projection() {
+        let source = include_str!("caption.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map_or(source, |(production, _tests)| production);
+        let generated_decode = ["CaptionInfoArchive", "::decode"].concat();
+        assert!(!production.contains(&generated_decode));
+        assert_eq!(
+            production
+                .matches("pages_movie_caption_codec::decode_caption_info(")
+                .count(),
+            1
+        );
+    }
 }

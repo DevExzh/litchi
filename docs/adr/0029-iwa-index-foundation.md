@@ -67,10 +67,11 @@ field preservation, and transactional publication remain below the public
 semantic API. No native identifier or archive type is added to this crate to
 make the adapter convenient.
 
-The adapter retains only the archive name and validated source position needed
-to resolve an already-parsed object. Public entry metadata exposes typed
-`FragmentId` and `ByteSpan` values; native archive names, source positions, and
-raw numeric compatibility queries remain private to the adapter.
+The adapter retains the archive name, validated source position, and native
+primary message type needed by private compatibility queries. Public entry
+metadata exposes typed `FragmentId` and `ByteSpan` values; native archive
+names, source positions, and raw numeric compatibility queries remain private
+to the adapter.
 
 ## Consequences
 
@@ -99,3 +100,23 @@ and `build_allow_missing_targets` continues to preserve dangling targets.
 `litchi-iwa-index` retains its canonical internal dependency on
 `litchi-iwa-graph`; only the redundant direct `litchi-iwa ->
 litchi-iwa-graph` edge and ordered debt 007 are removed.
+
+## 2026-08-22 amendment: semantic projection and graph compatibility
+
+The index now has an intentional archive-free semantic view in its public
+`semantic` module. `SemanticIndex` borrows an immutable `ObjectIndex` and
+publishes only neutral location metadata, adapter-local
+`SemanticObjectHandle` values, and opaque unresolved-reference state. Each
+handle carries a private per-view provenance stamp; callers may use its
+checked ordinal for display or local ordering, but an ordinal is not a native
+object identifier, a serialized token, or a handle that can be reused with a
+different semantic view. Package names, payloads, native identifiers, and
+graph snapshots remain outside this projection.
+
+The original low-level graph surface remains source-compatible through the
+`ObjectIdIter` and `ReferenceGraphSnapshot` re-exports and the
+`ObjectIndex::reference_graph` method. That method is explicitly deprecated
+and documented as a graph-identity compatibility bridge; new semantic code
+must use the bounded `SemanticIndex` operations or the typed `ObjectIndex`
+queries instead. This preserves existing adapter compilation without making
+the graph snapshot part of the supported semantic hand-off.

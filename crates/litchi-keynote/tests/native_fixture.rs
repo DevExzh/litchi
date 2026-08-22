@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_keynote::{
-    Document, DocumentReadOptions, DocumentSourceLimits, Package, ReadOptions, SemanticLimitKind,
-    SemanticLimits, SlideSelector, Stats, show::Mode,
+    Document, DocumentReadError, DocumentReadLimitKind, DocumentReadOptions,
+    DocumentSemanticLimits, DocumentSourceLimits, DocumentStats, Package, ReadOptions,
+    SlideSelector, Stats, show::Mode,
 };
 
 const EXPECTED_TEXT: &str =
@@ -121,7 +122,10 @@ fn archive_free_document_accepts_borrowed_package_bytes() -> Result<(), Box<dyn 
 
     assert_eq!(document.show(), package.show()?);
     assert_eq!(document.text()?, EXPECTED_TEXT);
-    assert_eq!(document.stats(), Some(package.stats()?));
+    assert_eq!(
+        document.stats().map(|stats| stats.slide_count),
+        Some(package.stats()?.slide_count)
+    );
     assert_eq!(
         document
             .metadata()
@@ -142,37 +146,34 @@ fn archive_free_byte_ingress_honors_source_and_semantic_limits()
     let defaults = DocumentSourceLimits::default();
     let exact_source = DocumentSourceLimits::new(
         u64::try_from(source.len())?,
-        defaults.max_files(),
-        defaults.max_entry_size(),
-        defaults.max_total_size(),
-        defaults.max_iwa_stream_size(),
+        defaults.max_entries(),
+        defaults.max_entry_bytes(),
+        defaults.max_aggregate_bytes(),
+        defaults.max_component_bytes(),
     )?;
     let source_error = Document::from_bytes_with_options(
         &source,
         DocumentReadOptions::new(
             DocumentSourceLimits::new(
                 u64::try_from(source.len().saturating_sub(1))?,
-                defaults.max_files(),
-                defaults.max_entry_size(),
-                defaults.max_total_size(),
-                defaults.max_iwa_stream_size(),
+                defaults.max_entries(),
+                defaults.max_entry_bytes(),
+                defaults.max_aggregate_bytes(),
+                defaults.max_component_bytes(),
             )?,
-            SemanticLimits::default(),
+            DocumentSemanticLimits::default(),
         ),
     )
     .expect_err("source max-minus-one must reject complete package bytes");
-    assert!(matches!(
-        source_error,
-        litchi_keynote::ReadError::Archive(_)
-    ));
+    assert!(matches!(source_error, DocumentReadError::Limit { .. }));
 
-    let semantic = SemanticLimits::new(
+    let semantic = DocumentSemanticLimits::new(
         EXPECTED_OBJECTS - 1,
-        SemanticLimits::MAX_SLIDES,
-        SemanticLimits::MAX_REFERENCES,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
+        DocumentSemanticLimits::MAX_SLIDES,
+        DocumentSemanticLimits::MAX_REFERENCES,
+        DocumentSemanticLimits::MAX_TEXT_STORAGES,
+        DocumentSemanticLimits::MAX_TEXT_FRAGMENTS,
+        DocumentSemanticLimits::MAX_TEXT_BYTES,
     )?;
     let semantic_error = Document::from_bytes_with_options(
         &source,
@@ -181,11 +182,11 @@ fn archive_free_byte_ingress_honors_source_and_semantic_limits()
     .expect_err("object max-minus-one must reject before publishing a document");
     assert!(matches!(
         semantic_error,
-        litchi_keynote::ReadError::SemanticLimit {
-            kind: SemanticLimitKind::Objects,
+        DocumentReadError::Limit {
+            kind: DocumentReadLimitKind::Objects,
             maximum,
             ..
-        } if maximum == EXPECTED_OBJECTS - 1
+        } if maximum == (EXPECTED_OBJECTS - 1) as u64
     ));
     Ok(())
 }
@@ -196,6 +197,7 @@ fn focused_reader_surface_is_exact_shareable_and_archive_free()
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Package>();
     assert_send_sync::<Document>();
+    assert_send_sync::<DocumentStats>();
     assert_send_sync::<Stats>();
 
     let bytes = std::fs::read(fixture_path())?;
@@ -320,7 +322,7 @@ fn archive_free_document_rejects_other_iwork_formats_before_semantic_publication
     for path in [pages_fixture_path(), pages_directory_fixture_path()] {
         assert!(matches!(
             Document::open(path),
-            Err(litchi_keynote::ReadError::NotKeynote)
+            Err(DocumentReadError::NotKeynote)
         ));
     }
 }
@@ -338,7 +340,10 @@ fn archive_free_document_has_full_zip_and_directory_semantic_parity()
     assert_eq!(directory.show(), zipped.show());
     assert_eq!(zipped.text()?, EXPECTED_TEXT);
     assert_eq!(directory.text()?, EXPECTED_TEXT);
-    assert_eq!(zipped.stats(), Some(package.stats()?));
+    assert_eq!(
+        zipped.stats().map(|stats| stats.slide_count),
+        Some(package.stats()?.slide_count)
+    );
     assert_eq!(directory.stats(), zipped.stats());
     assert_eq!(
         zipped.snapshot().slides().as_ptr(),
@@ -396,54 +401,51 @@ fn archive_free_directory_is_frozen_and_enforces_source_and_semantic_limits()
     let defaults = DocumentSourceLimits::default();
     let exact_source = DocumentSourceLimits::new(
         exact_input,
-        defaults.max_files(),
-        defaults.max_entry_size(),
-        defaults.max_total_size(),
-        defaults.max_iwa_stream_size(),
+        defaults.max_entries(),
+        defaults.max_entry_bytes(),
+        defaults.max_aggregate_bytes(),
+        defaults.max_component_bytes(),
     )?;
     let exact = Document::open_with_options(
         &source,
-        DocumentReadOptions::new(exact_source, SemanticLimits::default()),
+        DocumentReadOptions::new(exact_source, DocumentSemanticLimits::default()),
     )?;
     assert_eq!(exact.text()?, EXPECTED_TEXT);
-    assert_eq!(
-        exact.stats().map(|stats| stats.total_objects),
-        Some(EXPECTED_OBJECTS)
-    );
+    assert_eq!(exact.stats().map(|stats| stats.slide_count), Some(1));
 
     let too_small_source = DocumentSourceLimits::new(
         exact_input - 1,
-        defaults.max_files(),
-        defaults.max_entry_size(),
-        defaults.max_total_size(),
-        defaults.max_iwa_stream_size(),
+        defaults.max_entries(),
+        defaults.max_entry_bytes(),
+        defaults.max_aggregate_bytes(),
+        defaults.max_component_bytes(),
     )?;
     let error = Document::open_with_options(
         &source,
-        DocumentReadOptions::new(too_small_source, SemanticLimits::default()),
+        DocumentReadOptions::new(too_small_source, DocumentSemanticLimits::default()),
     )
     .expect_err("aggregate index plus properties max-minus-one must refuse");
-    assert!(matches!(error, litchi_keynote::ReadError::Detection(_)));
+    assert!(matches!(error, DocumentReadError::Limit { .. }));
 
-    let semantic = SemanticLimits::new(
+    let semantic = DocumentSemanticLimits::new(
         EXPECTED_OBJECTS - 1,
-        SemanticLimits::MAX_SLIDES,
-        SemanticLimits::MAX_REFERENCES,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
+        DocumentSemanticLimits::MAX_SLIDES,
+        DocumentSemanticLimits::MAX_REFERENCES,
+        DocumentSemanticLimits::MAX_TEXT_STORAGES,
+        DocumentSemanticLimits::MAX_TEXT_FRAGMENTS,
+        DocumentSemanticLimits::MAX_TEXT_BYTES,
     )?;
     let error =
         Document::open_with_options(&source, DocumentReadOptions::new(exact_source, semantic))
             .expect_err("object max-minus-one must refuse before publishing a document");
     assert!(matches!(
         error,
-        litchi_keynote::ReadError::SemanticLimit {
-            kind: SemanticLimitKind::Objects,
-            observed: EXPECTED_OBJECTS,
+        DocumentReadError::Limit {
+            kind: DocumentReadLimitKind::Objects,
+            observed,
             maximum,
             ..
-        } if maximum == EXPECTED_OBJECTS - 1
+        } if observed == EXPECTED_OBJECTS as u64 && maximum == (EXPECTED_OBJECTS - 1) as u64
     ));
 
     std::fs::remove_dir_all(&source)?;

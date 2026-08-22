@@ -18,13 +18,14 @@ use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len, wire::WireView};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::keynote_speaker_notes_codec;
-use litchi_iwa_text::{TextPosition, TextSpan};
+use litchi_iwa_text::{TextPosition, TextSpan, storage::Storage};
 use litchi_iwa_text_wire::{RewriteBehavior, RewriteLimits};
 use thiserror::Error;
 
 use super::{
     NOTE_MESSAGE_TYPE, Package, PhysicalSource, ReadError, SLIDE_MESSAGE_TYPE,
-    STORAGE_MESSAGE_TYPE, SemanticBudget, SemanticLimitKind, SemanticPath, unique_payload,
+    STORAGE_MESSAGE_TYPE, SemanticBudget, SemanticLimitKind, SemanticPath, checked_semantic_charge,
+    unique_payload,
 };
 use crate::SlideSelector;
 
@@ -292,7 +293,6 @@ impl<'a> SlideNotesEdit<'a> {
 
     /// Validate and atomically publish the staged immutable candidate.
     pub fn commit(self) -> Result<SlideNotesCommit, SlideNotesError> {
-        self.source.validate().map_err(map_read_error)?;
         let current =
             notes_snapshot_at(self.source, self.position)?.ok_or(SlideNotesError::InvalidSource)?;
         if current.note_identifier != self.note_identifier
@@ -356,6 +356,7 @@ impl<'a> SlideNotesEdit<'a> {
                 diagnostics: SlideNotesDiagnostics::unchanged(),
             });
         }
+        selected_slide_snapshot(self.source, self.position)?;
         if !catalog.source_is_exact() {
             return Err(SlideNotesError::UnsupportedSource);
         }
@@ -622,6 +623,7 @@ impl Package {
                 diagnostics: SlideNotesDiagnostics::unchanged(),
             });
         }
+        selected_slide_snapshot(self, patch.position)?;
         prove_exclusive_notes_ownership(
             self,
             patch.position,
@@ -634,7 +636,6 @@ impl Package {
         let candidate =
             Package::from_source_with_options(Arc::clone(&patch.target), self.state.options)
                 .map_err(map_read_error)?;
-        candidate.validate().map_err(map_read_error)?;
         verify_candidate(self, &candidate, patch.position, patch.after())?;
         Ok(SlideNotesCommit {
             package: candidate,
@@ -699,21 +700,57 @@ fn notes_snapshot_at(
             },
         )
         .map_err(map_read_error)?;
-    let text = package
-        .required_text_storage(
-            storage,
-            &mut budget,
-            SemanticPath::SlideNotes {
-                index: position.get(),
-            },
-        )
-        .map_err(map_read_error)?
-        .into_text();
+    let path = SemanticPath::SlideNotes {
+        index: position.get(),
+    };
+    let storage_payload = one_message(&storage.messages, STORAGE_MESSAGE_TYPE)?
+        .1
+        .data
+        .as_slice();
+    let text = decode_notes_storage(package, storage_payload, &mut budget, path)?.into_text();
     Ok(Some(NotesSnapshot {
         note_identifier,
         storage_identifier,
         text,
     }))
+}
+
+/// Decode speaker-notes storage through the strict schema pass and lazy text
+/// projection while charging the same package-wide semantic counters as the
+/// general reader. The source payload is borrowed for validation only; the
+/// returned storage owns its text/runs and no native wire fields.
+fn decode_notes_storage(
+    package: &Package,
+    payload: &[u8],
+    budget: &mut SemanticBudget,
+    path: SemanticPath,
+) -> Result<Storage, SlideNotesError> {
+    let storage_count = checked_semantic_charge(
+        budget.text_storages,
+        1,
+        SemanticLimitKind::TextStorages,
+        package.semantic_limits().max_text_storages(),
+        path,
+    )
+    .map_err(map_read_error)?;
+    let archive_limits = package
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let text_limits = storage_rewrite_limits(package, archive_limits.max_message_bytes())?;
+    let validated = litchi_iwa_text_wire::decode_storage_with_limits(payload, text_limits)
+        .map_err(map_text_rewrite_error)?;
+    let validation = validated.validation();
+    budget
+        .charge_fragments(validation.fragments(), path)
+        .map_err(map_read_error)?;
+    budget
+        .charge_text(validation.utf8_len(), path)
+        .map_err(map_read_error)?;
+    budget.text_storages = storage_count;
+    Ok(validated.into_storage())
 }
 
 fn decode_slide_note_reference(
@@ -856,9 +893,25 @@ fn rewrite_notes(
         .map_err(map_archive_error)?;
     let candidate = Package::from_source_with_options(output.into(), source.state.options)
         .map_err(map_read_error)?;
-    candidate.validate().map_err(map_read_error)?;
     verify_candidate(source, &candidate, position, expected)?;
     Ok(candidate)
+}
+
+fn selected_slide_snapshot(
+    package: &Package,
+    position: Position,
+) -> Result<crate::Slide, SlideNotesError> {
+    let record = package
+        .slide_record_at(position.get())
+        .map_err(map_read_error)?
+        .ok_or(SlideNotesError::SlidePositionNotFound { position })?;
+    let slide = package
+        .required_object(record.slide_identifier, "Keynote slide")
+        .map_err(map_read_error)?;
+    let mut budget = SemanticBudget::new(package.semantic_limits());
+    package
+        .parse_slide(position.get(), slide, record.is_skipped, &mut budget)
+        .map_err(map_read_error)
 }
 
 fn verify_candidate(
@@ -891,27 +944,19 @@ fn verify_candidate(
         candidate_notes.note_identifier,
         candidate_notes.storage_identifier,
     )?;
-    let before = source.slides().map_err(map_read_error)?;
-    let after = candidate.slides().map_err(map_read_error)?;
-    if before.len() != after.len() {
+    let before = selected_slide_snapshot(source, position)?;
+    let after = selected_slide_snapshot(candidate, position)?;
+    if before.index() != after.index()
+        || before.is_skipped() != after.is_skipped()
+        || before.name() != after.name()
+        || before.title() != after.title()
+        || before.text_content() != after.text_content()
+        || before.text_storages() != after.text_storages()
+        || before.movies() != after.movies()
+        || before.builds() != after.builds()
+        || before.transition() != after.transition()
+    {
         return Err(SlideNotesError::Verification);
-    }
-    for (index, (old, new)) in before.iter().zip(after).enumerate() {
-        if index == position.get() {
-            if old.index() != new.index()
-                || old.is_skipped() != new.is_skipped()
-                || old.name() != new.name()
-                || old.title() != new.title()
-                || old.text_content() != new.text_content()
-                || old.text_storages() != new.text_storages()
-                || old.builds() != new.builds()
-                || old.transition() != new.transition()
-            {
-                return Err(SlideNotesError::Verification);
-            }
-        } else if old != new {
-            return Err(SlideNotesError::Verification);
-        }
     }
     Ok(())
 }

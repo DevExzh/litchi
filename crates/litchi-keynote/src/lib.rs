@@ -313,11 +313,13 @@ pub mod transition;
 pub use background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use build::{AnimationType, Build};
 pub use chart::{ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError};
-pub use document::{Document, DocumentReadOptions};
+pub use document::{
+    Document, DocumentIoKind, DocumentReadError, DocumentReadLimitKind, DocumentReadOptions,
+    DocumentSemanticLimitKind, DocumentSemanticLimits, DocumentSemanticLimitsError,
+    DocumentSourceLimitKind, DocumentSourceLimits, DocumentSourceLimitsError, DocumentStats,
+};
 pub use error::{Error, Result};
 pub use litchi_core::Position;
-/// Checked physical limits for archive-free Keynote document capture.
-pub use litchi_iwa_detect::Limits as DocumentSourceLimits;
 /// Maximum canonical `Metadata/Properties.plist` bytes retained by
 /// archive-free document ingress.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
@@ -326,16 +328,18 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[doc(hidden)]
 pub use package::__semantic_document_from_prepared_source;
 pub use package::{
-    Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES,
-    MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind,
-    ReadError, ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError, SemanticPath,
-    SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
-    SlideNotesPatch, SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError,
-    SlideOrderLimitKind, SlideOrderPatch, SlideTextCommit, SlideTextDiagnostics, SlideTextEdit,
-    SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure, WriteError,
+    ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
+    ChartTitlePatch, Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES,
+    MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch,
+    PayloadLimitKind, ReadError, ReadOptions, SemanticLimitKind, SemanticLimits,
+    SemanticLimitsError, SemanticPath, SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit,
+    SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit, SlideOrderDiagnostics,
+    SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch, SlideTextCommit,
+    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats,
+    TextStorageFailure, WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
-pub use slide::media::MovieKind;
+pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
 pub use slide::{Slide, Transition};
 pub use time::Seconds;
 pub(crate) use transition::Effect;

@@ -8,6 +8,7 @@ mod edit;
 mod limits;
 mod rendering_invalidation;
 pub(crate) mod show_settings;
+mod slide_chart_title;
 pub(crate) mod slide_delete;
 mod slide_notes;
 mod slide_order;
@@ -16,6 +17,7 @@ pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;
 mod slide_text;
 pub(crate) mod slide_transition;
+pub(crate) mod soundtrack_order;
 pub(crate) mod soundtrack_settings;
 
 use std::fmt;
@@ -26,6 +28,7 @@ use std::str;
 use std::sync::Arc;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 use litchi_iwa_archive::{ComponentCatalog, Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::{
@@ -35,8 +38,8 @@ use litchi_iwa_common::{
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{
-    keynote_document_codec, keynote_placeholder_text_codec, keynote_show_codec,
-    keynote_slide_transition_codec, keynote_speaker_notes_codec,
+    keynote_document_codec, keynote_media_codec, keynote_placeholder_text_codec,
+    keynote_show_codec, keynote_slide_transition_codec, keynote_speaker_notes_codec,
 };
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
@@ -49,12 +52,22 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::show::{Mode, Settings, Show, Size};
-use crate::{AnimationType, Build, Document, Seconds, Slide, Transition, transition::Effect};
+use crate::{
+    AnimationType, Build, Document, DocumentStats, MovieInfo, MovieKind, Seconds, Slide,
+    Transition,
+    slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume},
+    slide::media::{Point as MediaPoint, Size as MediaSize},
+    transition::Effect,
+};
 
 pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
+};
+pub use slide_chart_title::{
+    ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
+    ChartTitlePatch,
 };
 pub use slide_notes::{
     SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
@@ -81,6 +94,7 @@ const BUILD_MESSAGE_TYPE: u32 = 8;
 const NOTE_MESSAGE_TYPE: u32 = 15;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const MOVIE_MESSAGE_TYPE: u32 = 3_007;
 
 /// A result returned by a native Keynote package operation.
 type ReadResult<T> = Result<T, ReadError>;
@@ -809,7 +823,7 @@ impl Package {
                 .fetch_add(1, Ordering::Relaxed);
             // Make check/decode/set implementations reliably overlap in the
             // concurrency regression. The production build has no delay.
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(10));
         }
 
         let show_identifier = self.root_show_identifier()?;
@@ -969,6 +983,12 @@ impl Package {
                 resource: "Keynote semantic builds",
                 amount: preflight.builds,
             })?;
+        builder
+            .try_reserve_movies(owned_drawables.len())
+            .map_err(|_error| ReadError::Allocation {
+                resource: "Keynote semantic movies",
+                amount: owned_drawables.len(),
+            })?;
         let storage_capacity = owned_drawables
             .len()
             .saturating_add(1)
@@ -1029,6 +1049,17 @@ impl Package {
             {
                 continue;
             }
+            if let Some(movie_payload) = self.movie_payload(drawable_identifier)? {
+                let path = SemanticPath::SlideDrawable {
+                    slide: index,
+                    index: drawable_index,
+                };
+                let (movie, references) =
+                    decode_movie_info(movie_payload, self.semantic_wire_limits()?, path)?;
+                budget.charge_references(references, path)?;
+                builder.push_movie(movie);
+                continue;
+            }
             if let Some(storage) = self.drawable_storage(
                 drawable_identifier,
                 false,
@@ -1053,6 +1084,15 @@ impl Package {
             }
         }
         Ok(builder.build())
+    }
+
+    fn movie_payload(&self, identifier: u64) -> ReadResult<Option<&[u8]>> {
+        let drawable = self.required_object(identifier, "Keynote drawable")?;
+        optional_unique_payload(
+            &drawable.messages,
+            &[MOVIE_MESSAGE_TYPE],
+            "Keynote movie drawable",
+        )
     }
 
     fn extract_build(
@@ -1250,12 +1290,18 @@ pub(crate) fn semantic_document_from_prepared_source(
     let (components, archive, properties) = source.__into_semantic_parts()?;
     let package = Package::from_classified_components(components, archive, semantic)?;
     let show = package.decode_show()?;
-    let stats = Stats {
+    let package_stats = Stats {
         total_objects: package.state.total_objects,
         slide_count: show.slides().len(),
     };
     let metadata = metadata_from_show_and_properties(&show, properties.as_deref())?;
-    Ok(Document::from_source(show, metadata, stats))
+    Ok(Document::from_source(
+        show,
+        metadata,
+        DocumentStats {
+            slide_count: package_stats.slide_count,
+        },
+    ))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1270,6 +1316,38 @@ struct SlidePreflight<'source> {
 struct BuildPreflight<'source> {
     delivery: &'source str,
     duration: f64,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct MoviePreflight {
+    super_fields: usize,
+    geometry_fields: usize,
+    geometry_flags: Option<u32>,
+    geometry_angle: Option<f32>,
+    position_fields: usize,
+    position_x: Option<f32>,
+    position_y: Option<f32>,
+    display_size_fields: usize,
+    display_width: Option<f32>,
+    display_height: Option<f32>,
+    original_size_fields: usize,
+    original_width: Option<f32>,
+    original_height: Option<f32>,
+    natural_size_fields: usize,
+    natural_width: Option<f32>,
+    natural_height: Option<f32>,
+    start_time: Option<f32>,
+    end_time: Option<f32>,
+    poster_time: Option<f32>,
+    legacy_loop_mode: Option<u32>,
+    loop_mode: Option<i32>,
+    volume: Option<f32>,
+    audio_only: Option<bool>,
+    flags: Option<u32>,
+    is_live_video: Option<bool>,
+    movie_data_fields: usize,
+    poster_data_fields: usize,
+    data_references: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2071,6 +2149,398 @@ fn preflight_slide<'source>(
     })
 }
 
+fn decode_movie_info(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<(MovieInfo, usize)> {
+    let movie = preflight_movie(payload, wire_limits, path)?;
+    let position = match (movie.position_x, movie.position_y) {
+        (Some(x), Some(y)) => Some(MediaPoint { x, y }),
+        (None, None) => None,
+        _ => {
+            return Err(ReadError::InvalidFormat(
+                "Keynote movie position is missing one coordinate".to_owned(),
+            ));
+        },
+    };
+    let size = match (movie.display_width, movie.display_height) {
+        (Some(width), Some(height)) => Some(MediaSize { width, height }),
+        (None, None) => None,
+        _ => {
+            return Err(ReadError::InvalidFormat(
+                "Keynote movie size is missing one dimension".to_owned(),
+            ));
+        },
+    };
+    let natural_size = match (movie.natural_width, movie.natural_height) {
+        (Some(width), Some(height)) => Some(MediaSize { width, height }),
+        (None, None) => None,
+        _ => {
+            return Err(ReadError::InvalidFormat(
+                "Keynote movie natural size is missing one dimension".to_owned(),
+            ));
+        },
+    };
+    let original_size = match (movie.original_width, movie.original_height) {
+        (Some(width), Some(height)) => Some(MediaSize { width, height }),
+        (None, None) => None,
+        _ => {
+            return Err(ReadError::InvalidFormat(
+                "Keynote movie original size is missing one dimension".to_owned(),
+            ));
+        },
+    };
+    let kind = if movie.is_live_video == Some(true) {
+        MovieKind::LiveVideo
+    } else if movie.audio_only == Some(true) {
+        MovieKind::Audio
+    } else if movie.flags.is_some_and(|flags| flags & 1 != 0) {
+        MovieKind::Placeholder
+    } else {
+        MovieKind::File
+    };
+    let playback = decode_movie_playback(&movie)?;
+    Ok((
+        MovieInfo::from_parts(kind, position, size, natural_size, playback)
+            .with_original_size(original_size),
+        movie.data_references,
+    ))
+}
+
+fn preflight_movie(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<MoviePreflight> {
+    let mut movie = MoviePreflight::default();
+    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+        let field = visit.field();
+        match (visit.path(), field.number()) {
+            ([], 1) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.super_fields,
+                    "Keynote movie drawable base archive",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], 3) => {
+                set_unique_f32(field, &mut movie.start_time, "Keynote movie start time")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 4) => {
+                set_unique_f32(field, &mut movie.end_time, "Keynote movie end time")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 5) => {
+                set_unique_f32(field, &mut movie.poster_time, "Keynote movie poster time")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 6) => {
+                set_unique_u32(
+                    field,
+                    &mut movie.legacy_loop_mode,
+                    "Keynote movie legacy loop mode",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 7) => {
+                set_unique_f32(field, &mut movie.volume, "Keynote movie volume")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 9) => {
+                set_unique_bool(field, &mut movie.audio_only, "Keynote movie audio flag")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 13) => {
+                set_unique_u32(field, &mut movie.flags, "Keynote movie flags")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 14) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.movie_data_fields,
+                    "Keynote movie media data reference",
+                )?;
+                movie.data_references = movie.data_references.saturating_add(1);
+                validate_movie_data_reference(field.payload(), wire_limits)?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 15) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.poster_data_fields,
+                    "Keynote movie poster data reference",
+                )?;
+                movie.data_references = movie.data_references.saturating_add(1);
+                validate_movie_data_reference(field.payload(), wire_limits)?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 20) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.original_size_fields,
+                    "Keynote movie original size",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], 21) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.natural_size_fields,
+                    "Keynote movie natural size",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([], 24) => {
+                set_unique_i32(field, &mut movie.loop_mode, "Keynote movie loop mode")?;
+                Ok(WireDescent::Skip)
+            },
+            ([], 30) => {
+                set_unique_bool(
+                    field,
+                    &mut movie.is_live_video,
+                    "Keynote movie live-video flag",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([1], 1) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.geometry_fields,
+                    "Keynote movie geometry",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([1, 1], 1) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.position_fields,
+                    "Keynote movie position",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([1, 1], 2) => {
+                require_unique_length_delimited(
+                    field,
+                    &mut movie.display_size_fields,
+                    "Keynote movie displayed size",
+                )?;
+                Ok(WireDescent::Descend)
+            },
+            ([1, 1], 3) => {
+                set_unique_u32(
+                    field,
+                    &mut movie.geometry_flags,
+                    "Keynote movie geometry flags",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([1, 1], 4) => {
+                set_unique_f32(
+                    field,
+                    &mut movie.geometry_angle,
+                    "Keynote movie geometry angle",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([1, 1, 1], 1) => {
+                set_unique_f32(field, &mut movie.position_x, "Keynote movie position x")?;
+                Ok(WireDescent::Skip)
+            },
+            ([1, 1, 1], 2) => {
+                set_unique_f32(field, &mut movie.position_y, "Keynote movie position y")?;
+                Ok(WireDescent::Skip)
+            },
+            ([1, 1, 2], 1) => {
+                set_unique_f32(
+                    field,
+                    &mut movie.display_width,
+                    "Keynote movie displayed width",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([1, 1, 2], 2) => {
+                set_unique_f32(
+                    field,
+                    &mut movie.display_height,
+                    "Keynote movie displayed height",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([20], 1) => {
+                set_unique_f32(
+                    field,
+                    &mut movie.original_width,
+                    "Keynote movie original width",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([20], 2) => {
+                set_unique_f32(
+                    field,
+                    &mut movie.original_height,
+                    "Keynote movie original height",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([21], 1) => {
+                set_unique_f32(
+                    field,
+                    &mut movie.natural_width,
+                    "Keynote movie natural width",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            ([21], 2) => {
+                set_unique_f32(
+                    field,
+                    &mut movie.natural_height,
+                    "Keynote movie natural height",
+                )?;
+                Ok(WireDescent::Skip)
+            },
+            _ => Ok(WireDescent::Skip),
+        }
+    })
+    .map_err(|error| map_wire_preflight_error(error, "Keynote movie", path))?;
+
+    if movie.super_fields != 1 || movie.geometry_fields != 1 {
+        return Err(ReadError::InvalidFormat(
+            "Keynote movie is missing a unique drawable geometry envelope".to_owned(),
+        ));
+    }
+    if movie.position_fields > 0 && (movie.position_x.is_none() || movie.position_y.is_none()) {
+        return Err(ReadError::InvalidFormat(
+            "Keynote movie position is missing a required coordinate".to_owned(),
+        ));
+    }
+    if movie.display_size_fields > 0
+        && (movie.display_width.is_none() || movie.display_height.is_none())
+    {
+        return Err(ReadError::InvalidFormat(
+            "Keynote movie displayed size is missing a required dimension".to_owned(),
+        ));
+    }
+    if movie.original_size_fields > 0
+        && (movie.original_width.is_none() || movie.original_height.is_none())
+    {
+        return Err(ReadError::InvalidFormat(
+            "Keynote movie original size is missing a required dimension".to_owned(),
+        ));
+    }
+    if movie.natural_size_fields > 0
+        && (movie.natural_width.is_none() || movie.natural_height.is_none())
+    {
+        return Err(ReadError::InvalidFormat(
+            "Keynote movie natural size is missing a required dimension".to_owned(),
+        ));
+    }
+    Ok(movie)
+}
+
+fn decode_movie_playback(movie: &MoviePreflight) -> ReadResult<Option<MediaPlaybackSettings>> {
+    let Some(end_time) = movie.end_time else {
+        return Ok(None);
+    };
+    let start_time = movie
+        .start_time
+        .map(|value| movie_duration(value, "Keynote movie start time"))
+        .transpose()?;
+    let end_time = movie_duration(end_time, "Keynote movie end time")?;
+    let poster_time = movie
+        .poster_time
+        .map(|value| movie_duration(value, "Keynote movie poster time"))
+        .transpose()?;
+    let modern_loop = movie.loop_mode.map(MediaLoopMode::from_raw);
+    let legacy_loop = movie
+        .legacy_loop_mode
+        .map(|value| MediaLoopMode::from_raw(i32::from_le_bytes(value.to_le_bytes())));
+    if modern_loop.is_some() && legacy_loop.is_some() && modern_loop != legacy_loop {
+        return Err(ReadError::InvalidFormat(
+            "Keynote movie has conflicting modern and legacy loop modes".to_owned(),
+        ));
+    }
+    let loop_mode = modern_loop.or(legacy_loop);
+    let volume = movie
+        .volume
+        .map(MediaVolume::new)
+        .transpose()
+        .map_err(|error| ReadError::InvalidFormat(error.to_string()))?;
+    MediaPlaybackSettings {
+        start_time,
+        end_time,
+        poster_time,
+        loop_mode,
+        volume,
+    }
+    .canonicalize()
+    .map(Some)
+    .map_err(|error| ReadError::InvalidFormat(error.to_string()))
+}
+
+fn movie_duration(value: f32, context: &'static str) -> ReadResult<Duration> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(ReadError::InvalidFormat(format!(
+            "{context} must be finite and non-negative"
+        )));
+    }
+    Duration::try_from_secs_f32(value)
+        .map_err(|error| ReadError::InvalidFormat(format!("{context} is out of range: {error}")))
+}
+
+fn validate_movie_data_reference(
+    payload: &[u8],
+    wire_limits: WireLimits,
+) -> litchi_iwa_common::Result<()> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        litchi_iwa_common::Error::InvalidFormat(
+            "Keynote movie data-reference nesting limit does not fit u32".to_owned(),
+        )
+    })?;
+    let options = keynote_media_codec::DecodeOptions::new(
+        payload.len().max(1),
+        wire_limits.max_fields(),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    );
+    keynote_media_codec::decode_data_reference(payload, options)
+        .map(|_snapshot| ())
+        .map_err(|error| match error.resource_limit() {
+            Some(keynote_media_codec::DecodeLimit::Bytes { observed, maximum }) => {
+                litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::InputBytes,
+                    observed,
+                    limit: maximum,
+                }
+            },
+            Some(keynote_media_codec::DecodeLimit::Fields { observed, maximum }) => {
+                litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::Fields,
+                    observed,
+                    limit: maximum,
+                }
+            },
+            Some(keynote_media_codec::DecodeLimit::Work { observed, maximum }) => {
+                litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::RewriteWork,
+                    observed,
+                    limit: maximum,
+                }
+            },
+            Some(keynote_media_codec::DecodeLimit::Nesting { observed, maximum }) => {
+                litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::Nesting,
+                    observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                    limit: usize::try_from(maximum).unwrap_or(usize::MAX),
+                }
+            },
+            Some(_) => litchi_iwa_common::Error::InvalidFormat(error.to_string()),
+            None => litchi_iwa_common::Error::InvalidFormat(error.to_string()),
+        })
+}
+
 fn preflight_build<'source>(
     payload: &'source [u8],
     wire_limits: WireLimits,
@@ -2736,6 +3206,72 @@ fn set_unique_utf8<'source>(
             "{context} is duplicated"
         )));
     }
+    Ok(())
+}
+
+fn set_unique_f32(
+    field: WireFieldView<'_>,
+    slot: &mut Option<f32>,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    let mut fields = usize::from(slot.is_some());
+    require_unique_fixed32(field, &mut fields, context)?;
+    let value = f32::from_le_bytes(field.payload().try_into().map_err(|_error| {
+        litchi_iwa_common::Error::InvalidFormat(format!("{context} has invalid fixed32 width"))
+    })?);
+    if !value.is_finite() {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} must be finite"
+        )));
+    }
+    slot.replace(value);
+    Ok(())
+}
+
+fn set_unique_u32(
+    field: WireFieldView<'_>,
+    slot: &mut Option<u32>,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    let mut fields = usize::from(slot.is_some());
+    let value = require_unique_uint64(field, &mut fields, context)?;
+    let value = u32::try_from(value).map_err(|_error| {
+        litchi_iwa_common::Error::InvalidFormat(format!("{context} exceeds uint32"))
+    })?;
+    slot.replace(value);
+    Ok(())
+}
+
+fn set_unique_i32(
+    field: WireFieldView<'_>,
+    slot: &mut Option<i32>,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    let mut fields = usize::from(slot.is_some());
+    require_unique_canonical_int32(field, &mut fields, context)?;
+    let (raw, consumed) =
+        litchi_iwa_common::decode_varint_from_bytes(field.payload()).map_err(|error| {
+            litchi_iwa_common::Error::InvalidFormat(format!(
+                "{context} has an invalid varint: {error}"
+            ))
+        })?;
+    if consumed != field.payload().len() {
+        return Err(litchi_iwa_common::Error::InvalidFormat(format!(
+            "{context} has trailing varint bytes"
+        )));
+    }
+    slot.replace(i32::from_le_bytes((raw as u32).to_le_bytes()));
+    Ok(())
+}
+
+fn set_unique_bool(
+    field: WireFieldView<'_>,
+    slot: &mut Option<bool>,
+    context: &'static str,
+) -> litchi_iwa_common::Result<()> {
+    let mut fields = usize::from(slot.is_some());
+    let value = require_unique_bool(field, &mut fields, context)?;
+    slot.replace(value);
     Ok(())
 }
 
@@ -3735,6 +4271,108 @@ mod tests {
             panic!("duplicate required identifiers must fail strict preflight");
         };
         assert!(matches!(error, ReadError::InvalidFormat(_)));
+    }
+
+    #[test]
+    fn movie_projection_is_ordered_id_free_and_preserves_audio_semantics()
+    -> Result<(), Box<dyn std::error::Error>> {
+        fn length_delimited(number: u32, payload: &[u8]) -> Vec<u8> {
+            let mut output = Vec::new();
+            litchi_iwa_common::encode_varint_into(&mut output, (u64::from(number) << 3) | 2);
+            litchi_iwa_common::encode_varint_into(
+                &mut output,
+                u64::try_from(payload.len()).expect("test payload fits u64"),
+            );
+            output.extend_from_slice(payload);
+            output
+        }
+
+        fn fixed32(number: u32, value: f32) -> Vec<u8> {
+            let mut output = Vec::new();
+            litchi_iwa_common::encode_varint_into(&mut output, (u64::from(number) << 3) | 5);
+            output.extend_from_slice(&value.to_le_bytes());
+            output
+        }
+
+        fn varint(number: u32, value: u64) -> Vec<u8> {
+            let mut output = Vec::new();
+            litchi_iwa_common::encode_varint_into(&mut output, u64::from(number) << 3);
+            litchi_iwa_common::encode_varint_into(&mut output, value);
+            output
+        }
+
+        let mut point = fixed32(1, 12.0);
+        point.extend(fixed32(2, 24.0));
+        let mut size = fixed32(1, 640.0);
+        size.extend(fixed32(2, 360.0));
+        let mut geometry = length_delimited(1, &point);
+        geometry.extend(length_delimited(2, &size));
+        let drawable_archive = length_delimited(1, &geometry);
+        let super_archive = length_delimited(1, &drawable_archive);
+        let data_reference = varint(1, 17);
+
+        let mut movie = super_archive;
+        movie.extend(fixed32(4, 3.0));
+        movie.extend(varint(9, 1));
+        movie.extend(length_delimited(14, &data_reference));
+        movie.extend(length_delimited(15, &data_reference));
+
+        let (summary, references) = decode_movie_info(
+            &movie,
+            WireLimits::default(),
+            SemanticPath::SlideDrawable { slide: 0, index: 2 },
+        )?;
+        assert_eq!(summary.kind(), MovieKind::Audio);
+        assert!(summary.is_audio());
+        assert_eq!(summary.position(), Some(MediaPoint { x: 12.0, y: 24.0 }));
+        assert_eq!(
+            summary.size(),
+            Some(MediaSize {
+                width: 640.0,
+                height: 360.0
+            })
+        );
+        assert_eq!(summary.duration(), Some(Duration::from_secs(3)));
+        assert_eq!(references, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn movie_projection_rejects_unbounded_data_reference_payloads() {
+        let mut point = vec![0x0d, 0, 0, 0, 0, 0x15, 0, 0, 0, 0];
+        let size = [0x0d, 0, 0, 0, 0, 0x15, 0, 0, 0, 0];
+        point.extend(length_delimited_for_test(2, &size));
+        let geometry = length_delimited_for_test(1, &point);
+        let drawable_archive = length_delimited_for_test(1, &geometry);
+        let super_archive = length_delimited_for_test(1, &drawable_archive);
+        let huge_reference = vec![0_u8; 128];
+        let mut movie = super_archive;
+        movie.extend(length_delimited_for_test(14, &huge_reference));
+        let limits = WireLimits::default()
+            .with_input_bytes(256)
+            .expect("test limit")
+            .with_rewrite_work(16)
+            .expect("test limit");
+
+        assert!(matches!(
+            decode_movie_info(
+                &movie,
+                limits,
+                SemanticPath::SlideDrawable { slide: 0, index: 0 }
+            ),
+            Err(ReadError::PayloadLimit { .. }) | Err(ReadError::InvalidFormat(_))
+        ));
+    }
+
+    fn length_delimited_for_test(number: u32, payload: &[u8]) -> Vec<u8> {
+        let mut output = Vec::new();
+        litchi_iwa_common::encode_varint_into(&mut output, (u64::from(number) << 3) | 2);
+        litchi_iwa_common::encode_varint_into(
+            &mut output,
+            u64::try_from(payload.len()).expect("test payload fits u64"),
+        );
+        output.extend_from_slice(payload);
+        output
     }
 
     #[test]

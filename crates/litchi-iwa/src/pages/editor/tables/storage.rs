@@ -5,7 +5,6 @@ use super::*;
 #[derive(Debug, Clone)]
 pub(crate) struct PagesTableGraph {
     pub(super) info: PagesTableInfo,
-    pub(super) drawable_archive: String,
     pub(super) attachment_object_id: u64,
     pub(super) formula_context_ids: Vec<u64>,
 }
@@ -123,7 +122,6 @@ pub(crate) fn body_table_graphs(editor: &PagesEditor) -> Result<Vec<PagesTableGr
             }
         }
         result.push(PagesTableGraph {
-            drawable_archive: archive_name,
             attachment_object_id: attachment_reference.identifier,
             formula_context_ids,
             info: PagesTableInfo {

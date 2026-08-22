@@ -8,7 +8,8 @@ use std::sync::OnceLock;
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_protos::keynote_chart_title_codec::{
     ChartTitleWrite, DecodeLimit, DecodeOptions, DecodeReport, WireResourceLimit,
-    decode_chart_title, decode_chart_title_text, decode_visible_chart_title,
+    decode_chart_title, decode_chart_title_extension, decode_chart_title_text,
+    decode_visible_chart_title, rewrite_chart_title, rewrite_chart_title_extension,
     rewrite_chart_title_with_report,
 };
 
@@ -42,6 +43,7 @@ fuzz_target!(|data: &[u8]| {
     };
 
     exercise_source(&source, data);
+    exercise_selected_unknown_interleavings(data);
     exercise_malformed_mutations(&source, data);
 
     // These checks are independent of the fuzzer's package source and need
@@ -52,6 +54,7 @@ fuzz_target!(|data: &[u8]| {
         exercise_redacted_malformed();
         exercise_limit_guards();
         exercise_input_limit();
+        exercise_atomic_rewrite_limit();
     });
 });
 
@@ -126,6 +129,12 @@ fn exercise_source(source: &[u8], data: &[u8]) {
         source,
         "snapshot did not retain exact source"
     );
+    assert_eq!(
+        decode_chart_title_extension(source, decode_options)
+            .unwrap_or_else(|error| panic!("extension read disagreed with strict decode: {error}")),
+        snapshot,
+        "extension read disagreed with strict decode"
+    );
     if let Some(title) = snapshot.title() {
         assert_borrowed(source, title.as_bytes());
     }
@@ -162,28 +171,71 @@ fn exercise_source(source: &[u8], data: &[u8]) {
         source,
         snapshot.title_visible(),
         snapshot.title(),
+        snapshot.title_visible(),
+        snapshot.title(),
         decode_options,
     );
 
     let replacement = replacement_title(data);
-    exercise_rewrite(
+    exercise_semantic_matrix(
         source,
         snapshot.title_visible(),
         snapshot.title(),
-        Some(true),
-        Some(replacement.as_ref()),
+        replacement.as_ref(),
         decode_options,
     );
-    // Native removal is represented by an explicit hidden switch and an
-    // absent title field, retaining proto2 presence semantics.
-    exercise_rewrite(
+    exercise_atomic_rewrite_failure(
         source,
         snapshot.title_visible(),
         snapshot.title(),
-        Some(false),
-        None,
+        replacement.as_ref(),
         decode_options,
     );
+}
+
+fn exercise_selected_unknown_interleavings(data: &[u8]) {
+    // Random mutations rarely retain a complete pair of selected fields and
+    // then place unknown spans on both sides of that pair. Keep a few tiny,
+    // valid layouts in the target so wire-local replacement is exercised for
+    // every selected/unknown ordering. The selected fields are deliberately
+    // reversed in one case; protobuf field-number order is not a wire-order
+    // requirement, and the codec must preserve that source layout.
+    let title = replacement_title(data);
+    let unknown_before = field_text(4000, b"before");
+    let unknown_between = field_varint(4001, u64::from(data.first().copied().unwrap_or(7)));
+    let unknown_after = field_text(4002, b"after");
+    let unknown_tail = field_varint(4003, u64::from(data.get(1).copied().unwrap_or(9)));
+    let cases = [
+        [
+            unknown_before.clone(),
+            field_varint(21, 1),
+            unknown_between.clone(),
+            field_text(23, title.as_bytes()),
+            unknown_after.clone(),
+        ]
+        .concat(),
+        [
+            field_text(23, title.as_bytes()),
+            unknown_before.clone(),
+            field_varint(21, 0),
+            unknown_between.clone(),
+            unknown_tail.clone(),
+        ]
+        .concat(),
+        [
+            unknown_before,
+            unknown_between,
+            field_text(23, title.as_bytes()),
+            unknown_after,
+            field_varint(21, 1),
+            unknown_tail,
+        ]
+        .concat(),
+    ];
+
+    for source in cases {
+        exercise_source(&source, data);
+    }
 }
 
 fn decode_chart_title_with_report_checked<'source>(
@@ -226,13 +278,15 @@ fn assert_borrowed(source: &[u8], payload: &[u8]) {
 
 fn exercise_noop(
     source: &[u8],
-    title_visible: Option<bool>,
-    title: Option<&str>,
+    expected_visible: Option<bool>,
+    expected_title: Option<&str>,
+    write_visible: Option<bool>,
+    write_title: Option<&str>,
     options: DecodeOptions,
 ) {
     let (output, report) = rewrite_chart_title_with_report(
         source,
-        ChartTitleWrite::new(title_visible, title),
+        ChartTitleWrite::new(write_visible, write_title),
         options,
     )
     .unwrap_or_else(|error| panic!("matching chart-title rewrite failed: {error}"));
@@ -245,7 +299,98 @@ fn exercise_noop(
         &source.to_vec(),
         "no-op rewrite modified its source"
     );
+    let readback = decode_chart_title(source, options)
+        .unwrap_or_else(|error| panic!("no-op rewrite made source unreadable: {error}"));
+    assert_eq!(readback.title_visible(), expected_visible);
+    assert_eq!(readback.title(), expected_title);
+
+    let alias_output = rewrite_chart_title(
+        source,
+        ChartTitleWrite::new(write_visible, write_title),
+        options,
+    )
+    .unwrap_or_else(|error| panic!("chart-title rewrite alias failed: {error}"));
+    assert_eq!(alias_output, source, "rewrite alias was not byte-exact");
+
+    let extension_output = rewrite_chart_title_extension(
+        source,
+        ChartTitleWrite::new(write_visible, write_title),
+        options,
+    )
+    .unwrap_or_else(|error| panic!("chart-title extension rewrite failed: {error}"));
+    assert_eq!(
+        extension_output, source,
+        "extension rewrite alias was not byte-exact"
+    );
+    assert_eq!(source, &source.to_vec(), "no-op aliases modified source");
     black_box(report);
+}
+
+fn exercise_semantic_matrix(
+    source: &[u8],
+    before_visible: Option<bool>,
+    before_title: Option<&str>,
+    replacement: &str,
+    options: DecodeOptions,
+) {
+    // Keep the complete proto2 presence/value matrix in the target. In
+    // particular, a hidden title is still a present field, and an explicitly
+    // visible title without field 23 reads back as the native empty default.
+    // The final pair is the editor's set operation; (false, None) is clear.
+    let writes = [
+        ChartTitleWrite::new(None, None),
+        ChartTitleWrite::new(None, Some("")),
+        ChartTitleWrite::new(None, Some(replacement)),
+        ChartTitleWrite::new(Some(false), None),
+        ChartTitleWrite::new(Some(false), Some("")),
+        ChartTitleWrite::new(Some(false), Some(replacement)),
+        ChartTitleWrite::new(Some(true), None),
+        ChartTitleWrite::new(Some(true), Some("")),
+        ChartTitleWrite::new(Some(true), Some(replacement)),
+    ];
+    for write in writes {
+        exercise_rewrite(
+            source,
+            before_visible,
+            before_title,
+            write.title_visible(),
+            write.title(),
+            options,
+        );
+    }
+}
+
+fn exercise_atomic_rewrite_failure(
+    source: &[u8],
+    before_visible: Option<bool>,
+    before_title: Option<&str>,
+    replacement: &str,
+    options: DecodeOptions,
+) {
+    // Force the candidate title below its configured ceiling. The strict
+    // source read may succeed, but publication must fail before any candidate
+    // can escape. Re-read the source after the error to make the atomicity
+    // assertion observable rather than only checking the borrowed slice.
+    let before = source.to_vec();
+    let capped = options.with_max_title_bytes(replacement.len().saturating_sub(1));
+    let result = rewrite_chart_title_with_report(
+        source,
+        ChartTitleWrite::new(Some(true), Some(replacement)),
+        capped,
+    );
+    let error = result.expect_err("title-capped rewrite unexpectedly succeeded");
+    observe_error(error);
+    assert_eq!(
+        source,
+        before.as_slice(),
+        "failed rewrite modified its source"
+    );
+
+    let after = decode_chart_title(source, options).unwrap_or_else(|decode_error| {
+        panic!("source became unreadable after failed rewrite: {decode_error}")
+    });
+    assert_eq!(after.title_visible(), before_visible);
+    assert_eq!(after.title(), before_title);
 }
 
 fn exercise_rewrite(
@@ -256,6 +401,23 @@ fn exercise_rewrite(
     after_title: Option<&str>,
     decode_options: DecodeOptions,
 ) {
+    // The public semantic editor treats clearing an already-hidden or absent
+    // title as an exact no-op. A hidden field-23 value is stale wire state
+    // rather than a visible title, so do not ask the wire-level codec to
+    // represent a transition that changes only hidden presence state. The
+    // visible case still rewrites field 21 to false and removes field 23.
+    if clear_is_noop(before_visible, after_visible, after_title) {
+        exercise_noop(
+            source,
+            before_visible,
+            before_title,
+            after_visible,
+            after_title,
+            decode_options,
+        );
+        return;
+    }
+
     let before = source.to_vec();
     let write = ChartTitleWrite::new(after_visible, after_title);
     let rewritten = rewrite_chart_title_with_report(source, write, decode_options);
@@ -288,31 +450,191 @@ fn exercise_rewrite(
     );
     assert_report(readback_report, output.len());
     assert_unknown_fields_preserved(source, &output);
+    if selected_field_presence(source) == selected_field_presence(&output) {
+        assert_selected_unknown_interleaving_preserved(source, &output);
+    }
 
     // Rewriting with the original presence/value pair is the wire-local
     // inverse. It must restore every unknown field and every original span,
-    // not merely the selected semantic values.
+    // not merely the selected semantic values. A clear request against a
+    // hidden/absent title is an intentional exact no-op, so that inverse
+    // cannot restore a previously present hidden field-23 span.
+    // The first rewrite may temporarily remove every selected field, making
+    // the candidate shorter than the original. Give the inverse pass a
+    // source ceiling that covers both sides of the round trip; reusing the
+    // candidate-sized policy would reject a valid restoration before the
+    // codec can check it.
+    let inverse_options = if source.len() >= output.len() {
+        options(source)
+    } else {
+        options(&output)
+    };
     let restored = rewrite_chart_title_with_report(
         &output,
         ChartTitleWrite::new(before_visible, before_title),
-        readback_options,
+        inverse_options,
     );
-    let Ok((restored, inverse_report)) = restored else {
-        if let Err(error) = restored {
-            observe_error(error);
-        }
+    let (restored, inverse_report) = restored.unwrap_or_else(|error| {
+        panic!("successful chart-title rewrite was not invertible: {error}")
+    });
+    if clear_is_noop(after_visible, before_visible, before_title) {
+        assert_eq!(
+            restored, output,
+            "clear no-op inverse changed a hidden/absent title source"
+        );
+        assert!(!inverse_report.changed());
+        assert_eq!(inverse_report.input_bytes(), output.len());
+        assert_eq!(inverse_report.output_bytes(), output.len());
+        assert_unknown_fields_preserved(source, &restored);
+        black_box(inverse_report);
         return;
-    };
-    assert_eq!(
-        restored, source,
-        "chart-title inverse did not restore source"
-    );
-    assert_eq!(restored, before.as_slice());
+    }
+
+    let selected_positions_lost =
+        selected_field_presence(source) != selected_field_presence(&output);
+    if restored != source && selected_positions_lost {
+        // Removing or replacing a selected span erases its historical wire
+        // position. The inverse can only append that span after the surviving
+        // source spans; check semantic restoration and exact unknown
+        // preservation without pretending that the original selected/unknown
+        // interleaving remains recoverable.
+        let inverse_readback =
+            decode_chart_title_with_report_checked(&restored, options(&restored));
+        assert_eq!(inverse_readback.0.title_visible(), before_visible);
+        assert_eq!(inverse_readback.0.title(), before_title);
+        assert_report(inverse_readback.1, restored.len());
+        assert_unknown_fields_preserved(source, &restored);
+    } else if restored != source && selected_field_order_is_only_difference(source, &restored) {
+        // With no selected span removed by the first write, the codec's
+        // deterministic inverse can differ only by swapping fields 21 and
+        // 23 within their existing selected slots.
+        let inverse_readback =
+            decode_chart_title_with_report_checked(&restored, options(&restored));
+        assert_eq!(inverse_readback.0.title_visible(), before_visible);
+        assert_eq!(inverse_readback.0.title(), before_title);
+        assert_report(inverse_readback.1, restored.len());
+        assert_unknown_fields_preserved(source, &restored);
+    } else {
+        assert_eq!(
+            restored, source,
+            "chart-title inverse did not restore source"
+        );
+        assert_eq!(restored, before.as_slice());
+    }
+    assert_eq!(inverse_report.changed(), report.changed());
+    assert_eq!(inverse_report.input_bytes(), output.len());
+    assert_eq!(inverse_report.output_bytes(), restored.len());
     black_box(inverse_report);
+}
+
+fn clear_is_noop(
+    current_visible: Option<bool>,
+    write_visible: Option<bool>,
+    write_title: Option<&str>,
+) -> bool {
+    write_visible == Some(false) && write_title.is_none() && current_visible != Some(true)
 }
 
 fn visible_title<'title>(visible: Option<bool>, title: Option<&'title str>) -> Option<&'title str> {
     (visible == Some(true)).then(|| title.unwrap_or_default())
+}
+
+fn selected_field_order_is_only_difference(source: &[u8], output: &[u8]) -> bool {
+    let Some(source_spans) = wire_field_spans(source) else {
+        return false;
+    };
+    let Some(output_spans) = wire_field_spans(output) else {
+        return false;
+    };
+    if source_spans.len() != output_spans.len() {
+        return false;
+    }
+
+    // Unknown spans must occupy exactly the same wire slots. Selected spans
+    // may swap with one another, but they may not cross an unknown span.
+    let mut source_selected = Vec::new();
+    let mut output_selected = Vec::new();
+    for ((source_number, source_raw), (output_number, output_raw)) in
+        source_spans.iter().zip(output_spans.iter())
+    {
+        let source_is_selected = is_selected_field(*source_number);
+        let output_is_selected = is_selected_field(*output_number);
+        if source_is_selected != output_is_selected {
+            return false;
+        }
+        if source_is_selected {
+            source_selected.push(*source_raw);
+            output_selected.push(*output_raw);
+        } else if source_raw != output_raw {
+            return false;
+        }
+    }
+
+    source_selected.len() == output_selected.len()
+        && source_selected
+            .iter()
+            .all(|span| output_selected.iter().any(|candidate| candidate == span))
+        && output_selected
+            .iter()
+            .all(|span| source_selected.iter().any(|candidate| candidate == span))
+}
+
+fn assert_selected_unknown_interleaving_preserved(source: &[u8], output: &[u8]) {
+    let source_spans =
+        wire_field_spans(source).expect("strict source decode produced unparseable wire spans");
+    let output_spans =
+        wire_field_spans(output).expect("strict output decode produced unparseable wire spans");
+    assert_eq!(
+        source_spans.len(),
+        output_spans.len(),
+        "rewrite changed selected/unknown span count without changing presence"
+    );
+    for ((source_number, source_raw), (output_number, output_raw)) in
+        source_spans.iter().zip(output_spans.iter())
+    {
+        assert_eq!(
+            is_selected_field(*source_number),
+            is_selected_field(*output_number),
+            "rewrite changed selected/unknown field interleaving"
+        );
+        if !is_selected_field(*source_number) {
+            assert!(
+                source_raw == output_raw,
+                "rewrite moved or changed an unknown wire span"
+            );
+        }
+    }
+}
+
+fn selected_field_presence(source: &[u8]) -> Vec<u64> {
+    let mut fields = wire_field_spans(source)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|(number, _)| is_selected_field(number).then_some(number))
+        .collect::<Vec<_>>();
+    fields.sort_unstable();
+    fields
+}
+
+fn is_selected_field(number: u64) -> bool {
+    matches!(number, 21 | 23)
+}
+
+fn wire_field_spans<'source>(source: &'source [u8]) -> Option<Vec<(u64, &'source [u8])>> {
+    let mut spans = Vec::new();
+    let mut offset = 0;
+    while offset < source.len() {
+        let start = offset;
+        let (tag, next) = read_varint(source, offset)?;
+        offset = next;
+        let field_number = tag >> 3;
+        let wire_type = tag & 7;
+        if !skip_wire(source, &mut offset, wire_type, field_number) {
+            return None;
+        }
+        spans.push((field_number, &source[start..offset]));
+    }
+    Some(spans)
 }
 
 fn replacement_title(data: &[u8]) -> Cow<'_, str> {
@@ -492,34 +814,60 @@ fn exercise_input_limit() {
     observe_error(error);
 }
 
+fn exercise_atomic_rewrite_limit() {
+    // This reaches the rewrite's output preflight after a successful source
+    // decode. It verifies that an output-budget failure has no partial result
+    // and leaves the caller-owned source semantically untouched.
+    let source = field_varint(4000, 7);
+    let before = source.clone();
+    let options = DecodeOptions::new(source.len(), 128, source.len() * 8, 8)
+        .with_max_output_bytes(source.len())
+        .with_max_title_bytes(128);
+    let error = rewrite_chart_title_with_report(
+        &source,
+        ChartTitleWrite::new(Some(true), Some("atomic")),
+        options,
+    )
+    .expect_err("output-capped rewrite unexpectedly succeeded");
+    assert!(
+        error.output_limit_values().is_some(),
+        "output-capped rewrite returned an unrelated error: {error}"
+    );
+    observe_error(error);
+    assert_eq!(source, before, "failed output rewrite modified its source");
+    let snapshot = decode_chart_title(
+        &source,
+        DecodeOptions::new(source.len(), 128, source.len() * 8, 8)
+            .with_max_output_bytes(128)
+            .with_max_title_bytes(128),
+    )
+    .expect("output-capped rewrite made source unreadable");
+    assert_eq!(snapshot.title_visible(), None);
+    assert_eq!(snapshot.title(), None);
+}
+
 fn assert_unknown_fields_preserved(source: &[u8], output: &[u8]) {
-    for raw in unknown_field_spans(source) {
-        assert!(
-            output.windows(raw.len()).any(|window| window == raw),
-            "rewrite dropped an unknown chart-title wire span"
-        );
-    }
+    assert_eq!(
+        unknown_field_spans(output),
+        unknown_field_spans(source),
+        "rewrite changed the order or bytes of an unknown chart-title wire span"
+    );
+}
+
+fn selected_field_spans(source: &[u8]) -> Vec<&[u8]> {
+    wire_field_spans(source)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|(number, raw)| is_selected_field(number).then_some(raw))
+        .collect()
 }
 
 fn unknown_field_spans(source: &[u8]) -> Vec<&[u8]> {
-    let mut spans = Vec::new();
-    let mut offset = 0;
-    while offset < source.len() {
-        let start = offset;
-        let Some((tag, next)) = read_varint(source, offset) else {
-            return Vec::new();
-        };
-        offset = next;
-        let field_number = tag >> 3;
-        let wire_type = tag & 7;
-        if !skip_wire(source, &mut offset, wire_type, field_number) {
-            return Vec::new();
-        }
-        if field_number != 21 && field_number != 23 {
-            spans.push(&source[start..offset]);
-        }
-    }
-    spans
+    wire_field_spans(source)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|(number, raw)| (!is_selected_field(number)).then_some(raw))
+        .collect()
 }
 
 fn skip_wire(source: &[u8], offset: &mut usize, wire_type: u64, group: u64) -> bool {
@@ -570,7 +918,6 @@ fn advance(source: &[u8], offset: &mut usize, amount: usize) -> bool {
 }
 
 fn read_varint(source: &[u8], mut offset: usize) -> Option<(u64, usize)> {
-    let start = offset;
     let mut value = 0u64;
     for shift in (0..64).step_by(7) {
         let byte = *source.get(offset)?;
@@ -580,7 +927,6 @@ fn read_varint(source: &[u8], mut offset: usize) -> Option<(u64, usize)> {
             return Some((value, offset));
         }
     }
-    let _ = start;
     None
 }
 

@@ -21,7 +21,7 @@ pub mod order;
 
 use std::collections::HashSet;
 
-use super::selector::TableSelector;
+use super::selector::{SheetSelector, TableSelector};
 use super::table::{Error, InsertError, InsertResult, Table};
 
 /// Errors raised while resolving a semantic table selector.
@@ -121,6 +121,35 @@ impl Sheet {
         self.index
     }
 
+    /// Returns the typed zero-based position in this immutable snapshot.
+    ///
+    /// The position is a semantic collection coordinate. It is not a native
+    /// archive or object identifier and remains stable for the lifetime of
+    /// this sheet snapshot.
+    #[must_use]
+    pub const fn position(&self) -> litchi_core::Position {
+        litchi_core::Position::new(self.index)
+    }
+
+    /// Returns a name-first selector for this sheet.
+    ///
+    /// Names are matched exactly and case-sensitively. Callers that need an
+    /// unambiguous snapshot-local selector can use [`Self::position_selector`]
+    /// instead when malformed input may repeat a name.
+    #[must_use]
+    pub fn selector(&self) -> SheetSelector<'_> {
+        SheetSelector::name(self.name())
+    }
+
+    /// Returns a typed position selector for this sheet.
+    ///
+    /// This selector does not depend on the sheet name and therefore remains
+    /// usable when a malformed source contains duplicate names.
+    #[must_use]
+    pub const fn position_selector(&self) -> SheetSelector<'static> {
+        SheetSelector::position(self.position())
+    }
+
     /// Iterates over tables in native order.
     #[must_use]
     pub fn tables(&self) -> impl ExactSizeIterator<Item = &Table> + '_ {
@@ -136,8 +165,11 @@ impl Sheet {
     ///
     /// Returns [`SelectorError::DuplicateTableName`] if a malformed semantic
     /// model contains the requested name more than once.
-    pub fn select(&self, selector: TableSelector<'_>) -> Result<Option<&Table>> {
-        match selector {
+    pub fn select<'selector, S>(&self, selector: S) -> Result<Option<&Table>>
+    where
+        S: Into<TableSelector<'selector>>,
+    {
+        match selector.into() {
             TableSelector::Name(name) => {
                 let mut matches = self.tables.iter().filter(|table| table.name() == name);
                 let Some(table) = matches.next() else {
@@ -150,6 +182,25 @@ impl Sheet {
             },
             TableSelector::Index(index) => Ok(self.tables.get(index)),
         }
+    }
+
+    /// Resolves a table from any borrowed name, index, or typed position that
+    /// converts to a [`TableSelector`].
+    ///
+    /// Missing tables and out-of-range positions return `Ok(None)`. A
+    /// duplicate exact name returns an error without exposing either matching
+    /// table, so callers can retry another selector against the unchanged
+    /// immutable sheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SelectorError::DuplicateTableName`] if a malformed semantic
+    /// model contains the requested name more than once.
+    pub fn select_by<'selector, S>(&self, selector: S) -> Result<Option<&Table>>
+    where
+        S: Into<TableSelector<'selector>>,
+    {
+        self.select(selector)
     }
 
     /// Returns a table by exact name.
@@ -399,5 +450,93 @@ mod tests {
             ),
             Err(Error::DuplicateTableName { name }) if name == "First"
         ));
+    }
+
+    #[test]
+    fn sheet_selectors_keep_exact_case_and_offer_typed_positions() {
+        let table = TableBuilder::new("Revenue", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("table should be valid: {error}"));
+        let sheet = Sheet::try_from_tables("Summary", 4, vec![table])
+            .unwrap_or_else(|error| panic!("sheet should be valid: {error}"));
+
+        assert_eq!(sheet.selector(), SheetSelector::name("Summary"));
+        assert_eq!(sheet.position(), litchi_core::Position::new(4));
+        assert_eq!(
+            sheet.position_selector(),
+            SheetSelector::position(litchi_core::Position::new(4))
+        );
+        assert_eq!(
+            sheet.select("Revenue").unwrap().map(Table::name),
+            Some("Revenue")
+        );
+        assert!(sheet.select_by("revenue").unwrap().is_none());
+    }
+
+    #[test]
+    fn select_by_accepts_borrowed_names_indices_and_positions() {
+        let first = TableBuilder::new("First", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("first table should be valid: {error}"));
+        let second = TableBuilder::new("Second", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("second table should be valid: {error}"));
+        let sheet = Sheet::try_from_tables("Sheet", 0, vec![first, second])
+            .unwrap_or_else(|error| panic!("sheet should be valid: {error}"));
+        let name = String::from("Second");
+
+        assert_eq!(
+            sheet.select_by(&name).unwrap().map(Table::name),
+            Some("Second")
+        );
+        assert_eq!(
+            sheet.select_by(0usize).unwrap().map(Table::name),
+            Some("First")
+        );
+        assert_eq!(
+            sheet
+                .select_by(litchi_core::Position::new(1))
+                .unwrap()
+                .map(Table::name),
+            Some("Second")
+        );
+    }
+
+    #[test]
+    fn select_by_missing_and_ambiguous_inputs_are_failure_atomic() {
+        let first = TableBuilder::new("First", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("first table should be valid: {error}"));
+        let second = TableBuilder::new("Second", Dimensions::new(1, 1))
+            .finish()
+            .unwrap_or_else(|error| panic!("second table should be valid: {error}"));
+        let sheet = Sheet::try_from_tables("Sheet", 0, vec![first.clone(), second.clone()])
+            .unwrap_or_else(|error| panic!("sheet should be valid: {error}"));
+
+        assert!(sheet.select_by(99usize).unwrap().is_none());
+        assert_eq!(sheet.table_count(), 2);
+        assert_eq!(
+            sheet.tables().map(Table::name).collect::<Vec<_>>(),
+            ["First", "Second"]
+        );
+
+        let ambiguous = Sheet {
+            name: "Malformed".into(),
+            index: 0,
+            tables: vec![first, second.clone(), second].into_boxed_slice(),
+        };
+        let error = ambiguous
+            .select_by("Second")
+            .expect_err("duplicate names must be rejected");
+        assert_eq!(
+            error,
+            SelectorError::DuplicateTableName {
+                name: "Second".into(),
+            }
+        );
+        assert_eq!(
+            ambiguous.tables().map(Table::name).collect::<Vec<_>>(),
+            ["First", "Second", "Second"]
+        );
     }
 }

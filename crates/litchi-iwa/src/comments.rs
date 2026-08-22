@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::str;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use litchi_iwa_common::comment::{
@@ -18,12 +19,12 @@ use crate::package_metadata::{
     component_identifier_for_entry, next_object_identifier, release_package_identifier_suffix,
     remove_component_external_references_to_object, set_package_last_object_identifier,
 };
-use crate::protobuf::{kn, tn, tp, tsch, tsd, tsk, tsp, tst, tswp};
 #[cfg(test)]
-use crate::wire::parse_wire_fields;
+use crate::protobuf::{kn, tn, tp, tsch, tst, tswp};
+use crate::protobuf::{tsd, tsk, tsp};
 use crate::wire::{
-    append_repeated_length_delimited_field, patch_length_delimited_field,
-    patch_nested_length_delimited_field, patch_varint_field,
+    append_repeated_length_delimited_field, parse_wire_fields, patch_length_delimited_field,
+    patch_nested_length_delimited_field, patch_nested_varint_field, patch_varint_field,
     remove_repeated_length_delimited_field_where, transform_length_delimited_fields_at_path,
 };
 use crate::{Error, IWorkPackage, Result};
@@ -33,7 +34,26 @@ const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
 const ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE: u32 = 213;
 const APPLE_EPOCH_UNIX_OFFSET_SECONDS: f64 = 978_307_200.0;
 const GENERATED_AUTHOR_NAME: &str = "litchi-iwa";
+const GENERATED_AUTHOR_PUBLIC_ID: &str = "4C495443-4849-4957-8100-000000000001:058e44481db1c6fdeeac88af010136d7f8949f54bde61ef9af3e078562b968b6";
 const COMMENT_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+const COMMENT_REFERENCE_IDENTIFIER_FIELD: u32 = 1;
+const ANNOTATION_AUTHOR_NAME_FIELD: u32 = 1;
+const ANNOTATION_AUTHOR_COLOR_FIELD: u32 = 2;
+const ANNOTATION_AUTHOR_PUBLIC_ID_FIELD: u32 = 3;
+const ANNOTATION_AUTHOR_IS_PUBLIC_FIELD: u32 = 4;
+const ANNOTATION_AUTHOR_PUBLIC_IDS_FIELD: u32 = 5;
+const COLOR_MODEL_FIELD: u32 = 1;
+const COLOR_RED_FIELD: u32 = 3;
+const COLOR_GREEN_FIELD: u32 = 4;
+const COLOR_BLUE_FIELD: u32 = 5;
+const COLOR_ALPHA_FIELD: u32 = 6;
+const COLOR_CYAN_FIELD: u32 = 7;
+const COLOR_MAGENTA_FIELD: u32 = 8;
+const COLOR_YELLOW_FIELD: u32 = 9;
+const COLOR_BLACK_FIELD: u32 = 10;
+const COLOR_WHITE_FIELD: u32 = 11;
+const COLOR_RGBSPACE_FIELD: u32 = 12;
+const MIN_SIGN_EXTENDED_INT32: u64 = 0xffff_ffff_8000_0000;
 
 fn comment_storage_allocation_error(resource: &'static str, amount: usize) -> Error {
     Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
@@ -401,7 +421,7 @@ fn drawable_locations(
                 })?;
                 let mut location = None;
                 for (message_index, message) in object.messages.iter().enumerate() {
-                    let Some(payload) = DrawablePayload::decode(
+                    let Some(payload) = DrawableCommentProjection::decode(
                         application,
                         message.type_,
                         message.data.as_slice(),
@@ -419,7 +439,7 @@ fn drawable_locations(
                         archive_name: name.to_owned(),
                         message_index,
                         message_type: message.type_,
-                        comment_storage_object_id: payload.comment_identifier(),
+                        comment_storage_object_id: payload.comment_identifier,
                     });
                 }
                 if let Some(location) = location {
@@ -934,41 +954,64 @@ fn replace_drawable_comment_reference(
                 location.object_id, location.message_index
             ))
         })?;
-        let payload = DrawablePayload::decode(application, message.type_, message.data.as_slice())?
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "object {} payload {} is no longer a drawable",
-                    location.object_id, location.message_index
-                ))
-            })?;
-        if payload.comment_identifier() != old {
+        let payload =
+            DrawableCommentProjection::decode(application, message.type_, message.data.as_slice())?
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "object {} payload {} is no longer a drawable",
+                        location.object_id, location.message_index
+                    ))
+                })?;
+        if payload.comment_identifier != old {
             return Err(Error::InvalidFormat(format!(
                 "drawable object {} comment changed during mutation",
                 location.object_id
             )));
         }
         let message_type = message.type_;
-        let replacement = new.map(|identifier| {
-            tsp::Reference {
-                identifier,
-                ..Default::default()
-            }
-            .encode_to_vec()
-        });
-        let data = patch_nested_length_delimited_field(
-            message.data.as_slice(),
-            payload.comment_wire_path(),
-            old.is_some(),
-            replacement.as_deref(),
-        )?;
-        let verified = DrawablePayload::decode(application, message_type, data.as_slice())?
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "object {} stopped decoding as a drawable after comment patch",
-                    location.object_id
-                ))
-            })?;
-        if verified.comment_identifier() != new {
+        let data = match (old, new) {
+            // Keep the existing TSP.Reference as the preservation
+            // representation.  Re-encoding it here would silently discard
+            // producer extensions and unknown fields nested inside the leaf.
+            (Some(_), Some(identifier)) => {
+                let (path, path_len) = drawable_comment_identifier_path(payload.comment_wire_path)?;
+                patch_nested_varint_field(
+                    message.data.as_slice(),
+                    &path[..path_len],
+                    true,
+                    Some(identifier),
+                )?
+            },
+            // A newly attached reference has no source leaf to preserve.
+            (None, Some(identifier)) => {
+                let replacement = tsp::Reference {
+                    identifier,
+                    ..Default::default()
+                }
+                .encode_to_vec();
+                patch_nested_length_delimited_field(
+                    message.data.as_slice(),
+                    payload.comment_wire_path,
+                    false,
+                    Some(replacement.as_slice()),
+                )?
+            },
+            (Some(_), None) | (None, None) => patch_nested_length_delimited_field(
+                message.data.as_slice(),
+                payload.comment_wire_path,
+                old.is_some(),
+                None,
+            )?,
+        };
+        let verified =
+            DrawableCommentProjection::decode(application, message_type, data.as_slice())?
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "object {} stopped decoding as a drawable after comment patch",
+                        location.object_id
+                    ))
+                })?;
+        if verified.comment_identifier != new {
             return Err(Error::InvalidFormat(format!(
                 "drawable object {} comment patch failed validation",
                 location.object_id
@@ -988,6 +1031,24 @@ fn replace_drawable_comment_reference(
         );
         Ok(())
     })
+}
+
+/// Append the identifier leaf to a supported drawable comment route without
+/// allocating.  The route depth is format-owned and currently at most four;
+/// refusing a future/unknown route keeps this host-side patch bounded.
+fn drawable_comment_identifier_path(path: &[u32]) -> Result<([u32; 5], usize)> {
+    let path_len = path.len().checked_add(1).ok_or_else(|| {
+        Error::InvalidFormat("drawable comment identifier path length overflow".to_owned())
+    })?;
+    if path_len > 5 {
+        return Err(Error::InvalidFormat(format!(
+            "drawable comment identifier path is too deep: {path_len}"
+        )));
+    }
+    let mut identifier_path = [0; 5];
+    identifier_path[..path.len()].copy_from_slice(path);
+    identifier_path[path.len()] = COMMENT_REFERENCE_IDENTIFIER_FIELD;
+    Ok((identifier_path, path_len))
 }
 
 fn update_reference_metadata(
@@ -1067,18 +1128,40 @@ fn read_comment_storage(
             typed_reply_ids.push(storage_id_from_raw(reply_id)?);
         }
         let reply_ids = typed_reply_ids.into_boxed_slice();
+        let text = materialize_comment_text(storage_id, comment.text().unwrap_or_default())?;
         let storage_uuid = comment
             .storage_uuid()
             .map(|uuid| comment_uuid(uuid.lower(), uuid.upper()))
             .transpose()?;
         Ok(Comment {
-            text: comment.text().unwrap_or_default().to_owned(),
+            text,
             creation_date_seconds: comment.creation_date().map(|date| date.seconds()),
             author_id,
             reply_ids,
             storage_uuid,
         })
     })
+}
+
+/// Materialize the borrowed strict-codec text only after validation succeeds.
+///
+/// The codec's text budget is bounded by the source payload, while the common
+/// comment model owns its text.  Keep that ownership transition fallible so a
+/// hostile payload cannot turn the final host-side copy into an infallible
+/// allocation.  Unknown wire bytes remain in the source payload and are never
+/// reconstructed by this projection.
+fn materialize_comment_text(storage_id: u64, text: &str) -> Result<String> {
+    let mut materialized = String::new();
+    materialized
+        .try_reserve_exact(text.len())
+        .map_err(|_| comment_storage_allocation_error("iWork comment text", text.len()))?;
+    materialized.push_str(text);
+    if materialized.len() != text.len() {
+        return Err(Error::InvalidFormat(format!(
+            "comment storage object {storage_id} text materialization changed length"
+        )));
+    }
+    Ok(materialized)
 }
 
 fn update_comment_storage_text(
@@ -1368,7 +1451,637 @@ pub(crate) fn update_comment_reply_reference(
     })
 }
 
-#[derive(Debug, Clone)]
+/// Borrowed, generated-free facts from one annotation-author payload.
+///
+/// The source message remains the preservation representation.  In
+/// particular, this projection never reconstructs an author or color, so
+/// unknown fields survive every storage-list patch byte-for-byte.
+#[derive(Debug, PartialEq)]
+struct AnnotationAuthorProjection<'source> {
+    name: Option<&'source str>,
+    color: Option<AnnotationColorProjection>,
+    public_id: Option<&'source str>,
+    is_public_author: Option<bool>,
+    public_ids: Vec<&'source str>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AnnotationColorProjection {
+    model: i32,
+    red: Option<u32>,
+    green: Option<u32>,
+    blue: Option<u32>,
+    alpha: Option<u32>,
+    cyan: Option<u32>,
+    magenta: Option<u32>,
+    yellow: Option<u32>,
+    black: Option<u32>,
+    white: Option<u32>,
+    rgbspace: Option<i32>,
+}
+
+impl AnnotationColorProjection {
+    fn generated() -> Self {
+        Self {
+            model: tsp::color::ColorModel::Rgb as i32,
+            red: Some(0.368_627_46_f32.to_bits()),
+            green: Some(0.568_627_5_f32.to_bits()),
+            blue: Some(0.937_254_9_f32.to_bits()),
+            alpha: Some(1.0_f32.to_bits()),
+            cyan: None,
+            magenta: None,
+            yellow: None,
+            black: None,
+            white: None,
+            rgbspace: Some(tsp::color::RgbColorSpace::Srgb as i32),
+        }
+    }
+}
+
+impl AnnotationAuthorProjection<'_> {
+    fn is_generated(&self, public_id: bool) -> bool {
+        self.name == Some(GENERATED_AUTHOR_NAME)
+            && self.color == Some(AnnotationColorProjection::generated())
+            && self.public_id == public_id.then_some(GENERATED_AUTHOR_PUBLIC_ID)
+            && self.is_public_author == Some(false)
+            && if public_id {
+                self.public_ids == [GENERATED_AUTHOR_PUBLIC_ID]
+            } else {
+                self.public_ids.is_empty()
+            }
+    }
+}
+
+fn strict_annotation_author_error(object_id: u64, error: impl std::fmt::Display) -> Error {
+    Error::InvalidFormat(format!(
+        "annotation author object {object_id} failed strict validation: {error}"
+    ))
+}
+
+/// Parse one annotation payload's fields under the shared finite wire budget.
+///
+/// The generated author messages are not used as a preservation
+/// representation.  Keep the source bytes authoritative and retain the
+/// common parser's typed allocation error instead of turning an exhausted
+/// candidate-local vector into a generic malformed-message error.
+fn annotation_wire_fields(object_id: u64, source: &[u8]) -> Result<Vec<crate::wire::WireField>> {
+    match litchi_iwa_common::wire::parse_wire_fields_with_limits(
+        source,
+        litchi_iwa_common::WireLimits::default(),
+    ) {
+        Ok(fields) => Ok(fields),
+        Err(litchi_iwa_common::Error::Allocation { resource, amount }) => {
+            Err(Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource,
+                amount,
+            }))
+        },
+        Err(error) => Err(strict_annotation_author_error(object_id, error)),
+    }
+}
+
+fn canonical_annotation_field(
+    object_id: u64,
+    source: &[u8],
+    field: crate::wire::WireField,
+) -> Result<()> {
+    field
+        .validate_canonical_key(source)
+        .map_err(|error| strict_annotation_author_error(object_id, error))?;
+    match field.wire_type() {
+        0 => {
+            let payload = field
+                .payload(source)
+                .map_err(|error| strict_annotation_author_error(object_id, error))?;
+            let (value, width) = litchi_iwa_common::varint::decode_varint_from_bytes(payload)
+                .map_err(|error| strict_annotation_author_error(object_id, error))?;
+            if width != payload.len() || width != litchi_iwa_common::varint::encoded_len(value) {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    format!(
+                        "protobuf field {} has a noncanonical varint value",
+                        field.number()
+                    ),
+                ));
+            }
+        },
+        1 => {
+            let payload = field
+                .payload(source)
+                .map_err(|error| strict_annotation_author_error(object_id, error))?;
+            if payload.len() != 8 {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    format!(
+                        "protobuf field {} has an invalid fixed64 width",
+                        field.number()
+                    ),
+                ));
+            }
+        },
+        2 => field
+            .validate_canonical_length(source)
+            .map_err(|error| strict_annotation_author_error(object_id, error))?,
+        5 => {
+            let payload = field
+                .payload(source)
+                .map_err(|error| strict_annotation_author_error(object_id, error))?;
+            if payload.len() != 4 {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    format!(
+                        "protobuf field {} has an invalid fixed32 width",
+                        field.number()
+                    ),
+                ));
+            }
+        },
+        wire_type => {
+            return Err(strict_annotation_author_error(
+                object_id,
+                format!(
+                    "protobuf field {} has unsupported wire type {wire_type}",
+                    field.number()
+                ),
+            ));
+        },
+    }
+    Ok(())
+}
+
+fn annotation_length(
+    object_id: u64,
+    source: &[u8],
+    field: crate::wire::WireField,
+) -> Result<&[u8]> {
+    if field.wire_type() != 2 {
+        return Err(strict_annotation_author_error(
+            object_id,
+            format!("protobuf field {} is not length-delimited", field.number()),
+        ));
+    }
+    field
+        .payload(source)
+        .map_err(|error| strict_annotation_author_error(object_id, error))
+}
+
+fn annotation_varint(object_id: u64, source: &[u8], field: crate::wire::WireField) -> Result<u64> {
+    if field.wire_type() != 0 {
+        return Err(strict_annotation_author_error(
+            object_id,
+            format!("protobuf field {} is not a varint", field.number()),
+        ));
+    }
+    let payload = field
+        .payload(source)
+        .map_err(|error| strict_annotation_author_error(object_id, error))?;
+    litchi_iwa_common::varint::decode_varint_from_bytes(payload)
+        .map_err(|error| strict_annotation_author_error(object_id, error))
+        .and_then(|(value, width)| {
+            if width != payload.len() || width != litchi_iwa_common::varint::encoded_len(value) {
+                Err(strict_annotation_author_error(
+                    object_id,
+                    format!(
+                        "protobuf field {} has a noncanonical varint value",
+                        field.number()
+                    ),
+                ))
+            } else {
+                Ok(value)
+            }
+        })
+}
+
+fn annotation_fixed32(object_id: u64, source: &[u8], field: crate::wire::WireField) -> Result<u32> {
+    if field.wire_type() != 5 {
+        return Err(strict_annotation_author_error(
+            object_id,
+            format!("protobuf field {} is not a fixed32", field.number()),
+        ));
+    }
+    let payload = field
+        .payload(source)
+        .map_err(|error| strict_annotation_author_error(object_id, error))?;
+    let bytes: [u8; 4] = payload.try_into().map_err(|_error| {
+        strict_annotation_author_error(
+            object_id,
+            format!(
+                "protobuf field {} has an invalid fixed32 width",
+                field.number()
+            ),
+        )
+    })?;
+    Ok(u32::from_le_bytes(bytes))
+}
+
+fn annotation_int32(object_id: u64, source: &[u8], field: crate::wire::WireField) -> Result<i32> {
+    let value = annotation_varint(object_id, source, field)?;
+    if let Ok(value) = i32::try_from(value) {
+        return Ok(value);
+    }
+    if value < MIN_SIGN_EXTENDED_INT32 {
+        return Err(strict_annotation_author_error(
+            object_id,
+            format!(
+                "protobuf field {} has an out-of-range int32",
+                field.number()
+            ),
+        ));
+    }
+    i32::try_from(i64::from_ne_bytes(value.to_ne_bytes())).map_err(|_error| {
+        strict_annotation_author_error(
+            object_id,
+            format!(
+                "protobuf field {} has an out-of-range int32",
+                field.number()
+            ),
+        )
+    })
+}
+
+fn annotation_bool(object_id: u64, source: &[u8], field: crate::wire::WireField) -> Result<bool> {
+    match annotation_varint(object_id, source, field)? {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(strict_annotation_author_error(
+            object_id,
+            format!(
+                "protobuf field {} has a noncanonical bool value",
+                field.number()
+            ),
+        )),
+    }
+}
+
+fn annotation_string(object_id: u64, source: &[u8], field: crate::wire::WireField) -> Result<&str> {
+    let payload = annotation_length(object_id, source, field)?;
+    str::from_utf8(payload).map_err(|error| strict_annotation_author_error(object_id, error))
+}
+
+fn decode_annotation_color(object_id: u64, source: &[u8]) -> Result<AnnotationColorProjection> {
+    let fields = annotation_wire_fields(object_id, source)?;
+    let mut model = None;
+    let mut red = None;
+    let mut green = None;
+    let mut blue = None;
+    let mut alpha = None;
+    let mut cyan = None;
+    let mut magenta = None;
+    let mut yellow = None;
+    let mut black = None;
+    let mut white = None;
+    let mut rgbspace = None;
+    for field in fields {
+        canonical_annotation_field(object_id, source, field)?;
+        match field.number() {
+            COLOR_MODEL_FIELD
+                if model
+                    .replace(annotation_int32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.model",
+                ));
+            },
+            COLOR_MODEL_FIELD => {},
+            COLOR_RED_FIELD
+                if red
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.r",
+                ));
+            },
+            COLOR_RED_FIELD => {},
+            COLOR_GREEN_FIELD
+                if green
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.g",
+                ));
+            },
+            COLOR_GREEN_FIELD => {},
+            COLOR_BLUE_FIELD
+                if blue
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.b",
+                ));
+            },
+            COLOR_BLUE_FIELD => {},
+            COLOR_ALPHA_FIELD
+                if alpha
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.a",
+                ));
+            },
+            COLOR_ALPHA_FIELD => {},
+            COLOR_CYAN_FIELD
+                if cyan
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.c",
+                ));
+            },
+            COLOR_CYAN_FIELD => {},
+            COLOR_MAGENTA_FIELD
+                if magenta
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.m",
+                ));
+            },
+            COLOR_MAGENTA_FIELD => {},
+            COLOR_YELLOW_FIELD
+                if yellow
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.y",
+                ));
+            },
+            COLOR_YELLOW_FIELD => {},
+            COLOR_BLACK_FIELD
+                if black
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.k",
+                ));
+            },
+            COLOR_BLACK_FIELD => {},
+            COLOR_WHITE_FIELD
+                if white
+                    .replace(annotation_fixed32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.w",
+                ));
+            },
+            COLOR_WHITE_FIELD => {},
+            COLOR_RGBSPACE_FIELD
+                if rgbspace
+                    .replace(annotation_int32(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSP.Color.rgbspace",
+                ));
+            },
+            COLOR_RGBSPACE_FIELD => {},
+            _ => {},
+        }
+    }
+    Ok(AnnotationColorProjection {
+        model: model.ok_or_else(|| {
+            strict_annotation_author_error(object_id, "missing required TSP.Color.model")
+        })?,
+        red,
+        green,
+        blue,
+        alpha,
+        cyan,
+        magenta,
+        yellow,
+        black,
+        white,
+        rgbspace,
+    })
+}
+
+fn decode_annotation_author<'source>(
+    object_id: u64,
+    source: &'source [u8],
+) -> Result<AnnotationAuthorProjection<'source>> {
+    let fields = annotation_wire_fields(object_id, source)?;
+    let mut name = None;
+    let mut color = None;
+    let mut public_id = None;
+    let mut is_public_author = None;
+    let mut public_ids = Vec::new();
+    let mut allocation_failed = None;
+    for field in fields {
+        canonical_annotation_field(object_id, source, field)?;
+        match field.number() {
+            ANNOTATION_AUTHOR_NAME_FIELD
+                if name
+                    .replace(annotation_string(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSK.AnnotationAuthorArchive.name",
+                ));
+            },
+            ANNOTATION_AUTHOR_NAME_FIELD => {},
+            ANNOTATION_AUTHOR_COLOR_FIELD
+                if color
+                    .replace(decode_annotation_color(
+                        object_id,
+                        annotation_length(object_id, source, field)?,
+                    )?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSK.AnnotationAuthorArchive.color",
+                ));
+            },
+            ANNOTATION_AUTHOR_COLOR_FIELD => {},
+            ANNOTATION_AUTHOR_PUBLIC_ID_FIELD
+                if public_id
+                    .replace(annotation_string(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSK.AnnotationAuthorArchive.public_id",
+                ));
+            },
+            ANNOTATION_AUTHOR_PUBLIC_ID_FIELD => {},
+            ANNOTATION_AUTHOR_IS_PUBLIC_FIELD
+                if is_public_author
+                    .replace(annotation_bool(object_id, source, field)?)
+                    .is_some() =>
+            {
+                return Err(strict_annotation_author_error(
+                    object_id,
+                    "duplicate TSK.AnnotationAuthorArchive.is_public_author",
+                ));
+            },
+            ANNOTATION_AUTHOR_IS_PUBLIC_FIELD => {},
+            ANNOTATION_AUTHOR_PUBLIC_IDS_FIELD => {
+                let value = annotation_string(object_id, source, field)?;
+                if allocation_failed.is_none() {
+                    if public_ids.try_reserve(1).is_err() {
+                        allocation_failed = Some(public_ids.len().saturating_add(1));
+                    } else {
+                        public_ids.push(value);
+                    }
+                }
+            },
+            _ => {},
+        }
+    }
+    if let Some(amount) = allocation_failed {
+        return Err(comment_storage_allocation_error(
+            "iWork annotation-author public IDs",
+            amount,
+        ));
+    }
+    Ok(AnnotationAuthorProjection {
+        name,
+        color,
+        public_id,
+        is_public_author,
+        public_ids,
+    })
+}
+
+fn annotation_author_storage_ids(storage_id: u64, source: &[u8]) -> Result<Vec<u64>> {
+    let fields = annotation_wire_fields(storage_id, source)?;
+    let mut identifiers = Vec::new();
+    let mut allocation_failed = None;
+    for field in fields {
+        canonical_annotation_field(storage_id, source, field)?;
+        if field.number() != 1 {
+            continue;
+        }
+        let payload = annotation_length(storage_id, source, field)?;
+        let reference = comment_storage_codec::decode_reference(
+            payload,
+            comment_storage_decode_options(payload),
+        )
+        .map_err(|error| strict_annotation_author_error(storage_id, error))?;
+        let identifier = reference.identifier();
+        // Validate the typed identity before a candidate-local collection
+        // allocation so malformed IDs retain precedence over exhaustion.
+        author_id_from_raw(identifier)?;
+        if allocation_failed.is_none() {
+            if identifiers.try_reserve(1).is_err() {
+                allocation_failed = Some(identifiers.len().saturating_add(1));
+            } else {
+                identifiers.push(identifier);
+            }
+        }
+    }
+    if let Some(amount) = allocation_failed {
+        return Err(comment_storage_allocation_error(
+            "iWork annotation-author identifiers",
+            amount,
+        ));
+    }
+    Ok(identifiers)
+}
+
+fn annotation_author_is_generated(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    author_id: u64,
+    public_id: bool,
+) -> Result<bool> {
+    let archive_name = locations.get(&author_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("annotation author object {author_id} is missing"))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(author_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("annotation author object {author_id} is missing"))
+    })?;
+    let matching_message_count = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == ANNOTATION_AUTHOR_MESSAGE_TYPE)
+        .count();
+    let mut messages = Vec::new();
+    messages
+        .try_reserve_exact(matching_message_count)
+        .map_err(|_| {
+            comment_storage_allocation_error(
+                "iWork annotation-author payloads",
+                matching_message_count,
+            )
+        })?;
+    messages.extend(
+        object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == ANNOTATION_AUTHOR_MESSAGE_TYPE),
+    );
+    if messages.len() != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "object {author_id} must contain exactly one annotation-author payload"
+        )));
+    }
+    let projection = decode_annotation_author(author_id, messages[0].data.as_slice())?;
+    Ok(projection.is_generated(public_id))
+}
+
+fn validate_annotation_author(
+    package: &IWorkPackage,
+    locations: &HashMap<u64, String>,
+    author_id: u64,
+) -> Result<()> {
+    let archive_name = locations.get(&author_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("annotation author object {author_id} is missing"))
+    })?;
+    let archive = package.archive(archive_name)?;
+    let object = archive.object(author_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("annotation author object {author_id} is missing"))
+    })?;
+    let matching_message_count = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == ANNOTATION_AUTHOR_MESSAGE_TYPE)
+        .count();
+    let mut messages = Vec::new();
+    messages
+        .try_reserve_exact(matching_message_count)
+        .map_err(|_| {
+            comment_storage_allocation_error(
+                "iWork annotation-author payloads",
+                matching_message_count,
+            )
+        })?;
+    messages.extend(
+        object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == ANNOTATION_AUTHOR_MESSAGE_TYPE),
+    );
+    if messages.len() != 1 {
+        return Err(Error::InvalidFormat(format!(
+            "object {author_id} must contain exactly one annotation-author payload"
+        )));
+    }
+    decode_annotation_author(author_id, messages[0].data.as_slice()).map(|_| ())
+}
+
 struct AnnotationAuthorStorageLocation {
     archive_name: String,
     object_id: u64,
@@ -1432,7 +2145,7 @@ fn annotation_author_storage_location(
                 if message.type_ != ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE {
                     continue;
                 }
-                tsk::AnnotationAuthorStorageArchive::decode(message.data.as_slice())?;
+                annotation_author_storage_ids(object_id, message.data.as_slice())?;
                 if result
                     .replace(AnnotationAuthorStorageLocation {
                         archive_name: name.to_owned(),
@@ -1451,35 +2164,8 @@ fn annotation_author_storage_location(
     Ok(result)
 }
 
-fn annotation_author(
-    package: &IWorkPackage,
-    locations: &HashMap<u64, String>,
-    author_id: u64,
-) -> Result<tsk::AnnotationAuthorArchive> {
-    let archive_name = locations.get(&author_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("annotation author object {author_id} is missing"))
-    })?;
-    let archive = package.archive(archive_name)?;
-    let object = archive.object(author_id).ok_or_else(|| {
-        Error::InvalidFormat(format!("annotation author object {author_id} is missing"))
-    })?;
-    let messages = object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == ANNOTATION_AUTHOR_MESSAGE_TYPE)
-        .collect::<Vec<_>>();
-    if messages.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "object {author_id} must contain exactly one annotation-author payload"
-        )));
-    }
-    Ok(tsk::AnnotationAuthorArchive::decode(
-        messages[0].data.as_slice(),
-    )?)
-}
-
 fn generated_author_public_id() -> String {
-    "4C495443-4849-4957-8100-000000000001:058e44481db1c6fdeeac88af010136d7f8949f54bde61ef9af3e078562b968b6".to_owned()
+    GENERATED_AUTHOR_PUBLIC_ID.to_owned()
 }
 
 fn generated_annotation_author() -> tsk::AnnotationAuthorArchive {
@@ -1553,7 +2239,7 @@ pub(crate) fn preferred_or_ensure_table_annotation_author(
     let Some(location) = annotation_author_storage_location(package)? else {
         return Ok((None, None, false));
     };
-    let storage = {
+    let author_ids = {
         let archive = package.archive(&location.archive_name)?;
         let object = archive.object(location.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -1561,11 +2247,12 @@ pub(crate) fn preferred_or_ensure_table_annotation_author(
                 location.object_id
             ))
         })?;
-        tsk::AnnotationAuthorStorageArchive::decode(
+        annotation_author_storage_ids(
+            location.object_id,
             object.messages[location.message_index].data.as_slice(),
         )?
     };
-    if storage.annotation_author.is_empty() {
+    if author_ids.is_empty() {
         ensure_table_annotation_author(package)
     } else {
         preferred_annotation_author(package)
@@ -1579,7 +2266,7 @@ fn ensure_generated_annotation_author(
     let Some(location) = annotation_author_storage_location(package)? else {
         return Ok((None, None, false));
     };
-    let storage = {
+    let author_ids = {
         let archive = package.archive(&location.archive_name)?;
         let object = archive.object(location.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -1587,30 +2274,38 @@ fn ensure_generated_annotation_author(
                 location.object_id
             ))
         })?;
-        tsk::AnnotationAuthorStorageArchive::decode(
+        annotation_author_storage_ids(
+            location.object_id,
             object.messages[location.message_index].data.as_slice(),
         )?
     };
     let mut seen = HashSet::new();
     let locations = object_locations(package)?;
-    for author in &storage.annotation_author {
-        if !seen.insert(author.identifier) {
+    for author_id in &author_ids {
+        if !seen.insert(*author_id) {
             return Err(Error::InvalidFormat(format!(
                 "annotation-author storage duplicates object {}",
-                author.identifier
+                author_id
             )));
         }
-        if annotation_author(package, &locations, author.identifier)? == generated {
-            return Ok((Some(author.identifier), Some(location.archive_name), false));
+        if annotation_author_is_generated(
+            package,
+            &locations,
+            *author_id,
+            generated.public_id.is_some(),
+        )? {
+            return Ok((Some(*author_id), Some(location.archive_name), false));
         }
     }
 
     let author_id = next_object_identifier(package)?;
-    let mut expected_authors = storage
-        .annotation_author
-        .iter()
-        .map(|reference| reference.identifier)
-        .collect::<Vec<_>>();
+    let mut expected_authors = author_ids;
+    expected_authors.try_reserve(1).map_err(|_| {
+        comment_storage_allocation_error(
+            "iWork annotation-author identifiers",
+            expected_authors.len().saturating_add(1),
+        )
+    })?;
     expected_authors.push(author_id);
     package.update_archive(&location.archive_name, |archive| {
         {
@@ -1628,14 +2323,8 @@ fn ensure_generated_annotation_author(
                 1,
                 &object_reference(author_id).encode_to_vec(),
             )?;
-            let verified = tsk::AnnotationAuthorStorageArchive::decode(data.as_slice())?;
-            if verified
-                .annotation_author
-                .iter()
-                .map(|reference| reference.identifier)
-                .collect::<Vec<_>>()
-                != expected_authors
-            {
+            let verified = annotation_author_storage_ids(location.object_id, data.as_slice())?;
+            if verified != expected_authors {
                 return Err(Error::InvalidFormat(
                     "annotation-author storage update failed validation".to_owned(),
                 ));
@@ -1660,7 +2349,7 @@ fn preferred_annotation_author(
     let Some(location) = annotation_author_storage_location(package)? else {
         return Ok((None, None, false));
     };
-    let storage = {
+    let author_ids = {
         let archive = package.archive(&location.archive_name)?;
         let object = archive.object(location.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -1668,31 +2357,28 @@ fn preferred_annotation_author(
                 location.object_id
             ))
         })?;
-        tsk::AnnotationAuthorStorageArchive::decode(
+        annotation_author_storage_ids(
+            location.object_id,
             object.messages[location.message_index].data.as_slice(),
         )?
     };
-    if storage.annotation_author.is_empty() {
+    if author_ids.is_empty() {
         return Err(Error::InvalidFormat(
             "annotation-author storage unexpectedly has no registered authors".to_owned(),
         ));
     }
     let locations = object_locations(package)?;
     let mut seen = HashSet::new();
-    for author in &storage.annotation_author {
-        if !seen.insert(author.identifier) {
+    for author_id in &author_ids {
+        if !seen.insert(*author_id) {
             return Err(Error::InvalidFormat(format!(
                 "annotation-author storage duplicates object {}",
-                author.identifier
+                author_id
             )));
         }
-        annotation_author(package, &locations, author.identifier)?;
+        validate_annotation_author(package, &locations, *author_id)?;
     }
-    Ok((
-        Some(storage.annotation_author[0].identifier),
-        Some(location.archive_name),
-        false,
-    ))
+    Ok((Some(author_ids[0]), Some(location.archive_name), false))
 }
 
 pub(crate) fn remove_generated_annotation_author_if_unused(
@@ -1700,8 +2386,9 @@ pub(crate) fn remove_generated_annotation_author_if_unused(
     author_id: u64,
 ) -> Result<bool> {
     let locations = object_locations(package)?;
-    let author = annotation_author(package, &locations, author_id)?;
-    if author != generated_annotation_author() && author != generated_local_annotation_author() {
+    if !annotation_author_is_generated(package, &locations, author_id, true)?
+        && !annotation_author_is_generated(package, &locations, author_id, false)?
+    {
         return Ok(false);
     }
     for name in package.iwa_entry_names() {
@@ -1746,11 +2433,10 @@ pub(crate) fn remove_generated_annotation_author_if_unused(
         let original = storage_object.messages[location.message_index]
             .data
             .as_slice();
-        let storage = tsk::AnnotationAuthorStorageArchive::decode(original)?;
-        if storage
-            .annotation_author
+        let author_ids = annotation_author_storage_ids(location.object_id, original)?;
+        if author_ids
             .iter()
-            .filter(|reference| reference.identifier == author_id)
+            .filter(|identifier| **identifier == author_id)
             .count()
             != 1
         {
@@ -1759,12 +2445,14 @@ pub(crate) fn remove_generated_annotation_author_if_unused(
             )));
         }
         let data = remove_repeated_length_delimited_field_where(original, 1, |payload| {
-            Ok(tsp::Reference::decode(payload)?.identifier == author_id)
+            let reference = comment_storage_codec::decode_reference(
+                payload,
+                comment_storage_decode_options(payload),
+            )
+            .map_err(|error| strict_annotation_author_error(author_id, error))?;
+            Ok(reference.identifier() == author_id)
         })?;
-        if tsk::AnnotationAuthorStorageArchive::decode(data.as_slice())?
-            .annotation_author
-            .iter()
-            .any(|reference| reference.identifier == author_id)
+        if annotation_author_storage_ids(location.object_id, data.as_slice())?.contains(&author_id)
         {
             return Err(Error::InvalidFormat(
                 "annotation-author storage removal failed validation".to_owned(),
@@ -1895,6 +2583,126 @@ fn comment_object_is_referenced(
     Ok(false)
 }
 
+/// Borrowed routing facts for the direct drawable comment edge.
+///
+/// The full generated drawable envelopes are intentionally not part of this
+/// production projection.  We validate the selected nested path and the
+/// `TSP.Reference` at its leaf, while the original payload remains the only
+/// representation used for writes.  This keeps unrelated fields (including
+/// producer extensions and unknown bytes) opaque and byte-preserving.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DrawableCommentProjection {
+    comment_identifier: Option<u64>,
+    comment_wire_path: &'static [u32],
+}
+
+impl DrawableCommentProjection {
+    fn decode(application: Application, message_type: u32, source: &[u8]) -> Result<Option<Self>> {
+        let Some((comment_wire_path, chart_super_optional)) =
+            drawable_comment_wire_path(application, message_type)
+        else {
+            return Ok(None);
+        };
+        let (comment_identifier, first_envelope_present) =
+            decode_drawable_comment_identifier(message_type, source, comment_wire_path)?;
+        if chart_super_optional && !first_envelope_present {
+            return Ok(None);
+        }
+        Ok(Some(Self {
+            comment_identifier,
+            comment_wire_path,
+        }))
+    }
+}
+
+fn drawable_comment_wire_path(
+    application: Application,
+    message_type: u32,
+) -> Option<(&'static [u32], bool)> {
+    let route = match message_type {
+        3002 => &[6][..],
+        3004 | 3005 | 3006 | 3007 | 3008 | 5021 | 6000 => &[1, 6][..],
+        3009 | 2011 | 6007 => &[1, 1, 6][..],
+        2014 | 12 => &[1, 1, 1, 6][..],
+        7 => match application {
+            Application::Pages | Application::Keynote | Application::Numbers => &[1, 1, 1, 6],
+            Application::Common => return None,
+        },
+        _ => return None,
+    };
+    if message_type == 12 && application != Application::Keynote
+        || (message_type == 6000 || message_type == 6007) && application == Application::Numbers
+    {
+        return None;
+    }
+    Some((route, message_type == 5021))
+}
+
+fn drawable_projection_error(message_type: u32, error: impl std::fmt::Display) -> Error {
+    Error::InvalidFormat(format!(
+        "drawable payload {message_type} failed strict comment validation: {error}"
+    ))
+}
+
+fn decode_drawable_comment_identifier(
+    message_type: u32,
+    source: &[u8],
+    path: &[u32],
+) -> Result<(Option<u64>, bool)> {
+    let mut current = source;
+    let mut first_envelope_present = false;
+    for (depth, field_number) in path.iter().copied().enumerate() {
+        let fields = parse_wire_fields(current)
+            .map_err(|error| drawable_projection_error(message_type, error))?;
+        let mut selected = None;
+        for field in fields {
+            field
+                .validate_canonical_framing(current)
+                .map_err(|error| drawable_projection_error(message_type, error))?;
+            if field.number() != field_number {
+                continue;
+            }
+            if selected.is_some() {
+                return Err(drawable_projection_error(
+                    message_type,
+                    format!("duplicate selected field {field_number}"),
+                ));
+            }
+            if field.wire_type() != 2 {
+                return Err(drawable_projection_error(
+                    message_type,
+                    format!("selected field {field_number} is not length-delimited"),
+                ));
+            }
+            selected = Some(
+                field
+                    .payload(current)
+                    .map_err(|error| drawable_projection_error(message_type, error))?,
+            );
+        }
+        let Some(selected) = selected else {
+            return Ok((None, first_envelope_present));
+        };
+        if depth == 0 {
+            first_envelope_present = true;
+        }
+        if depth + 1 == path.len() {
+            let reference = comment_storage_codec::decode_reference(
+                selected,
+                comment_storage_decode_options(selected),
+            )
+            .map_err(|error| drawable_projection_error(message_type, error))?;
+            return Ok((Some(reference.identifier()), first_envelope_present));
+        }
+        current = selected;
+    }
+    Err(drawable_projection_error(
+        message_type,
+        "empty drawable comment path",
+    ))
+}
+
+#[cfg(test)]
 enum DrawablePayload {
     Drawable(tsd::DrawableArchive),
     Shape(tsd::ShapeArchive),
@@ -1913,6 +2721,7 @@ enum DrawablePayload {
     WpTable(tst::WpTableInfoArchive),
 }
 
+#[cfg(test)]
 impl DrawablePayload {
     fn decode(application: Application, type_: u32, data: &[u8]) -> Result<Option<Self>> {
         let payload = match type_ {
@@ -1999,24 +2808,6 @@ impl DrawablePayload {
             .comment
             .as_ref()
             .map(|value| value.identifier)
-    }
-
-    fn comment_wire_path(&self) -> &'static [u32] {
-        match self {
-            Self::Drawable(_) => &[6],
-            Self::Shape(_)
-            | Self::Image(_)
-            | Self::Mask(_)
-            | Self::Movie(_)
-            | Self::Group(_)
-            | Self::Chart(_)
-            | Self::Table(_) => &[1, 6],
-            Self::ConnectionLine(_) | Self::ShapeInfo(_) | Self::WpTable(_) => &[1, 1, 6],
-            Self::CommentInfo(_)
-            | Self::PagesPlaceholder(_)
-            | Self::KeynotePlaceholder(_)
-            | Self::NumbersPlaceholder(_) => &[1, 1, 1, 6],
-        }
     }
 
     #[cfg(test)]
