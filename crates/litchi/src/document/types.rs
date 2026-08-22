@@ -4,16 +4,16 @@ use crate::detection_smart as detection;
 use litchi_core::detection::FileFormat;
 use litchi_core::{Error, Result};
 use std::io::{Read, Seek};
-#[cfg(all(feature = "docx", feature = "markdown", any(unix, windows)))]
+#[cfg(all(feature = "docx", feature = "markdown"))]
 use std::sync::OnceLock;
 
 #[cfg(feature = "doc")]
 use litchi_doc as doc;
 
-#[cfg(all(feature = "docx", feature = "markdown", any(unix, windows)))]
+#[cfg(all(feature = "docx", feature = "markdown"))]
 type DocxSourceCache = OnceLock<Box<crate::docx::Package>>;
 
-#[cfg(all(feature = "docx", not(feature = "markdown"), any(unix, windows)))]
+#[cfg(all(feature = "docx", not(feature = "markdown")))]
 type DocxSourceCache = ();
 
 /// A Word document implementation that can be .doc, .docx, .pages, .rtf, or .odt format.
@@ -32,8 +32,8 @@ pub(super) enum DocumentImpl {
     /// Modern .docx format
     #[cfg(feature = "docx")]
     Docx(Box<crate::docx::Package>, litchi_core::Metadata),
-    /// Filesystem-backed modern .docx with deferred part payloads.
-    #[cfg(all(feature = "docx", any(unix, windows)))]
+    /// Source-backed modern .docx with deferred part payloads.
+    #[cfg(feature = "docx")]
     DocxSource(crate::docx::source_backed::Package, DocxSourceCache),
     /// Apple Pages format
     #[cfg(feature = "pages")]

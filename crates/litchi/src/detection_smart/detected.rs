@@ -230,6 +230,154 @@ fn reclaim_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
     std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
 }
 
+/// Result of the private source-backed DOCX bytes probe.
+#[cfg(feature = "docx")]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the valid DOCX handoff moves the existing source-backed package without an extra allocation"
+)]
+pub(crate) enum DocxSourceBytesDetection {
+    /// A validated source-retaining DOCX owner whose catalog identifies DOCX.
+    Docx(crate::docx::source_backed::Package),
+    /// A validated DOCX catalog whose WordprocessingML semantic opening failed.
+    /// The caller reports this typed owner error without reopening eagerly.
+    DocxError(crate::docx::Error),
+    /// A hard source-backed OPC failure that must not be hidden by format fallback.
+    OpcError(crate::opc::OpcError),
+    /// The original bytes for the established byte-backed detector.
+    Fallback(Vec<u8>),
+}
+
+/// Probe owned bytes through the source-backed OPC catalog, retaining the
+/// original allocation for every non-DOCX or failed fallback.
+///
+/// The public smart-detector result remains source-compatible and eager. The
+/// unified document facade uses this narrower handoff so an owned DOCX can
+/// retain its source identity and defer ordinary document payloads. A catalog
+/// that identifies DOCX but fails its semantic-owner admission propagates
+/// that typed error instead of retrying through the eager parser.
+#[cfg(feature = "docx")]
+pub(crate) fn detect_docx_source_bytes(
+    bytes: Vec<u8>,
+    limits: crate::opc::ReadLimits,
+) -> DocxSourceBytesDetection {
+    use litchi_core::ReadAt;
+    use std::sync::Arc;
+
+    if bytes.len() < 4
+        || !litchi_core::detection::simd_utils::signature_matches(
+            &bytes,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        )
+    {
+        return DocxSourceBytesDetection::Fallback(bytes);
+    }
+
+    // Keep a reclaimable shared owner so a non-DOCX package or source-catalog
+    // failure can continue through the historical detector without copying
+    // its input. The source package is dropped before every fallback reclaim;
+    // matching DOCX semantic failures are returned directly.
+    let shared = Arc::new(bytes);
+    let source: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
+    #[cfg(feature = "odt")]
+    let source_version = match source.version() {
+        Ok(version) => version,
+        Err(error) => {
+            return DocxSourceBytesDetection::OpcError(crate::opc::OpcError::IoError(error));
+        },
+    };
+    #[cfg(feature = "odt")]
+    let is_odt_mime = match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {
+        Ok(format) => format == Some(litchi_core::detection::FileFormat::Odt),
+        Err(error) => {
+            return DocxSourceBytesDetection::OpcError(odt_mime_probe_error_to_opc(error));
+        },
+    };
+    let package_result =
+        crate::opc::SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits);
+    let package = match package_result {
+        Ok(package) => package,
+        Err(error) => {
+            #[cfg(feature = "odt")]
+            if is_odt_mime {
+                if missing_ooxml_content_types_error(&error) {
+                    drop(source);
+                    return DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(shared));
+                }
+                if hard_docx_source_bytes_probe_error(&error) {
+                    match odt_source_ooxml_probe_wins(
+                        &source,
+                        source_version,
+                        crate::opc::ReadLimits::default(),
+                    ) {
+                        Ok(false) => {
+                            drop(source);
+                            return DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(
+                                shared,
+                            ));
+                        },
+                        Ok(true) => return DocxSourceBytesDetection::OpcError(error),
+                        Err(probe_error) => {
+                            return DocxSourceBytesDetection::OpcError(probe_error);
+                        },
+                    }
+                }
+                return DocxSourceBytesDetection::OpcError(error);
+            }
+            if hard_docx_source_bytes_probe_error(&error) {
+                return DocxSourceBytesDetection::OpcError(error);
+            }
+            drop(source);
+            return DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(shared));
+        },
+    };
+
+    if crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
+        == Some(litchi_core::detection::FileFormat::Docx)
+    {
+        return match crate::docx::source_backed::Package::from_source_backed_package(package) {
+            Ok(document) => DocxSourceBytesDetection::Docx(document),
+            Err(error) => DocxSourceBytesDetection::DocxError(error),
+        };
+    }
+
+    drop(package);
+    drop(source);
+    DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(shared))
+}
+
+#[cfg(feature = "docx")]
+fn reclaim_docx_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
+    std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
+}
+
+#[cfg(feature = "docx")]
+fn hard_docx_source_bytes_probe_error(error: &crate::opc::OpcError) -> bool {
+    matches!(
+        error,
+        crate::opc::OpcError::InvalidReadLimit { .. }
+            | crate::opc::OpcError::ReadLimit { .. }
+            | crate::opc::OpcError::Cancelled
+            | crate::opc::OpcError::Execution(_)
+            | crate::opc::OpcError::IoError(_)
+            | crate::opc::OpcError::SourceChanged { .. }
+            | crate::opc::OpcError::Allocation { .. }
+            | crate::opc::OpcError::CollectionAllocation { .. }
+    )
+}
+
+#[cfg(all(
+    feature = "odt",
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
+fn missing_ooxml_content_types_error(error: &crate::opc::OpcError) -> bool {
+    matches!(
+        error,
+        crate::opc::OpcError::PartNotFound(part)
+            if part == "[Content_Types].xml" || part == "/[Content_Types].xml"
+    )
+}
+
 /// Result of the private source-backed PPTX bytes probe.
 #[cfg(feature = "pptx")]
 #[allow(
@@ -922,7 +1070,7 @@ pub(crate) enum DocxSourcePathError {
     Docx(crate::docx::Error),
 }
 
-#[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
+#[cfg(all(feature = "docx", feature = "odt"))]
 fn odt_mime_probe_error_to_opc(error: litchi_core::Error) -> crate::opc::OpcError {
     match error {
         litchi_core::Error::Io(error) => crate::opc::OpcError::IoError(error),
@@ -1199,18 +1347,21 @@ fn ensure_odt_source_current(
 
 #[cfg(all(
     feature = "odt",
-    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-    any(unix, windows)
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
 ))]
 fn odt_source_ooxml_probe_wins(
     source: &std::sync::Arc<dyn litchi_core::ReadAt>,
     expected: litchi_core::SourceVersion,
     limits: crate::opc::ReadLimits,
 ) -> std::result::Result<bool, crate::opc::OpcError> {
-    let package = crate::opc::SourceBackedPackage::from_read_at_with_limits(
+    let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(
         std::sync::Arc::clone(source),
         limits,
-    )?;
+    ) {
+        Ok(package) => package,
+        Err(error) if missing_ooxml_content_types_error(&error) => return Ok(false),
+        Err(error) => return Err(error),
+    };
     let wins =
         crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
             .is_some();
@@ -1456,7 +1607,7 @@ fn detect_ooxml_package(package: crate::opc::OpcPackage) -> Option<DetectedForma
 #[cfg(test)]
 mod short_signature_tests {
     use super::detect_format_smart;
-    #[cfg(feature = "pptx")]
+    #[cfg(any(feature = "docx", feature = "pptx"))]
     use std::io::{Cursor, Write};
 
     #[cfg(feature = "odt")]
@@ -1547,6 +1698,92 @@ mod short_signature_tests {
     #[test]
     fn short_zip_candidate_is_rejected_without_short_read_failure() {
         assert!(detect_format_smart(b"PK\x03\x04".to_vec()).is_none());
+    }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn source_docx_probe_preserves_non_docx_zip_allocation_for_fallback() {
+        let mut output = Cursor::new(Vec::with_capacity(256));
+        let mut writer = zip::ZipWriter::new(&mut output);
+        writer
+            .start_file(
+                "plain.txt",
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Stored),
+            )
+            .unwrap();
+        writer.write_all(b"not a DOCX package").unwrap();
+        writer.finish().unwrap();
+        let bytes = output.into_inner();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+
+        let detected = super::detect_docx_source_bytes(bytes, crate::opc::ReadLimits::default());
+        let super::DocxSourceBytesDetection::Fallback(retained) = detected else {
+            panic!("non-DOCX ZIP unexpectedly selected the source owner");
+        };
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
+    }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn source_docx_probe_preserves_valid_non_docx_opc_allocation_for_fallback() {
+        use crate::opc::constants::{content_type as ct, relationship_type as rt};
+        use crate::opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
+
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/ppt/presentation.xml").unwrap(),
+                ct::PML_PRESENTATION_MAIN.to_owned(),
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
+                    .to_vec(),
+            )))
+            .unwrap();
+        package
+            .rels_mut()
+            .try_add_relationship(
+                rt::OFFICE_DOCUMENT.to_owned(),
+                "ppt/presentation.xml".to_owned(),
+                "rId1".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+
+        let detected = super::detect_docx_source_bytes(bytes, crate::opc::ReadLimits::default());
+        let super::DocxSourceBytesDetection::Fallback(retained) = detected else {
+            panic!("non-DOCX OPC unexpectedly selected the source owner");
+        };
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
+    }
+
+    #[cfg(feature = "docx")]
+    #[test]
+    fn source_docx_probe_propagates_matching_owner_errors() {
+        use crate::opc::constants::content_type as ct;
+        use crate::opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
+
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/word/document.xml").unwrap(),
+                ct::WML_DOCUMENT_MAIN.to_owned(),
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+                    .to_vec(),
+            )))
+            .unwrap();
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+
+        let detected = super::detect_docx_source_bytes(bytes, crate::opc::ReadLimits::default());
+        assert!(matches!(
+            detected,
+            super::DocxSourceBytesDetection::DocxError(_)
+        ));
     }
 
     #[cfg(feature = "xlsx")]
