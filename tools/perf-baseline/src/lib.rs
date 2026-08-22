@@ -40425,8 +40425,16 @@ fn run_streaming_creation(
     let mut elapsed = Vec::with_capacity(samples);
     let mut summaries = Vec::with_capacity(samples);
     let mut digests = Vec::with_capacity(samples);
+    let collect_resource_metrics = case == Case::RtfStreamingCreate;
+    let mut resource_observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let sink = HashingDiscardSink::new(maximum, corpus.metrics.retained_authoring_window_bytes);
+        let process_before = if collect_resource_metrics {
+            process_metrics::Snapshot::read().ok()
+        } else {
+            None
+        };
+        let allocation_region = collect_resource_metrics.then(allocation_metrics::begin);
         let started = Instant::now();
         let (sink, metrics) = match case {
             Case::XlsxStreamingCreate => write_streaming_xlsx(sink, corpus.shape)?,
@@ -40434,6 +40442,15 @@ fn run_streaming_creation(
             _ => return Err("non-streaming case reached streaming runner".into()),
         };
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.and_then(|region| region.finish());
+        let process_after = if collect_resource_metrics {
+            process_metrics::Snapshot::read().ok()
+        } else {
+            None
+        };
+        let process_metrics = process_before
+            .zip(process_after)
+            .map(|(before, after)| after.delta(before));
         let (mut summary, digest) = sink.finish();
         if metrics != corpus.metrics
             || summary.accepted_bytes != u64::try_from(corpus.manifest.archive_bytes)?
@@ -40452,6 +40469,13 @@ fn run_streaming_creation(
         if iteration >= warmup_iterations {
             summaries.push(summary);
             digests.push(digest);
+            if collect_resource_metrics {
+                resource_observations.push(operation_metrics::InProcessObservation {
+                    elapsed_ns: elapsed_ns(duration)?,
+                    process_metrics,
+                    allocation_metrics,
+                });
+            }
         }
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
@@ -40468,6 +40492,25 @@ fn run_streaming_creation(
     {
         return Err("streaming creation output digest changed across samples".into());
     }
+    let operation_metrics = if collect_resource_metrics {
+        let sink_observation = operation_metrics::SinkObservation {
+            accepted_bytes: sink.accepted_bytes,
+            write_calls: sink.write_calls,
+            largest_write: sink.largest_write,
+            bytes_0: sink.write_size_buckets.bytes_0,
+            bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+            bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+            bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+            bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+            bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+        };
+        Some(operation_metrics::from_in_process_observations(
+            &resource_observations,
+            sink_observation,
+        )?)
+    } else {
+        None
+    };
     Ok(CaseResult {
         case: case.name(),
         cache_state: None,
@@ -40477,7 +40520,7 @@ fn run_streaming_creation(
         source: None,
         execution: None,
         output_sha256: Some(corpus.manifest.archive_sha256.clone()),
-        operation_metrics: None,
+        operation_metrics,
     })
 }
 
@@ -42563,6 +42606,43 @@ mod tests {
                 measured.output_sha256.as_deref(),
                 Some(small.manifest.archive_sha256.as_str())
             );
+            if case == Case::RtfStreamingCreate {
+                let operation = measured
+                    .operation_metrics
+                    .as_ref()
+                    .expect("RTF streaming must publish operation resource metrics");
+                assert_eq!(operation.sample_count, 1);
+                assert_eq!(operation.sample_indices, vec![0]);
+                assert_eq!(
+                    operation.sink.accepted_bytes.values,
+                    Some(vec![small.manifest.archive_bytes as u64])
+                );
+                assert!(matches!(
+                    operation.process.status,
+                    crate::operation_metrics::MetricStatus::Measured
+                        | crate::operation_metrics::MetricStatus::Unavailable
+                ));
+                if operation.process.status == crate::operation_metrics::MetricStatus::Measured {
+                    assert_eq!(
+                        operation
+                            .process
+                            .user_cpu_ticks
+                            .values
+                            .as_ref()
+                            .unwrap()
+                            .len(),
+                        1
+                    );
+                    assert_eq!(operation.process.rchar.values.as_ref().unwrap().len(), 1);
+                } else {
+                    assert!(operation.process.user_cpu_ticks.values.is_none());
+                    assert!(operation.process.rchar.values.is_none());
+                }
+                let json = serde_json::to_value(operation).unwrap();
+                assert_eq!(json["sample_count"], 1);
+                assert_eq!(json["sink"]["write_status"], "measured");
+                assert!(json["process"].get("status").is_some());
+            }
         }
     }
 

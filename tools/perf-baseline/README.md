@@ -1703,6 +1703,16 @@ ordinary `Workbook` or `Document` facade, and exhaustively checked against the
 shape. That artifact is dropped before samples run. Every timed digest must
 equal the reopened artifact digest.
 
+RTF streaming results also publish aligned, per-retained-sample
+`operation_metrics`. Process counters are best-effort same-process procfs
+deltas whose scope includes the after-snapshot probe overhead; unsupported
+platforms report them as unavailable. The allocator target reports checked
+operation regions, while the ordinary binary leaves allocation metrics absent.
+Allocator live/high-water values are absolute before/after process counters,
+and `peak_rss_bytes` is the process-lifetime high-water mark, not an
+operation-local peak. Resource probes, digest finalization, and correctness
+checks remain outside the elapsed-time interval.
+
 The `sink` record additionally reports exact rows/cells or paragraphs/runs,
 input bytes, authored worksheet/RTF bytes, `retained_output_bytes: 0`, and the
 production writer's explicit `retained_authoring_window_bytes`. Increasing total output
