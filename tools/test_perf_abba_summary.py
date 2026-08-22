@@ -135,9 +135,18 @@ def report(rows, *, revision="control-revision", dirty=False):
     environment = copy.deepcopy(ENVIRONMENT)
     environment["git_revision"] = revision
     environment["git_worktree_dirty"] = dirty
+    candidate = revision.startswith("candidate")
     return {
         "schema_version": 1,
         "tool": copy.deepcopy(TOOL),
+        "binary_identity": {
+            "path": "/tmp/litchi-perf-candidate" if candidate else "/tmp/litchi-perf-control",
+            "binary_sha256": "b" * 64 if candidate else "a" * 64,
+            "binary_bytes": 200 if candidate else 100,
+            "mode_bits": 0o755,
+            "executable": True,
+            "profile": "release",
+        },
         "environment": environment,
         "configuration": copy.deepcopy(CONFIGURATION),
         "results": rows,
@@ -724,17 +733,73 @@ class PerfAbbaSummaryTests(unittest.TestCase):
                 perf_abba_summary.summarize_reports(legs)
 
         summary = perf_abba_summary.summarize_reports(four_legs())
-        self.assertEqual(
-            summary["implementation_identity"],
-            {
-                "control": {"git_revision": "control-revision", "legs": ["a1", "a2"]},
-                "candidate": {
-                    "git_revision": "candidate-revision",
-                    "legs": ["b1", "b2"],
-                },
-                "distinct": True,
-            },
+        identity = summary["implementation_identity"]
+        self.assertEqual(identity["control"]["git_revision"], "control-revision")
+        self.assertEqual(identity["candidate"]["git_revision"], "candidate-revision")
+        self.assertEqual(identity["control"]["legs"], ["a1", "a2"])
+        self.assertEqual(identity["candidate"]["legs"], ["b1", "b2"])
+        self.assertEqual(identity["control"]["binary_sha256"], "a" * 64)
+        self.assertEqual(identity["candidate"]["binary_sha256"], "b" * 64)
+        self.assertTrue(identity["distinct"])
+
+    def test_binary_identity_is_required_exact_within_legs_and_distinct_across_legs(self):
+        missing = four_legs()
+        missing[0].pop("binary_identity")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "binary_identity"
+        ):
+            perf_abba_summary.summarize_reports(missing)
+
+        malformed = four_legs()
+        malformed[1]["binary_identity"]["binary_sha256"] = "not-a-sha256"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "binary_sha256"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        non_executable_mode = four_legs()
+        non_executable_mode[0]["binary_identity"]["mode_bits"] = 0o644
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "executable permission bits"
+        ):
+            perf_abba_summary.summarize_reports(non_executable_mode)
+
+        missing_unix_mode = four_legs()
+        missing_unix_mode[0]["binary_identity"]["mode_bits"] = None
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "present for Unix targets"
+        ):
+            perf_abba_summary.summarize_reports(missing_unix_mode)
+
+        oversized = four_legs()
+        oversized[0]["binary_identity"]["binary_bytes"] = 1 << 64
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "positive unsigned integer"
+        ):
+            perf_abba_summary.summarize_reports(oversized)
+
+        same_leg_drift = four_legs()
+        same_leg_drift[3]["binary_identity"]["binary_bytes"] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "control binary identity"
+        ):
+            perf_abba_summary.summarize_reports(same_leg_drift)
+
+        identical = four_legs()
+        identical[1]["binary_identity"] = copy.deepcopy(
+            identical[0]["binary_identity"]
         )
+        identical[2]["binary_identity"] = copy.deepcopy(
+            identical[0]["binary_identity"]
+        )
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "hashes must differ"
+        ):
+            perf_abba_summary.summarize_reports(identical)
+
+        summary = perf_abba_summary.summarize_reports(four_legs())
+        self.assertTrue(summary["verification"]["binary_identity_verified"])
+        self.assertTrue(summary["verification"]["binary_hashes_distinct"])
 
     def test_rust_statistics_verify_integer_tails_dispersion_and_uncertainty(self):
         values = list(range(1, 17))

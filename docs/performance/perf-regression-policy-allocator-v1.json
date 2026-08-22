@@ -14,6 +14,7 @@
   ],
   "require_clean_worktree": true,
   "require_distinct_revisions": true,
+  "require_binary_identity": true,
   "tool_identity": {
     "name": "litchi-perf-baseline",
     "version": "0.1.0",

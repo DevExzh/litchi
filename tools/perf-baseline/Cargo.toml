@@ -6,11 +6,17 @@ publish = false
 
 [features]
 allocator-metrics = []
+xlsb-crud = ["dep:litchi-xlsb", "litchi/xlsb"]
 
 [[bin]]
 name = "litchi-perf-baseline-alloc"
 path = "src/bin/litchi-perf-baseline-alloc.rs"
 required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "xlsb_crud"
+path = "src/bin/xlsb_crud.rs"
+required-features = ["xlsb-crud"]
 
 [dependencies]
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
@@ -29,6 +35,7 @@ litchi-ppt = { path = "../../crates/litchi-ppt" }
 litchi-pptx = { path = "../../crates/litchi-pptx" }
 litchi-rtf = { path = "../../crates/litchi-rtf" }
 litchi-xls = { path = "../../crates/litchi-xls" }
+litchi-xlsb = { path = "../../crates/litchi-xlsb", optional = true }
 litchi-xlsx = { path = "../../crates/litchi-xlsx" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

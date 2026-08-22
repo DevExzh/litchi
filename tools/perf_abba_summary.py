@@ -50,6 +50,22 @@ REQUIRED_TOOL_FIELDS = (
     "target_arch",
     "instrumentation",
 )
+REQUIRED_BINARY_IDENTITY_FIELDS = (
+    "path",
+    "binary_sha256",
+    "binary_bytes",
+    "mode_bits",
+    "executable",
+    "profile",
+)
+OPTIONAL_BINARY_IDENTITY_FIELDS = frozenset(("label",))
+UNIX_TARGET_OSES = frozenset(
+    {
+        "aix", "android", "dragonfly", "freebsd", "fuchsia", "haiku",
+        "hurd", "illumos", "ios", "linux", "macos", "netbsd", "openbsd",
+        "tvos", "visionos", "watchos",
+    }
+)
 REQUIRED_CONFIGURATION_FIELDS = (
     "samples_per_case",
     "warmup_iterations_per_case",
@@ -622,6 +638,82 @@ def _validate_tool(tool: dict[str, Any], label: str) -> None:
         raise AbbaSummaryInputError(
             f"{label}.tool.instrumentation must be 'none' for latency ABBA"
         )
+
+
+def _validate_binary_identity(
+    binary: Any, label: str, tool: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate the untimed identity of the executable producing a report.
+
+    The descriptor follows ``perf_resource_profile.binary_identity``.  Paths
+    are provenance only and are not resolved against the reader's filesystem;
+    the hash, byte count, mode bits, executable marker, and profile are the
+    portable syntax/identity channels.  Unix mode bits are explicitly null on
+    platforms without a portable permission-bit representation.
+    """
+
+    location = f"{label}.binary_identity"
+    value = _require_object(binary, location)
+    missing = set(REQUIRED_BINARY_IDENTITY_FIELDS) - set(value)
+    if missing:
+        raise AbbaSummaryInputError(
+            f"{location} is missing required keys: {sorted(missing)}"
+        )
+    unknown = set(value) - set(REQUIRED_BINARY_IDENTITY_FIELDS) - OPTIONAL_BINARY_IDENTITY_FIELDS
+    if unknown:
+        raise AbbaSummaryInputError(f"{location} has unknown keys: {sorted(unknown)}")
+    path = value["path"]
+    if not isinstance(path, str) or not path:
+        raise AbbaSummaryInputError(f"{location}.path must be a non-empty string")
+    # Accept both POSIX and Windows absolute paths while keeping the path
+    # itself opaque: reports may be compared on a different host.
+    if not (path.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", path) or path.startswith("\\\\")):
+        raise AbbaSummaryInputError(f"{location}.path must be absolute")
+    digest = _validate_output_sha256(value["binary_sha256"], f"{location}.binary_sha256")
+    binary_bytes = value["binary_bytes"]
+    if (
+        isinstance(binary_bytes, bool)
+        or not isinstance(binary_bytes, int)
+        or binary_bytes <= 0
+        or binary_bytes > (1 << 64) - 1
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.binary_bytes must be a positive unsigned integer"
+        )
+    mode_bits = value["mode_bits"]
+    if mode_bits is not None and (
+        isinstance(mode_bits, bool)
+        or not isinstance(mode_bits, int)
+        or mode_bits < 0
+        or mode_bits > 0o7777
+        or mode_bits & 0o111 == 0
+    ):
+        raise AbbaSummaryInputError(
+            f"{location}.mode_bits must be null or executable permission bits"
+        )
+    if tool["target_os"] in UNIX_TARGET_OSES and mode_bits is None:
+        raise AbbaSummaryInputError(
+            f"{location}.mode_bits must be present for Unix targets"
+        )
+    if value["executable"] is not True:
+        raise AbbaSummaryInputError(f"{location}.executable must be true")
+    profile = value["profile"]
+    if not isinstance(profile, str) or not profile:
+        raise AbbaSummaryInputError(f"{location}.profile must be a non-empty string")
+    if profile != tool["profile"]:
+        raise AbbaSummaryInputError(
+            f"{location}.profile does not match {label}.tool.profile"
+        )
+    if "label" in value:
+        _required_nonempty_string(value["label"], location, "label")
+    return {
+        **value,
+        "binary_sha256": digest,
+        "binary_bytes": binary_bytes,
+        "mode_bits": mode_bits,
+        "executable": True,
+        "profile": profile,
+    }
 
 
 def _validate_environment(environment: dict[str, Any], label: str) -> None:
@@ -1345,6 +1437,7 @@ def _validate_report(
     frozenset[str],
     bool,
     dict[tuple[str, str], str],
+    dict[str, Any],
 ]:
     root = _require_object(report, label)
     canonical_report = _canonical_json(root, f"{label}.report")
@@ -1361,6 +1454,7 @@ def _validate_report(
     if not tool:
         raise AbbaSummaryInputError(f"{label}.tool must not be empty")
     _validate_tool(tool, label)
+    binary_identity = _validate_binary_identity(root.get("binary_identity"), label, tool)
     environment = _require_object(root.get("environment"), f"{label}.environment")
     if not environment:
         raise AbbaSummaryInputError(f"{label}.environment must not be empty")
@@ -1383,6 +1477,7 @@ def _validate_report(
         filesystem_shapes,
         filesystem_present,
         filesystem_identity,
+        binary_identity,
     )
 
 
@@ -1849,6 +1944,25 @@ def summarize_reports(
     if len(configurations) != 1:
         raise AbbaSummaryInputError("harness configuration differs between ABBA legs")
 
+    binary_identities = {
+        label: _canonical_json(item[9], f"{label}.binary_identity")
+        for label, item in validated.items()
+    }
+    if binary_identities["a1"] != binary_identities["a2"]:
+        raise AbbaSummaryInputError("control binary identity differs between A1 and A2")
+    if binary_identities["b1"] != binary_identities["b2"]:
+        raise AbbaSummaryInputError("candidate binary identity differs between B1 and B2")
+    binary_identity_values = {
+        label: item[9] for label, item in validated.items()
+    }
+    if (
+        binary_identity_values["a1"]["binary_sha256"]
+        == binary_identity_values["b1"]["binary_sha256"]
+    ):
+        raise AbbaSummaryInputError(
+            "control and candidate executable SHA-256 hashes must differ"
+        )
+
     for label, (
         _,
         _,
@@ -1857,6 +1971,7 @@ def summarize_reports(
         indexed,
         _,
         filesystem_shapes,
+        _,
         _,
         _,
     ) in validated.items():
@@ -1983,9 +2098,16 @@ def summarize_reports(
             "legs": environments,
         },
         "implementation_identity": {
-            "control": {"git_revision": control_revision, "legs": ["a1", "a2"]},
+            "control": {
+                "git_revision": control_revision,
+                "binary_sha256": binary_identity_values["a1"]["binary_sha256"],
+                "binary_identity": binary_identity_values["a1"],
+                "legs": ["a1", "a2"],
+            },
             "candidate": {
                 "git_revision": candidate_revision,
+                "binary_sha256": binary_identity_values["b1"]["binary_sha256"],
+                "binary_identity": binary_identity_values["b1"],
                 "legs": ["b1", "b2"],
             },
             "distinct": True,
@@ -1995,6 +2117,8 @@ def summarize_reports(
         "verification": {
             "result_count": len(results),
             "tool_identity_verified": True,
+            "binary_identity_verified": True,
+            "binary_hashes_distinct": True,
             "configuration_identity_verified": True,
             "environment_stable_identity_verified": True,
             "environment_legs_recorded": True,

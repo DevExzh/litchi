@@ -36,6 +36,17 @@ report contains the generator parameters and SHA-256 hashes for the generated
 container and target entry, so a result always identifies its exact input or
 packaged output.
 
+Every newly emitted report also carries an additive top-level
+`binary_identity` descriptor for the actual running executable. It follows the
+resource-profile descriptor vocabulary: `path`, `binary_sha256`,
+`binary_bytes`, `mode_bits`, `executable`, and `profile`. The executable is
+hashed with a bounded streaming reader after all timed cases have completed;
+the harness does not hash the binary inside warmups, samples, or child
+operation timers. Unix reports record permission bits, while platforms without
+a portable permission-bit equivalent emit `mode_bits: null`; `profile` remains
+explicit on every platform. A changed file identity or size during the read
+fails report generation rather than publishing unverifiable provenance.
+
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
@@ -49,7 +60,8 @@ python3 tools/perf_abba_summary.py \
 ```
 
 The helper recomputes p50, mean, p95, and p99 from retained samples and fails
-closed when harness configuration, stable environment facts, corpus identity,
+closed when harness configuration, stable environment facts, executable
+identity, corpus identity,
 source metrics, sink metrics, or result coverage differ between legs. Its
 default same-implementation drift ceilings are 5% for p50 and mean, 10% for
 p95, and 15% for p99; use `--drift-ceilings` only when a recorded calibration
@@ -61,6 +73,11 @@ different non-empty candidate revision; each leg's environment and canonical
 report hash is retained in the summary. Configured shape arrays are checked
 against result rows; filesystem evidence is the schema-specific exception for
 format-specific filesystem shapes such as `media-rich`.
+
+The ABBA binary descriptor is an exact identity within each implementation:
+A1 must equal A2 and B1 must equal B2, including path, size, mode, and profile.
+The control and candidate `binary_sha256` values must differ. Missing or
+malformed descriptors fail closed before any statistic is accepted.
 
 The helper verifies every integer statistic, Welford sample standard deviation,
 and the two-sided Student's-t 95% confidence interval using the harness
@@ -109,6 +126,30 @@ redirect the package.
 The native OLE2, DOCX/PPTX, RTF, and ODF semantic matrices are deliberately
 opt-in. They measure only current public APIs and therefore do not change the
 default 36 cases / 198 records.
+
+The XLSB semantic CRUD baseline is a separate opt-in binary so that its
+format-specific dependency does not alter the default matrix. It uses the
+public XLSB owner and umbrella facade over the deterministic POI
+`testVarious.xlsb` fixture (including its inert opaque/VBA members), and
+reports warm raw samples with p50/mean/p95/p99, source/output SHA-256
+identities, worksheet/cell coordinates, sizes, and untimed reopen,
+semantic-readback, exact no-op patch/unrelated-Part semantic-digest,
+malformed-input, package/cell resource-limit, and sparse-iteration gates. The stored-cell scan and the
+`ceil(1%)` edit are explicitly scoped to the selected worksheet. The binary
+fails closed when any gate does not pass:
+
+```sh
+CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
+  cargo run --manifest-path tools/perf-baseline/Cargo.toml --release \
+  --features xlsb-crud --bin xlsb_crud -- \
+  --case all --warmup 3 --samples 30 \
+  --json target/perf/xlsb-crud.json
+```
+
+The default XLSB fixture SHA-256 is
+`8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc`.
+Use `--fixture` to select another public fixture; capability-dependent
+operations refuse unsupported corpora rather than fabricating an edit.
 
 ## Run
 

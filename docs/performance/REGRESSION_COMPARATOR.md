@@ -18,6 +18,28 @@ upper regression thresholds:
 - p99 latency: 15%
 - allocation, RSS, and work counters when present: 5%
 
+The checked policies set `require_binary_identity: true`. Current harness
+reports add a top-level `binary_identity` descriptor without changing report
+`schema_version` 1. It contains the actual executable path, SHA-256, byte
+size, executable mode bits (or explicit `null` where unavailable), and build
+profile. The harness computes the digest with a bounded streaming read after
+timed work has finished. The comparator validates each descriptor's syntax and
+profile independently, but deliberately permits baseline/current descriptors
+to differ: comparing a baseline binary with a current binary is normal. A
+descriptor is not used as an equality requirement between those two reports.
+For compatibility with older schema-1 reports, policies that omit
+`require_binary_identity` accept the descriptor as an optional additive field;
+if one side emits it, both sides must emit it and both descriptors are still
+validated. The checked policies intentionally require it, so new regression
+comparisons cannot silently omit executable provenance.
+
+This is a deliberate hosted-reference boundary: reports produced before the
+binary descriptor was introduced are not valid inputs to the checked policies.
+Regenerate the explicit `reference_run_id` with the current harness before
+requesting a hosted comparison. Locally maintained legacy policies may omit
+`require_binary_identity` only for historical analysis that makes no current
+provenance claim.
+
 Allocator-only evidence uses the separate
 [`perf-regression-policy-allocator-v1.json`](perf-regression-policy-allocator-v1.json).
 That policy requires the `litchi-perf-baseline-alloc` binary identity and
