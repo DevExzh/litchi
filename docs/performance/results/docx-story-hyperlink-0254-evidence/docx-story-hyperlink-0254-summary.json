@@ -1,0 +1,443 @@
+{
+  "claim_scope": "eight repeated Snapshot::plan_target_urls calls on a prepared immutable DOCX snapshot; not end-to-end, I/O, allocation, RSS, or general DOCX speedup",
+  "comparison": {
+    "statistics": {
+      "accepted_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "both_direction_gate_passed": true,
+      "candidate_reduction_percent": {
+        "a1_to_b1": {
+          "mean": 90.99814867192106,
+          "p50": 91.36267400139751,
+          "p95": 89.83883436243187,
+          "p99": 89.53382221837664
+        },
+        "a2_to_b2": {
+          "mean": 91.3280969059432,
+          "p50": 91.59257744805967,
+          "p95": 90.3266484154305,
+          "p99": 88.22589736652236
+        }
+      },
+      "claim_status": "accepted_scoped_plan_timing_only",
+      "drift_within_ceiling": {
+        "candidate": {
+          "mean": true,
+          "p50": true,
+          "p95": true,
+          "p99": true
+        },
+        "control": {
+          "mean": true,
+          "p50": true,
+          "p95": true,
+          "p99": true
+        }
+      },
+      "legs": {
+        "a1": {
+          "max": 1326503,
+          "mean": 774770.294,
+          "min": 727403,
+          "p50": 764218,
+          "p95": 817544,
+          "p99": 1028599,
+          "sample_count": 500,
+          "standard_deviation": 56838.4170763671
+        },
+        "a2": {
+          "max": 1162050,
+          "mean": 779340.7660000004,
+          "min": 630142,
+          "p50": 770355,
+          "p95": 848527,
+          "p99": 887040,
+          "sample_count": 500,
+          "standard_deviation": 40786.73253965985
+        },
+        "b1": {
+          "max": 140020,
+          "mean": 69743.67000000001,
+          "min": 63967,
+          "p50": 66008,
+          "p95": 83072,
+          "p99": 107655,
+          "sample_count": 500,
+          "standard_deviation": 8712.753690242462
+        },
+        "b2": {
+          "max": 128103,
+          "mean": 67583.67599999999,
+          "min": 63756,
+          "p50": 64767,
+          "p95": 82081,
+          "p99": 104441,
+          "sample_count": 500,
+          "standard_deviation": 7591.654152064165
+        }
+      },
+      "paired_candidate_lower": {
+        "mean": true,
+        "p50": true,
+        "p95": true,
+        "p99": true
+      },
+      "rejected_statistics": [],
+      "same_implementation_drift_percent": {
+        "candidate_b1_to_b2": {
+          "mean": -3.0970466567073687,
+          "p50": -1.8800751424069808,
+          "p95": -1.192941063174114,
+          "p99": -2.9854628210487206
+        },
+        "control_a1_to_a2": {
+          "mean": 0.5899131697995144,
+          "p50": 0.8030431107354183,
+          "p95": 3.789765443817091,
+          "p99": -13.762311649146072
+        }
+      },
+      "stability_gates_passed": true
+    }
+  },
+  "compatibility": {
+    "custom_summary_recomputed_from_raw_samples": true,
+    "existing_tools_perf_abba_summary": "incompatible_with_raw_reports",
+    "reasons": [
+      "current helper requires binary_identity absent from committed 9f2350e39 reports",
+      "older control helper lacks fixed custom-corpus exception",
+      "docx source includes measured plan_ns and cannot be strict source identity"
+    ]
+  },
+  "corpus": {
+    "canonical_sha256": "5a924ad4ffba528aef52724cbc463495f5272772b3970ada66e933ad70cbd439",
+    "manifest": {
+      "archive_bytes": 47677,
+      "archive_member_count": 100,
+      "archive_sha256": "88aaed9b547d9af0079ad7685f7ba5a43f5b5df32254695ea2891d764065cb5f",
+      "compression": "deflate",
+      "entry_bytes": 2119,
+      "entry_count": 1152,
+      "generator": "litchi-docx-story-hyperlink-plan-v1",
+      "name": "docx-story-hyperlink-plan",
+      "package_format": "DOCX/OPC/ZIP",
+      "payload_kind": "deterministic-story-hyperlinks",
+      "shape": "49-stories-1152-links",
+      "target_entry": "shared-external-hyperlink-relationship",
+      "target_payload_bytes": 41,
+      "target_payload_sha256": "6c006f36a0db0d1b2a6c98409642e53a2d25f9328b72e5ff760d233efa2639de",
+      "uncompressed_payload_bytes": 101960,
+      "xlsx": null
+    },
+    "output_equal_all_legs": true,
+    "output_sha256": "9d51dd76638bf230b40031e3948d1e3cdcef410d5be7c69fa0e572a782d2fd6e",
+    "source_static_projection_equal_all_legs": true,
+    "source_static_projection_sha256": "ef4b06efa1d7d9f02a83b4a2c0ab28cd762e974aa6613d31ff4353e0701a1b5b"
+  },
+  "execution": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "case": "docx_story_hyperlink_plan",
+    "cpu_affinity": "0",
+    "samples_per_leg": 500,
+    "shared_target_directory": "/home/zhuhe/CodeProjects/litchi-worktrees/docx-story-hyperlink-0254-target",
+    "warmups_per_leg": 20
+  },
+  "generated_utc": "2026-08-22T04:16:16.865978Z",
+  "harness": {
+    "configuration": {
+      "cases": [
+        "docx_story_hyperlink_plan"
+      ],
+      "corpus_shapes": [
+        "tiny",
+        "many-small",
+        "few-large",
+        "wide-root"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "filesystem_cache_states": [
+        "warm",
+        "cold-requested"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "payload_kinds": [
+        "compressible",
+        "incompressible"
+      ],
+      "range_simulation": {
+        "bandwidth_bytes_per_second": 52428800,
+        "fixed_latency_us": 100,
+        "max_physical_range_bytes": 4096,
+        "request_overhead_us": 25
+      },
+      "rtf_variants": [
+        "plain"
+      ],
+      "samples_per_case": 500,
+      "semantic_shapes": [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      "warmup_iterations_per_case": 20,
+      "writer_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium",
+        "dense-sparse"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium",
+        "large"
+      ],
+      "xlsx_shapes": [
+        "tiny",
+        "medium",
+        "dense-wide"
+      ]
+    },
+    "revisions": {
+      "a1": "dbf33bdc0fa381c531fb8a2eda92f388e9a20a49",
+      "a2": "dbf33bdc0fa381c531fb8a2eda92f388e9a20a49",
+      "b1": "9f2350e393da9a8e3ce98892cf2abc32dda9a56d",
+      "b2": "9f2350e393da9a8e3ce98892cf2abc32dda9a56d"
+    },
+    "stable_environment": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "0",
+      "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+      "filesystem_type": null,
+      "git_worktree_dirty": false,
+      "kernel": "Linux 7.0.0-30-generic",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "4",
+      "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "rustflags": null,
+      "source_destination_same_device": null,
+      "storage_identifier": null,
+      "total_memory_bytes": 33600217088
+    },
+    "tool": {
+      "binary": "litchi-perf-baseline",
+      "instrumentation": "none",
+      "name": "litchi-perf-baseline",
+      "profile": "release",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "version": "0.1.0"
+    },
+    "worktrees_clean": true
+  },
+  "implementation_identity": {
+    "candidate": {
+      "binary_bytes": 45523880,
+      "binary_mode": "0555",
+      "binary_sha256": "1a4e2bdc0ff1720173054ed5f61fbfa06b4e239416086a175e8a6f8c2b4ff67b",
+      "legs": [
+        "b1",
+        "b2"
+      ],
+      "revision": "9f2350e393da9a8e3ce98892cf2abc32dda9a56d"
+    },
+    "control": {
+      "binary_bytes": 45459504,
+      "binary_mode": "0555",
+      "binary_sha256": "ec2d0e73f5f449315197e664412375f04f27737954571cbb1db37fbdfee4fd3d",
+      "legs": [
+        "a1",
+        "a2"
+      ],
+      "revision": "dbf33bdc0fa381c531fb8a2eda92f388e9a20a49"
+    }
+  },
+  "legs": {
+    "a1": {
+      "binary_sha256": "ec2d0e73f5f449315197e664412375f04f27737954571cbb1db37fbdfee4fd3d",
+      "declared_statistics_match_samples": true,
+      "elapsed_ns": {
+        "max": 1326503,
+        "mean": 774770.294,
+        "min": 727403,
+        "p50": 764218,
+        "p95": 817544,
+        "p99": 1028599,
+        "sample_count": 500,
+        "standard_deviation": 56838.4170763671
+      },
+      "harness_flags": {
+        "complete_inventory_verified": true,
+        "deterministic_output_verified": true,
+        "duplicate_selector_dedup_verified": true,
+        "inventory_verified": true,
+        "missing_selector_refusal_verified": true,
+        "output_inventory_verified": true,
+        "output_relationships_verified": true,
+        "output_text_verified": true,
+        "plan_effect_verified": true,
+        "publication_verified": true,
+        "source_immutability_verified": true
+      },
+      "output_sha256": "9d51dd76638bf230b40031e3948d1e3cdcef410d5be7c69fa0e572a782d2fd6e",
+      "revision": "dbf33bdc0fa381c531fb8a2eda92f388e9a20a49",
+      "source_static_projection_sha256": "ef4b06efa1d7d9f02a83b4a2c0ab28cd762e974aa6613d31ff4353e0701a1b5b"
+    },
+    "a2": {
+      "binary_sha256": "ec2d0e73f5f449315197e664412375f04f27737954571cbb1db37fbdfee4fd3d",
+      "declared_statistics_match_samples": true,
+      "elapsed_ns": {
+        "max": 1162050,
+        "mean": 779340.7660000004,
+        "min": 630142,
+        "p50": 770355,
+        "p95": 848527,
+        "p99": 887040,
+        "sample_count": 500,
+        "standard_deviation": 40786.73253965985
+      },
+      "harness_flags": {
+        "complete_inventory_verified": true,
+        "deterministic_output_verified": true,
+        "duplicate_selector_dedup_verified": true,
+        "inventory_verified": true,
+        "missing_selector_refusal_verified": true,
+        "output_inventory_verified": true,
+        "output_relationships_verified": true,
+        "output_text_verified": true,
+        "plan_effect_verified": true,
+        "publication_verified": true,
+        "source_immutability_verified": true
+      },
+      "output_sha256": "9d51dd76638bf230b40031e3948d1e3cdcef410d5be7c69fa0e572a782d2fd6e",
+      "revision": "dbf33bdc0fa381c531fb8a2eda92f388e9a20a49",
+      "source_static_projection_sha256": "ef4b06efa1d7d9f02a83b4a2c0ab28cd762e974aa6613d31ff4353e0701a1b5b"
+    },
+    "b1": {
+      "binary_sha256": "1a4e2bdc0ff1720173054ed5f61fbfa06b4e239416086a175e8a6f8c2b4ff67b",
+      "declared_statistics_match_samples": true,
+      "elapsed_ns": {
+        "max": 140020,
+        "mean": 69743.67000000001,
+        "min": 63967,
+        "p50": 66008,
+        "p95": 83072,
+        "p99": 107655,
+        "sample_count": 500,
+        "standard_deviation": 8712.753690242462
+      },
+      "harness_flags": {
+        "complete_inventory_verified": true,
+        "deterministic_output_verified": true,
+        "duplicate_selector_dedup_verified": true,
+        "inventory_verified": true,
+        "missing_selector_refusal_verified": true,
+        "output_inventory_verified": true,
+        "output_relationships_verified": true,
+        "output_text_verified": true,
+        "plan_effect_verified": true,
+        "publication_verified": true,
+        "source_immutability_verified": true
+      },
+      "output_sha256": "9d51dd76638bf230b40031e3948d1e3cdcef410d5be7c69fa0e572a782d2fd6e",
+      "revision": "9f2350e393da9a8e3ce98892cf2abc32dda9a56d",
+      "source_static_projection_sha256": "ef4b06efa1d7d9f02a83b4a2c0ab28cd762e974aa6613d31ff4353e0701a1b5b"
+    },
+    "b2": {
+      "binary_sha256": "1a4e2bdc0ff1720173054ed5f61fbfa06b4e239416086a175e8a6f8c2b4ff67b",
+      "declared_statistics_match_samples": true,
+      "elapsed_ns": {
+        "max": 128103,
+        "mean": 67583.67599999999,
+        "min": 63756,
+        "p50": 64767,
+        "p95": 82081,
+        "p99": 104441,
+        "sample_count": 500,
+        "standard_deviation": 7591.654152064165
+      },
+      "harness_flags": {
+        "complete_inventory_verified": true,
+        "deterministic_output_verified": true,
+        "duplicate_selector_dedup_verified": true,
+        "inventory_verified": true,
+        "missing_selector_refusal_verified": true,
+        "output_inventory_verified": true,
+        "output_relationships_verified": true,
+        "output_text_verified": true,
+        "plan_effect_verified": true,
+        "publication_verified": true,
+        "source_immutability_verified": true
+      },
+      "output_sha256": "9d51dd76638bf230b40031e3948d1e3cdcef410d5be7c69fa0e572a782d2fd6e",
+      "revision": "9f2350e393da9a8e3ce98892cf2abc32dda9a56d",
+      "source_static_projection_sha256": "ef4b06efa1d7d9f02a83b4a2c0ab28cd762e974aa6613d31ff4353e0701a1b5b"
+    }
+  },
+  "protocol": {
+    "drift_ceilings_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "mean_and_standard_deviation": "Welford binary64",
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "p50": "Rust u64 floor midpoint",
+    "p95_p99": "integer nearest-rank",
+    "reduction_percent": "(control-candidate)/control*100",
+    "same_path_drift_percent": "(second-first)/first*100",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ]
+  },
+  "raw_reports": {
+    "a1": {
+      "bytes": 33438,
+      "file": "a1.json",
+      "sha256": "59e207ad6b2e6b1d7ac4b9c9f25892577bf92410a519a50ad230be4baae4288d"
+    },
+    "a2": {
+      "bytes": 33431,
+      "file": "a2.json",
+      "sha256": "93bd6f9f003a879b6db4c2bb26bcf55d095977ccdc49da8867063cf5c0109b4c"
+    },
+    "b1": {
+      "bytes": 32450,
+      "file": "b1.json",
+      "sha256": "b0d72590f87787e483a893f6eb24a05b62fe7a1d0d1b08393eb7406f3916865c"
+    },
+    "b2": {
+      "bytes": 32441,
+      "file": "b2.json",
+      "sha256": "9c1db3f2b98dd447f0ee2ac5d85abe771f34002337d35f3b3afeebd0e1b84d64"
+    }
+  },
+  "schema_version": 1,
+  "source_immutability_caveat": "source_immutability_verified is retained as harness-reported but is not independent proof because the harness verifies against its own generated corpus/source path; independent corpus/output hashes are stronger evidence",
+  "tool": {
+    "name": "litchi-docx-story-hyperlink-abba-summary",
+    "version": "0.1.0-custom"
+  }
+}
