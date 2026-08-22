@@ -11203,3 +11203,46 @@ The accepted order cases are bounded package-level ownership/preservation
 evidence only. No native Keynote open/save gate is admitted by this amendment;
 no `litchi-iwa -> litchi-keynote` host edge or ordered debt is retired, and no
 host-exit or monolith-exit claim follows.
+
+## 2026-08-23 amendment: Pages fallback/removal, Keynote chart-title bridge, and IWA entry delegation
+
+The detached wave ref `696be8e2e` includes four bounded ownership changes:
+`8e7fba67b` narrows the Pages optional-footnote fallback,
+`0b118f2d8` delegates IWA entry lookup to package state,
+`966fc0212` routes legacy Keynote chart titles through the focused semantic
+package API, and `696be8e2e` makes legacy Pages footnote removal
+failure-atomic. This amendment records source-level scope only; no Cargo or
+native verification result is added here.
+
+The Pages section-text bridge now accepts malformed optional footnote payloads
+only for the known storage-table field-16 error forms (including the TSWP
+wordings). Other invalid body payloads remain strict failures, so the fallback
+does not become a general invalid-format escape hatch. Legacy
+`PagesEditor::remove_body_footnote` stages anchor removal on a cloned editor,
+re-reads the staged body-footnote graph, and publishes only after the removed
+native reference identity is absent. This preserves the adjacent footnote
+that shifts into the deleted position and leaves the live editor unchanged if
+validation fails. These are legacy-host compatibility and failure-atomicity
+changes; they do not establish focused Pages mutation, native application
+behavior, or reader/editor retirement.
+
+The focused `litchi-keynote::Package` chart-title seam now supplies bounded
+semantic catalog, read, set, and clear transactions. Legacy `KeynoteEditor`
+chart-title selectors retain host graph/ownership validation, map native
+drawable identities to semantic chart positions where needed, and delegate
+the title operation to the focused selector-first package API; the host chart
+catalog follows the same focused route. A verified focused commit is written
+back to the host editor, while the remaining chart graph and other chart
+operations stay in the migration host. This is a semantic bridge only, not a
+native open/save or byte-inertness result.
+
+`IWorkPackage` entry containment, reads, test-only mutable access, insertion,
+replacement, removal, and IWA insertion now call `PackageState::position`
+directly; the redundant package-level lookup wrapper was removed. This
+centralizes lookup without changing the public package boundary or retiring a
+host dependency edge.
+
+No historical verification count or ordered debt is revised: the recorded
+64-package/239-declaration baseline and 13-entry migration ledger remain in
+force. No Cargo gate, native gate, dependency-edge retirement, or monolith
+deletion claim follows; the monolith remains a migration host.

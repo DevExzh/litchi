@@ -3583,3 +3583,40 @@ The order transaction's synthetic bounded cases are not a native Keynote
 open/save gate. No host dependency edge or ordered debt is retired, and this
 amendment makes no host-exit, host-deletion, or complete monolith-exit claim;
 the monolith deletion gate remains open.
+
+## 2026-08-23 amendment: bounded Pages fallback/removal, Keynote chart-title bridge, and IWA entry delegation
+
+The detached wave ref `696be8e2e` contains four source-level changes relevant
+to the ordered exit: `8e7fba67b` narrows optional Pages footnote fallback,
+`696be8e2e` makes legacy footnote removal failure-atomic,
+`966fc0212` delegates legacy Keynote chart-title operations through the
+focused semantic package, and `0b118f2d8` delegates IWA entry lookup to
+`PackageState`. This amendment records bounded implementation scope only; it
+does not add Cargo or native gate evidence.
+
+The Pages fallback now recognizes only the known malformed optional-footnote
+storage field-16 error forms, while unrelated invalid body payloads remain
+strict. Legacy footnote removal edits a cloned editor, validates absence of
+the removed native reference identity in the staged graph, and publishes only
+after that postcondition succeeds. Thus adjacent-footnote position shifts do
+not delete the wrong reference, and a failed postcondition does not partially
+mutate the live editor. The focused Pages package, native application
+behavior, and broader Pages host reader/editor ownership remain open.
+
+The legacy Keynote chart-title read/set/clear and catalog routes now enter the
+focused `litchi-keynote::Package` semantic chart-title API after the host
+resolves and validates native chart ownership. Identifier-based calls map to
+semantic chart positions; focused commits are written back to the host
+editor. The bridge covers this chart-title seam only. Remaining chart graph
+work, other chart mutations, and the host compatibility surface remain
+migration work, and no native open/save or byte-inertness result is implied.
+
+IWA package entry containment, reads, mutation helpers, replacement,
+removal, and IWA insertion now use the package state's canonical position
+lookup directly. This removes a duplicate helper but does not remove the
+`litchi-iwa` host, its dependency edge, or any ordered debt.
+
+The historical 64 workspace packages, 239 internal dependency declarations,
+and 13-entry ordered migration ledger are unchanged. None of these bounded
+changes satisfies the deletion gate, retires a host edge, or authorizes
+monolith deletion; no Cargo/native/complete-monolith result is claimed.
