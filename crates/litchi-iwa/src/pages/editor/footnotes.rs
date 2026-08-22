@@ -43,6 +43,7 @@ const FOOTNOTE_ANCHOR_UNIT: u16 = 0x000e;
 const FOOTNOTE_MARK: char = '\u{fffc}';
 const FOOTNOTE_CONTENT_PREFIX: &str = "\u{fffc} ";
 const FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT: u32 = 64;
+const MAX_BODY_FOOTNOTES: usize = 4096;
 
 /// Native Pages footnote data plus the private objects it owns.
 #[derive(Debug, Clone)]
@@ -273,27 +274,58 @@ pub(super) fn cleanup_removed_body_footnotes(
     if before.is_empty() {
         return Ok(());
     }
-    let remaining = body_footnote_graphs(package, body_storage_id)?
-        .into_iter()
-        .map(|graph| graph.reference_id)
-        .collect::<HashSet<_>>();
-    let removed = before
-        .iter()
-        .filter(|graph| !remaining.contains(&graph.reference_id))
-        .collect::<Vec<_>>();
-    if removed.is_empty() {
+    let remaining_graphs = body_footnote_graphs(package, body_storage_id)?;
+    let mut remaining = HashSet::new();
+    remaining.try_reserve(remaining_graphs.len()).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "Pages body remaining footnote references",
+            amount: remaining_graphs.len(),
+        })
+    })?;
+    remaining.extend(remaining_graphs.into_iter().map(|graph| graph.reference_id));
+
+    let removed_count = before.iter().try_fold(0usize, |count, graph| {
+        if remaining.contains(&graph.reference_id) {
+            Ok(count)
+        } else {
+            count.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Pages removed footnote graph count overflows usize".to_owned(),
+                )
+            })
+        }
+    })?;
+    if removed_count == 0 {
         return Ok(());
     }
+    let identifier_count = footnote_cleanup_identifier_count(removed_count)?;
 
     let mut staged = package.clone();
-    let mut identifiers = Vec::with_capacity(removed.len() * 3);
-    for graph in removed {
+    let mut identifiers = Vec::new();
+    identifiers
+        .try_reserve_exact(identifier_count)
+        .map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Pages removed footnote object identifiers",
+                amount: identifier_count,
+            })
+        })?;
+    for graph in before
+        .iter()
+        .filter(|graph| !remaining.contains(&graph.reference_id))
+    {
         identifiers.extend(remove_unreferenced_footnote_graph(&mut staged, graph)?);
     }
     release_package_identifier_suffix(&mut staged, &identifiers)?;
     IWorkPackage::from_bytes(&staged.to_bytes()?)?;
     *package = staged;
     Ok(())
+}
+
+fn footnote_cleanup_identifier_count(removed_count: usize) -> Result<usize> {
+    removed_count.checked_mul(3).ok_or_else(|| {
+        Error::InvalidFormat("Pages removed footnote identifier count overflows usize".to_owned())
+    })
 }
 
 fn body_footnote_by_selector(
@@ -455,11 +487,12 @@ fn reserve_footnote_collection<T>(
         .len()
         .checked_add(additional)
         .ok_or_else(|| Error::InvalidFormat(format!("{resource} size overflows usize")))?;
-    if requested > limits.max_fields() {
+    let limit = limits.max_fields().min(MAX_BODY_FOOTNOTES);
+    if requested > limit {
         return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
             kind: LimitKind::Fields,
             observed: requested,
-            limit: limits.max_fields(),
+            limit,
         }));
     }
     values.try_reserve_exact(additional).map_err(|_| {
@@ -480,11 +513,12 @@ fn reserve_footnote_set<T: Eq + Hash>(
         .len()
         .checked_add(additional)
         .ok_or_else(|| Error::InvalidFormat(format!("{resource} size overflows usize")))?;
-    if requested > limits.max_fields() {
+    let limit = limits.max_fields().min(MAX_BODY_FOOTNOTES);
+    if requested > limit {
         return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
             kind: LimitKind::Fields,
             observed: requested,
-            limit: limits.max_fields(),
+            limit,
         }));
     }
     values.try_reserve(additional).map_err(|_| {
@@ -823,7 +857,7 @@ fn remove_unreferenced_footnote_graph(
         &[TEXTUAL_ATTACHMENT_MESSAGE_TYPE],
         "marker attachment",
     )?;
-    Ok(vec![reference_id, graph.storage_id, graph.marker_id])
+    Ok([reference_id, graph.storage_id, graph.marker_id])
 }
 
 fn remove_unreferenced_footnote_object(
@@ -1020,6 +1054,16 @@ mod tests {
             })
         ));
         assert!(graphs.is_empty());
+    }
+
+    #[test]
+    fn footnote_cleanup_identifier_count_checks_overflow() {
+        let error = footnote_cleanup_identifier_count(usize::MAX).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message)
+                if message == "Pages removed footnote identifier count overflows usize"
+        ));
     }
 
     #[test]
