@@ -1670,14 +1670,18 @@ struct TypedListVisitor<'converter, T, C> {
 /// failure, so the staged prefix is only published after the complete payload
 /// has decoded successfully.
 struct CommentReplyVisitor {
+    root_storage_id: u64,
     reply_ids: Vec<u64>,
+    seen_reply_ids: HashSet<u64>,
     semantic_error: Option<Error>,
 }
 
 impl CommentReplyVisitor {
-    fn new() -> Self {
+    fn new(root_storage_id: u64) -> Self {
         Self {
+            root_storage_id,
             reply_ids: Vec::new(),
+            seen_reply_ids: HashSet::new(),
             semantic_error: None,
         }
     }
@@ -1703,6 +1707,16 @@ impl comment_storage_codec::CommentStorageVisitor for CommentReplyVisitor {
         if self.semantic_error.is_some() {
             return Ok(());
         }
+        let identifier = reply.identifier();
+        // A direct self-reference or duplicate reply would make the native
+        // thread ambiguous. Keep this check alongside collection so malformed
+        // graph edges cannot escape through the typed sidecar.
+        if identifier == self.root_storage_id || self.seen_reply_ids.contains(&identifier) {
+            self.record_semantic_error(Error::MalformedPayload {
+                path: SemanticPath::StructuredTables,
+            });
+            return Ok(());
+        }
         if self.reply_ids.try_reserve(1).is_err() {
             self.record_semantic_error(allocation_error(
                 "Numbers comment replies",
@@ -1710,7 +1724,15 @@ impl comment_storage_codec::CommentStorageVisitor for CommentReplyVisitor {
             ));
             return Ok(());
         }
-        self.reply_ids.push(reply.identifier());
+        if self.seen_reply_ids.try_reserve(1).is_err() {
+            self.record_semantic_error(allocation_error(
+                "Numbers comment reply identities",
+                self.seen_reply_ids.len().saturating_add(1),
+            ));
+            return Ok(());
+        }
+        self.seen_reply_ids.insert(identifier);
+        self.reply_ids.push(identifier);
         Ok(())
     }
 }
@@ -3281,7 +3303,7 @@ impl<'a> TableDataExtractor<'a> {
                     let output_text_offset = budget.output_text_bytes;
 
                     if first_candidate.is_none() {
-                        let mut visitor = CommentReplyVisitor::new();
+                        let mut visitor = CommentReplyVisitor::new(storage_id);
                         let (comment, report) =
                             comment_storage_codec::decode_comment_storage_archive_with_visitor(
                                 source,
@@ -3300,6 +3322,21 @@ impl<'a> TableDataExtractor<'a> {
                         budget.charge_comment_decode_report(report)?;
                         budget.charge_output_text(report.text_bytes())?;
                         let (raw_reply_ids, semantic_error) = visitor.take_parts();
+                        // The codec streams every validated `replies` field,
+                        // and its report is the authoritative cardinality.
+                        // Keep this check at the publication boundary so a
+                        // future visitor change cannot silently publish a
+                        // truncated reply collection after a successful
+                        // decode.  An allocation failure remains the
+                        // visitor's typed semantic error and is handled
+                        // below, preserving its precedence.
+                        if semantic_error.is_none()
+                            && raw_reply_ids.len() != report.reply_references()
+                        {
+                            return Err(Error::MalformedPayload {
+                                path: SemanticPath::StructuredTables,
+                            });
+                        }
                         first_candidate = Some((comment, raw_reply_ids, semantic_error));
                     } else {
                         let (_comment, report) =
