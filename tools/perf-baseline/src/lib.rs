@@ -9,6 +9,7 @@
 pub mod allocation_metrics;
 mod cold_verified;
 mod corpus_manifest;
+mod docx_story_hyperlinks;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
@@ -644,6 +645,7 @@ enum Case {
     OdtFileEagerOpenFullTextLifecycle,
     OdtFileSourceOpenFullTextLifecycle,
     DocxSourceBackedOneEditSave,
+    DocxStoryHyperlinkPlan,
     PptxSourceBackedOneEditSave,
     PptxEagerBatchEditSave,
     PptxSourceBackedBatchEditSave,
@@ -1048,6 +1050,7 @@ impl Case {
             Self::OdtFileEagerOpenFullTextLifecycle => "odt_file_eager_open_full_text_lifecycle",
             Self::OdtFileSourceOpenFullTextLifecycle => "odt_file_source_open_full_text_lifecycle",
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
+            Self::DocxStoryHyperlinkPlan => "docx_story_hyperlink_plan",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
             Self::PptxSourceBackedBatchEditSave => "pptx_source_backed_batch_edit_save",
@@ -2158,6 +2161,10 @@ impl Case {
         matches!(self, Self::DocxSourceBackedOneEditSave)
     }
 
+    const fn is_docx_story_hyperlink_plan(self) -> bool {
+        matches!(self, Self::DocxStoryHyperlinkPlan)
+    }
+
     const fn is_pptx_source_edit_save(self) -> bool {
         matches!(
             self,
@@ -3062,6 +3069,8 @@ struct SourceSummary {
     rtf_paragraph_split_merge: Option<RtfParagraphSplitMergeSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     doc_owner_public_phases: Option<DocOwnerPublicPhaseSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    docx_story_hyperlinks: Option<docx_story_hyperlinks::DocxStoryHyperlinkPlanSummary>,
 }
 
 /// Actual member-count evidence retained by the ZIP index selector.  The
@@ -6727,6 +6736,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_opc_source_cache_evidence()
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
+                    && !case.is_docx_story_hyperlink_plan()
                     && !case.is_doc_owner_public_phases()
                     && !case.is_pptx_source_edit_save()
                     && !case.is_pptx_cross_copy()
@@ -7107,6 +7117,20 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     {
         let corpus = build_docx_source_edit_corpus()?;
         results.push(run_docx_source_backed_one_edit_save(
+            &corpus,
+            options.warmup_iterations,
+            options.samples,
+        )?);
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_docx_story_hyperlink_plan())
+    {
+        let corpus = docx_story_hyperlinks::build_corpus()?;
+        results.push(docx_story_hyperlinks::run(
+            Case::DocxStoryHyperlinkPlan,
             &corpus,
             options.warmup_iterations,
             options.samples,
@@ -8498,6 +8522,7 @@ fn parse_case(value: &str) -> Option<Case> {
             Some(Case::CfbOpenStreamSimulatedMini4095SharedRepeat8)
         },
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
+        "docx_story_hyperlink_plan" => Some(Case::DocxStoryHyperlinkPlan),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
         "pptx_source_backed_batch_edit_save" => Some(Case::PptxSourceBackedBatchEditSave),
@@ -8953,6 +8978,7 @@ fn print_usage() {
                                        odt_file_eager_open_full_text_lifecycle,\n\
                                        odt_file_source_open_full_text_lifecycle,\n\
                                        docx_source_backed_one_edit_save,\n\
+                                       docx_story_hyperlink_plan,\n\
                                        pptx_source_backed_one_edit_save,\n\
                                        pptx_eager_batch_edit_save,\n\
                                        pptx_source_backed_batch_edit_save,\n\
@@ -15288,6 +15314,9 @@ fn run_case_with_config(
         },
         Case::DocxSourceBackedOneEditSave => {
             run_docx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::DocxStoryHyperlinkPlan => {
+            Err("DOCX story-hyperlink planning uses its dedicated corpus runner".into())
         },
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)

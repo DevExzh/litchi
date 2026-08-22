@@ -112,6 +112,22 @@ default 36 cases / 198 records.
 
 ## Run
 
+Run the opt-in DOCX story-hyperlink planning case over its deterministic
+49-story/1,152-relationship corpus:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml --release -- \
+  --case docx_story_hyperlink_plan --warmup 3 --samples 30 \
+  --json target/perf/docx-story-hyperlink-plan.json
+```
+
+The corpus, source-backed story inventory, selector guards, one untimed
+semantic publication/readback, and one repeat publication for deterministic
+output validation are prepared outside the measured interval. Each retained
+sample times eight repeated `Snapshot::plan_target_urls` calls on the prepared
+immutable snapshot. The case is opt-in and does not change the default 36-case
+matrix.
+
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
