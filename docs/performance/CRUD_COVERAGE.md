@@ -898,8 +898,10 @@ Change 0097 separately measures fresh RTF streaming creation after bounded
 escape-free ASCII batching. The p50 geomean improves 76.41%/76.47% and p95
 75.23%/75.76%; the large case reduces sink calls from 7,208,970 to 1,441,802
 under a hard 32-byte request ceiling, with exact bytes and hashes. This does not
-claim existing-document edit, allocation, RSS or cold-I/O improvement. iWork
-remains deliberately deferred while the `iwa-*` crates change separately.
+claim existing-document edit, allocation, RSS or cold-I/O improvement. Change
+0256 adds aligned same-process allocator/procfs vectors to this selector, but no
+pinned resource report or improvement is accepted yet. iWork remains
+deliberately deferred while the `iwa-*` crates change separately.
 
 Change 0116 adds eight opt-in native PPT `Pictures` selectors to the then-current
 216-name matrix: matched eager/source-backed presentation-open cases, cold

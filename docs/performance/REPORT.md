@@ -3035,14 +3035,19 @@ remain open. The older Change 0103 `4N -> 3N` scan-removal ABBA still has
 disagreeing latency directions; only its exact logical-work reduction was
 accepted independently.
 
+Change 0256 adds the missing per-sample allocator/procfs envelope to fixed-window
+RTF streaming creation. The vectors are descriptive same-process observations,
+with explicit unavailable states and process-lifetime high-water semantics; no
+pinned release resource report or allocation/RSS improvement is accepted yet.
+
 Other high-priority gaps are physical cold-filesystem and real range-source
 matrices beyond the debug smoke and repeated tmpfs release capture, threshold
 tuning and cache-acceptance work beyond the committed explicit scaling curves,
 operation-local allocation and total/peak-memory attribution for bounded
 forward-only XLSX creation, richer XLSX authoring plus physical/cold-I/O and
-producer evidence, allocation/peak-memory evidence for the now latency-measured
+producer evidence, a pinned allocator/resource capture for the now-instrumented
 RTF creation path, and broad format-semantic CRUD coverage beyond the generated
-text/grid slices
+text/grid slices.
 (bulk action distinctions, dependency-copy, merge/split, patch timing, repair,
 security, malformed and real-producer corpora, plus broader ODF and RTF
 coverage). Native DOC/XLS/PPT semantic baselines now have accepted XLS
