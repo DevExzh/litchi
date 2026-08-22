@@ -1871,11 +1871,11 @@ where
         None
     };
     let prepared_docx = if operation.is_docx_query() {
-        if operation.is_source_docx() {
-            Some(litchi::Document::open(&source)?)
+        Some(if operation.is_source_docx() {
+            PreparedDocx::source(&source)?
         } else {
-            Some(litchi::Document::from_bytes(fs::read(&source)?)?)
-        }
+            PreparedDocx::eager(fs::read(&source)?)?
+        })
     } else {
         None
     };
@@ -3308,14 +3308,90 @@ fn run_pptx_operation(
     Ok(())
 }
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the harness compares the typed eager owner with the unified source owner"
+)]
+enum PreparedDocx {
+    Eager(litchi_docx::Package, litchi_core::Metadata),
+    Source(litchi::Document),
+}
+
+impl PreparedDocx {
+    fn eager(bytes: Vec<u8>) -> Result<Self, Box<dyn Error>> {
+        let detected = litchi::detection_smart::detect_format_smart_with_limits(
+            bytes,
+            litchi_docx::ReadLimits::default(),
+        )
+        .ok_or("DOCX eager detector did not identify a supported package")?;
+        let package = match detected {
+            litchi::detection_smart::DetectedFormat::Docx(opc) => {
+                litchi_docx::Package::from_opc_package(opc)?
+            },
+            _ => return Err("DOCX eager detector returned a non-DOCX package".into()),
+        };
+        package.document()?.text()?;
+        let metadata = package
+            .props()
+            .cloned()
+            .map(litchi_core::Metadata::from)
+            .unwrap_or_default();
+        Ok(Self::Eager(package, metadata))
+    }
+
+    fn source(source: &Path) -> Result<Self, Box<dyn Error>> {
+        Ok(Self::Source(litchi::Document::open(source)?))
+    }
+
+    fn paragraph_count(&self) -> Result<usize, Box<dyn Error>> {
+        match self {
+            Self::Eager(package, _) => Ok(package.document()?.paragraph_count()?),
+            Self::Source(document) => Ok(document.paragraph_count()?),
+        }
+    }
+
+    fn list_paragraphs(&self) -> Result<(), Box<dyn Error>> {
+        match self {
+            Self::Eager(package, _) => {
+                let paragraphs = package
+                    .document()?
+                    .paragraphs()?
+                    .into_iter()
+                    .map(litchi::document::Paragraph::Docx)
+                    .collect::<Vec<_>>();
+                std::hint::black_box(paragraphs);
+            },
+            Self::Source(document) => {
+                let paragraphs = document.paragraphs()?;
+                std::hint::black_box(paragraphs);
+            },
+        }
+        Ok(())
+    }
+
+    fn text(&self) -> Result<String, Box<dyn Error>> {
+        match self {
+            Self::Eager(package, _) => Ok(package.document()?.text()?),
+            Self::Source(document) => Ok(document.text()?),
+        }
+    }
+
+    fn semantic_signature(&self) -> Result<String, Box<dyn Error>> {
+        match self {
+            Self::Eager(package, metadata) => docx_package_signature(package, metadata),
+            Self::Source(document) => docx_document_signature(document),
+        }
+    }
+}
+
 fn run_docx_operation(
     operation: Operation,
     source: &Path,
-    prepared: Option<&litchi::Document>,
+    prepared: Option<&PreparedDocx>,
 ) -> Result<(), Box<dyn Error>> {
     match operation {
         Operation::DocxEagerOpen => {
-            let document = litchi::Document::from_bytes(fs::read(source)?)?;
+            let document = PreparedDocx::eager(fs::read(source)?)?;
             std::hint::black_box(document);
         },
         Operation::DocxSourceOpen => {
@@ -3332,8 +3408,7 @@ fn run_docx_operation(
         },
         Operation::DocxEagerListParagraphs | Operation::DocxSourceListParagraphs => {
             let document = prepared.ok_or("DOCX list-paragraphs operation has no prepared root")?;
-            let paragraphs = document.paragraphs()?;
-            std::hint::black_box(paragraphs);
+            document.list_paragraphs()?;
         },
         Operation::DocxEagerFullText | Operation::DocxSourceFullText => {
             let document = prepared.ok_or("DOCX full-text operation has no prepared root")?;
@@ -3343,9 +3418,9 @@ fn run_docx_operation(
         Operation::DocxEagerOpenParagraphCountLifecycle
         | Operation::DocxSourceOpenParagraphCountLifecycle => {
             let document = if operation.is_source_docx() {
-                litchi::Document::open(source)?
+                PreparedDocx::source(source)?
             } else {
-                litchi::Document::from_bytes(fs::read(source)?)?
+                PreparedDocx::eager(fs::read(source)?)?
             };
             let count = document.paragraph_count()?;
             if count != super::SemanticShape::Medium.docx_paragraphs() {
@@ -3355,9 +3430,9 @@ fn run_docx_operation(
         },
         Operation::DocxEagerOpenFullTextLifecycle | Operation::DocxSourceOpenFullTextLifecycle => {
             let document = if operation.is_source_docx() {
-                litchi::Document::open(source)?
+                PreparedDocx::source(source)?
             } else {
-                litchi::Document::from_bytes(fs::read(source)?)?
+                PreparedDocx::eager(fs::read(source)?)?
             };
             let text = document.text()?;
             std::hint::black_box((document, text));
@@ -3670,9 +3745,9 @@ fn verify_docx_operation(
             return Err("DOCX filesystem source hash differs from corpus manifest".into());
         }
     }
-    let eager = litchi::Document::from_bytes(bytes.clone())?;
-    let source_backed = litchi::Document::open(source)?;
-    if docx_document_signature(&eager)? != docx_document_signature(&source_backed)? {
+    let eager = PreparedDocx::eager(bytes.clone())?;
+    let source_backed = PreparedDocx::source(source)?;
+    if eager.semantic_signature()? != source_backed.semantic_signature()? {
         return Err("DOCX eager/source ordinary-root semantic signatures differ".into());
     }
     if eager.paragraph_count()? != super::SemanticShape::Medium.docx_paragraphs() {
@@ -3718,7 +3793,52 @@ fn docx_document_signature(document: &litchi::Document) -> Result<String, Box<dy
             Err("DOCX element has no supported projection".into())
         })
         .collect::<Result<Vec<(&str, String)>, Box<dyn Error>>>()?;
-    let metadata = serde_json::to_vec(&document.metadata()?)?;
+    let metadata = document.metadata()?;
+    Ok(super::sha256_hex(&serde_json::to_vec(&(
+        document.paragraph_count()?,
+        document.text()?,
+        paragraphs,
+        tables,
+        elements,
+        metadata,
+    ))?))
+}
+
+fn docx_package_signature(
+    package: &litchi_docx::Package,
+    metadata: &litchi_core::Metadata,
+) -> Result<String, Box<dyn Error>> {
+    let document = package.document()?;
+    let paragraphs = document
+        .paragraphs()?
+        .into_iter()
+        .map(|paragraph| paragraph.text())
+        .collect::<Result<Vec<_>, _>>()?;
+    let tables = document
+        .tables()?
+        .into_iter()
+        .map(|table| docx_package_table_projection(&table))
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    let elements = document.elements()?.into_iter().try_fold(
+        Vec::new(),
+        |mut elements, element| -> Result<Vec<(&str, String)>, Box<dyn Error>> {
+            match element {
+                litchi_docx::Element::Paragraph(paragraph) => {
+                    elements.push(("paragraph", paragraph.text()?));
+                },
+                litchi_docx::Element::Table(table) => {
+                    let projection = docx_package_table_projection(&table)?;
+                    elements.push(("table", serde_json::to_string(&projection)?));
+                },
+                litchi_docx::Element::Unknown(block)
+                    if docx_unknown_is_section_properties(&block) => {},
+                litchi_docx::Element::Unknown(_) => {
+                    return Err("DOCX element has no supported projection".into());
+                },
+            }
+            Ok(elements)
+        },
+    )?;
     Ok(super::sha256_hex(&serde_json::to_vec(&(
         document.paragraph_count()?,
         document.text()?,
@@ -3753,6 +3873,51 @@ fn docx_table_projection(
         })
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
     Ok((row_count, rows))
+}
+
+fn docx_package_table_projection(
+    table: &litchi_docx::Table,
+) -> Result<(usize, Vec<(usize, Vec<String>)>), Box<dyn Error>> {
+    let row_count = table.row_count()?;
+    let rows = table.rows()?;
+    if rows.len() != row_count {
+        return Err("DOCX package table row count disagrees with its row projection".into());
+    }
+    let rows = rows
+        .into_iter()
+        .map(|row| {
+            let cell_count = row.cell_count()?;
+            let cells = row
+                .cells()?
+                .into_iter()
+                .map(|cell| cell.text())
+                .collect::<Result<Vec<_>, _>>()?;
+            if cells.len() != cell_count {
+                return Err(
+                    "DOCX package table cell count disagrees with its cell projection".into(),
+                );
+            }
+            Ok((cell_count, cells))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+    Ok((row_count, rows))
+}
+
+fn docx_unknown_is_section_properties(block: &litchi_docx::OpaqueBlock) -> bool {
+    let bytes = block.xml_bytes();
+    let Some(open) = bytes.iter().position(|byte| *byte == b'<') else {
+        return false;
+    };
+    let name_start = open.saturating_add(1);
+    let Some(name_end) = bytes[name_start..]
+        .iter()
+        .position(|byte| matches!(*byte, b' ' | b'\t' | b'\r' | b'\n' | b'/' | b'>'))
+        .map(|offset| name_start.saturating_add(offset))
+    else {
+        return false;
+    };
+    let name = &bytes[name_start..name_end];
+    name == b"sectPr" || name.strip_prefix(b"w:") == Some(b"sectPr")
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
