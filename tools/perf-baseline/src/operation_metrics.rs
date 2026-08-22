@@ -265,6 +265,17 @@ pub(crate) struct OperationMetrics {
     pub allocation: Option<AllocationMetrics>,
 }
 
+/// One timed in-process operation and its best-effort process/allocator
+/// observations.  The elapsed value is the same value published in the
+/// caller's `Statistics`; the constructor below sorts all resource vectors by
+/// that value and the original sample index.
+#[derive(Clone, Debug)]
+pub(crate) struct InProcessObservation {
+    pub elapsed_ns: u64,
+    pub process_metrics: Option<crate::process_metrics::Delta>,
+    pub allocation_metrics: Option<crate::allocation_metrics::Sample>,
+}
+
 const ALIGNMENT: &str = "elapsed_ns.samples_by_elapsed_then_sample_index";
 const LATENCY_CLAIM: &str = "evidence_only_filesystem_selector";
 const COMPARABLE_LATENCY_CLAIM: &str = "comparable_timed_operation";
@@ -289,6 +300,9 @@ const MATERIALIZATION_SCOPE: &str = "logical_materialization_counter";
 const CFB_PHASE_ELAPSED_SCOPE: &str = "timed_cfb_phase_elapsed_ns";
 const CFB_PHASE_SOURCE_SCOPE: &str = "timed_cfb_phase_logical_read_at";
 const ALLOCATION_SCOPE: &str = "operation_global_system_allocator";
+const IN_PROCESS_PROCESS_SCOPE: &str =
+    "procfs_in_process_operation_delta_including_procfs_probe_overhead";
+const IN_PROCESS_PROC_IO_SCOPE: &str = IN_PROCESS_PROCESS_SCOPE;
 
 /// Builds the additive envelope for one warm or cold `CaseResult`.
 ///
@@ -366,7 +380,8 @@ pub(crate) fn aggregate(
 
     let source_status = match first_scope.as_str() {
         "timed_read_at" => MetricStatus::Measured,
-        "untimed_source_replay_only"
+        "not_applicable_in_process_sink"
+        | "untimed_source_replay_only"
         | "not_applicable_eager_opc"
         | "not_applicable_eager_pptx"
         | "not_applicable_eager_docx"
@@ -665,6 +680,89 @@ pub(crate) fn from_sink_observation(
         cfb_phases: absent_cfb_phase_metrics(),
         allocation: None,
     })
+}
+
+/// Builds the operation-metrics envelope for a fixed-window in-process
+/// writer.  The source and publication fields are deliberately marked
+/// not-applicable because this operation creates directly into a logical
+/// sink; process and allocator observations remain best-effort and therefore
+/// publish `unavailable` when the corresponding provider is absent.
+pub(crate) fn from_in_process_observations(
+    observations: &[InProcessObservation],
+    sink: SinkObservation,
+) -> Result<OperationMetrics, Box<dyn Error>> {
+    if observations.is_empty() {
+        return Err("in-process operation metrics cannot have zero observations".into());
+    }
+
+    let samples = observations
+        .iter()
+        .enumerate()
+        .map(|(sample_index, observation)| SampleEvidence {
+            sample_index,
+            cache_state: "warm",
+            elapsed_ns: observation.elapsed_ns,
+            parent_wall_ns: observation.elapsed_ns,
+            cold_advice: crate::filesystem::ColdAdvice::NotRequested,
+            cold_verified: None,
+            logical_read_counter_scope: SINK_SOURCE_SCOPE.to_owned(),
+            logical_read_calls: 0,
+            logical_read_requested_bytes: 0,
+            logical_read_bytes: 0,
+            logical_read_largest_requested_bytes: 0,
+            logical_read_largest_returned_bytes: 0,
+            logical_read_pattern: None,
+            max_concurrent_reads: 0,
+            logical_read_request_sizes: Vec::new(),
+            logical_read_request_size_buckets: crate::filesystem::ReadSizeBuckets::default(),
+            process_metrics: observation.process_metrics,
+            allocation_metrics: observation.allocation_metrics.clone(),
+            output_sha256: None,
+            output_bytes: None,
+            opc_materialized_parts: None,
+            cfb_changed_spans: None,
+            cfb_published_bytes: None,
+            cfb_phases: None,
+            pptx_source_replay: None,
+            docx_source_replay: None,
+        })
+        .collect::<Vec<_>>();
+    let elapsed = observations
+        .iter()
+        .map(|observation| observation.elapsed_ns)
+        .collect::<Vec<_>>();
+    let mut metrics = aggregate(&samples, "warm", &elapsed)?;
+    metrics.latency_claim = COMPARABLE_LATENCY_CLAIM;
+    relabel_in_process_scopes(&mut metrics.process);
+    metrics.set_sink_observation(observations.len(), sink)?;
+    Ok(metrics)
+}
+
+fn relabel_in_process_scopes(metrics: &mut ProcessMetrics) {
+    for vector in [
+        &mut metrics.user_cpu_ticks,
+        &mut metrics.system_cpu_ticks,
+        &mut metrics.clock_ticks_per_second,
+        &mut metrics.minor_faults,
+        &mut metrics.major_faults,
+        &mut metrics.voluntary_context_switches,
+        &mut metrics.nonvoluntary_context_switches,
+    ] {
+        vector.scope = IN_PROCESS_PROCESS_SCOPE;
+    }
+    for vector in [
+        &mut metrics.rchar,
+        &mut metrics.wchar,
+        &mut metrics.read_bytes,
+        &mut metrics.write_bytes,
+        &mut metrics.cancelled_write_bytes,
+        &mut metrics.syscr,
+        &mut metrics.syscw,
+    ] {
+        vector.scope = IN_PROCESS_PROC_IO_SCOPE;
+    }
+    metrics.rss_delta_bytes.scope = "procfs_in_process_rss_delta_including_procfs_probe_overhead";
+    metrics.peak_rss_bytes.scope = HWM_SCOPE;
 }
 
 impl OperationMetrics {
@@ -1036,7 +1134,10 @@ fn optional_values(
 mod tests {
     use serde_json::Value;
 
-    use super::{MetricStatus, MetricVector, SinkObservation, aggregate, from_sink_observation};
+    use super::{
+        InProcessObservation, MetricStatus, MetricVector, SinkObservation, aggregate,
+        from_in_process_observations, from_sink_observation,
+    };
     use crate::filesystem::{
         CfbPhaseEvidence, CfbPhaseSample, ColdAdvice, ReadPattern, ReadSizeBuckets, SampleEvidence,
     };
@@ -1348,6 +1449,111 @@ mod tests {
         assert!(envelope.process.cancelled_write_bytes.values.is_none());
         assert!(envelope.process.syscr.values.is_none());
         assert!(envelope.process.syscw.values.is_none());
+        let json = serde_json::to_value(envelope).unwrap();
+        assert_eq!(json["process"]["status"], "unavailable");
+        assert!(json["process"]["user_cpu_ticks"].get("values").is_none());
+    }
+
+    #[test]
+    fn in_process_observations_publish_aligned_resource_vectors_and_json() {
+        let observations = vec![
+            InProcessObservation {
+                elapsed_ns: 30,
+                process_metrics: Some(metrics()),
+                allocation_metrics: Some(measured_allocation_sample(7)),
+            },
+            InProcessObservation {
+                elapsed_ns: 10,
+                process_metrics: Some(metrics()),
+                allocation_metrics: Some(measured_allocation_sample(5)),
+            },
+        ];
+        let envelope = from_in_process_observations(
+            &observations,
+            SinkObservation {
+                accepted_bytes: 100,
+                write_calls: 4,
+                largest_write: 64,
+                bytes_0: 0,
+                bytes_1_to_512: 4,
+                bytes_513_to_4096: 0,
+                bytes_4097_to_16384: 0,
+                bytes_16385_to_65536: 0,
+                bytes_over_65536: 0,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(envelope.sample_count, 2);
+        assert_eq!(envelope.sample_indices, vec![1, 0]);
+        assert_eq!(envelope.latency_claim, "comparable_timed_operation");
+        assert_eq!(
+            envelope.source.counter_scope,
+            "not_applicable_in_process_sink"
+        );
+        assert_eq!(envelope.source.status, MetricStatus::NotApplicable);
+        assert_eq!(envelope.process.status, MetricStatus::Measured);
+        assert_eq!(
+            envelope.process.user_cpu_ticks.scope,
+            "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+        );
+        assert_eq!(
+            envelope.process.rchar.scope,
+            "procfs_in_process_operation_delta_including_procfs_probe_overhead"
+        );
+        assert_eq!(
+            envelope
+                .allocation
+                .as_ref()
+                .unwrap()
+                .allocation_calls
+                .values,
+            Some(vec![5, 7])
+        );
+        assert_eq!(envelope.sink.accepted_bytes.values, Some(vec![100, 100]));
+        let json = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(json["process"]["status"], "measured");
+        assert_eq!(
+            json["allocation"]["allocation_calls"]["values"],
+            serde_json::json!([5, 7])
+        );
+        assert_eq!(json["sink"]["write_status"], "measured");
+    }
+
+    #[test]
+    fn in_process_observations_mark_procfs_unavailable_without_values() {
+        let observations = vec![
+            InProcessObservation {
+                elapsed_ns: 20,
+                process_metrics: None,
+                allocation_metrics: None,
+            },
+            InProcessObservation {
+                elapsed_ns: 10,
+                process_metrics: None,
+                allocation_metrics: None,
+            },
+        ];
+        let envelope = from_in_process_observations(
+            &observations,
+            SinkObservation {
+                accepted_bytes: 1,
+                write_calls: 1,
+                largest_write: 1,
+                bytes_0: 0,
+                bytes_1_to_512: 1,
+                bytes_513_to_4096: 0,
+                bytes_4097_to_16384: 0,
+                bytes_16385_to_65536: 0,
+                bytes_over_65536: 0,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(envelope.process.status, MetricStatus::Unavailable);
+        assert!(envelope.process.user_cpu_ticks.values.is_none());
+        assert!(envelope.process.rchar.values.is_none());
+        assert!(envelope.allocation.is_none());
         let json = serde_json::to_value(envelope).unwrap();
         assert_eq!(json["process"]["status"], "unavailable");
         assert!(json["process"]["user_cpu_ticks"].get("values").is_none());
