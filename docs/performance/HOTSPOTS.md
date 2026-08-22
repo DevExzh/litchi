@@ -11,6 +11,15 @@ repeated story/relationship scans with preindexed targets; paired reductions
 range from 88.225897% to 91.592577% under CPU-0 release A1/B1/B2/A2 with 20
 warmups and 500 retained samples per leg. This is plan-only evidence, not an
 end-to-end DOCX, I/O, allocation, RSS, resource, or general speedup claim.)
+
+Current implementation-only status:
+[change 0257 — source-backed DOCX owned-byte ingress](changes/0257-docx-owned-bytes-source-backed-ingress.md)
+removes eager materialization of ordinary DOCX Part payloads from the normal
+owned-byte facade while retaining catalog admission, typed limits, ODT/OOXML
+arbitration, and truthful historical eager harness controls. It adds no
+latency, allocation, RSS, physical-I/O, decompression, or broad DOCX claim;
+pinned 20/500 release ABBA evidence remains open.
+
 [change 0252 — XLSX page-break projection ABBA evidence](changes/0252-xlsx-pagebreak-projection-abba.md)
 (the fixed media-rich eager page-break selector accepts p50/mean/p95/p99 at
 approximately 1.2%-2.0% lower candidate latency; the source-backed selector

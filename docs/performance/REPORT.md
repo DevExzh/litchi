@@ -11,6 +11,18 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## DOCX owned-byte source-backed ingress (change 0257)
+
+[Change 0257](changes/0257-docx-owned-bytes-source-backed-ingress.md) routes
+ordinary `Document::from_bytes[_with_limits]` DOCX inputs through the retained
+source-backed owner. Mandatory OPC/DOCX catalog admission remains at open;
+main-document and ordinary unselected Part payloads are deferred until a
+semantic query. The integration also preserves structured limits, ODT/OOXML
+arbitration, allocation-preserving fallback, and the historical eager meaning
+of the existing filesystem harness controls. This is implementation and
+correctness evidence only; no latency, allocation, RSS, I/O, decompression, or
+general DOCX speedup claim is made.
+
 ## DOCX story-hyperlink planning ABBA evidence (change 0254)
 
 [Change 0254](changes/0254-docx-story-hyperlink-index-abba.md) records the

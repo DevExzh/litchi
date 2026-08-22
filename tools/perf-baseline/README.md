@@ -283,15 +283,18 @@ additions bring the selectable matrix to 245 names while leaving the default
 eight ordinary-root DOCX filesystem selectors (`docx_file_{eager,source}_{open,
 paragraph_count,list_paragraphs,full_text}`) are also opt-in over the fixed
 200-paragraph/eight-incompressible-2 MiB-media corpus. Root-open timing covers
-`fs::read` plus eager `Document::from_bytes` versus source `Document::open`;
-query roots are prepared outside timing and the timer covers only the named
-root query. Independent untimed `litchi_docx::source_backed::Package` replays
+`fs::read` plus a harness-local recreation of the historical eager facade
+preparation versus source `Document::open`; the eager control uses smart
+detection, the typed DOCX owner, full-text validation, and facade-equivalent
+metadata conversion because normal `Document::from_bytes` is source-backed as
+of change 0257. Query roots are prepared outside timing and the timer covers
+only the named root query. Independent untimed
+`litchi_docx::source_backed::Package` replays
 record catalog/open reads and, for query selectors, complete coverage of the
 compressed main-document range during document preparation plus zero
 media/unselected/core overlap during the query. Completed return sizes, range
 coverage, materializations, and an explicit classification are also recorded.
-Full
-eager/source semantic parity, exact source hash, logical OPC
+Full eager/source semantic parity, exact source hash, logical OPC
 part/relationship/content-type/blob-hash gates, media hashes, and source
 immutability remain verification outside timing. This is correctness and
 logical compressed-range evidence only: it makes no latency, physical-I/O,
@@ -299,10 +302,11 @@ decompression, allocation, RSS, cold-cache, ABBA, security, or Markdown claim.
 Together these additions bring the selectable matrix to 253 names while
 leaving the default 36 cases / 198 records unchanged;
 eight matched DOCX/PPTX ordinary-root lifecycle selectors additionally time a
-fresh eager byte-owner or source-backed filesystem open plus paragraph count,
-full text, slide count, or one selected slide. They reuse the same fixed
-media-rich corpora, fresh-child protocol, complete untimed semantic/archive
-gates, and independent positional replays. Change 0188 retains the selectors
+fresh historical eager byte-owner control or source-backed filesystem open
+plus paragraph count, full text, slide count, or one selected slide. They reuse
+the same fixed media-rich corpora, fresh-child protocol, complete untimed
+semantic/archive gates, and independent positional replays. Change 0188
+retains the selectors
 and raw warm release ABBA, but accepts no latency statistic because every
 p50/mean pair misses at least one same-implementation drift gate and all tails
 are conservatively withheld. These selectors bring the current matrix to 332
