@@ -151,6 +151,33 @@ The default XLSB fixture SHA-256 is
 Use `--fixture` to select another public fixture; capability-dependent
 operations refuse unsupported corpora rather than fabricating an edit.
 
+The unified RTF owned-byte ingress is covered by two additional opt-in
+selectors, `rtf_file_open` and `rtf_file_open_lifecycle`. They reuse the
+deterministic semantic RTF corpus and time exactly
+`litchi::Document::from_bytes(Vec<u8>)`, or that construction plus
+`Document::text()` for the lifecycle case. The caller-owned `Vec<u8>` clone,
+the independent native `litchi_rtf::Document` semantic oracle, exact source
+SHA-256 check, and facade/native parity checks are outside the timer. The
+default `plain` variant is ASCII-only and remains runnable on a pre-ingress
+control build:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml --release -- \
+  --case rtf_file_open,rtf_file_open_lifecycle \
+  --semantic-shape tiny --rtf-variant plain --warmup 3 --samples 30 \
+  --json target/perf/rtf-root.json
+```
+
+`--rtf-variant byte1252,lzfu` enables the literal CP-1252 and compressed LZFu
+corpora. Their exact-byte native round trips and semantic projections are
+correctness oracles; facade parity is required when the native byte ingress is
+available. The report records `source.rtf_root` with the transport variant,
+source hash, text/paragraph digests, and explicit `performance_claim: "none"`;
+these selectors make no generic latency, allocation, physical-I/O, producer,
+or ABBA claim. They are opt-in and leave the default 36 cases / 198 records
+unchanged. The exhaustive `Case` registry/count tests now cover 380 selectable
+names.
+
 ## Run
 
 Run the opt-in DOCX story-hyperlink planning case over its deterministic
