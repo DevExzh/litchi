@@ -2,7 +2,7 @@
 
 use litchi_core::{Error, Result};
 use litchi_odf_common::constants::{ODF_CONTENT, ODF_FORMULA, ODF_FORMULA_TEMPLATE};
-use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+use litchi_odf_common::core::{OwnedPackage, PackageWriter, SourcePackageLimits};
 use litchi_odf_common::package::rebuild_package;
 use std::io::Read;
 
@@ -81,10 +81,27 @@ impl Package {
     ///
     /// Returns an error when reading fails or the bytes are not a valid
     /// Formula-family package.
-    pub fn from_reader(mut reader: impl Read) -> Result<Self> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes)?;
-        Self::from_bytes(bytes)
+    pub fn from_reader(reader: impl Read) -> Result<Self> {
+        Self::from_reader_with_limits(reader, SourcePackageLimits::default())
+    }
+
+    /// Read and validate a Formula-family package from a stream under
+    /// explicit finite package limits.
+    pub fn from_reader_with_limits(reader: impl Read, limits: SourcePackageLimits) -> Result<Self> {
+        let owned = OwnedPackage::from_reader_with_limits(reader, limits)?;
+        let flavor = Flavor::from_mimetype(&owned.mimetype()?)?;
+        if !owned.has_file(ODF_CONTENT)? {
+            return Err(Error::InvalidFormat(
+                "Formula package is missing content.xml".to_string(),
+            ));
+        }
+        let content = owned.get_file(ODF_CONTENT)?;
+        if std::str::from_utf8(&content).is_err() {
+            return Err(Error::InvalidFormat(
+                "Formula content.xml is not valid UTF-8".to_string(),
+            ));
+        }
+        Ok(Self { owned, flavor })
     }
 
     /// Return the exact package MIME type.

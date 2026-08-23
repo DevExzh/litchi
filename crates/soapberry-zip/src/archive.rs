@@ -1717,10 +1717,17 @@ impl<'a> ZipFileHeaderRecord<'a> {
     /// The count includes the raw member name, extra fields, and file comment.
     /// It is available without allocating or normalizing any of those fields.
     #[inline]
-    pub(crate) fn metadata_size_hint(&self) -> u64 {
+    pub fn metadata_size_hint(&self) -> u64 {
         u64::from(self.file_name_len)
             + u64::from(self.extra_field_len)
             + u64::from(self.file_comment_len)
+    }
+
+    /// Whether the central-directory record declares traditional ZIP
+    /// encryption through general-purpose flag bit zero.
+    #[inline]
+    pub fn is_encrypted(&self) -> bool {
+        self.flags & 1 != 0
     }
 
     /// The declared offset to the local file header within the Zip archive.
