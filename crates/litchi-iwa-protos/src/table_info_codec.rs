@@ -1101,7 +1101,8 @@ mod tests {
     }
 
     #[test]
-    fn nested_unknown_fields_consume_field_and_work_budgets() {
+    fn nested_unknown_fields_consume_field_and_work_budgets()
+    -> Result<(), Box<dyn std::error::Error>> {
         let source = [
             0x0a, 0x02, 0x08, 0x01, // one nested unknown field in super
             0x12, 0x04, 0x08, 0x2a, 0x10, 0x09, // identifier + nested unknown
@@ -1129,6 +1130,7 @@ mod tests {
                 .work_limit_values(),
             Some((32, 31))
         );
+        Ok(())
     }
 
     #[test]
