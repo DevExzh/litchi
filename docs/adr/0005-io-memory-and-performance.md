@@ -806,3 +806,33 @@ This is a finite reader-resource contract, not a measurement of peak memory,
 allocation count, latency, throughput, or package-wide performance. No
 manifest edge changes, generated-schema retirement, or workspace-wide Prost
 claim follow from this reader cutover.
+
+## 2026-08-24 amendment: Wave55 PackageMetadata registry reader resource record
+
+Commit `02eeb3acc29801838e3981236fd1e41ecbc44fee` moves only the three private
+`litchi-iwa` PackageMetadata registry queries
+`component_identifier_for_entry` (157 non-definition callers),
+`component_identifier_for_object_uuid` (14), and `component_uuid_identifiers`
+(41), 209 callers in total, through the doc-hidden
+`litchi_iwa_protos::package_metadata_codec` borrowed visitor. Mutation, writer,
+allocator, save-token, and data-reference routes remain on generated Prost
+messages.
+
+The reader derives package/effective-message limits and `WireLimits` for input,
+output, fields, work, nesting, components, and references. A strict two-pass
+preflight/visitor charges those finite resources before observations are
+accepted. Visitor results stay borrowed; the UUID query uses fallible
+`HashSet` staging, and byte, field, work, nesting, and allocation failures are
+typed and mapped without publishing partial observations. This is a bounded
+resource contract, not a performance, peak-RSS, or allocation measurement.
+
+Admission is intentionally narrower than permissive Prost decoding for the
+selected projection: selected fields require canonical singular required and
+nonzero values, valid UTF-8, canonical booleans, complete UUIDs, and valid
+nested references. Malformed versioned records therefore fail even when the
+three query results would otherwise ignore them. The codec validates only this
+projection, not the complete `PackageMetadata` schema; unknown noncanonical
+keys or lengths are rejected, while unknown noncanonical varint values and
+balanced unknown groups are accepted. No manifest/public-API, package-owner,
+workspace Prost-retirement, host, or monolith claim follows from this reader
+cutover.

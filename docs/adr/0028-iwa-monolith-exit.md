@@ -4445,3 +4445,28 @@ Generated `TableDataList` schemas, Prost-backed mutation code, the
 host remain. This slice retires no generated schema or Prost use, moves no
 package owner out of the host, and satisfies no host- or monolith-deletion
 gate.
+
+## 2026-08-24 amendment: Wave55 PackageMetadata registry reader slice (not a monolith-exit gate)
+
+Commit `02eeb3acc29801838e3981236fd1e41ecbc44fee` cuts only three private
+PackageMetadata registry readers from owned generated-message projection to the
+doc-hidden `litchi_iwa_protos::package_metadata_codec` borrowed visitor:
+`component_identifier_for_entry` has 157 non-definition callers,
+`component_identifier_for_object_uuid` 14, and `component_uuid_identifiers` 41
+(209 total). `litchi-iwa` retains the compatibility query surface and package
+ownership; mutation, writer, allocator, save-token, and data-reference routes
+remain generated Prost routes.
+
+The visitor's two-pass finite resource admission, strict selected-projection
+canonicality, fallible UUID-set staging, and typed limit/allocation failures
+are recorded in ADR 0005. Focused codec, host, caller, check, Clippy, boundary,
+format, and documentation gates are recorded in ADR 0008. The live boundary
+baseline remains only the known 23 Pages table-lock findings. Numbers 14.4
+accepted the duplicated-sheet candidate through save/close/reopen in the UI,
+but native normalization leaves a known duplicate-component-identity
+`InvalidFormat` reread debt, so this is application acceptance only and not
+Rust/native post-save parity.
+
+No manifest or public-API change, package-owner move, generated-schema or
+Prost retirement, ordered-debt retirement, migration-host exit, or
+`litchi-iwa` monolith-deletion claim follows from this bounded reader slice.

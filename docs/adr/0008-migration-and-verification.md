@@ -12257,3 +12257,62 @@ It does not establish Rust/native byte parity, package-wide reader parity,
 native type-6011 segment acceptance, exact RSS/allocation/latency,
 performance, mutation-path migration, or a durable workspace publication
 gate.
+
+## 2026-08-24 amendment: Wave55 PackageMetadata registry reader verification record
+
+Commit `02eeb3acc29801838e3981236fd1e41ecbc44fee` verifies the three private
+PackageMetadata registry queries through the borrowed
+`litchi_iwa_protos::package_metadata_codec` visitor. The focused gates passed
+as follows:
+
+- `cargo test -p litchi-iwa-protos package_metadata_codec --lib --quiet`:
+  14/14;
+- `cargo test -p litchi-iwa --lib package_metadata::tests:: --quiet`: 8/8;
+- six `cargo test -p litchi-iwa --lib <filter> --quiet` caller filters passed
+  1/1 each: `keynote::editor::slide_charts::reference_line::tests::scratch_presentation_supports_reference_line_crud`,
+  `pages::editor::charts::tests::pages_normalized_chart_styles_support_full_lifecycle_crud`,
+  `pages::editor::body_shapes::caption::tests::scratch_document_supports_native_shape_title_caption_crud`,
+  `numbers::editor::conditional_highlight::tests::scratch_document_conditional_highlights_create_replace_and_delete`,
+  `keynote::editor::tests::build_crud_tracks_only_native_uuid_objects_and_releases_highwater`,
+  and `comments::tests::creates_reuses_and_cleans_native_author_graph`. The
+  Keynote reference-line lifecycle exercises all three migrated queries;
+- `cargo check -p litchi-iwa-protos -p litchi-iwa --all-targets --quiet`:
+  passed with the checkout's existing warnings;
+- `cargo clippy -p litchi-iwa-protos --lib --quiet -- -D warnings`: passed.
+  Scoped `cargo clippy -p litchi-iwa --lib --tests --no-deps --quiet -- -D
+  warnings -A deprecated -A dead-code -A unused-imports -A
+  clippy::derivable-impls` also passed;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 351/351, and
+  `py_compile` passed. The live `--explain` audit exits 1 only for the known
+  23 Pages table-lock findings and reports no PackageMetadata or Numbers-
+  storage finding;
+- targeted Rust formatting and `git diff --check`: passed; workspace doc
+  tests passed.
+
+The implementation commit skipped the global `rustfmt`, `cargo-lint`, and
+`cargo-test-lib` hooks only after these scoped gates passed, because those
+hooks retained unrelated checkout baselines. The strict projection and its
+canonicality/resource caveats are the same as the resource record in ADR 0005;
+mutation and writer paths remain generated Prost paths.
+
+Numbers 14.4 application acceptance used the source fixture
+`test-data/iwork/numbers/basic.numbers` (136,357 bytes, SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`) and the
+generated candidate
+`/private/tmp/litchi-wave55-metadata-native.4D1yTa/duplicated.numbers` before
+native save (137,739 bytes, SHA-256
+`ce352175a4ea441560fe5afc8ac9fbafc647eec4bd05ec6778d6fd4c0ad391f5`). The
+pre-native `litchi-numbers` read showed `Sheet 1` and `Sheet 1-1`, each with
+`Table 1` at 22x7 and two materialized cells. Numbers opened the candidate
+without repair; the UI verified both sheets and tables plus `Litchi native
+Numbers fixture` and `42`, and save/close/reopen preserved them. The
+post-native file was 139,219 bytes with SHA-256
+`790aa7386ad6f5bb641dda0aaef3a47236cbe727b9712a5a9cf581ffce6d6754`.
+
+After native normalization, `cargo run -p litchi-numbers --example
+read_numbers` rejected `InvalidFormat` for duplicate object identities and
+`cargo run -p litchi-iwa --example inspect_numbers_document` exited
+`InvalidFormat`. This is recorded as known native-normalized component-
+identity compatibility debt: the result is application acceptance only and
+provides no Rust/native post-save parity, package-wide performance, latency,
+allocation, or peak-memory claim. No full-workspace green claim is made.
