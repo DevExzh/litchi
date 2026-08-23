@@ -5,6 +5,10 @@ use litchi_iwa_protos::numbers_table_cell_storage_codec as table_cell_storage_co
 
 const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6011;
 const TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
+const TABLE_CELL_STORAGE_MAX_FIELDS: usize = litchi_iwa_common::WireLimits::MAX_FIELDS;
+const TABLE_CELL_STORAGE_MAX_WORK: usize = litchi_iwa_common::WireLimits::MAX_REWRITE_WORK;
+const TABLE_CELL_STORAGE_MAX_REFERENCES: usize = litchi_numbers::MAX_REFERENCES;
+const TABLE_CELL_STORAGE_MAX_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
 
 /// Give the generated-free table-cell projection the same finite profile used
 /// by the other Numbers readers.  This helper is intentionally local to the
@@ -29,6 +33,444 @@ fn table_cell_storage_decode_options(source: &[u8]) -> table_cell_storage_codec:
             .len()
             .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
     )
+}
+
+/// Aggregate budget for one read-only table-cell storage operation.
+///
+/// The codec options apply to one source payload.  Roots can name many
+/// segments, and rich-text ownership scans can inspect the whole package, so
+/// successful reports must also be charged against one operation-local
+/// ceiling. Malformed candidates have no report, so their complete source
+/// length (or one unit for an empty source) is conservatively charged as work
+/// before candidate selection continues. Each charge is committed atomically
+/// after all counters pass.
+#[derive(Debug, Clone, Copy, Default)]
+struct TableCellStorageBudget {
+    fields: usize,
+    work: usize,
+    references: usize,
+    text_bytes: usize,
+}
+
+impl TableCellStorageBudget {
+    fn new() -> Self {
+        Self {
+            fields: 0,
+            work: 0,
+            references: 0,
+            text_bytes: 0,
+        }
+    }
+
+    const fn remaining_fields(self) -> usize {
+        TABLE_CELL_STORAGE_MAX_FIELDS.saturating_sub(self.fields)
+    }
+
+    const fn remaining_work(self) -> usize {
+        TABLE_CELL_STORAGE_MAX_WORK.saturating_sub(self.work)
+    }
+
+    const fn remaining_references(self) -> usize {
+        TABLE_CELL_STORAGE_MAX_REFERENCES.saturating_sub(self.references)
+    }
+
+    const fn remaining_text_bytes(self) -> usize {
+        TABLE_CELL_STORAGE_MAX_TEXT_BYTES.saturating_sub(self.text_bytes)
+    }
+
+    fn options(self, source: &[u8]) -> table_cell_storage_codec::DecodeOptions {
+        table_cell_storage_codec::DecodeOptions::new(
+            source
+                .len()
+                .clamp(1, litchi_iwa_common::WireLimits::MAX_INPUT_BYTES),
+            self.remaining_fields(),
+            self.remaining_work(),
+            TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT,
+            self.remaining_references(),
+            self.remaining_text_bytes(),
+        )
+    }
+
+    fn charge_counter(
+        current: &mut usize,
+        amount: usize,
+        maximum: usize,
+        kind: litchi_iwa_common::LimitKind,
+    ) -> Result<()> {
+        let observed = current.checked_add(amount).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table-cell storage {kind} counter overflows host usize"
+            ))
+        })?;
+        if observed > maximum {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind,
+                observed,
+                limit: maximum,
+            }));
+        }
+        *current = observed;
+        Ok(())
+    }
+
+    fn charge_untyped(
+        current: &mut usize,
+        amount: usize,
+        maximum: usize,
+        name: &str,
+    ) -> Result<()> {
+        let observed = current.checked_add(amount).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table-cell storage {name} counter overflows host usize"
+            ))
+        })?;
+        if observed > maximum {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers table-cell storage {name} exceeded its aggregate limit: observed {observed}, limit {maximum}"
+            )));
+        }
+        *current = observed;
+        Ok(())
+    }
+
+    fn charge_report(&mut self, report: table_cell_storage_codec::DecodeReport) -> Result<()> {
+        let mut next = *self;
+        Self::charge_counter(
+            &mut next.fields,
+            report.fields(),
+            TABLE_CELL_STORAGE_MAX_FIELDS,
+            litchi_iwa_common::LimitKind::Fields,
+        )?;
+        Self::charge_counter(
+            &mut next.work,
+            report.work_bytes(),
+            TABLE_CELL_STORAGE_MAX_WORK,
+            litchi_iwa_common::LimitKind::RewriteWork,
+        )?;
+        Self::charge_untyped(
+            &mut next.references,
+            report.references(),
+            TABLE_CELL_STORAGE_MAX_REFERENCES,
+            "reference",
+        )?;
+        Self::charge_untyped(
+            &mut next.text_bytes,
+            report.text_bytes(),
+            TABLE_CELL_STORAGE_MAX_TEXT_BYTES,
+            "text",
+        )?;
+        *self = next;
+        Ok(())
+    }
+
+    fn charge_failed_candidate(&mut self, source_bytes: usize) -> Result<()> {
+        Self::charge_counter(
+            &mut self.work,
+            source_bytes,
+            TABLE_CELL_STORAGE_MAX_WORK,
+            litchi_iwa_common::LimitKind::RewriteWork,
+        )
+    }
+}
+
+fn table_cell_storage_decode_error(
+    context: &str,
+    error: table_cell_storage_codec::DecodeError,
+    budget: TableCellStorageBudget,
+) -> Error {
+    use table_cell_storage_codec::DecodeLimit;
+
+    match error.resource_limit() {
+        Some(DecodeLimit::Bytes { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::InputBytes,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(DecodeLimit::Fields { observed, .. }) => {
+            let observed = budget.fields.saturating_add(observed);
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit: TABLE_CELL_STORAGE_MAX_FIELDS,
+            })
+        },
+        Some(DecodeLimit::Work { observed, .. }) => {
+            let observed = budget.work.saturating_add(observed);
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed,
+                limit: TABLE_CELL_STORAGE_MAX_WORK,
+            })
+        },
+        Some(DecodeLimit::Nesting { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Nesting,
+                observed: observed as usize,
+                limit: maximum as usize,
+            })
+        },
+        Some(DecodeLimit::Allocation { requested }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table-cell storage projection",
+                amount: requested,
+            })
+        },
+        Some(DecodeLimit::References { observed, .. }) => Error::InvalidFormat(format!(
+            "{context} exceeded its aggregate reference limit: observed {}, limit {TABLE_CELL_STORAGE_MAX_REFERENCES}",
+            budget.references.saturating_add(observed)
+        )),
+        Some(DecodeLimit::Text { observed, .. }) => Error::InvalidFormat(format!(
+            "{context} exceeded its aggregate text limit: observed {}, limit {TABLE_CELL_STORAGE_MAX_TEXT_BYTES}",
+            budget.text_bytes.saturating_add(observed)
+        )),
+        None => Error::InvalidFormat(format!("{context} failed strict validation: {error}")),
+        _ => Error::InvalidFormat(format!(
+            "{context} exceeded an unsupported strict resource limit"
+        )),
+    }
+}
+
+#[derive(Default)]
+struct TableCellStorageVisitor<'requested> {
+    requested_keys: Option<&'requested HashSet<u32>>,
+    rich_text_payload_id: Option<u64>,
+    track_keys: bool,
+    reject_duplicate_keys: bool,
+    track_segments: bool,
+    track_entry_bounds: bool,
+    keys: HashSet<u32>,
+    segment_ids: Vec<u64>,
+    string_values: Vec<(u32, String)>,
+    rich_text_matches: usize,
+    saw_entry: bool,
+    min_entry_key: Option<u32>,
+    max_entry_key: Option<u32>,
+    error: Option<Error>,
+}
+
+impl<'requested> TableCellStorageVisitor<'requested> {
+    fn strings(requested_keys: &'requested HashSet<u32>) -> Self {
+        Self {
+            requested_keys: Some(requested_keys),
+            track_keys: true,
+            reject_duplicate_keys: true,
+            track_segments: true,
+            ..Self::default()
+        }
+    }
+
+    fn has_entries_root() -> Self {
+        Self {
+            track_segments: true,
+            ..Self::default()
+        }
+    }
+
+    fn has_entries_segment() -> Self {
+        Self {
+            track_entry_bounds: true,
+            ..Self::default()
+        }
+    }
+
+    fn rich_text(payload_id: u64) -> Self {
+        Self {
+            rich_text_payload_id: Some(payload_id),
+            ..Self::default()
+        }
+    }
+
+    fn record_error(&mut self, error: Error) {
+        if self.error.is_none() {
+            self.error = Some(error);
+        }
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        self.error.take().map_or(Ok(()), Err)
+    }
+
+    fn merge_keys(
+        &mut self,
+        global_keys: &mut HashSet<u32>,
+        table_id: u64,
+        list_type: tst::table_data_list::ListType,
+    ) -> Result<()> {
+        if let Some(key) = self.keys.iter().find(|key| global_keys.contains(key)) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {list_type:?} table {table_id} repeats entry key {key} across root and segments"
+            )));
+        }
+        global_keys.try_reserve(self.keys.len()).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table-cell storage entry keys",
+                amount: self.keys.len(),
+            })
+        })?;
+        global_keys.extend(self.keys.drain());
+        Ok(())
+    }
+}
+
+impl table_cell_storage_codec::StorageVisitor for TableCellStorageVisitor<'_> {
+    fn visit_list_entry(
+        &mut self,
+        entry: table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+    ) -> std::result::Result<(), table_cell_storage_codec::DecodeError> {
+        self.saw_entry = true;
+        let key = entry.key();
+        if self.track_entry_bounds {
+            self.min_entry_key = Some(self.min_entry_key.map_or(key, |min| min.min(key)));
+            self.max_entry_key = Some(self.max_entry_key.map_or(key, |max| max.max(key)));
+        }
+        if self.track_keys {
+            if self.reject_duplicate_keys && self.keys.contains(&key) {
+                self.record_error(Error::InvalidFormat(format!(
+                    "Numbers table-data-list contains duplicate entry key {key}"
+                )));
+                return Ok(());
+            }
+            self.keys.try_reserve(1).map_err(|_| {
+                table_cell_storage_codec::DecodeError::allocation(self.keys.len().saturating_add(1))
+            })?;
+            self.keys.insert(key);
+        }
+
+        if let Some(requested_keys) = self.requested_keys
+            && requested_keys.contains(&key)
+            && let Some(value) = entry.string_value()
+        {
+            let mut owned = String::new();
+            owned
+                .try_reserve(value.len())
+                .map_err(|_| table_cell_storage_codec::DecodeError::allocation(value.len()))?;
+            owned.push_str(value);
+            self.string_values.try_reserve(1).map_err(|_| {
+                table_cell_storage_codec::DecodeError::allocation(
+                    self.string_values.len().saturating_add(1),
+                )
+            })?;
+            self.string_values.push((key, owned));
+        }
+
+        if let Some(payload_id) = self.rich_text_payload_id
+            && entry
+                .rich_text_payload()
+                .is_some_and(|reference| reference.identifier() == payload_id)
+        {
+            if let Some(next) = self.rich_text_matches.checked_add(1) {
+                self.rich_text_matches = next;
+            } else {
+                self.record_error(Error::InvalidFormat(
+                    "Numbers rich-text payload reference count overflows host usize".to_owned(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_list_segment(
+        &mut self,
+        reference: table_cell_storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), table_cell_storage_codec::DecodeError> {
+        if !self.track_segments {
+            return Ok(());
+        }
+        let identifier = reference.reference().identifier();
+        self.segment_ids.try_reserve(1).map_err(|_| {
+            table_cell_storage_codec::DecodeError::allocation(
+                self.segment_ids.len().saturating_add(1),
+            )
+        })?;
+        self.segment_ids.push(identifier);
+        Ok(())
+    }
+}
+
+fn validate_table_data_list_snapshot(
+    table_id: u64,
+    list_type: tst::table_data_list::ListType,
+    observed: i32,
+) -> Result<()> {
+    if observed != list_type as i32 {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers table {table_id} has list type {observed}, expected {list_type:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_table_data_list_segment_snapshot(
+    object_id: u64,
+    list_type: tst::table_data_list::ListType,
+    segment: table_cell_storage_codec::TableDataListSegmentSnapshot<'_>,
+) -> Result<(u32, u32)> {
+    if segment.list_type() != list_type as i32 {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers table-data-list segment {object_id} has list type {}, expected {list_type:?}",
+            segment.list_type()
+        )));
+    }
+    let end = segment
+        .key_range_location()
+        .checked_add(segment.key_range_length())
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table-data-list segment {object_id} key range overflows"
+            ))
+        })?;
+    Ok((segment.key_range_location(), end))
+}
+
+fn validate_segment_entry_keys(
+    object_id: u64,
+    keys: &HashSet<u32>,
+    range: (u32, u32),
+) -> Result<()> {
+    if keys.iter().any(|key| *key < range.0 || *key >= range.1) {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers table-data-list segment {object_id} contains an entry outside its key range"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_segment_entry_bounds(
+    object_id: u64,
+    min_entry_key: Option<u32>,
+    max_entry_key: Option<u32>,
+    range: (u32, u32),
+) -> Result<()> {
+    if min_entry_key.is_some_and(|key| key < range.0)
+        || max_entry_key.is_some_and(|key| key >= range.1)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers table-data-list segment {object_id} contains an entry outside its key range"
+        )));
+    }
+    Ok(())
+}
+
+fn merge_segment_entry_keys(
+    global_keys: &mut HashSet<u32>,
+    values: &mut HashMap<u32, String>,
+    visitor: &mut TableCellStorageVisitor<'_>,
+    table_id: u64,
+    list_type: tst::table_data_list::ListType,
+) -> Result<()> {
+    visitor.merge_keys(global_keys, table_id, list_type)?;
+    values
+        .try_reserve(visitor.string_values.len())
+        .map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table-cell storage string values",
+                amount: visitor.string_values.len(),
+            })
+        })?;
+    values.extend(visitor.string_values.drain(..));
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -191,50 +633,89 @@ pub(super) fn resolve_table_string_values(
         ))
     })?;
     let list_type = tst::table_data_list::ListType::String;
-    let message_index = table_data_list_message_index(object, list_type).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "Object {table_id} has no Numbers {list_type:?} TableDataList payload"
-        ))
-    })?;
-    let list = TableDataList::decode(object.messages[message_index].data.as_slice())?;
-    let TableDataList {
-        entries, segments, ..
-    } = list;
-    let mut values = HashMap::with_capacity(requested_keys.len());
-    let mut keys = HashSet::with_capacity(entries.len());
-    for entry in entries {
-        let key = entry.key;
-        if !keys.insert(key) {
-            return Err(Error::InvalidFormat(format!(
-                "Numbers String table {table_id} contains duplicate root entry keys"
-            )));
+    let mut budget = TableCellStorageBudget::new();
+    let mut selected_root = None;
+    for message in object
+        .messages
+        .iter()
+        .filter(|message| matches!(message.type_, 6_005 | 6_201))
+    {
+        let source = message.data.as_slice();
+        let mut visitor = TableCellStorageVisitor::strings(requested_keys);
+        let decoded = table_cell_storage_codec::decode_table_data_list_with_visitor(
+            source,
+            budget.options(source),
+            &mut visitor,
+        );
+        let (root, report) = match decoded {
+            Ok(decoded) => decoded,
+            Err(error) if error.resource_limit().is_some() => {
+                return Err(table_cell_storage_decode_error(
+                    &format!("Numbers String table {table_id} candidate"),
+                    error,
+                    budget,
+                ));
+            },
+            Err(_) => {
+                budget.charge_failed_candidate(source.len().max(1))?;
+                continue;
+            },
+        };
+        if root.list_type() != list_type as i32 {
+            budget.charge_report(report)?;
+            continue;
         }
-        if requested_keys.contains(&key)
-            && let Some(value) = entry.string
-        {
-            values.insert(key, value);
-        }
+        budget.charge_report(report)?;
+        visitor.finish()?;
+        selected_root = Some((root, visitor));
+        break;
     }
+    let Some((root, mut root_visitor)) = selected_root else {
+        return Err(Error::InvalidFormat(format!(
+            "Object {table_id} has no Numbers {list_type:?} TableDataList payload"
+        )));
+    };
+    validate_table_data_list_snapshot(table_id, list_type, root.list_type())?;
 
-    let mut segment_ids = HashSet::with_capacity(segments.len());
-    for reference in segments {
-        if !segment_ids.insert(reference.identifier) {
+    let mut values = HashMap::new();
+    values
+        .try_reserve(root_visitor.string_values.len())
+        .map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table-cell storage string values",
+                amount: root_visitor.string_values.len(),
+            })
+        })?;
+    let mut keys = HashSet::new();
+    let mut segment_ids_seen = HashSet::new();
+    root_visitor.merge_keys(&mut keys, table_id, list_type)?;
+    values.extend(root_visitor.string_values.drain(..));
+
+    let segment_ids = std::mem::take(&mut root_visitor.segment_ids);
+    for reference in segment_ids {
+        if segment_ids_seen.contains(&reference) {
             return Err(Error::InvalidFormat(format!(
-                "Numbers String table {table_id} repeats segment object {}",
-                reference.identifier
+                "Numbers String table {table_id} repeats segment object {reference}"
             )));
         }
-        let segment_archive = locations.get(&reference.identifier).ok_or_else(|| {
+        segment_ids_seen.try_reserve(1).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table-cell storage segment identities",
+                amount: segment_ids_seen.len().saturating_add(1),
+            })
+        })?;
+        segment_ids_seen.insert(reference);
+        let segment_archive = locations.get(&reference).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "Numbers table-data-list segment object {} is missing",
-                reference.identifier
+                reference
             ))
         })?;
         let archive = package.archive(segment_archive)?;
-        let segment_object = archive.object(reference.identifier).ok_or_else(|| {
+        let segment_object = archive.object(reference).ok_or_else(|| {
             Error::InvalidFormat(format!(
                 "Numbers table-data-list segment object {} is missing",
-                reference.identifier
+                reference
             ))
         })?;
         let mut segment_messages = segment_object
@@ -244,30 +725,41 @@ pub(super) fn resolve_table_string_values(
         let Some(segment_message) = segment_messages.next() else {
             return Err(Error::InvalidFormat(format!(
                 "Object {} has no Numbers TableDataListSegment payload",
-                reference.identifier
+                reference
             )));
         };
         if segment_messages.next().is_some() {
             return Err(Error::InvalidFormat(format!(
                 "Object {} has multiple Numbers TableDataListSegment payloads",
-                reference.identifier
+                reference
             )));
         }
-        let segment = TableDataListSegment::decode(segment_message.data.as_slice())?;
-        validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
-        for entry in segment.entries {
-            let key = entry.key;
-            if !keys.insert(key) {
-                return Err(Error::InvalidFormat(format!(
-                    "Numbers String table {table_id} repeats entry key {key} across root and segments"
-                )));
-            }
-            if requested_keys.contains(&key)
-                && let Some(value) = entry.string
-            {
-                values.insert(key, value);
-            }
-        }
+        let source = segment_message.data.as_slice();
+        let mut segment_visitor = TableCellStorageVisitor::strings(requested_keys);
+        let (segment, report) =
+            table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+                source,
+                budget.options(source),
+                &mut segment_visitor,
+            )
+            .map_err(|error| {
+                table_cell_storage_decode_error(
+                    &format!("Numbers String table {table_id} segment {reference}"),
+                    error,
+                    budget,
+                )
+            })?;
+        budget.charge_report(report)?;
+        let range = validate_table_data_list_segment_snapshot(reference, list_type, segment)?;
+        validate_segment_entry_keys(reference, &segment_visitor.keys, range)?;
+        segment_visitor.finish()?;
+        merge_segment_entry_keys(
+            &mut keys,
+            &mut values,
+            &mut segment_visitor,
+            table_id,
+            list_type,
+        )?;
     }
     Ok(values)
 }
@@ -293,35 +785,76 @@ pub(super) fn table_data_list_has_entries(
             "Numbers table-data-list object {table_id} is missing"
         ))
     })?;
-    let message_index = table_data_list_message_index(object, list_type).ok_or_else(|| {
-        Error::InvalidFormat(format!(
+    let mut budget = TableCellStorageBudget::new();
+    let mut selected_root = None;
+    for message in object
+        .messages
+        .iter()
+        .filter(|message| matches!(message.type_, 6_005 | 6_201))
+    {
+        let source = message.data.as_slice();
+        let mut visitor = TableCellStorageVisitor::has_entries_root();
+        let decoded = table_cell_storage_codec::decode_table_data_list_with_visitor(
+            source,
+            budget.options(source),
+            &mut visitor,
+        );
+        let (root, report) = match decoded {
+            Ok(decoded) => decoded,
+            Err(error) if error.resource_limit().is_some() => {
+                return Err(table_cell_storage_decode_error(
+                    &format!("Numbers {list_type:?} table {table_id} candidate"),
+                    error,
+                    budget,
+                ));
+            },
+            Err(_) => {
+                budget.charge_failed_candidate(source.len().max(1))?;
+                continue;
+            },
+        };
+        if root.list_type() != list_type as i32 {
+            budget.charge_report(report)?;
+            continue;
+        }
+        budget.charge_report(report)?;
+        visitor.finish()?;
+        selected_root = Some((root, visitor));
+        break;
+    }
+    let Some((root, root_visitor)) = selected_root else {
+        return Err(Error::InvalidFormat(format!(
             "Object {table_id} has no Numbers {list_type:?} TableDataList payload"
-        ))
-    })?;
-    let list = TableDataList::decode(object.messages[message_index].data.as_slice())?;
-    if !list.entries.is_empty() {
+        )));
+    };
+    validate_table_data_list_snapshot(table_id, list_type, root.list_type())?;
+    if root_visitor.saw_entry {
         return Ok(true);
     }
 
-    let mut segment_ids = HashSet::with_capacity(list.segments.len());
-    for reference in list.segments {
-        if !segment_ids.insert(reference.identifier) {
+    let mut segment_ids_seen = HashSet::new();
+    for reference in root_visitor.segment_ids {
+        if segment_ids_seen.contains(&reference) {
             return Err(Error::InvalidFormat(format!(
-                "Numbers {list_type:?} table {table_id} repeats segment object {}",
-                reference.identifier
+                "Numbers {list_type:?} table {table_id} repeats segment object {reference}"
             )));
         }
-        let segment_archive = locations.get(&reference.identifier).ok_or_else(|| {
+        segment_ids_seen.try_reserve(1).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers table-cell storage segment identities",
+                amount: segment_ids_seen.len().saturating_add(1),
+            })
+        })?;
+        segment_ids_seen.insert(reference);
+        let segment_archive = locations.get(&reference).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Numbers table-data-list segment object {} is missing",
-                reference.identifier
+                "Numbers table-data-list segment object {reference} is missing"
             ))
         })?;
         let archive = package.archive(segment_archive)?;
-        let segment_object = archive.object(reference.identifier).ok_or_else(|| {
+        let segment_object = archive.object(reference).ok_or_else(|| {
             Error::InvalidFormat(format!(
-                "Numbers table-data-list segment object {} is missing",
-                reference.identifier
+                "Numbers table-data-list segment object {reference} is missing"
             ))
         })?;
         let mut segment_messages = segment_object
@@ -330,19 +863,39 @@ pub(super) fn table_data_list_has_entries(
             .filter(|message| message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE);
         let Some(segment_message) = segment_messages.next() else {
             return Err(Error::InvalidFormat(format!(
-                "Object {} has no Numbers TableDataListSegment payload",
-                reference.identifier
+                "Object {reference} has no Numbers TableDataListSegment payload"
             )));
         };
         if segment_messages.next().is_some() {
             return Err(Error::InvalidFormat(format!(
-                "Object {} has multiple Numbers TableDataListSegment payloads",
-                reference.identifier
+                "Object {reference} has multiple Numbers TableDataListSegment payloads"
             )));
         }
-        let segment = TableDataListSegment::decode(segment_message.data.as_slice())?;
-        validate_table_data_list_segment(reference.identifier, list_type, &segment)?;
-        if !segment.entries.is_empty() {
+        let source = segment_message.data.as_slice();
+        let mut segment_visitor = TableCellStorageVisitor::has_entries_segment();
+        let (segment, report) =
+            table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+                source,
+                budget.options(source),
+                &mut segment_visitor,
+            )
+            .map_err(|error| {
+                table_cell_storage_decode_error(
+                    &format!("Numbers {list_type:?} table {table_id} segment {reference}"),
+                    error,
+                    budget,
+                )
+            })?;
+        budget.charge_report(report)?;
+        segment_visitor.finish()?;
+        let range = validate_table_data_list_segment_snapshot(reference, list_type, segment)?;
+        validate_segment_entry_bounds(
+            reference,
+            segment_visitor.min_entry_key,
+            segment_visitor.max_entry_key,
+            range,
+        )?;
+        if segment_visitor.saw_entry {
             return Ok(true);
         }
     }
@@ -1596,39 +2149,72 @@ pub(super) fn set_rich_text(
     Ok(key)
 }
 
-fn rich_text_payload_entry_count(package: &IWorkPackage, payload_id: u64) -> Result<usize> {
-    let mut count = 0;
+pub(super) fn rich_text_payload_entry_count(
+    package: &IWorkPackage,
+    payload_id: u64,
+) -> Result<usize> {
+    let mut count: usize = 0;
+    let mut budget = TableCellStorageBudget::new();
     for archive_name in package.iwa_entry_names() {
         let archive = package.archive(archive_name)?;
         for object in &archive.objects {
             for message in &object.messages {
                 if message.type_ == 6_005 {
-                    let list = TableDataList::decode(message.data.as_slice())?;
-                    if list.list_type == tst::table_data_list::ListType::RichTextPayload as i32 {
-                        count += list
-                            .entries
-                            .iter()
-                            .filter(|entry| {
-                                entry
-                                    .rich_text_payload
-                                    .as_ref()
-                                    .is_some_and(|reference| reference.identifier == payload_id)
-                            })
-                            .count();
+                    let source = message.data.as_slice();
+                    let mut visitor = TableCellStorageVisitor::rich_text(payload_id);
+                    let (list, report) =
+                        table_cell_storage_codec::decode_table_data_list_with_visitor(
+                            source,
+                            budget.options(source),
+                            &mut visitor,
+                        )
+                        .map_err(|error| {
+                            table_cell_storage_decode_error(
+                                "Numbers rich-text TableDataList",
+                                error,
+                                budget,
+                            )
+                        })?;
+                    budget.charge_report(report)?;
+                    visitor.finish()?;
+                    if list.list_type() == tst::table_data_list::ListType::RichTextPayload as i32 {
+                        count = count
+                            .checked_add(visitor.rich_text_matches)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "Numbers rich-text payload reference count overflows host usize"
+                                        .to_owned(),
+                                )
+                            })?;
                     }
                 } else if message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE {
-                    let segment = TableDataListSegment::decode(message.data.as_slice())?;
-                    if segment.list_type == tst::table_data_list::ListType::RichTextPayload as i32 {
-                        count += segment
-                            .entries
-                            .iter()
-                            .filter(|entry| {
-                                entry
-                                    .rich_text_payload
-                                    .as_ref()
-                                    .is_some_and(|reference| reference.identifier == payload_id)
-                            })
-                            .count();
+                    let source = message.data.as_slice();
+                    let mut visitor = TableCellStorageVisitor::rich_text(payload_id);
+                    let (segment, report) =
+                        table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+                            source,
+                            budget.options(source),
+                            &mut visitor,
+                        )
+                        .map_err(|error| {
+                            table_cell_storage_decode_error(
+                                "Numbers rich-text TableDataListSegment",
+                                error,
+                                budget,
+                            )
+                        })?;
+                    budget.charge_report(report)?;
+                    visitor.finish()?;
+                    if segment.list_type() == tst::table_data_list::ListType::RichTextPayload as i32
+                    {
+                        count = count
+                            .checked_add(visitor.rich_text_matches)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "Numbers rich-text payload reference count overflows host usize"
+                                        .to_owned(),
+                                )
+                            })?;
                     }
                 }
             }
@@ -3438,6 +4024,153 @@ pub(super) fn row_offset_capacity(tile: &Tile, table_columns: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn storage_visitor_stages_requested_strings_after_strict_decode() {
+        let payload = TableDataList {
+            list_type: tst::table_data_list::ListType::String as i32,
+            next_list_id: 2,
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 7,
+                refcount: 1,
+                string: Some("staged".to_owned()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let requested = HashSet::from([7]);
+        let mut visitor = TableCellStorageVisitor::strings(&requested);
+        let (snapshot, _) = table_cell_storage_codec::decode_table_data_list_with_visitor(
+            &payload,
+            table_cell_storage_decode_options(&payload),
+            &mut visitor,
+        )
+        .unwrap();
+
+        visitor.finish().unwrap();
+        assert_eq!(
+            snapshot.list_type(),
+            tst::table_data_list::ListType::String as i32
+        );
+        assert_eq!(visitor.string_values, vec![(7, "staged".to_owned())]);
+    }
+
+    #[test]
+    fn storage_visitor_counts_rich_text_references_without_generated_storage() {
+        let payload = TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            next_list_id: 2,
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 7,
+                refcount: 1,
+                rich_text_payload: Some(tsp::Reference {
+                    identifier: 99,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let mut visitor = TableCellStorageVisitor::rich_text(99);
+        let (snapshot, _) = table_cell_storage_codec::decode_table_data_list_with_visitor(
+            &payload,
+            table_cell_storage_decode_options(&payload),
+            &mut visitor,
+        )
+        .unwrap();
+
+        visitor.finish().unwrap();
+        assert_eq!(
+            snapshot.list_type(),
+            tst::table_data_list::ListType::RichTextPayload as i32
+        );
+        assert_eq!(visitor.rich_text_matches, 1);
+    }
+
+    #[test]
+    fn storage_budget_rejects_a_later_segment_at_the_aggregate_field_limit() {
+        let payload = TableDataListSegment {
+            list_type: tst::table_data_list::ListType::String as i32,
+            key_range: tsp::Range {
+                location: 0,
+                length: 1,
+            },
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let mut budget = TableCellStorageBudget::new();
+        let mut first_visitor = TableCellStorageVisitor::has_entries_segment();
+        let (_, first_report) =
+            table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+                &payload,
+                budget.options(&payload),
+                &mut first_visitor,
+            )
+            .unwrap();
+        budget.charge_report(first_report).unwrap();
+
+        // Simulate a full operation that has consumed the aggregate budget
+        // before this later segment. The local codec ceiling is one field;
+        // the host mapper must report the used offset plus the local visit.
+        budget.fields = TABLE_CELL_STORAGE_MAX_FIELDS - 1;
+        let mut later_visitor = TableCellStorageVisitor::has_entries_segment();
+        let error = table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+            &payload,
+            budget.options(&payload),
+            &mut later_visitor,
+        )
+        .unwrap_err();
+        let mapped = table_cell_storage_decode_error("later segment", error, budget);
+        assert!(matches!(
+            mapped,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit,
+            }) if observed > TABLE_CELL_STORAGE_MAX_FIELDS
+                && limit == TABLE_CELL_STORAGE_MAX_FIELDS
+        ));
+        assert!(!later_visitor.saw_entry);
+    }
+
+    #[test]
+    fn storage_rich_text_visitor_does_not_publish_before_later_wire_failure() {
+        let valid = TableDataList {
+            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+            next_list_id: 2,
+            entries: vec![tst::table_data_list::ListEntry {
+                key: 7,
+                refcount: 1,
+                rich_text_payload: Some(tsp::Reference {
+                    identifier: 99,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let mut malformed = valid;
+        malformed.push(0x1a); // truncated length-delimited field after the entry
+        let mut visitor = TableCellStorageVisitor::rich_text(99);
+        let result = table_cell_storage_codec::decode_table_data_list_with_visitor(
+            &malformed,
+            table_cell_storage_decode_options(&malformed),
+            &mut visitor,
+        );
+        assert!(result.is_err());
+        assert_eq!(visitor.rich_text_matches, 1);
+
+        // The caller publishes the count only from a successful enclosing
+        // decode; staged visitor state is deliberately not a result.
+        let published = result
+            .ok()
+            .map(|(_snapshot, _report)| visitor.rich_text_matches)
+            .unwrap_or(0);
+        assert_eq!(published, 0);
+    }
 
     #[test]
     fn table_data_list_message_index_matches_prost_for_valid_payload() {

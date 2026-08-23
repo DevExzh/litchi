@@ -164,6 +164,15 @@ impl DecodeError {
         Self { limit: None }
     }
 
+    /// Construct a typed failure for a caller-owned visitor staging
+    /// allocation.  Visitors can use this when `try_reserve` refuses to grow
+    /// their temporary transaction state; the enclosing decode then forwards
+    /// the failure without publishing partial side effects.
+    #[must_use]
+    pub const fn allocation(requested: usize) -> Self {
+        Self::limited(DecodeLimit::Allocation { requested })
+    }
+
     pub(crate) const fn limited(limit: DecodeLimit) -> Self {
         Self { limit: Some(limit) }
     }
@@ -5491,6 +5500,14 @@ mod tests {
         source
     }
 
+    fn rich_text_entry(key: u32, payload_id: u64) -> Vec<u8> {
+        let mut source = Vec::new();
+        v(&mut source, 1, u64::from(key));
+        v(&mut source, 2, 1);
+        b(&mut source, 9, &reference(payload_id));
+        source
+    }
+
     fn range_minimal() -> Vec<u8> {
         let mut source = Vec::new();
         v(&mut source, 1, 4);
@@ -6303,5 +6320,220 @@ mod tests {
         assert_eq!(visitor.entries.len(), 1);
         assert_eq!(visitor.entries[0].key, 61);
         assert_eq!(source, before);
+    }
+
+    #[derive(Default)]
+    struct AllocationRefusingListVisitor {
+        entries: usize,
+    }
+
+    impl StorageVisitor for AllocationRefusingListVisitor {
+        fn visit_list_entry(
+            &mut self,
+            _entry: TableDataListEntrySnapshot<'_>,
+        ) -> Result<(), DecodeError> {
+            self.entries += 1;
+            Err(DecodeError::allocation(2))
+        }
+    }
+
+    #[test]
+    fn list_visitor_forwards_staging_allocation_failure_without_mutating_source() {
+        let source = list_oracle().encode_to_vec();
+        let before = source.clone();
+        let mut visitor = AllocationRefusingListVisitor::default();
+        let error = decode_table_data_list_with_visitor(&source, options(&source), &mut visitor)
+            .unwrap_err();
+
+        assert_eq!(visitor.entries, 1);
+        assert_eq!(error.allocation_requested(), Some(2));
+        assert_eq!(source, before);
+    }
+
+    #[derive(Default)]
+    struct RichTextReferenceCollector {
+        payload_ids: Vec<u64>,
+        segment_ids: Vec<u64>,
+    }
+
+    impl StorageVisitor for RichTextReferenceCollector {
+        fn visit_list_entry(
+            &mut self,
+            entry: TableDataListEntrySnapshot<'_>,
+        ) -> Result<(), DecodeError> {
+            if let Some(reference) = entry.rich_text_payload() {
+                self.payload_ids.push(reference.identifier());
+            }
+            Ok(())
+        }
+
+        fn visit_list_segment(
+            &mut self,
+            reference: ReferenceRecord<'_>,
+        ) -> Result<(), DecodeError> {
+            self.segment_ids.push(reference.reference().identifier());
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn rich_text_reference_visitors_expose_root_and_segment_entries_and_ranges() {
+        let mut root = Vec::new();
+        v(
+            &mut root,
+            1,
+            u64::try_from(tst::table_data_list::ListType::RichTextPayload as i32).unwrap(),
+        );
+        v(&mut root, 2, 50);
+        b(&mut root, 3, &rich_text_entry(10, 77));
+        b(&mut root, 3, &rich_text_entry(11, 99));
+        b(&mut root, 4, &reference(901));
+
+        let mut root_visitor = RichTextReferenceCollector::default();
+        let (root_snapshot, root_report) =
+            decode_table_data_list_with_visitor(&root, options(&root), &mut root_visitor).unwrap();
+        assert_eq!(
+            root_snapshot.list_type(),
+            tst::table_data_list::ListType::RichTextPayload as i32
+        );
+        assert_eq!(root_visitor.payload_ids, [77, 99]);
+        assert_eq!(root_visitor.segment_ids, [901]);
+        assert_eq!(root_report.references(), 3);
+
+        let mut segment = Vec::new();
+        v(
+            &mut segment,
+            1,
+            u64::try_from(tst::table_data_list::ListType::RichTextPayload as i32).unwrap(),
+        );
+        b(&mut segment, 2, &{
+            let mut range = Vec::new();
+            v(&mut range, 1, 10);
+            v(&mut range, 2, 2);
+            range
+        });
+        b(&mut segment, 3, &rich_text_entry(10, 77));
+        b(&mut segment, 3, &rich_text_entry(11, 123));
+
+        let mut segment_visitor = RichTextReferenceCollector::default();
+        let (segment_snapshot, segment_report) = decode_table_data_list_segment_with_visitor(
+            &segment,
+            options(&segment),
+            &mut segment_visitor,
+        )
+        .unwrap();
+        assert_eq!(
+            segment_snapshot.list_type(),
+            tst::table_data_list::ListType::RichTextPayload as i32
+        );
+        assert_eq!(
+            (
+                segment_snapshot.key_range_location(),
+                segment_snapshot.key_range_length()
+            ),
+            (10, 2)
+        );
+        assert_eq!(segment_visitor.payload_ids, [77, 123]);
+        assert!(segment_visitor.segment_ids.is_empty());
+        assert_eq!(segment_report.references(), 2);
+    }
+
+    #[test]
+    fn list_visitor_accepts_exact_aggregate_limits_and_rejects_each_tightened_limit() {
+        let source = list_oracle().encode_to_vec();
+        let (_, report) = decode_table_data_list_with_report(&source, options(&source)).unwrap();
+        let exact = DecodeOptions::new(
+            source.len(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.references(),
+            report.text_bytes(),
+        );
+        let mut visitor = ListCollector::for_source(&source);
+        let (_, visitor_report) =
+            decode_table_data_list_with_visitor(&source, exact, &mut visitor).unwrap();
+        assert_eq!(visitor_report, report);
+
+        let tightened = [
+            DecodeOptions::new(
+                source.len() - 1,
+                usize::MAX,
+                usize::MAX,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+            DecodeOptions::new(
+                source.len(),
+                report.fields() - 1,
+                usize::MAX,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                report.work_bytes() - 1,
+                64,
+                usize::MAX,
+                usize::MAX,
+            ),
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                usize::MAX,
+                report.max_depth() - 1,
+                usize::MAX,
+                usize::MAX,
+            ),
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                usize::MAX,
+                64,
+                report.references() - 1,
+                usize::MAX,
+            ),
+            DecodeOptions::new(
+                source.len(),
+                usize::MAX,
+                usize::MAX,
+                64,
+                usize::MAX,
+                report.text_bytes() - 1,
+            ),
+        ];
+        let expected = [
+            DecodeLimit::Bytes {
+                observed: source.len(),
+                maximum: source.len() - 1,
+            },
+            DecodeLimit::Fields {
+                observed: report.fields(),
+                maximum: report.fields() - 1,
+            },
+            DecodeLimit::Work {
+                observed: report.work_bytes(),
+                maximum: report.work_bytes() - 1,
+            },
+            DecodeLimit::Nesting {
+                observed: report.max_depth(),
+                maximum: report.max_depth() - 1,
+            },
+            DecodeLimit::References {
+                observed: report.references(),
+                maximum: report.references() - 1,
+            },
+            DecodeLimit::Text {
+                observed: report.text_bytes(),
+                maximum: report.text_bytes() - 1,
+            },
+        ];
+        for (options, expected) in tightened.into_iter().zip(expected) {
+            let error = decode_table_data_list_with_visitor(&source, options, &mut ()).unwrap_err();
+            assert_eq!(error.resource_limit(), Some(expected));
+        }
     }
 }

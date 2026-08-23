@@ -14246,6 +14246,358 @@ class BoundaryPolicyTests(unittest.TestCase):
                 any("example calls test-only" in item for item in violations)
             )
 
+    def test_numbers_table_cell_storage_read_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/storage.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_STORAGE_READ_FUNCTIONS,
+            (
+                "resolve_table_string_values",
+                "table_data_list_has_entries",
+                "rich_text_payload_entry_count",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_STORAGE_ROOT_READ_FUNCTIONS,
+            (
+                "resolve_table_string_values",
+                "table_data_list_has_entries",
+            ),
+        )
+
+    def test_numbers_table_cell_storage_read_boundary_allows_codec_and_masks_tests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use prost::Message;\n"
+                "fn resolve_table_string_values() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_visitor(bytes);\n"
+                "    table_cell_storage_codec::decode_table_data_list_segment_with_visitor(bytes);\n"
+                "}\n"
+                "fn table_data_list_has_entries() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn rich_text_payload_entry_count() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_segment_with_report(bytes);\n"
+                "}\n"
+                "fn resolve_table_data_list() {\n"
+                "    let _ = TableDataList::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn generated_oracle() {\n"
+                "    let _ = TableDataListSegment::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_storage_source_topology(root),
+                [],
+            )
+
+    def test_numbers_table_cell_storage_read_boundary_allows_codec_module_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::numbers_table_cell_storage_codec as codec;\n"
+                "fn resolve_table_string_values() {\n"
+                "    codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn table_data_list_has_entries() {\n"
+                "    litchi_iwa_protos::numbers_table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn rich_text_payload_entry_count() {\n"
+                "    numbers_table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_storage_source_topology(root),
+                [],
+            )
+
+    def test_numbers_table_cell_storage_read_boundary_rejects_missing_codec_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn resolve_table_string_values() { helper(bytes); }\n"
+                "fn table_data_list_has_entries() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn rich_text_payload_entry_count() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_cell_storage_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "resolve_table_string_values does not route through "
+                "numbers_table_cell_storage_codec",
+                violations[0],
+            )
+
+    def test_numbers_table_cell_storage_read_boundary_rejects_generated_decodes_in_scope(
+        self,
+    ) -> None:
+        marker_sources = {
+            "TableDataList::decode": (
+                "let _ = TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "TableDataListSegment::decode": (
+                "let _ = TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "prost Message::decode": (
+                "let _ = Message::decode(bytes);\n",
+                "prost Message::decode",
+            ),
+            "raw TableDataList::decode": (
+                "let _ = r#TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "raw TableDataListSegment::decode": (
+                "let _ = r#TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "UFCS Prost decode": (
+                "let _ = <tst::TableDataList as prost::Message>::decode(bytes);\n",
+                "UFCS Prost decode",
+            ),
+            "qualified UFCS Prost decode": (
+                "let _ = <::tst::r#TableDataList as ::prost::Message>::decode(bytes);\n",
+                "UFCS Prost decode",
+            ),
+        }
+        for label, (marker, expected_label) in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "#[cfg(test)]\n"
+                        "use prost::Message;\n"
+                        "fn resolve_table_string_values() {\n"
+                        "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                        "}\n"
+                        "fn table_data_list_has_entries() {\n"
+                        "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                        "}\n"
+                        "fn rich_text_payload_entry_count() {\n"
+                        "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                        f"    {marker}"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_iwa_numbers_table_cell_storage_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(expected_label, violations[0])
+                    self.assertIn("rich_text_payload_entry_count", violations[0])
+
+    def test_numbers_table_cell_storage_read_boundary_rejects_helper_decode_indirection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn eager_helper(bytes: &[u8]) {\n"
+                "    let _ = r#TableDataListSegment::decode(bytes);\n"
+                "}\n"
+                "fn unrelated_mutation_helper(bytes: &[u8]) {\n"
+                "    let _ = TableDataList::decode(bytes);\n"
+                "}\n"
+                "fn resolve_table_string_values() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "    eager_helper(bytes);\n"
+                "}\n"
+                "fn table_data_list_has_entries() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn rich_text_payload_entry_count() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_cell_storage_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "resolve_table_string_values via helper eager_helper uses "
+                "TableDataListSegment::decode",
+                violations[0],
+            )
+
+    def test_numbers_table_cell_storage_read_boundary_rejects_qualified_helper_decode(
+        self,
+    ) -> None:
+        prefixes = (
+            "crate::storage",
+            "self",
+            "super",
+            "storage",
+            "Self",
+        )
+        for prefix in prefixes:
+            with self.subTest(prefix=prefix):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn eager_helper(bytes: &[u8]) {\n"
+                        "    let _ = TableDataList::decode(bytes);\n"
+                        "}\n"
+                        "fn resolve_table_string_values() {\n"
+                        "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                        f"    {prefix}::eager_helper(bytes);\n"
+                        "}\n"
+                        "fn table_data_list_has_entries() {\n"
+                        "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                        "}\n"
+                        "fn rich_text_payload_entry_count() {\n"
+                        "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_iwa_numbers_table_cell_storage_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "resolve_table_string_values via helper eager_helper uses "
+                        "TableDataList::decode",
+                        violations[0],
+                    )
+
+    def test_numbers_table_cell_storage_read_boundary_ignores_unrelated_method_calls(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn eager_helper(bytes: &[u8]) {\n"
+                "    let _ = TableDataList::decode(bytes);\n"
+                "}\n"
+                "fn resolve_table_string_values() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "    object.eager_helper(bytes);\n"
+                "    OtherType::eager_helper(bytes);\n"
+                "}\n"
+                "fn table_data_list_has_entries() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn rich_text_payload_entry_count() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_storage_source_topology(root),
+                [],
+            )
+
+    def test_numbers_table_cell_storage_read_boundary_ignores_nested_same_name_function(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn wrapper() {\n"
+                "    fn resolve_table_string_values(bytes: &[u8]) {\n"
+                "        let _ = TableDataList::decode(bytes);\n"
+                "    }\n"
+                "}\n"
+                "fn resolve_table_string_values() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn table_data_list_has_entries() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn rich_text_payload_entry_count() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_storage_source_topology(root),
+                [],
+            )
+
+    def test_numbers_table_cell_storage_root_reads_reject_message_index_admission(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn resolve_table_string_values() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "    table_data_list_message_index(object, list_type);\n"
+                "}\n"
+                "fn table_data_list_has_entries() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n"
+                "fn rich_text_payload_entry_count() {\n"
+                "    table_cell_storage_codec::decode_table_data_list_with_report(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_numbers_table_cell_storage_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "resolve_table_string_values calls table_data_list_message_index",
+                violations[0],
+            )
+
+    def test_numbers_table_cell_storage_read_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_table_cell_storage_source_topology()", main_source
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

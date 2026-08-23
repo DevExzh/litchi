@@ -6000,6 +6000,332 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
 }
 
 #[test]
+fn table_string_storage_resolves_root_and_segment_entries_by_key() {
+    let package = package_with_string_segments(
+        vec![
+            string_list_entry(1, "root one"),
+            string_list_entry(3, "root three"),
+        ],
+        vec![60],
+        vec![(
+            60,
+            tst::table_data_list::ListType::String as i32,
+            crate::protobuf::tsp::Range {
+                location: 2,
+                length: 3,
+            },
+            vec![
+                string_list_entry(2, "segment two"),
+                string_list_entry(4, "segment four"),
+            ],
+        )],
+    );
+    let locations = object_locations(&package).unwrap();
+    let values =
+        resolve_table_string_values(&package, &locations, 20, &HashSet::from([1, 2, 3, 4]))
+            .unwrap();
+
+    assert_eq!(values.len(), 4);
+    assert_eq!(values.get(&1).map(String::as_str), Some("root one"));
+    assert_eq!(values.get(&2).map(String::as_str), Some("segment two"));
+    assert_eq!(values.get(&3).map(String::as_str), Some("root three"));
+    assert_eq!(values.get(&4).map(String::as_str), Some("segment four"));
+
+    let subset =
+        resolve_table_string_values(&package, &locations, 20, &HashSet::from([2, 4])).unwrap();
+    assert_eq!(subset.len(), 2);
+    assert_eq!(subset.get(&2).map(String::as_str), Some("segment two"));
+    assert_eq!(subset.get(&4).map(String::as_str), Some("segment four"));
+    assert!(!subset.contains_key(&1));
+    assert!(!subset.contains_key(&3));
+
+    assert!(
+        table_data_list_has_entries(
+            &package,
+            &locations,
+            20,
+            tst::table_data_list::ListType::String,
+        )
+        .unwrap()
+    );
+}
+
+#[test]
+fn table_string_storage_skips_invalid_root_candidate_without_mutation() {
+    let mut package = package_with_string_segments(
+        vec![string_list_entry(1, "selected")],
+        Vec::new(),
+        Vec::new(),
+    );
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(20).unwrap();
+            let valid = object.messages[0].clone();
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: 6_005,
+                    // The list type is present, but required next_list_id is
+                    // absent. The following valid candidate must still win.
+                    data: vec![0x08, tst::table_data_list::ListType::String as u8],
+                },
+            )?;
+            object.push_message(valid)?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    let locations = object_locations(&package).unwrap();
+
+    let values =
+        resolve_table_string_values(&package, &locations, 20, &HashSet::from([1])).unwrap();
+    assert_eq!(values.get(&1).map(String::as_str), Some("selected"));
+    assert!(
+        table_data_list_has_entries(
+            &package,
+            &locations,
+            20,
+            tst::table_data_list::ListType::String,
+        )
+        .unwrap()
+    );
+    assert_eq!(package.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn rich_text_payload_count_streams_root_and_segment_entries() {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(20).unwrap();
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: 6_005,
+                    data: TableDataList {
+                        list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+                        next_list_id: 4,
+                        entries: vec![rich_text_list_entry(1, 99), rich_text_list_entry(2, 100)],
+                        segments: vec![Reference {
+                            identifier: 60,
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                },
+            )?;
+            archive.insert_object(ArchiveObject::new(
+                60,
+                vec![RawMessage {
+                    type_: 6_011,
+                    data: TableDataListSegment {
+                        list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+                        key_range: crate::protobuf::tsp::Range {
+                            location: 3,
+                            length: 2,
+                        },
+                        entries: vec![rich_text_list_entry(3, 99), rich_text_list_entry(4, 99)],
+                    }
+                    .encode_to_vec(),
+                }],
+            )?)?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+
+    assert_eq!(rich_text_payload_entry_count(&package, 99).unwrap(), 3);
+    assert_eq!(rich_text_payload_entry_count(&package, 100).unwrap(), 1);
+    assert_eq!(rich_text_payload_entry_count(&package, 101).unwrap(), 0);
+    assert_eq!(package.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn table_data_list_has_entries_preserves_short_circuit_compatibility() {
+    let root_entry_with_missing_segment =
+        package_with_string_segments(vec![string_list_entry(1, "root")], vec![60], Vec::new());
+    let locations = object_locations(&root_entry_with_missing_segment).unwrap();
+    assert!(
+        table_data_list_has_entries(
+            &root_entry_with_missing_segment,
+            &locations,
+            20,
+            tst::table_data_list::ListType::String,
+        )
+        .unwrap()
+    );
+
+    let first_segment_entry_with_later_missing_segment = package_with_string_segments(
+        Vec::new(),
+        vec![60, 61],
+        vec![(
+            60,
+            tst::table_data_list::ListType::String as i32,
+            crate::protobuf::tsp::Range {
+                location: 2,
+                length: 1,
+            },
+            vec![string_list_entry(2, "segment")],
+        )],
+    );
+    let locations = object_locations(&first_segment_entry_with_later_missing_segment).unwrap();
+    assert!(
+        table_data_list_has_entries(
+            &first_segment_entry_with_later_missing_segment,
+            &locations,
+            20,
+            tst::table_data_list::ListType::String,
+        )
+        .unwrap()
+    );
+}
+
+#[test]
+fn table_string_storage_rejects_duplicate_root_and_segment_keys() {
+    let duplicate_root = package_with_string_segments(
+        vec![
+            string_list_entry(1, "first"),
+            string_list_entry(1, "second"),
+        ],
+        Vec::new(),
+        Vec::new(),
+    );
+    let locations = object_locations(&duplicate_root).unwrap();
+    assert!(
+        resolve_table_string_values(&duplicate_root, &locations, 20, &HashSet::from([1]),).is_err()
+    );
+
+    let duplicate_across_root_and_segment = package_with_string_segments(
+        vec![string_list_entry(1, "root")],
+        vec![60],
+        vec![(
+            60,
+            tst::table_data_list::ListType::String as i32,
+            crate::protobuf::tsp::Range {
+                location: 1,
+                length: 1,
+            },
+            vec![string_list_entry(1, "segment")],
+        )],
+    );
+    let locations = object_locations(&duplicate_across_root_and_segment).unwrap();
+    assert!(
+        resolve_table_string_values(
+            &duplicate_across_root_and_segment,
+            &locations,
+            20,
+            &HashSet::from([1]),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn table_string_storage_rejects_duplicate_and_missing_segments() {
+    let duplicate_segments = package_with_string_segments(
+        vec![string_list_entry(1, "root")],
+        vec![60, 60],
+        vec![(
+            60,
+            tst::table_data_list::ListType::String as i32,
+            crate::protobuf::tsp::Range {
+                location: 2,
+                length: 1,
+            },
+            vec![string_list_entry(2, "segment")],
+        )],
+    );
+    let locations = object_locations(&duplicate_segments).unwrap();
+    assert!(
+        resolve_table_string_values(&duplicate_segments, &locations, 20, &HashSet::from([1, 2]),)
+            .is_err()
+    );
+
+    let missing_segment =
+        package_with_string_segments(vec![string_list_entry(1, "root")], vec![60], Vec::new());
+    let locations = object_locations(&missing_segment).unwrap();
+    assert!(
+        resolve_table_string_values(&missing_segment, &locations, 20, &HashSet::from([1]),)
+            .is_err()
+    );
+}
+
+#[test]
+fn table_string_storage_rejects_segment_type_and_range_mismatch() {
+    let wrong_type = package_with_string_segments(
+        vec![string_list_entry(1, "root")],
+        vec![60],
+        vec![(
+            60,
+            tst::table_data_list::ListType::Formula as i32,
+            crate::protobuf::tsp::Range {
+                location: 2,
+                length: 1,
+            },
+            vec![string_list_entry(2, "segment")],
+        )],
+    );
+    let locations = object_locations(&wrong_type).unwrap();
+    assert!(
+        resolve_table_string_values(&wrong_type, &locations, 20, &HashSet::from([1, 2]),).is_err()
+    );
+
+    let wrong_range = package_with_string_segments(
+        vec![string_list_entry(1, "root")],
+        vec![60],
+        vec![(
+            60,
+            tst::table_data_list::ListType::String as i32,
+            crate::protobuf::tsp::Range {
+                location: 9,
+                length: 1,
+            },
+            vec![string_list_entry(2, "segment")],
+        )],
+    );
+    let locations = object_locations(&wrong_range).unwrap();
+    assert!(
+        resolve_table_string_values(&wrong_range, &locations, 20, &HashSet::from([1, 2]),).is_err()
+    );
+}
+
+#[test]
+fn table_string_storage_later_malformed_segment_fails_without_mutation() {
+    let mut package = package_with_string_segments(
+        vec![string_list_entry(1, "root")],
+        vec![60],
+        vec![(
+            60,
+            tst::table_data_list::ListType::String as i32,
+            crate::protobuf::tsp::Range {
+                location: 2,
+                length: 1,
+            },
+            vec![string_list_entry(2, "segment")],
+        )],
+    );
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(60).unwrap();
+            let mut data = object.messages[0].data.clone();
+            // A valid root and entry precede this truncated length-delimited
+            // field. The read must publish no staged values on the later
+            // malformed field.
+            data.push(0x1a);
+            object.replace_message(0, RawMessage { type_: 6_011, data })?;
+            Ok(())
+        })
+        .unwrap();
+    let before = package.to_bytes().unwrap();
+    let locations = object_locations(&package).unwrap();
+    assert!(
+        resolve_table_string_values(&package, &locations, 20, &HashSet::from([1, 2]),).is_err()
+    );
+    assert_eq!(package.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn source_created_table_executes_sort_order_without_moving_headers_or_footers() {
     let editor = NumbersDocumentBuilder::new()
         .table_dimensions(5, 3)
@@ -7153,6 +7479,77 @@ fn form_sheet_table_create_delete_restores_unknown_reference_bytes() {
             .collect::<Vec<_>>(),
         baseline_entries
     );
+}
+
+fn string_list_entry(key: u32, value: &str) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount: 1,
+        string: Some(value.to_owned()),
+        ..Default::default()
+    }
+}
+
+fn rich_text_list_entry(key: u32, payload_id: u64) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount: 1,
+        rich_text_payload: Some(Reference {
+            identifier: payload_id,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn package_with_string_segments(
+    root_entries: Vec<tst::table_data_list::ListEntry>,
+    segment_refs: Vec<u64>,
+    segment_specs: Vec<(
+        u64,
+        i32,
+        crate::protobuf::tsp::Range,
+        Vec<tst::table_data_list::ListEntry>,
+    )>,
+) -> IWorkPackage {
+    let mut package = test_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(20).unwrap();
+            let mut list = TableDataList::decode(object.messages[0].data.as_slice())?;
+            list.entries = root_entries;
+            list.segments = segment_refs
+                .into_iter()
+                .map(|identifier| Reference {
+                    identifier,
+                    ..Default::default()
+                })
+                .collect();
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: 6005,
+                    data: list.encode_to_vec(),
+                },
+            )?;
+            for (identifier, list_type, key_range, entries) in segment_specs {
+                archive.insert_object(ArchiveObject::new(
+                    identifier,
+                    vec![RawMessage {
+                        type_: 6_011,
+                        data: TableDataListSegment {
+                            list_type,
+                            key_range,
+                            entries,
+                        }
+                        .encode_to_vec(),
+                    }],
+                )?)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    package
 }
 
 fn move_table_data_list_entries_to_segment(
