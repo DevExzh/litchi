@@ -5586,10 +5586,12 @@ fn preflight_formula_category_payload(
             MAX_FORMULA_WORK,
         ));
     }
-    let input_bytes = source
-        .len()
-        .saturating_mul(MAX_FORMULA_CATEGORY_DEPTH.saturating_add(1))
-        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let input_bytes = checked_formula_work_product(
+        source.len(),
+        MAX_FORMULA_CATEGORY_DEPTH.saturating_add(1),
+        budget.maximum_work,
+    )?
+    .clamp(1, WireLimits::MAX_INPUT_BYTES);
     let fields = remaining_work.clamp(1, WireLimits::MAX_FIELDS);
     let limits = WireLimits::default()
         .with_input_bytes(input_bytes)?
