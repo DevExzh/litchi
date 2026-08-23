@@ -65,6 +65,26 @@ fn non_style_payload_state(
     Ok(payload)
 }
 
+fn non_style_payload_state_with_unknown_title_fields(
+    title_visible: Option<bool>,
+    title: Option<&str>,
+) -> TestResult<Vec<u8>> {
+    let mut extension = Vec::new();
+    append_varint_field(&mut extension, 4_000, 7)?;
+    if let Some(title_visible) = title_visible {
+        append_varint_field(&mut extension, 21, u64::from(title_visible))?;
+    }
+    append_length_delimited_field(&mut extension, 4_001, b"opaque title metadata")?;
+    if let Some(title) = title {
+        append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+    }
+    append_varint_field(&mut extension, 4_002, 9)?;
+
+    let mut payload = Vec::new();
+    append_length_delimited_field(&mut payload, 10_000, &extension)?;
+    Ok(payload)
+}
+
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
 }
@@ -137,6 +157,30 @@ fn synthetic_package_with_states(states: [(Option<bool>, Option<&str>); 2]) -> T
             ("Data/sentinel.bin", b"unrelated ZIP sentinel".as_slice()),
             (DOCUMENT_MEMBER, document_component.as_slice()),
         ],
+        Limits::default(),
+    )?)
+}
+
+fn synthetic_package_with_unknown_title_fields() -> TestResult<Vec<u8>> {
+    let source = synthetic_package()?;
+    let mut stream = document_stream(&source)?;
+    let mut archive = Archive::parse(&stream)?;
+    let object = archive
+        .object_mut(NON_STYLES[0])
+        .ok_or_else(|| io::Error::other("missing synthetic chart non-style object"))?;
+    let message = object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == CHART_NON_STYLE_MESSAGE_TYPE)
+        .ok_or_else(|| io::Error::other("missing synthetic chart non-style message"))?;
+    message.data = non_style_payload_state_with_unknown_title_fields(Some(true), Some("Revenue"))?;
+    stream = archive.to_bytes()?;
+    let compressed = SnappyStream::compress(&stream)?;
+    Ok(Catalog::from_bytes(&source)?.reassemble_to_bytes(
+        &[litchi_iwa_archive::package::EntryEdit::new(
+            DOCUMENT_MEMBER,
+            &compressed,
+        )],
         Limits::default(),
     )?)
 }
@@ -338,6 +382,42 @@ fn chart_title_clear_hidden_or_absent_stale_text_is_exact_noop() -> TestResult<(
             non_style_payload_state(state.0, state.1)?
         );
     }
+    Ok(())
+}
+
+#[test]
+fn selector_edit_preserves_unknown_generated_title_spans_and_other_owners() -> TestResult<()> {
+    let package = Package::from_bytes(&synthetic_package_with_unknown_title_fields()?)?;
+    let source_bytes = exact_bytes(&package)?;
+    let source_other_owner =
+        message_payload(&source_bytes, NON_STYLES[1], CHART_NON_STYLE_MESSAGE_TYPE)?;
+
+    let committed = package
+        .edit_slide_chart_title("Charts", "Revenue")?
+        .set("Revenue by region")?
+        .commit()?;
+    assert_eq!(
+        message_payload(
+            &exact_bytes(committed.package())?,
+            NON_STYLES[0],
+            CHART_NON_STYLE_MESSAGE_TYPE,
+        )?,
+        non_style_payload_state_with_unknown_title_fields(Some(true), Some("Revenue by region"))?,
+    );
+    assert_eq!(
+        message_payload(
+            &exact_bytes(committed.package())?,
+            NON_STYLES[1],
+            CHART_NON_STYLE_MESSAGE_TYPE,
+        )?,
+        source_other_owner,
+    );
+    assert_eq!(
+        committed
+            .package()
+            .slide_chart_title(0usize, ChartSelector::name("Revenue by region"))?,
+        Some("Revenue by region".to_owned()),
+    );
     Ok(())
 }
 
