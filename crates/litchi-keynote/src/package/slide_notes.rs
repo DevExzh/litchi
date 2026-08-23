@@ -27,7 +27,7 @@ use super::{
     STORAGE_MESSAGE_TYPE, SemanticBudget, SemanticLimitKind, SemanticPath, checked_semantic_charge,
     unique_payload,
 };
-use crate::SlideSelector;
+use crate::{SlideSelector, SlideSelectorError};
 
 /// A finite resource governed while speaker notes are read or rewritten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -97,6 +97,9 @@ pub enum SlideNotesError {
     /// An exact-name selector was ambiguous.
     #[error("the Keynote slide selector is ambiguous")]
     AmbiguousSelector,
+    /// An exact-name selector was empty.
+    #[error("the Keynote slide selector name cannot be empty")]
+    EmptySlideName,
     /// An exact-name selector did not match.
     #[error("the Keynote show has no slide matching the requested name")]
     SlideNameNotFound,
@@ -659,9 +662,16 @@ fn resolve_position(
             .show()
             .map_err(map_read_error)?
             .select_slide(selector)
-            .map_err(|_error| SlideNotesError::AmbiguousSelector)?
+            .map_err(map_slide_selector_error)?
             .map(|slide| Position::new(slide.index()))
             .ok_or(SlideNotesError::SlideNameNotFound),
+    }
+}
+
+fn map_slide_selector_error(error: SlideSelectorError) -> SlideNotesError {
+    match error {
+        SlideSelectorError::EmptySlideName => SlideNotesError::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => SlideNotesError::AmbiguousSelector,
     }
 }
 

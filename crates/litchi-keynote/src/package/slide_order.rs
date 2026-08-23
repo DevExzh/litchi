@@ -87,6 +87,9 @@ pub enum SlideOrderError {
     /// An exact-name selector matched more than one slide.
     #[error("the Keynote slide selector is ambiguous")]
     AmbiguousSelector,
+    /// An exact-name selector was empty.
+    #[error("the Keynote slide selector name cannot be empty")]
+    EmptySlideName,
     /// An exact-name selector matched no slide.
     #[error("the Keynote show has no slide matching the requested name")]
     SlideNameNotFound,
@@ -894,8 +897,11 @@ fn clone_identifiers(identifiers: &[u64]) -> Result<Box<[u64]>, SlideOrderError>
     Ok(cloned.into_boxed_slice())
 }
 
-fn map_selector_error(_error: SlideSelectorError) -> SlideOrderError {
-    SlideOrderError::AmbiguousSelector
+fn map_selector_error(error: SlideSelectorError) -> SlideOrderError {
+    match error {
+        SlideSelectorError::EmptySlideName => SlideOrderError::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => SlideOrderError::AmbiguousSelector,
+    }
 }
 
 fn map_read_error(error: ReadError) -> SlideOrderError {

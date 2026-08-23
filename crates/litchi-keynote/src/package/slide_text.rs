@@ -28,7 +28,7 @@ use super::{
     SHAPE_INFO_MESSAGE_TYPE, SLIDE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, SemanticBudget,
     SemanticLimitKind, SemanticPath, unique_payload,
 };
-use crate::{SlideSelector, slide::placeholder::Kind};
+use crate::{SlideSelector, SlideSelectorError, slide::placeholder::Kind};
 
 const PREVIEW_ENTRY_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 
@@ -111,6 +111,9 @@ pub enum SlideTextError {
     /// An exact-name selector was ambiguous.
     #[error("the Keynote slide selector is ambiguous")]
     AmbiguousSelector,
+    /// An exact-name selector was empty.
+    #[error("the Keynote slide selector name cannot be empty")]
+    EmptySlideName,
     /// An exact-name selector did not match.
     #[error("the Keynote show has no slide matching the requested name")]
     SlideNameNotFound,
@@ -936,9 +939,16 @@ fn resolve_position(
             .show()
             .map_err(map_read_error)?
             .select_slide(selector)
-            .map_err(|_error| SlideTextError::AmbiguousSelector)?
+            .map_err(map_slide_selector_error)?
             .map(|slide| Position::new(slide.index()))
             .ok_or(SlideTextError::SlideNameNotFound),
+    }
+}
+
+fn map_slide_selector_error(error: SlideSelectorError) -> SlideTextError {
+    match error {
+        SlideSelectorError::EmptySlideName => SlideTextError::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => SlideTextError::AmbiguousSelector,
     }
 }
 
