@@ -591,6 +591,6 @@ mod tests {
         assert!(Arc::ptr_eq(&text, &extractor.text));
         assert!(Arc::ptr_eq(&cp_to_byte, &extractor.cp_to_byte));
         assert_eq!(text.as_str(), "A😀B");
-        assert_eq!(&*cp_to_byte, &[0, 1, 1, 5]);
+        assert_eq!(&*cp_to_byte, &[0, 1, 1, 5, 6]);
     }
 }

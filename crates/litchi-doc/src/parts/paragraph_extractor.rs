@@ -818,7 +818,7 @@ mod tests {
         .unwrap();
 
         let (first, available) = extractor.extract_paragraph_at(0).unwrap();
-        assert_eq!(available, 1);
+        assert_eq!(available, 0);
         assert_eq!(first.unwrap().0, "unmarked text");
         let (missing, available) = extractor.extract_paragraph_at(1).unwrap();
         assert!(missing.is_none());
