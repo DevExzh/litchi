@@ -1,9 +1,11 @@
-//! Private-type Buffa projection for Keynote slide transitions.
+//! Private-type Buffa projection and opaque validator for Keynote transitions.
 //!
 //! Strict handwritten parsing establishes singularity, wire types, and
 //! canonical encodings before Buffa observes a selected transition field.
-//! Buffa then supplies a bounded borrowed lazy-view cross-check.  The source
-//! bytes remain the only preservation and rewrite representation.
+//! Buffa then supplies a bounded borrowed lazy-view cross-check. Opaque native
+//! color and path payloads use the same strict parser without publishing a
+//! generated or semantic wire model. The source bytes remain the only
+//! preservation and rewrite representation.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -367,9 +369,57 @@ pub fn decode_slide_node_has_transition(
     Ok(strict)
 }
 
+/// Strictly validate one opaque native transition color payload.
+///
+/// The payload is deliberately not decoded into a semantic color value. Its
+/// known fields are checked for canonical framing, wire type, duplicate
+/// singular values, finite scalar values, and the required model field while
+/// unknown fields remain source-owned.
+pub fn validate_opaque_color(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
+    validate_decode_input(source, options)?;
+    let mut budget = Budget::new(options);
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, &mut budget, 0, |field, _budget, _depth| {
+        let kind = match field.number {
+            1 | 12 => Some(OpaqueFieldKind::Int32),
+            3..=11 => Some(OpaqueFieldKind::Float),
+            _ => None,
+        };
+        let Some(kind) = kind else {
+            return Ok(());
+        };
+        let bit = 1_u16
+            .checked_shl(field.number - 1)
+            .ok_or_else(|| DecodeError::noncanonical("transition color field number"))?;
+        if seen & bit != 0 {
+            return Err(DecodeError::duplicate_singular("transition color field"));
+        }
+        seen |= bit;
+        validate_opaque_field(field, kind)
+    })?;
+    if seen & 1 == 0 {
+        return Err(DecodeError::missing_required(
+            "transition color model field",
+        ));
+    }
+    Ok(())
+}
+
+/// Strictly validate one opaque native transition path payload.
+///
+/// Path-source variants are retained as bytes by the semantic layer. This
+/// validator checks only their known schema and required nested envelopes,
+/// preserving unknown fields without exposing the wire model publicly.
+pub fn validate_opaque_path(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
+    validate_decode_input(source, options)?;
+    let mut budget = Budget::new(options);
+    validate_path_source_message(source, options, &mut budget, 0)
+}
+
 struct Budget {
     fields: usize,
     work: usize,
+    scanned_bytes: usize,
     max_fields: usize,
     max_work: usize,
 }
@@ -378,6 +428,7 @@ impl Budget {
         Self {
             fields: 0,
             work: 0,
+            scanned_bytes: 0,
             max_fields: options.max_fields,
             max_work: options.max_work_bytes,
         }
@@ -415,6 +466,512 @@ impl Budget {
         }
         Ok(())
     }
+
+    fn charge_opaque(&mut self, source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
+        let observed = self.scanned_bytes.saturating_add(source.len());
+        if observed > options.max_message_bytes {
+            return Err(DecodeError::resource(WireResourceLimit::Bytes {
+                observed,
+                maximum: options.max_message_bytes,
+            }));
+        }
+        self.scanned_bytes = observed;
+        self.charge(source, options)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum OpaqueFieldKind {
+    Message,
+    String,
+    Int32,
+    Bool,
+    Float,
+}
+
+fn validate_opaque_message<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+    mut visit: impl FnMut(StrictField<'source>, &mut Budget, usize) -> Result<(), DecodeError>,
+) -> Result<(), DecodeError> {
+    if depth > options.recursion_limit as usize {
+        return Err(DecodeError::resource(WireResourceLimit::Nesting {
+            observed: u32::try_from(depth).unwrap_or(u32::MAX),
+            maximum: options.recursion_limit,
+        }));
+    }
+    if source.len() > options.max_message_bytes {
+        return Err(DecodeError::resource(WireResourceLimit::Bytes {
+            observed: source.len(),
+            maximum: options.max_message_bytes,
+        }));
+    }
+    budget.charge_opaque(source, options)?;
+    for field_result in StrictFields::new(source, options.recursion_limit) {
+        let field = field_result?;
+        if matches!(
+            field.wire_type,
+            buffa::encoding::WireType::StartGroup | buffa::encoding::WireType::EndGroup
+        ) {
+            return Err(buffa::DecodeError::InvalidWireType(field.wire_type as u32).into());
+        }
+        visit(field, budget, depth)?;
+    }
+    Ok(())
+}
+
+fn validate_opaque_field(field: StrictField<'_>, kind: OpaqueFieldKind) -> Result<(), DecodeError> {
+    match kind {
+        OpaqueFieldKind::Message => field.length_delimited().map(|_| ()),
+        OpaqueFieldKind::String => {
+            let payload = field.length_delimited()?;
+            str::from_utf8(payload)
+                .map(|_| ())
+                .map_err(|_error| DecodeError::noncanonical("opaque transition string"))
+        },
+        OpaqueFieldKind::Int32 => {
+            let value = field.varint()?;
+            if value > i32::MAX as u64 && value < MIN_SIGN_EXTENDED_INT32 {
+                return Err(DecodeError::noncanonical("opaque transition int32 scalar"));
+            }
+            Ok(())
+        },
+        OpaqueFieldKind::Bool => {
+            if !matches!(field.varint()?, 0 | 1) {
+                return Err(DecodeError::noncanonical("opaque transition bool scalar"));
+            }
+            Ok(())
+        },
+        OpaqueFieldKind::Float => {
+            if !f32::from_bits(field.fixed32_bits()?).is_finite() {
+                return Err(DecodeError::noncanonical("opaque transition float scalar"));
+            }
+            Ok(())
+        },
+    }
+}
+
+fn validate_path_field(field: StrictField<'_>, path: &[u32]) -> Result<(), DecodeError> {
+    let kind = match (path, field.number) {
+        ([], 1 | 2) => Some(OpaqueFieldKind::Bool),
+        ([], 3..=8) => Some(OpaqueFieldKind::Message),
+        ([], 9 | 10) => Some(OpaqueFieldKind::String),
+        ([3], 1) => Some(OpaqueFieldKind::Int32),
+        ([3], 2 | 3) => Some(OpaqueFieldKind::Message),
+        ([3, 2] | [3, 3], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([4], 1) => Some(OpaqueFieldKind::Int32),
+        ([4], 2) => Some(OpaqueFieldKind::Float),
+        ([4], 3) => Some(OpaqueFieldKind::Message),
+        ([4], 4) => Some(OpaqueFieldKind::Bool),
+        ([4, 3], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([5], 1) => Some(OpaqueFieldKind::String),
+        ([5], 2 | 3) => Some(OpaqueFieldKind::Message),
+        ([5, 2], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([5, 3], 1) => Some(OpaqueFieldKind::Message),
+        ([5, 3, 1], 1) => Some(OpaqueFieldKind::Int32),
+        ([5, 3, 1], 2) => Some(OpaqueFieldKind::Message),
+        ([5, 3, 1, 2], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([6], 1 | 2) => Some(OpaqueFieldKind::Message),
+        ([6], 3..=5) => Some(OpaqueFieldKind::Float),
+        ([6, 1] | [6, 2], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([7], 1) => Some(OpaqueFieldKind::Message),
+        ([7], 2) => Some(OpaqueFieldKind::Int32),
+        ([7], 3 | 4) => Some(OpaqueFieldKind::Float),
+        ([7, 1], 1) => Some(OpaqueFieldKind::String),
+        ([7, 1], 2 | 3) => Some(OpaqueFieldKind::Message),
+        ([7, 1, 2], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([7, 1, 3], 1) => Some(OpaqueFieldKind::Message),
+        ([7, 1, 3, 1], 1) => Some(OpaqueFieldKind::Int32),
+        ([7, 1, 3, 1], 2) => Some(OpaqueFieldKind::Message),
+        ([7, 1, 3, 1, 2], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([8], 1 | 2) => Some(OpaqueFieldKind::Message),
+        ([8, 1], 1) => Some(OpaqueFieldKind::Message),
+        ([8, 1], 2) => Some(OpaqueFieldKind::Bool),
+        ([8, 1, 1], 1..=3) => Some(OpaqueFieldKind::Message),
+        ([8, 1, 1], 4) => Some(OpaqueFieldKind::Int32),
+        ([8, 1, 1, 1] | [8, 1, 1, 2] | [8, 1, 1, 3], 1 | 2) => Some(OpaqueFieldKind::Float),
+        ([8, 2], 1 | 2) => Some(OpaqueFieldKind::Float),
+        _ => None,
+    };
+    kind.map_or(Ok(()), |kind| validate_opaque_field(field, kind))
+}
+
+fn validate_path_source_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[])?;
+        match field.number {
+            number @ 1..=2 => {
+                require_opaque_singular(&mut seen, number)?;
+            },
+            number @ 3..=8 => {
+                require_opaque_singular(&mut seen, number)?;
+                match number {
+                    3 => validate_point_path_source_message(
+                        field.length_delimited()?,
+                        options,
+                        budget,
+                        depth + 1,
+                    )?,
+                    4 => validate_scalar_path_source_message(
+                        field.length_delimited()?,
+                        options,
+                        budget,
+                        depth + 1,
+                    )?,
+                    5 => validate_bezier_path_source_message(
+                        field.length_delimited()?,
+                        options,
+                        budget,
+                        depth + 1,
+                    )?,
+                    6 => validate_callout_path_source_message(
+                        field.length_delimited()?,
+                        options,
+                        budget,
+                        depth + 1,
+                    )?,
+                    7 => validate_connection_path_source_message(
+                        field.length_delimited()?,
+                        options,
+                        budget,
+                        depth + 1,
+                    )?,
+                    8 => validate_editable_path_source_message(
+                        field.length_delimited()?,
+                        options,
+                        budget,
+                        depth + 1,
+                    )?,
+                    _ => unreachable!("path message range is exhaustive"),
+                }
+            },
+            number @ 9..=10 => {
+                require_opaque_singular(&mut seen, number)?;
+            },
+            _ => {},
+        }
+        Ok(())
+    })
+}
+
+fn validate_point_path_source_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[3])?;
+        if let number @ 1..=3 = field.number {
+            require_opaque_singular(&mut seen, number)?;
+            match number {
+                2 => validate_point_message(field.length_delimited()?, options, budget, depth + 1)?,
+                3 => validate_size_message(field.length_delimited()?, options, budget, depth + 1)?,
+                _ => {},
+            }
+        }
+        Ok(())
+    })
+}
+
+fn validate_scalar_path_source_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[4])?;
+        if let number @ 1..=4 = field.number {
+            require_opaque_singular(&mut seen, number)?;
+            if number == 3 {
+                validate_size_message(field.length_delimited()?, options, budget, depth + 1)?;
+            }
+        }
+        Ok(())
+    })
+}
+
+fn validate_bezier_path_source_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[5])?;
+        if let number @ 1..=3 = field.number {
+            require_opaque_singular(&mut seen, number)?;
+            match number {
+                2 => validate_size_message(field.length_delimited()?, options, budget, depth + 1)?,
+                3 => validate_tsp_path_message(
+                    field.length_delimited()?,
+                    options,
+                    budget,
+                    depth + 1,
+                )?,
+                _ => {},
+            }
+        }
+        Ok(())
+    })
+}
+
+fn validate_callout_path_source_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[6])?;
+        if let number @ 1..=5 = field.number {
+            require_opaque_singular(&mut seen, number)?;
+            match number {
+                1 => validate_size_message(field.length_delimited()?, options, budget, depth + 1)?,
+                2 => validate_point_message(field.length_delimited()?, options, budget, depth + 1)?,
+                _ => {},
+            }
+        }
+        Ok(())
+    })
+}
+
+fn validate_connection_path_source_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[7])?;
+        if let number @ 1..=4 = field.number {
+            require_opaque_singular(&mut seen, number)?;
+            if number == 1 {
+                validate_bezier_path_source_message(
+                    field.length_delimited()?,
+                    options,
+                    budget,
+                    depth + 1,
+                )?;
+            }
+        }
+        Ok(())
+    })?;
+    require_opaque_fields(seen, 1)
+}
+
+fn validate_editable_path_source_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut size_seen = false;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[8])?;
+        match field.number {
+            1 => validate_editable_subpath_message(
+                field.length_delimited()?,
+                options,
+                budget,
+                depth + 1,
+            )?,
+            2 => {
+                if std::mem::replace(&mut size_seen, true) {
+                    return Err(DecodeError::duplicate_singular(
+                        "transition editable-path size",
+                    ));
+                }
+                validate_size_message(field.length_delimited()?, options, budget, depth + 1)?;
+            },
+            _ => {},
+        }
+        Ok(())
+    })
+}
+
+fn validate_editable_subpath_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut closed_seen = false;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[8, 1])?;
+        match field.number {
+            1 => validate_editable_node_message(
+                field.length_delimited()?,
+                options,
+                budget,
+                depth + 1,
+            )?,
+            2 => {
+                if std::mem::replace(&mut closed_seen, true) {
+                    return Err(DecodeError::duplicate_singular(
+                        "transition subpath closed state",
+                    ));
+                }
+            },
+            _ => {},
+        }
+        Ok(())
+    })?;
+    if !closed_seen {
+        return Err(DecodeError::missing_required(
+            "transition subpath closed state",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_editable_node_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[8, 1, 1])?;
+        if let number @ 1..=4 = field.number {
+            require_opaque_singular(&mut seen, number)?;
+            if number <= 3 {
+                validate_point_message(field.length_delimited()?, options, budget, depth + 1)?;
+            }
+        }
+        Ok(())
+    })?;
+    require_opaque_fields(seen, 0b1111)
+}
+
+fn validate_tsp_path_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[5, 3])?;
+        if field.number == 1 {
+            validate_tsp_path_element_message(
+                field.length_delimited()?,
+                options,
+                budget,
+                depth + 1,
+            )?;
+        }
+        Ok(())
+    })
+}
+
+fn validate_tsp_path_element_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    let mut type_seen = false;
+    validate_opaque_message(source, options, budget, depth, |field, budget, depth| {
+        validate_path_field(field, &[5, 3, 1])?;
+        match field.number {
+            1 => {
+                if std::mem::replace(&mut type_seen, true) {
+                    return Err(DecodeError::duplicate_singular(
+                        "transition path element type",
+                    ));
+                }
+            },
+            2 => validate_point_message(field.length_delimited()?, options, budget, depth + 1)?,
+            _ => {},
+        }
+        Ok(())
+    })?;
+    if !type_seen {
+        return Err(DecodeError::missing_required(
+            "transition path element type",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_point_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    validate_required_pair(source, options, budget, depth, "transition path point")
+}
+
+fn validate_size_message(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+) -> Result<(), DecodeError> {
+    validate_required_pair(source, options, budget, depth, "transition path size")
+}
+
+fn validate_required_pair(
+    source: &[u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+    depth: usize,
+    context: &'static str,
+) -> Result<(), DecodeError> {
+    let mut seen = 0_u16;
+    validate_opaque_message(source, options, budget, depth, |field, _budget, _depth| {
+        validate_path_field(field, &[3, 2])?;
+        if matches!(field.number, 1 | 2) {
+            require_opaque_singular(&mut seen, field.number)?;
+        }
+        Ok(())
+    })?;
+    require_opaque_fields_with_context(seen, 0b11, context)
+}
+
+fn require_opaque_singular(seen: &mut u16, field_number: u32) -> Result<(), DecodeError> {
+    let shift = field_number
+        .checked_sub(1)
+        .ok_or_else(|| DecodeError::noncanonical("invalid transition field"))?;
+    let bit = 1_u16
+        .checked_shl(shift)
+        .ok_or_else(|| DecodeError::noncanonical("transition field number"))?;
+    if *seen & bit != 0 {
+        return Err(DecodeError::duplicate_singular("transition path field"));
+    }
+    *seen |= bit;
+    Ok(())
+}
+
+fn require_opaque_fields(seen: u16, required: u16) -> Result<(), DecodeError> {
+    require_opaque_fields_with_context(seen, required, "transition required field")
+}
+
+fn require_opaque_fields_with_context(
+    seen: u16,
+    required: u16,
+    context: &'static str,
+) -> Result<(), DecodeError> {
+    if seen & required != required {
+        return Err(DecodeError::missing_required(context));
+    }
+    Ok(())
 }
 
 fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
@@ -1161,7 +1718,8 @@ mod tests {
 
     use super::{
         Budget, DecodeError, DecodeOptions, WireResourceLimit, decode_slide_node_has_transition,
-        decode_slide_transition, preflight_slide_transition,
+        decode_slide_transition, preflight_slide_transition, validate_opaque_color,
+        validate_opaque_path,
     };
 
     fn options(source: &[u8]) -> DecodeOptions {
@@ -1394,6 +1952,132 @@ mod tests {
             Some("known")
         );
         Ok(())
+    }
+
+    #[test]
+    fn opaque_validation_charges_aggregate_scanned_bytes() {
+        let nested = length_field(1, &[]);
+        let source = length_field(7, &nested);
+        assert_eq!(source.len(), 4);
+        let error = validate_opaque_path(&source, DecodeOptions::new(5, 8)).unwrap_err();
+        assert_eq!(
+            error.wire_resource_limit(),
+            Some(WireResourceLimit::Bytes {
+                observed: 6,
+                maximum: 5,
+            })
+        );
+    }
+
+    #[test]
+    fn opaque_validation_enforces_exact_field_cap() {
+        let mut source = varint_field(1, 1);
+        source.extend(fixed32_field(3, 1.0));
+        let limited = DecodeOptions::new(64, 8).with_resource_limits(1, usize::MAX);
+        assert_eq!(
+            validate_opaque_color(&source, limited)
+                .unwrap_err()
+                .field_limit_values(),
+            Some((2, 1))
+        );
+        let exact = DecodeOptions::new(64, 8).with_resource_limits(2, usize::MAX);
+        assert!(validate_opaque_color(&source, exact).is_ok());
+    }
+
+    #[test]
+    fn opaque_unknown_fields_retain_noncanonical_framing_acceptance() {
+        let mut source = varint_field(1, 1);
+        push_overlong_varint((20_u64 << 3) | 2, &mut source);
+        source.push(0);
+        assert!(validate_opaque_color(&source, DecodeOptions::new(64, 8)).is_ok());
+
+        let mut path = Vec::new();
+        push_overlong_varint((20_u64 << 3) | 2, &mut path);
+        path.push(0);
+        assert!(validate_opaque_path(&path, DecodeOptions::new(64, 8)).is_ok());
+    }
+
+    #[test]
+    fn opaque_unknown_groups_are_rejected() {
+        let mut source = varint_field(1, 1);
+        push_varint((20_u64 << 3) | 3, &mut source);
+        push_varint((20_u64 << 3) | 4, &mut source);
+        assert!(validate_opaque_color(&source, DecodeOptions::new(64, 8)).is_err());
+
+        let mut path = Vec::new();
+        push_varint((20_u64 << 3) | 3, &mut path);
+        push_varint((20_u64 << 3) | 4, &mut path);
+        assert!(validate_opaque_path(&path, DecodeOptions::new(64, 8)).is_err());
+    }
+
+    #[test]
+    fn opaque_codec_enforces_color_and_nested_path_schema() {
+        let options = DecodeOptions::new(1_024, 8);
+        assert!(validate_opaque_color(&varint_field(1, 1), options).is_ok());
+        assert_eq!(
+            validate_opaque_color(&[], options)
+                .unwrap_err()
+                .missing_required_field(),
+            Some("transition color model field")
+        );
+        let mut duplicate_model = varint_field(1, 1);
+        duplicate_model.extend(varint_field(1, 1));
+        assert_eq!(
+            validate_opaque_color(&duplicate_model, options)
+                .unwrap_err()
+                .duplicate_singular_field(),
+            Some("transition color field")
+        );
+        let mut non_finite_color = varint_field(1, 1);
+        non_finite_color.extend(fixed32_field(3, f32::NAN));
+        assert_eq!(
+            validate_opaque_color(&non_finite_color, options)
+                .unwrap_err()
+                .noncanonical_reason(),
+            Some("opaque transition float scalar")
+        );
+
+        assert!(validate_opaque_path(&[], options).is_ok());
+        let valid_connection = length_field(7, &length_field(1, &[]));
+        assert!(validate_opaque_path(&valid_connection, options).is_ok());
+        assert!(validate_opaque_path(&length_field(7, &[]), options).is_err());
+
+        let valid_subpath = length_field(8, &length_field(1, &varint_field(2, 0)));
+        assert!(validate_opaque_path(&valid_subpath, options).is_ok());
+        assert!(validate_opaque_path(&length_field(8, &length_field(1, &[])), options).is_err());
+
+        let typed_element =
+            length_field(5, &length_field(3, &length_field(1, &varint_field(1, 1))));
+        assert!(validate_opaque_path(&typed_element, options).is_ok());
+        let empty_element = length_field(5, &length_field(3, &length_field(1, &[])));
+        assert!(validate_opaque_path(&empty_element, options).is_err());
+
+        let incomplete_point = length_field(3, &length_field(2, &fixed32_field(1, 0.0)));
+        assert!(validate_opaque_path(&incomplete_point, options).is_err());
+        assert!(validate_opaque_path(&length_field(9, &[0xff]), options).is_err());
+        assert!(validate_opaque_path(&varint_field(1, 2), options).is_err());
+        assert!(
+            validate_opaque_path(&length_field(4, &fixed32_field(2, f32::INFINITY)), options)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn opaque_validation_allows_exact_nesting_boundary() {
+        let nested = length_field(1, &[]);
+        let source = length_field(7, &nested);
+        let exact = DecodeOptions::new(64, 2).with_resource_limits(usize::MAX, usize::MAX);
+        assert!(validate_opaque_path(&source, exact).is_ok());
+        let below = DecodeOptions::new(64, 1).with_resource_limits(usize::MAX, usize::MAX);
+        assert_eq!(
+            validate_opaque_path(&source, below)
+                .unwrap_err()
+                .wire_resource_limit(),
+            Some(WireResourceLimit::Nesting {
+                observed: 2,
+                maximum: 1,
+            })
+        );
     }
 
     fn animation_present(animation: super::AnimationSnapshot<'_>, field: u32) -> bool {

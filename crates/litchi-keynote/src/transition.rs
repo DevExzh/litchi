@@ -2,9 +2,7 @@
 
 use crate::Result;
 
-pub use crate::package::slide_transition::{
-    validate_opaque_transition_settings, Commit, Diagnostics, Edit, Error, LimitKind, Patch,
-};
+pub use crate::package::slide_transition::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
 const NONE_EFFECT: &str = "none";
 const DISSOLVE_EFFECT: &str = "apple:dissolve";
@@ -382,8 +380,9 @@ impl std::fmt::Debug for TextDelivery {
 /// Lossless animation-level values attached to a slide transition.
 ///
 /// The payload fields intentionally remain opaque. Their protobuf structure,
-/// validation, and wire-preserving patching belong to the IWA adapter; this
-/// crate only owns bounded native-free storage and semantic scalar checks.
+/// strict wire validation belongs to the shared internal transition codec,
+/// and wire-preserving patching remains package-private. This public module
+/// owns only bounded native-free storage and semantic scalar checks.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AnimationParameters {
     /// Exact native color payload, when one is present.

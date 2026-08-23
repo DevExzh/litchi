@@ -2049,7 +2049,8 @@ editable. `clear` is idempotent and retains Keynote's native no-effect
 envelope rather than deleting or synthesizing one. Commits carry an
 exact-source-checked inverse patch. A private Buffa lazy view projects known
 native fields, while bounded raw-record rewriting preserves accepted source
-bytes.
+bytes. The same doc-hidden neutral codec strictly validates retained opaque
+color and path payloads for both the focused package and migration adapter.
 
 ```rust,no_run
 use std::io;

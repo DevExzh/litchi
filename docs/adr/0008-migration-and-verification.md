@@ -12024,3 +12024,48 @@ evidence is only the native evidence already separately verified; this
 amendment adds no new Cargo, native, Rust/native-parity, or
 performance/allocation claim, and retires no gate, dependency edge, debt,
 host exit, or monolith deletion.
+
+## 2026-08-23 amendment: Wave51 Keynote ingress and validator-boundary verification
+
+The accepted Wave51 slice hardens exact-file `litchi-keynote::Package` path
+ingress and moves strict opaque Color/PathSource validation from a focused
+public adapter export into the existing doc-hidden transition codec. The
+private Buffa projection remains borrowed and generated-type-free downstream;
+opaque source bytes remain the preservation authority. This removes both
+Keynote validator findings from the source boundary without changing emitted
+Keynote bytes or semantic transition values.
+
+Verification used a detached tracked snapshot because the updated parent HEAD
+already fails the unrelated Pages native-message provenance build ratchet
+before Keynote compilation. The detached build script alone received an
+environment-controlled verification bypass; that bypass is absent from this
+source change. Under that isolation, the following passed:
+
+- 12/12 focused transition-codec tests;
+- 4/4 focused opaque package-wrapper tests and 23/23 `Package` ingress/unit
+  tests;
+- 11/11 slide-transition and 9/9 native-fixture Rust integration tests;
+- 6/6 migration-host transition-adapter module tests;
+- library checks for `litchi-iwa-protos`, `litchi-keynote`, and `litchi-iwa`;
+- strict library Clippy for `litchi-iwa-protos` and `litchi-keynote`;
+- 315/315 boundary-checker unit tests, targeted formatting, and diff checks.
+
+These gates ran on macOS. The Windows-only namespace, handle-type, sharing,
+and metadata branches received static review but no Windows compile/runtime
+gate in this environment.
+
+The complete `litchi-keynote` library run reached 150 passes and one failure
+in the untouched soundtrack ZIP central-offset assertion test. The combined
+all-target check is separately blocked by an unnecessary qualification in the
+untouched `crates/litchi-keynote/tests/soundtrack_order.rs`. The clean
+tracked boundary audit has 20 Pages table-lock alias findings and no Keynote
+finding; the shared dirty worktree has three additional findings from its
+untracked Pages host table-lock file. These baselines are not attributed to
+this slice.
+
+No Keynote application was launched: filesystem admission and internal
+validation authority changed, but no output artifact or user-visible semantic
+mutation was produced, so a native save/reopen gate is not evidence for this
+change. Workspace inventory remains 64 packages, 239 internal declarations,
+one migration host, and 13 ordered debts. No generated schema, Prost use,
+dependency edge, debt, native gate, host exit, or monolith deletion is retired.

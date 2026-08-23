@@ -2267,3 +2267,37 @@ alias.
 Its package-level bounded cases do not constitute a native Keynote open/save
 gate. No `litchi-iwa` host edge or ordered debt is retired, and this amendment
 makes no host-exit or monolith-exit claim.
+
+## 2026-08-23 amendment: Keynote exact-file ingress and opaque validation authority
+
+`litchi_keynote::Package::open` and its limit/options variants now admit only
+a descriptor-pinned regular file. Unix opens the final component with
+`O_NOFOLLOW`, `O_NONBLOCK`, and `O_CLOEXEC`; Windows rejects device namespaces
+and non-disk handles, opens the final reparse point, rejects reparse
+descriptors, permits concurrent readers while excluding
+writers/renames/deletes, and retains descriptor identity. Other platforms fail
+closed. The reader compares descriptor metadata before and after capture,
+requires the observed byte count to equal the admitted length, retries
+interrupted reads, begins with at most 64 KiB of source capacity, and grows
+geometrically without exceeding the physical input ceiling. Byte constructors,
+archive-free `Document` ingress, directory preparation, and output publication
+are unchanged; this is not a claim of descriptor safety for every Keynote API.
+
+Opaque transition color and path bytes remain public semantic values only as
+bounded source-owned payloads. Their strict wire authority now resides in the
+doc-hidden `litchi-iwa-protos::keynote_slide_transition_codec`, beside the
+private Buffa transition projection. Known fields retain canonical framing,
+wire-kind, singularity, required-field, UTF-8, Boolean, signed-int, and finite
+float checks. Unknown fields remain byte-owned by the source and may retain
+noncanonical framing, while groups remain forbidden. Aggregate selected-message
+bytes, fields, and nesting preserve the predecessor `WireLimits` contract; the
+codec's two scans are bounded by twice that unchanged aggregate byte ceiling
+rather than introducing the rewrite-work limit as a new semantic restriction.
+
+Graph selection, package mutation, raw-byte preservation, error mapping, and
+patch/inverse proof remain private to `litchi-keynote`. The adapter-only public
+`litchi_keynote::transition::validate_opaque_transition_settings` export is
+removed intentionally from the unpublished `0.0.1` API; semantic callers use
+`Settings`, checked payload setters, and package transactions rather than a
+wire validator. Generated Buffa types and codec values do not cross the
+focused public facade.

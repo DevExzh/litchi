@@ -4287,3 +4287,31 @@ entries, and TableDataList/CommentStorage smokes recorded 100 ASan runs with
 11/20 seeds. No native type-6011 proof or current fuzz campaign follows.
 The host edge, all ordered debt, and the monolith remain; no dependency-edge
 or debt retirement, migration-host exit, or deletion claim is made.
+
+## 2026-08-23 amendment: Wave51 Keynote boundary ownership correction
+
+Current opaque Keynote transition wire validation belongs to the doc-hidden
+`litchi-iwa-protos::keynote_slide_transition_codec`, not the focused public
+transition facade. `litchi-keynote` continues to own selector-first package
+transactions, rooted graph admission, exact raw-byte patching, inverse proof,
+and error mapping. `litchi-iwa` remains a compatibility consumer and retains
+its semantic conversion adapter. The removed
+`litchi_keynote::transition::validate_opaque_transition_settings` function was
+adapter-only and intentionally source-breaking for the unpublished `0.0.1`
+surface; no public wire-oriented compatibility shim is retained.
+
+The same slice makes focused `litchi-keynote::Package` exact-file opening
+descriptor-first, no-follow/reparse/device-rejecting, mutation-checked, and bounded.
+That admission hardening does not move a package owner out of the migration
+host, replace archive-free `Document` preparation, or establish atomic/durable
+filesystem publication.
+
+The two Keynote boundary findings are gone. A clean tracked audit still has 20
+unrelated focused Pages table-lock aliases; the shared worktree adds three
+findings from its untracked Pages host table-lock source. Debt 010
+(`litchi-iwa -> litchi-iwa-protos`) and debt 014
+(`litchi-iwa -> litchi-keynote`) both remain, as do all other ordered debts.
+The inventory is unchanged at 64 packages, 239 internal declarations, one
+migration host, and 13 debts. This is boundary and ingress hardening, not
+generated-schema or Prost retirement, dependency-edge removal, native
+application evidence, host exit, or monolith deletion.

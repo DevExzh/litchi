@@ -33,6 +33,8 @@ use litchi_iwa_protos::{
     keynote_slide_transition_codec::{
         DecodeOptions as TransitionDecodeOptions, TransitionSettingsSnapshot,
         decode_slide_node_has_transition, decode_slide_transition,
+        validate_opaque_color as validate_codec_opaque_color,
+        validate_opaque_path as validate_codec_opaque_path,
     },
 };
 use thiserror::Error;
@@ -1818,18 +1820,6 @@ fn validate_requested_opaque_settings(
     Ok(())
 }
 
-/// Validate opaque transition submessages for archive adapters.
-///
-/// The semantic settings intentionally retain color and timing-curve bytes
-/// without interpreting them. Native adapters that project those settings
-/// still need the package boundary's strict wire validation before exposing
-/// them. Keep this forwarding entry point alongside the validator so every
-/// adapter uses the same duplicate-field, wire-type, finite-scalar, and
-/// nested-required-field checks.
-pub fn validate_opaque_transition_settings(settings: &Settings) -> Result<(), Error> {
-    validate_requested_opaque_settings(settings, WireLimits::default())
-}
-
 fn map_requested_opaque_error(error: Error) -> Error {
     match error {
         Error::LimitExceeded { .. } | Error::Allocation { .. } => error,
@@ -1837,480 +1827,30 @@ fn map_requested_opaque_error(error: Error) -> Error {
     }
 }
 
-fn validate_opaque_color(source: &[u8], limits: WireLimits) -> Result<(), Error> {
-    let mut seen = 0_u16;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
-        if matches!(visit.field().wire_type(), 3 | 4) {
-            return Err(litchi_iwa_common::Error::InvalidFormat(
-                "group-bearing transition color".to_owned(),
-            ));
-        }
-        validate_color_field(visit.field(), &mut seen)?;
-        Ok(WireDescent::Skip)
-    })
-    .map_err(map_wire_error)?;
-    if seen & 1 == 0 {
-        return Err(Error::InvalidSource);
-    }
-    Ok(())
-}
-
-#[allow(
-    clippy::unnested_or_patterns,
-    reason = "separate path-schema comments are clearer than a mechanically nested pattern"
-)]
-fn validate_opaque_path(source: &[u8], limits: WireLimits) -> Result<(), Error> {
-    preflight_wire_tree_with_limits(source, limits, |visit| {
-        if matches!(visit.field().wire_type(), 3 | 4) {
-            return Err(litchi_iwa_common::Error::InvalidFormat(
-                "group-bearing transition path".to_owned(),
-            ));
-        }
-        let path = visit.path();
-        let field = visit.field().number();
-        validate_path_field_wire(visit.field(), path)?;
-        let descend = match (path, field) {
-            // PathSourceArchive variants.
-            ([], 3..=8)
-            // PointPathSourceArchive / ScalarPathSourceArchive.
-            | ([3], 2 | 3)
-            | ([4], 3)
-            // BezierPathSourceArchive -> Size / TSP.Path.
-            | ([5], 2 | 3)
-            | ([5, 3], 1)
-            | ([5, 3, 1], 2)
-            // CalloutPathSourceArchive.
-            | ([6], 1 | 2)
-            // ConnectionLinePathSourceArchive -> Bezier -> Size / Path.
-            | ([7], 1)
-            | ([7, 1], 2 | 3)
-            | ([7, 1, 3], 1)
-            | ([7, 1, 3, 1], 2)
-            // EditableBezierPathSourceArchive -> Subpath -> Node -> Points.
-            | ([8], 1 | 2)
-            | ([8, 1], 1)
-            | ([8, 1, 1], 1..=3) => WireDescent::Descend,
-            _ => WireDescent::Skip,
-        };
-        Ok(descend)
-    })
-    .map(|_preflight| ())
-    .map_err(map_wire_error)?;
-    validate_path_required_messages(source, limits).map_err(map_wire_error)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OpaqueFieldKind {
-    Message,
-    String,
-    Int32,
-    Bool,
-    Float,
-}
-
-fn validate_color_field(field: WireFieldView<'_>, seen: &mut u16) -> litchi_iwa_common::Result<()> {
-    let kind = match field.number() {
-        1 | 12 => OpaqueFieldKind::Int32,
-        3..=11 => OpaqueFieldKind::Float,
-        _ => return Ok(()),
-    };
-    let bit = 1_u16 << (field.number() - 1);
-    if *seen & bit != 0 {
-        return Err(opaque_wire_error("transition color field is duplicated"));
-    }
-    *seen |= bit;
-    validate_opaque_field(field, kind, "transition color field")
-}
-
-fn validate_path_field_wire(
-    field: WireFieldView<'_>,
-    path: &[u32],
-) -> litchi_iwa_common::Result<()> {
-    let kind = match (path, field.number()) {
-        ([], 1 | 2) => OpaqueFieldKind::Bool,
-        ([], 3..=8) => OpaqueFieldKind::Message,
-        ([], 9 | 10) => OpaqueFieldKind::String,
-        ([3], 1) => OpaqueFieldKind::Int32,
-        ([3], 2 | 3) => OpaqueFieldKind::Message,
-        ([3, 2] | [3, 3], 1 | 2) => OpaqueFieldKind::Float,
-        ([4], 1) => OpaqueFieldKind::Int32,
-        ([4], 2) => OpaqueFieldKind::Float,
-        ([4], 3) => OpaqueFieldKind::Message,
-        ([4], 4) => OpaqueFieldKind::Bool,
-        ([4, 3], 1 | 2) => OpaqueFieldKind::Float,
-        ([5], 1) => OpaqueFieldKind::String,
-        ([5], 2 | 3) => OpaqueFieldKind::Message,
-        ([5, 2], 1 | 2) => OpaqueFieldKind::Float,
-        ([5, 3], 1) => OpaqueFieldKind::Message,
-        ([5, 3, 1], 1) => OpaqueFieldKind::Int32,
-        ([5, 3, 1], 2) => OpaqueFieldKind::Message,
-        ([5, 3, 1, 2], 1 | 2) => OpaqueFieldKind::Float,
-        ([6], 1 | 2) => OpaqueFieldKind::Message,
-        ([6], 3..=5) => OpaqueFieldKind::Float,
-        ([6, 1] | [6, 2], 1 | 2) => OpaqueFieldKind::Float,
-        ([7], 1) => OpaqueFieldKind::Message,
-        ([7], 2) => OpaqueFieldKind::Int32,
-        ([7], 3 | 4) => OpaqueFieldKind::Float,
-        ([7, 1], 1) => OpaqueFieldKind::String,
-        ([7, 1], 2 | 3) => OpaqueFieldKind::Message,
-        ([7, 1, 2], 1 | 2) => OpaqueFieldKind::Float,
-        ([7, 1, 3], 1) => OpaqueFieldKind::Message,
-        ([7, 1, 3, 1], 1) => OpaqueFieldKind::Int32,
-        ([7, 1, 3, 1], 2) => OpaqueFieldKind::Message,
-        ([7, 1, 3, 1, 2], 1 | 2) => OpaqueFieldKind::Float,
-        ([8], 1 | 2) => OpaqueFieldKind::Message,
-        ([8, 1], 1) => OpaqueFieldKind::Message,
-        ([8, 1], 2) => OpaqueFieldKind::Bool,
-        ([8, 1, 1], 1..=3) => OpaqueFieldKind::Message,
-        ([8, 1, 1], 4) => OpaqueFieldKind::Int32,
-        ([8, 1, 1, 1] | [8, 1, 1, 2] | [8, 1, 1, 3], 1 | 2) => OpaqueFieldKind::Float,
-        ([8, 2], 1 | 2) => OpaqueFieldKind::Float,
-        _ => return Ok(()),
-    };
-    validate_opaque_field(field, kind, "transition path field")
-}
-
-fn validate_opaque_field(
-    field: WireFieldView<'_>,
-    kind: OpaqueFieldKind,
-    context: &'static str,
-) -> litchi_iwa_common::Result<()> {
-    field.validate_canonical_framing()?;
-    let expected_wire = match kind {
-        OpaqueFieldKind::Message | OpaqueFieldKind::String => 2,
-        OpaqueFieldKind::Int32 | OpaqueFieldKind::Bool => 0,
-        OpaqueFieldKind::Float => 5,
-    };
-    if field.wire_type() != expected_wire {
-        return Err(opaque_wire_error(context));
-    }
-    match kind {
-        OpaqueFieldKind::Message => {},
-        OpaqueFieldKind::String => {
-            std::str::from_utf8(field.payload()).map_err(|_error| opaque_wire_error(context))?;
-        },
-        OpaqueFieldKind::Int32 => {
-            let value = canonical_opaque_varint(field, context)?;
-            if value > i32::MAX as u64 && value < 0xffff_ffff_8000_0000 {
-                return Err(opaque_wire_error(context));
-            }
-        },
-        OpaqueFieldKind::Bool => {
-            if !matches!(canonical_opaque_varint(field, context)?, 0 | 1) {
-                return Err(opaque_wire_error(context));
-            }
-        },
-        OpaqueFieldKind::Float => {
-            let bytes: [u8; 4] = field
-                .payload()
-                .try_into()
-                .map_err(|_error| opaque_wire_error(context))?;
-            if !f32::from_le_bytes(bytes).is_finite() {
-                return Err(opaque_wire_error(context));
-            }
-        },
-    }
-    Ok(())
-}
-
-fn canonical_opaque_varint(
-    field: WireFieldView<'_>,
-    context: &'static str,
-) -> litchi_iwa_common::Result<u64> {
-    let (value, consumed) =
-        decode_varint_from_bytes(field.payload()).map_err(|_error| opaque_wire_error(context))?;
-    if consumed != field.payload().len() || consumed != canonical_varint_len(value) {
-        return Err(opaque_wire_error(context));
-    }
-    Ok(value)
-}
-
-fn validate_path_required_messages(
-    source: &[u8],
+fn transition_decode_options_for_opaque(
     limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    validate_path_source_message(source, limits)
-}
-
-fn validate_path_source_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        match field.number() {
-            number @ 1..=10 => require_opaque_singular(&mut seen, number)?,
-            _ => continue,
-        }
-        match field.number() {
-            3 => validate_point_path_source_message(field.payload(), limits)?,
-            4 => validate_scalar_path_source_message(field.payload(), limits)?,
-            5 => validate_bezier_path_source_message(field.payload(), limits)?,
-            6 => validate_callout_path_source_message(field.payload(), limits)?,
-            7 => validate_connection_path_source_message(field.payload(), limits)?,
-            8 => validate_editable_path_source_message(field.payload(), limits)?,
-            _ => {},
-        }
-    }
-    Ok(())
-}
-
-fn validate_point_path_source_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        match field.number() {
-            number @ 1..=3 => require_opaque_singular(&mut seen, number)?,
-            _ => continue,
-        }
-        match field.number() {
-            2 => validate_point_message(field.payload(), limits)?,
-            3 => validate_size_message(field.payload(), limits)?,
-            _ => {},
-        }
-    }
-    Ok(())
-}
-
-fn validate_scalar_path_source_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        match field.number() {
-            number @ 1..=4 => require_opaque_singular(&mut seen, number)?,
-            _ => continue,
-        }
-        if field.number() == 3 {
-            validate_size_message(field.payload(), limits)?;
-        }
-    }
-    Ok(())
-}
-
-fn validate_bezier_path_source_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        match field.number() {
-            number @ 1..=3 => require_opaque_singular(&mut seen, number)?,
-            _ => continue,
-        }
-        match field.number() {
-            2 => validate_size_message(field.payload(), limits)?,
-            3 => validate_tsp_path_message(field.payload(), limits)?,
-            _ => {},
-        }
-    }
-    Ok(())
-}
-
-fn validate_callout_path_source_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        match field.number() {
-            number @ 1..=5 => require_opaque_singular(&mut seen, number)?,
-            _ => continue,
-        }
-        match field.number() {
-            1 => validate_size_message(field.payload(), limits)?,
-            2 => validate_point_message(field.payload(), limits)?,
-            _ => {},
-        }
-    }
-    Ok(())
-}
-
-fn validate_connection_path_source_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        match field.number() {
-            number @ 1..=4 => require_opaque_singular(&mut seen, number)?,
-            _ => continue,
-        }
-        if field.number() == 1 {
-            validate_bezier_path_source_message(field.payload(), limits)?;
-        }
-    }
-    require_opaque_fields(
-        seen,
-        1,
-        "transition connection path is missing its base archive",
+) -> Result<TransitionDecodeOptions, Error> {
+    let recursion_limit =
+        u32::try_from(limits.max_nesting()).map_err(|_error| Error::InvalidSource)?;
+    // The predecessor wire-tree validator charged aggregate input bytes and
+    // fields, but not rewrite work. Two strict passes are intrinsic to this
+    // codec, so derive a finite ceiling from the unchanged byte budget rather
+    // than making `max_rewrite_work` a new compatibility restriction.
+    let validation_work = limits.max_input_bytes().saturating_mul(2);
+    Ok(
+        TransitionDecodeOptions::new(limits.max_input_bytes(), recursion_limit)
+            .with_resource_limits(limits.max_fields(), validation_work),
     )
 }
 
-fn validate_editable_path_source_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut size_seen = false;
-    for field in view.fields() {
-        match field.number() {
-            1 => validate_editable_subpath_message(field.payload(), limits)?,
-            2 => {
-                if std::mem::replace(&mut size_seen, true) {
-                    return Err(opaque_wire_error(
-                        "transition editable-path size is duplicated",
-                    ));
-                }
-                validate_size_message(field.payload(), limits)?;
-            },
-            _ => {},
-        }
-    }
-    Ok(())
+fn validate_opaque_color(source: &[u8], limits: WireLimits) -> Result<(), Error> {
+    let options = transition_decode_options_for_opaque(limits)?;
+    validate_codec_opaque_color(source, options).map_err(map_transition_codec_error)
 }
 
-fn validate_editable_subpath_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut closed_seen = false;
-    for field in view.fields() {
-        match field.number() {
-            1 => validate_editable_node_message(field.payload(), limits)?,
-            2 => {
-                if std::mem::replace(&mut closed_seen, true) {
-                    return Err(opaque_wire_error(
-                        "transition subpath closed state is duplicated",
-                    ));
-                }
-            },
-            _ => {},
-        }
-    }
-    if !closed_seen {
-        return Err(opaque_wire_error(
-            "transition subpath is missing its closed state",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_editable_node_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        match field.number() {
-            number @ 1..=4 => require_opaque_singular(&mut seen, number)?,
-            _ => continue,
-        }
-        if matches!(field.number(), 1..=3) {
-            validate_point_message(field.payload(), limits)?;
-        }
-    }
-    require_opaque_fields(seen, 0b1111, "transition editable node is incomplete")
-}
-
-fn validate_tsp_path_message(source: &[u8], limits: WireLimits) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    for field in view.fields() {
-        if field.number() == 1 {
-            validate_tsp_path_element_message(field.payload(), limits)?;
-        }
-    }
-    Ok(())
-}
-
-fn validate_tsp_path_element_message(
-    source: &[u8],
-    limits: WireLimits,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut type_seen = false;
-    for field in view.fields() {
-        match field.number() {
-            1 => {
-                if std::mem::replace(&mut type_seen, true) {
-                    return Err(opaque_wire_error(
-                        "transition path element type is duplicated",
-                    ));
-                }
-            },
-            2 => validate_point_message(field.payload(), limits)?,
-            _ => {},
-        }
-    }
-    if !type_seen {
-        return Err(opaque_wire_error(
-            "transition path element is missing its type",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_point_message(source: &[u8], limits: WireLimits) -> litchi_iwa_common::Result<()> {
-    validate_required_pair(source, limits, "transition path point is incomplete")
-}
-
-fn validate_size_message(source: &[u8], limits: WireLimits) -> litchi_iwa_common::Result<()> {
-    validate_required_pair(source, limits, "transition path size is incomplete")
-}
-
-fn validate_required_pair(
-    source: &[u8],
-    limits: WireLimits,
-    context: &'static str,
-) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(source, limits)?;
-    let mut seen = 0_u16;
-    for field in view.fields() {
-        if matches!(field.number(), 1 | 2) {
-            require_opaque_singular(&mut seen, field.number())?;
-        }
-    }
-    require_opaque_fields(seen, 0b11, context)
-}
-
-fn require_opaque_singular(seen: &mut u16, field_number: u32) -> litchi_iwa_common::Result<()> {
-    let shift = field_number
-        .checked_sub(1)
-        .ok_or_else(|| opaque_wire_error("invalid field"))?;
-    let bit = 1_u16
-        .checked_shl(shift)
-        .ok_or_else(|| opaque_wire_error("opaque field number is too large"))?;
-    if *seen & bit != 0 {
-        return Err(opaque_wire_error("transition path field is duplicated"));
-    }
-    *seen |= bit;
-    Ok(())
-}
-
-fn require_opaque_fields(
-    seen: u16,
-    required: u16,
-    context: &'static str,
-) -> litchi_iwa_common::Result<()> {
-    if seen & required != required {
-        return Err(opaque_wire_error(context));
-    }
-    Ok(())
-}
-
-fn opaque_wire_error(context: &'static str) -> litchi_iwa_common::Error {
-    litchi_iwa_common::Error::InvalidFormat(context.to_owned())
+fn validate_opaque_path(source: &[u8], limits: WireLimits) -> Result<(), Error> {
+    let options = transition_decode_options_for_opaque(limits)?;
+    validate_codec_opaque_path(source, options).map_err(map_transition_codec_error)
 }
 
 fn strict_node_transition_flag(source: &[u8], limits: WireLimits) -> Result<bool, Error> {
@@ -2712,6 +2252,16 @@ mod tests {
         let mut scalar = vec![0x22, 0x05, 0x15];
         scalar.extend_from_slice(&f32::INFINITY.to_le_bytes());
         assert_invalid(validate_opaque_path(&scalar, limits));
+    }
+
+    #[test]
+    fn opaque_validation_preserves_the_predecessor_rewrite_work_contract() {
+        let limits = WireLimits::default()
+            .with_rewrite_work(1)
+            .expect("positive rewrite-work limit");
+        assert!(validate_opaque_color(&[0x08, 0x01], limits).is_ok());
+        let valid_connection = length_delimited(7, &length_delimited(1, &[]));
+        assert!(validate_opaque_path(&valid_connection, limits).is_ok());
     }
 
     #[test]
