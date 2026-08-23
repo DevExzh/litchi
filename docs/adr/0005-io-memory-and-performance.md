@@ -504,3 +504,12 @@ aliases introduced by `093b82f40` (three public sites each), plus two
 pre-existing findings for `TableLockState` and the shared `TableSelector`
 export. This disposition changes no policy edge, debt item, ownership
 assignment, or verification gate.
+
+## 2026-08-23 follow-up: aggregate comment-scan scope
+
+Committed HEAD `22e8c58ca` only changes where the bounded Numbers comment-cell
+scan-work counter is accumulated: the counter now spans the model/cell scan
+instead of resetting for each table. The change does not alter Cargo metadata
+or the boundary-checker topology, and it does not turn the historical
+`4e84abdf` 20-finding audit above into a current-wave gate. No policy edge,
+debt item, ownership assignment, or verification result changes here.
