@@ -258,6 +258,10 @@ impl PagesEditor {
 
     /// Clear all text owned by one section while preserving the section itself.
     #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Pages section-text API; use litchi_pages::Package::edit_section_text with SectionSelector and clear; retained for migration-host compatibility"
+    )]
     pub fn clear_section_text(&mut self, section_id: u64) -> Result<()> {
         self.set_section_text(section_id, "")
     }
