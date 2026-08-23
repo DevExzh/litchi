@@ -1,0 +1,1376 @@
+{
+  "environment": {
+    "legs": {
+      "a1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "9426734501c29d4b41b86ac66683efa1ca3e290d",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      },
+      "a2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "9426734501c29d4b41b86ac66683efa1ca3e290d",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      },
+      "b1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "107060085595da22c01572ecbc6e04c172ca5cd1",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      },
+      "b2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "107060085595da22c01572ecbc6e04c172ca5cd1",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      }
+    },
+    "stable": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "2",
+      "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+      "filesystem_type": null,
+      "git_worktree_dirty": false,
+      "kernel": "Linux 7.0.0-30-generic",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "4",
+      "rustc_version": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "rustflags": null,
+      "source_destination_same_device": null,
+      "storage_identifier": null,
+      "total_memory_bytes": 33600217088
+    }
+  },
+  "harness_identity": {
+    "configuration": {
+      "cases": [
+        "rtf_file_open",
+        "rtf_file_open_lifecycle"
+      ],
+      "corpus_shapes": [
+        "tiny",
+        "many-small",
+        "few-large",
+        "wide-root"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "filesystem_cache_states": [
+        "warm"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "payload_kinds": [
+        "compressible",
+        "incompressible"
+      ],
+      "range_simulation": {
+        "bandwidth_bytes_per_second": 52428800,
+        "fixed_latency_us": 100,
+        "max_physical_range_bytes": 4096,
+        "request_overhead_us": 25
+      },
+      "rtf_variants": [
+        "plain"
+      ],
+      "samples_per_case": 500,
+      "semantic_shapes": [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      "warmup_iterations_per_case": 20,
+      "writer_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "xlsb_shapes": [
+        "tiny",
+        "medium",
+        "large",
+        "sparse"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium",
+        "dense-sparse"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium",
+        "large"
+      ],
+      "xlsx_shapes": [
+        "tiny",
+        "medium",
+        "dense-wide"
+      ]
+    },
+    "schema_version": 1,
+    "tool": {
+      "binary": "litchi-perf-baseline",
+      "instrumentation": "none",
+      "name": "litchi-perf-baseline",
+      "profile": "release",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "version": "0.1.0"
+    }
+  },
+  "implementation_identity": {
+    "candidate": {
+      "binary_identity": {
+        "binary_bytes": 49564504,
+        "binary_sha256": "aa7e29e407ec66925b8a2ac7be6620862bdb4687a198498b2fd8443d45922cee",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/home/zhuhe/CodeProjects/litchi-rtf-abba.RRdo3C/candidate-litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "aa7e29e407ec66925b8a2ac7be6620862bdb4687a198498b2fd8443d45922cee",
+      "git_revision": "107060085595da22c01572ecbc6e04c172ca5cd1",
+      "legs": [
+        "b1",
+        "b2"
+      ]
+    },
+    "control": {
+      "binary_identity": {
+        "binary_bytes": 49568584,
+        "binary_sha256": "bdba203782d4b7ca4d0e58830e0cb41a60b8393a761366e962e3cc840236153b",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/home/zhuhe/CodeProjects/litchi-rtf-abba.RRdo3C/control-litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "bdba203782d4b7ca4d0e58830e0cb41a60b8393a761366e962e3cc840236153b",
+      "git_revision": "9426734501c29d4b41b86ac66683efa1ca3e290d",
+      "legs": [
+        "a1",
+        "a2"
+      ]
+    },
+    "distinct": true
+  },
+  "protocol": {
+    "dispersion": "sample standard deviation via Rust Welford update",
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "percentiles": "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "uncertainty": "95% two-sided Student's t interval for the mean; embedded harness critical-value table with Cornish-Fisher tail"
+  },
+  "report_identity": {
+    "a1": {
+      "canonical_sha256": "eb155d84b224136ec58a9986ddfe23de506539755b1407105eadfe4d64aa3f24"
+    },
+    "a2": {
+      "canonical_sha256": "8d74935d8c3c2b36861c87cbfb355aed9f481541776577471bac6668e5ced703"
+    },
+    "b1": {
+      "canonical_sha256": "3042574938925c07f850ffbdd8c44964915b063c7726b560686556cf498d4a9b"
+    },
+    "b2": {
+      "canonical_sha256": "405a6fdaace267938728c233b616e0d8f2651a685e7ef4075dc29ea0eebc19de"
+    }
+  },
+  "results": [
+    {
+      "case": "rtf_file_open",
+      "corpus": {
+        "archive_bytes": 10851,
+        "archive_member_count": 1,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -3.9237459226276648,
+            "p50": -3.093671843803199,
+            "p95": 1.793582338196142,
+            "p99": -3.9910091914961936
+          },
+          "a2_to_b2": {
+            "mean": 7.857675174084779,
+            "p50": 2.67333494014622,
+            "p95": 13.276400533906981,
+            "p99": 12.410393252074806
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": false,
+            "p50": true,
+            "p95": false,
+            "p99": false
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 49396.49766334992,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 50598.05033665008
+            },
+            "max": 121037,
+            "mean": 49997.274,
+            "min": 45192,
+            "p50": 47581,
+            "p95": 64229,
+            "p99": 74743,
+            "sample_count": 500,
+            "standard_deviation": 6837.464407070793
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 54531.21188258814,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 56444.56411741189
+            },
+            "max": 125283,
+            "mean": 55487.88800000001,
+            "min": 46083,
+            "p50": 49788,
+            "p95": 77167,
+            "p99": 88442,
+            "sample_count": 500,
+            "standard_deviation": 10887.976943919319
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 51349.45369139626,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 52568.6263086037
+            },
+            "max": 134866,
+            "mean": 51959.03999999998,
+            "min": 46084,
+            "p50": 49053,
+            "p95": 63077,
+            "p99": 77726,
+            "sample_count": 500,
+            "standard_deviation": 6937.731121962088
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 50548.52486080719,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 51707.1351391929
+            },
+            "max": 87251,
+            "mean": 51127.830000000045,
+            "min": 46074,
+            "p50": 48457,
+            "p95": 66922,
+            "p99": 77466,
+            "sample_count": 500,
+            "standard_deviation": 6593.099675248002
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree; control drift +10.981827% exceeds 5% ceiling",
+          "p50": "paired directions disagree",
+          "p95": "control drift +20.143549% exceeds 10% ceiling",
+          "p99": "paired directions disagree; control drift +18.328138% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -1.599740872810456,
+            "p50": -1.2150123335983527,
+            "p95": 6.095724273506983,
+            "p99": -0.33450840130715587
+          },
+          "control": {
+            "mean": 10.981826729193308,
+            "p50": 4.638406086463084,
+            "p95": 20.14354886422021,
+            "p99": 18.32813775203029
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":10851,\"archive_member_count\":1,\"archive_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":200,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-medium\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"medium\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":9999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":200,\"paragraph_text_sha256\":\"18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_only\",\"source_bytes\":10851,\"source_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "medium",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 200,
+          "paragraph_text_sha256": "18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_only",
+          "source_bytes": 10851,
+          "source_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open",
+      "corpus": {
+        "archive_bytes": 1347,
+        "archive_member_count": 1,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 24,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-tiny",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "tiny",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 1199,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p50"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -7.383357181114667,
+            "p50": -4.008016032064128,
+            "p95": -37.276923076923076,
+            "p99": -15.368661205019185
+          },
+          "a2_to_b2": {
+            "mean": 0.9030579645692655,
+            "p50": -1.3074031704526883,
+            "p95": 14.25689307330195,
+            "p99": 10.514578343107294
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": false,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": false,
+            "p99": false
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 6087.174058593868,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6280.153941406135
+            },
+            "max": 21160,
+            "mean": 6183.664000000002,
+            "min": 5857,
+            "p50": 5988,
+            "p95": 6500,
+            "p99": 9643,
+            "sample_count": 500,
+            "standard_deviation": 1098.1566678932822
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 6327.088693603444,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6606.743306396562
+            },
+            "max": 26188,
+            "mean": 6466.916000000003,
+            "min": 5968,
+            "p50": 6119,
+            "p95": 8922,
+            "p99": 12107,
+            "sample_count": 500,
+            "standard_deviation": 1591.3813049862426
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 6526.393311579095,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6754.058688420913
+            },
+            "max": 21579,
+            "mean": 6640.226000000004,
+            "min": 6058,
+            "p50": 6228,
+            "p95": 8923,
+            "p99": 11125,
+            "sample_count": 500,
+            "standard_deviation": 1295.5353064987328
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 6316.75994852112,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6500.272051478877
+            },
+            "max": 19827,
+            "mean": 6408.515999999999,
+            "min": 6028,
+            "p50": 6199,
+            "p95": 7650,
+            "p99": 10834,
+            "sample_count": 500,
+            "standard_deviation": 1044.2800387552595
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree",
+          "p50": "candidate is not lower in both paired directions",
+          "p95": "paired directions disagree; control drift +37.261538% exceeds 10% ceiling; candidate drift -14.266502% exceeds 10% ceiling",
+          "p99": "paired directions disagree; control drift +25.552214% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -3.489489664960279,
+            "p50": -0.4656390494540783,
+            "p95": -14.266502297433597,
+            "p99": -2.6157303370786518
+          },
+          "control": {
+            "mean": 4.580649918883064,
+            "p50": 2.1877087508350033,
+            "p95": 37.261538461538464,
+            "p99": 25.552214041273462
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":1347,\"archive_member_count\":1,\"archive_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":24,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-tiny\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"tiny\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":1199,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":24,\"paragraph_text_sha256\":\"aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_only\",\"source_bytes\":1347,\"source_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "tiny",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 24,
+          "paragraph_text_sha256": "aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_only",
+          "source_bytes": 1347,
+          "source_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open",
+      "corpus": {
+        "archive_bytes": 540051,
+        "archive_member_count": 1,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 10000,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-large",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "large",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 499999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 3.6484373972369974,
+            "p50": 4.046600728696123,
+            "p95": 4.6030356002043185,
+            "p99": 7.696248108127213
+          },
+          "a2_to_b2": {
+            "mean": -6.7755422841535875,
+            "p50": -6.448713711342744,
+            "p95": -3.4234870480325736,
+            "p99": -15.546598749784756
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": false,
+            "p50": false,
+            "p95": true,
+            "p99": false
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 1828643.1548139264,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1853374.1411860746
+            },
+            "max": 2607541,
+            "mean": 1841008.6480000005,
+            "min": 1562993,
+            "p50": 1831216,
+            "p95": 2077151,
+            "p99": 2235219,
+            "sample_count": 500,
+            "standard_deviation": 140732.27319021977
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 1763136.2188178045,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1793057.1291821976
+            },
+            "max": 2904160,
+            "mean": 1778096.674000001,
+            "min": 1557705,
+            "p50": 1745759,
+            "p95": 2064474,
+            "p99": 2497170,
+            "sample_count": 500,
+            "standard_deviation": 170265.66058214588
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 1763703.4195826235,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1783977.780417379
+            },
+            "max": 2198868,
+            "mean": 1773840.6000000013,
+            "min": 1560539,
+            "p50": 1757114,
+            "p95": 1981539,
+            "p99": 2063191,
+            "sample_count": 500,
+            "standard_deviation": 115371.7383050758
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 1874968.6259985187,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1922176.1060014807
+            },
+            "max": 4857720,
+            "mean": 1898572.3659999997,
+            "min": 1612051,
+            "p50": 1858338,
+            "p95": 2135151,
+            "p99": 2885395,
+            "sample_count": 500,
+            "standard_deviation": 268635.3011734555
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree; candidate drift +7.031735% exceeds 5% ceiling",
+          "p50": "paired directions disagree; candidate drift +5.760810% exceeds 5% ceiling",
+          "p95": "paired directions disagree",
+          "p99": "paired directions disagree; candidate drift +39.851085% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 7.031734756775684,
+            "p50": 5.760810055579775,
+            "p95": 7.752156278528961,
+            "p99": 39.85108504253848
+          },
+          "control": {
+            "mean": -3.4172557564215986,
+            "p50": -4.666680500825681,
+            "p95": -0.6103070985210031,
+            "p99": 11.719254354942402
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":540051,\"archive_member_count\":1,\"archive_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":10000,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-large\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"large\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":499999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":10000,\"paragraph_text_sha256\":\"f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_only\",\"source_bytes\":540051,\"source_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "large",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 10000,
+          "paragraph_text_sha256": "f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_only",
+          "source_bytes": 540051,
+          "source_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus": {
+        "archive_bytes": 10851,
+        "archive_member_count": 1,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -4.413143749453787,
+            "p50": -2.6874299025105683,
+            "p95": -7.472428539275265,
+            "p99": -4.750872295882763
+          },
+          "a2_to_b2": {
+            "mean": -2.209177313728384,
+            "p50": 1.000499209584824,
+            "p95": -9.092193820770548,
+            "p99": -11.77051239867189
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 47117.219558758574,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 48119.28844124146
+            },
+            "max": 101731,
+            "mean": 47618.254000000015,
+            "min": 43941,
+            "p50": 46364,
+            "p95": 57759,
+            "p99": 71650,
+            "sample_count": 500,
+            "standard_deviation": 5702.297094135262
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 48506.94571984742,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 49225.18228015259
+            },
+            "max": 86989,
+            "mean": 48866.064000000006,
+            "min": 45322,
+            "p50": 48076,
+            "p95": 56609,
+            "p99": 66862,
+            "sample_count": 500,
+            "standard_deviation": 4087.142433344463
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 49166.512812771995,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 50272.91918722809
+            },
+            "max": 100429,
+            "mean": 49719.716000000044,
+            "min": 44893,
+            "p50": 47610,
+            "p95": 62075,
+            "p99": 75054,
+            "sample_count": 500,
+            "standard_deviation": 6296.032103463224
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 49390.27295653326,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 50500.931043466735
+            },
+            "max": 91247,
+            "mean": 49945.602,
+            "min": 44831,
+            "p50": 47595,
+            "p95": 61756,
+            "p99": 74732,
+            "sample_count": 500,
+            "standard_deviation": 6320.226575648311
+          }
+        },
+        "rejected_statistics": {
+          "mean": "candidate is not lower in both paired directions",
+          "p50": "paired directions disagree",
+          "p95": "candidate is not lower in both paired directions",
+          "p99": "candidate is not lower in both paired directions"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 0.4543187656179588,
+            "p50": -0.0315059861373661,
+            "p95": -0.5138944824808699,
+            "p99": -0.4290244357396008
+          },
+          "control": {
+            "mean": 2.6204446723308883,
+            "p50": 3.6925200586662066,
+            "p95": -1.9910317006873388,
+            "p99": -6.68248429867411
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":10851,\"archive_member_count\":1,\"archive_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":200,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-medium\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"medium\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":9999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":200,\"paragraph_text_sha256\":\"18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_and_full_text_lifecycle\",\"source_bytes\":10851,\"source_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "medium",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 200,
+          "paragraph_text_sha256": "18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_and_full_text_lifecycle",
+          "source_bytes": 10851,
+          "source_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus": {
+        "archive_bytes": 1347,
+        "archive_member_count": 1,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 24,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-tiny",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "tiny",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 1199,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p50",
+          "mean"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -10.798623333644604,
+            "p50": -1.1202272010097822,
+            "p95": -4.480540717322577,
+            "p99": 6.634061686518892
+          },
+          "a2_to_b2": {
+            "mean": -1.057241725057397,
+            "p50": -0.7875255945818239,
+            "p95": 5.189578479135776,
+            "p99": -6.702365015618028
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": false,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 6553.471238381323,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6809.824761618677
+            },
+            "max": 22611,
+            "mean": 6681.648,
+            "min": 6189,
+            "p50": 6338,
+            "p95": 9173,
+            "p99": 12677,
+            "sample_count": 500,
+            "standard_deviation": 1458.7858940452263
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 6523.403121275255,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6713.304878724738
+            },
+            "max": 18806,
+            "mean": 6618.353999999997,
+            "min": 6188,
+            "p50": 6349,
+            "p95": 9442,
+            "p99": 11205,
+            "sample_count": 500,
+            "standard_deviation": 1080.640521430284
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 7258.292702826767,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 7548.0552971732295
+            },
+            "max": 21149,
+            "mean": 7403.173999999998,
+            "min": 6228,
+            "p50": 6409,
+            "p95": 9584,
+            "p99": 11836,
+            "sample_count": 500,
+            "standard_deviation": 1648.9010173002227
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 6563.771367589872,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6812.8806324101315
+            },
+            "max": 23862,
+            "mean": 6688.326000000002,
+            "min": 6228,
+            "p50": 6399,
+            "p95": 8952,
+            "p99": 11956,
+            "sample_count": 500,
+            "standard_deviation": 1417.5622671637996
+          }
+        },
+        "rejected_statistics": {
+          "mean": "candidate is not lower in both paired directions; candidate drift -9.655966% exceeds 5% ceiling",
+          "p50": "candidate is not lower in both paired directions",
+          "p95": "paired directions disagree",
+          "p99": "paired directions disagree"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -9.65596648140374,
+            "p50": -0.15603058199407083,
+            "p95": -6.59432387312187,
+            "p99": 1.0138560324433932
+          },
+          "control": {
+            "mean": -0.9472812695311621,
+            "p50": 0.1735563269170085,
+            "p95": 2.9325193502670883,
+            "p99": -11.611580026820226
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":1347,\"archive_member_count\":1,\"archive_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":24,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-tiny\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"tiny\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":1199,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":24,\"paragraph_text_sha256\":\"aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_and_full_text_lifecycle\",\"source_bytes\":1347,\"source_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "tiny",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 24,
+          "paragraph_text_sha256": "aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_and_full_text_lifecycle",
+          "source_bytes": 1347,
+          "source_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus": {
+        "archive_bytes": 540051,
+        "archive_member_count": 1,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 10000,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-large",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "large",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 499999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 1.0136418942795515,
+            "p50": 1.100688161922634,
+            "p95": 4.117331119845707,
+            "p99": 6.493644941305854
+          },
+          "a2_to_b2": {
+            "mean": -6.9417343872565445,
+            "p50": -6.110220982682812,
+            "p95": -9.920151902225772,
+            "p99": -13.894948127382856
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": false,
+            "p50": false,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 1740403.0572953206,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1760521.3027046788
+            },
+            "max": 2424078,
+            "mean": 1750462.1799999997,
+            "min": 1572706,
+            "p50": 1725466,
+            "p95": 1966128,
+            "p99": 2195023,
+            "sample_count": 500,
+            "standard_deviation": 114483.3597193797
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 1756485.2612435888,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1766919.2707564128
+            },
+            "max": 2002607,
+            "mean": 1761702.2660000008,
+            "min": 1626861,
+            "p50": 1756925,
+            "p95": 1870677,
+            "p99": 1946981,
+            "sample_count": 500,
+            "standard_deviation": 59374.982264426755
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 1722666.2095387192,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1742771.314461282
+            },
+            "max": 2648518,
+            "mean": 1732718.7620000006,
+            "min": 1590370,
+            "p50": 1706474,
+            "p95": 1885176,
+            "p99": 2052486,
+            "sample_count": 500,
+            "standard_deviation": 114408.58346299616
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 1874884.6365801445,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1893105.2794198566
+            },
+            "max": 2619737,
+            "mean": 1883994.9580000006,
+            "min": 1704267,
+            "p50": 1864277,
+            "p95": 2056251,
+            "p99": 2217513,
+            "sample_count": 500,
+            "standard_deviation": 103685.00662422462
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree; candidate drift +8.730568% exceeds 5% ceiling",
+          "p50": "paired directions disagree; candidate drift +9.247313% exceeds 5% ceiling",
+          "p95": "paired directions disagree",
+          "p99": "paired directions disagree"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 8.730568359829414,
+            "p50": 9.247313466246776,
+            "p95": 9.074749519408268,
+            "p99": 8.040347169237695
+          },
+          "control": {
+            "mean": 0.642121042569515,
+            "p50": 1.8232176119378767,
+            "p95": -4.854770391347867,
+            "p99": -11.300200499038052
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":540051,\"archive_member_count\":1,\"archive_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":10000,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-large\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"large\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":499999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":10000,\"paragraph_text_sha256\":\"f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_and_full_text_lifecycle\",\"source_bytes\":540051,\"source_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "large",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 10000,
+          "paragraph_text_sha256": "f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_and_full_text_lifecycle",
+          "source_bytes": 540051,
+          "source_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    }
+  ],
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-abba-summary",
+    "version": "0.1.0"
+  },
+  "verification": {
+    "binary_hashes_distinct": true,
+    "binary_identity_verified": true,
+    "case_corpus_identity_verified": true,
+    "configuration_identity_verified": true,
+    "environment_legs_recorded": true,
+    "environment_stable_identity_verified": true,
+    "filesystem_evidence_identity_verified": true,
+    "operation_metrics_identity": {
+      "consistently_absent": 6,
+      "verified_equal": 0
+    },
+    "output_sha256_identity": {
+      "consistently_absent": 6,
+      "verified_equal": 0
+    },
+    "output_sha256_identity_verified": false,
+    "result_count": 6,
+    "sink_identity": {
+      "consistently_absent": 6,
+      "verified_equal": 0
+    },
+    "sink_identity_verified": false,
+    "source_identity": {
+      "consistently_absent": 0,
+      "verified_equal": 6
+    },
+    "source_identity_verified": true,
+    "statistics_recomputed_from_samples": true,
+    "tool_identity_verified": true
+  }
+}

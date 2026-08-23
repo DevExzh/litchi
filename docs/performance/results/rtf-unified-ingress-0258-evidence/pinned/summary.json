@@ -1,0 +1,1387 @@
+{
+  "environment": {
+    "legs": {
+      "a1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "9426734501c29d4b41b86ac66683efa1ca3e290d",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      },
+      "a2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "9426734501c29d4b41b86ac66683efa1ca3e290d",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      },
+      "b1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "107060085595da22c01572ecbc6e04c172ca5cd1",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      },
+      "b2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+        "filesystem_type": null,
+        "git_revision": "107060085595da22c01572ecbc6e04c172ca5cd1",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-30-generic",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "4",
+        "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+        "rustflags": null,
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 33600217088
+      }
+    },
+    "stable": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "2",
+      "cpu_model": "AMD EPYC 9575F 64-Core Processor",
+      "filesystem_type": null,
+      "git_worktree_dirty": false,
+      "kernel": "Linux 7.0.0-30-generic",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "4",
+      "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+      "rustflags": null,
+      "source_destination_same_device": null,
+      "storage_identifier": null,
+      "total_memory_bytes": 33600217088
+    }
+  },
+  "harness_identity": {
+    "configuration": {
+      "cases": [
+        "rtf_file_open",
+        "rtf_file_open_lifecycle"
+      ],
+      "corpus_shapes": [
+        "tiny",
+        "many-small",
+        "few-large",
+        "wide-root"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "filesystem_cache_states": [
+        "warm"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "payload_kinds": [
+        "compressible",
+        "incompressible"
+      ],
+      "range_simulation": {
+        "bandwidth_bytes_per_second": 52428800,
+        "fixed_latency_us": 100,
+        "max_physical_range_bytes": 4096,
+        "request_overhead_us": 25
+      },
+      "rtf_variants": [
+        "plain"
+      ],
+      "samples_per_case": 500,
+      "semantic_shapes": [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      "warmup_iterations_per_case": 20,
+      "writer_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "xlsb_shapes": [
+        "tiny",
+        "medium",
+        "large",
+        "sparse"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium",
+        "dense-sparse"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium",
+        "large"
+      ],
+      "xlsx_shapes": [
+        "tiny",
+        "medium",
+        "dense-wide"
+      ]
+    },
+    "schema_version": 1,
+    "tool": {
+      "binary": "litchi-perf-baseline",
+      "instrumentation": "none",
+      "name": "litchi-perf-baseline",
+      "profile": "release",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "version": "0.1.0"
+    }
+  },
+  "implementation_identity": {
+    "candidate": {
+      "binary_identity": {
+        "binary_bytes": 49564504,
+        "binary_sha256": "aa7e29e407ec66925b8a2ac7be6620862bdb4687a198498b2fd8443d45922cee",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/home/zhuhe/CodeProjects/litchi-rtf-abba.RRdo3C/candidate-litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "aa7e29e407ec66925b8a2ac7be6620862bdb4687a198498b2fd8443d45922cee",
+      "git_revision": "107060085595da22c01572ecbc6e04c172ca5cd1",
+      "legs": [
+        "b1",
+        "b2"
+      ]
+    },
+    "control": {
+      "binary_identity": {
+        "binary_bytes": 49568584,
+        "binary_sha256": "bdba203782d4b7ca4d0e58830e0cb41a60b8393a761366e962e3cc840236153b",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/home/zhuhe/CodeProjects/litchi-rtf-abba.RRdo3C/control-litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "bdba203782d4b7ca4d0e58830e0cb41a60b8393a761366e962e3cc840236153b",
+      "git_revision": "9426734501c29d4b41b86ac66683efa1ca3e290d",
+      "legs": [
+        "a1",
+        "a2"
+      ]
+    },
+    "distinct": true
+  },
+  "protocol": {
+    "dispersion": "sample standard deviation via Rust Welford update",
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "percentiles": "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "uncertainty": "95% two-sided Student's t interval for the mean; embedded harness critical-value table with Cornish-Fisher tail"
+  },
+  "report_identity": {
+    "a1": {
+      "canonical_sha256": "a068075190f4f84ca524c6ed95e3a2fece93da794cfa77310e8399f51452b1ad"
+    },
+    "a2": {
+      "canonical_sha256": "aa400a3483baece39ac4f1c0886a2a03407ca3d0b69b9b0feefa3ec0ae463a76"
+    },
+    "b1": {
+      "canonical_sha256": "61cee83f5d566205033639c7218c5a93f4dfc7b9195fa8198dabda1e4e8c99f6"
+    },
+    "b2": {
+      "canonical_sha256": "38972365190986981c78cbd572da3ab240edaee2faf69e087e2735e37d2bbad2"
+    }
+  },
+  "results": [
+    {
+      "case": "rtf_file_open",
+      "corpus": {
+        "archive_bytes": 10851,
+        "archive_member_count": 1,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -3.8778930119633466,
+            "p50": -0.13180385938175754,
+            "p95": -18.02352083143404,
+            "p99": -28.846406949197156
+          },
+          "a2_to_b2": {
+            "mean": -2.9843480702920693,
+            "p50": -1.7714106451950224,
+            "p95": -4.160282075362892,
+            "p99": -9.093728851793367
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": false,
+            "p99": false
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 49078.367855413984,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 49618.42414458603
+            },
+            "max": 77416,
+            "mean": 49348.39600000001,
+            "min": 45803,
+            "p50": 48557,
+            "p95": 54845,
+            "p99": 60784,
+            "sample_count": 500,
+            "standard_deviation": 3073.2033119168627
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 49221.03128591418,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 50139.496714085784
+            },
+            "max": 77127,
+            "mean": 49680.26399999998,
+            "min": 45352,
+            "p50": 47815,
+            "p95": 60693,
+            "p99": 70928,
+            "sample_count": 500,
+            "standard_deviation": 5226.549625161198
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 50614.65981084783,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 51909.48818915219
+            },
+            "max": 117972,
+            "mean": 51262.07400000001,
+            "min": 45743,
+            "p50": 48621,
+            "p95": 64730,
+            "p99": 78318,
+            "sample_count": 500,
+            "standard_deviation": 7368.252051410169
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 50623.40652906007,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 51702.3854709399
+            },
+            "max": 90936,
+            "mean": 51162.895999999986,
+            "min": 45683,
+            "p50": 48662,
+            "p95": 63218,
+            "p99": 77378,
+            "sample_count": 500,
+            "standard_deviation": 6139.955638248816
+          }
+        },
+        "rejected_statistics": {
+          "mean": "candidate is not lower in both paired directions",
+          "p50": "candidate is not lower in both paired directions",
+          "p95": "candidate is not lower in both paired directions; control drift +10.662777% exceeds 10% ceiling",
+          "p99": "candidate is not lower in both paired directions; control drift +16.688602% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -0.19347246855447497,
+            "p50": 0.08432570288558441,
+            "p95": -2.3358566352541326,
+            "p99": -1.2002349396051994
+          },
+          "control": {
+            "mean": 0.6725000747744122,
+            "p50": -1.5281009947072512,
+            "p95": 10.66277691676543,
+            "p99": 16.68860226375362
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":10851,\"archive_member_count\":1,\"archive_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":200,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-medium\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"medium\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":9999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":200,\"paragraph_text_sha256\":\"18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_only\",\"source_bytes\":10851,\"source_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "medium",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 200,
+          "paragraph_text_sha256": "18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_only",
+          "source_bytes": 10851,
+          "source_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open",
+      "corpus": {
+        "archive_bytes": 1347,
+        "archive_member_count": 1,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 24,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-tiny",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "tiny",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 1199,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p50",
+          "mean",
+          "p95"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -1.8458632022814752,
+            "p50": -1.3074031704526883,
+            "p95": -1.7602816450632102,
+            "p99": -0.21583551062137907
+          },
+          "a2_to_b2": {
+            "mean": -4.609994901648219,
+            "p50": -1.4831905075807514,
+            "p95": -41.43503555268261,
+            "p99": 4.818642617339214
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": false,
+            "p50": true,
+            "p95": false,
+            "p99": false
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": false
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 6156.491466575917,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6280.616533424085
+            },
+            "max": 15421,
+            "mean": 6218.554000000001,
+            "min": 5908,
+            "p50": 6119,
+            "p95": 6249,
+            "p99": 8803,
+            "sample_count": 500,
+            "standard_deviation": 706.3366804125296
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 6108.96519497959,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6648.098805020412
+            },
+            "max": 68944,
+            "mean": 6378.532000000001,
+            "min": 5918,
+            "p50": 6068,
+            "p95": 6188,
+            "p99": 15191,
+            "sample_count": 500,
+            "standard_deviation": 3067.9527841130625
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 6249.364482022035,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6417.315517977972
+            },
+            "max": 20659,
+            "mean": 6333.340000000004,
+            "min": 6008,
+            "p50": 6199,
+            "p95": 6359,
+            "p99": 8822,
+            "sample_count": 500,
+            "standard_deviation": 955.7294124487529
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 6515.2823762415765,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6829.881623758426
+            },
+            "max": 27148,
+            "mean": 6672.582000000001,
+            "min": 5998,
+            "p50": 6158,
+            "p95": 8752,
+            "p99": 14459,
+            "sample_count": 500,
+            "standard_deviation": 1790.2345899490658
+          }
+        },
+        "rejected_statistics": {
+          "mean": "candidate is not lower in both paired directions; candidate drift +5.356447% exceeds 5% ceiling",
+          "p50": "candidate is not lower in both paired directions",
+          "p95": "candidate is not lower in both paired directions; candidate drift +37.631703% exceeds 10% ceiling",
+          "p99": "paired directions disagree; control drift +72.566171% exceeds 15% ceiling; candidate drift +63.897075% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 5.356446993213648,
+            "p50": -0.6613969995160509,
+            "p95": 37.63170309797138,
+            "p99": 63.89707549308547
+          },
+          "control": {
+            "mean": 2.5725916346468978,
+            "p50": -0.8334695211635889,
+            "p95": -0.9761561849895983,
+            "p99": 72.56617062365103
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":1347,\"archive_member_count\":1,\"archive_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":24,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-tiny\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"tiny\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":1199,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":24,\"paragraph_text_sha256\":\"aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_only\",\"source_bytes\":1347,\"source_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "tiny",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 24,
+          "paragraph_text_sha256": "aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_only",
+          "source_bytes": 1347,
+          "source_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open",
+      "corpus": {
+        "archive_bytes": 540051,
+        "archive_member_count": 1,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 10000,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-large",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "large",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 499999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 3.639828643072969,
+            "p50": 3.812737213939235,
+            "p95": 2.1940546554514997,
+            "p99": 1.3923528319389973
+          },
+          "a2_to_b2": {
+            "mean": 4.3686517679980374,
+            "p50": 3.444067115154039,
+            "p95": 12.010203108435768,
+            "p99": 12.278873556232456
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 1833803.7682272415,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1861542.611772758
+            },
+            "max": 3674360,
+            "mean": 1847673.1899999997,
+            "min": 1627972,
+            "p50": 1825093,
+            "p95": 2082537,
+            "p99": 2353211,
+            "sample_count": 500,
+            "standard_deviation": 157848.5568300975
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 1832056.0548730078,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1864950.4491269924
+            },
+            "max": 3254352,
+            "mean": 1848503.252,
+            "min": 1584002,
+            "p50": 1810679,
+            "p95": 2180904,
+            "p99": 2507502,
+            "sample_count": 500,
+            "standard_deviation": 187186.3422233752
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 1766370.7654404773,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1794471.338559522
+            },
+            "max": 3131893,
+            "mean": 1780421.0519999997,
+            "min": 1542194,
+            "p50": 1755507,
+            "p95": 2036845,
+            "p99": 2320446,
+            "sample_count": 500,
+            "standard_deviation": 159906.9876745724
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 1750998.0927740217,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1784499.07122598
+            },
+            "max": 4692793,
+            "mean": 1767748.5820000009,
+            "min": 1542223,
+            "p50": 1748318,
+            "p95": 1918973,
+            "p99": 2199609,
+            "sample_count": 500,
+            "standard_deviation": 190638.12420156
+          }
+        },
+        "rejected_statistics": {},
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -0.7117681508968594,
+            "p50": -0.4095113263575708,
+            "p95": -5.786989191617428,
+            "p99": -5.207490284195366
+          },
+          "control": {
+            "mean": 0.04492471961453225,
+            "p50": -0.7897679734676535,
+            "p95": 4.7234214806267545,
+            "p99": 6.556615620103765
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":540051,\"archive_member_count\":1,\"archive_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":10000,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-large\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"large\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":499999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":10000,\"paragraph_text_sha256\":\"f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_only\",\"source_bytes\":540051,\"source_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "large",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 10000,
+          "paragraph_text_sha256": "f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_only",
+          "source_bytes": 540051,
+          "source_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>); corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus": {
+        "archive_bytes": 10851,
+        "archive_member_count": 1,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 200,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-medium",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "medium",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 9999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [
+          "p50"
+        ],
+        "adverse_both_statistics": [
+          "p95",
+          "p99"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 0.9345813582568964,
+            "p50": 0.8046817849305048,
+            "p95": -1.1000320561488757,
+            "p99": -5.536927956502039
+          },
+          "a2_to_b2": {
+            "mean": -0.38704303656202727,
+            "p50": 1.2800851970181044,
+            "p95": -10.879449207586386,
+            "p99": -17.0370794395867
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": false,
+            "p99": false
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 49266.364093557255,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 50084.21590644273
+            },
+            "max": 68774,
+            "mean": 49675.28999999999,
+            "min": 44431,
+            "p50": 47845,
+            "p95": 59271,
+            "p99": 66210,
+            "sample_count": 500,
+            "standard_deviation": 4654.005425749511
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 48092.883119502905,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 49787.70488049713
+            },
+            "max": 200286,
+            "mean": 48940.294000000016,
+            "min": 44482,
+            "p50": 46950,
+            "p95": 61584,
+            "p99": 69877,
+            "sample_count": 500,
+            "standard_deviation": 9644.424022876123
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 48744.317522127894,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 49677.75047787199
+            },
+            "max": 78428,
+            "mean": 49211.03399999994,
+            "min": 44601,
+            "p50": 47460,
+            "p95": 59923,
+            "p99": 69876,
+            "sample_count": 500,
+            "standard_deviation": 5311.722701059435
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 48425.65126292575,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 49833.77673707425
+            },
+            "max": 99036,
+            "mean": 49129.714,
+            "min": 43951,
+            "p50": 46349,
+            "p95": 68284,
+            "p99": 81782,
+            "sample_count": 500,
+            "standard_deviation": 8012.971902210514
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree",
+          "p95": "candidate is not lower in both paired directions; candidate drift +13.952906% exceeds 10% ceiling",
+          "p99": "candidate is not lower in both paired directions; candidate drift +17.038754% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -0.1652474930722683,
+            "p50": -2.3409186683522965,
+            "p95": 13.9529062296614,
+            "p99": 17.038754364874922
+          },
+          "control": {
+            "mean": -1.4796008236690261,
+            "p50": -1.8706238896436407,
+            "p95": 3.902414334160045,
+            "p99": 5.538438302371243
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":10851,\"archive_member_count\":1,\"archive_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":200,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-medium\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"medium\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":9999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":200,\"paragraph_text_sha256\":\"18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_and_full_text_lifecycle\",\"source_bytes\":10851,\"source_sha256\":\"48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "medium",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "3acfdadaadb147411456415b42d84fd0de5acc4962e1afc76a85f9366c7af1af",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 200,
+          "paragraph_text_sha256": "18155ad317e46fd49d754a0c5edc099fbd3fbd2d61b812c37d03aac4663a3c60",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_and_full_text_lifecycle",
+          "source_bytes": 10851,
+          "source_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus": {
+        "archive_bytes": 1347,
+        "archive_member_count": 1,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 24,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-tiny",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "tiny",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 1199,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p95"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 1.2271188797868646,
+            "p50": -0.32771535580524347,
+            "p95": -0.6145337225380243,
+            "p99": 31.377089514436644
+          },
+          "a2_to_b2": {
+            "mean": -4.730607346634052,
+            "p50": 1.5564801972568962,
+            "p95": -22.374370236403564,
+            "p99": -0.21832523417142052
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": false,
+            "p50": true,
+            "p95": false,
+            "p99": false
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": false,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 6431.4066294404365,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6798.933370559565
+            },
+            "max": 45454,
+            "mean": 6615.170000000001,
+            "min": 6259,
+            "p50": 6408,
+            "p95": 6509,
+            "p99": 13819,
+            "sample_count": 500,
+            "standard_deviation": 2091.4197661819953
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 6643.819082259195,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6878.6729177408015
+            },
+            "max": 19328,
+            "mean": 6761.245999999998,
+            "min": 6339,
+            "p50": 6489,
+            "p95": 7741,
+            "p99": 14199,
+            "sample_count": 500,
+            "standard_deviation": 1336.4414034043798
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 6458.113733589541,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 6609.8742664104675
+            },
+            "max": 17464,
+            "mean": 6533.994000000004,
+            "min": 6268,
+            "p50": 6429,
+            "p95": 6549,
+            "p99": 9483,
+            "sample_count": 500,
+            "standard_deviation": 863.5969646766924
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 6868.404370010078,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 7293.78362998992
+            },
+            "max": 47986,
+            "mean": 7081.093999999999,
+            "min": 6199,
+            "p50": 6388,
+            "p95": 9473,
+            "p99": 14230,
+            "sample_count": 500,
+            "standard_deviation": 2420.6309171863604
+          }
+        },
+        "rejected_statistics": {
+          "mean": "paired directions disagree; candidate drift +8.373133% exceeds 5% ceiling",
+          "p50": "paired directions disagree",
+          "p95": "candidate is not lower in both paired directions; control drift +18.927639% exceeds 10% ceiling; candidate drift +44.648038% exceeds 10% ceiling",
+          "p99": "paired directions disagree; candidate drift +50.057999% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 8.37313288013418,
+            "p50": -0.6377352620936383,
+            "p95": 44.648037868376846,
+            "p99": 50.057998523673945
+          },
+          "control": {
+            "mean": 2.2081972194213795,
+            "p50": 1.2640449438202246,
+            "p95": 18.927638654171147,
+            "p99": 2.7498371806932482
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":1347,\"archive_member_count\":1,\"archive_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":24,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-tiny\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"tiny\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":1199,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":24,\"paragraph_text_sha256\":\"aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_and_full_text_lifecycle\",\"source_bytes\":1347,\"source_sha256\":\"ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "tiny",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "504f07326cb3ae78b77dd9652a244aef121d6d6704004eea8d7b9766c89af9bb",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 24,
+          "paragraph_text_sha256": "aef3df6a1efe06087270f0cd407a28554202c2cc6787adda6c9b85ff8ddd9967",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_and_full_text_lifecycle",
+          "source_bytes": 1347,
+          "source_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    },
+    {
+      "case": "rtf_file_open_lifecycle",
+      "corpus": {
+        "archive_bytes": 540051,
+        "archive_member_count": 1,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "compression": "none",
+        "entry_bytes": 49,
+        "entry_count": 10000,
+        "generator": "litchi-rtf-semantic-v2",
+        "name": "rtf-semantic-plain-large",
+        "package_format": "RTF",
+        "payload_kind": "deterministic-semantic-text",
+        "rtf_variant": "plain",
+        "shape": "large",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "uncompressed_payload_bytes": 499999,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [],
+        "adverse_both_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": -3.8158357945090398,
+            "p50": -2.7951648115003827,
+            "p95": -3.7115603700769086,
+            "p99": -45.43486920297639
+          },
+          "a2_to_b2": {
+            "mean": -5.66955001128495,
+            "p50": -5.394477612834071,
+            "p95": -8.603602042561993,
+            "p99": -6.931902517092263
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": false,
+            "p50": false,
+            "p95": true,
+            "p99": false
+          },
+          "control": {
+            "mean": false,
+            "p50": false,
+            "p95": false,
+            "p99": false
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 1836384.753357029,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1869950.9386429717
+            },
+            "max": 3871952,
+            "mean": 1853167.8460000004,
+            "min": 1641581,
+            "p50": 1820322,
+            "p95": 2029416,
+            "p99": 2779077,
+            "sample_count": 500,
+            "standard_deviation": 191009.18525978134
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 1677809.7495784778,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1690493.8304215218
+            },
+            "max": 1968711,
+            "mean": 1684151.7899999998,
+            "min": 1545648,
+            "p50": 1669930,
+            "p95": 1817913,
+            "p99": 1929528,
+            "sample_count": 500,
+            "standard_deviation": 72179.06732504729
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 1885620.1354810628,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1962143.2405189383
+            },
+            "max": 8122818,
+            "mean": 1923881.6880000005,
+            "min": 1627491,
+            "p50": 1871203,
+            "p95": 2104739,
+            "p99": 4041747,
+            "sample_count": 500,
+            "standard_deviation": 435456.57101984276
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 1770479.623994273,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1788791.612005728
+            },
+            "max": 2466216,
+            "mean": 1779635.6180000005,
+            "min": 1580015,
+            "p50": 1760014,
+            "p95": 1974319,
+            "p99": 2063281,
+            "sample_count": 500,
+            "standard_deviation": 104204.80852257487
+          }
+        },
+        "rejected_statistics": {
+          "mean": "candidate is not lower in both paired directions; control drift -9.120386% exceeds 5% ceiling; candidate drift -7.497658% exceeds 5% ceiling",
+          "p50": "candidate is not lower in both paired directions; control drift -8.261835% exceeds 5% ceiling; candidate drift -5.942113% exceeds 5% ceiling",
+          "p95": "candidate is not lower in both paired directions; control drift -10.421865% exceeds 10% ceiling",
+          "p99": "candidate is not lower in both paired directions; control drift -30.569466% exceeds 15% ceiling; candidate drift -48.950763% exceeds 15% ceiling"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": -7.497658036859491,
+            "p50": -5.9421131753209036,
+            "p95": -6.196492771787856,
+            "p99": -48.95076312297628
+          },
+          "control": {
+            "mean": -9.120385741896825,
+            "p50": -8.26183499402853,
+            "p95": -10.421865206542178,
+            "p99": -30.569466049339404
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":540051,\"archive_member_count\":1,\"archive_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"compression\":\"none\",\"entry_bytes\":49,\"entry_count\":10000,\"generator\":\"litchi-rtf-semantic-v2\",\"name\":\"rtf-semantic-plain-large\",\"package_format\":\"RTF\",\"payload_kind\":\"deterministic-semantic-text\",\"rtf_variant\":\"plain\",\"shape\":\"large\",\"target_entry\":\"paragraph:0\",\"target_payload_bytes\":49,\"target_payload_sha256\":\"53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84\",\"uncompressed_payload_bytes\":499999,\"xlsx\":null}",
+        "operation_metrics_canonical_json": null,
+        "operation_metrics_status": "consistently_absent",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"read_bytes\":[],\"read_calls\":[],\"rtf_root\":{\"canonical_text_sha256\":\"f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc\",\"implementation\":\"unified_owned_bytes_facade\",\"native_exact_source_roundtrip_verified\":true,\"native_semantic_parity_verified\":true,\"paragraph_count\":10000,\"paragraph_text_sha256\":\"f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e\",\"performance_claim\":\"none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim\",\"phase\":\"owned_bytes_open_and_full_text_lifecycle\",\"source_bytes\":540051,\"source_sha256\":\"957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e\",\"timing_scope\":\"litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer\",\"transport_variant\":\"plain\"}}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": null,
+      "shape": "large",
+      "sink": null,
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "read_bytes": [],
+        "read_calls": [],
+        "rtf_root": {
+          "canonical_text_sha256": "f122900c5e612d3218061ddd766889f8c2520c4e3b51e6aa3df6158fc736abdc",
+          "implementation": "unified_owned_bytes_facade",
+          "native_exact_source_roundtrip_verified": true,
+          "native_semantic_parity_verified": true,
+          "paragraph_count": 10000,
+          "paragraph_text_sha256": "f7749cf129061d20e5622f0fdab57434ff7fd205662b7bf9bab1c7444900ae6e",
+          "performance_claim": "none: scoped synthetic RTF ingress evidence only; no generic, producer, allocation, I/O, or ABBA claim",
+          "phase": "owned_bytes_open_and_full_text_lifecycle",
+          "source_bytes": 540051,
+          "source_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+          "timing_scope": "litchi::Document::from_bytes(Vec<u8>)+Document::text; corpus, clone/setup, native oracle, source hash, and parity checks outside timer",
+          "transport_variant": "plain"
+        }
+      }
+    }
+  ],
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-abba-summary",
+    "version": "0.1.0"
+  },
+  "verification": {
+    "binary_hashes_distinct": true,
+    "binary_identity_verified": true,
+    "case_corpus_identity_verified": true,
+    "configuration_identity_verified": true,
+    "environment_legs_recorded": true,
+    "environment_stable_identity_verified": true,
+    "filesystem_evidence_identity_verified": true,
+    "operation_metrics_identity": {
+      "consistently_absent": 6,
+      "verified_equal": 0
+    },
+    "output_sha256_identity": {
+      "consistently_absent": 6,
+      "verified_equal": 0
+    },
+    "output_sha256_identity_verified": false,
+    "result_count": 6,
+    "sink_identity": {
+      "consistently_absent": 6,
+      "verified_equal": 0
+    },
+    "sink_identity_verified": false,
+    "source_identity": {
+      "consistently_absent": 0,
+      "verified_equal": 6
+    },
+    "source_identity_verified": true,
+    "statistics_recomputed_from_samples": true,
+    "tool_identity_verified": true
+  }
+}

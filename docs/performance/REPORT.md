@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-22
+Date: 2026-08-23
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -10,6 +10,23 @@ claim that the end-to-end performance program or CRUD scenario matrix is
 complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
+
+## Byte-native unified RTF ingress (change 0258)
+
+[Change 0258](changes/0258-rtf-byte-native-facade.md) removes the facade's
+UTF-8 conversion gate and hands owned RTF bytes directly to the native parser.
+Literal CP-1252, LZFu, and stored MELA transports now retain native semantics
+and exact source bytes; byte, reader, and smart detection keep ZIP/OLE2
+precedence. Two opt-in facade selectors raise the selectable harness count to
+380 without changing the 36-case default matrix.
+
+Two CPU-2 release A1/B1/B2/A2 captures used identical control/candidate
+binaries, plain tiny/medium/large corpora, 20 warmups, and 500 samples per leg.
+The pinned-metadata capture accepts five in-run cells, but the immediately
+preceding equivalent capture accepts 0/24. Because the accepted set does not
+reproduce, all latency results are withheld and no claim-registry entry is
+added. Both compact packages are retained as non-reproducibility evidence;
+the landing is supported by correctness and source-preservation gates only.
 
 ## DOCX owned-byte source-backed ingress (change 0257)
 

@@ -21,6 +21,23 @@ The schema-1 corpus objects and the comparator's case/corpus identity digest are
 unchanged; V2 fields that are not represented by the historical report remain
 explicitly unknown rather than being inferred.
 
+## Latest retained unified RTF byte-ingress evidence (change 0258)
+
+`litchi::Document::from_bytes` now hands owned RTF bytes directly to the native
+RTF parser. The facade therefore accepts literal CP-1252 plus native LZFu and
+stored MELA transports without a lossy UTF-8 gate, while byte/reader/smart
+detection preserves ZIP and OLE2 precedence. Exact native-source round trip,
+semantic parity, malformed-frame refusal, and cursor restoration are focused
+correctness gates.
+
+Two clean CPU-2 release A1/B1/B2/A2 captures reuse identical binaries over the
+two new opt-in facade selectors, tiny/medium/large plain generated RTF, 20
+warmups, and 500 samples per leg. The pinned-metadata capture accepts five
+in-run cells, while the immediately preceding equivalent capture accepts none.
+The accepted set is not reproducible, so no latency statistic or speedup claim
+is retained. Both compact packages and the complete claim boundary are in
+[change 0258](changes/0258-rtf-byte-native-facade.md).
+
 ## Latest retained high-level ODT source-ingress result (change 0191)
 
 `litchi::Document::open(Path)` now retains validated ODT files through one
@@ -840,6 +857,13 @@ The stage-1 records above are retained unchanged. The current harness has
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
+
+Change 0258 adds the opt-in `rtf_file_open` and
+`rtf_file_open_lifecycle` selectors over plain, CP-1252, LZFu, and MELA
+variants. The non-plain variants are correctness-only because the historical
+facade control cannot open them. Back-to-back plain 20-warmup/500-sample ABBA
+captures fail cross-run reproducibility, so the retained evidence supports no
+latency claim and does not change the historical default tranche.
 
 Four opt-in XLSB lifecycle selectors cover fresh open, worksheet listing, one
 cell, and a prepared full `worksheet.cells()` scan over deterministic tiny,
