@@ -419,6 +419,71 @@ fn mixed_reorder_patch_retains_only_unchanged_name_caches() {
 }
 
 #[test]
+fn inverse_mixed_patch_retains_reordered_cache_and_reparses_replacement() {
+    let source = state();
+    let source_document = parse(&source, "Index/Document.iwa");
+    let source_metadata = parse(&source, "Index/Metadata.iwa");
+
+    let mut target = source.clone();
+    assert_eq!(
+        target.replace_entry_data("Index/Metadata.iwa", vec![8]),
+        Some(vec![2])
+    );
+    let document = target
+        .remove_entry("Index/Document.iwa")
+        .unwrap_or_else(|| panic!("document entry should exist"));
+    target
+        .try_insert_entry_at(1, document)
+        .unwrap_or_else(|error| panic!("reinserted document should be accepted: {error}"));
+
+    let patch = source.patch_to(&target);
+    let published = source
+        .apply_patch(&patch)
+        .unwrap_or_else(|error| panic!("mixed patch should publish: {error}"));
+    let published_document = published
+        .get_or_parse_archive("Index/Document.iwa", |_| {
+            panic!("forward reorder must retain the document archive cache")
+        })
+        .unwrap_or_else(|error| panic!("published document cache should be usable: {error}"));
+    assert!(Arc::ptr_eq(&source_document, &published_document));
+
+    let published_metadata = published
+        .get_or_parse_archive("Index/Metadata.iwa", |_| Ok((Archive::default(), 1)))
+        .unwrap_or_else(|error| panic!("published metadata should parse: {error}"));
+    assert!(!Arc::ptr_eq(&source_metadata, &published_metadata));
+
+    let restored = published
+        .apply_patch(&patch.inverse())
+        .unwrap_or_else(|error| panic!("inverse mixed patch should publish: {error}"));
+    assert_eq!(
+        restored.iter().map(Entry::name).collect::<Vec<_>>(),
+        ["Index/Document.iwa", "Index/Metadata.iwa"]
+    );
+
+    let restored_document = restored
+        .get_or_parse_archive("Index/Document.iwa", |_| {
+            panic!("inverse reorder must retain the document archive cache")
+        })
+        .unwrap_or_else(|error| panic!("restored document cache should be usable: {error}"));
+    assert!(Arc::ptr_eq(&source_document, &restored_document));
+
+    let restored_metadata_parse_count = AtomicUsize::new(0);
+    let restored_metadata = restored
+        .get_or_parse_archive("Index/Metadata.iwa", |_| {
+            restored_metadata_parse_count.fetch_add(1, Ordering::SeqCst);
+            Ok((Archive::default(), 1))
+        })
+        .unwrap_or_else(|error| panic!("restored metadata should parse: {error}"));
+    assert!(!Arc::ptr_eq(&published_metadata, &restored_metadata));
+    assert!(!Arc::ptr_eq(&source_metadata, &restored_metadata));
+    assert_eq!(
+        restored_metadata_parse_count.load(Ordering::SeqCst),
+        1,
+        "inverse replacement must detach the forward-generation cache"
+    );
+}
+
+#[test]
 fn speculative_and_oversized_archives_are_rejected_with_typed_limits() {
     let limits = ArchiveLimits::default()
         .with_archive_bytes(4)
