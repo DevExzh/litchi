@@ -40,6 +40,30 @@ and `OutputBytes` release. It remains correctness-only: no selector or
 default-count change and no latency, allocation, RSS, physical-I/O, or
 resource-performance claim.
 
+## Latest PPTX slide-boundary publication coverage (change 0265)
+
+The opt-in `pptx_slide_remove_boundary_save` and
+`pptx_slide_move_boundary_save` selectors use a deterministic four-slide,
+dependency-free PPTX corpus with 45 ZIP members, 32,396 source archive bytes,
+and source SHA-256
+`685a1805ad291e8f9852d3ccd584320f20847bd0ac8fdf29857f96efe1109477`.
+Removal covers first, middle, and last positions and a final-only refusal;
+move covers `0 -> 3`, `3 -> 0`, and the exact `from == to` no-op. The two
+selectors raise the selectable matrix to 385 names while the default remains
+36 cases / 198 records.
+
+The production opened-presentation `Snapshot`/`Transaction` paths are used.
+Phase vectors cover plan, commit, sequential OPC publication, and semantic
+reopen; setup and independent oracles are untimed. Twice-built determinism,
+semantic reopen, source immutability, serialized durable forward/inverse
+patches, stale/foreign, dependency, unknown-member, markup-compatibility,
+signed-package, limits, partial-sink, and zero-sink gates are required. Raw
+local and local-offset-normalized central records for untouched members must
+match; move requires strict `[Content_Types].xml` identity. This is
+correctness and phase evidence only: no latency, allocation, RSS,
+decompression, throughput, physical-I/O, or broad PPTX claim is retained. See
+[change 0265](changes/0265-pptx-slide-boundary-publication.md).
+
 ## Latest DOCX story-hyperlink publication coverage (change 0263)
 
 The opt-in `docx_story_hyperlink_noop_save` and
@@ -950,7 +974,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**383 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**385 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.

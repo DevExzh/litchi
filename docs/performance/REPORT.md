@@ -1,6 +1,6 @@
 # Performance program phase report
 
-Date: 2026-08-23
+Date: 2026-08-24
 Branch: `feat/office-format-completeness`
 Historical production base for the original measured tranche:
 `6df5d4a1fbe53a8216e63f24cc1392be60b714a8`
@@ -27,6 +27,33 @@ edit refusal, external-target inventory without fetching, and one-under input
 plus zero-output budget/release behavior. This is bounded correctness-only
 evidence; it changes no selector or default count and makes no latency,
 allocation, RSS, physical-I/O, or resource-performance claim.
+
+## PPTX slide-boundary publication selectors (change 0265)
+
+[Change 0265](changes/0265-pptx-slide-boundary-publication.md), landed in
+`0b62b26b4033a6d6f358a1178c57fc901215c1f2`, adds the opt-in
+`pptx_slide_remove_boundary_save` and `pptx_slide_move_boundary_save`
+selectors. Their deterministic four-dependency-free-slide corpus contains 45
+ZIP members, 32,396 archive bytes, and source SHA-256
+`685a1805ad291e8f9852d3ccd584320f20847bd0ac8fdf29857f96efe1109477`.
+
+Removal covers the first, middle, and last positions and separately refuses
+removal of the only slide. Move covers both boundary directions and requires
+an exact no-op when `from == to`. The production opened-presentation
+`Snapshot`/`Transaction` and typed removal/commit paths are used. Samples
+report plan, commit, sequential publication, and semantic-reopen phases;
+setup and all independent oracles remain outside those clocks.
+
+Twice-built determinism, semantic reopen, source immutability, durable
+serialized forward/inverse patches, stale/foreign refusal, dependency,
+unknown-member, markup-compatibility, signed-package, and limits refusals,
+plus partial/zero-sink behavior, are required. Untouched members retain raw
+ZIP local records and central-directory records with local offsets normalized;
+move additionally requires strict `[Content_Types].xml` identity. The
+selectors raise the selectable matrix to 385 names while the default remains
+36 cases / 198 records. This is correctness and phase evidence only: no
+latency, allocation, RSS, decompression, throughput, physical-I/O, or broad
+PPTX claim is registered.
 
 ## DOCX story-hyperlink publication selectors (change 0263)
 
@@ -1217,7 +1244,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **383 selectable cases**; 200 was the count before the
+harness contains **385 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -2685,7 +2712,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 383 selectable cases. Change
+The current standalone harness provides 385 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors
