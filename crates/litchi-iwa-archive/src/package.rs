@@ -871,28 +871,28 @@ pub struct LogicalEntryLimits {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum LogicalEntryLimitProfile {
-    SemanticComponents,
-    SemanticMetadata,
-    SemanticProperties,
+    Components,
+    Metadata,
+    Properties,
 }
 
 impl LogicalEntryLimits {
     /// Select only IWA components and materialize no package sidecars.
     pub const SEMANTIC_COMPONENTS: Self = Self {
-        profile: LogicalEntryLimitProfile::SemanticComponents,
+        profile: LogicalEntryLimitProfile::Components,
     };
 
     /// iWork's three canonical semantic metadata authorities, each capped at
     /// 64 KiB and required to use a supported ZIP compression method.
     pub const SEMANTIC_METADATA: Self = Self {
-        profile: LogicalEntryLimitProfile::SemanticMetadata,
+        profile: LogicalEntryLimitProfile::Metadata,
     };
 
     /// Keynote's archive-free metadata authority, capped at 64 KiB and
     /// required to use a supported ZIP compression method. Build history and
     /// document identifier members remain outside this profile.
     pub const SEMANTIC_PROPERTIES: Self = Self {
-        profile: LogicalEntryLimitProfile::SemanticProperties,
+        profile: LogicalEntryLimitProfile::Properties,
     };
 
     /// Compatibility alias for the original Pages-specific spelling.
@@ -902,14 +902,14 @@ impl LogicalEntryLimits {
 
     const fn maximum_for(self, logical_name: &[u8]) -> Option<u64> {
         match self.profile {
-            LogicalEntryLimitProfile::SemanticComponents => None,
-            LogicalEntryLimitProfile::SemanticMetadata => match logical_name {
+            LogicalEntryLimitProfile::Components => None,
+            LogicalEntryLimitProfile::Metadata => match logical_name {
                 b"Metadata/Properties.plist"
                 | b"Metadata/BuildVersionHistory.plist"
                 | b"Metadata/DocumentIdentifier" => Some(Self::MAX_SEMANTIC_METADATA_BYTES),
                 _ => None,
             },
-            LogicalEntryLimitProfile::SemanticProperties => match logical_name {
+            LogicalEntryLimitProfile::Properties => match logical_name {
                 b"Metadata/Properties.plist" => Some(Self::MAX_SEMANTIC_METADATA_BYTES),
                 _ => None,
             },
@@ -919,18 +919,15 @@ impl LogicalEntryLimits {
     const fn includes_metadata(self) -> bool {
         matches!(
             self.profile,
-            LogicalEntryLimitProfile::SemanticMetadata
-                | LogicalEntryLimitProfile::SemanticProperties
+            LogicalEntryLimitProfile::Metadata | LogicalEntryLimitProfile::Properties
         )
     }
 
     const fn selects_metadata_authority(self, logical_name: &[u8]) -> bool {
         match self.profile {
-            LogicalEntryLimitProfile::SemanticComponents => false,
-            LogicalEntryLimitProfile::SemanticMetadata => {
-                is_semantic_metadata_authority(logical_name)
-            },
-            LogicalEntryLimitProfile::SemanticProperties => {
+            LogicalEntryLimitProfile::Components => false,
+            LogicalEntryLimitProfile::Metadata => is_semantic_metadata_authority(logical_name),
+            LogicalEntryLimitProfile::Properties => {
                 matches!(logical_name, b"Metadata/Properties.plist")
             },
         }

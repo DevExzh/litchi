@@ -593,12 +593,12 @@ fn rebuild_with_signature(archive: &ArchiveReader<'_>, signature_xml: &str) -> R
         if name == "mimetype" || stored {
             writer.write_stored(name, &bytes)
         } else {
-            writer.write_deflated(name, &bytes)
+            writer.write_deflated_sized(name, &bytes)
         }
         .map_err(|error| Error::ZipError(error.to_string()))?;
     }
     writer
-        .write_deflated(DOCUMENT_SIGNATURE_PATH, signature_xml.as_bytes())
+        .write_deflated_sized(DOCUMENT_SIGNATURE_PATH, signature_xml.as_bytes())
         .map_err(|error| Error::ZipError(error.to_string()))?;
     writer
         .finish_to_bytes()
