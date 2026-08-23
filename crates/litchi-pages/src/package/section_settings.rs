@@ -89,7 +89,9 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             Diagnostics::unchanged(),
         ));
     }
-    if settings_at_position(source, position)? != before {
+    let mut budget = transaction::TransactionBudget::new(source)?;
+    let (target, decoded) = settings_at_position_with_budget(source, position, &mut budget)?;
+    if decoded != before {
         return Err(Error::InvalidSource {
             path: Path::section(position),
         });
@@ -100,15 +102,7 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
 
-    let mut budget = transaction::TransactionBudget::new(source)?;
-    let target = transaction::resolve_target(source, position, &mut budget)?;
     let payload = transaction::selected_payload(source, target)?;
-    let decoded = decode_settings(source, payload, Path::section(position), &mut budget)?;
-    if decoded != before {
-        return Err(Error::InvalidSource {
-            path: Path::section(position),
-        });
-    }
     validate_changed_dependencies(source, target, &before, &after, &mut budget)?;
     let rewritten = rewrite_payload(source, payload, &before, &after, &mut budget)?;
     let (candidate, stats) =
