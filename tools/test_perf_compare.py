@@ -1008,6 +1008,26 @@ class PerfCompareTests(unittest.TestCase):
                 baseline, current, self.operation_metrics_policy()
             )
 
+    def test_filesystem_xlsx_counter_scope_is_valid_for_not_applicable_source(self):
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            operation_metrics = operation_metrics_report_fields()
+            source = operation_metrics["source"]
+            source["status"] = "not_applicable"
+            source["counter_scope"] = "not_applicable_filesystem_xlsx"
+            for field, vector in source.items():
+                if field in {"status", "counter_scope"}:
+                    continue
+                vector["status"] = "not_applicable"
+                vector.pop("values", None)
+            item["operation_metrics"] = operation_metrics
+
+        result = perf_compare.compare_reports(
+            baseline, current, self.operation_metrics_policy()
+        )
+        self.assertEqual(result["status"], "pass")
+
     def test_invalid_source_counter_scope_fails_closed(self):
         baseline = report()
         current = report(revision="current")

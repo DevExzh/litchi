@@ -1494,6 +1494,7 @@ _SOURCE_COUNTER_SCOPES = {
     "not_applicable_eager_opc",
     "not_applicable_eager_pptx",
     "not_applicable_eager_docx",
+    "not_applicable_filesystem_xlsx",
     "not_applicable_immutable_owned_slice",
     "not_applicable_in_process_sink",
 }
