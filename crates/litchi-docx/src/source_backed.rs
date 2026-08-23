@@ -17,8 +17,9 @@ use crate::namespace::scan_word_element_ranges;
 use crate::package::validate_document_main_content_type;
 use crate::paragraph::Paragraph;
 use crate::parts::document_part::{
-    document_blocks, document_elements, document_paragraph, document_paragraph_count,
-    document_paragraphs, document_tables, is_xml_outer_whitespace, visible_document_xml,
+    ParagraphIndex, document_blocks, document_elements, document_paragraph,
+    document_paragraph_count, document_paragraph_from_index, document_paragraphs,
+    document_paragraphs_from_index, document_tables, is_xml_outer_whitespace, visible_document_xml,
 };
 use crate::redact;
 use crate::sanitize::{self, RelationshipState};
@@ -389,15 +390,19 @@ impl Package {
         let data = main.data()?;
         let managed = self.package.cache_diagnostics().budget_managed;
         let document: Result<Document> = (|| {
-            let xml = if managed {
+            let (xml, paragraph_index) = if managed {
                 ensure_source_document_xml(data.as_bytes())?;
-                DocumentPayload::Managed(data)
+                let paragraph_index = ParagraphIndex::from_xml(data.as_bytes()).ok().map(Arc::new);
+                (DocumentPayload::Managed(data), paragraph_index)
             } else {
-                DocumentPayload::Owned(visible_document_xml(data.into_arc()?)?)
+                let xml = visible_document_xml(data.into_arc()?)?;
+                let paragraph_index = ParagraphIndex::from_xml(xml.as_slice()).ok().map(Arc::new);
+                (DocumentPayload::Owned(xml), paragraph_index)
             };
             let source_version = self.package.source_version()?;
             Ok(Document {
                 xml,
+                paragraph_index,
                 source_version,
                 execution: self.execution.clone(),
             })
@@ -1893,6 +1898,10 @@ impl DocumentPayload {
 #[derive(Clone)]
 pub struct Document {
     xml: DocumentPayload,
+    /// Bounded offsets into the pinned XML. The index owns no payload bytes;
+    /// managed documents therefore retain the same `PartData` ownership and
+    /// budget reservations as the uncached selective facade.
+    paragraph_index: Option<Arc<ParagraphIndex>>,
     source_version: SourceVersion,
     execution: Option<ExecutionContext>,
 }
@@ -1937,6 +1946,9 @@ impl Document {
     /// Count visible paragraphs in the pinned document.
     pub fn paragraph_count(&self) -> Result<usize> {
         self.check_execution()?;
+        if let Some(index) = self.paragraph_index.as_deref() {
+            return Ok(index.len());
+        }
         document_paragraph_count(self.xml.as_bytes())
     }
 
@@ -1946,19 +1958,29 @@ impl Document {
     /// semantic output, not a hidden payload alias.
     pub fn paragraph_text(&self, index: usize) -> Result<Option<String>> {
         self.check_execution()?;
-        let mut position = 0usize;
-        let mut selected = None;
-        scan_word_element_ranges(self.xml.as_bytes(), &[b"p"], |_, start, length| {
-            if position == index {
-                selected = Some((start, length));
-            }
-            position = position.checked_add(1).ok_or_else(|| {
-                Error::InvalidFormat("document paragraph counter overflow".into())
+        let selected = self.paragraph_index.as_deref().and_then(|paragraph_index| {
+            paragraph_index
+                .get(index)
+                .map(|range| (range.start, range.length))
+        });
+        let (start, length) = if let Some(selected) = selected {
+            selected
+        } else {
+            let mut position = 0usize;
+            let mut selected = None;
+            scan_word_element_ranges(self.xml.as_bytes(), &[b"p"], |_, start, length| {
+                if position == index {
+                    selected = Some((start, length));
+                }
+                position = position.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("document paragraph counter overflow".into())
+                })?;
+                Ok(())
             })?;
-            Ok(())
-        })?;
-        let Some((start, length)) = selected else {
-            return Ok(None);
+            let Some(selected) = selected else {
+                return Ok(None);
+            };
+            selected
         };
         let start = usize::try_from(start)
             .map_err(|_| Error::InvalidFormat("document paragraph offset overflow".into()))?;
@@ -1981,6 +2003,9 @@ impl Document {
         let DocumentPayload::Owned(xml) = &self.xml else {
             unreachable!("managed document payload rejected above")
         };
+        if let Some(index) = self.paragraph_index.as_deref() {
+            return document_paragraphs_from_index(Arc::clone(xml), index);
+        }
         document_paragraphs(Arc::clone(xml))
     }
 
@@ -1999,6 +2024,13 @@ impl Document {
         let DocumentPayload::Owned(xml) = &self.xml else {
             unreachable!("managed document payload rejected above")
         };
+        if let Some(paragraph_index) = self.paragraph_index.as_deref() {
+            return Ok(document_paragraph_from_index(
+                Arc::clone(xml),
+                paragraph_index,
+                index,
+            ));
+        }
         document_paragraph(Arc::clone(xml), index)
     }
 
