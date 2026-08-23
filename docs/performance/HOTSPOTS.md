@@ -44,6 +44,23 @@ relationship, managed-Budget, typed sink-refusal, and raw untouched-member
 identity gates pass; no latency, allocation/RSS, decompression,
 physical-I/O, or producer claim is made.)
 
+[change 0261 — strict claim canonical recomputation](changes/0261-strict-claim-canonical-recomputation.md)
+(the strict verifier now has `_project_report` sequentially validate raw
+samples, recompute bounded elapsed statistics and identity projections without
+retaining elapsed sample values, and discard the raw report/sample payload
+before the next leg. It recomputes elapsed cells and the complete canonical
+summary from the four raw ABBA projections, rejects mixed report profiles, and
+derives resource A1/B1/B2/A2 values and paired deltas from parsed leg sources.
+`time`/`heaptrack` run, status, artifact, and parser identities fail closed;
+exact resource variant, revision, binary, harness tool, and profile binding is
+required, and raw projection-marker fields are ignored. Public projection
+helpers are not exposed; the module-private `_ValidatedProjection` trust carrier is
+created by the public verifier path only after raw validation, while plain
+mapping inputs and mutations fail before summarization. The four-report package
+is bounded at 512 MiB per member, 2 GiB total decompressed input, and 64 MiB
+summary size. This is evidence-integrity and verifier-memory hardening only; no
+speedup or library-memory claim follows.)
+
 [change 0260 — fresh-child XLSX filesystem roots](changes/0260-xlsx-fresh-child-filesystem-roots.md)
 (the existing path-open and open-plus-names/count/full-text selectors now run
 each sample in a fresh child over one pinned medium XLSX. Warm and explicit
