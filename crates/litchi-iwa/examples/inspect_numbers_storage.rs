@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
+#[allow(deprecated)]
 use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa_protos::{tsd, tst};
 use prost::Message;

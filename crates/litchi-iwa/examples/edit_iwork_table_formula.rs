@@ -6,6 +6,7 @@ use litchi_iwa::numbers::{
     FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersEditor,
 };
 use litchi_iwa::pages::PagesEditor;
+#[allow(deprecated)]
 use litchi_iwa::raw::package::IWorkPackage;
 
 fn parse_cell(address: &str) -> Result<FormulaCellReference, String> {

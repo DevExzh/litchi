@@ -2501,9 +2501,11 @@ and `DataMetadataMap`; referenced deletion is rejected transactionally.
 ## Low-level raw CRUD (migration and compatibility only)
 
 The `raw` namespace deliberately exposes native package and IWA primitives.
-It is not a stable semantic facade: callers must understand IWA object
-identities, message types, and preservation obligations. Concrete format APIs
-must not re-export these values.
+It is deprecated and is not a stable semantic facade: callers must understand
+IWA object identities, message types, and preservation obligations. It remains
+available only for migration-host compatibility and low-level integrations;
+use focused format-semantic APIs where they cover the operation. Concrete
+format APIs must not re-export these values.
 
 ```rust
 use litchi_iwa::raw::package::IWorkPackage;

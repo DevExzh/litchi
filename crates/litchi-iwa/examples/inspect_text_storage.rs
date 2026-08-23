@@ -1,5 +1,6 @@
 use std::env;
 
+#[allow(deprecated)]
 use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa_protos::tswp::StorageArchive;
 use prost::Message;

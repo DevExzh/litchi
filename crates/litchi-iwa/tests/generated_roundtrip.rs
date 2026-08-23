@@ -48,6 +48,7 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
     Ok(())
 }
 
+#[allow(deprecated)]
 fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(path)?;
 

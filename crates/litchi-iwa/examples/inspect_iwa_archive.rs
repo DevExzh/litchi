@@ -4,7 +4,9 @@ use std::env;
 
 #[allow(deprecated)]
 use litchi_iwa::charts::raw::IWorkChartArchive;
+#[allow(deprecated)]
 use litchi_iwa::raw::package::IWorkPackage;
+#[allow(deprecated)]
 use litchi_iwa::raw::theme::IWorkThemeArchive;
 use litchi_iwa_protos::kn;
 use litchi_iwa_protos::tn;
