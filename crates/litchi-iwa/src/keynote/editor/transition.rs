@@ -118,10 +118,7 @@ pub(super) fn validate_transition_settings(settings: &TransitionSettings) -> Res
     settings.validate().map_err(|error| {
         Error::ParseError(format!("invalid Keynote transition settings: {error}"))
     })?;
-    litchi_keynote::transition::validate_opaque_transition_settings(
-        settings,
-        WireLimits::default(),
-    )
+    litchi_keynote::transition::validate_opaque_transition_settings(settings)
     .map_err(|error| {
         Error::ParseError(format!(
             "invalid Keynote transition opaque payload: {error}"
