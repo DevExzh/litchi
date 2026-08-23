@@ -11336,3 +11336,29 @@ projection scope.
 These two detached diffs are recorded as bounded source changes only. No
 Cargo, native, dependency-edge, ordered-debt, host-exit, or monolith result or
 claim is added by this amendment.
+
+## 2026-08-23 amendment: Pages route provenance inventory completion
+
+Commit `ebf7a9aa7` changes only `crates/litchi-iwa-protos/build.rs`. The Pages
+native-message provenance inventory now includes the body-shape caption
+consumer and the focused section consumers for background, pagination,
+settings, text, and section transactions, alongside the existing legacy and
+footnote routes. Each route records its declaration source separately from its
+production use-marker source, so a declaration cannot satisfy its own use
+check. The registry ratchet also records the existing storage dispatches for
+`2001u32` and `2022u32`.
+
+The sibling source list emits `cargo:rerun-if-changed` markers for routes that
+are present. Once any workspace route is present, the declaration, use-marker,
+additional-source, and registry inventory must be complete; a partial sibling
+checkout fails closed rather than weakening the guard. An entirely absent
+sibling inventory remains the intentional standalone-package escape hatch.
+Route declarations accept private or restricted visibility such as
+`pub(crate)`, `pub(super)`, and `pub(in crate::pages)`, while unrestricted
+`pub` remains rejected. No unavailable native IDs are added to canonical
+message ratchets or the public codec API; existing canonical blocks remain the
+authority.
+
+This is source-level provenance-guard hardening only. No Cargo/build/test or
+native result is admitted, and no dependency edge or ordered debt is retired;
+there is no host-exit or monolith-deletion claim.
