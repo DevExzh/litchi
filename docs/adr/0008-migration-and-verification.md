@@ -11802,3 +11802,38 @@ Keynote was quit after the gate.
 This is application-only evidence. It establishes no Rust/native parity, no
 ownership result, no migration-debt retirement, and no `litchi-iwa`
 monolith-exit or deletion claim.
+
+
+## 2026-08-23 amendment: current-HEAD scope correction
+
+Review of committed HEAD `baa1cadd` confirms that the dated evidence remains
+narrow. The `28a90aa77` formula-category change checks only the source-length
+product for `MAX_FORMULA_CATEGORY_DEPTH.saturating_add(1)` passes through
+`checked_formula_work_product` before the wire input-byte clamp. It does not
+claim that category traversal, retained projection, or every formula work
+product was newly proven; the separate `711e2b517` wording covers only the
+formula-reference, TableInfo, and table-model-name products and explicitly
+makes no category-scan claim.
+
+The Pages `FootnoteSemanticBudget` is per
+`project_body_footnotes` projection or `native_footnotes` pass. It charges
+projected footnote text and custom-marker bytes before per-value ownership, but
+does not charge staged `set` text, `after` values, or candidate-package
+retention. `TransactionBudget` belongs to the section transaction/rewrite
+paths; the footnote-text rewrite seam has separate wire/text limits. Neither
+budget wording is a package-wide or full-transaction accounting claim.
+
+Numbers message-type wording is context-scoped. In strict rooted ownership,
+type `6000` is the TableInfo owner and type `6001` is the TableModel
+payload; the global compatibility projection may also inspect a
+model-shaped legacy type-`6000` payload only after its shape gate. The neutral
+IWA registry's `6000`/`6001` table-model entries are a bounded name-only
+projection and do not publish cell data or establish complete model migration.
+The comment ownership census can validate referenced type-`6011` segment
+messages, but the recorded native fixture contained zero type-`6011` entries;
+there is therefore no native Segment-support or type-`6011` proof.
+
+The `baa1cadd` source change adds bounded comment-cell scan work and shared
+comment-text ownership only. It supplies no new Cargo, native, Segment,
+dependency-edge, host-exit, or monolith-deletion evidence. This amendment is
+documentation-only and does not alter any historical tail.
