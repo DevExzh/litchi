@@ -79,10 +79,15 @@ cargo +nightly fuzz check pages_section_codec
 wire-local rewrites. A successful input covers borrowed field-21/23 reads,
 title-only and visible-title helpers, every proto2 presence/value combination,
 exact no-op/set/clear behavior, unknown wire-span preservation, and a semantic
-inverse that restores the selected values and unknown spans. Exact source bytes
-are required when selected wire spans remain positionally recoverable; removing
-selected spans can lose their original interleaving, so those inverse cases are
-checked semantically while retaining every unknown span. Failed title- and
+inverse that restores the selected values and unknown spans when the requested
+pair is representable. Exact source bytes are required when selected wire spans
+remain positionally recoverable; removing selected spans can lose their original
+interleaving, so those inverse cases are checked semantically while retaining
+every unknown span. A clear request (`title_visible = Some(false)` with no title)
+against a hidden or absent title is an intentional exact no-op; if an earlier
+rewrite removed a hidden field-21 span while no title text was present, its
+inverse therefore preserves the candidate rather than recreating that span.
+Failed title- and
 output-capped rewrites must not publish a partial candidate or modify their
 source. Malformed mutations are required to remain rejected without modifying
 their source. Error formatting is checked against a private sentinel, so
