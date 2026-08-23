@@ -43,11 +43,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let package = family::Package::open(path, MIMETYPE, BODY_MARKER, "ODS")?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-        })
+        Self::from_bytes(std::fs::read(path.as_ref())?)
     }
 
     /// Open a password-encrypted ODS package and validate its decrypted semantic owners.
