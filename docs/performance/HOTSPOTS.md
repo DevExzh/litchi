@@ -3,6 +3,14 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0258 — byte-native unified RTF ingress](changes/0258-rtf-byte-native-facade.md)
+(the facade now passes owned RTF bytes directly to the native parser and
+recognizes literal CP-1252, LZFu, and stored MELA transports without changing
+ZIP/OLE2 precedence. Back-to-back CPU-2 release captures reuse identical
+binaries and workloads but do not reproduce the same accepted latency cells,
+so no speedup statistic is retained. Both compact packages are preserved as
+non-reproducibility evidence; the landing is correctness-only.)
+
 [change 0254 — DOCX story-hyperlink planning ABBA evidence](changes/0254-docx-story-hyperlink-index-abba.md)
 (the independently audited `fcb3104a5` release package accepts all p50/mean/p95/p99
 statistics for eight repeated `Snapshot::plan_target_urls` calls on a prepared
@@ -2049,6 +2057,15 @@ only 2.61%/2.30%, with p95 +0.54%; it was fully reverted. See
 [`change 0036`](changes/0036-ole-common-stage-attribution.md).
 
 ## RTF path
+
+Change 0258 closes the unified owned-byte transport gap: the facade no longer
+forces RTF through `String::from_utf8`, and all three detector seams admit
+native compressed/stored framing after container precedence checks. New
+`rtf_file_open` and `rtf_file_open_lifecycle` selectors isolate this adapter
+boundary. Their two equivalent controlled captures disagree on the accepted
+cell set, so this removes a correctness/compatibility hotspot without an
+accepted latency result. See
+[`change 0258`](changes/0258-rtf-byte-native-facade.md).
 
 `litchi-rtf` now also exposes bounded forward-only authoring. Escape-free
 printable ASCII is emitted in direct spans capped at 32 bytes, without adding a
