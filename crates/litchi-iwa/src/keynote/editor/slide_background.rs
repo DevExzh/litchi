@@ -97,7 +97,6 @@ fn map_focused_slide_background_error<E: std::fmt::Display>(error: E) -> Error {
 // lazy codec behind `litchi-keynote::Package`.
 #[cfg(test)]
 pub(super) fn background_from_fill(fill_payload: &[u8]) -> Result<Background> {
-    use litchi_keynote::background::Opaque;
     use prost::Message as _;
 
     let fill = tsd::FillArchive::decode(fill_payload)?;

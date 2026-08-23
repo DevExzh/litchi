@@ -332,11 +332,12 @@ pub use package::{
     ChartTitlePatch, Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES,
     MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch,
     PayloadLimitKind, ReadError, ReadOptions, SemanticLimitKind, SemanticLimits,
-    SemanticLimitsError, SemanticPath, SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit,
-    SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit, SlideOrderDiagnostics,
-    SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch, SlideTextCommit,
-    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats,
-    TextStorageFailure, WriteError,
+    SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
+    SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
+    SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
+    SlideNotesPatch, SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError,
+    SlideOrderLimitKind, SlideOrderPatch, SlideTextCommit, SlideTextDiagnostics, SlideTextEdit,
+    SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure, WriteError,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};

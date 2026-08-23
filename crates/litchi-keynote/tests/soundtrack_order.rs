@@ -429,8 +429,7 @@ fn changed_order_rejects_a_tight_output_limit_atomically() -> TestResult {
     let native = Package::open(fixture())?;
     let source = with_soundtrack_media(&bytes(&native)?)?;
     let input_bytes = u64::try_from(source.len())?;
-    let limits =
-        litchi_keynote::Limits::new(input_bytes, 128, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
+    let limits = Limits::new(input_bytes, 128, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
     let package = Package::from_bytes_with_limits(&source, limits)?;
     let mut edit = package.edit_soundtrack_order();
     edit.move_item(Position::new(0), Position::new(1))?;

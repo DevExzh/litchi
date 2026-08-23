@@ -388,6 +388,10 @@ mod tests {
             "keynote_slide_transition",
             include_str!("keynote_slide_transition_codec.rs"),
         ),
+        (
+            "keynote_slide_background",
+            include_str!("keynote_slide_background_codec.rs"),
+        ),
         ("keynote_show", include_str!("keynote_show_codec.rs")),
         ("numbers_names", include_str!("numbers_names_codec.rs")),
         (

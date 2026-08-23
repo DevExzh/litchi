@@ -1,0 +1,30 @@
+// Read-only Buffa projection for a Keynote slide-style TSD.FillArchive.
+//
+// The fill's gradient and image branches deliberately stay opaque bytes.  A
+// generated gradient-stop view (and the image/reference closure) would turn a
+// small style-field ingress into a generated ownership graph.  The strict
+// handwritten codec validates those branches while this projection supplies a
+// borrowed cross-check for the selected RGB color scalars.
+syntax = "proto2";
+
+package LitchiIwaKeynoteBackgroundProjection;
+
+message KeynoteSlideBackgroundArchive {
+  optional KeynoteColorArchive color = 1;
+  optional bytes gradient = 2;
+  optional bytes image = 3;
+}
+
+message KeynoteColorArchive {
+  required int32 model = 1;
+  optional float r = 3;
+  optional float g = 4;
+  optional float b = 5;
+  optional float a = 6;
+  optional float c = 7;
+  optional float m = 8;
+  optional float y = 9;
+  optional float k = 10;
+  optional float w = 11;
+  optional int32 rgbspace = 12;
+}
