@@ -95,9 +95,9 @@ XLSX speedup claim is registered.
 
 [Change 0262](changes/0262-xlsx-vendor-extension-preservation.md) adds an
 explicit `vendor-extension` shape to the existing XLSX cell-value selectors.
-The shape is excluded from `XlsxCellCrudShape::ALL` and adds no `Case`; the
-selectable count remains 381 and the default matrix remains 36 cases / 198
-records.
+The shape is excluded from `XlsxCellCrudShape::ALL` and adds no `Case`; at
+change 0262's landing, the selectable count was 381 and the default matrix
+remained 36 cases / 198 records.
 
 Its deterministic four-sheet, 48-by-48, eight-media corpus adds orphan XML
 and binary vendor Parts plus one XML-local internal relationship. The generated
@@ -142,8 +142,9 @@ the landing is supported by correctness and source-preservation gates only.
 
 ## Relationship-heavy lazy OPC structural open (change 0259)
 
-The opt-in `opc_relationship_open` selector raises the current selectable
-harness count to 381 while preserving the default 36-case / 198-record matrix.
+At change 0259's landing, the opt-in `opc_relationship_open` selector raised
+the then-current selectable harness count to 381 while preserving the default
+36-case / 198-record matrix.
 Its fixed corpus contains 256 tiny deflated Parts, 257 deflated relationship
 manifests, and `[Content_Types].xml`; independent archive, lazy-reader, and
 PackageReader identity gates cover names, counts, payload digests, and source

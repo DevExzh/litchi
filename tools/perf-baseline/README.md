@@ -204,8 +204,9 @@ covered 380 selectable names.
 
 ## Change 0259 relationship-heavy OPC structural open
 
-The opt-in `opc_relationship_open` selector raises the current selectable
-count to 381 while leaving the default 36 cases / 198 records unchanged. It
+At change 0259's landing, the opt-in `opc_relationship_open` selector raised
+the then-current selectable count to 381 while leaving the default 36 cases /
+198 records unchanged. It
 uses one fixed in-memory corpus: 256 compressible 96-byte Parts, one external
 relationship per Part, one package-root relationship, and
 `[Content_Types].xml`. The resulting ZIP has exactly 514 members (256 Parts,
@@ -286,8 +287,9 @@ ZIP members, 4,227,295 archive bytes, and source SHA-256
 `b031d236b0f48b45ab357126ff238a40e2a2e147c1471cf82e429ab6f6d250fb`.
 
 The shape is intentionally excluded from `XlsxCellCrudShape::ALL` and adds no
-`Case`, so the selectable count remains 381 and the default matrix remains 36
-cases / 198 records. Focused source-backed and managed-cell controls verify
+`Case`; at change 0262's landing, the selectable count was 381 and the default
+matrix remained 36 cases / 198 records. Focused source-backed and managed-cell
+controls verify
 exact no-op/edit/lifecycle behavior, typed stale/foreign and partial-output
 refusals, managed Budget boundaries, package/content-type/relationship
 topology, and raw local plus central-directory identity for untouched members.
@@ -348,8 +350,8 @@ only: they make no latency, allocation, RSS, physical-I/O, or broad DOCX claim.
 The redaction locality gate requires exactly the 14 story XML/`.rels` members
 to change and compares every untouched member's raw ZIP local record and
 offset-normalized central-directory record byte-for-byte.
-They bring the selectable matrix to 383 names while leaving the default 36
-cases / 198 records unchanged.
+At change 0263's landing, they brought the selectable matrix to 383 names while
+leaving the default 36 cases / 198 records unchanged.
 
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated

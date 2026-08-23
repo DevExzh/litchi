@@ -3,14 +3,6 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
-[change 0264 — real-producer security correctness corpus](changes/0264-real-producer-security-corpus.md)
-(the ignored locked gate covers eight pinned POI/OOXML fixtures: signed
-DOCX/XLSX/PPTX, protected DOCX, two encrypted DOC files, a macro XLS, and an
-external-link XLSX. Signature/protection/password, inert-VBA, external
-inventory, one-under input, zero-output publication, and RAII release checks
-pass. This is bounded correctness-only evidence with no selector/default
-count, latency, allocation/RSS, physical-I/O, or resource-performance claim.)
-
 [change 0265 — PPTX slide-boundary publication selectors](changes/0265-pptx-slide-boundary-publication.md)
 (the opt-in remove and move selectors use a deterministic four-slide,
 dependency-free PPTX corpus with 45 ZIP members, 32,396 source bytes, and
@@ -24,6 +16,14 @@ unknown-member, MCE, signed, limits, stale/foreign, partial, and zero-sink
 gates are covered. Move requires strict `[Content_Types].xml` identity. This
 is correctness and phase evidence only; no latency, allocation/RSS,
 physical-I/O, or broad PPTX claim is made.)
+
+[change 0264 — real-producer security correctness corpus](changes/0264-real-producer-security-corpus.md)
+(the ignored locked gate covers eight pinned POI/OOXML fixtures: signed
+DOCX/XLSX/PPTX, protected DOCX, two encrypted DOC files, a macro XLS, and an
+external-link XLSX. Signature/protection/password, inert-VBA, external
+inventory, one-under input, zero-output publication, and RAII release checks
+pass. This is bounded correctness-only evidence with no selector/default
+count, latency, allocation/RSS, physical-I/O, or resource-performance claim.)
 
 [change 0263 — DOCX story-hyperlink publication selectors](changes/0263-docx-story-hyperlink-publication.md)
 (the opt-in no-op and shared-target redaction selectors cover seven Word story

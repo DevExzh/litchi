@@ -71,8 +71,8 @@ The opt-in `docx_story_hyperlink_noop_save` and
 corpus: main, header, footer, footnotes, endnotes, comments, and glossary;
 15 OPC Parts; 24 ZIP members; 9,900 archive bytes; and source SHA-256
 `457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac`.
-The selectable matrix is 383 names and the default remains 36 cases / 198
-records.
+At change 0263's landing, the selectable matrix was 383 names and the default
+remained 36 cases / 198 records.
 
 Source and sink preparation plus the independent story-XML and `.rels`
 namespace/membership/target/type/mode oracles are outside the timed interval.
@@ -106,8 +106,9 @@ The opt-in `vendor-extension` shape extends the existing four-sheet, 48-by-48,
 eight-media cell-values corpus with orphan XML and binary vendor Parts plus one
 XML-local internal relationship. It is selected through
 `--xlsx-cell-crud-shape vendor-extension`, is excluded from
-`XlsxCellCrudShape::ALL`, and adds no `Case`; the selectable count remains 381
-and the default matrix remains 36 cases / 198 records.
+`XlsxCellCrudShape::ALL`, and adds no `Case`; at change 0262's landing, the
+selectable count was 381 and the default matrix remained 36 cases / 198
+records.
 
 The generated source archive has exactly 20 ZIP members, 4,227,295 bytes, and
 4,231,356 logical uncompressed payload bytes. Its source SHA-256 is
@@ -137,9 +138,9 @@ eligible structural member, but it is not a measured allocation, memory, RSS,
 latency, I/O, or end-to-end result. See
 [change 0259](changes/0259-opc-shared-structural-members.md); a fixed
 relationship-heavy corpus and controlled resource/ABBA evidence remain open.
-The opt-in `opc_relationship_open` harness selector raises the current
-selectable count to 381; it is unmeasured correctness/timing-boundary coverage
-only and makes no performance claim.
+At change 0259's landing, the opt-in `opc_relationship_open` harness selector
+raised the then-current selectable count to 381; it is unmeasured
+correctness/timing-boundary coverage only and makes no performance claim.
 
 ## Latest retained unified RTF byte-ingress evidence (change 0258)
 
