@@ -118,6 +118,11 @@ IWORK_EXAMPLE_NATIVE_ID_CALL = re.compile(
 )
 IWA_KEYNOTE_SOURCE_ROOT = Path("crates/litchi-iwa/src/keynote")
 IWA_KEYNOTE_EDITOR_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
+IWA_KEYNOTE_SLIDE_INFO_RAW_FIELDS = (
+    "title_storage_id",
+    "body_storage_id",
+    "notes_storage_id",
+)
 RETIRED_IWA_KEYNOTE_METHODS = (
     "set_slide_name",
     "set_slide_title",
@@ -5239,6 +5244,58 @@ def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
                 "retired litchi-iwa Keynote slide-name README call "
                 f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
             )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_slide_info_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep migrated Keynote text-storage IDs advisory-deprecated.
+
+    ``KeynoteSlideInfo`` remains a migration-host compatibility value, but its
+    title/body/speaker-notes storage identities are native handles.  The
+    focused package owns those semantic text paths now, so a future edit must
+    not silently make the handles look like supported API again.
+    """
+
+    path = root / IWA_KEYNOTE_EDITOR_SOURCE
+    if not path.is_file():
+        return []
+
+    source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+    struct = _rust_named_struct_body(source, "KeynoteSlideInfo")
+    if struct is None:
+        return []
+    body, body_offset = struct
+    violations: list[str] = []
+
+    for field_name in IWA_KEYNOTE_SLIDE_INFO_RAW_FIELDS:
+        field = re.search(
+            rf"^[ \t]*pub[ \t]+(?:r#)?{re.escape(field_name)}\b[ \t]*:",
+            body,
+            re.MULTILINE,
+        )
+        if field is None:
+            continue
+
+        prefix = body[: field.start()]
+        attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
+        nearest = attributes[-1] if attributes else None
+        deprecated = False
+        if nearest is not None and re.match(
+            r"[ \t]*#[ \t]*\[[ \t]*deprecated\b",
+            prefix[nearest.start() :],
+        ):
+            closing = prefix.find("]", nearest.end())
+            if closing >= 0 and not prefix[closing + 1 :].strip():
+                deprecated = True
+        if deprecated:
+            continue
+
+        line_number = source.count("\n", 0, body_offset + field.start()) + 1
+        violations.append(
+            "litchi-iwa Keynote slide info native field must remain deprecated "
+            f"{field_name}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+        )
 
     return sorted(set(violations))
 
@@ -11087,6 +11144,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_litchi_semantic_facade_source_topology()
         + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_keynote_slide_info_source_topology()
         + audit_iwa_keynote_document_source_topology()
         + audit_iwa_keynote_show_settings_source_topology()
         + audit_keynote_show_settings_facade_source_topology()
