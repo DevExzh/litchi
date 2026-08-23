@@ -45,6 +45,7 @@ fn assert_expected_cells(package: &Package) -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
+#[allow(deprecated)]
 fn native_numbers_table_info_projection_opens_rooted_and_compatibility_paths()
 -> Result<(), Box<dyn std::error::Error>> {
     let path = fixture_path();
