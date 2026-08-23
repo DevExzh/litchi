@@ -6,12 +6,14 @@ package LitchiIwaPackageMetadataProjection;
 
 message PackageMetadataArchive {
   required uint64 last_object_identifier = 1;
+  optional uint64 save_token = 8;
 }
 
 message ComponentInfoArchive {
   required uint64 identifier = 1;
   required string preferred_locator = 2;
   optional string locator = 3;
+  optional uint64 save_token = 12;
 }
 
 message ComponentExternalReferenceArchive {

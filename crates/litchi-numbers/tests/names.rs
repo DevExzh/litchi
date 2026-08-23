@@ -4,7 +4,7 @@ use std::sync::Arc;
 use litchi_iwa_archive::{Limits, package::Catalog, package::EntryEdit};
 use litchi_iwa_common::{
     decode_varint_from_bytes, encode_varint_into,
-    wire::{WireView, append_length_delimited_field, append_varint_field},
+    wire::{WireView, append_length_delimited_field, append_varint_field, patch_varint_field},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst};
@@ -27,6 +27,8 @@ const THIRD_MODEL: u64 = 22;
 const SIDECARS: u64 = 90;
 const CALCULATION_ENGINE: u64 = 700;
 const FORMULA_OWNER_DEPENDENCIES: u64 = 701;
+const METADATA: &str = "Index/Metadata.iwa";
+const PACKAGE_METADATA_TYPE: u32 = 11_006;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -103,6 +105,144 @@ fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
 }
 
+fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> TestResult {
+    append_varint_field(data, field_number, value)?;
+    Ok(())
+}
+
+fn metadata_component(
+    identifier: u64,
+    locator: &str,
+    token: u64,
+    unknown: u64,
+) -> TestResult<Vec<u8>> {
+    metadata_component_optional(identifier, locator, Some(token), unknown)
+}
+
+fn metadata_component_optional(
+    identifier: u64,
+    locator: &str,
+    token: Option<u64>,
+    unknown: u64,
+) -> TestResult<Vec<u8>> {
+    let mut data = tsp::ComponentInfo {
+        identifier,
+        preferred_locator: locator.to_owned(),
+        locator: Some(locator.to_owned()),
+        save_token: token,
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_unknown_varint(&mut data, 90, unknown)?;
+    Ok(data)
+}
+
+fn metadata_payload(include_tables: bool) -> TestResult<Vec<u8>> {
+    let mut payload = tsp::PackageMetadata {
+        last_object_identifier: 1_000,
+        save_token: Some(10),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component(100, "Document", 9, 901)?,
+    )?;
+    if include_tables {
+        append_length_delimited_field(
+            &mut payload,
+            3,
+            &metadata_component(101, "Tables", 8, 902)?,
+        )?;
+    }
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component(102, "ViewState", 7, 903)?,
+    )?;
+    let versioned = metadata_component(100, "Document", 3, 904)?;
+    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_unknown_varint(&mut payload, 90, 900)?;
+    Ok(payload)
+}
+
+fn metadata_payload_with_absent_document_token() -> TestResult<Vec<u8>> {
+    let mut payload = tsp::PackageMetadata {
+        last_object_identifier: 1_000,
+        save_token: Some(10),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component_optional(100, "Document", None, 901)?,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component(102, "ViewState", 7, 903)?,
+    )?;
+    append_unknown_varint(&mut payload, 90, 900)?;
+    Ok(payload)
+}
+
+fn metadata_entry(include_tables: bool) -> TestResult<Vec<u8>> {
+    compressed(vec![object(
+        100,
+        PACKAGE_METADATA_TYPE,
+        metadata_payload(include_tables)?,
+    )?])
+}
+
+fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA)
+        .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
+    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    archive.objects[0].replace_message_preserving_header(
+        0,
+        RawMessage {
+            type_: PACKAGE_METADATA_TYPE,
+            data: payload,
+        },
+    )?;
+    let rewritten = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(METADATA, &rewritten)], Limits::default())?)
+}
+
+fn with_metadata_component(source: &[u8], component: Vec<u8>) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA)
+        .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
+    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    append_length_delimited_field(&mut archive.objects[0].messages[0].data, 3, &component)?;
+    replace_metadata_payload(source, archive.objects[0].messages[0].data.clone())
+}
+
+fn metadata_payload_from_bytes(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA)
+        .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
+    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    Ok(archive.objects[0].messages[0].data.clone())
+}
+
+fn metadata_component_payloads(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
+    Ok(WireView::parse(&metadata_payload_from_bytes(source)?)?
+        .fields()
+        .filter(|field| field.number() == 3)
+        .map(|field| field.payload().to_owned())
+        .collect())
+}
+
 fn package_bytes(locked: bool, pivot: bool, previews: usize) -> TestResult<Vec<u8>> {
     let mut root = object(
         1,
@@ -167,10 +307,12 @@ fn package_bytes(locked: bool, pivot: bool, previews: usize) -> TestResult<Vec<u
         777,
         b"view state is byte exact".to_vec(),
     )?])?;
+    let metadata = metadata_entry(false)?;
     let mut entries: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"unrelated zip member"),
         (DOCUMENT, &document),
         (VIEW_STATE, &view),
+        (METADATA, &metadata),
     ];
     let preview_values = [
         ("preview.jpg", b"preview one".as_slice()),
@@ -417,13 +559,15 @@ fn split_components(source: &[u8]) -> TestResult<Vec<u8>> {
         });
     let document = compressed(document_objects)?;
     let tables = compressed(table_objects)?;
+    let metadata = metadata_entry(true)?;
     let mut entries = catalog
         .iter()
-        .filter(|entry| entry.name() != DOCUMENT)
+        .filter(|entry| entry.name() != DOCUMENT && entry.name() != METADATA)
         .map(|entry| (entry.name(), entry.data()))
         .collect::<Vec<_>>();
     entries.insert(1, (DOCUMENT, document.as_slice()));
     entries.insert(2, ("Index/Tables.iwa", tables.as_slice()));
+    entries.push((METADATA, metadata.as_slice()));
     Ok(litchi_iwa_archive::package::to_bytes(
         entries,
         Limits::default(),
@@ -1071,6 +1215,182 @@ fn split_components_and_every_preview_cardinality_publish_once() -> TestResult {
                 .data()
         );
     }
+    Ok(())
+}
+
+#[test]
+fn changed_names_advance_metadata_tokens_and_inverse_restores_exact_source() -> TestResult {
+    let source = split_components(&package_bytes(false, false, 1)?)?;
+    let source_payload = metadata_payload_from_bytes(&source)?;
+    let source_metadata = tsp::PackageMetadata::decode(source_payload.as_slice())?;
+    let source_components = metadata_component_payloads(&source)?;
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_names()
+        .rename_sheet("Alpha", "Tokenized")?
+        .rename_table("Alpha", "One", "Token table")?
+        .commit()?;
+
+    let target_bytes = bytes(commit.package())?;
+    let target_payload = metadata_payload_from_bytes(&target_bytes)?;
+    let target_metadata = tsp::PackageMetadata::decode(target_payload.as_slice())?;
+    assert_eq!(
+        target_metadata.last_object_identifier,
+        source_metadata.last_object_identifier
+    );
+    assert_eq!(target_metadata.save_token, Some(11));
+    assert_eq!(
+        target_metadata
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "Document")
+            .and_then(|component| component.save_token),
+        Some(11)
+    );
+    assert_eq!(
+        target_metadata
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "Tables")
+            .and_then(|component| component.save_token),
+        Some(11)
+    );
+    assert_eq!(
+        target_metadata
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "ViewState")
+            .and_then(|component| component.save_token),
+        Some(7)
+    );
+    assert_eq!(
+        target_metadata
+            .versioned_components
+            .iter()
+            .find(|component| component.preferred_locator == "Document")
+            .and_then(|component| component.save_token),
+        Some(3)
+    );
+    assert!(
+        WireView::parse(&target_payload)?
+            .fields()
+            .any(|field| field.number() == 90)
+    );
+    for component in metadata_component_payloads(&target_bytes)? {
+        assert!(
+            WireView::parse(&component)?
+                .fields()
+                .any(|field| field.number() == 90)
+        );
+    }
+    assert!(source_components.iter().all(|component| {
+        WireView::parse(component)
+            .map(|view| view.fields().any(|field| field.number() == 90))
+            .unwrap_or(false)
+    }));
+    assert_eq!(
+        bytes(
+            commit
+                .package()
+                .apply_names(&commit.patch().inverse())?
+                .package()
+        )?,
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_absent_selected_token_is_added_and_inverse_is_exact() -> TestResult {
+    let source = replace_metadata_payload(
+        &package_bytes(false, false, 0)?,
+        metadata_payload_with_absent_document_token()?,
+    )?;
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_names()
+        .rename_sheet("Alpha", "Absent token")?
+        .commit()?;
+    let target_bytes = bytes(commit.package())?;
+    let target =
+        tsp::PackageMetadata::decode(metadata_payload_from_bytes(&target_bytes)?.as_slice())?;
+    assert_eq!(target.save_token, Some(11));
+    assert_eq!(
+        target
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "Document")
+            .and_then(|component| component.save_token),
+        Some(11)
+    );
+    assert_eq!(
+        bytes(
+            commit
+                .package()
+                .apply_names(&commit.patch().inverse())?
+                .package()
+        )?,
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn changed_names_fail_closed_for_missing_duplicate_or_overflow_metadata() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let missing =
+        catalog.reassemble_with_deletions_to_bytes(&[], &[METADATA], Limits::default())?;
+    let missing_package = Package::from_bytes(&missing)?;
+    let missing_before = bytes(&missing_package)?;
+    assert!(matches!(
+        missing_package
+            .edit_names()
+            .rename_sheet("Alpha", "Missing metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&missing_package)?, missing_before);
+
+    let duplicate_source =
+        with_metadata_component(&source, metadata_component(100, "Document", 9, 999)?)?;
+    let duplicate = Package::from_bytes(&duplicate_source)?;
+    let duplicate_before = bytes(&duplicate)?;
+    assert!(matches!(
+        duplicate
+            .edit_names()
+            .rename_sheet("Alpha", "Duplicate metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&duplicate)?, duplicate_before);
+
+    let mut wrong_wire_payload = metadata_payload(false)?;
+    append_length_delimited_field(&mut wrong_wire_payload, 8, b"wrong wire")?;
+    let wrong_wire_source = replace_metadata_payload(&source, wrong_wire_payload)?;
+    let wrong_wire = Package::from_bytes(&wrong_wire_source)?;
+    let wrong_wire_before = bytes(&wrong_wire)?;
+    assert!(matches!(
+        wrong_wire
+            .edit_names()
+            .rename_sheet("Alpha", "Wrong wire metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&wrong_wire)?, wrong_wire_before);
+
+    let overflow_payload = patch_varint_field(&metadata_payload(false)?, 8, true, Some(u64::MAX))?;
+    let overflow_source = replace_metadata_payload(&source, overflow_payload)?;
+    let overflow = Package::from_bytes(&overflow_source)?;
+    let overflow_before = bytes(&overflow)?;
+    assert!(matches!(
+        overflow
+            .edit_names()
+            .rename_sheet("Alpha", "Overflow metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&overflow)?, overflow_before);
     Ok(())
 }
 

@@ -2936,6 +2936,32 @@ mod tests {
             }
             .encode_to_vec(),
         )?;
+        let metadata = object(
+            100,
+            11_006,
+            litchi_iwa_protos::tsp::PackageMetadata {
+                last_object_identifier: 100,
+                components: [
+                    (10, "Document"),
+                    (11, "Sheet"),
+                    (12, "Alias"),
+                    (13, "Other"),
+                ]
+                .into_iter()
+                .map(
+                    |(identifier, locator)| litchi_iwa_protos::tsp::ComponentInfo {
+                        identifier,
+                        preferred_locator: locator.to_owned(),
+                        save_token: Some(1),
+                        ..Default::default()
+                    },
+                )
+                .collect(),
+                save_token: Some(1),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
         package_bytes_from_archives([
             (
                 "Index/Document.iwa",
@@ -2959,6 +2985,12 @@ mod tests {
                 "Index/Other.iwa",
                 Archive {
                     objects: vec![unaliased_sheet],
+                },
+            ),
+            (
+                "Index/Metadata.iwa",
+                Archive {
+                    objects: vec![metadata],
                 },
             ),
         ])
