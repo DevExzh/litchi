@@ -12450,3 +12450,56 @@ The native evidence is therefore bounded to open/render and emitted-artifact
 reopen/readback. It is not native save acceptance, durable publication,
 Rust/native parity, or native token-set acceptance, and it makes no
 performance or RSS claim.
+
+## 2026-08-24 amendment: Wave58 focused Numbers comment-replacement verification record
+
+Implementation commit `e96a3a301` delegates the deprecated raw-ID
+`NumbersEditor::set_cell_comment` replacement subset to
+`litchi_numbers::Package::set_table_cell_comment`. The host resolves the
+native table once into scoped `SheetSelector::index` and
+`TableSelector::index` values, constructs a checked `CellPosition`, publishes
+the immutable focused commit, reopens it through the migration host, and
+cross-checks the legacy semantic readback before assignment. Focused
+`CommentNotFound` and `UnsupportedDependency` results retain the legacy
+creation/reply/shared/segmented compatibility path. A package-wide focused
+`InvalidFormat` that reflects an as-yet-unmigrated table projection also
+retains compatibility; typed focused comment invalid-source, limit,
+allocation, selector, and verification failures do not fall back.
+
+Focused host regressions prove that a real root-only comment package takes the
+focused route, preserves comment identity/metadata, and deletes all three root
+previews. A reply-bearing synthetic graph takes the legacy route, preserves
+its reply and previews, and remains readable. Existing comment CRUD and reply
+CRUD tests remain green. Verification commands and results were:
+
+- `cargo test -p litchi-iwa --lib supported_cell_comment_replacement_delegates_to_focused_package_owner -- --nocapture`: 1/1 passed;
+- `cargo test -p litchi-iwa --lib unsupported_comment_graph_keeps_legacy_fallback_and_previews -- --nocapture`: 1/1 passed;
+- `cargo test -p litchi-iwa --lib numbers::editor::tests::cell_comment -- --nocapture`: 2/2 passed;
+- `cargo check -p litchi-iwa --all-targets`: passed with existing deprecation/dead-code warnings;
+- scoped `cargo clippy -p litchi-iwa --lib -- -D warnings` passed with explicit existing `deprecated`, `dead_code`, `unused_imports`, `manual_contains`, `clone_on_copy`, and `derivable_impls` allowances;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 373/373;
+- `py_compile`, Rust formatting, and `git diff --check`: passed.
+
+The repository-wide pre-commit formatting/lint hooks remain blocked by
+unrelated dirty `table_info_codec.rs`, `protobuf.rs`, and Pages table-lock /
+footnote work, so the implementation commit used the completed scoped gates
+above. The live boundary checker exits 1 only for the known 23 Pages
+table-lock findings (20 flat aliases and three untracked retired-host
+findings); it reports no Wave58 Numbers comment-delegation finding. This is
+not a full-workspace green claim.
+
+The checked-in real interoperability oracle
+`crates/litchi-numbers/tests/fixtures/comment-edit-root.numbers` is 6,154
+bytes with SHA-256
+`b433c124314b3c42a5d65a650e16d1ea57ec9512e3d59f2b4796d2e2e9d00f7f`.
+The disposable Rust output
+`/private/tmp/litchi-wave58-native/rust-edited.numbers` is 6,165 bytes with
+SHA-256
+`37d6be2bb684f04352ee6aec4817bf18fc3e8aabc7313d6580bc64d481608cea`.
+Rust reopened it and read the exact requested text, preserved creation date,
+author, storage UUID, and empty reply list. Numbers 14.4 opened it without a
+repair alert, rendered the 3x3 `Review` table, and exposed B2 as `Contains
+comment`. The accessibility surface did not expose the comment text, so the
+native claim is bounded to no-repair open, table render, and comment presence;
+it is not a native text-parity, save/reopen, autosave, durability,
+performance, or RSS claim.
