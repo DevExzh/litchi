@@ -11500,22 +11500,70 @@ monolith-exit claim follows.
 ## 2026-08-23 amendment: checked Numbers formula-work products and owner preflight
 
 Detached commit `711e2b517` changes only
-`crates/litchi-numbers/src/package/extractor.rs`. Formula-reference scans and
-the formula category, sheet-name, and table-name scans replace saturating
-source-length-by-pass estimates with checked products. Overflow is reported as
-the existing `SemanticLimitKind::FormulaWork` error against the active
-formula-work ceiling, rather than wrapping or under-counting the scan.
+`crates/litchi-numbers/src/package/extractor.rs`. Only the changed reference,
+TableInfo, and name work products are covered: the formula-reference
+remaining three-pass charge, root/sheet reference-map seven-pass products,
+TableInfo remaining passes, and selected table-model name seven-pass
+products now use checked multiplication before charging work. Product
+overflow maps to the existing `SemanticLimitKind::FormulaWork` boundary
+with the product formula budget; no formula-category scan change is
+claimed.
 
-The formula-owner preflight likewise uses checked additions for source bytes,
-field visits, nested UUID and local-reference payloads, and malformed-field
-charges. Wire `RewriteWork` failures from that selected preflight are mapped
-to the Numbers formula-work semantic limit. A formula-work limit failure is
-propagated out of the compatibility owner scan; unrelated malformed owner
-candidates retain the existing skip behavior. This is bounded accounting and
-error-propagation hardening only; it does not change formula ownership,
-rendering, or authoring scope.
+The formula-owner preflight uses checked additions for source bytes, visited
+fields, nested UUID and local-reference payloads, and malformed-field
+charges. An owner accumulator overflow is surfaced as `LimitKind::RewriteWork`
+against the hard-coded `MAX_FORMULA_WORK`, then mapped to
+`SemanticLimitKind::FormulaWork`. A FormulaWork limit is propagated out of
+the compatibility owner scan; unrelated malformed owner candidates retain
+the existing skip behavior. This is bounded arithmetic and error
+propagation hardening only; it does not change formula ownership, rendering,
+or authoring scope.
 
 No Cargo/build/test or native result is admitted for this detached source
 change. It retires no dependency edge or ordered debt, makes no migration-host
 or host-exit claim, and does not satisfy or alter the IWA monolith-deletion
 gate.
+
+## 2026-08-23 amendment: guarded legacy drawable-comment text ownership
+
+Commit `0fb5175bd` changes only `crates/litchi-iwa/src/comments.rs`.
+For changed existing drawable-comment text, the legacy path first validates
+the direct reply graph. An in-place storage-text update is considered only
+when there is one direct drawable user; it clones the package, removes that
+selected edge in the clone, and runs the existing package-wide reference
+census across comment-storage and reply edges plus package-metadata maps,
+external/data references, object registries, and ambiguous IDs. Duplicate
+selected metadata references are rejected. The original package is updated
+in place only when no remaining reference is found; otherwise the existing
+copy-on-write path is retained.
+
+This is fail-closed compatibility hardening for one existing drawable-comment
+text path. It does not add broad comment CRUD or a public ownership API.
+No Cargo/build/test or native result is admitted; no dependency edge or
+ordered debt is retired, no migration-host or host-exit claim follows, and
+the IWA monolith-deletion gate remains open.
+
+## 2026-08-23 amendment: focused Pages aggregate semantic footnote budget
+
+Commit `58f824eb6` changes only
+`crates/litchi-pages/src/package.rs` and
+`crates/litchi-pages/src/package/footnote_text.rs`. `FootnoteSemanticBudget`
+is instantiated separately for each `project_body_footnotes` projection and
+each `native_footnotes` pass; it is not a package-wide accumulator shared
+between passes. It checks the aggregate bytes of projected footnote text
+and custom markers before per-value owned strings are retained. The existing
+`MAX_BODY_FOOTNOTES` bound and fallible collection reservations remain in
+force, and per-value text/custom-marker limits still apply.
+
+The surrounding footnote text transaction and rewrite path use
+`TransactionBudget` for transaction and candidate work, while setters and
+commit retain per-value checks including `Footnote::with_custom_mark`.
+`FootnoteSemanticBudget` does not account for staged `set` text, `after`
+values, or candidate-package retention; this amendment makes no aggregate
+set/after_text/candidate-retention claim.
+
+This is focused aggregate semantic-cap hardening only. No Cargo/build/test
+or native result is admitted, and no performance, allocation-count, RSS, or
+throughput claim is made. It retires no dependency edge or ordered debt,
+makes no migration-host or host-exit claim, and does not satisfy the IWA
+monolith-deletion gate.

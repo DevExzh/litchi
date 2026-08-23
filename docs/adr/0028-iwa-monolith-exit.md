@@ -3833,13 +3833,17 @@ ordered debt is retired, and no migration-host or monolith-exit claim follows.
 ## 2026-08-23 amendment: checked Numbers formula-work products and owner preflight
 
 Detached commit `711e2b517` is limited to checked work accounting in
-`crates/litchi-numbers/src/package/extractor.rs`. Formula-reference and
-formula-owner/category/name preflights now use checked source-length products
-and checked cumulative owner charges. Overflow maps to the existing
-`SemanticLimitKind::FormulaWork` boundary, including wire rewrite-work errors
-from the owner preflight; a formula-work failure is propagated instead of
-being treated as an ordinary malformed compatibility candidate. Other
-malformed owner candidates retain their prior skip path.
+`crates/litchi-numbers/src/package/extractor.rs`. The changed
+formula-reference, TableInfo, and table-model-name products now use checked
+source-length multiplication before work charges; no formula-category scan
+change is claimed. The owner preflight uses checked additions for source,
+field, nested UUID, local-reference, and malformed-field work.
+
+An owner accumulator overflow is reported as `LimitKind::RewriteWork` with
+the hard-coded `MAX_FORMULA_WORK`, then mapped to the
+`SemanticLimitKind::FormulaWork` error. A FormulaWork limit propagates
+instead of being treated as an ordinary malformed compatibility candidate;
+other malformed owner candidates retain their skip path.
 
 This does not move FormulaArchive or formula-owner responsibility out of the
 current package/host boundary and does not broaden formula authoring or
@@ -3847,3 +3851,44 @@ rendering. It is source-level finite-accounting hardening only: no
 Cargo/build/test or native result is admitted, no `litchi-iwa` dependency edge
 or ordered debt is retired, and no host-exit or monolith-deletion claim
 follows.
+
+## 2026-08-23 amendment: guarded legacy drawable-comment text ownership
+
+Commit `0fb5175bd` is limited to `crates/litchi-iwa/src/comments.rs`.
+Before an existing drawable-comment text change can update shared storage
+in place, the host validates the direct reply graph and requires one direct
+drawable user. It then removes the selected edge only on a private package
+clone and runs the package-wide reference census across comment storage and
+reply edges, package-metadata maps, external/data references, object
+registries, and ambiguous identifiers. Duplicate selected metadata
+references fail closed; any remaining reference keeps the existing
+copy-on-write path.
+
+This is a narrow legacy-host compatibility guard, not broad comment CRUD or
+a replacement owner. No Cargo/build/test or native result is admitted; no
+`litchi-iwa` dependency edge or ordered debt is retired, no host-exit claim
+follows, and the monolith deletion gate remains open.
+
+## 2026-08-23 amendment: focused Pages aggregate semantic footnote budget
+
+Commit `58f824eb6` changes only
+`crates/litchi-pages/src/package.rs` and
+`crates/litchi-pages/src/package/footnote_text.rs`. `FootnoteSemanticBudget`
+is separate for each `project_body_footnotes` projection and each
+`native_footnotes` pass, rather than a shared package-wide accumulator. It
+checks projected footnote text plus custom-marker bytes before per-value
+owned strings are retained. The existing `MAX_BODY_FOOTNOTES` bound,
+fallible collection reservations, and per-value text/custom-marker checks
+remain governing limits.
+
+The surrounding text transaction and rewrite path use `TransactionBudget`
+for transaction/candidate work, and setters/commit retain per-value checks
+including `Footnote::with_custom_mark`. `FootnoteSemanticBudget` does not
+account for staged `set` text, `after` values, or candidate-package
+retention; no aggregate set/after_text/candidate-retention claim is made.
+
+This is focused aggregate semantic-cap hardening only. No Cargo/build/test
+or native result is admitted and no performance, allocation-count, RSS, or
+throughput claim is made. No `litchi-iwa` dependency edge or ordered debt
+is retired, no host-exit claim follows, and the monolith deletion gate
+remains open.
