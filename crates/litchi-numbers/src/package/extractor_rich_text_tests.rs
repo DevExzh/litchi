@@ -41,6 +41,65 @@ fn rich_text_projection_matches_generated_oracle_and_reports_bounded_work() {
 }
 
 #[test]
+fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022() {
+    // The focused sidecar route is deliberately narrower than the legacy
+    // compatibility scan: 6218 owns the payload envelope and 2001 owns its
+    // writable StorageArchive.  Type 2022 is a native sibling in the legacy
+    // range, not an alias that this focused extractor may guess as storage.
+    assert_eq!(super::RICH_TEXT_PAYLOAD_MESSAGE_TYPE, 6_218);
+    assert_eq!(super::STORAGE_MESSAGE_TYPE, 2_001);
+    assert_ne!(super::STORAGE_MESSAGE_TYPE, 2_022);
+
+    let source = litchi_iwa_protos::tswp::StorageArchive {
+        text: vec!["first".to_owned(), String::new(), "last".to_owned()],
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let limits = litchi_iwa_text_wire::Limits::new(
+        source.len(),
+        source.len(),
+        source.len(),
+        source.len(),
+    )
+    .unwrap_or_else(|error| panic!("focused storage limits should be valid: {error}"));
+    let projected = litchi_iwa_text_wire::from_bytes_with_limits(&source, limits)
+        .unwrap_or_else(|error| panic!("compatibility storage projection should succeed: {error}"));
+
+    // The semantic text is the source-order concatenation, while the
+    // zero-length middle occurrence remains visible as a run.  This is the
+    // bounded text-wire contract; it makes no claim that Numbers preserves
+    // or renders native formatting/style tables as semantic rich text.
+    assert_eq!(projected.text(), "firstlast");
+    assert_eq!(projected.runs().len(), 3);
+    assert_eq!(projected.runs()[0], litchi_iwa_text::storage::Run::new(0, 5));
+    assert_eq!(projected.runs()[1], litchi_iwa_text::storage::Run::new(5, 0));
+    assert_eq!(projected.runs()[2], litchi_iwa_text::storage::Run::new(5, 4));
+
+    // The compatibility decoder intentionally accepts a noncanonical length
+    // varint, whereas the focused/native validation pass requires canonical
+    // selected framing.  Keep this distinction explicit so the permissive
+    // compatibility behavior is not mistaken for native strict acceptance.
+    let noncanonical_length = [0x1a, 0x81, 0x00, b'x'];
+    let permissive_limits = litchi_iwa_text_wire::Limits::new(32, 32, 32, 32)
+        .unwrap_or_else(|error| panic!("compatibility limits should be valid: {error}"));
+    assert_eq!(
+        litchi_iwa_text_wire::from_bytes_with_limits(&noncanonical_length, permissive_limits)
+            .unwrap_or_else(|error| panic!("compatibility wire should remain accepted: {error}"))
+            .text(),
+        "x"
+    );
+    let strict_limits = litchi_iwa_text_wire::RewriteLimits::new(
+        32, 32, 4, 32, 32, 32, 32, 32, 512,
+    )
+    .unwrap_or_else(|error| panic!("strict storage limits should be valid: {error}"));
+    assert!(
+        litchi_iwa_text_wire::validate_storage_with_limits(&noncanonical_length, strict_limits)
+            .is_err(),
+        "focused/native storage validation must reject noncanonical framing"
+    );
+}
+
+#[test]
 fn rich_text_projection_preserves_unknown_fields_and_matches_oracle() {
     let mut source = rich_text_payload(7);
     // Unknown length-delimited bytes are intentionally opaque to this narrow
