@@ -2830,6 +2830,12 @@ fn decode_table_data_list_type_in(
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         if field.number == 1 {
             set_once(&mut list_type, canonical_int32(field.varint()?)?)?;
+        } else if (!segment && matches!(field.number, 3 | 4)) || (segment && field.number == 3) {
+            // Repeated entry and segment payloads are intentionally skipped
+            // by the routing probe, but their known wire shape still belongs
+            // to the strict envelope contract. Reject a wrong wire type
+            // before the caller admits the candidate to a full decode.
+            let _ = field.bytes()?;
         }
     }
     let snapshot = TableDataListTypeSnapshot {
@@ -5655,6 +5661,30 @@ mod tests {
                 options(&duplicate_segment_type)
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn list_type_routes_reject_wrong_wire_for_known_repeated_payloads() {
+        for field_number in [3, 4] {
+            let mut malformed_root = list_minimal();
+            v(&mut malformed_root, field_number, 1);
+            assert!(
+                decode_table_data_list_type_with_report(&malformed_root, options(&malformed_root))
+                    .is_err(),
+                "root repeated field {field_number} accepted a varint wire type"
+            );
+        }
+
+        let mut malformed_segment = segment_minimal();
+        v(&mut malformed_segment, 3, 1);
+        assert!(
+            decode_table_data_list_segment_type_with_report(
+                &malformed_segment,
+                options(&malformed_segment)
+            )
+            .is_err(),
+            "segment repeated field 3 accepted a varint wire type"
         );
     }
 
