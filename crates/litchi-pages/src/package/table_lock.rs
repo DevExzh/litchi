@@ -1725,6 +1725,13 @@ fn message_declares_reference_prefix(
         .len()
         .checked_add(field_reference_capacity)
         .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })?;
+    // Charge the complete nested reference inventory before reserving the
+    // aggregate declaration map.  Otherwise a low reference ceiling could
+    // be discovered only after this allocation has already taken place.
+    for field in &message.field_infos {
+        budget.charge_payload_references(field.object_references.len())?;
+        budget.charge_payload_references(field.data_references.len())?;
+    }
     let mut declarations = HashMap::new();
     budget.charge_payload_work(declaration_capacity)?;
     declarations
@@ -1754,8 +1761,6 @@ fn message_declares_reference_prefix(
     }
     let mut field_declarations = 0usize;
     for field in &message.field_infos {
-        budget.charge_payload_references(field.object_references.len())?;
-        budget.charge_payload_references(field.data_references.len())?;
         budget.charge_payload_work(field.path.path.len())?;
         if field.data_references.iter().any(|candidate| {
             declarations
@@ -3058,6 +3063,28 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn aggregate_reference_budget_is_charged_before_declaration_reserve() {
+        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
+        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        field.object_references.push(100);
+        message.field_infos.push(field);
+
+        let mut budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
+        budget.maximum_payload_references = 0;
+        assert!(matches!(
+            message_declares_reference_prefix(&message, 100, &[TABLE_BODY_FIELD], &mut budget,),
+            Err(BodyTableLockError::LimitExceeded {
+                kind: BodyTableLockLimitKind::PayloadReferences,
+                ..
+            })
+        ));
+        // One unit is charged for the FieldInfo inventory and one for its
+        // nested reference scan; the declaration-map reservation must not
+        // charge or allocate before the reference ceiling rejects the input.
+        assert_eq!(budget.total_work, 2);
     }
 
     #[test]
