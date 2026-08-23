@@ -80,6 +80,7 @@ pub mod xml_splice;
 
 // Re-export main types for convenience
 // Manifest is internal to the package system
+pub use crate::package::ArchiveLimits;
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::{Package, PreparedPackage, validate_content_document_part, validate_content_part};
 #[allow(

@@ -3,11 +3,12 @@
 use super::codec::{classify_mimetype, decode_xml_part};
 use super::model::{Family, Package};
 use crate::constants;
-use crate::core::{Meta, OwnedPackage};
+use crate::core::{Meta, OwnedPackage, SourcePackageLimits};
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::package::replace_content_xml_with_payload_verification;
 use std::io::Read;
 use std::path::Path;
+use zeroize::Zeroizing;
 
 impl Package {
     pub fn owned_package(&self) -> &OwnedPackage {
@@ -40,10 +41,29 @@ impl Package {
         Self::from_reader(file)
     }
 
+    /// Open and validate a packaged document under explicit finite limits.
+    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourcePackageLimits) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_limits(file, limits)
+    }
+
     /// Open and validate a password-encrypted packaged `OpenDocument` file.
     pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        let mut password = Zeroizing::new(password.into());
         let file = std::fs::File::open(path)?;
-        Self::from_reader_with_password(file, password)
+        Self::from_reader_with_password(file, std::mem::take(&mut *password))
+    }
+
+    /// Open and validate a password-encrypted packaged document with explicit
+    /// finite limits.
+    pub fn open_with_limits_and_password(
+        path: impl AsRef<Path>,
+        limits: SourcePackageLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let mut password = Zeroizing::new(password.into());
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_limits_and_password(file, limits, std::mem::take(&mut *password))
     }
 
     /// Read and validate a packaged `OpenDocument` file.
@@ -52,12 +72,37 @@ impl Package {
         Self::from_owned(package)
     }
 
+    /// Read and validate a packaged document under explicit finite limits.
+    pub fn from_reader_with_limits(reader: impl Read, limits: SourcePackageLimits) -> Result<Self> {
+        let package = OwnedPackage::from_reader_with_limits(reader, limits)?;
+        Self::from_owned(package)
+    }
+
     /// Read and validate a password-encrypted packaged `OpenDocument` file.
     pub fn from_reader_with_password(
         reader: impl Read,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_owned(OwnedPackage::from_reader_with_password(reader, password)?)
+        let mut password = Zeroizing::new(password.into());
+        Self::from_owned(OwnedPackage::from_reader_with_password(
+            reader,
+            std::mem::take(&mut *password),
+        )?)
+    }
+
+    /// Read and validate a password-encrypted packaged document with explicit
+    /// finite limits.
+    pub fn from_reader_with_limits_and_password(
+        reader: impl Read,
+        limits: SourcePackageLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let mut password = Zeroizing::new(password.into());
+        Self::from_owned(OwnedPackage::from_reader_with_limits_and_password(
+            reader,
+            limits,
+            std::mem::take(&mut *password),
+        )?)
     }
 
     /// Validate a packaged `OpenDocument` file from owned bytes.
@@ -66,9 +111,34 @@ impl Package {
         Self::from_owned(package)
     }
 
+    /// Validate packaged document bytes under explicit finite limits.
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourcePackageLimits) -> Result<Self> {
+        let package = OwnedPackage::from_bytes_with_limits(bytes, limits)?;
+        Self::from_owned(package)
+    }
+
     /// Validate password-encrypted packaged `OpenDocument` bytes.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Self::from_owned(OwnedPackage::from_bytes_with_password(bytes, password)?)
+        let mut password = Zeroizing::new(password.into());
+        Self::from_owned(OwnedPackage::from_bytes_with_password(
+            bytes,
+            std::mem::take(&mut *password),
+        )?)
+    }
+
+    /// Validate password-encrypted packaged document bytes with explicit
+    /// finite limits.
+    pub fn from_bytes_with_limits_and_password(
+        bytes: Vec<u8>,
+        limits: SourcePackageLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let mut password = Zeroizing::new(password.into());
+        Self::from_owned(OwnedPackage::from_bytes_with_limits_and_password(
+            bytes,
+            limits,
+            std::mem::take(&mut *password),
+        )?)
     }
 
     fn from_owned(package: OwnedPackage) -> Result<Self> {

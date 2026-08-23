@@ -13,8 +13,8 @@
 //! ```
 
 use crate::constants;
-use crate::core::{OwnedPackage, PreparedPackage};
-use litchi_core::{Error, ReadAt, SourceVersion};
+use crate::core::{OwnedPackage, PreparedPackage, package::read_owned_input};
+use litchi_core::{Error, ReadAt, Resource, ResourceLimit, Result, SourceVersion};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -88,6 +88,51 @@ impl Default for CatalogProbeLimits {
     }
 }
 
+/// Maximum input accepted by the compatibility detector defaults.
+pub const DEFAULT_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+/// Finite limits for ODF detection and stream ingress.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_input_bytes: u64,
+}
+
+impl Limits {
+    /// Construct a detector profile with an explicit input ceiling.
+    #[must_use]
+    pub const fn new(max_input_bytes: u64) -> Self {
+        Self { max_input_bytes }
+    }
+
+    /// Return the maximum source bytes accepted by this profile.
+    #[must_use]
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
+    }
+
+    /// Return a copy with a different input ceiling.
+    #[must_use]
+    pub const fn with_max_input_bytes(mut self, maximum: u64) -> Self {
+        self.max_input_bytes = maximum;
+        self
+    }
+
+    fn validate(self) -> Result<()> {
+        if self.max_input_bytes == 0 || self.max_input_bytes > DEFAULT_MAX_INPUT_BYTES {
+            return Err(Error::InvalidFormat(format!(
+                "ODF detector input bytes must be between 1 and {DEFAULT_MAX_INPUT_BYTES}"
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::new(DEFAULT_MAX_INPUT_BYTES)
+    }
+}
+
 /// Classify the raw contents of an ODF `mimetype` member.
 ///
 /// Leading and trailing ASCII whitespace is ignored without allocating.
@@ -118,45 +163,76 @@ pub fn mime(value: &[u8]) -> Option<Format> {
 /// an owned string.
 #[must_use]
 pub fn flat_mime(value: &[u8]) -> Option<String> {
+    flat_mime_with_limits(value, Limits::default())
+        .ok()
+        .flatten()
+}
+
+/// Read a recognized flat `ODF` MIME value under explicit finite limits.
+pub fn flat_mime_with_limits(value: &[u8], limits: Limits) -> Result<Option<String>> {
+    check_input_len(value.len(), limits, "ODF flat detector input")?;
     with_flat_mime(value, |raw_mimetype| {
         let trimmed_mimetype = trim_ascii(raw_mimetype);
-        mime(trimmed_mimetype)?;
-        let mimetype_text = std::str::from_utf8(trimmed_mimetype).ok()?;
-        Some(mimetype_text.to_owned())
+        if mime(trimmed_mimetype).is_none() {
+            return Ok(None);
+        }
+        let Some(mimetype_text) = std::str::from_utf8(trimmed_mimetype).ok() else {
+            return Ok(None);
+        };
+        let mut owned = String::new();
+        owned
+            .try_reserve_exact(mimetype_text.len())
+            .map_err(|source| Error::Allocation {
+                resource: "ODF flat detector mimetype",
+                source,
+            })?;
+        owned.push_str(mimetype_text);
+        Ok(Some(owned))
     })
 }
 
-fn with_flat_mime<T>(value: &[u8], classify: impl FnOnce(&[u8]) -> Option<T>) -> Option<T> {
+fn with_flat_mime<T>(
+    value: &[u8],
+    classify: impl FnOnce(&[u8]) -> Result<Option<T>>,
+) -> Result<Option<T>> {
     let mut reader = NsReader::from_reader(value);
     loop {
-        let (event_namespace, event) = reader.read_resolved_event().ok()?;
+        let (event_namespace, event) = match reader.read_resolved_event() {
+            Ok(event) => event,
+            Err(_) => return Ok(None),
+        };
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if !matches!(event_namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                     || element.local_name().as_ref() != b"document"
                 {
-                    return None;
+                    return Ok(None);
                 }
                 for raw_attribute in element.attributes() {
-                    let attribute = raw_attribute.ok()?;
+                    let Ok(attribute) = raw_attribute else {
+                        return Ok(None);
+                    };
                     let (attribute_namespace, local_name) =
                         reader.resolver().resolve_attribute(attribute.key);
                     if matches!(attribute_namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                         && local_name.as_ref() == b"mimetype"
                     {
-                        let decoded_mimetype = attribute
-                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                            .ok()?;
+                        let Ok(decoded_mimetype) = attribute.decoded_and_normalized_value(
+                            XmlVersion::Implicit1_0,
+                            reader.decoder(),
+                        ) else {
+                            return Ok(None);
+                        };
                         return classify(decoded_mimetype.as_bytes());
                     }
                 }
-                return None;
+                return Ok(None);
             },
             Event::Decl(_) | Event::Comment(_) | Event::DocType(_) | Event::PI(_) => {},
             Event::Text(text) if text.iter().all(u8::is_ascii_whitespace) => {},
-            Event::Eof => return None,
+            Event::Eof => return Ok(None),
             Event::End(_) | Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {
-                return None;
+                return Ok(None);
             },
         }
     }
@@ -166,7 +242,13 @@ fn with_flat_mime<T>(value: &[u8], classify: impl FnOnce(&[u8]) -> Option<T>) ->
 #[inline]
 #[must_use]
 pub fn flat(value: &[u8]) -> Option<Format> {
-    with_flat_mime(value, mime)
+    flat_with_limits(value, Limits::default()).ok().flatten()
+}
+
+/// Detect a flat `OpenDocument` XML document under explicit finite limits.
+pub fn flat_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+    check_input_len(value.len(), limits, "ODF flat detector input")?;
+    with_flat_mime(value, |raw_mimetype| Ok(mime(raw_mimetype)))
 }
 
 /// Detect a packaged or flat `OpenDocument` document from complete bytes.
@@ -176,15 +258,28 @@ pub fn flat(value: &[u8]) -> Option<Format> {
 /// decompression buffer. The central archive structure is also validated.
 #[must_use]
 pub fn bytes(value: &[u8]) -> Option<Format> {
+    bytes_with_limits(value, Limits::default()).ok().flatten()
+}
+
+/// Detect a packaged or flat `OpenDocument` document under explicit finite
+/// limits.
+pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+    check_input_len(value.len(), limits, "ODF detector input")?;
     if value.starts_with(ZIP_SIGNATURE) {
-        let format = packaged_mime(value)?;
-        let archive = soapberry_zip::office::ArchiveReader::new(value).ok()?;
-        if !archive.is_stored(MIMETYPE_PATH).ok()? {
-            return None;
+        let Some(format) = packaged_mime_with_limits(value, limits)? else {
+            return Ok(None);
+        };
+        let archive =
+            soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
+        if !archive
+            .is_stored(MIMETYPE_PATH)
+            .map_err(map_detector_zip_error)?
+        {
+            return Ok(None);
         }
-        return Some(format);
+        return Ok(Some(format));
     }
-    flat(value)
+    flat_with_limits(value, limits)
 }
 
 /// Classify a packaged ODF candidate from its local `mimetype` entry only.
@@ -195,7 +290,16 @@ pub fn bytes(value: &[u8]) -> Option<Format> {
 /// header, unknown MIME type, or non-ZIP input returns `None`.
 #[must_use]
 pub fn packaged_mime(value: &[u8]) -> Option<Format> {
-    mime(packaged_mime_bytes(value)?)
+    packaged_mime_with_limits(value, Limits::default())
+        .ok()
+        .flatten()
+}
+
+/// Classify a packaged ODF candidate from its local `mimetype` entry under
+/// explicit finite limits.
+pub fn packaged_mime_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+    check_input_len(value.len(), limits, "ODF detector input")?;
+    Ok(packaged_mime_bytes(value).and_then(mime))
 }
 
 /// Check whether a ZIP candidate has the reserved OPC content-types member.
@@ -279,7 +383,7 @@ pub fn packaged_has_ooxml_catalog_with_limits(
 /// errors.
 pub fn packaged_has_ooxml_catalog_read_at(
     source: &dyn ReadAt,
-) -> litchi_core::Result<Option<bool>> {
+) -> Result<Option<bool>> {
     packaged_has_ooxml_catalog_read_at_with_limits(source, CatalogProbeLimits::default())
 }
 
@@ -291,7 +395,7 @@ pub fn packaged_has_ooxml_catalog_read_at(
 pub fn packaged_has_ooxml_catalog_read_at_with_limits(
     source: &dyn ReadAt,
     limits: CatalogProbeLimits,
-) -> litchi_core::Result<Option<bool>> {
+) -> Result<Option<bool>> {
     let expected = source.version()?;
     let detected = (|| {
         let length = source.len()?;
@@ -459,10 +563,28 @@ pub fn packaged_has_ooxml_catalog_from_reader_with_limits<R: Read + Seek>(
 /// family facade.  The source identity is checked before and after the probe;
 /// a source that changes while it is being read is rejected instead of being
 /// classified from a mixed snapshot.
-pub fn packaged_mime_read_at(source: &dyn ReadAt) -> litchi_core::Result<Option<Format>> {
+pub fn packaged_mime_read_at(source: &dyn ReadAt) -> Result<Option<Format>> {
+    packaged_mime_read_at_with_limits(source, Limits::default())
+}
+
+/// Detect a packaged ODF document from a positional source under explicit
+/// finite limits.
+pub fn packaged_mime_read_at_with_limits(
+    source: &dyn ReadAt,
+    limits: Limits,
+) -> Result<Option<Format>> {
+    limits.validate()?;
     let expected = source.version()?;
     let detected = (|| {
         let length = source.len()?;
+        if length > limits.max_input_bytes {
+            return Err(Error::ResourceLimit(ResourceLimit {
+                resource: Resource::InputBytes,
+                observed: length,
+                limit: limits.max_input_bytes,
+                scope: "ODF detector input".into(),
+            }));
+        }
         let local_name_end = u64::try_from(LOCAL_HEADER_BYTES + MIMETYPE_NAME.len())
             .expect("fixed local header size fits in u64");
         if length < local_name_end {
@@ -520,7 +642,7 @@ pub fn prepared(value: Vec<u8>) -> Option<PreparedPackage> {
 /// allocation so a lower-precedence package detector can inspect it without a
 /// full-input clone.
 #[must_use = "inspect the prepared package or recover the original bytes"]
-pub fn prepared_or_original(value: Vec<u8>) -> Result<PreparedPackage, Vec<u8>> {
+pub fn prepared_or_original(value: Vec<u8>) -> std::result::Result<PreparedPackage, Vec<u8>> {
     let Some(format) = packaged_mime(&value) else {
         return Err(value);
     };
@@ -544,15 +666,43 @@ pub fn prepared_package(value: Vec<u8>) -> Option<PreparedPackage> {
 /// caller's original cursor position on every success or failure path. If the
 /// original position cannot be restored, this function returns `None`.
 pub fn reader<R: Read + Seek>(value: &mut R) -> Option<Format> {
-    let original = value.stream_position().ok()?;
+    reader_with_limits(value, Limits::default()).ok().flatten()
+}
+
+/// Detect an ODF stream under explicit finite limits while restoring its
+/// original cursor position on every success or failure path.
+pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Result<Option<Format>> {
+    limits.validate()?;
+    let original = value.stream_position()?;
     let detected = (|| {
-        value.seek(SeekFrom::Start(0)).ok()?;
-        let mut data = Vec::new();
-        value.read_to_end(&mut data).ok()?;
-        bytes(&data)
+        value.seek(SeekFrom::Start(0))?;
+        let data = read_owned_input(&mut *value, limits.max_input_bytes, "ODF detector input")?;
+        bytes_with_limits(&data, limits)
     })();
-    value.seek(SeekFrom::Start(original)).ok()?;
+    value.seek(SeekFrom::Start(original))?;
     detected
+}
+
+fn check_input_len(length: usize, limits: Limits, scope: &'static str) -> Result<()> {
+    limits.validate()?;
+    let observed = u64::try_from(length)
+        .map_err(|_| Error::InvalidFormat("ODF detector input exceeds platform limits".into()))?;
+    if observed > limits.max_input_bytes {
+        return Err(Error::ResourceLimit(ResourceLimit {
+            resource: Resource::InputBytes,
+            observed,
+            limit: limits.max_input_bytes,
+            scope: scope.into(),
+        }));
+    }
+    Ok(())
+}
+
+fn map_detector_zip_error(error: soapberry_zip::Error) -> Error {
+    match crate::core::package::map_zip_error(error) {
+        error @ (Error::Allocation { .. } | Error::Io(_) | Error::ResourceLimit(_)) => error,
+        error => Error::InvalidFormat(error.to_string()),
+    }
 }
 
 fn packaged_mime_bytes(value: &[u8]) -> Option<&[u8]> {
@@ -597,10 +747,7 @@ fn packaged_mime_layout(header: &[u8], name: &[u8]) -> Option<(usize, usize, u32
     Some((data_start, compressed, expected_crc))
 }
 
-fn ensure_source_current(
-    expected: SourceVersion,
-    observed: SourceVersion,
-) -> litchi_core::Result<()> {
+fn ensure_source_current(expected: SourceVersion, observed: SourceVersion) -> Result<()> {
     if expected == observed {
         Ok(())
     } else {
@@ -716,7 +863,7 @@ fn catalog_probe_range_is_bounded(
     end <= directory_offset
 }
 
-fn map_catalog_probe_zip_error(error: soapberry_zip::Error) -> litchi_core::Result<Option<bool>> {
+fn map_catalog_probe_zip_error(error: soapberry_zip::Error) -> Result<Option<bool>> {
     match error.into_kind() {
         soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
             map_catalog_probe_io_error(error)
@@ -728,7 +875,7 @@ fn map_catalog_probe_zip_error(error: soapberry_zip::Error) -> litchi_core::Resu
     }
 }
 
-fn map_catalog_probe_io_error(error: std::io::Error) -> litchi_core::Result<Option<bool>> {
+fn map_catalog_probe_io_error(error: std::io::Error) -> Result<Option<bool>> {
     if error
         .get_ref()
         .is_some_and(|source| source.is::<ReadAtProviderError>())
@@ -750,7 +897,7 @@ fn read_at_catalog_exact(
     source: &dyn ReadAt,
     mut offset: u64,
     mut output: &mut [u8],
-) -> litchi_core::Result<bool> {
+) -> Result<bool> {
     while !output.is_empty() {
         match source.read_at(offset, output) {
             Ok(0) => return Ok(false),
@@ -998,6 +1145,47 @@ mod tests {
         invalid.set_position(4);
         assert_eq!(reader(&mut invalid), None);
         assert_eq!(invalid.position(), 4);
+    }
+
+    #[test]
+    fn bounded_reader_uses_max_plus_one_and_restores_position() {
+        let mut reader = Cursor::new(b"xx".to_vec());
+        reader.set_position(1);
+        let error = reader_with_limits(&mut reader, Limits::new(1)).unwrap_err();
+        assert!(matches!(error, Error::ResourceLimit(_)));
+        assert_eq!(reader.position(), 1);
+        assert!(matches!(
+            reader_with_limits(&mut reader, Limits::new(0)),
+            Err(Error::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn detector_preserves_zip_file_count_and_metadata_limits() {
+        for (resource, expected_resource) in [
+            (soapberry_zip::LimitResource::FileCount, Resource::Objects),
+            (
+                soapberry_zip::LimitResource::MetadataBytes,
+                Resource::InputBytes,
+            ),
+        ] {
+            let error = map_detector_zip_error(soapberry_zip::Error::from(
+                soapberry_zip::ErrorKind::LimitExceeded {
+                    resource,
+                    actual: 2,
+                    maximum: 1,
+                },
+            ));
+            assert!(matches!(
+                error,
+                Error::ResourceLimit(ResourceLimit {
+                    resource,
+                    observed: 2,
+                    limit: 1,
+                    ..
+                }) if resource == expected_resource
+            ));
+        }
     }
 
     #[test]

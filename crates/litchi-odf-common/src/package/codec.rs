@@ -1,8 +1,11 @@
 //! Archive access and neutral `manifest.xml` codecs.
 
-use super::model::{Archive, ArchiveNames, ArchiveReaderKind, Entry, Manifest, PreparedArchive};
+use super::model::{
+    Archive, ArchiveLimits, ArchiveMetadata, ArchiveNames, ArchiveReaderKind, Entry, Manifest,
+    PreparedArchive,
+};
 use super::path::validate_manifest_path;
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -45,6 +48,57 @@ pub(crate) enum ManifestScanAttributes {
     ManifestAndLoext(Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)>),
 }
 
+const DEFAULT_MAX_MANIFEST_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Preserve ZIP resource-limit and allocation failures at the ODF boundary.
+///
+/// The neutral package layer is the owner of borrowed archive access, so all
+/// callers (including the core package owner and the detector) use this one
+/// mapping instead of flattening archive limits into format strings.
+pub(crate) fn map_archive_error(error: soapberry_zip::Error) -> Error {
+    map_archive_error_kind(error.into_kind())
+}
+
+pub(crate) fn map_archive_error_kind(kind: soapberry_zip::ErrorKind) -> Error {
+    match kind {
+        soapberry_zip::ErrorKind::Allocation { resource, source } => {
+            Error::Allocation { resource, source }
+        },
+        soapberry_zip::ErrorKind::LimitExceeded {
+            resource,
+            actual,
+            maximum,
+        } => archive_limit_error(resource, actual, maximum),
+        soapberry_zip::ErrorKind::IO(io_error) | soapberry_zip::ErrorKind::Io(io_error) => {
+            Error::Io(io_error)
+        },
+        kind => Error::InvalidFormat(soapberry_zip::Error::from(kind).to_string()),
+    }
+}
+
+fn archive_limit_error(resource: soapberry_zip::LimitResource, actual: u64, maximum: u64) -> Error {
+    let (dimension, scope) = match resource {
+        soapberry_zip::LimitResource::FileCount => (Resource::Objects, "ODF ZIP file count"),
+        soapberry_zip::LimitResource::MemberNameBytes => {
+            (Resource::InputBytes, "ODF ZIP member name bytes")
+        },
+        soapberry_zip::LimitResource::MetadataBytes => {
+            (Resource::InputBytes, "ODF ZIP metadata bytes")
+        },
+        soapberry_zip::LimitResource::CompressedSize => {
+            (Resource::InputBytes, "ODF ZIP compressed bytes")
+        },
+        soapberry_zip::LimitResource::EntrySize => (Resource::InputBytes, "ODF ZIP entry bytes"),
+        soapberry_zip::LimitResource::TotalSize => (Resource::InputBytes, "ODF ZIP total bytes"),
+    };
+    Error::ResourceLimit(ResourceLimit {
+        resource: dimension,
+        observed: actual,
+        limit: maximum,
+        scope: scope.into(),
+    })
+}
+
 fn try_copy_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
@@ -70,10 +124,15 @@ impl<'data> Archive<'data> {
     ///
     /// Returns an error when `data` is not a readable ZIP archive.
     pub fn new(data: &'data [u8]) -> Result<Self> {
+        Self::new_with_limits(data, ArchiveLimits::default())
+    }
+
+    /// Open an ODF ZIP archive with explicit central-directory limits.
+    pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> {
         #[cfg(test)]
         super::model::note_index_build();
-        let reader = ArchiveReader::new(data)
-            .map_err(|error| Error::InvalidFormat(format!("Invalid ZIP archive: {error}")))?;
+        let reader = ArchiveReader::new_with_limits(data, limits.into_zip_limits())
+            .map_err(map_archive_error)?;
         Ok(Self {
             reader: ArchiveReaderKind::Borrowed(reader),
         })
@@ -97,7 +156,27 @@ impl<'data> Archive<'data> {
             ArchiveReaderKind::Borrowed(reader) => reader.read(path),
             ArchiveReaderKind::Prepared(reader) => reader.read(path),
         };
-        result.map_err(|error| Error::InvalidFormat(error.to_string()))
+        result.map_err(map_archive_error)
+    }
+
+    /// Read one archive member after checking its declared uncompressed size
+    /// against a caller-selected finite limit.
+    pub fn read_with_limit(
+        &self,
+        path: &str,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<Vec<u8>> {
+        let metadata = self.metadata(path)?;
+        if metadata.uncompressed_size() > maximum {
+            return Err(Error::ResourceLimit(ResourceLimit {
+                resource: Resource::InputBytes,
+                observed: metadata.uncompressed_size(),
+                limit: maximum,
+                scope: scope.into(),
+            }));
+        }
+        self.read(path)
     }
 
     /// Read one UTF-8 archive member.
@@ -111,6 +190,34 @@ impl<'data> Archive<'data> {
             .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8 in '{path}': {error}")))
     }
 
+    /// Read one UTF-8 archive member under a declared-size limit.
+    pub fn read_string_with_limit(
+        &self,
+        path: &str,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<String> {
+        let bytes = self.read_with_limit(path, maximum, scope)?;
+        String::from_utf8(bytes)
+            .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8 in '{path}': {error}")))
+    }
+
+    /// Return declared ZIP metadata for one archive member without reading
+    /// or decompressing its payload.
+    pub fn metadata(&self, path: &str) -> Result<ArchiveMetadata> {
+        let result = match &self.reader {
+            ArchiveReaderKind::Borrowed(reader) => reader.metadata(path),
+            ArchiveReaderKind::Prepared(reader) => reader.metadata(path),
+        };
+        result
+            .map(|metadata| ArchiveMetadata {
+                compressed_size: metadata.compressed_size(),
+                uncompressed_size: metadata.uncompressed_size(),
+                directory: metadata.is_directory(),
+            })
+            .map_err(map_archive_error)
+    }
+
     /// Read the package manifest, accepting both common ODF locations.
     ///
     /// # Errors
@@ -118,11 +225,21 @@ impl<'data> Archive<'data> {
     /// Returns an error when neither conventional manifest location can be
     /// read as UTF-8.
     pub fn read_manifest_xml(&self) -> Result<String> {
+        self.read_manifest_xml_with_limit(DEFAULT_MAX_MANIFEST_BYTES, "ODF manifest bytes")
+    }
+
+    /// Read the package manifest while checking its declared size before
+    /// materialization.
+    pub fn read_manifest_xml_with_limit(
+        &self,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<String> {
         if self.contains(MANIFEST_PATHS[0]) {
-            return self.read_string(MANIFEST_PATHS[0]);
+            return self.read_string_with_limit(MANIFEST_PATHS[0], maximum, scope);
         }
         if self.contains(MANIFEST_PATHS[1]) {
-            return self.read_string(MANIFEST_PATHS[1]);
+            return self.read_string_with_limit(MANIFEST_PATHS[1], maximum, scope);
         }
         Err(Error::InvalidFormat(
             "No manifest.xml found in ODF package".to_string(),
@@ -156,7 +273,7 @@ impl<'data> Archive<'data> {
             ArchiveReaderKind::Borrowed(reader) => reader.is_stored(path),
             ArchiveReaderKind::Prepared(reader) => reader.is_stored(path),
         };
-        result.map_err(|error| Error::InvalidFormat(error.to_string()))
+        result.map_err(map_archive_error)
     }
 }
 

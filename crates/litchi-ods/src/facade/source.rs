@@ -152,7 +152,12 @@ impl SourceBackedSpreadsheet {
         source: Arc<dyn ReadAt>,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_read_at_inner_with_password(source, ReadLimits::default(), password)
+        let mut password = Zeroizing::new(password.into());
+        Self::from_read_at_inner_with_password(
+            source,
+            ReadLimits::default(),
+            std::mem::take(&mut *password),
+        )
     }
 
     /// Open an ODS from a positional source with explicit finite limits.
@@ -167,7 +172,8 @@ impl SourceBackedSpreadsheet {
         limits: ReadLimits,
         password: impl Into<String>,
     ) -> Result<Self> {
-        Self::from_read_at_inner_with_password(source, limits, password)
+        let mut password = Zeroizing::new(password.into());
+        Self::from_read_at_inner_with_password(source, limits, std::mem::take(&mut *password))
     }
 
     fn from_read_at_inner(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
