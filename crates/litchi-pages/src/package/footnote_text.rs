@@ -7,13 +7,14 @@
 //! remain untouched. Insert/remove therefore stay in the migration host until
 //! their graph lifecycle can be moved without weakening cleanup.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_archive::{ComponentCatalog, SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{WireLimits, encode_varint_into, varint::encoded_len, wire::WireView};
-use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::pages_footnote_codec;
 use litchi_iwa_text_wire::RewriteError;
 use thiserror::Error;
@@ -530,6 +531,58 @@ struct NativeFootnote {
     marker_identifier: NonZeroU64,
 }
 
+/// Borrowed object locations for one immutable source snapshot.
+///
+/// The map owns no archive data: every value remains borrowed from the
+/// source catalog retained by the package's `Arc`.  Keeping the first value
+/// for an identifier preserves the historical `find_object` first-match
+/// behavior even if this helper is ever used before package-wide duplicate
+/// validation.
+#[derive(Debug)]
+struct FootnoteObjectLocations<'source> {
+    objects: HashMap<u64, &'source ArchiveObject>,
+}
+
+impl<'source> FootnoteObjectLocations<'source> {
+    fn new(components: &'source ComponentCatalog) -> Result<Self, FootnoteTextError> {
+        let object_count = components.iter().try_fold(0usize, |count, component| {
+            count.checked_add(component.archive().objects.len()).ok_or(
+                FootnoteTextError::LimitExceeded {
+                    kind: FootnoteTextLimitKind::Entries,
+                    observed: usize_to_u64(usize::MAX),
+                    maximum: usize_to_u64(super::MAX_OBJECTS),
+                },
+            )
+        })?;
+        if object_count > super::MAX_OBJECTS {
+            return Err(FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::Entries,
+                observed: usize_to_u64(object_count),
+                maximum: usize_to_u64(super::MAX_OBJECTS),
+            });
+        }
+
+        let mut objects = HashMap::new();
+        objects.try_reserve_exact(object_count).map_err(|_error| {
+            FootnoteTextError::Allocation {
+                amount: object_count,
+            }
+        })?;
+        for component in components.iter() {
+            for object in &component.archive().objects {
+                if let Some(identifier) = object.archive_info.identifier {
+                    objects.entry(identifier).or_insert(object);
+                }
+            }
+        }
+        Ok(Self { objects })
+    }
+
+    fn get(&self, identifier: u64) -> Option<&'source ArchiveObject> {
+        self.objects.get(&identifier).copied()
+    }
+}
+
 fn resolve_footnote(
     package: &Package,
     selector: Selector,
@@ -553,16 +606,14 @@ fn resolve_footnote(
 fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
     let mut semantic_budget =
         super::FootnoteSemanticBudget::new(effective_text_limit(package.state.source.limits()));
-    let root = root_references_with_limits(
-        package.state.source.components(),
-        package.state.source.limits(),
-    )
-    .map_err(map_package_error)?;
+    let components = package.state.source.components();
+    let root = root_references_with_limits(components, package.state.source.limits())
+        .map_err(map_package_error)?;
     let Some(body_identifier) = root.body else {
         return Ok(Vec::new());
     };
-    let body = find_object(package.state.source.components(), body_identifier.get())
-        .ok_or(FootnoteTextError::InvalidSource)?;
+    let body =
+        find_object(components, body_identifier.get()).ok_or(FootnoteTextError::InvalidSource)?;
     let body_payload =
         unique_text_payload(&body.messages, body_identifier).map_err(map_package_error)?;
     let (body_storage, _) = decode_body_storage(
@@ -599,6 +650,7 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
                 amount: entries.len(),
             })?;
     }
+    let object_locations = FootnoteObjectLocations::new(components)?;
     let mut previous = None;
     for entry in entries {
         if previous.is_some_and(|position| position >= entry.character_index) {
@@ -615,7 +667,8 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             entry.character_index,
         )
         .map_err(map_package_error)?;
-        let reference = find_object(package.state.source.components(), entry.identifier.get())
+        let reference = object_locations
+            .get(entry.identifier.get())
             .ok_or(FootnoteTextError::InvalidSource)?;
         let payload = unique_message_payload(
             &reference.messages,
@@ -643,7 +696,8 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             return Err(FootnoteTextError::InvalidSource);
         }
         seen_storages.push(storage_identifier);
-        let storage = find_object(package.state.source.components(), storage_identifier.get())
+        let storage = object_locations
+            .get(storage_identifier.get())
             .ok_or(FootnoteTextError::InvalidSource)?;
         let storage_payload = unique_text_payload(&storage.messages, storage_identifier)
             .map_err(map_package_error)?;
@@ -687,7 +741,8 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             return Err(FootnoteTextError::InvalidSource);
         }
         seen_markers.push(marker_identifier);
-        let marker = find_object(package.state.source.components(), marker_identifier.get())
+        let marker = object_locations
+            .get(marker_identifier.get())
             .ok_or(FootnoteTextError::InvalidSource)?;
         let marker_payload = unique_message_payload(
             &marker.messages,
@@ -1667,11 +1722,17 @@ fn usize_to_u64(value: usize) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
     use super::{
-        FootnoteTextError, FootnoteTextLimitKind, checked_utf16_units, is_canonical_component_name,
-        position_from_anchor, rewrite_custom_mark_wire,
+        FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind, FootnoteTextPatch,
+        checked_utf16_units, is_canonical_component_name, position_from_anchor,
+        rewrite_custom_mark_wire,
     };
+    use crate::footnote::body::{Footnote, Position};
     use litchi_iwa_common::WireLimits;
+    use litchi_iwa_core::ArchiveObject;
 
     #[test]
     fn mutation_authority_accepts_only_canonical_index_components() {
@@ -1717,5 +1778,68 @@ mod tests {
         assert_eq!(backward, source);
         assert_eq!(&forward[..2], &source[..2]);
         assert_eq!(&forward[5..], &source[5..]);
+    }
+
+    #[test]
+    fn borrowed_locations_keep_first_ordered_match_and_isolate_unrelated_ids() {
+        let first = ArchiveObject::new(7, Vec::new())
+            .unwrap_or_else(|error| panic!("first object: {error}"));
+        let duplicate = ArchiveObject::new(7, Vec::new())
+            .unwrap_or_else(|error| panic!("duplicate object: {error}"));
+        let unrelated = ArchiveObject::new(8, Vec::new())
+            .unwrap_or_else(|error| panic!("unrelated object: {error}"));
+        let mut objects = HashMap::new();
+        objects
+            .try_reserve_exact(3)
+            .unwrap_or_else(|error| panic!("location reservation: {error}"));
+        objects.entry(7).or_insert(&first);
+        objects.entry(7).or_insert(&duplicate);
+        objects.entry(8).or_insert(&unrelated);
+        let locations = FootnoteObjectLocations { objects };
+
+        assert!(std::ptr::eq(
+            locations.get(7).unwrap_or_else(|| panic!("first location")),
+            &first
+        ));
+        assert!(std::ptr::eq(
+            locations
+                .get(8)
+                .unwrap_or_else(|| panic!("unrelated location")),
+            &unrelated
+        ));
+        assert!(locations.get(9).is_none());
+    }
+
+    #[test]
+    fn inverse_and_exact_noop_preserve_patch_bytes() {
+        let before = Footnote::new(Position::ZERO, "before")
+            .unwrap_or_else(|error| panic!("before footnote: {error}"));
+        let after = Footnote::new(Position::ZERO, "after")
+            .unwrap_or_else(|error| panic!("after footnote: {error}"));
+        let source_bytes: Arc<[u8]> = Arc::from(&b"source"[..]);
+        let target_bytes: Arc<[u8]> = Arc::from(&b"target"[..]);
+        let patch = FootnoteTextPatch {
+            source_bytes: Arc::clone(&source_bytes),
+            target_bytes: Arc::clone(&target_bytes),
+            source_fingerprint: 1,
+            target_fingerprint: 2,
+            position: Position::ZERO,
+            before: before.clone(),
+            after: after.clone(),
+        };
+        assert_eq!(patch.inverse().inverse(), patch);
+        assert!(!patch.is_noop());
+
+        let noop = FootnoteTextPatch {
+            source_bytes: Arc::clone(&source_bytes),
+            target_bytes: source_bytes,
+            source_fingerprint: 1,
+            target_fingerprint: 1,
+            position: Position::ZERO,
+            before: before.clone(),
+            after: before,
+        };
+        assert!(noop.is_noop());
+        assert_eq!(noop.inverse().inverse(), noop);
     }
 }
