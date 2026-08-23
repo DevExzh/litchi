@@ -12,7 +12,7 @@
 //! comments and clearing comments are refused; both operations require
 //! ownership-graph mutations that this adapter does not perform.
 
-use std::{fmt, sync::Arc};
+use std::{collections::HashSet, fmt, sync::Arc};
 
 use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
@@ -40,7 +40,7 @@ const ROOT_PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-w
 /// the editable text, so callers cannot depend on native identifiers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Comment {
-    text: String,
+    text: Arc<str>,
 }
 
 impl Comment {
@@ -52,13 +52,15 @@ impl Comment {
     /// a fallible reservation before staging it.
     #[must_use]
     pub fn new(text: impl Into<String>) -> Self {
-        Self { text: text.into() }
+        Self {
+            text: Arc::from(text.into().into_boxed_str()),
+        }
     }
 
     /// Borrow the comment text.
     #[must_use]
     pub fn text(&self) -> &str {
-        &self.text
+        self.text.as_ref()
     }
 
     fn try_from_text(text: &str, maximum: usize, path: Path) -> Result<Self, Error> {
@@ -78,7 +80,9 @@ impl Comment {
                 path,
             })?;
         retained.push_str(text);
-        Ok(Self { text: retained })
+        Ok(Self {
+            text: Arc::from(retained.into_boxed_str()),
+        })
     }
 }
 
@@ -1429,12 +1433,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         }
         prove_global_comment_ownership(edit.source, &located)?;
     }
-    let maximum = edit.source.state.options.semantic().max_output_text_bytes();
-    let after = edit
-        .after
-        .as_ref()
-        .map(|comment| Comment::try_from_text(comment.text.as_str(), maximum, edit.target.path))
-        .transpose()?;
+    let after = edit.after.clone();
     let source_cell = located.cell_bytes.clone().ok_or(Error::InvalidSource {
         path: edit.target.path,
     })?;
@@ -1710,29 +1709,60 @@ fn map_wire_error(error: litchi_iwa_common::Error, path: Path) -> Error {
     }
 }
 
-fn cell_range(
+// The generated storage decoders charge their own wire work, but the native
+// range and uniqueness scans below run in this adapter. Keep their cost on
+// the same hard ceiling so malformed sparse rows cannot hide an unbounded
+// amount of adapter-side work.
+fn charge_scan_work(work: &mut usize, amount: usize, path: Path) -> Result<(), Error> {
+    let observed = work.checked_add(amount).ok_or(Error::LimitExceeded {
+        kind: LimitKind::WireWork,
+        observed: usize::MAX,
+        maximum: WireLimits::MAX_REWRITE_WORK,
+        path,
+    })?;
+    if observed > WireLimits::MAX_REWRITE_WORK {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum: WireLimits::MAX_REWRITE_WORK,
+            path,
+        });
+    }
+    *work = observed;
+    Ok(())
+}
+
+fn cell_ranges(
     offsets: &[u8],
     storage_length: usize,
-    column: usize,
     expected_cells: usize,
     wide: bool,
     column_count: usize,
     path: Path,
-) -> Result<Option<std::ops::Range<usize>>, Error> {
+    scan_work: &mut usize,
+) -> Result<Vec<Option<std::ops::Range<usize>>>, Error> {
     if !offsets.len().is_multiple_of(2)
-        || column >= column_count
         || column_count > offsets.len() / 2
         || expected_cells > offsets.len() / 2
+        || expected_cells > column_count
     {
         return Err(Error::InvalidSource { path });
     }
+    charge_scan_work(scan_work, column_count, path)?;
     let width = if wide { 4 } else { 1 };
     let mut populated = 0usize;
-    let mut selected = None;
-    let mut end = None;
+    let mut ranges = Vec::new();
+    ranges
+        .try_reserve_exact(column_count)
+        .map_err(|_| Error::Allocation {
+            amount: column_count,
+            path,
+        })?;
+    let mut previous = None;
     for (index, bytes) in offsets.chunks_exact(2).take(column_count).enumerate() {
         let raw = u16::from_le_bytes([bytes[0], bytes[1]]);
         if raw == u16::MAX {
+            ranges.push(None);
             continue;
         }
         populated = populated
@@ -1744,23 +1774,53 @@ fn cell_range(
         if offset >= storage_length {
             return Err(Error::InvalidSource { path });
         }
-        if index == column {
-            selected = Some(offset);
-        } else if selected.is_some() && end.is_none() {
-            end = Some(offset);
+        if let Some((previous_index, previous_offset)) = previous {
+            if previous_offset >= offset {
+                return Err(Error::InvalidSource { path });
+            }
+            ranges[previous_index] = Some(previous_offset..offset);
         }
+        previous = Some((index, offset));
+        ranges.push(None);
     }
     if populated != expected_cells {
         return Err(Error::InvalidSource { path });
     }
-    let Some(start) = selected else {
-        return Ok(None);
-    };
-    let end = end.unwrap_or(storage_length);
-    (start < end)
-        .then_some(start..end)
+    if let Some((previous_index, previous_offset)) = previous {
+        if previous_offset >= storage_length {
+            return Err(Error::InvalidSource { path });
+        }
+        ranges[previous_index] = Some(previous_offset..storage_length);
+    }
+    Ok(ranges)
+}
+
+fn cell_range(
+    offsets: &[u8],
+    storage_length: usize,
+    column: usize,
+    expected_cells: usize,
+    wide: bool,
+    column_count: usize,
+    path: Path,
+) -> Result<Option<std::ops::Range<usize>>, Error> {
+    if column >= column_count {
+        return Err(Error::InvalidSource { path });
+    }
+    let mut scan_work = 0;
+    let ranges = cell_ranges(
+        offsets,
+        storage_length,
+        expected_cells,
+        wide,
+        column_count,
+        path,
+        &mut scan_work,
+    )?;
+    ranges
+        .get(column)
+        .cloned()
         .ok_or(Error::InvalidSource { path })
-        .map(Some)
 }
 
 fn copy_bytes(bytes: &[u8], path: Path) -> Result<Arc<[u8]>, Error> {
@@ -2186,13 +2246,18 @@ fn scan_global_comment_cells(
     if let Some(amount) = tiles.allocation_failed {
         return Err(Error::Allocation { amount, path });
     }
+    let mut scan_work = 0;
+    let mut seen_tile_keys = HashSet::new();
+    seen_tile_keys
+        .try_reserve(tiles.tiles.len())
+        .map_err(|_| Error::Allocation {
+            amount: tiles.tiles.len(),
+            path,
+        })?;
     let mut comment_keys = Vec::new();
-    for (tile_position, (tile_key, tile_id)) in tiles.tiles.iter().copied().enumerate() {
-        if tile_id == 0
-            || tiles.tiles[..tile_position]
-                .iter()
-                .any(|(prior_key, _)| *prior_key == tile_key)
-        {
+    for (tile_key, tile_id) in tiles.tiles.iter().copied() {
+        charge_scan_work(&mut scan_work, 1, path)?;
+        if tile_id == 0 || !seen_tile_keys.insert(tile_key) {
             return Err(Error::InvalidSource { path });
         }
         let tile_resolved = source
@@ -2222,16 +2287,21 @@ fn scan_global_comment_cells(
         if let Some(amount) = rows.allocation_failed {
             return Err(Error::Allocation { amount, path });
         }
+        let mut seen_row_keys = HashSet::new();
+        seen_row_keys
+            .try_reserve(rows.rows.len())
+            .map_err(|_| Error::Allocation {
+                amount: rows.rows.len(),
+                path,
+            })?;
         let tile_view = WireView::parse_with_limits(
             tile_message.data.as_slice(),
             wire_limits_for(tile_message.data.len(), 0, path)?,
         )
         .map_err(|error| map_wire_error(error, path))?;
-        for (row_position, (row_key, row_occurrence)) in rows.rows.iter().copied().enumerate() {
-            if rows.rows[..row_position]
-                .iter()
-                .any(|(prior_key, _)| *prior_key == row_key)
-            {
+        for (row_key, row_occurrence) in rows.rows.iter().copied() {
+            charge_scan_work(&mut scan_work, 1, path)?;
+            if !seen_row_keys.insert(row_key) {
                 return Err(Error::InvalidSource { path });
             }
             let row_field = tile_view
@@ -2258,19 +2328,17 @@ fn scan_global_comment_cells(
                 };
             let expected_cells = usize::try_from(row_info.cell_count())
                 .map_err(|_| Error::InvalidSource { path })?;
-            for column in 0..column_count {
-                let Some(cell_range) = cell_range(
-                    offsets,
-                    storage_buffer.len(),
-                    column,
-                    expected_cells,
-                    row_info.has_wide_offsets().unwrap_or(false),
-                    column_count,
-                    path,
-                )?
-                else {
-                    continue;
-                };
+            let ranges = cell_ranges(
+                offsets,
+                storage_buffer.len(),
+                expected_cells,
+                row_info.has_wide_offsets().unwrap_or(false),
+                column_count,
+                path,
+                &mut scan_work,
+            )?;
+            charge_scan_work(&mut scan_work, expected_cells, path)?;
+            for cell_range in ranges.into_iter().flatten() {
                 let cell_source = storage_buffer
                     .get(cell_range)
                     .ok_or(Error::InvalidSource { path })?;
@@ -2934,4 +3002,68 @@ fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<String>, Error> 
         }
     }
     Ok(deletions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Comment, Error, LimitKind, Path, WireLimits, cell_ranges};
+
+    #[test]
+    fn cell_ranges_precompute_sparse_offsets_in_one_pass() {
+        let offsets = [0, 0, u8::MAX, u8::MAX, 3, 0, u8::MAX, u8::MAX];
+        let mut scan_work = 0;
+        let ranges = cell_ranges(&offsets, 8, 2, false, 4, Path::Package, &mut scan_work)
+            .expect("sparse offsets should decode");
+
+        assert_eq!(scan_work, 4);
+        assert_eq!(ranges, vec![Some(0..3), None, Some(3..8), None]);
+    }
+
+    #[test]
+    fn cell_ranges_charges_offset_scan_work() {
+        let mut scan_work = WireLimits::MAX_REWRITE_WORK - 3;
+        let error = cell_ranges(
+            &[0, 0, 1, 0, 2, 0, 3, 0],
+            4,
+            4,
+            false,
+            4,
+            Path::Package,
+            &mut scan_work,
+        )
+        .expect_err("range scan should charge its work");
+
+        assert_eq!(
+            error,
+            Error::LimitExceeded {
+                kind: LimitKind::WireWork,
+                observed: WireLimits::MAX_REWRITE_WORK + 1,
+                maximum: WireLimits::MAX_REWRITE_WORK,
+                path: Path::Package,
+            }
+        );
+    }
+
+    #[test]
+    fn cell_ranges_reject_descending_offsets() {
+        let mut scan_work = 0;
+        let error = cell_ranges(&[3, 0, 1, 0], 4, 2, false, 2, Path::Package, &mut scan_work)
+            .expect_err("offsets must be strictly increasing");
+
+        assert!(matches!(
+            error,
+            Error::InvalidSource {
+                path: Path::Package
+            }
+        ));
+    }
+
+    #[test]
+    fn comment_clone_shares_arc_backed_text() {
+        let original = Comment::new("shared text");
+        let cloned = original.clone();
+
+        assert!(std::sync::Arc::ptr_eq(&original.text, &cloned.text));
+        assert_eq!(cloned.text(), "shared text");
+    }
 }
