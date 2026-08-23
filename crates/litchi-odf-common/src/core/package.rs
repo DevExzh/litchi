@@ -5,6 +5,7 @@
 //!
 //! Uses soapberry-zip for high-performance zero-copy ZIP parsing.
 
+pub use crate::package::ArchiveLimits;
 use crate::package::{self, Archive, PreparedArchive};
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
@@ -12,7 +13,7 @@ use litchi_core::{
     Error, ExecutionContext, ExecutionError, ReadAt, Resource, ResourceLimit, Result, SourceVersion,
 };
 use soapberry_zip::office::{
-    ArchiveLimits as SourceArchiveLimits, ArchiveValidationPolicy as SourceArchiveValidationPolicy,
+    ArchiveValidationPolicy as SourceArchiveValidationPolicy,
     IndexedArchive as SourceIndexedArchive,
 };
 use soapberry_zip::{ErrorKind as ZipErrorKind, ReaderAt as ZipReaderAt};
@@ -68,7 +69,7 @@ pub struct SourcePackageLimits {
     /// package owner.
     pub max_source_bytes: u64,
     /// ZIP index and declared member limits.
-    pub archive: SourceArchiveLimits,
+    pub archive: ArchiveLimits,
     /// Maximum declared and materialized `mimetype` bytes.
     pub max_mimetype_bytes: u64,
     /// Maximum declared and materialized manifest bytes.
@@ -79,7 +80,7 @@ impl SourcePackageLimits {
     /// Construct a positional package policy from a source ceiling and ZIP
     /// limits.
     #[must_use]
-    pub const fn new(max_source_bytes: u64, archive: SourceArchiveLimits) -> Self {
+    pub const fn new(max_source_bytes: u64, archive: ArchiveLimits) -> Self {
         Self {
             max_source_bytes,
             archive,
@@ -96,7 +97,7 @@ impl SourcePackageLimits {
 
     /// Return the configured ZIP limits.
     #[must_use]
-    pub const fn archive_limits(self) -> SourceArchiveLimits {
+    pub const fn archive_limits(self) -> ArchiveLimits {
         self.archive
     }
 
@@ -110,7 +111,7 @@ impl SourcePackageLimits {
     /// Set the ZIP limits; package opening validates that callers only tighten
     /// the hard default ceilings.
     #[must_use]
-    pub const fn with_archive_limits(mut self, archive: SourceArchiveLimits) -> Self {
+    pub const fn with_archive_limits(mut self, archive: ArchiveLimits) -> Self {
         self.archive = archive;
         self
     }
@@ -146,7 +147,7 @@ impl Default for SourcePackageLimits {
     fn default() -> Self {
         Self {
             max_source_bytes: 2 * 1024 * 1024 * 1024,
-            archive: SourceArchiveLimits::default(),
+            archive: ArchiveLimits::default(),
             max_mimetype_bytes: 4 * 1024,
             max_manifest_bytes: 16 * 1024 * 1024,
         }
@@ -519,7 +520,7 @@ impl SourceBackedPackage {
         let archive_result = SourceIndexedArchive::from_reader_with_limits_and_policy(
             reader,
             source_length,
-            limits.archive,
+            limits.archive.into_zip_limits(),
             SourceArchiveValidationPolicy::StrictPackage,
         );
         let archive = match archive_result {
@@ -1065,36 +1066,36 @@ fn validate_source_limits(limits: SourcePackageLimits) -> Result<()> {
         limits.max_manifest_bytes,
         hard.max_manifest_bytes,
     )?;
-    if limits.archive.max_files == 0 || limits.archive.max_files > hard.archive.max_files {
+    if limits.archive.max_files() == 0 || limits.archive.max_files() > hard.archive.max_files() {
         return Err(Error::InvalidFormat(format!(
             "ODF archive max_files must be between 1 and {}",
-            hard.archive.max_files
+            hard.archive.max_files()
         )));
     }
     validate_limit(
         "ODF archive max_member_name_bytes",
-        limits.archive.max_member_name_bytes,
-        hard.archive.max_member_name_bytes,
+        limits.archive.max_member_name_bytes(),
+        hard.archive.max_member_name_bytes(),
     )?;
     validate_limit(
         "ODF archive max_metadata_bytes",
-        limits.archive.max_metadata_bytes,
-        hard.archive.max_metadata_bytes,
+        limits.archive.max_metadata_bytes(),
+        hard.archive.max_metadata_bytes(),
     )?;
     validate_limit(
         "ODF archive max_compressed_size",
-        limits.archive.max_compressed_size,
-        hard.archive.max_compressed_size,
+        limits.archive.max_compressed_size(),
+        hard.archive.max_compressed_size(),
     )?;
     validate_limit(
         "ODF archive max_entry_size",
-        limits.archive.max_entry_size,
-        hard.archive.max_entry_size,
+        limits.archive.max_entry_size(),
+        hard.archive.max_entry_size(),
     )?;
     validate_limit(
         "ODF archive max_total_size",
-        limits.archive.max_total_size,
-        hard.archive.max_total_size,
+        limits.archive.max_total_size(),
+        hard.archive.max_total_size(),
     )?;
     Ok(())
 }
@@ -1117,12 +1118,14 @@ fn resource_limit_error(observed: u64, limit: u64, scope: &'static str) -> Error
     })
 }
 
-fn read_owned_input<R: Read>(reader: R, maximum: u64, scope: &'static str) -> Result<Vec<u8>> {
-    let read_limit = maximum.checked_add(1).ok_or_else(|| {
-        Error::InvalidFormat("ODF owned package input limit overflows".to_string())
-    })?;
-    let reserve = usize::try_from(read_limit.min(64 * 1024)).map_err(|_| {
-        Error::InvalidFormat("ODF owned package input limit exceeds platform limits".to_string())
+pub(crate) fn read_owned_input<R: Read>(
+    mut reader: R,
+    maximum: u64,
+    scope: &'static str,
+) -> Result<Vec<u8>> {
+    const READ_CHUNK: usize = 64 * 1024;
+    let reserve = usize::try_from(maximum.min(READ_CHUNK as u64)).map_err(|_| {
+        Error::InvalidFormat("ODF owned package input exceeds platform limits".to_string())
     })?;
     let mut data = Vec::new();
     data.try_reserve_exact(reserve)
@@ -1130,12 +1133,28 @@ fn read_owned_input<R: Read>(reader: R, maximum: u64, scope: &'static str) -> Re
             resource: scope,
             source,
         })?;
-    reader.take(read_limit).read_to_end(&mut data)?;
-    let observed = u64::try_from(data.len()).map_err(|_| {
-        Error::InvalidFormat("ODF owned package input exceeds platform limits".to_string())
-    })?;
-    if observed > maximum {
-        return Err(resource_limit_error(observed, maximum, scope));
+
+    let mut chunk = [0_u8; READ_CHUNK];
+    loop {
+        let read = reader.read(&mut chunk)?;
+        if read == 0 {
+            break;
+        }
+        let observed = data.len().checked_add(read).ok_or_else(|| {
+            Error::InvalidFormat("ODF owned package input exceeds platform limits".to_string())
+        })?;
+        let observed = u64::try_from(observed).map_err(|_| {
+            Error::InvalidFormat("ODF owned package input exceeds platform limits".to_string())
+        })?;
+        if observed > maximum {
+            return Err(resource_limit_error(observed, maximum, scope));
+        }
+        data.try_reserve_exact(read)
+            .map_err(|source| Error::Allocation {
+                resource: scope,
+                source,
+            })?;
+        data.extend_from_slice(&chunk[..read]);
     }
     Ok(data)
 }
@@ -1369,7 +1388,7 @@ impl OwnedPackage {
             soapberry_zip::office::IndexedArchive::from_reader_with_limits_and_policy(
                 Arc::clone(&data),
                 data_length,
-                limits.archive,
+                limits.archive.into_zip_limits(),
                 policy,
             )
             .map_err(map_owned_zip_error)?,
@@ -1674,20 +1693,21 @@ impl<'data> Package<'data> {
     /// package requirements, or cannot be decrypted.
     pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
         let path = normalize_member_path(path)?;
-        let bytes = self
-            .archive
-            .read(path)
-            .map_err(|error| Error::InvalidFormat(format!("File not found: {path}: {error}")))?;
+        let bytes = self.archive.read(path).map_err(|error| match error {
+            limit @ Error::ResourceLimit(_) => limit,
+            error => Error::InvalidFormat(format!("File not found: {path}: {error}")),
+        })?;
         let Some(entry) = manifest_entry_for_path(&self.manifest, path)? else {
             return Ok(bytes);
         };
         let Some(encryption) = &entry.encryption else {
             return Ok(bytes);
         };
-        if !self.archive.is_stored(path).map_err(|error| {
-            Error::InvalidFormat(format!(
+        if !self.archive.is_stored(path).map_err(|error| match error {
+            limit @ Error::ResourceLimit(_) => limit,
+            error => Error::InvalidFormat(format!(
                 "Unable to inspect encrypted ODF entry '{path}': {error}"
-            ))
+            )),
         })? {
             return Err(Error::InvalidFormat(format!(
                 "Encrypted ODF entry '{path}' must use ZIP Store"
@@ -2096,14 +2116,12 @@ mod tests {
         let source = CountingSource::new(data.clone());
         let limits = SourcePackageLimits::new(
             u64::try_from(data.len() - 1).unwrap(),
-            SourceArchiveLimits::default(),
+            ArchiveLimits::default(),
         );
         assert!(SourceBackedPackage::from_read_at_with_limits(source, limits).is_err());
 
-        let limits = SourcePackageLimits::new(
-            u64::try_from(data.len()).unwrap(),
-            SourceArchiveLimits::default(),
-        );
+        let limits =
+            SourcePackageLimits::new(u64::try_from(data.len()).unwrap(), ArchiveLimits::default());
         let source = CountingSource::new(data.clone());
         let package = SourceBackedPackage::from_read_at_with_limits(source, limits).unwrap();
         let materialized = package.materialize().unwrap();
@@ -2123,10 +2141,8 @@ mod tests {
             NEXT_PATH_ID.fetch_add(1, Ordering::Relaxed),
         ));
         std::fs::write(&path, &data).unwrap();
-        let exact = SourcePackageLimits::new(
-            u64::try_from(data.len()).unwrap(),
-            SourceArchiveLimits::default(),
-        );
+        let exact =
+            SourcePackageLimits::new(u64::try_from(data.len()).unwrap(), ArchiveLimits::default());
         assert!(SourceBackedPackage::from_path_with_limits(&path, exact).is_ok());
         assert!(
             SourceBackedPackage::from_path_with_limits_and_password(&path, exact, "password")
@@ -2149,7 +2165,7 @@ mod tests {
 
     #[test]
     fn owned_reader_limits_apply_before_zip_indexing_and_match_password_path() {
-        let limits = SourcePackageLimits::new(8, SourceArchiveLimits::default());
+        let limits = SourcePackageLimits::new(8, ArchiveLimits::default());
         assert!(matches!(
             OwnedPackage::from_reader_with_limits(Cursor::new(vec![0_u8; 8]), limits),
             Err(Error::InvalidFormat(_))
@@ -2187,7 +2203,7 @@ mod tests {
 
     #[test]
     fn owned_password_ingress_handles_validation_read_and_archive_errors() {
-        let invalid_limits = SourcePackageLimits::new(0, SourceArchiveLimits::default());
+        let invalid_limits = SourcePackageLimits::new(0, ArchiveLimits::default());
         let mut reader = Cursor::new(vec![0_u8; 1]);
         assert!(matches!(
             OwnedPackage::from_reader_with_limits_and_password(
@@ -2221,17 +2237,15 @@ mod tests {
     fn source_backed_rejects_unbounded_or_oversized_policies_before_reads() {
         let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
         let source = CountingSource::new(data.clone());
-        let limits = SourcePackageLimits::new(
-            u64::try_from(data.len()).unwrap(),
-            SourceArchiveLimits::UNBOUNDED,
-        );
+        let limits =
+            SourcePackageLimits::new(u64::try_from(data.len()).unwrap(), ArchiveLimits::UNBOUNDED);
         assert!(SourceBackedPackage::from_read_at_with_limits(source.clone(), limits).is_err());
         assert_eq!(source.read_count(), 0);
 
         let source = CountingSource::new(data);
         let limits = SourcePackageLimits::new(
             SourcePackageLimits::default().max_source_bytes + 1,
-            SourceArchiveLimits::default(),
+            ArchiveLimits::default(),
         );
         assert!(SourceBackedPackage::from_read_at_with_limits(source.clone(), limits).is_err());
         assert_eq!(source.read_count(), 0);
