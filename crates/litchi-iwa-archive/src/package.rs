@@ -941,6 +941,7 @@ impl LogicalEntryLimits {
 pub struct Catalog {
     entries: Vec<Entry>,
     source: SharedBytes,
+    source_total_uncompressed: u64,
     source_is_exact: bool,
     semantic_profile: Option<LogicalEntryLimitProfile>,
     legacy_outer_prefix: Option<Box<[u8]>>,
@@ -1280,6 +1281,7 @@ impl Catalog {
         if crate::zip::is_encrypted(&archive) {
             return Err(Error::Encrypted);
         }
+        let source_total_uncompressed = archive.directory_index_report()?.expanded_bytes;
 
         let semantic_profile = logical_entry_limits.map(|limits| limits.profile);
         if semantic_profile.is_some() {
@@ -1341,6 +1343,7 @@ impl Catalog {
         Ok(Catalog {
             entries,
             source,
+            source_total_uncompressed,
             source_is_exact,
             semantic_profile,
             legacy_outer_prefix,
@@ -1587,6 +1590,7 @@ impl Catalog {
         checked_limits.check_input_size(source_size, "catalog source")?;
 
         if edits.is_empty() && deleted_names.is_empty() {
+            self.check_source_total(checked_limits)?;
             checked_limits.check_output_size(source_size)?;
             return self.to_bytes();
         }
@@ -1595,6 +1599,7 @@ impl Catalog {
             && !edits.is_empty()
             && identical_edits_are_noop(&self.entries, edits, checked_limits)?
         {
+            self.check_source_total(checked_limits)?;
             checked_limits.check_output_size(source_size)?;
             return self.to_bytes();
         }
@@ -1717,6 +1722,17 @@ impl Catalog {
         Ok(output)
     }
 
+    fn check_source_total(&self, limits: Limits) -> Result<()> {
+        if self.source_total_uncompressed > limits.max_total_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::TotalBytes,
+                observed: self.source_total_uncompressed,
+                maximum: limits.max_total_bytes(),
+            });
+        }
+        Ok(())
+    }
+
     /// Transactionally prepare an edited package and write its committed ZIP
     /// artifact to a caller-owned sink.
     ///
@@ -1740,6 +1756,7 @@ impl Catalog {
                 Error::InvalidBundle("catalog source length does not fit u64".to_owned())
             })?;
             checked_limits.check_input_size(source_size, "catalog source")?;
+            self.check_source_total(checked_limits)?;
             checked_limits.check_output_size(source_size)?;
             self.write_to(&mut sink)?;
             return Ok(());
@@ -5183,6 +5200,39 @@ mod tests {
             })
         ));
         assert_eq!(limited_sink, [0xde, 0xad, 0xbe, 0xef]);
+        Ok(())
+    }
+
+    #[test]
+    fn exact_noop_reassembly_enforces_the_total_uncompressed_limit() -> Result<()> {
+        let bytes = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let input = u64::try_from(bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("test ZIP length does not fit u64".to_owned())
+        })?;
+        let limits = Limits::new(input, 10, 4096, 1, 1024)?;
+
+        for edits in [
+            Vec::new(),
+            vec![EntryEdit::new("Untouched/a", b"keep this payload")],
+        ] {
+            assert!(matches!(
+                catalog.reassemble_to_bytes(&edits, limits),
+                Err(Error::Limit {
+                    kind: crate::LimitKind::TotalBytes,
+                    ..
+                })
+            ));
+        }
+        let mut sink = vec![0xde, 0xad];
+        assert!(matches!(
+            catalog.write_reassembled_to(&[], &mut sink, limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::TotalBytes,
+                ..
+            })
+        ));
+        assert_eq!(sink, [0xde, 0xad]);
         Ok(())
     }
 
