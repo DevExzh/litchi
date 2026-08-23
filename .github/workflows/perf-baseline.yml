@@ -168,6 +168,9 @@ jobs:
           cargo check --locked --manifest-path "$PERF_MANIFEST"
           cargo test --locked --manifest-path "$PERF_MANIFEST"
 
+      - name: Check release fresh-child XLSX contract
+        run: cargo test --release --locked --manifest-path "$PERF_MANIFEST" --test xlsx_filesystem
+
       - name: Check allocator-only benchmark target
         run: |
           cargo check --locked --manifest-path "$PERF_MANIFEST" \

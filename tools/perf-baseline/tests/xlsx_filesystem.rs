@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
@@ -19,14 +20,18 @@ fn temporary_report_path() -> (std::path::PathBuf, std::path::PathBuf) {
 }
 
 #[test]
-fn xlsx_file_selectors_run_as_one_sample_fresh_children() {
+fn xlsx_file_selectors_run_as_two_samples_in_distinct_fresh_children() {
+    const XLSX_SOURCE_SHA256: &str =
+        "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036";
+    const XLSX_SEMANTIC_SHA256: &str =
+        "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e";
     let (root, report) = temporary_report_path();
     let output = Command::new(env!("CARGO_BIN_EXE_litchi-perf-baseline"))
         .args([
             "--case",
             "xlsx_file_open,xlsx_file_open_lifecycle",
             "--samples",
-            "1",
+            "2",
             "--warmup",
             "0",
             "--filesystem-cache",
@@ -63,24 +68,37 @@ fn xlsx_file_selectors_run_as_one_sample_fresh_children() {
         .as_array()
         .expect("filesystem evidence array");
     assert_eq!(evidence.len(), 2);
-    for sample in evidence.iter().map(|entry| &entry["samples"][0]) {
-        assert_eq!(sample["cache_state"], "warm");
-        assert_eq!(
-            sample["logical_read_counter_scope"],
-            "not_applicable_filesystem_xlsx"
-        );
-        assert_eq!(
-            sample["xlsx_source_sha256"],
-            "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
-        );
-        assert_eq!(
-            sample["xlsx_semantic_sha256"].as_str().map(str::len),
-            Some(64)
-        );
-    }
+    let mut all_child_process_ids = HashSet::new();
     for entry in evidence {
         assert_eq!(entry["fresh_child_per_sample"], true);
-        assert_eq!(entry["sample_count"], 1);
+        assert_eq!(entry["sample_count"], 2);
+        let samples = entry["samples"]
+            .as_array()
+            .expect("filesystem samples array");
+        assert_eq!(samples.len(), 2);
+        let mut selector_child_process_ids = HashSet::new();
+        for sample in samples {
+            assert_eq!(sample["cache_state"], "warm");
+            assert_eq!(
+                sample["logical_read_counter_scope"],
+                "not_applicable_filesystem_xlsx"
+            );
+            assert_eq!(sample["xlsx_source_sha256"], XLSX_SOURCE_SHA256);
+            assert_eq!(sample["xlsx_semantic_sha256"], XLSX_SEMANTIC_SHA256);
+            let child_process_id = sample["child_process_id"]
+                .as_u64()
+                .expect("fresh filesystem child process ID");
+            assert!(child_process_id > 0);
+            assert!(
+                selector_child_process_ids.insert(child_process_id),
+                "one selector reused a child process ID"
+            );
+            assert!(
+                all_child_process_ids.insert(child_process_id),
+                "selectors reused a child process ID"
+            );
+        }
+        assert_eq!(selector_child_process_ids.len(), 2);
     }
     fs::remove_dir_all(root).expect("remove XLSX filesystem test directory");
 }
