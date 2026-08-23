@@ -60,6 +60,13 @@ pub(crate) const FORBIDDEN_BUFFA_OWNERSHIP_MARKERS: &[&str] = &[
     "decode_length_delimited_reader",
     "decode_view_with_options",
     "decode_with_options",
+    // Keep the generic eager message merge/decode entry points covered too;
+    // the existing `decode_length_delimited` marker covers that companion
+    // API while these two methods have distinct names. Direct view decoding
+    // remains separately audited by the archive ingress test because the
+    // private encoder's source validation may use a view without owning it.
+    "decode::<",
+    "merge::<",
 ];
 
 #[cfg(test)]
@@ -669,6 +676,18 @@ pub fn decode_projection(bytes: &[u8]) {{
             (
                 "eager message with options",
                 "options.decode_with_options::<Archive>(bytes)",
+            ),
+            (
+                "eager message decoder",
+                "options.decode::<Archive>(&mut input)",
+            ),
+            (
+                "eager length-delimited message decoder",
+                "options.decode_length_delimited::<Archive>(&mut input)",
+            ),
+            (
+                "eager message merge",
+                "options.merge::<Archive>(&mut message, &mut input)",
             ),
         ];
 
