@@ -4023,3 +4023,45 @@ malformed/truncated payloads, invalid UTF-8, duplicate names, and the absence
 of a production generated decode call. This is bounded neutral-projection
 hardening only: no Cargo/build/test or native result is admitted, and no
 format-owner edge, ordered debt, host-exit, or monolith result follows.
+
+## 2026-08-23 amendment: Wave34 evidence is bounded and does not advance the exit gate
+
+The current-ref Wave34 source changes remain compatibility and bounded-work
+changes, not monolith-exit work. `d24c4fb4444afa68cd739ac0e11b38ba68cde441`
+hardens only the comment-storage codec fuzz target: its bounded normalizer and
+ceilings are 64 KiB input, 8192 fields, 256 KiB work, 1024 references, 64 KiB
+text, and recursion 64. The target cross-checks strict standalone reference
+decoding against report/visitor observations, checks source borrowing and
+source preservation, and includes once-per-process deterministic canonical,
+malformed, callback-error, and exact Bytes/Fields/Work/References/Text/Nesting
+limit probes. No fuzz campaign or sanitizer result is claimed.
+
+`8b7a6381dfa9dd7d59812af4c24beeee65ca8070` changes only Pages footnote
+projection. `native_footnotes` builds one borrowed, fallibly reserved object
+location map, keeps the first object for each nonzero identifier to preserve
+the prior first-match lookup, and uses it for body-footnote reference,
+storage, and marker resolution. Missing identifiers still fail closed. The
+commit contains focused map and patch inverse/no-op tests, but this handoff
+supplies no test execution result.
+
+`0d5a523e6d3046a2d5ab2ee18755339ff7e1501b` marks the raw-ID Pages, Numbers,
+and Keynote direct drawable-comment and reply compatibility methods as
+deprecated while retaining `IWorkDrawableCommentEditor` as the migration-host
+editor. It does not alter signatures, IDs, validation, publication, or bytes;
+focused text comment/reply owners remain outside the deprecation. This is a
+source/rustdoc boundary, not a replacement owner or a host-exit step.
+
+The supplied native evidence is limited to application reopen: Pages fixture
+`/private/tmp/litchi_native_pages_footnote_wave34.pages`, SHA-256
+`b04a442045665fd51648342a1028976e0730f78680a3bd2b67c3f91bd40b11a`; Numbers
+table-info fixture, SHA-256
+`a3a34b9e374fd2cee2ac7d734f9d1693bb6ad35a3111275ae5bd0202a97e6a07`, with
+formulas/comments; and Keynote transition initial/post hashes
+`9c9274…`/`8e5b810…`. This is native evidence only: it establishes no Rust
+parity, native save/round-trip fidelity, byte identity, or ownership move.
+Native soundtrack evidence is incomplete, so no soundtrack gate or pass is
+recorded.
+
+No Cargo/build/test result is admitted beyond the supplied artifact handoff.
+No `litchi-iwa` dependency edge or ordered debt is retired, and the
+migration-host, host-exit, and monolith-deletion gates remain open.

@@ -11725,3 +11725,57 @@ compile while external callers receive rustdoc/compiler guidance. This is a
 source/rustdoc ratchet only; no Cargo/build/test or native result is admitted,
 no dependency edge or ordered debt is retired, and no host-exit or monolith-
 deletion claim follows.
+
+## 2026-08-23 amendment: Wave34 bounded codec, footnote lookup, and compatibility evidence
+
+The reviewed Wave34 source commits on the current ref are bounded as follows.
+Commit `d24c4fb4444afa68cd739ac0e11b38ba68cde441` changes only the
+`comment_storage_codec` fuzz target. Its input normalizer accepts raw input up
+to 64 KiB (or the target's `hex:` form), and the target carries explicit
+field, work, reference, text, and recursion ceilings of 8192, 256 KiB, 1024,
+64 KiB, and 64. Accepted streamed replies are checked with the standalone
+reference decoder; the report, visitor, and closure paths compare the same
+decoded observations, assert borrowed reply/text slices stay in the caller's
+source, and assert source bytes are unchanged. A once-per-process deterministic
+probe also exercises canonical references/archive data, malformed reference
+and archive cases, callback errors, and the exact Bytes, Fields, Work,
+References, Text, and Nesting limit variants. These are properties encoded in
+the target; no completed fuzz campaign or sanitizer result is admitted here.
+
+Commit `8b7a6381dfa9dd7d59812af4c24beeee65ca8070` changes only
+`crates/litchi-pages/src/package/footnote_text.rs`. `native_footnotes` builds
+one borrowed `FootnoteObjectLocations` map from the component archives after
+the body projection. Checked object-count arithmetic and
+`try_reserve_exact` enforce the existing object ceiling; nonzero identifiers
+retain the first archive object, matching the historical `find_object`
+first-match behavior. Body-footnote references, storage objects, and marker
+objects then use that map, while missing identifiers still fail closed. The
+source includes focused checks for first-match/unrelated-ID isolation and for
+inverse plus exact-no-op patch behavior; no execution result for those tests
+is supplied by this amendment.
+
+Commit `0d5a523e6d3046a2d5ab2ee18755339ff7e1501b` records the compatibility
+boundary: `IWorkDrawableCommentEditor` remains the migration-host editor,
+while raw-ID Pages, Numbers, and Keynote direct drawable-comment and reply
+methods are advisory-deprecated. Signatures, identifiers, validation,
+publication, and bytes are unchanged; focused text comment/reply APIs and
+other semantic owners are not deprecated. Scoped `allow(deprecated)` keeps
+the migration-host examples compiling. No focused drop-in owner for direct
+drawable-comment CRUD is claimed.
+
+The supplied native evidence is bounded application-reopen evidence only:
+the Pages footnote fixture
+`/private/tmp/litchi_native_pages_footnote_wave34.pages` has SHA-256
+`b04a442045665fd51648342a1028976e0730f78680a3bd2b67c3f91bd40b11a8`; the
+Numbers table-info fixture has SHA-256
+`a3a34b9e374fd2cee2ac7d734f9d1693bb6ad35a3111275ae5bd0202a97e6a07` and
+contains formulas/comments; and the Keynote transition fixture was supplied
+with initial/post hashes `9c9274…`/`8e5b810…`. These artifacts do not supply
+Rust/native parity, a native save or round-trip claim, or byte-identity
+evidence. Native soundtrack evidence remains incomplete: no soundtrack gate
+is admitted by this amendment, and it is not recorded as a pass.
+
+No Cargo/build/test execution result beyond the supplied artifact handoff is
+admitted. This amendment retires no dependency edge or ordered debt, makes no
+allocation/performance claim, and makes no migration-host, host-exit, or IWA
+monolith-deletion claim.
