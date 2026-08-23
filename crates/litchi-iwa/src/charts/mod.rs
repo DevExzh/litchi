@@ -14,6 +14,10 @@ use crate::{Error, IWorkPackage, Result};
 mod archive;
 
 /// Native protobuf-backed chart data for advanced format-level integrations.
+#[deprecated(
+    since = "0.0.1",
+    note = "legacy migration-host raw chart archive; use focused chart semantic APIs where available; chart migration remains pending"
+)]
 pub mod raw {
     pub use super::archive::IWorkChartArchive;
 }
