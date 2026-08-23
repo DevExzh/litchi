@@ -101,6 +101,21 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertRegex(self.workflow, r"cargo check[\s\S]+allocator-metrics")
         self.assertRegex(self.workflow, r"cargo test[\s\S]+allocator-metrics")
 
+    def test_real_producer_security_corpus_is_locked_and_after_normal_harness(self):
+        self.assertIn("permissions:\n  contents: read\n  actions: read", self.workflow)
+        self.assertIn(
+            'cargo test --locked --manifest-path "$PERF_MANIFEST" '
+            "--lib security_corpus -- --ignored",
+            self.workflow,
+        )
+        normal = self.workflow.index("- name: Check standalone harness")
+        security = self.workflow.index(
+            "- name: Run real-producer security correctness corpus"
+        )
+        allocator = self.workflow.index("- name: Check allocator-only benchmark target")
+        self.assertLess(normal, security)
+        self.assertLess(security, allocator)
+
     def test_allocator_target_is_executed_and_compared_by_ci(self):
         self.assertRegex(
             self.workflow,
