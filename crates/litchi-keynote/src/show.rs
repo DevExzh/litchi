@@ -398,6 +398,9 @@ impl Show {
     ///
     /// This compatibility helper delegates to [`Self::select_slide`]. New
     /// code can pass a [`SlideSelector`] to make the lookup domain explicit.
+    #[deprecated(
+        note = "use `Show::slides().get(index)` for positional lookup or `Show::select_slide(SlideSelector::position(Position::new(index)))` to retain selector errors"
+    )]
     #[must_use]
     pub fn slide(&self, index: usize) -> Option<&Slide> {
         self.select_slide(index).ok().flatten()
