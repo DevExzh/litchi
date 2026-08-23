@@ -37,6 +37,16 @@ pub(crate) trait ArchiveAccess {
         &'a self,
         name: &str,
     ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error>;
+
+    /// Return a shared materialization when this archive has a validated,
+    /// reusable decompression path. Positional archives intentionally retain
+    /// the default `None` so their structural reads stay caller-owned.
+    fn read_shared(
+        &self,
+        _name: &str,
+    ) -> std::result::Result<Option<Arc<Vec<u8>>>, soapberry_zip::Error> {
+        Ok(None)
+    }
 }
 
 /// A structural ZIP member can be consumed directly from a validated stored
@@ -45,6 +55,7 @@ pub(crate) trait ArchiveAccess {
 /// ordinary OPC model.
 enum StructuralMember<'a> {
     Borrowed(&'a [u8]),
+    Shared(Arc<Vec<u8>>),
     Owned(Vec<u8>),
 }
 
@@ -52,6 +63,7 @@ impl StructuralMember<'_> {
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Borrowed(bytes) => bytes,
+            Self::Shared(bytes) => bytes,
             Self::Owned(bytes) => bytes,
         }
     }
@@ -63,10 +75,13 @@ fn read_structural_member<'a, A: ArchiveAccess + ?Sized>(
 ) -> Result<StructuralMember<'a>> {
     match archive.read_stored_borrowed(name)? {
         Some(bytes) => Ok(StructuralMember::Borrowed(bytes)),
-        None => archive
-            .read(name)
-            .map(StructuralMember::Owned)
-            .map_err(Into::into),
+        None => match archive.read_shared(name)? {
+            Some(bytes) => Ok(StructuralMember::Shared(bytes)),
+            None => archive
+                .read(name)
+                .map(StructuralMember::Owned)
+                .map_err(Into::into),
+        },
     }
 }
 
@@ -95,6 +110,13 @@ impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
         name: &str,
     ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error> {
         Self::read_stored_borrowed(self, name)
+    }
+
+    fn read_shared(
+        &self,
+        name: &str,
+    ) -> std::result::Result<Option<Arc<Vec<u8>>>, soapberry_zip::Error> {
+        Self::read_shared(self, name).map(Some)
     }
 }
 
@@ -1596,6 +1618,88 @@ mod tests {
             .unwrap();
         writer.write_stored("word/document.xml", document).unwrap();
         writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn structural_member_reuses_lazy_shared_decompression_allocation() {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_deflated("payload.xml", b"shared structural payload")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+
+        let member = read_structural_member(&archive, "payload.xml").unwrap();
+        let cached = archive.read_shared("payload.xml").unwrap();
+        match member {
+            StructuralMember::Shared(shared) => {
+                assert!(Arc::ptr_eq(&shared, &cached));
+                assert_eq!(shared.as_slice(), b"shared structural payload");
+            },
+            StructuralMember::Borrowed(_) => {
+                panic!("deflated structural member unexpectedly borrowed")
+            },
+            StructuralMember::Owned(_) => {
+                panic!("lazy structural member did not use shared decompression")
+            },
+        }
+    }
+
+    #[test]
+    fn structural_member_keeps_stored_payload_borrowed() {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("payload.xml", b"borrowed structural payload")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+        let source = archive
+            .read_stored_borrowed("payload.xml")
+            .unwrap()
+            .expect("stored payload must be borrowable");
+
+        let member = read_structural_member(&archive, "payload.xml").unwrap();
+        match member {
+            StructuralMember::Borrowed(borrowed) => {
+                assert_eq!(borrowed, b"borrowed structural payload");
+                assert_eq!(borrowed.as_ptr(), source.as_ptr());
+                assert_eq!(borrowed.len(), source.len());
+                assert_eq!(archive.cache_size(), 0);
+            },
+            StructuralMember::Shared(_) => {
+                panic!("stored structural member unexpectedly entered shared cache")
+            },
+            StructuralMember::Owned(_) => {
+                panic!("stored structural member unexpectedly materialized")
+            },
+        }
+    }
+
+    #[test]
+    fn structural_member_uses_owned_fallback_for_indexed_archive() {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored("payload.xml", b"indexed structural payload")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let archive = soapberry_zip::office::IndexedArchive::from_reader(
+            std::io::Cursor::new(bytes.clone()),
+            bytes.len() as u64,
+        )
+        .unwrap();
+
+        let member = read_structural_member(&archive, "payload.xml").unwrap();
+        match member {
+            StructuralMember::Owned(owned) => {
+                assert_eq!(owned, b"indexed structural payload");
+            },
+            StructuralMember::Borrowed(_) => {
+                panic!("indexed structural member unexpectedly borrowed")
+            },
+            StructuralMember::Shared(_) => {
+                panic!("indexed structural member unexpectedly shared")
+            },
+        }
     }
 
     #[test]
