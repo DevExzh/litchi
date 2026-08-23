@@ -1282,6 +1282,40 @@ fn body_table_lock_ignores_valid_unrelated_section_paths() -> TestResult<()> {
 }
 
 #[test]
+fn stale_body_table_metadata_is_not_reported_as_a_missing_table() -> TestResult<()> {
+    let empty = Package::from_bytes(&synthetic_package_with_table_count(None, 0)?)?;
+    assert!(matches!(
+        empty.body_table_lock(BodyTableSelector::index(0)),
+        Err(BodyTableLockError::TableNotFound)
+    ));
+
+    let source = rewrite_document_archive(&synthetic_package(None)?, |archive| {
+        let body = archive.object_mut(BODY_IDENTIFIER).ok_or("missing body")?;
+        let message_index = body
+            .messages
+            .iter()
+            .position(|message| message.type_ == BODY_MESSAGE_TYPE)
+            .ok_or("missing body message")?;
+        let mut storage =
+            tswp::StorageArchive::decode(body.messages[message_index].data.as_slice())?;
+        storage.table_attachment = Some(tswp::ObjectAttributeTable { entries: vec![] });
+        body.messages[message_index].data = storage.encode_to_vec();
+        Ok(())
+    })?;
+    let package = Package::from_bytes(&source)?;
+
+    assert!(matches!(
+        package.body_table_lock(BodyTableSelector::index(0)),
+        Err(BodyTableLockError::InvalidSource)
+    ));
+    assert!(matches!(
+        package.edit_body_table_lock(BodyTableSelector::index(0)),
+        Err(BodyTableLockError::InvalidSource)
+    ));
+    Ok(())
+}
+
+#[test]
 fn missing_rooted_table_edge_fails_closed_at_the_table_lock_adapter() -> TestResult<()> {
     let source = synthetic_package(None)?;
     let catalog = Catalog::from_bytes(&source)?;
