@@ -5,7 +5,6 @@ impl Document {
     ///
     /// The position spans the subdocuments in the same order as [`Self::paragraphs`]. Missing
     /// positions return `Ok(None)`.
-    #[must_use]
     pub fn paragraph_at(&self, position: Position) -> Result<Option<Paragraph>> {
         let mut remaining = position.get();
         let text = self.text_extractor.text_shared();
