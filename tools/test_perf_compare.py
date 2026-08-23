@@ -282,6 +282,21 @@ def operation_metrics_report_fields():
     }
 
 
+def filesystem_xlsx_operation_metrics_report_fields(sample_indices=None):
+    operation_metrics = operation_metrics_report_fields()
+    source = operation_metrics["source"]
+    source["status"] = "not_applicable"
+    source["counter_scope"] = "not_applicable_filesystem_xlsx"
+    for field, vector in source.items():
+        if field in {"status", "counter_scope"}:
+            continue
+        vector["status"] = "not_applicable"
+        vector.pop("values", None)
+    if sample_indices is not None:
+        operation_metrics["sample_indices"] = sample_indices
+    return operation_metrics
+
+
 ALLOCATOR_VECTOR_FIELDS = (
     "allocation_calls",
     "deallocation_calls",
@@ -998,9 +1013,14 @@ class PerfCompareTests(unittest.TestCase):
         current = report(revision="current")
         baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
         current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
-        current["results"][0]["operation_metrics"]["source"][
-            "counter_scope"
-        ] = "untimed_source_replay_only"
+        source = current["results"][0]["operation_metrics"]["source"]
+        source["status"] = "not_applicable"
+        source["counter_scope"] = "untimed_source_replay_only"
+        for field, vector in source.items():
+            if field in {"status", "counter_scope"}:
+                continue
+            vector["status"] = "not_applicable"
+            vector.pop("values", None)
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError, "source counter scope mismatch"
         ):
@@ -1012,21 +1032,66 @@ class PerfCompareTests(unittest.TestCase):
         baseline = report()
         current = report(revision="current")
         for item in (baseline["results"][0], current["results"][0]):
-            operation_metrics = operation_metrics_report_fields()
-            source = operation_metrics["source"]
-            source["status"] = "not_applicable"
-            source["counter_scope"] = "not_applicable_filesystem_xlsx"
-            for field, vector in source.items():
-                if field in {"status", "counter_scope"}:
-                    continue
-                vector["status"] = "not_applicable"
-                vector.pop("values", None)
-            item["operation_metrics"] = operation_metrics
+            item["operation_metrics"] = (
+                filesystem_xlsx_operation_metrics_report_fields()
+            )
+            item["elapsed_ns"]["sample_order"] = list(range(5))
 
         result = perf_compare.compare_reports(
             baseline, current, self.operation_metrics_policy()
         )
         self.assertEqual(result["status"], "pass")
+
+    def test_filesystem_xlsx_counter_scope_requires_sample_order(self):
+        for missing_value in ("missing", None):
+            with self.subTest(sample_order=missing_value):
+                baseline = report()
+                current = report(revision="current")
+                for item in (baseline["results"][0], current["results"][0]):
+                    item["operation_metrics"] = (
+                        filesystem_xlsx_operation_metrics_report_fields()
+                    )
+                    if missing_value != "missing":
+                        item["elapsed_ns"]["sample_order"] = missing_value
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "elapsed_ns.sample_order is required",
+                ):
+                    perf_compare.compare_reports(
+                        baseline, current, self.operation_metrics_policy()
+                    )
+
+    def test_source_counter_scope_status_compatibility_fails_closed(self):
+        baseline = report()
+        current = report(revision="current")
+        baseline["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"] = operation_metrics_report_fields()
+        current["results"][0]["operation_metrics"]["source"][
+            "counter_scope"
+        ] = "not_applicable_filesystem_xlsx"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "source.status=.*incompatible.*not_applicable_filesystem_xlsx",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["operation_metrics"] = filesystem_xlsx_operation_metrics_report_fields()
+            item["elapsed_ns"]["sample_order"] = list(range(5))
+        current["results"][0]["operation_metrics"]["source"][
+            "counter_scope"
+        ] = "timed_read_at"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "source.status=.*incompatible.*timed_read_at",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
 
     def test_invalid_source_counter_scope_fails_closed(self):
         baseline = report()
@@ -1292,6 +1357,11 @@ class PerfCompareTests(unittest.TestCase):
         for field, value, pattern in (
             ("sample_indices", [0, 0, 2, 3, 4], "sample_indices must be unique"),
             ("sample_indices", [0, 1, 2], "sample_indices has 3 samples"),
+            (
+                "sample_indices",
+                [0, 1, 2, 3, 5],
+                "sample_indices must be a complete permutation",
+            ),
         ):
             with self.subTest(envelope_field=field, value=value):
                 baseline = report()
@@ -1324,6 +1394,24 @@ class PerfCompareTests(unittest.TestCase):
         with self.assertRaisesRegex(
             perf_compare.ComparisonInputError,
             "increase across tied elapsed samples",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = descriptive_parallel_report()
+        current = descriptive_parallel_report(revision="current")
+        for report_value in (baseline, current):
+            sample_order = report_value["results"][0]["elapsed_ns"]["sample_order"]
+            report_value["results"][0]["operation_metrics"] = (
+                filesystem_xlsx_operation_metrics_report_fields(sample_order)
+            )
+        current["results"][0]["operation_metrics"]["sample_indices"] = list(
+            range(5)
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "sample_indices must match elapsed_ns.sample_order",
         ):
             perf_compare.compare_reports(
                 baseline, current, self.operation_metrics_policy()

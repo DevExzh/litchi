@@ -1149,8 +1149,17 @@ def _operation_metrics_identity_projection(value: Any) -> Any:
                     else "absent"
                 ),
             }
+        source = value.get("source")
+        normalize_sample_indices = (
+            isinstance(source, dict)
+            and source.get("counter_scope") == "not_applicable_filesystem_xlsx"
+        )
         return {
-            key: _operation_metrics_identity_projection(item)
+            key: (
+                "<permutation>"
+                if normalize_sample_indices and key == "sample_indices"
+                else _operation_metrics_identity_projection(item)
+            )
             for key, item in value.items()
         }
     if isinstance(value, list):
@@ -1311,11 +1320,15 @@ def _operation_metrics_identity(
             # current nested vector and alignment rules.  Keep this call in
             # sync with perf_compare._collect_metrics: it takes the sample
             # list, not a precomputed count.
+            elapsed_sample_order = elapsed.get(
+                "sample_order", perf_compare._METRIC_SAMPLE_ORDER_MISSING
+            )
             perf_compare._validate_operation_metrics(
                 operation_metrics,
                 operation_location,
                 samples,
                 report_schema,
+                elapsed_sample_order=elapsed_sample_order,
             )
         except perf_compare.ComparisonInputError as error:
             raise AbbaSummaryInputError(str(error)) from error

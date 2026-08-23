@@ -547,6 +547,29 @@ def with_operation_metrics(reports):
     return reports
 
 
+def with_xlsx_operation_metrics(reports):
+    """Attach valid filesystem-XLSX operation metrics and sample identity."""
+
+    reports = with_operation_metrics(reports)
+    for leg in reports:
+        for result in leg["results"]:
+            sample_count = len(result["elapsed_ns"]["samples"])
+            sample_order = list(range(sample_count))
+            result["elapsed_ns"]["sample_order"] = sample_order
+            metrics = result["operation_metrics"]
+            metrics["sample_count"] = sample_count
+            metrics["sample_indices"] = sample_order
+            source = metrics["source"]
+            source["status"] = "not_applicable"
+            source["counter_scope"] = "not_applicable_filesystem_xlsx"
+            for field, vector in source.items():
+                if field in {"status", "counter_scope"}:
+                    continue
+                vector["status"] = "not_applicable"
+                vector.pop("values", None)
+    return reports
+
+
 def with_legacy_operation_metrics(reports):
     """Attach the pre-additive schema-1 operation-metrics envelope."""
 
@@ -1030,7 +1053,7 @@ class PerfAbbaSummaryTests(unittest.TestCase):
                 lambda legs: legs[1]["results"][0]["operation_metrics"]["source"].update(
                     counter_scope="untimed_source_replay_only"
                 ),
-                "operation_metrics identity",
+                "source.status=.*incompatible",
             ),
         )
         for mutation, message in mutations:
@@ -1051,6 +1074,47 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             ]["operation_metrics_status"],
             "verified_equal",
         )
+
+    def test_operation_metrics_identity_ignores_valid_cross_leg_sample_order(self):
+        reports = with_xlsx_operation_metrics(four_legs())
+        sample_indices = reports[1]["results"][1]["operation_metrics"][
+            "sample_indices"
+        ]
+        reordered_sample_indices = [
+            *sample_indices[3:6],
+            *sample_indices[:3],
+            *sample_indices[6:],
+        ]
+        reports[1]["results"][1]["operation_metrics"][
+            "sample_indices"
+        ] = reordered_sample_indices
+        reports[1]["results"][1]["elapsed_ns"][
+            "sample_order"
+        ] = reordered_sample_indices
+        self.assertEqual(
+            perf_abba_summary._operation_metrics_identity_projection(
+                reports[1]["results"][1]["operation_metrics"]
+            )["sample_indices"],
+            "<permutation>",
+        )
+
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(
+            summary["results"][0]["identity"]["operation_metrics_status"],
+            "verified_equal",
+        )
+
+    def test_operation_metrics_identity_preserves_non_xlsx_sample_indices(self):
+        reports = with_operation_metrics(four_legs())
+        operation_metrics = reports[0]["results"][0]["operation_metrics"]
+        operation_metrics["source"]["status"] = "not_applicable"
+        operation_metrics["source"][
+            "counter_scope"
+        ] = "not_applicable_in_process_sink"
+        projected = perf_abba_summary._operation_metrics_identity_projection(
+            operation_metrics
+        )
+        self.assertEqual(projected["sample_indices"], list(range(15)))
 
     def test_legacy_operation_metrics_use_exact_historical_schema(self):
         reports = with_legacy_operation_metrics(four_legs())

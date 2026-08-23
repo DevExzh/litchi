@@ -1433,6 +1433,7 @@ def _metric_class_for_path(
 
 
 _METRIC_VECTOR_MISSING = object()
+_METRIC_SAMPLE_ORDER_MISSING = object()
 _METRIC_VECTOR_KEYS = {"values", "status", "scope"}
 _METRIC_VECTOR_STATUSES = {"measured", "not_applicable", "unavailable", "overflow"}
 
@@ -1497,6 +1498,16 @@ _SOURCE_COUNTER_SCOPES = {
     "not_applicable_filesystem_xlsx",
     "not_applicable_immutable_owned_slice",
     "not_applicable_in_process_sink",
+}
+_SOURCE_COUNTER_SCOPE_STATUSES = {
+    "timed_read_at": "measured",
+    "untimed_source_replay_only": "not_applicable",
+    "not_applicable_eager_opc": "not_applicable",
+    "not_applicable_eager_pptx": "not_applicable",
+    "not_applicable_eager_docx": "not_applicable",
+    "not_applicable_filesystem_xlsx": "not_applicable",
+    "not_applicable_immutable_owned_slice": "not_applicable",
+    "not_applicable_in_process_sink": "not_applicable",
 }
 _PATTERN_VALUES = {"sequential", "random", "unknown"}
 _PROCESS_METRICS_KEYS = {
@@ -1695,7 +1706,12 @@ def _validate_phase_set(value: Any, path: str, status: str, sample_count: int) -
 
 
 def _validate_operation_metrics(
-    value: Any, path: str, elapsed_samples: list[Any], report_schema: int
+    value: Any,
+    path: str,
+    elapsed_samples: list[Any],
+    report_schema: int,
+    *,
+    elapsed_sample_order: Any = _METRIC_SAMPLE_ORDER_MISSING,
 ) -> None:
     """Validate the exact operation-metrics envelope for report schema 1."""
     # `_validate_report_identity` rejects future report schemas before this
@@ -1741,6 +1757,11 @@ def _validate_operation_metrics(
         )
     if len(set(sample_indices)) != len(sample_indices):
         raise ComparisonInputError(f"{path}.sample_indices must be unique")
+    if set(sample_indices) != set(range(sample_count)):
+        raise ComparisonInputError(
+            f"{path}.sample_indices must be a complete permutation of retained "
+            "sample indices"
+        )
     alignment = obj["alignment"]
     if alignment != OPERATION_ALIGNMENT:
         raise ComparisonInputError(
@@ -1775,11 +1796,74 @@ def _validate_operation_metrics(
             raise ComparisonInputError(
                 f"{path}.sample_indices must increase across tied elapsed samples"
             )
-
     source = _require_exact_keys(obj["source"], f"{path}.source", _SOURCE_METRICS_KEYS)
     source_status = _validate_metric_status(
         source["status"], f"{path}.source.status"
     )
+    counter_scope = source["counter_scope"]
+    if not isinstance(counter_scope, str) or counter_scope not in _SOURCE_COUNTER_SCOPES:
+        raise ComparisonInputError(
+            f"{path}.source.counter_scope must be one of "
+            f"{sorted(_SOURCE_COUNTER_SCOPES)}"
+        )
+    expected_source_status = _SOURCE_COUNTER_SCOPE_STATUSES[counter_scope]
+    if source_status != expected_source_status:
+        raise ComparisonInputError(
+            f"{path}.source.status={source_status!r} is incompatible with "
+            f"{path}.source.counter_scope={counter_scope!r}; expected "
+            f"{expected_source_status!r}"
+        )
+    # Filesystem XLSX metrics are aggregated from the same fresh-child sample
+    # identity that produces elapsed_ns.sample_order.  In-process sink
+    # summaries may instead repeat one deterministic value across all samples,
+    # so their synthetic 0..n sample identity is not required to mirror that
+    # elapsed-order permutation.
+    if counter_scope == "not_applicable_filesystem_xlsx":
+        if (
+            elapsed_sample_order is _METRIC_SAMPLE_ORDER_MISSING
+            or elapsed_sample_order is None
+        ):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order is required for "
+                "not_applicable_filesystem_xlsx operation metrics"
+            )
+        if not isinstance(elapsed_sample_order, list):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order must be a list"
+            )
+        if len(elapsed_sample_order) != sample_count:
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order has {len(elapsed_sample_order)} "
+                f"samples; expected {sample_count}"
+            )
+        if any(
+            isinstance(index, bool)
+            or not isinstance(index, int)
+            or index < 0
+            for index in elapsed_sample_order
+        ):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order must contain non-negative integers"
+            )
+        if set(elapsed_sample_order) != set(range(sample_count)):
+            raise ComparisonInputError(
+                f"{path}.elapsed_ns.sample_order must be a complete permutation"
+            )
+        for index in range(1, sample_count):
+            if (
+                elapsed_values[index] == elapsed_values[index - 1]
+                and elapsed_sample_order[index]
+                <= elapsed_sample_order[index - 1]
+            ):
+                raise ComparisonInputError(
+                    f"{path}.elapsed_ns.sample_order must increase across tied "
+                    "elapsed samples"
+                )
+        if sample_indices != elapsed_sample_order:
+            raise ComparisonInputError(
+                f"{path}.sample_indices must match elapsed_ns.sample_order"
+            )
+
     if source_status == "measured" and latency_claim != EVIDENCE_ONLY_LATENCY_CLAIM:
         raise ComparisonInputError(
             f"{path}.measured source metrics require "
@@ -1813,12 +1897,6 @@ def _validate_operation_metrics(
                 f"{path}.source.{key}.status must be {boundary_status!r} "
                 f"for source status {source_status!r}"
             )
-    counter_scope = source["counter_scope"]
-    if not isinstance(counter_scope, str) or counter_scope not in _SOURCE_COUNTER_SCOPES:
-        raise ComparisonInputError(
-            f"{path}.source.counter_scope must be one of "
-            f"{sorted(_SOURCE_COUNTER_SCOPES)}"
-        )
     _validate_status_group(
         obj["process"],
         f"{path}.process",
@@ -2099,6 +2177,9 @@ def _collect_metrics(
                 root,
                 elapsed_samples,
                 report_schema,
+                elapsed_sample_order=elapsed.get(
+                    "sample_order", _METRIC_SAMPLE_ORDER_MISSING
+                ),
             )
         _walk_metrics(
             value,
