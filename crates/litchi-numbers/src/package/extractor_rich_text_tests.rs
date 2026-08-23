@@ -55,13 +55,9 @@ fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022()
         ..Default::default()
     }
     .encode_to_vec();
-    let limits = litchi_iwa_text_wire::Limits::new(
-        source.len(),
-        source.len(),
-        source.len(),
-        source.len(),
-    )
-    .unwrap_or_else(|error| panic!("focused storage limits should be valid: {error}"));
+    let limits =
+        litchi_iwa_text_wire::Limits::new(source.len(), source.len(), source.len(), source.len())
+            .unwrap_or_else(|error| panic!("focused storage limits should be valid: {error}"));
     let projected = litchi_iwa_text_wire::from_bytes_with_limits(&source, limits)
         .unwrap_or_else(|error| panic!("compatibility storage projection should succeed: {error}"));
 
@@ -71,9 +67,18 @@ fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022()
     // or renders native formatting/style tables as semantic rich text.
     assert_eq!(projected.text(), "firstlast");
     assert_eq!(projected.runs().len(), 3);
-    assert_eq!(projected.runs()[0], litchi_iwa_text::storage::Run::new(0, 5));
-    assert_eq!(projected.runs()[1], litchi_iwa_text::storage::Run::new(5, 0));
-    assert_eq!(projected.runs()[2], litchi_iwa_text::storage::Run::new(5, 4));
+    assert_eq!(
+        projected.runs()[0],
+        litchi_iwa_text::storage::Run::new(0, 5)
+    );
+    assert_eq!(
+        projected.runs()[1],
+        litchi_iwa_text::storage::Run::new(5, 0)
+    );
+    assert_eq!(
+        projected.runs()[2],
+        litchi_iwa_text::storage::Run::new(5, 4)
+    );
 
     // The compatibility decoder intentionally accepts a noncanonical length
     // varint, whereas the focused/native validation pass requires canonical
@@ -88,10 +93,9 @@ fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022()
             .text(),
         "x"
     );
-    let strict_limits = litchi_iwa_text_wire::RewriteLimits::new(
-        32, 32, 4, 32, 32, 32, 32, 32, 512,
-    )
-    .unwrap_or_else(|error| panic!("strict storage limits should be valid: {error}"));
+    let strict_limits =
+        litchi_iwa_text_wire::RewriteLimits::new(32, 32, 4, 32, 32, 32, 32, 32, 512)
+            .unwrap_or_else(|error| panic!("strict storage limits should be valid: {error}"));
     assert!(
         litchi_iwa_text_wire::validate_storage_with_limits(&noncanonical_length, strict_limits)
             .is_err(),
