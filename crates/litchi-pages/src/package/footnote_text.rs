@@ -1262,7 +1262,10 @@ fn rewrite_custom_mark_wire(
         return Err(FootnoteTextError::InvalidSource);
     }
     let selected_length = selected.map_or(0, |field| field.raw().len());
-    let replacement_length = after.map_or(0, |value| encoded_bytes_field_length(3, value.len()));
+    let replacement_length = after
+        .map(|value| encoded_bytes_field_length(3, value.len(), limits))
+        .transpose()?
+        .unwrap_or(0);
     let output_length = source
         .len()
         .checked_sub(selected_length)
@@ -1325,10 +1328,19 @@ fn rewrite_custom_mark_wire(
     Ok(output)
 }
 
-fn encoded_bytes_field_length(number: u32, payload_length: usize) -> usize {
+fn encoded_bytes_field_length(
+    number: u32,
+    payload_length: usize,
+    limits: WireLimits,
+) -> Result<usize, FootnoteTextError> {
     encoded_len((u64::from(number) << 3) | 2)
-        .saturating_add(encoded_len(usize_to_u64(payload_length)))
-        .saturating_add(payload_length)
+        .checked_add(encoded_len(usize_to_u64(payload_length)))
+        .and_then(|length| length.checked_add(payload_length))
+        .ok_or(FootnoteTextError::LimitExceeded {
+            kind: FootnoteTextLimitKind::OutputBytes,
+            observed: u64::MAX,
+            maximum: usize_to_u64(limits.max_output_bytes()),
+        })
 }
 
 fn append_bytes_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) {
