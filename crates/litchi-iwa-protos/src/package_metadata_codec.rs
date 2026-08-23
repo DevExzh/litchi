@@ -837,7 +837,12 @@ impl RewriteError {
             allocation: None,
         }
     }
-    const fn allocation(requested: usize) -> Self {
+    /// Construct a typed failure for a caller-owned visitor staging
+    /// allocation. Visitors can use this when `try_reserve` refuses to grow
+    /// temporary transaction state; the enclosing inspection forwards the
+    /// failure without publishing a candidate.
+    #[must_use]
+    pub const fn allocation(requested: usize) -> Self {
         Self {
             limit: None,
             reason: None,
@@ -1558,6 +1563,41 @@ mod tests {
             self.0 += 1;
             Ok(())
         }
+    }
+
+    #[derive(Default)]
+    struct AllocationRefusingVisitor {
+        components: usize,
+    }
+
+    impl PackageMetadataVisitor for AllocationRefusingVisitor {
+        fn visit_component(
+            &mut self,
+            _component: ComponentDescriptor<'_>,
+        ) -> Result<(), RewriteError> {
+            self.components += 1;
+            Err(RewriteError::allocation(2))
+        }
+    }
+
+    #[test]
+    fn visitor_allocation_failure_is_forwarded_without_following_observations() {
+        let source = metadata(
+            10,
+            &[
+                component(1, "a.iwa", None, &[], &[]),
+                component(2, "b.iwa", None, &[], &[]),
+            ],
+            &[],
+        );
+        let before = source.clone();
+        let mut visitor = AllocationRefusingVisitor::default();
+        let error = inspect_package_metadata_with_visitor(&source, options(&source), &mut visitor)
+            .unwrap_err();
+
+        assert_eq!(visitor.components, 1);
+        assert_eq!(error.allocation_request(), Some(2));
+        assert_eq!(source, before);
     }
 
     #[test]

@@ -10,6 +10,11 @@ use crate::wire::{
     remove_repeated_length_delimited_field_where, transform_length_delimited_fields_at_path,
 };
 use crate::{Error, IWorkPackage, Result};
+use litchi_iwa_common::{LimitKind, WireLimits};
+use litchi_iwa_protos::package_metadata_codec::{
+    ComponentDescriptor, ObjectUuidDescriptor, PackageMetadataVisitor, RewriteError, RewriteLimit,
+    RewriteOptions, inspect_package_metadata_with_visitor,
+};
 
 pub(crate) const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
 pub(crate) const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
@@ -126,22 +131,16 @@ pub(crate) fn component_identifier_for_entry(
         .strip_prefix("Index/")
         .and_then(|name| name.strip_suffix(".iwa"))
         .ok_or_else(|| Error::InvalidFormat(format!("invalid IWA component name {entry_name}")))?;
-    with_package_metadata(package, |metadata| {
-        let matches = metadata
-            .components
-            .iter()
-            .filter(|component| {
-                component
-                    .locator
-                    .as_deref()
-                    .unwrap_or(&component.preferred_locator)
-                    == locator
-            })
-            .map(|component| component.identifier)
-            .collect::<Vec<_>>();
-        match matches.as_slice() {
-            [] => Ok(None),
-            [identifier] => Ok(Some(*identifier)),
+    with_package_metadata_payload(package, |source| {
+        let mut visitor = ComponentLocatorVisitor {
+            locator,
+            first_match: None,
+            matches: 0,
+        };
+        inspect_package_metadata_payload(package, source, &mut visitor)?;
+        match visitor.matches {
+            0 => Ok(None),
+            1 => Ok(visitor.first_match),
             _ => Err(Error::InvalidFormat(format!(
                 "PackageMetadata contains multiple components for {entry_name}"
             ))),
@@ -154,21 +153,18 @@ pub(crate) fn component_identifier_for_object_uuid(
     package: &IWorkPackage,
     object_identifier: u64,
 ) -> Result<Option<u64>> {
-    with_package_metadata(package, |metadata| {
-        let matches = metadata
-            .components
-            .iter()
-            .filter(|component| {
-                component
-                    .object_uuid_map_entries
-                    .iter()
-                    .any(|entry| entry.identifier == object_identifier)
-            })
-            .map(|component| component.identifier)
-            .collect::<Vec<_>>();
-        match matches.as_slice() {
-            [] => Ok(None),
-            [identifier] => Ok(Some(*identifier)),
+    with_package_metadata_payload(package, |source| {
+        let mut visitor = ObjectUuidOwnerVisitor {
+            object_identifier,
+            current_component: None,
+            current_component_matches: false,
+            first_match: None,
+            matches: 0,
+        };
+        inspect_package_metadata_payload(package, source, &mut visitor)?;
+        match visitor.matches {
+            0 => Ok(None),
+            1 => Ok(visitor.first_match),
             _ => Err(Error::InvalidFormat(format!(
                 "Object {object_identifier} is registered in multiple package components"
             ))),
@@ -832,28 +828,238 @@ pub(crate) fn component_uuid_identifiers(
     package: &IWorkPackage,
     component_identifier: u64,
 ) -> Result<Option<HashSet<u64>>> {
-    with_package_metadata(package, |metadata| {
-        let components = metadata
-            .components
-            .iter()
-            .filter(|component| component.identifier == component_identifier)
-            .collect::<Vec<_>>();
-        if components.len() != 1 {
+    with_package_metadata_payload(package, |source| {
+        let mut visitor = ComponentUuidVisitor {
+            component_identifier,
+            components: 0,
+            identifiers: HashSet::new(),
+            duplicate_identifier: None,
+        };
+        inspect_package_metadata_payload(package, source, &mut visitor)?;
+        if visitor.components != 1 {
             return Err(Error::InvalidFormat(format!(
                 "PackageMetadata must contain exactly one component {component_identifier}"
             )));
         }
-        let mut identifiers = HashSet::new();
-        for entry in &components[0].object_uuid_map_entries {
-            if !identifiers.insert(entry.identifier) {
-                return Err(Error::InvalidFormat(format!(
-                    "Component {component_identifier} UUID map duplicates object {}",
-                    entry.identifier
-                )));
+        if let Some(identifier) = visitor.duplicate_identifier {
+            return Err(Error::InvalidFormat(format!(
+                "Component {component_identifier} UUID map duplicates object {identifier}"
+            )));
+        }
+        Ok(visitor.identifiers)
+    })
+}
+
+const PACKAGE_METADATA_RECURSION_LIMIT: u32 = 64;
+
+fn package_metadata_read_options(package: &IWorkPackage) -> RewriteOptions {
+    let package_limits = package.limits();
+    let archive_limits = package_limits.archive_limits();
+    let message_limit = package_limits
+        .max_iwa_stream_bytes()
+        .min(archive_limits.max_message_bytes())
+        .max(1);
+    let input_limit = message_limit.min(WireLimits::MAX_INPUT_BYTES);
+    let output_limit = message_limit.min(WireLimits::MAX_OUTPUT_BYTES);
+    let record_limit = WireLimits::MAX_FIELDS.min(input_limit);
+    RewriteOptions::new(
+        input_limit,
+        output_limit,
+        WireLimits::MAX_FIELDS,
+        WireLimits::MAX_REWRITE_WORK,
+        PACKAGE_METADATA_RECURSION_LIMIT.min(WireLimits::MAX_NESTING as u32),
+        record_limit,
+        record_limit,
+        0,
+    )
+}
+
+fn inspect_package_metadata_payload<V: PackageMetadataVisitor>(
+    package: &IWorkPackage,
+    source: &[u8],
+    visitor: &mut V,
+) -> Result<()> {
+    inspect_package_metadata_with_visitor(source, package_metadata_read_options(package), visitor)
+        .map(|_inspection| ())
+        .map_err(package_metadata_inspection_error)
+}
+
+fn package_metadata_inspection_error(error: RewriteError) -> Error {
+    if let Some(limit) = error.resource_limit() {
+        let (kind, observed, maximum) = match limit {
+            RewriteLimit::InputBytes { observed, maximum } => {
+                (LimitKind::InputBytes, observed, maximum)
+            },
+            RewriteLimit::OutputBytes { observed, maximum } => {
+                (LimitKind::OutputBytes, observed, maximum)
+            },
+            RewriteLimit::Fields { observed, maximum } => (LimitKind::Fields, observed, maximum),
+            RewriteLimit::Work { observed, maximum } => (LimitKind::RewriteWork, observed, maximum),
+            RewriteLimit::Nesting { observed, maximum } => {
+                (LimitKind::Nesting, observed as usize, maximum as usize)
+            },
+            RewriteLimit::Components { observed, maximum } => {
+                return Error::InvalidFormat(format!(
+                    "PackageMetadata component inspection limit exceeded: observed {observed}, limit {maximum}"
+                ));
+            },
+            RewriteLimit::References { observed, maximum } => {
+                return Error::InvalidFormat(format!(
+                    "PackageMetadata reference inspection limit exceeded: observed {observed}, limit {maximum}"
+                ));
+            },
+            RewriteLimit::Additions { observed, maximum } => {
+                return Error::InvalidFormat(format!(
+                    "PackageMetadata inspection unexpectedly exceeded its addition limit: observed {observed}, limit {maximum}"
+                ));
+            },
+            _ => {
+                return Error::InvalidFormat(format!("PackageMetadata inspection failed: {error}"));
+            },
+        };
+        return Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit: maximum,
+        });
+    }
+    if let Some(amount) = error.allocation_request() {
+        return Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "PackageMetadata visitor staging",
+            amount,
+        });
+    }
+    match error.invalid_reason() {
+        Some(reason) => Error::InvalidFormat(format!(
+            "PackageMetadata strict inspection failed: {reason:?}"
+        )),
+        None => Error::InvalidFormat(format!("PackageMetadata strict inspection failed: {error}")),
+    }
+}
+
+fn with_package_metadata_payload<T, F>(package: &IWorkPackage, read: F) -> Result<Option<T>>
+where
+    F: FnOnce(&[u8]) -> Result<T>,
+{
+    if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
+        return Ok(None);
+    }
+    package.with_parsed_archive(PACKAGE_METADATA_ENTRY, |archive| {
+        let (object_index, message_index) = package_metadata_location(archive)?;
+        read(
+            archive.objects[object_index].messages[message_index]
+                .data
+                .as_slice(),
+        )
+        .map(Some)
+    })
+}
+
+struct ComponentLocatorVisitor<'source> {
+    locator: &'source str,
+    first_match: Option<u64>,
+    matches: usize,
+}
+
+impl PackageMetadataVisitor for ComponentLocatorVisitor<'_> {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if component.is_current() && component.effective_locator() == self.locator {
+            self.matches = self
+                .matches
+                .checked_add(1)
+                .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
+            self.first_match.get_or_insert(component.identifier());
+        }
+        Ok(())
+    }
+}
+
+struct ObjectUuidOwnerVisitor {
+    object_identifier: u64,
+    current_component: Option<u64>,
+    current_component_matches: bool,
+    first_match: Option<u64>,
+    matches: usize,
+}
+
+impl PackageMetadataVisitor for ObjectUuidOwnerVisitor {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        self.current_component = component.is_current().then_some(component.identifier());
+        self.current_component_matches = false;
+        Ok(())
+    }
+
+    fn visit_object_uuid(
+        &mut self,
+        binding: ObjectUuidDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        let component = binding.component();
+        if component.is_current()
+            && self.current_component.is_some()
+            && !self.current_component_matches
+            && binding.object_identifier() == self.object_identifier
+        {
+            self.current_component_matches = true;
+            self.matches = self
+                .matches
+                .checked_add(1)
+                .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
+            self.first_match.get_or_insert(component.identifier());
+        }
+        Ok(())
+    }
+}
+
+struct ComponentUuidVisitor {
+    component_identifier: u64,
+    components: usize,
+    identifiers: HashSet<u64>,
+    duplicate_identifier: Option<u64>,
+}
+
+impl PackageMetadataVisitor for ComponentUuidVisitor {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if component.is_current() && component.identifier() == self.component_identifier {
+            self.components = self
+                .components
+                .checked_add(1)
+                .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
+        }
+        Ok(())
+    }
+
+    fn visit_object_uuid(
+        &mut self,
+        binding: ObjectUuidDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        let component = binding.component();
+        if component.is_current() && component.identifier() == self.component_identifier {
+            let identifier = binding.object_identifier();
+            if self.identifiers.contains(&identifier) {
+                self.duplicate_identifier.get_or_insert(identifier);
+            } else {
+                let requested = self
+                    .identifiers
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
+                self.identifiers
+                    .try_reserve(1)
+                    .map_err(|_error| RewriteError::allocation(requested))?;
+                self.identifiers.insert(identifier);
             }
         }
-        Ok(identifiers)
-    })
+        Ok(())
+    }
 }
 
 fn with_package_metadata<T, F>(package: &IWorkPackage, read: F) -> Result<Option<T>>
@@ -1117,6 +1323,299 @@ mod tests {
     use crate::protobuf::tsp::{
         ComponentExternalReference, ComponentInfo, ObjectUuidMapEntry, PackageMetadata, Uuid,
     };
+
+    fn package_with_metadata(metadata: PackageMetadata) -> IWorkPackage {
+        package_with_metadata_data(metadata.encode_to_vec())
+    }
+
+    fn package_with_metadata_data(data: Vec<u8>) -> IWorkPackage {
+        package_with_metadata_messages(vec![RawMessage {
+            type_: PACKAGE_METADATA_MESSAGE_TYPE,
+            data,
+        }])
+    }
+
+    fn package_with_metadata_messages(messages: Vec<RawMessage>) -> IWorkPackage {
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                PACKAGE_METADATA_ENTRY,
+                &Archive {
+                    objects: vec![ArchiveObject::new(10, messages).unwrap()],
+                },
+            )
+            .unwrap();
+        package
+    }
+
+    fn assert_component_queries_fail(package: &IWorkPackage) {
+        assert!(component_identifier_for_entry(package, "Index/One.iwa").is_err());
+        assert!(component_identifier_for_object_uuid(package, 1).is_err());
+        assert!(component_uuid_identifiers(package, 1).is_err());
+    }
+
+    #[test]
+    fn component_queries_use_locator_precedence_and_ignore_versioned_components() {
+        let package = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![
+                ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "Preferred".to_owned(),
+                    locator: Some("Actual".to_owned()),
+                    ..Default::default()
+                },
+                ComponentInfo {
+                    identifier: 3,
+                    preferred_locator: "Fallback".to_owned(),
+                    object_uuid_map_entries: vec![
+                        ObjectUuidMapEntry {
+                            identifier: 42,
+                            uuid: Uuid { lower: 3, upper: 4 },
+                        },
+                        ObjectUuidMapEntry {
+                            identifier: 43,
+                            uuid: Uuid { lower: 5, upper: 6 },
+                        },
+                    ],
+                    ..Default::default()
+                },
+            ],
+            versioned_components: vec![ComponentInfo {
+                identifier: 2,
+                preferred_locator: "VersionedPreferred".to_owned(),
+                locator: Some("VersionedActual".to_owned()),
+                object_uuid_map_entries: vec![ObjectUuidMapEntry {
+                    identifier: 77,
+                    uuid: Uuid { lower: 1, upper: 2 },
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+
+        assert_eq!(
+            component_identifier_for_entry(&package, "Index/Actual.iwa").unwrap(),
+            Some(1)
+        );
+        assert_eq!(
+            component_identifier_for_entry(&package, "Index/Preferred.iwa").unwrap(),
+            None
+        );
+        assert_eq!(
+            component_identifier_for_entry(&package, "Index/Fallback.iwa").unwrap(),
+            Some(3)
+        );
+        assert_eq!(
+            component_identifier_for_entry(&package, "Index/VersionedActual.iwa").unwrap(),
+            None
+        );
+        assert_eq!(
+            component_identifier_for_object_uuid(&package, 77).unwrap(),
+            None
+        );
+        assert_eq!(
+            component_identifier_for_object_uuid(&package, 42).unwrap(),
+            Some(3)
+        );
+        assert_eq!(
+            component_uuid_identifiers(&package, 1).unwrap(),
+            Some(HashSet::new())
+        );
+        assert_eq!(
+            component_uuid_identifiers(&package, 3).unwrap(),
+            Some(HashSet::from([42, 43]))
+        );
+        assert!(component_uuid_identifiers(&package, 2).is_err());
+    }
+
+    #[test]
+    fn component_queries_reject_duplicate_locator_and_owner_entries() {
+        let package = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![
+                ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "Shared".to_owned(),
+                    object_uuid_map_entries: vec![ObjectUuidMapEntry {
+                        identifier: 77,
+                        uuid: Uuid { lower: 1, upper: 2 },
+                    }],
+                    ..Default::default()
+                },
+                ComponentInfo {
+                    identifier: 2,
+                    preferred_locator: "Shared".to_owned(),
+                    object_uuid_map_entries: vec![ObjectUuidMapEntry {
+                        identifier: 77,
+                        uuid: Uuid { lower: 3, upper: 4 },
+                    }],
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        });
+
+        assert!(component_identifier_for_entry(&package, "Index/Shared.iwa").is_err());
+        assert!(component_identifier_for_object_uuid(&package, 77).is_err());
+    }
+
+    #[test]
+    fn component_uuid_queries_reject_duplicate_components_and_uuid_entries() {
+        let duplicate_components = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![
+                ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "One".to_owned(),
+                    ..Default::default()
+                },
+                ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "One-again".to_owned(),
+                    ..Default::default()
+                },
+            ],
+            versioned_components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "Old".to_owned(),
+                object_uuid_map_entries: vec![ObjectUuidMapEntry {
+                    identifier: 99,
+                    uuid: Uuid { lower: 5, upper: 6 },
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert!(component_uuid_identifiers(&duplicate_components, 1).is_err());
+
+        let duplicate_uuid = package_with_metadata(PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "One".to_owned(),
+                object_uuid_map_entries: vec![
+                    ObjectUuidMapEntry {
+                        identifier: 42,
+                        uuid: Uuid { lower: 1, upper: 2 },
+                    },
+                    ObjectUuidMapEntry {
+                        identifier: 42,
+                        uuid: Uuid { lower: 3, upper: 4 },
+                    },
+                ],
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(
+            component_identifier_for_object_uuid(&duplicate_uuid, 42).unwrap(),
+            Some(1)
+        );
+        assert!(component_uuid_identifiers(&duplicate_uuid, 1).is_err());
+    }
+
+    #[test]
+    fn component_queries_preserve_missing_metadata_and_reject_malformed_wire() {
+        let package = IWorkPackage::new();
+        assert_eq!(
+            component_identifier_for_entry(&package, "Index/One.iwa").unwrap(),
+            None
+        );
+        assert_eq!(
+            component_identifier_for_object_uuid(&package, 1).unwrap(),
+            None
+        );
+        assert_eq!(component_uuid_identifiers(&package, 1).unwrap(), None);
+
+        let missing_payload = package_with_metadata_messages(vec![RawMessage {
+            type_: 1,
+            data: Vec::new(),
+        }]);
+        assert_component_queries_fail(&missing_payload);
+
+        let valid = PackageMetadata {
+            last_object_identifier: 10,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let duplicate_payloads = package_with_metadata_messages(vec![
+            RawMessage {
+                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                data: valid.clone(),
+            },
+            RawMessage {
+                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                data: valid,
+            },
+        ]);
+        assert_component_queries_fail(&duplicate_payloads);
+
+        for data in [
+            vec![0x08, 0x80],
+            vec![0x08, 0x00],
+            vec![0x1a, 0x02, 0x08, 0x01],
+            vec![0x08, 0x0a, 0x1a, 0x02, 0x08, 0x01],
+            vec![0x08, 0x8a, 0x00],
+            vec![0x08, 0x0a, 0x08, 0x0a],
+            vec![0x0a, 0x01, 0x0a],
+            vec![0x08, 0x0a, 0x1a, 0x05, 0x08, 0x01, 0x12, 0x01, 0xff],
+            vec![
+                0x08, 0x0a, 0x1a, 0x0b, 0x08, 0x01, 0x12, 0x01, 0x41, 0x32, 0x04, 0x08, 0x02, 0x18,
+                0x02,
+            ],
+            vec![0x08, 0x0a, 0x5a, 0x02, 0x08, 0x01],
+        ] {
+            let malformed = package_with_metadata_data(data);
+            assert_component_queries_fail(&malformed);
+        }
+    }
+
+    #[test]
+    fn component_query_inspection_honors_finite_field_limits() {
+        let metadata = PackageMetadata {
+            last_object_identifier: 10,
+            components: vec![ComponentInfo {
+                identifier: 1,
+                preferred_locator: "One".to_owned(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let source = metadata.encode_to_vec();
+        let mut visitor = ComponentLocatorVisitor {
+            locator: "One",
+            first_match: None,
+            matches: 0,
+        };
+        let options = RewriteOptions::new(
+            source.len(),
+            source.len(),
+            1,
+            WireLimits::MAX_REWRITE_WORK,
+            PACKAGE_METADATA_RECURSION_LIMIT,
+            source.len(),
+            source.len(),
+            0,
+        );
+        let error = inspect_package_metadata_with_visitor(&source, options, &mut visitor)
+            .expect_err("the deliberately tiny field budget must fail closed");
+        assert!(error.resource_limit().is_some());
+        assert!(matches!(
+            package_metadata_inspection_error(error),
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                ..
+            })
+        ));
+        assert!(matches!(
+            package_metadata_inspection_error(RewriteError::allocation(3)),
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "PackageMetadata visitor staging",
+                amount: 3,
+            })
+        ));
+    }
 
     #[test]
     fn allocator_observes_identifiers_retained_only_by_metadata_registries() {

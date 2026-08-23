@@ -2228,6 +2228,145 @@ NUMBERS_TABLE_CELL_STORAGE_NO_EAGER_DECODE_PATTERNS = (
         ),
     ),
 )
+IWA_PACKAGE_METADATA_SOURCE = Path("crates/litchi-iwa/src/package_metadata.rs")
+PACKAGE_METADATA_READ_FUNCTIONS = (
+    "component_identifier_for_entry",
+    "component_identifier_for_object_uuid",
+    "component_uuid_identifiers",
+)
+PACKAGE_METADATA_CODEC_VISITOR_FUNCTIONS = (
+    "inspect_package_metadata_with_visitor",
+)
+PACKAGE_METADATA_GENERATED_TYPE_NAMES = (
+    "PackageMetadata",
+    "ComponentInfo",
+    "ObjectUuidMapEntry",
+)
+PACKAGE_METADATA_CODEC_VISITOR_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])"
+    r"(?:(?:::)?(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+    r"(?:r#)?package_metadata_codec[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?(?:inspect_package_metadata_with_visitor)[ \t\r\n]*\("
+)
+PACKAGE_METADATA_CODEC_MODULE_IMPORT = re.compile(
+    r"^[ \t]*(?:pub(?:[ \t\r\n]*\([^()]*\))?[ \t\r\n]+)?"
+    r"use[ \t\r\n]+(?P<path>[^;]+);",
+    re.MULTILINE,
+)
+PACKAGE_METADATA_CODEC_BARE_VISITOR_CALL = re.compile(
+    r"(?<![A-Za-z0-9_:#.])"
+    r"(?:r#)?inspect_package_metadata_with_visitor[ \t\r\n]*\("
+)
+PACKAGE_METADATA_BARE_CALL = re.compile(
+    r"(?<![A-Za-z0-9_:#.])(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*\("
+)
+PACKAGE_METADATA_QUALIFIED_CALL = re.compile(
+    r"(?<![A-Za-z0-9_:#.])"
+    r"(?:r#)?(?:crate|self|super|package_metadata)"
+    r"(?:[ \t\r\n]*::[ \t\r\n]*(?:r#)?[A-Za-z_][A-Za-z0-9_]*)*"
+    r"[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\("
+)
+PACKAGE_METADATA_FUNCTION_POINTER_ALIAS = re.compile(
+    r"\b(?:let|const)[ \t\r\n]+(?:mut[ \t\r\n]+)?"
+    r"(?P<alias>(?:r#)?[A-Za-z_][A-Za-z0-9_]*)"
+    r"(?:[ \t\r\n]*:[^=;\n]+)?[ \t\r\n]*=[ \t\r\n]*"
+    r"(?P<target>(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+    r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*;"
+)
+PACKAGE_METADATA_LOCAL_PATH_ROOTS = frozenset(
+    {"crate", "self", "super", "package_metadata"}
+)
+PACKAGE_METADATA_NO_EAGER_DECODE_PATTERNS = (
+    (
+        "PackageMetadata::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])"
+            r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+            r"(?:r#)?PackageMetadata[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "ComponentInfo::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])"
+            r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+            r"(?:r#)?ComponentInfo[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "ObjectUuidMapEntry::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])"
+            r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+            r"(?:r#)?ObjectUuidMapEntry[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "UFCS generated PackageMetadata decode",
+        re.compile(
+            r"<[\s\S]*?(?:r#)?PackageMetadata[\s\S]*?>"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "UFCS generated ComponentInfo decode",
+        re.compile(
+            r"<[\s\S]*?(?:r#)?ComponentInfo[\s\S]*?>"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "UFCS generated ObjectUuidMapEntry decode",
+        re.compile(
+            r"<[\s\S]*?(?:r#)?ObjectUuidMapEntry[\s\S]*?>"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated Prost Message::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:r#)?Message[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "qualified Prost Message::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_])(?:r#)?prost[ \t\r\n]*::[ \t\r\n]*"
+            r"(?:r#)?Message[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated PackageMetadata collection materialization",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?!(?:r#)?(?:self|visitor)\b)"
+            r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+            r"[ \t\r\n]*\.[ \t\r\n]*"
+            r"(?:components|versioned_components|data_metadata_map)\b"
+        ),
+    ),
+    (
+        "generated ComponentInfo collection materialization",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:[A-Za-z_][A-Za-z0-9_]*|r#[A-Za-z_][A-Za-z0-9_]*)"
+            r"[ \t\r\n]*\.[ \t\r\n]*"
+            r"(?:object_uuid_map_entries|external_references|"
+            r"versioned_external_references)\b"
+        ),
+    ),
+    (
+        "generated metadata collection type",
+        re.compile(
+            r"(?<![A-Za-z0-9_])(?:::)?"
+            r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+            r"(?:r#)?(?:Vec|HashSet|BTreeSet)"
+            r"[ \t\r\n]*<[\s\S]*?(?:PackageMetadata|ComponentInfo|"
+            r"ObjectUuidMapEntry)\b"
+        ),
+    ),
+)
 NUMBERS_EXTRACTOR_NO_EAGER_COMMENT_STORAGE_SOURCE_PATTERNS = (
     (
         "CommentStorageArchive::decode",
@@ -10628,6 +10767,279 @@ def audit_iwa_numbers_table_cell_storage_source_topology(
     return sorted(set(violations))
 
 
+def _package_metadata_codec_call_patterns(
+    source: str,
+) -> tuple[re.Pattern[str], ...]:
+    """Return package-metadata visitor calls, including imported aliases."""
+
+    masked_source = _mask_rust_non_code(source)
+    patterns: list[re.Pattern[str]] = [PACKAGE_METADATA_CODEC_VISITOR_CALL]
+    visitor_names = set(PACKAGE_METADATA_CODEC_VISITOR_FUNCTIONS)
+    for import_match in PACKAGE_METADATA_CODEC_MODULE_IMPORT.finditer(masked_source):
+        path = import_match.group("path")
+        if "package_metadata_codec" not in path:
+            continue
+        if "*" in path or any(
+            function_name in path
+            for function_name in PACKAGE_METADATA_CODEC_VISITOR_FUNCTIONS
+        ):
+            patterns.append(PACKAGE_METADATA_CODEC_BARE_VISITOR_CALL)
+        visitor_alias_match = re.search(
+            r"(?:r#)?inspect_package_metadata_with_visitor"
+            r"[ \t\r\n]+as[ \t\r\n]+"
+            r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+            path,
+        )
+        if visitor_alias_match is not None:
+            alias = re.escape(visitor_alias_match.group("alias"))
+            visitor_names.add(visitor_alias_match.group("alias"))
+            patterns.append(
+                re.compile(
+                    rf"(?<![A-Za-z0-9_:#.])(?:r#)?{alias}"
+                    r"[ \t\r\n]*\("
+                )
+            )
+        alias_match = re.search(
+            r"\bas[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+            path,
+        )
+        if alias_match is None:
+            continue
+        alias = re.escape(alias_match.group("alias"))
+        patterns.append(
+            re.compile(
+                rf"(?<![A-Za-z0-9_:#.]){alias}[ \t\r\n]*::"
+                r"[ \t\r\n]*(?:r#)?inspect_package_metadata_with_visitor"
+                r"[ \t\r\n]*\("
+            )
+        )
+    for pointer_match in PACKAGE_METADATA_FUNCTION_POINTER_ALIAS.finditer(masked_source):
+        target_name = _package_metadata_local_target_name(
+            pointer_match.group("target")
+        )
+        if target_name not in visitor_names:
+            continue
+        alias = re.escape(pointer_match.group("alias"))
+        patterns.append(
+            re.compile(
+                rf"(?<![A-Za-z0-9_:#.])(?:r#)?{alias}"
+                r"[ \t\r\n]*\("
+            )
+        )
+    return tuple(patterns)
+
+
+def _package_metadata_no_eager_decode_patterns(
+    source: str,
+) -> tuple[tuple[str, re.Pattern[str]], ...]:
+    """Add generated-message aliases to the static read-side deny-list."""
+
+    patterns = list(PACKAGE_METADATA_NO_EAGER_DECODE_PATTERNS)
+    masked_source = _mask_rust_non_code(source)
+    for import_match in PACKAGE_METADATA_CODEC_MODULE_IMPORT.finditer(masked_source):
+        path = import_match.group("path")
+        prost_trait_alias_match = re.search(
+            r"(?:r#)?Message[ \t\r\n]+as[ \t\r\n]+"
+            r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+            path,
+        )
+        if "prost" in path and prost_trait_alias_match is not None:
+            alias = re.escape(prost_trait_alias_match.group("alias"))
+            patterns.append(
+                (
+                    "imported Prost Message trait alias decode",
+                    re.compile(
+                        rf"(?<![A-Za-z0-9_:#.])(?:r#)?{alias}"
+                        r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+                    ),
+                )
+            )
+        for generated_name in PACKAGE_METADATA_GENERATED_TYPE_NAMES:
+            alias_match = re.search(
+                rf"\b{generated_name}\b[ \t\r\n]+as[ \t\r\n]+"
+                r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+                path,
+            )
+            if alias_match is None:
+                continue
+            alias = re.escape(alias_match.group("alias"))
+            patterns.append(
+                (
+                    f"generated {generated_name} alias decode",
+                    re.compile(
+                        rf"(?<![A-Za-z0-9_:#.])(?:r#)?{alias}"
+                        r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+                    ),
+                )
+            )
+            patterns.append(
+                (
+                    f"generated {generated_name} type alias collection",
+                    re.compile(
+                        rf"(?<![A-Za-z0-9_])(?:::)?"
+                        rf"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+                        rf"(?:r#)?(?:Vec|HashSet|BTreeSet)"
+                        rf"[ \t\r\n]*<[ \t\r\n]*(?:r#)?{alias}\b"
+                    ),
+                )
+            )
+
+    type_alias_pattern = re.compile(
+        r"\btype[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)"
+        r"[ \t\r\n]*=[ \t\r\n]*(?:[^;\n]*::[ \t\r\n]*)?"
+        r"(?:r#)?(?P<generated>PackageMetadata|ComponentInfo|"
+        r"ObjectUuidMapEntry)\b"
+    )
+    for alias_match in type_alias_pattern.finditer(masked_source):
+        alias = re.escape(alias_match.group("alias"))
+        generated_name = alias_match.group("generated")
+        patterns.append(
+            (
+                f"generated {generated_name} type alias decode",
+                re.compile(
+                    rf"(?<![A-Za-z0-9_:#.])(?:r#)?{alias}"
+                    r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+                ),
+            )
+        )
+        patterns.append(
+            (
+                f"generated {generated_name} type alias collection",
+                re.compile(
+                    rf"(?<![A-Za-z0-9_])(?:::)?"
+                    rf"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+                    rf"(?:r#)?(?:Vec|HashSet|BTreeSet)"
+                    rf"[ \t\r\n]*<[ \t\r\n]*(?:r#)?{alias}\b"
+                ),
+            )
+        )
+    return tuple(patterns)
+
+
+def _package_metadata_local_target_name(target: str) -> str | None:
+    """Resolve a simple function path only when it can name a local helper."""
+
+    parts = [part.strip() for part in target.split("::") if part.strip()]
+    if not parts:
+        return None
+    first = parts[0].removeprefix("r#")
+    if len(parts) > 1 and first not in PACKAGE_METADATA_LOCAL_PATH_ROOTS:
+        return None
+    return parts[-1].removeprefix("r#")
+
+
+def audit_iwa_package_metadata_read_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep package-metadata identity queries on the borrowed visitor seam.
+
+    Package publication/mutation helpers intentionally retain generated Prost
+    ownership for now.  Only the three read-only identity queries are in this
+    ratchet: every reachable helper must invoke the strict
+    ``package_metadata_codec`` visitor and must not decode or materialize the
+    generated ``PackageMetadata``/``ComponentInfo``/``ObjectUuidMapEntry``
+    graph.  Test-gated generated fixtures are masked item-by-item, so a test
+    oracle cannot hide a later production regression.
+    """
+
+    violations: list[str] = []
+    source_path = root / IWA_PACKAGE_METADATA_SOURCE
+    if not source_path.is_file():
+        return violations
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    production_source = _mask_rust_cfg_test_items(raw_source)
+    top_level_functions = _rust_top_level_function_bodies(production_source)
+    codec_call_patterns = _package_metadata_codec_call_patterns(production_source)
+    no_eager_decode_patterns = _package_metadata_no_eager_decode_patterns(
+        production_source
+    )
+
+    for function_name in PACKAGE_METADATA_READ_FUNCTIONS:
+        result = top_level_functions.get(function_name)
+        if result is None:
+            violations.append(
+                "focused litchi-iwa PackageMetadata read function is missing "
+                f"{function_name}: {IWA_PACKAGE_METADATA_SOURCE}"
+            )
+            continue
+
+        reachable: list[tuple[str, str, int]] = []
+        pending = [function_name]
+        visited: set[str] = set()
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            current_result = top_level_functions.get(current)
+            if current_result is None:
+                continue
+            visited.add(current)
+            current_body, current_offset = current_result
+            reachable.append((current, current_body, current_offset))
+            for call_pattern in (
+                PACKAGE_METADATA_BARE_CALL,
+                PACKAGE_METADATA_QUALIFIED_CALL,
+            ):
+                for call in call_pattern.finditer(current_body):
+                    helper_name = call.group("name")
+                    if (
+                        helper_name in top_level_functions
+                        and helper_name not in visited
+                    ):
+                        pending.append(helper_name)
+            for pointer_match in PACKAGE_METADATA_FUNCTION_POINTER_ALIAS.finditer(
+                current_body
+            ):
+                alias = pointer_match.group("alias").removeprefix("r#")
+                target_name = _package_metadata_local_target_name(
+                    pointer_match.group("target")
+                )
+                if target_name not in top_level_functions:
+                    continue
+                alias_call = re.compile(
+                    rf"(?<![A-Za-z0-9_:#.])(?:r#)?{re.escape(alias)}"
+                    r"[ \t\r\n]*\("
+                )
+                if alias_call.search(current_body) is not None:
+                    pending.append(target_name)
+
+        if not any(
+            any(pattern.search(body) for pattern in codec_call_patterns)
+            for _name, body, _offset in reachable
+        ):
+            _name, _body, body_offset = reachable[0]
+            line_number = production_source.count("\n", 0, body_offset) + 1
+            violations.append(
+                "focused litchi-iwa PackageMetadata read function "
+                f"{function_name} does not route through "
+                "package_metadata_codec visitor: "
+                f"{IWA_PACKAGE_METADATA_SOURCE}:{line_number}"
+            )
+
+        for current_name, body, body_offset in reachable:
+            for label, pattern in no_eager_decode_patterns:
+                for match in pattern.finditer(body):
+                    line_number = (
+                        production_source.count(
+                            "\n", 0, body_offset + match.start()
+                        )
+                        + 1
+                    )
+                    helper_suffix = (
+                        ""
+                        if current_name == function_name
+                        else f" via helper {current_name}"
+                    )
+                    violations.append(
+                        "focused litchi-iwa PackageMetadata read function "
+                        f"{function_name}{helper_suffix} uses {label}: "
+                        f"{IWA_PACKAGE_METADATA_SOURCE}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_extractor_no_eager_comment_storage_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -12165,6 +12577,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
         + audit_iwa_numbers_table_cell_storage_source_topology()
+        + audit_iwa_package_metadata_read_source_topology()
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
