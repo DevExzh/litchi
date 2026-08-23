@@ -314,13 +314,27 @@ verification stay outside the timer; the full scan times only boxed
 These selectors bring the matrix to 348 names while leaving the default 36
 cases / 198 records unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
-`xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
-and a temporary source file. The first times exactly
-`litchi::Workbook::open(Path)`;
-the lifecycle selector times that call plus worksheet names, count, and text.
-Both selectors compare those projections and metadata with an untimed
-`litchi::Workbook::from_bytes(Vec<u8>)` oracle and verify the source archive
-SHA-256. They leave the default 36 cases / 198 records unchanged.
+`xlsx_file_open_lifecycle`) run each measured sample in a fresh child process
+over the fixed medium cell-CRUD corpus: generator
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1`, 4,226,429 archive
+bytes, and source SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`.
+Warm and cold-requested samples use their ordinary source file; cold-verified
+uses a page-aligned ZIP copy only when fincore/filesystem admission succeeds
+and the operation observes a positive process `read_bytes` delta, otherwise
+the report records an explicit ineligible proof. The open selector times exactly
+`litchi::Workbook::open(Path)`; the lifecycle selector times that call plus
+worksheet names, worksheet count, and full text. The opened root and lifecycle
+projection remain live until elapsed, allocation, procfs, and cold-proof
+snapshots finish, so black-box/drop work is outside the timed scope.
+Untimed typed `litchi_xlsx::Workbook` cell verification/full-text checks and an
+independently opened OPC/property metadata oracle validate every child; each
+child reports its final actual source SHA-256, including the aligned cold
+source hash. These filesystem selectors classify logical reads as
+`not_applicable_filesystem_xlsx` (unavailable for this uninstrumented facade
+path), report procfs evidence only when the host
+provides it, and make no physical-I/O, storage-media, or speedup claim. They
+leave the default 36 cases / 198 records unchanged.
 Two additional high-level XLSX bytes selectors (`xlsx_bytes_open` and
 `xlsx_bytes_open_lifecycle`) exercise `litchi::Workbook::from_bytes(Vec<u8>)`
 over the deterministic medium cell-CRUD corpus. The first times exactly the
@@ -2665,14 +2679,16 @@ native-Office claim is made.
   and value in `B1:B<rows>` through the source-backed public API, with the same
   second-sheet deferral proof.
 - `xlsx_file_open`: open the deterministic medium cell-CRUD XLSX corpus through
-  the high-level `litchi::Workbook::open(Path)` filesystem route. The timed
-  scope is exactly that public path call; the untimed oracle compares metadata,
-  worksheet names/count, full text, and the source archive SHA-256 with
-  `Workbook::from_bytes(Vec<u8>)`.
-- `xlsx_file_open_lifecycle`: use the same temporary source file and oracle,
-  but time the high-level path open followed by worksheet names, worksheet
-  count, and full text. The selector is opt-in and does not claim a source
-  speedup or physical-I/O result.
+  the high-level `litchi::Workbook::open(Path)` filesystem route in a fresh
+  child. The timed scope is exactly that public path call; untimed typed
+  `litchi_xlsx::Workbook` cell/full-text checks and an independently opened
+  OPC/property metadata oracle validate the exact child workbook and final
+  actual source hash (the fixed ordinary pin or the aligned cold-copy hash).
+- `xlsx_file_open_lifecycle`: use the same fixed source and independent
+  oracles in a fresh child, but time the high-level path open followed by
+  worksheet names, worksheet count, and full text. The report classifies
+  logical reads as unavailable for this facade path and makes no physical-I/O
+  or speedup claim; cold-verified remains an explicit fincore/procfs proof.
 - `xlsx_bytes_open`: move a prepared owned XLSX allocation into
   `litchi::Workbook::from_bytes(Vec<u8>)`; the input clone and typed eager
   semantic/hash guards are outside timing, so the measured scope is exactly

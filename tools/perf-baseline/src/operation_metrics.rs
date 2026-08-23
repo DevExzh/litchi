@@ -385,6 +385,7 @@ pub(crate) fn aggregate(
         | "not_applicable_eager_opc"
         | "not_applicable_eager_pptx"
         | "not_applicable_eager_docx"
+        | "not_applicable_filesystem_xlsx"
         | "not_applicable_immutable_owned_slice" => MetricStatus::NotApplicable,
         _ => MetricStatus::Unavailable,
     };
@@ -725,6 +726,8 @@ pub(crate) fn from_in_process_observations(
             cfb_phases: None,
             pptx_source_replay: None,
             docx_source_replay: None,
+            xlsx_source_sha256: None,
+            xlsx_semantic_sha256: None,
         })
         .collect::<Vec<_>>();
     let elapsed = observations
@@ -1175,6 +1178,8 @@ mod tests {
             cfb_phases: None,
             pptx_source_replay: None,
             docx_source_replay: None,
+            xlsx_source_sha256: None,
+            xlsx_semantic_sha256: None,
         }
     }
 
@@ -1596,6 +1601,15 @@ mod tests {
         assert_eq!(envelope.source.status, MetricStatus::NotApplicable);
         assert!(envelope.source.logical_read_calls.values.is_none());
         assert!(envelope.source.logical_read_pattern.values.is_none());
+    }
+
+    #[test]
+    fn filesystem_xlsx_scope_is_explicitly_not_applicable() {
+        let mut sample = sample(0, "warm", 10, Some(metrics()));
+        sample.logical_read_counter_scope = "not_applicable_filesystem_xlsx".to_owned();
+        let envelope = aggregate(&[sample], "warm", &[10]).unwrap();
+        assert_eq!(envelope.source.status, MetricStatus::NotApplicable);
+        assert!(envelope.source.logical_read_calls.values.is_none());
     }
 
     #[test]
