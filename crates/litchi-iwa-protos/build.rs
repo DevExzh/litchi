@@ -884,8 +884,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "TSPPackageMetadataArchive.proto",
-            858,
-            "f33fc54b7382231d9b8ece89390928cf634bd9a8108e5a929a30563e2d693a60",
+            927,
+            "cbfdc5b57d0b09153a7fa083f2557bff305aa7463375173cf4fd1eb75f52fced",
         ),
         (
             "TSTGroupNodeCategoryArchive.proto",
@@ -3018,12 +3018,14 @@ fn enforce_package_metadata_projection_provenance(
     const CANONICAL: &[&str] = &[
         "message PackageMetadata {",
         "required uint64 last_object_identifier = 1;",
+        "optional uint64 save_token = 8 [default = 0];",
         "repeated .TSP.ComponentInfo components = 3;",
         "repeated .TSP.ComponentInfo versioned_components = 11;",
         "message ComponentInfo {",
         "required uint64 identifier = 1;",
         "required string preferred_locator = 2;",
         "optional string locator = 3;",
+        "optional uint64 save_token = 12 [default = 0];",
         "repeated .TSP.ComponentExternalReference external_references = 6;",
         "repeated .TSP.ComponentDataReference data_references = 7;",
         "repeated .TSP.ObjectUUIDMapEntry object_uuid_map_entries = 11;",
@@ -3060,11 +3062,13 @@ fn enforce_package_metadata_projection_provenance(
 package LitchiIwaPackageMetadataProjection;
 message PackageMetadataArchive {
 required uint64 last_object_identifier = 1;
+optional uint64 save_token = 8;
 }
 message ComponentInfoArchive {
 required uint64 identifier = 1;
 required string preferred_locator = 2;
 optional string locator = 3;
+optional uint64 save_token = 12;
 }
 message ComponentExternalReferenceArchive {
 required uint64 component_identifier = 1;
@@ -3082,6 +3086,7 @@ required uint64 upper = 2;
     const CODEC_SYMBOLS: &[&str] = &[
         "pub struct RewriteOptions",
         "pub struct ComponentSelector",
+        "pub struct SaveTokenBatch",
         "pub struct ObjectUuidAddition",
         "pub struct ExternalReferenceAddition",
         "pub struct Batch",
@@ -3095,6 +3100,7 @@ required uint64 upper = 2;
         "pub trait PackageMetadataVisitor",
         "pub fn inspect_package_metadata_with_visitor",
         "pub fn rewrite_package_metadata",
+        "pub fn rewrite_package_metadata_save_tokens",
         "pub fn remove_package_metadata",
         "precharge_rewrite_and_verification",
         "try_reserve_exact",
@@ -5610,8 +5616,8 @@ fn enforce_package_metadata_projection_budget(directory: &Path) -> Result<(), Bo
         directory,
         "PackageMetadata",
         EXPECTED_FILES,
-        145_681,
-        "ee49927f75c6b632c83055f9b7e647920b389be41bec10e25871a6ef7b56ab31",
+        150_715,
+        "0354d6eaac80302d68dd7ff3ef7e3ea5ee7aefef337107ddab88dd5a8b7f7fca",
     )
 }
 

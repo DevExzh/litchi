@@ -10213,6 +10213,253 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertIn("DocumentArchive::decode", violations[0])
             self.assertIn(":4", violations[0])
 
+    def test_numbers_names_save_token_route_accepts_canonical_reachable_helper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                "fn rewrite_metadata() {\n"
+                "    metadata_codec::rewrite_package_metadata_save_tokens(\n"
+                "        source, batch, options\n"
+                "    );\n"
+                "}\n"
+                "fn rewrite_names() { rewrite_metadata(); }\n"
+                "fn unreachable_legacy() {\n"
+                "    crate::package_metadata::advance_package_save_token_for_components(\n"
+                "        source\n"
+                "    );\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn generated_oracle() {\n"
+                "    let _ = PackageMetadata::decode(source);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_save_token_publication_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_names_save_token_route_requires_reachable_codec_call(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                "fn unreachable() {\n"
+                "    metadata_codec::rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                "}\n"
+                "fn rewrite_names() { rewrite_native(source); }\n"
+                "fn rewrite_native() {}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_names_save_token_publication_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("does not call rewrite_package_metadata_save_tokens", violations[0])
+
+    def test_numbers_names_save_token_route_rejects_reachable_legacy_paths(
+        self,
+    ) -> None:
+        markers = {
+            "crate::package_metadata": (
+                "crate::package_metadata::rewrite_legacy(source);\n"
+            ),
+            "advance_package_save_token_for_components": (
+                "advance_package_save_token_for_components(source);\n"
+            ),
+            "set_package_last_object_identifier": (
+                "set_package_last_object_identifier(source, 1);\n"
+            ),
+            "PackageMetadata::decode": (
+                "let _ = tsp::PackageMetadata::decode(source);\n"
+            ),
+            "ComponentInfo::decode": (
+                "let _ = tsp::ComponentInfo::decode(source);\n"
+            ),
+            "Message::decode": "let _ = Message::decode(source);\n",
+            "prost": "let _ = prost_types::MessageInfo::default();\n",
+        }
+        for label, marker in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                        "fn rewrite_metadata() {\n"
+                        + marker
+                        + "    metadata_codec::rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                        "}\n"
+                        "fn rewrite_names() { rewrite_metadata(); }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_names_save_token_publication_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(label in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_numbers_names_save_token_route_scans_split_helpers_and_masks_cfg_items(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            owner.parent.mkdir(parents=True)
+            owner.write_text(
+                "fn rewrite_names() { rewrite_metadata_tokens(); }\n",
+                encoding="utf-8",
+            )
+            helper = (
+                root
+                / boundaries.NUMBERS_NAMES_PUBLICATION_HELPER_ROOT
+                / "metadata.rs"
+            )
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "use litchi_iwa_protos::package_metadata_codec::{\n"
+                "    rewrite_package_metadata_save_tokens,\n"
+                "};\n"
+                "fn rewrite_metadata_tokens() {\n"
+                "    rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn hidden_legacy() {\n"
+                "    advance_package_save_token_for_components(source);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_save_token_publication_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_names_save_token_manifest_requires_focused_normal_edge(self) -> None:
+        manifests = {
+            "litchi-iwa": "litchi-iwa = { workspace = true }\n",
+            "prost-types": "prost-types = { workspace = true }\n",
+            "missing codec": "thiserror = { workspace = true }\n",
+        }
+        for label, dependency in manifests.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True)
+                    manifest.write_text(
+                        "[dependencies]\n"
+                        + dependency
+                        + ("litchi-iwa-protos = { workspace = true }\n" if label != "missing codec" else "")
+                        + "\n[dev-dependencies]\nprost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+                    source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    source.write_text(
+                        "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                        "fn rewrite_names() {\n"
+                        "    metadata_codec::rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_names_save_token_manifest_topology(
+                        root
+                    )
+                    if label == "missing codec":
+                        self.assertTrue(any("missing normal litchi-iwa-protos" in item for item in violations))
+                    else:
+                        self.assertTrue(any(dependency.strip().split(" ")[0] in item for item in violations))
+
+    def test_numbers_names_public_api_rejects_save_token_codec_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn save_token(value: u64) {}\n"
+                "pub fn rewrite(value: SaveTokenBatch) -> RewriteOutput { todo!() }\n"
+                "pub fn select(value: ComponentSelector) -> PackageMetadata { todo!() }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES[1]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("", encoding="utf-8")
+
+            violations = boundaries.audit_numbers_names_facade_source_topology(root)
+            self.assertTrue(any("save-token state save_token" in item for item in violations))
+            self.assertTrue(any("package-metadata codec type SaveTokenBatch" in item for item in violations))
+            self.assertTrue(any("package-metadata codec type ComponentSelector" in item for item in violations))
+
+    def test_numbers_names_public_api_rejects_codec_alias_reexports_and_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("", encoding="utf-8")
+            lib = root / boundaries.NUMBERS_NAMES_EXPORT_SOURCES[0]
+            lib.parent.mkdir(parents=True, exist_ok=True)
+            lib.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "pub use codec::{Batch, RemovalBatch};\n"
+                "pub type PublicRewrite = codec::PreparedPackageMetadataRewrite;\n"
+                "pub mod package_metadata_codec;\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_NAMES_EXPORT_SOURCES[1]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text(
+                "pub use litchi_iwa_protos::package_metadata_codec::RewriteLimit;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_names_facade_source_topology(root)
+            self.assertGreaterEqual(
+                sum("package-metadata codec reexport/module alias" in item for item in violations),
+                4,
+                violations,
+            )
+            for type_name in (
+                "Batch",
+                "RemovalBatch",
+                "PreparedPackageMetadataRewrite",
+                "RewriteLimit",
+            ):
+                self.assertTrue(
+                    any(f"package-metadata codec type {type_name}" in item for item in violations),
+                    violations,
+                )
+
+    def test_numbers_names_save_token_route_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_names_save_token_publication_source_topology()",
+            main_source,
+        )
+
     def test_focused_numbers_package_no_eager_prost_allows_dev_only_manifest(
         self,
     ) -> None:
@@ -10223,7 +10470,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             manifest.write_text(
                 "[dependencies]\n"
                 "thiserror = { workspace = true }\n"
-                "prost-types = { workspace = true }\n"
+                "litchi-iwa-protos = { workspace = true }\n"
                 "# prost = { workspace = true }\n"
                 "\n"
                 "[dev-dependencies]\n"
@@ -10249,7 +10496,8 @@ class BoundaryPolicyTests(unittest.TestCase):
                     manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
                     manifest.parent.mkdir(parents=True)
                     manifest.write_text(
-                        f"{section}\nprost = {{ workspace = true }}\n\n"
+                        f"{section}\nprost = {{ workspace = true }}\n"
+                        "litchi-iwa-protos = { workspace = true }\n\n"
                         "[dev-dependencies]\nprost = { workspace = true }\n",
                         encoding="utf-8",
                     )
@@ -10333,7 +10581,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "[dependencies]\n"
                 "# prost = { workspace = true }\n"
                 "# \"prost\" = { workspace = true }\n"
-                "prost-types = { workspace = true }\n",
+                "litchi-iwa-protos = { workspace = true }\n",
                 encoding="utf-8",
             )
 

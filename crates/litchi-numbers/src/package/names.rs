@@ -27,7 +27,13 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
-    numbers_names_codec, numbers_table_cell_dependency_codec as dependency_codec, table_info_codec,
+    numbers_names_codec, numbers_table_cell_dependency_codec as dependency_codec,
+    package_metadata_codec::{
+        ComponentDescriptor, ComponentSelector, PackageMetadataVisitor, RewriteOptions,
+        SaveTokenBatch, inspect_package_metadata_with_visitor,
+        rewrite_package_metadata_save_tokens,
+    },
+    table_info_codec,
 };
 use thiserror::Error as ThisError;
 
@@ -44,6 +50,8 @@ const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const LEGACY_TABLE_MODEL_MESSAGE_TYPE: u32 = 6_000;
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 const FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE: u32 = 4_008;
+const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
+const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 const SHEET_NAME_FIELD: u32 = 1;
 const FORM_SHEET_SUPER_FIELD: u32 = 1;
 const TABLE_MODEL_NAME_FIELD: u32 = 8;
@@ -443,8 +451,9 @@ impl<'a> Edit<'a> {
     ///
     /// A semantic no-op shares the original snapshot and bypasses changed-only
     /// framing, cache, lock, and dependency guards. A changed batch rewrites
-    /// every touched component once, removes existing root previews, and fully
-    /// reopens the candidate under the retained package limits.
+    /// every touched native component once, advances the exact PackageMetadata
+    /// save-token sidecar, removes existing root previews, and fully reopens
+    /// the candidate under the retained package limits.
     ///
     /// # Costs
     ///
@@ -580,7 +589,10 @@ impl Diagnostics {
         self.operations != 0
     }
 
-    /// Return the number of rewritten IWA components.
+    /// Return the number of rewritten native semantic IWA components.
+    ///
+    /// The PackageMetadata save-token sidecar is intentionally not counted;
+    /// it is a publication dependency of these native component changes.
     #[must_use]
     pub const fn touched_components(self) -> usize {
         self.touched_components
@@ -653,9 +665,9 @@ impl Package {
     /// # Costs
     ///
     /// A changed patch reopens its retained target artifact once, verifies
-    /// semantic state, and scans package members plus touched native components
-    /// for exact locality. A no-op shares this package snapshot without
-    /// reassembly or reparsing.
+    /// semantic state, and scans package members plus touched native
+    /// components and the PackageMetadata sidecar for exact locality. A no-op
+    /// shares this package snapshot without reassembly or reparsing.
     ///
     /// # Errors
     ///
@@ -697,6 +709,7 @@ impl Package {
             &patch.native,
             patch.direction,
             patch.previews,
+            true,
         )?;
         Ok(Commit {
             package: candidate,
@@ -784,6 +797,7 @@ fn commit_edit(source: &Package, mut operations: Vec<Operation>) -> Result<Commi
         &native,
         Direction::Forward,
         preview_names.len(),
+        true,
     )?;
     let target = physical_source(&package)?.__source_owner();
     let target_fingerprint = fingerprint(&target);
@@ -905,6 +919,32 @@ fn validate_changed_work_budget(source: &Package, operations: &[Operation]) -> R
         .saturating_mul(topology)
         .saturating_add(tables.saturating_mul(tables))
         .saturating_add(objects);
+    let source_catalog = physical_source(source)?;
+    let source_bytes = source.source_bytes().len();
+    let entry_count = source_catalog.package().len();
+    let locator_bytes = source
+        .state
+        .components
+        .catalog()
+        .iter()
+        .fold(0usize, |total, component| {
+            total.saturating_add(component.name().len())
+        });
+    let metadata_bytes = source_catalog
+        .package()
+        .iter()
+        .find(|entry| entry.name() == PACKAGE_METADATA_ENTRY)
+        .map_or(0, |entry| entry.data().len());
+    // Name publication also scans/compresses the metadata sidecar, compares
+    // selected locators against current metadata components, reassembles the
+    // physical ZIP, reopens the complete candidate, and performs locality.
+    // Charge those caller-owned costs before native payload allocation.
+    let publication_work = source_bytes
+        .saturating_mul(2)
+        .saturating_add(entry_count.saturating_mul(2))
+        .saturating_add(metadata_bytes.saturating_mul(2))
+        .saturating_add(locator_bytes.saturating_mul(changed));
+    let observed = observed.saturating_add(publication_work);
     let maximum = source.state.options.semantic().max_formula_render_work();
     if observed > maximum {
         return Err(Error::LimitExceeded {
@@ -1906,9 +1946,307 @@ fn canonical_varint(source: &[u8]) -> Result<u64, Error> {
     Ok(value)
 }
 
+fn normalized_locator(name: &str) -> &str {
+    name.strip_prefix("Index/")
+        .and_then(|name| name.strip_suffix(".iwa"))
+        .unwrap_or(name)
+}
+
 struct OwnedEntryEdit<'a> {
     name: &'a str,
     data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MetadataRoute {
+    component_index: usize,
+    object_index: usize,
+    message_index: usize,
+}
+
+struct MetadataSelectorVisitor<'source> {
+    target_locators: &'source [&'source str],
+    identifiers: Vec<Option<u64>>,
+    duplicate: bool,
+}
+
+impl<'source> MetadataSelectorVisitor<'source> {
+    fn new(target_locators: &'source [&'source str]) -> Result<Self, Error> {
+        let mut identifiers = Vec::new();
+        identifiers
+            .try_reserve_exact(target_locators.len())
+            .map_err(|_allocation| Error::Allocation {
+                amount: target_locators.len(),
+            })?;
+        identifiers.resize(target_locators.len(), None);
+        Ok(Self {
+            target_locators,
+            identifiers,
+            duplicate: false,
+        })
+    }
+}
+
+impl PackageMetadataVisitor for MetadataSelectorVisitor<'_> {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> Result<(), litchi_iwa_protos::package_metadata_codec::RewriteError> {
+        if !component.is_current() {
+            return Ok(());
+        }
+        // The visitor is initialized with one slot per selected native
+        // component. Matching by effective locator makes the metadata route
+        // independent of whether ComponentInfo stores locator or preferred
+        // locator, while retaining the codec's exact identifier check.
+        for (index, locator) in self.target_locators.iter().enumerate() {
+            if component.effective_locator() == *locator {
+                if self.identifiers[index].is_some() {
+                    self.duplicate = true;
+                } else {
+                    self.identifiers[index] = Some(component.identifier());
+                }
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn metadata_route(source: &Package) -> Result<MetadataRoute, Error> {
+    let mut route = None;
+    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+        for (object_index, object) in component.archive().objects.iter().enumerate() {
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
+                    continue;
+                }
+                if route.is_some() || component.name() != PACKAGE_METADATA_ENTRY {
+                    return Err(Error::InvalidSource);
+                }
+                validate_message_metadata(object, message_index)?;
+                route = Some(MetadataRoute {
+                    component_index,
+                    object_index,
+                    message_index,
+                });
+            }
+        }
+    }
+    let route = route.ok_or(Error::InvalidSource)?;
+    let source_catalog = physical_source(source)?;
+    if source_catalog
+        .package()
+        .iter()
+        .filter(|entry| entry.name() == PACKAGE_METADATA_ENTRY)
+        .count()
+        != 1
+    {
+        return Err(Error::InvalidSource);
+    }
+    Ok(route)
+}
+
+fn metadata_rewrite_options(
+    source: &Package,
+    payload_length: usize,
+    selected_components: usize,
+) -> Result<RewriteOptions, Error> {
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
+        source
+            .state
+            .options
+            .archive()
+            .archive_limits()
+            .max_archive_bytes(),
+    );
+    if payload_length == 0 || payload_length > maximum_wire {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: usize_as_u64(payload_length),
+            maximum: usize_as_u64(maximum_wire),
+        });
+    }
+    let token_fields = selected_components
+        .checked_add(1)
+        .and_then(|count| count.checked_mul(16))
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: u64::MAX,
+            maximum: usize_as_u64(maximum_wire),
+        })?;
+    let output_bytes = payload_length
+        .checked_add(token_fields)
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: u64::MAX,
+            maximum: usize_as_u64(maximum_wire),
+        })?;
+    if output_bytes > maximum_wire {
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: usize_as_u64(output_bytes),
+            maximum: usize_as_u64(maximum_wire),
+        });
+    }
+    let fields = payload_length
+        .saturating_mul(8)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let components = source
+        .state
+        .components
+        .catalog()
+        .len()
+        .max(payload_length)
+        .max(selected_components)
+        .max(1);
+    // The handwritten visitor compares every current metadata locator against
+    // each selected native component. Include that caller-owned matching work
+    // in the same finite codec work ceiling.
+    let selector_work = components.saturating_mul(selected_components);
+    let work = payload_length
+        .saturating_mul(128)
+        .saturating_add(selector_work)
+        .saturating_add(token_fields)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    let references = source.state.options.semantic().max_references().max(1);
+    Ok(RewriteOptions::new(
+        payload_length,
+        output_bytes,
+        fields,
+        work,
+        64,
+        components,
+        references,
+        0,
+    ))
+}
+
+fn rewrite_metadata_entry(
+    source: &Package,
+    operations: &[NativeOperation],
+) -> Result<OwnedEntryEdit<'static>, Error> {
+    let route = metadata_route(source)?;
+    let metadata_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .ok_or(Error::InvalidSource)?;
+    let metadata_object = metadata_component
+        .archive()
+        .objects
+        .get(route.object_index)
+        .ok_or(Error::InvalidSource)?;
+    let metadata_message = metadata_object
+        .messages
+        .get(route.message_index)
+        .ok_or(Error::InvalidSource)?;
+
+    let mut component_indices = Vec::new();
+    component_indices
+        .try_reserve_exact(component_group_count(operations))
+        .map_err(|_allocation| Error::Allocation {
+            amount: component_group_count(operations),
+        })?;
+    for operation in operations {
+        if component_indices.last().copied() != Some(operation.component_index) {
+            component_indices.push(operation.component_index);
+        }
+    }
+    let mut target_locators = Vec::new();
+    target_locators
+        .try_reserve_exact(component_indices.len())
+        .map_err(|_allocation| Error::Allocation {
+            amount: component_indices.len(),
+        })?;
+    for component_index in &component_indices {
+        let component = source
+            .state
+            .components
+            .catalog()
+            .get_index(*component_index)
+            .ok_or(Error::InvalidSource)?;
+        target_locators.push(normalized_locator(component.name()));
+    }
+    let mut visitor = MetadataSelectorVisitor::new(&target_locators)?;
+    let options =
+        metadata_rewrite_options(source, metadata_message.data.len(), target_locators.len())?;
+    inspect_package_metadata_with_visitor(metadata_message.data.as_slice(), options, &mut visitor)
+        .map_err(map_metadata_codec_error)?;
+    if visitor.duplicate || visitor.identifiers.iter().any(Option::is_none) {
+        return Err(Error::InvalidSource);
+    }
+    let mut selectors = Vec::new();
+    selectors
+        .try_reserve_exact(visitor.identifiers.len())
+        .map_err(|_allocation| Error::Allocation {
+            amount: visitor.identifiers.len(),
+        })?;
+    for (index, identifier) in visitor.identifiers.into_iter().enumerate() {
+        selectors.push(ComponentSelector::new(
+            identifier.ok_or(Error::InvalidSource)?,
+            target_locators[index],
+        ));
+    }
+    let batch = SaveTokenBatch::new(&selectors);
+    let rewritten_payload =
+        rewrite_package_metadata_save_tokens(metadata_message.data.as_slice(), batch, options)
+            .map_err(map_metadata_codec_error)?
+            .into_bytes();
+
+    let source_catalog = physical_source(source)?;
+    let entry = source_catalog
+        .package()
+        .iter()
+        .find(|entry| entry.name() == PACKAGE_METADATA_ENTRY)
+        .ok_or(Error::InvalidSource)?;
+    if entry.is_opaque() {
+        return Err(Error::UnsupportedSource);
+    }
+    let stream = SnappyStream::decompress_with_limits(
+        entry.data(),
+        source_catalog
+            .limits()
+            .snappy_limits()
+            .map_err(map_archive_error)?,
+    )
+    .map_err(map_core_error)?;
+    let archive_limits = source_catalog
+        .limits()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let mut archive =
+        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let object = archive
+        .objects
+        .get_mut(route.object_index)
+        .ok_or(Error::InvalidSource)?;
+    if object
+        .messages
+        .get(route.message_index)
+        .is_none_or(|message| message.type_ != PACKAGE_METADATA_MESSAGE_TYPE)
+    {
+        return Err(Error::InvalidSource);
+    }
+    object
+        .replace_message_preserving_header_with_limits(
+            route.message_index,
+            RawMessage {
+                type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                data: rewritten_payload,
+            },
+            archive_limits,
+        )
+        .map_err(map_core_error)?;
+    let rewritten = archive
+        .to_bytes_with_limits(archive_limits)
+        .map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    Ok(OwnedEntryEdit {
+        name: PACKAGE_METADATA_ENTRY,
+        data: compressed,
+    })
 }
 
 fn rewrite_names(
@@ -1917,15 +2255,18 @@ fn rewrite_names(
     deleted_previews: &[&str],
 ) -> Result<(Package, usize), Error> {
     let source_catalog = physical_source(source)?;
+    // Fail closed on a missing or ambiguous PackageMetadata sidecar before
+    // allocating any rewritten native component payload.
+    metadata_route(source)?;
     let physical_limits = source_catalog.limits();
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let mut rewritten_entries = Vec::new();
     rewritten_entries
-        .try_reserve_exact(component_group_count(operations))
+        .try_reserve_exact(component_group_count(operations).saturating_add(1))
         .map_err(|_allocation| Error::Allocation {
-            amount: component_group_count(operations),
+            amount: component_group_count(operations).saturating_add(1),
         })?;
     let mut begin = 0usize;
     while begin < operations.len() {
@@ -1973,6 +2314,10 @@ fn rewrite_names(
         });
         begin = end;
     }
+    // A changed names transaction has one additional, exact sidecar write.
+    // The metadata codec validates the complete source payload before this
+    // entry is added, so failures leave the source catalog untouched.
+    rewritten_entries.push(rewrite_metadata_entry(source, operations)?);
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(rewritten_entries.len())
@@ -2001,6 +2346,7 @@ fn verify_exact_locality(
     operations: &[NativeOperation],
     direction: Direction,
     preview_count: usize,
+    metadata_changed: bool,
 ) -> Result<(), Error> {
     let source_catalog = physical_source(source)?;
     let candidate_catalog = physical_source(candidate)?;
@@ -2019,8 +2365,81 @@ fn verify_exact_locality(
         operations,
         &source_previews,
         &candidate_previews,
+        metadata_changed,
     )?;
+    if metadata_changed {
+        verify_metadata_locality(source, candidate)?;
+    }
     verify_component_locality(source, candidate, operations, direction)
+}
+
+fn verify_metadata_locality(source: &Package, candidate: &Package) -> Result<(), Error> {
+    let source_route = metadata_route(source)?;
+    let candidate_route = metadata_route(candidate)?;
+    if source_route.component_index != candidate_route.component_index
+        || source_route.object_index != candidate_route.object_index
+        || source_route.message_index != candidate_route.message_index
+    {
+        return Err(Error::Verification);
+    }
+    let source_component = source
+        .state
+        .components
+        .catalog()
+        .get(PACKAGE_METADATA_ENTRY)
+        .ok_or(Error::Verification)?;
+    let candidate_component = candidate
+        .state
+        .components
+        .catalog()
+        .get(PACKAGE_METADATA_ENTRY)
+        .ok_or(Error::Verification)?;
+    if source_component.archive().objects.len() != candidate_component.archive().objects.len() {
+        return Err(Error::Verification);
+    }
+    for (object_index, (before, after)) in source_component
+        .archive()
+        .objects
+        .iter()
+        .zip(&candidate_component.archive().objects)
+        .enumerate()
+    {
+        if before.archive_info.identifier != after.archive_info.identifier
+            || before.archive_info.should_merge != after.archive_info.should_merge
+            || before.messages.len() != after.messages.len()
+            || before.archive_info.message_infos.len() != after.archive_info.message_infos.len()
+        {
+            return Err(Error::Verification);
+        }
+        for (message_index, (before_message, after_message)) in
+            before.messages.iter().zip(&after.messages).enumerate()
+        {
+            let before_info = before
+                .archive_info
+                .message_infos
+                .get(message_index)
+                .ok_or(Error::Verification)?;
+            let after_info = after
+                .archive_info
+                .message_infos
+                .get(message_index)
+                .ok_or(Error::Verification)?;
+            if object_index == source_route.object_index
+                && message_index == source_route.message_index
+            {
+                if before_message.type_ != PACKAGE_METADATA_MESSAGE_TYPE
+                    || after_message.type_ != PACKAGE_METADATA_MESSAGE_TYPE
+                    || before_message.data == after_message.data
+                    || !message_info_preserved_except_length(before_info, after_info)
+                {
+                    return Err(Error::Verification);
+                }
+            } else if before_message != after_message || before_info != after_info {
+                return Err(Error::Verification);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn verify_package_members(
@@ -2029,6 +2448,7 @@ fn verify_package_members(
     operations: &[NativeOperation],
     source_previews: &[&str],
     candidate_previews: &[&str],
+    metadata_changed: bool,
 ) -> Result<(), Error> {
     let mut before = source
         .package()
@@ -2046,13 +2466,17 @@ fn verify_package_members(
                         .components()
                         .get_index(operation.component_index)
                         .is_some_and(|component| component.name() == before.name())
-                });
+                }) || (metadata_changed && before.name() == PACKAGE_METADATA_ENTRY);
                 let preserved = if selected {
                     selected_package_member_preserved(before, after)
                 } else {
                     package_member_preserved(before, after)
                 };
-                if !preserved {
+                if !preserved
+                    || (metadata_changed
+                        && before.name() == PACKAGE_METADATA_ENTRY
+                        && before.data() == after.data())
+                {
                     return Err(Error::Verification);
                 }
             },
@@ -2585,6 +3009,81 @@ fn map_dependency_codec_error(error: dependency_codec::DecodeError) -> Error {
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             }
+        },
+        Some(_) | None => Error::InvalidSource,
+    }
+}
+
+fn map_metadata_codec_error(
+    error: litchi_iwa_protos::package_metadata_codec::RewriteError,
+) -> Error {
+    if let Some(amount) = error.allocation_request() {
+        return Error::Allocation { amount };
+    }
+    match error.resource_limit() {
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::InputBytes {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::OutputBytes {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Fields {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::WireFields,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Work {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Nesting {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
+        },
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Components {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::PayloadItems,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::References {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::PayloadReferences,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(litchi_iwa_protos::package_metadata_codec::RewriteLimit::Additions {
+            observed,
+            maximum,
+        }) => Error::LimitExceeded {
+            kind: LimitKind::PayloadItems,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
         },
         Some(_) | None => Error::InvalidSource,
     }

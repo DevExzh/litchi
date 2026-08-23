@@ -1312,6 +1312,47 @@ NUMBERS_NAMES_IMPLEMENTATION_SOURCES = (
     Path("crates/litchi-numbers/src/names.rs"),
     Path("crates/litchi-numbers/src/package/names.rs"),
 )
+# Keep the publication-route audit narrow to the names owner and any helper
+# files split out beneath it.  In particular, do not walk all of
+# ``package/**/*.rs``: unrelated package editors may legitimately have their
+# own private helpers and should not become part of the names call graph.
+NUMBERS_NAMES_PUBLICATION_HELPER_ROOT = (
+    Path("crates/litchi-numbers/src/package/names")
+)
+NUMBERS_NAMES_PUBLICATION_FUNCTION = "rewrite_names"
+NUMBERS_NAMES_SAVE_TOKEN_REWRITE = "rewrite_package_metadata_save_tokens"
+NUMBERS_NAMES_SAVE_TOKEN_FORBIDDEN_PUBLIC_TYPES = frozenset(
+    {
+        "Batch",
+        "ComponentInfo",
+        "ComponentSelector",
+        "ComponentDescriptor",
+        "DataReferenceOwnerRemoval",
+        "DecodeError",
+        "DecodeOptions",
+        "ExternalReferenceAddition",
+        "ExternalReferenceDescriptor",
+        "ExternalReferenceRemoval",
+        "ObjectUuidAddition",
+        "ObjectUuidDescriptor",
+        "ObjectUuidRemoval",
+        "PackageMetadata",
+        "PackageMetadataInspection",
+        "PackageMetadataVisitor",
+        "PreparedPackageMetadataRewrite",
+        "RemovalBatch",
+        "RewriteError",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "RewriteLimit",
+        "RewriteOptions",
+        "RewriteOutput",
+        "RewriteReport",
+        "SaveTokenBatch",
+        "SaveTokenSelector",
+        "UuidBits",
+    }
+)
 NUMBERS_NAMES_EXPORT_SOURCES = (
     Path("crates/litchi-numbers/src/lib.rs"),
     Path("crates/litchi-numbers/src/package.rs"),
@@ -2429,6 +2470,72 @@ NUMBERS_NAMES_NO_EAGER_PROST_SOURCE_PATTERNS = (
         ),
     ),
 )
+NUMBERS_NAMES_SAVE_TOKEN_ROUTE_FORBIDDEN_PATTERNS = (
+    (
+        "legacy crate::package_metadata route",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:crate|self|super)[ \t\r\n]*::"
+            r"[ \t\r\n]*package_metadata\b"
+        ),
+    ),
+    (
+        "legacy advance_package_save_token_for_components route",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])advance_package_save_token_for_components\b"
+        ),
+    ),
+    (
+        "legacy set_package_last_object_identifier route",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])set_package_last_object_identifier\b"
+        ),
+    ),
+    (
+        "generated PackageMetadata::decode route",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:"
+            r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*"
+            r")*(?:r#)?PackageMetadata[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated ComponentInfo::decode route",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:"
+            r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*"
+            r")*(?:r#)?ComponentInfo[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated Prost Message::decode route",
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])(?:r#)?(?:Message|M)"
+            r"[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "prost route",
+        re.compile(r"(?<![A-Za-z0-9_#])(?:prost|prost_types)\b"),
+    ),
+)
+NUMBERS_NAMES_SAVE_TOKEN_MODULE_IMPORT = re.compile(
+    r"^[ \t]*(?:pub[ \t\r\n]+)?use[ \t\r\n]+"
+    r"litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*"
+    r"package_metadata_codec\b(?P<tail>[^;]*);",
+    re.MULTILINE,
+)
+NUMBERS_NAMES_SAVE_TOKEN_IWA_USE = re.compile(
+    r"^[ \t]*(?:pub[ \t\r\n]+)?use[ \t\r\n]+"
+    r"litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*(?P<path>[^;]+);",
+    re.MULTILINE,
+)
+NUMBERS_NAMES_SAVE_TOKEN_MODULE_ALIAS = re.compile(
+    r"\bas[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+NUMBERS_NAMES_SAVE_TOKEN_FORBIDDEN_NORMAL_DEPENDENCIES = frozenset(
+    {"litchi-iwa", "prost", "prost-types"}
+)
+NUMBERS_NAMES_SAVE_TOKEN_REQUIRED_NORMAL_DEPENDENCY = "litchi-iwa-protos"
 RETIRED_IWA_NUMBERS_SHEET_ORDER_METHODS = ("move_sheet",)
 RETIRED_IWA_NUMBERS_SHEET_ORDER_METHOD_SET = frozenset(
     RETIRED_IWA_NUMBERS_SHEET_ORDER_METHODS
@@ -5058,6 +5165,11 @@ def _iwork_public_leak(identifier: str) -> str | None:
 def _numbers_names_public_leak(identifier: str) -> str | None:
     """Classify implementation vocabulary forbidden in the Numbers names API."""
 
+    if identifier in NUMBERS_NAMES_SAVE_TOKEN_FORBIDDEN_PUBLIC_TYPES:
+        return "package-metadata codec type"
+    normalized = identifier.lower().replace("-", "_")
+    if "save_token" in normalized or "savetoken" in normalized:
+        return "save-token state"
     if identifier in NUMBERS_NAMES_PHYSICAL_TYPES:
         return "archive/IWA type"
     if identifier == "wire" or identifier in NUMBERS_NAMES_WIRE_TYPES:
@@ -5075,6 +5187,28 @@ def _numbers_names_public_leak(identifier: str) -> str | None:
     ):
         return "physical package name"
     return None
+
+
+def _numbers_names_codec_aliases(source: str) -> frozenset[str]:
+    """Return local aliases that import the hidden metadata codec module."""
+
+    aliases: set[str] = set()
+    masked_source = _mask_rust_non_code(source)
+    for import_match in NUMBERS_NAMES_SAVE_TOKEN_IWA_USE.finditer(masked_source):
+        imported_path = import_match.group("path")
+        if "package_metadata_codec" not in imported_path:
+            continue
+        alias_match = re.search(
+            r"\bpackage_metadata_codec[ \t\r\n]+as[ \t\r\n]+"
+            r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+            imported_path,
+        )
+        aliases.add(
+            alias_match.group("alias")
+            if alias_match is not None
+            else "package_metadata_codec"
+        )
+    return frozenset(aliases)
 
 
 def _numbers_names_owner_declaration(declaration: str) -> bool:
@@ -7850,6 +7984,20 @@ def audit_numbers_names_facade_source_topology(root: Path = ROOT) -> list[str]:
     for path in sorted(dedicated_sources | export_sources):
         dedicated_source = path in dedicated_sources
         source = path.read_text(encoding="utf-8")
+        codec_aliases = _numbers_names_codec_aliases(source)
+        masked_source = _mask_rust_non_code(source)
+        public_codec_module = re.compile(
+            r"^[ \t]*pub(?:[ \t\r\n]*\([^()]*\))?[ \t\r\n]+"
+            r"mod[ \t\r\n]+(?:r#)?package_metadata_codec\b",
+            re.MULTILINE,
+        )
+        for module_match in public_codec_module.finditer(masked_source):
+            module_line = masked_source.count("\n", 0, module_match.start()) + 1
+            violations.append(
+                "focused litchi-numbers names public API exposes "
+                "package-metadata codec reexport/module alias: "
+                f"{path.relative_to(root)}:{module_line}"
+            )
         declarations = [
             (declaration, line_number, True, dedicated_source)
             for declaration, line_number in _rust_public_declarations(source)
@@ -7865,9 +8013,34 @@ def audit_numbers_names_facade_source_topology(root: Path = ROOT) -> list[str]:
             public_declaration,
             complete_source_scope,
         ) in declarations:
+            codec_reexport = False
+            if public_declaration:
+                codec_reexport = bool(
+                    re.search(
+                        r"(?<![A-Za-z0-9_:#.])litchi_iwa_protos"
+                        r"[ \t\r\n]*::[ \t\r\n]*package_metadata_codec\b",
+                        declaration,
+                    )
+                )
+                if not codec_reexport:
+                    for alias in codec_aliases:
+                        if re.search(
+                            rf"(?<![A-Za-z0-9_:#.])(?:r#)?"
+                            rf"{re.escape(alias)}"
+                            r"(?:[ \t\r\n]*::|[ \t\r\n]*[,;])",
+                            declaration,
+                        ):
+                            codec_reexport = True
+                            break
+            if codec_reexport:
+                violations.append(
+                    "focused litchi-numbers names public API exposes "
+                    "package-metadata codec reexport/module alias: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
             if not _is_numbers_names_public_declaration(
                 declaration, dedicated_source=complete_source_scope
-            ):
+            ) and not codec_reexport:
                 continue
             owner_declaration = _numbers_names_owner_declaration(declaration)
             declaration_identifiers = [
@@ -10735,15 +10908,309 @@ def audit_numbers_identity_boundary_source_topology(
     return sorted(set(violations))
 
 
+def _numbers_names_publication_source_paths(root: Path) -> tuple[Path, ...]:
+    """Return the names owner files participating in publication routing."""
+
+    paths = {
+        root / relative
+        for relative in NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+        if (root / relative).is_file()
+    }
+    helper_root = root / NUMBERS_NAMES_PUBLICATION_HELPER_ROOT
+    if helper_root.is_dir():
+        paths.update(helper_root.rglob("*.rs"))
+    return tuple(sorted(paths))
+
+
+def _numbers_names_save_token_call_patterns(
+    production_sources: Iterable[tuple[Path, str]],
+) -> tuple[re.Pattern[str], ...]:
+    """Build canonical save-token call patterns from production imports.
+
+    A publication route may import the hidden codec module or the one function
+    directly.  The import must originate in ``litchi_iwa_protos``; accepting an
+    arbitrary local module called ``package_metadata_codec`` would let a legacy
+    host adapter satisfy the ratchet by name alone.
+    """
+
+    patterns: list[re.Pattern[str]] = [
+        re.compile(
+            r"(?<![A-Za-z0-9_:#.])litchi_iwa_protos"
+            r"[ \t\r\n]*::[ \t\r\n]*package_metadata_codec"
+            r"[ \t\r\n]*::[ \t\r\n]*"
+            + re.escape(NUMBERS_NAMES_SAVE_TOKEN_REWRITE)
+            + r"[ \t\r\n]*\("
+        )
+    ]
+    module_aliases: set[str] = set()
+    bare_function_aliases: set[str] = set()
+    bare_function_imported = False
+    for _path, source in production_sources:
+        masked_source = _mask_rust_non_code(source)
+        # Also accept grouped imports such as
+        # ``use litchi_iwa_protos::{package_metadata_codec, ...};``.  The
+        # direct-module regex below intentionally stays narrow for the common
+        # path form, while this pass handles Rust's brace import grammar.
+        for use_match in NUMBERS_NAMES_SAVE_TOKEN_IWA_USE.finditer(masked_source):
+            imported_path = use_match.group("path")
+            module_match = re.search(
+                r"(?<![A-Za-z0-9_])package_metadata_codec\b"
+                r"(?P<suffix>[ \t\r\n]*(?:::|as)[^,}]*)?",
+                imported_path,
+            )
+            if module_match is None:
+                continue
+            suffix = module_match.group("suffix") or ""
+            alias_match = re.search(
+                r"\bas[ \t\r\n]+(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+                suffix,
+            )
+            if alias_match is not None and "{" not in suffix:
+                module_aliases.add(alias_match.group("alias"))
+            if "::" not in suffix:
+                module_aliases.add("package_metadata_codec")
+            if NUMBERS_NAMES_SAVE_TOKEN_REWRITE in imported_path:
+                bare_function_imported = True
+        for import_match in NUMBERS_NAMES_SAVE_TOKEN_MODULE_IMPORT.finditer(
+            masked_source
+        ):
+            tail = import_match.group("tail")
+            alias_match = NUMBERS_NAMES_SAVE_TOKEN_MODULE_ALIAS.search(tail)
+            if alias_match is not None and "{" not in tail:
+                module_aliases.add(alias_match.group("alias"))
+            if re.search(
+                rf"(?:^|[{{, \t\r\n:])(?:r#)?"
+                rf"{re.escape(NUMBERS_NAMES_SAVE_TOKEN_REWRITE)}"
+                rf"(?:[ \t\r\n]+as[ \t\r\n]+(?P<alias>[A-Za-z_][A-Za-z0-9_]*))?"
+                rf"(?=[}},; \t\r\n]|$)",
+                tail,
+            ) is not None:
+                function_match = re.search(
+                    rf"(?:r#)?{re.escape(NUMBERS_NAMES_SAVE_TOKEN_REWRITE)}"
+                    rf"(?:[ \t\r\n]+as[ \t\r\n]+"
+                    rf"(?P<alias>[A-Za-z_][A-Za-z0-9_]*))?",
+                    tail,
+                )
+                if function_match is not None:
+                    bare_function_imported = True
+                    if function_match.group("alias"):
+                        bare_function_aliases.add(function_match.group("alias"))
+            if "*" in tail:
+                bare_function_imported = True
+        # ``use ...::package_metadata_codec;`` has no ``as`` clause and is
+        # consequently handled explicitly above rather than by the alias regex.
+        for import_match in NUMBERS_NAMES_SAVE_TOKEN_MODULE_IMPORT.finditer(
+            masked_source
+        ):
+            tail = import_match.group("tail").strip()
+            if tail in {"", "as package_metadata_codec"}:
+                module_aliases.add("package_metadata_codec")
+
+    for alias in sorted(module_aliases):
+        patterns.append(
+            re.compile(
+                rf"(?<![A-Za-z0-9_:#.]){re.escape(alias)}"
+                rf"[ \t\r\n]*::[ \t\r\n]*"
+                + re.escape(NUMBERS_NAMES_SAVE_TOKEN_REWRITE)
+                + r"[ \t\r\n]*\("
+            )
+        )
+    if bare_function_imported:
+        patterns.append(
+            re.compile(
+                r"(?<![A-Za-z0-9_:#.])(?:r#)?"
+                + re.escape(NUMBERS_NAMES_SAVE_TOKEN_REWRITE)
+                + r"[ \t\r\n]*\("
+            )
+        )
+    for alias in sorted(bare_function_aliases):
+        patterns.append(
+            re.compile(
+                rf"(?<![A-Za-z0-9_:#.]){re.escape(alias)}"
+                r"[ \t\r\n]*\("
+            )
+        )
+    return tuple(patterns)
+
+
+def _numbers_names_normal_manifest_dependency_lines(
+    manifest_path: Path,
+) -> tuple[dict[str, int], bool]:
+    """Return normal dependency names/lines and whether the canonical owner exists."""
+
+    dependencies: dict[str, int] = {}
+    if not manifest_path.is_file():
+        return dependencies, False
+    section: str | None = None
+    for line_number, line in enumerate(
+        manifest_path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        header = CARGO_SECTION_HEADER.match(line)
+        if header is not None:
+            section = header.group(1).strip()
+            continue
+        normal_dependencies = section == "dependencies" or (
+            section is not None
+            and section.endswith(".dependencies")
+            and not section.endswith(".dev-dependencies")
+        )
+        if not normal_dependencies:
+            continue
+        dependency_match = re.match(
+            r"^[ \t]*(?:\"(?P<quoted>[A-Za-z0-9_-]+)\"|"
+            r"(?P<plain>[A-Za-z0-9_-]+))"
+            r"[ \t]*(?:\.[ \t]*workspace)?[ \t]*=",
+            line,
+        )
+        if dependency_match is None:
+            continue
+        dependency = dependency_match.group("quoted") or dependency_match.group("plain")
+        dependencies.setdefault(dependency, line_number)
+        package_match = re.search(
+            r"\bpackage[ \t]*=[ \t]*\"(?P<package>[A-Za-z0-9_-]+)\"",
+            line,
+        )
+        if package_match is not None:
+            dependencies.setdefault(package_match.group("package"), line_number)
+    return dependencies, NUMBERS_NAMES_SAVE_TOKEN_REQUIRED_NORMAL_DEPENDENCY in dependencies
+
+
+def audit_numbers_names_save_token_manifest_topology(root: Path = ROOT) -> list[str]:
+    """Keep the names publication owner on the focused codec dependency edge."""
+
+    manifest_path = root / NUMBERS_PACKAGE_MANIFEST
+    if not manifest_path.is_file():
+        return []
+    dependencies, has_codec = _numbers_names_normal_manifest_dependency_lines(
+        manifest_path
+    )
+    violations: list[str] = []
+    for dependency in sorted(NUMBERS_NAMES_SAVE_TOKEN_FORBIDDEN_NORMAL_DEPENDENCIES):
+        line_number = dependencies.get(dependency)
+        if line_number is None:
+            continue
+        violations.append(
+            "focused litchi-numbers names publication manifest retains normal "
+            f"{dependency} dependency: {NUMBERS_PACKAGE_MANIFEST}:{line_number}"
+        )
+    if not has_codec:
+        violations.append(
+            "focused litchi-numbers names publication manifest is missing normal "
+            f"{NUMBERS_NAMES_SAVE_TOKEN_REQUIRED_NORMAL_DEPENDENCY} dependency: "
+            f"{NUMBERS_PACKAGE_MANIFEST}"
+        )
+    return sorted(set(violations))
+
+
+def audit_numbers_names_save_token_publication_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require name publication to use the bounded metadata save-token seam.
+
+    This is a production call-graph check, not a textual module check.  The
+    route starts at ``rewrite_names`` and follows local helper calls across the
+    names owner files.  Test-gated builders/oracles are masked item-by-item so
+    a cfg(test) decode or legacy helper cannot hide production code that comes
+    later in the file, and unreachable helpers remain harmless.
+    """
+
+    violations: list[str] = audit_numbers_names_save_token_manifest_topology(root)
+    source_paths = _numbers_names_publication_source_paths(root)
+    if not source_paths:
+        return violations
+
+    production_sources: list[tuple[Path, str]] = []
+    production_source_by_path: dict[Path, str] = {}
+    functions: dict[str, list[tuple[Path, str, int]]] = {}
+    for path in source_paths:
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        production_sources.append((path, production_source))
+        production_source_by_path[path] = production_source
+        for name, (body, body_offset) in _rust_top_level_function_bodies(
+            production_source
+        ).items():
+            functions.setdefault(name, []).append((path, body, body_offset))
+
+    rewrite_records = functions.get(NUMBERS_NAMES_PUBLICATION_FUNCTION, [])
+    if not rewrite_records:
+        violations.append(
+            "focused litchi-numbers names publication route is missing production "
+            f"{NUMBERS_NAMES_PUBLICATION_FUNCTION}: "
+            f"{NUMBERS_NAMES_PACKAGE_SOURCE}"
+        )
+        return sorted(set(violations))
+
+    route_patterns = _numbers_names_save_token_call_patterns(production_sources)
+    reachable: list[tuple[str, Path, str, int]] = []
+    pending = [(NUMBERS_NAMES_PUBLICATION_FUNCTION, *record) for record in rewrite_records]
+    visited: set[tuple[str, Path]] = set()
+    while pending:
+        current_name, path, body, body_offset = pending.pop()
+        visit_key = (current_name, path)
+        if visit_key in visited:
+            continue
+        visited.add(visit_key)
+        reachable.append((current_name, path, body, body_offset))
+        for helper_name, records in functions.items():
+            if helper_name == current_name:
+                continue
+            call = re.compile(
+                rf"(?<![A-Za-z0-9_:#.])(?:"
+                rf"(?:crate|self|super|names|package)[ \t\r\n]*::[ \t\r\n]*"
+                rf")*(?:r#)?{re.escape(helper_name)}"
+                r"[ \t\r\n]*\("
+            )
+            if call.search(body) is None:
+                continue
+            pending.extend((helper_name, *record) for record in records)
+
+    route_found = False
+    for current_name, path, body, body_offset in reachable:
+        for pattern in route_patterns:
+            if pattern.search(body) is not None:
+                route_found = True
+                break
+        for label, pattern in NUMBERS_NAMES_SAVE_TOKEN_ROUTE_FORBIDDEN_PATTERNS:
+            for match in pattern.finditer(body):
+                source = production_source_by_path[path]
+                line_number = (
+                    source.count("\n", 0, body_offset + match.start()) + 1
+                )
+                helper_suffix = (
+                    ""
+                    if current_name == NUMBERS_NAMES_PUBLICATION_FUNCTION
+                    else f" via helper {current_name}"
+                )
+                violations.append(
+                    "focused litchi-numbers names publication route "
+                    f"{label}{helper_suffix}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    if not route_found:
+        path, _body, body_offset = rewrite_records[0]
+        production_source = production_source_by_path[path]
+        line_number = production_source.count("\n", 0, body_offset) + 1
+        violations.append(
+            "focused litchi-numbers names publication route does not call "
+            f"{NUMBERS_NAMES_SAVE_TOKEN_REWRITE}: "
+            f"{path.relative_to(root)}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep the Numbers package ingress and manifest free of normal Prost.
+    """Keep the Numbers package ingress on the focused normal dependency edge.
 
     This is intentionally scoped to ``package.rs`` and the focused
     ``litchi-numbers`` manifest.  Generated Prost fixtures remain available in
-    test-only modules, but a normal dependency would make it possible to
-    reintroduce generated reads into production without a boundary review.
+    test-only modules, while production metadata/native readers use the normal
+    ``litchi-iwa-protos`` owner and cannot regain the monolithic ``litchi-iwa``
+    or ``prost-types`` edges without a boundary review.
     The production source slice excludes cfg(test)-gated items individually;
     cfg(test)-gated imports and helpers cannot hide later production code.
     """
@@ -10763,24 +11230,24 @@ def audit_numbers_package_no_eager_prost_source_topology(
 
     manifest_path = root / NUMBERS_PACKAGE_MANIFEST
     if manifest_path.is_file():
-        section: str | None = None
-        for line_number, line in enumerate(
-            manifest_path.read_text(encoding="utf-8").splitlines(), start=1
+        dependencies, has_codec = _numbers_names_normal_manifest_dependency_lines(
+            manifest_path
+        )
+        for dependency in sorted(
+            NUMBERS_NAMES_SAVE_TOKEN_FORBIDDEN_NORMAL_DEPENDENCIES
         ):
-            header = CARGO_SECTION_HEADER.match(line)
-            if header is not None:
-                section = header.group(1).strip()
-                continue
-            normal_dependencies = section == "dependencies" or (
-                section is not None
-                and section.endswith(".dependencies")
-                and not section.endswith(".dev-dependencies")
-            )
-            if not normal_dependencies or CARGO_PROST_DEPENDENCY.match(line) is None:
+            line_number = dependencies.get(dependency)
+            if line_number is None:
                 continue
             violations.append(
-                "focused litchi-numbers Cargo manifest retains normal prost "
-                f"dependency: {NUMBERS_PACKAGE_MANIFEST}:{line_number}"
+                "focused litchi-numbers Cargo manifest retains normal "
+                f"{dependency} dependency: {NUMBERS_PACKAGE_MANIFEST}:{line_number}"
+            )
+        if not has_codec:
+            violations.append(
+                "focused litchi-numbers Cargo manifest is missing normal "
+                f"{NUMBERS_NAMES_SAVE_TOKEN_REQUIRED_NORMAL_DEPENDENCY} dependency: "
+                f"{NUMBERS_PACKAGE_MANIFEST}"
             )
 
     return sorted(set(violations))
@@ -12795,6 +13262,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
+        + audit_numbers_names_save_token_publication_source_topology()
         + audit_iwa_numbers_names_source_topology()
         + audit_numbers_names_facade_source_topology()
         + audit_iwa_numbers_sheet_order_source_topology()
