@@ -836,3 +836,30 @@ keys or lengths are rejected, while unknown noncanonical varint values and
 balanced unknown groups are accepted. No manifest/public-API, package-owner,
 workspace Prost-retirement, host, or monolith claim follows from this reader
 cutover.
+
+## 2026-08-24 amendment: Wave56 Numbers exact-alias resource record
+
+Commit `e4952f7eeaa196263a28fac6cf86510c3e11a2f6` admits only
+source-authoritatively exact copies of one Numbers object identifier in
+distinct physical components. `Index::from_components` counts every physical
+object before checking `max_objects` and before reserving locator/type storage.
+It then sorts the physical locators deterministically, rejects duplicate
+identifiers within one component, compares cross-component candidates, and
+coalesces an admitted alias group to one logical locator and one primary-type
+entry. `Package::object_count` continues to report the physical count.
+
+`ArchiveObject::same_content_ignoring_offsets` performs the alias comparison
+without allocation. It compares decoded `ArchiveInfo`, exact raw messages,
+header and payload lengths, and retained original and original-canonical
+header bytes; only component-relative header and payload offsets are ignored.
+Consequently, payload, metadata, raw-header, or framing divergence fails
+closed even when a neutral decoded projection would otherwise compare equal.
+
+Lookup comparison work is based on the deduplicated logical locator set,
+while index allocation, population, sorting, and comparison topology are
+charged from the physical count. The already-admitted component/message bytes
+remain part of package ingress and candidate-reopen accounting. This is a
+finite operation-local accounting contract, not a measurement or claim for
+package-wide peak RSS, allocation count, latency, or throughput. The slice
+changes no manifest edge and retires no Prost-generated schema or workspace
+dependency.

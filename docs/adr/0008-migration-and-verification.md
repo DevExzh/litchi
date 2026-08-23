@@ -12316,3 +12316,75 @@ read_numbers` rejected `InvalidFormat` for duplicate object identities and
 identity compatibility debt: the result is application acceptance only and
 provides no Rust/native post-save parity, package-wide performance, latency,
 allocation, or peak-memory claim. No full-workspace green claim is made.
+
+## 2026-08-24 amendment: Wave56 Numbers exact-alias verification record
+
+Commit `e4952f7eeaa196263a28fac6cf86510c3e11a2f6` closes the Wave55
+post-native reader failure only for exact cross-component physical aliases.
+The Numbers index retains one deterministic logical locator when the core
+source-authoritative comparison succeeds. Same-component duplicates,
+divergent payload or metadata, and neutral-equal objects with different raw
+headers or framing still reject. Primary-type projection emits the logical
+object once, physical object limits still count every copy, unaliased semantic
+name edits preserve admitted aliases, and an edit routed to an aliased object
+fails atomically. No public raw-object-identifier API was added.
+
+The focused verification record is:
+
+- `cargo test -p litchi-iwa-core --lib --quiet`: 33/33;
+- `cargo test -p litchi-numbers --lib package::tests:: --quiet`: 37/37;
+- `cargo check -p litchi-numbers --all-targets --quiet`: passed with the two
+  existing deprecated `object_count` warnings;
+- strict core library/test Clippy passed. Numbers library/test Clippy passed
+  with explicit allowances for the existing `deprecated`, `manual_contains`,
+  and test-only `clone_on_copy` baselines;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 361/361;
+  `py_compile`, targeted Rust formatting, and `git diff --check` passed. The
+  direct Numbers identity audit returned no finding;
+- the live `python3 tools/check_crate_boundaries.py --explain` command exits 1
+  only for the known 23 Pages table-lock findings (20 flat aliases and three
+  untracked retired-host findings), with no Numbers identity finding;
+- workspace documentation tests passed.
+
+The full `litchi-numbers` library run was not green: 400 tests passed, four
+were ignored, and the unrelated
+`focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022`
+test failed its pre-existing strict noncanonical-storage-framing assertion.
+The implementation commit skipped the global `rustfmt`, `cargo-lint`, and
+`cargo-test-lib` hooks only after the focused gates passed, because the shared
+checkout retained unrelated formatting, Pages table-lock, deprecated-API, and
+Clippy/test baselines. No full-workspace or live-boundary green claim is made.
+
+Native acceptance used the Numbers 14.4-normalized Wave55 artifact containing
+660 physical objects, 652 unique identifiers, and eight exact
+cross-component aliases. The disposable file record is:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| tracked `test-data/iwork/numbers/basic.numbers` source oracle | 136,357 | `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693` |
+| `/private/tmp/litchi-wave55-metadata-native.4D1yTa/duplicated.numbers` | 139,219 | `790aa7386ad6f5bb641dda0aaef3a47236cbe727b9712a5a9cf581ffce6d6754` |
+| `/private/tmp/litchi-wave56-alias-native.nDHpCs/rust-renamed.numbers` | 82,271 | `5d113d16ac1e3178f856c486326d4a79fdb04f445256d4000c9223f3f89eef4e` |
+| `/private/tmp/litchi-wave56-alias-native.nDHpCs/inverse.numbers` | 139,219 | `790aa7386ad6f5bb641dda0aaef3a47236cbe727b9712a5a9cf581ffce6d6754` |
+| `/private/tmp/litchi-wave56-alias-native.nDHpCs/numbers-saved.numbers` | 143,159 | `279f2a9c0c00d09e382d3eef43d55cc8c5e00e57be5c19d7cb27ff76f09d6a74` |
+| same-directory pristine-control copy after Numbers save | 136,023 | `a8c23c687e734d0988412da47c56a6ca9d896de0962a7987de55095e0e60793b` |
+
+The Rust rename changed the second sheet/table to `Sheet 1-1 Rust` and
+`Table 1 Rust`; its inverse exactly reproduced the normalized input hash.
+Numbers 14.4 opened the Rust candidate without repair and displayed both 22 by
+7 tables, the renamed tabs/table name, `Litchi native Numbers fixture`, and
+`42`. A Save As attempt displayed an autosave error but emitted
+`numbers-saved.numbers`; both Numbers and the new Rust reader reopened that
+artifact with the same visible semantics, and the Rust reader also reopens the
+Rust candidate as two rooted and two compatibility tables.
+
+This is not native save/reopen acceptance. Command-S or resave repeatedly
+reported “The document could not be autosaved” with
+`com.apple.iWork.TSPersistence` code 2 for the Rust candidate, the normalized
+input, and the Numbers-emitted artifact. The pristine `basic.numbers` copy in
+the same directory saved successfully, changing from the tracked 136,357-byte
+hash above to the recorded 136,023-byte control hash. The remaining failure is
+bounded component-identity/provenance/save-token publication debt; this record
+does not select one unproven root cause. It establishes open/render, emitted-
+artifact reopen, strict Rust reread, and exact inverse evidence only—not
+durable native save parity, Rust/native byte parity, performance, or a
+publication gate.
