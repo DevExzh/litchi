@@ -271,6 +271,19 @@ KEYNOTE_CHART_TITLE_LEGACY_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_chart_title|"
     r"remove_slide_chart_title)(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
+IWA_KEYNOTE_CHART_TITLE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts" / "title.rs"
+)
+IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS = frozenset(
+    {"slide_chart_title", "set_slide_chart_title", "remove_slide_chart_title"}
+)
+IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS = frozenset(
+    {
+        "slide_chart_title_by_selector",
+        "set_slide_chart_title_by_selector",
+        "remove_slide_chart_title_by_selector",
+    }
+)
 KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "show.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "show_settings.rs",
@@ -9995,6 +10008,57 @@ def audit_keynote_chart_title_legacy_calls(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_chart_title_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep raw-ID chart titles deprecated beside the typed selector facade."""
+
+    path = root / IWA_KEYNOTE_CHART_TITLE_SOURCE
+    if not path.is_file():
+        return []
+
+    source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+    violations: list[str] = []
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
+        r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    declarations = {match.group(1) for match in declaration.finditer(source)}
+
+    for name in sorted(IWA_KEYNOTE_CHART_TITLE_TYPED_METHODS - declarations):
+        violations.append(
+            "litchi-iwa Keynote chart-title selector method is missing "
+            f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}"
+        )
+
+    for name in sorted(IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS - declarations):
+        violations.append(
+            "litchi-iwa Keynote chart-title legacy method is missing "
+            f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}"
+        )
+
+    for match in declaration.finditer(source):
+        name = match.group(1)
+        if name not in IWA_KEYNOTE_CHART_TITLE_LEGACY_METHODS:
+            continue
+
+        prefix = source[: match.start()]
+        attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
+        nearest = attributes[-1] if attributes else None
+        deprecated = False
+        if nearest is not None:
+            attribute = prefix[nearest.start() :]
+            if re.match(r"[ \t]*#[ \t]*\[[ \t]*deprecated\b", attribute):
+                closing = attribute.find("]")
+                deprecated = closing >= 0 and not attribute[closing + 1 :].strip()
+        if not deprecated:
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Keynote chart-title legacy method must remain deprecated "
+                f"{name}: {IWA_KEYNOTE_CHART_TITLE_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_pages_page_layout_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Reject physical identifiers and implementation types from the layout facade."""
 
@@ -11241,6 +11305,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_placeholder_visibility_facade_source_topology()
         + audit_keynote_package_no_eager_prost_source_topology()
         + audit_keynote_chart_title_legacy_calls()
+        + audit_iwa_keynote_chart_title_source_topology()
         + audit_keynote_document_public_api()
         + audit_numbers_package_no_eager_prost_source_topology()
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
