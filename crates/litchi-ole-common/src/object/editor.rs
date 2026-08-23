@@ -208,6 +208,38 @@ impl Editor {
         Ok(())
     }
 
+    /// Replaces an existing stream and returns the exact candidate rendering
+    /// that was validated while committing it.
+    ///
+    /// This is a narrow hand-off for format owners whose next validation stage
+    /// consumes the rendered package bytes.  It does not cache a rendering on
+    /// the editor, so ordinary `put_stream_shared` callers and no-op editors
+    /// retain their existing behavior and allocation profile.  The returned
+    /// bytes have already passed the same package check, CFB reopen, stream
+    /// recapture, and target discovery performed by a normal stream edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same bounded stream, CFB, and package-validation errors as
+    /// [`Self::put_stream_shared`].
+    pub fn put_stream_shared_with_rendered(
+        &mut self,
+        path: &[String],
+        data: Arc<[u8]>,
+    ) -> Result<Vec<u8>, OleError> {
+        if self
+            .stream(path)
+            .is_some_and(|current| current == data.as_ref())
+        {
+            return self.finish();
+        }
+        let mut candidate = self.clone();
+        candidate.package.put_stream(path, data, self.limits)?;
+        let (candidate, rendered) = candidate.commit_candidate_with_rendered()?;
+        *self = candidate;
+        Ok(rendered)
+    }
+
     /// Replaces existing streams in one failure-atomic CFB publication.
     ///
     /// Replacements are applied in iterator order to one isolated candidate.
@@ -471,15 +503,20 @@ impl Editor {
     }
 
     fn commit_candidate(mut self) -> Result<Self, OleError> {
+        self.commit_candidate_with_rendered()
+            .map(|(candidate, _rendered)| candidate)
+    }
+
+    fn commit_candidate_with_rendered(mut self) -> Result<(Self, Vec<u8>), OleError> {
         self.package.check(self.limits)?;
         let rendered = self.package.render()?;
-        let mut check = OleFile::open(Cursor::new(rendered))?;
+        let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
         codec::open(&check)?;
         let mut parsed = Package::capture(&mut check, self.limits)?;
         parsed.reuse_stream_allocations(&self.package)?;
         self.package = parsed;
         self.objects = discovery::from_package(&self.package, &self.targets, self.limits)?;
         self.changed = true;
-        Ok(self)
+        Ok((self, rendered))
     }
 }
