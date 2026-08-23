@@ -399,6 +399,325 @@ def with_filesystem_evidence(reports):
     return reports
 
 
+def with_xlsx_repeat_store_evidence(
+    *,
+    structural=False,
+    scenario="medium",
+    child_process_ids=True,
+    pid_offset=0,
+):
+    """Build four compact repeated-store filesystem reports for verifier tests."""
+
+    case = f"xlsx_source_repeated_store_{scenario}"
+    if structural:
+        case += "_reacquisition_control"
+    source_sha256 = (
+        "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec"
+        if scenario == "oversized"
+        else "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+    )
+    full_semantic_sha256 = (
+        "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e"
+    )
+    semantic_projection_sha256 = (
+        "01c253bf3fc611835e0806414c6417a9cfbb012ff6e01f9bb55cec94236a6235"
+    )
+    archive_bytes = 4_236_114 if scenario == "oversized" else 4_226_429
+    memory_limit = archive_bytes * 4 + 64 * 1024 * 1024
+    selected_member_bytes = (
+        8_389_041 if scenario == "oversized" else 63_294
+    )
+    query_count = 8 * 4
+    revisions = (
+        "control-revision",
+        "candidate-revision",
+        "candidate-revision",
+        "control-revision",
+    )
+    labels = ("a1", "b1", "b2", "a2")
+
+    def counters(**overrides):
+        value = {
+            "cache_cold_loads": 0,
+            "cache_successful_loads": 0,
+            "cache_bypasses": 0,
+            "cache_oversized_bypasses": 0,
+            "cache_evictions": 0,
+            "source_read_calls": 0,
+            "source_read_bytes": 0,
+            "selected_member_read_calls": 0,
+            "selected_member_read_bytes": 0,
+            "budget_input_bytes_used": 0,
+            "budget_work_used": 0,
+        }
+        value.update(overrides)
+        return value
+
+    def repeat_for(label):
+        query_elapsed = [result_elapsed // 4] * 3
+        query_elapsed.append(result_elapsed - sum(query_elapsed))
+        if structural:
+            if scenario == "medium":
+                delta = counters(
+                    cache_cold_loads=96,
+                    cache_successful_loads=96,
+                    cache_evictions=96,
+                    source_read_calls=query_count,
+                    source_read_bytes=3_200,
+                    selected_member_read_calls=query_count,
+                    selected_member_read_bytes=3_200,
+                    budget_input_bytes_used=3_200,
+                    budget_work_used=96,
+                )
+                before = counters(
+                    cache_cold_loads=1,
+                    cache_successful_loads=1,
+                    cache_evictions=1,
+                    budget_work_used=1,
+                )
+            else:
+                delta = counters(
+                    cache_cold_loads=32,
+                    cache_successful_loads=32,
+                    cache_bypasses=32,
+                    cache_oversized_bypasses=32,
+                    source_read_calls=query_count,
+                    source_read_bytes=3_200,
+                    selected_member_read_calls=query_count,
+                    selected_member_read_bytes=3_200,
+                    budget_input_bytes_used=3_200,
+                    budget_work_used=32,
+                )
+                before = counters(
+                    cache_successful_loads=1,
+                    cache_bypasses=1,
+                    cache_oversized_bypasses=1,
+                )
+            implementation = (
+                "explicit_part_data_reacquisition_structural_control"
+            )
+            claim_scope = (
+                "structural cache/read control only; elapsed/query_ns must not be "
+                "compared with candidate"
+            )
+            control_reacquire_count = query_count
+        else:
+            if scenario == "medium":
+                before = counters(
+                    cache_cold_loads=1,
+                    cache_successful_loads=1,
+                    cache_evictions=1,
+                    budget_work_used=1,
+                    source_read_calls=1,
+                    source_read_bytes=100,
+                    selected_member_read_calls=1,
+                    selected_member_read_bytes=100,
+                )
+            else:
+                before = counters(
+                    cache_successful_loads=1,
+                    cache_bypasses=1,
+                    cache_oversized_bypasses=1,
+                    source_read_calls=1,
+                    source_read_bytes=100,
+                    selected_member_read_calls=1,
+                    selected_member_read_bytes=100,
+                )
+            delta = (
+                counters(
+                    cache_cold_loads=1,
+                    cache_successful_loads=1,
+                    cache_evictions=1,
+                    source_read_calls=1,
+                    source_read_bytes=100,
+                    selected_member_read_calls=1,
+                    selected_member_read_bytes=100,
+                    budget_input_bytes_used=100,
+                    budget_work_used=1,
+                )
+                if label in {"a1", "a2"}
+                else counters()
+            )
+            implementation = "source_backed_cached_store"
+            claim_scope = (
+                "primary repeated-query selector; compare only the same selector "
+                "across A/B revisions"
+            )
+            control_reacquire_count = 0
+        after = {
+            key: before[key] + delta[key] for key in before
+        }
+        return {
+            "implementation": implementation,
+            "scenario": scenario,
+            "selected_member": "xl/worksheets/sheet1.xml",
+            "selected_member_uncompressed_bytes": selected_member_bytes,
+            "cache_max_bytes": 8 * 1024 * 1024,
+            "cache_max_entries": 2 if scenario == "medium" else 128,
+            "query_iterations": 8,
+            "query_names": ["cell", "cells", "visit", "stored_extent"],
+            "query_elapsed_ns": query_elapsed,
+            "timed_elapsed_total_ns": result_elapsed,
+            "control_reacquire_count": control_reacquire_count,
+            "timing_scope": "semantic_query_only; explicit PartData reacquisition excluded",
+            "claim_scope": claim_scope,
+            "budget_managed": True,
+            "budget_memory_limit": memory_limit,
+            "budget_input_bytes_limit": (1 << 64) - 1,
+            "budget_work_limit": (1 << 64) - 1,
+            "semantic_projection_sha256": semantic_projection_sha256,
+            "diagnostics_before": before,
+            "diagnostics_after": after,
+            "diagnostics_delta": delta,
+        }
+
+    reports = []
+    for leg_index, (label, revision) in enumerate(zip(labels, revisions)):
+        result_elapsed = (
+            80
+            if label == "b1"
+            else 82
+            if label == "b2"
+            else 100
+            if label == "a1"
+            else 102
+        )
+        result = row(case, [result_elapsed], source=None, sink=None)
+        result["source"] = None
+        result["sink"] = None
+        result["output_sha256"] = None
+        result["elapsed_ns"]["sample_order"] = list(range(15))
+        result["case"] = case
+        result["corpus"] = (
+            {
+                "name": "xlsx-source-repeated-store-oversized",
+                "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+                "package_format": "XLSX/OPC/ZIP",
+                "shape": "oversized",
+                "payload_kind": "fixed-medium-grid-with-oversized-selected-worksheet",
+                "compression": "deflate",
+                "entry_count": 9216,
+                "archive_member_count": 17,
+                "entry_bytes": 4,
+                "uncompressed_payload_bytes": 12_789_836,
+                "archive_bytes": 4_236_114,
+                "archive_sha256": source_sha256,
+                "target_entry": "Sheet1!A1",
+                "target_payload_bytes": 1,
+                "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                "xlsx": {
+                    "sheet_count": 4,
+                    "rows_per_sheet": 48,
+                    "columns_per_sheet": 48,
+                    "one_percent_update_count": 93,
+                    "source_members": {
+                        "workbook": "xl/workbook.xml",
+                        "worksheets": [
+                            "xl/worksheets/sheet1.xml",
+                            "xl/worksheets/sheet2.xml",
+                            "xl/worksheets/sheet3.xml",
+                            "xl/worksheets/sheet4.xml",
+                        ],
+                        "shared_strings": None,
+                        "styles": "xl/styles.xml",
+                    },
+                },
+            }
+            if scenario == "oversized"
+            else {
+                "name": "xlsx-source-repeated-store-medium",
+                "generator": "litchi-xlsx-source-repeated-store-corpus-v1",
+                "package_format": "XLSX/OPC/ZIP",
+                "shape": "medium",
+                "payload_kind": "fixed-medium-grid-for-repeated-selected-store",
+                "compression": "deflate",
+                "entry_count": 9216,
+                "archive_member_count": 17,
+                "entry_bytes": 4,
+                "uncompressed_payload_bytes": 4_231_168,
+                "archive_bytes": 4_226_429,
+                "archive_sha256": source_sha256,
+                "target_entry": "Sheet1!A1",
+                "target_payload_bytes": 1,
+                "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                "xlsx": {
+                    "sheet_count": 4,
+                    "rows_per_sheet": 48,
+                    "columns_per_sheet": 48,
+                    "one_percent_update_count": 93,
+                    "source_members": {
+                        "workbook": "xl/workbook.xml",
+                        "worksheets": [
+                            "xl/worksheets/sheet1.xml",
+                            "xl/worksheets/sheet2.xml",
+                            "xl/worksheets/sheet3.xml",
+                            "xl/worksheets/sheet4.xml",
+                        ],
+                        "shared_strings": None,
+                        "styles": "xl/styles.xml",
+                    },
+                },
+            }
+        )
+        leg = report([result], revision=revision)
+        leg["configuration"]["cases"] = [case]
+        leg["configuration"]["corpus_shapes"] = [scenario]
+        leg["configuration"]["filesystem_cache_states"] = ["warm"]
+        leg["configuration"]["filesystem_fresh_child_per_sample"] = True
+        evidence = {
+            "case": case,
+            "corpus": copy.deepcopy(result["corpus"]),
+            "warmup_iterations": 1,
+            "sample_count": 15,
+            "cache_states": ["warm"],
+            "fresh_child_per_sample": True,
+            "samples": [],
+            "tool": copy.deepcopy(leg["tool"]),
+            "configuration": copy.deepcopy(leg["configuration"]),
+        }
+        for sample_index in range(15):
+            sample = {
+                "sample_index": sample_index,
+                "cache_state": "warm",
+                "elapsed_ns": result_elapsed,
+                "parent_wall_ns": 200 + sample_index,
+                "cold_advice": "not_requested",
+                "logical_read_counter_scope": "not_applicable_filesystem_xlsx",
+                "logical_read_calls": 0,
+                "logical_read_requested_bytes": 0,
+                "logical_read_bytes": 0,
+                "logical_read_largest_requested_bytes": 0,
+                "logical_read_largest_returned_bytes": 0,
+                "max_concurrent_reads": 0,
+                "logical_read_request_sizes": [],
+                "logical_read_request_size_buckets": {
+                    "bytes_0": 0,
+                    "bytes_1_to_512": 0,
+                    "bytes_513_to_4096": 0,
+                    "bytes_4097_to_16384": 0,
+                    "bytes_16385_to_65536": 0,
+                    "bytes_over_65536": 0,
+                },
+                "process_metrics": None,
+                "output_sha256": None,
+                "output_bytes": None,
+                "opc_materialized_parts": None,
+                "cfb_changed_spans": None,
+                "cfb_published_bytes": None,
+                "xlsx_source_sha256": source_sha256,
+                "xlsx_semantic_sha256": full_semantic_sha256,
+                "xlsx_repeat_store": repeat_for(label),
+            }
+            if child_process_ids:
+                sample["child_process_id"] = (
+                    1_000 + pid_offset + leg_index * 100 + sample_index
+                )
+            evidence["samples"].append(sample)
+        leg["filesystem_evidence"] = [evidence]
+        reports.append(leg)
+    return reports
+
+
 class PerfAbbaSummaryTests(unittest.TestCase):
     def test_recomputes_statistics_and_emits_every_multi_shape_row(self):
         summary = perf_abba_summary.summarize_reports(four_legs())
@@ -597,6 +916,509 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             "one logical read range-size counter schema consistently",
         ):
             perf_abba_summary.summarize_reports(within_evidence)
+
+    def test_xlsx_repeated_store_primary_accepts_positive_control_and_zero_candidate_deltas(self):
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(summary["verification"]["result_count"], 1)
+        self.assertEqual(summary["results"][0]["case"], "xlsx_source_repeated_store_medium")
+        self.assertTrue(summary["verification"]["filesystem_evidence_identity_verified"])
+        self.assertEqual(
+            summary["results"][0]["elapsed_ns"]["accepted_statistics"],
+            ["p50", "mean", "p95", "p99"],
+        )
+
+        timing_only = copy.deepcopy(reports)
+        for sample in timing_only[1]["filesystem_evidence"][0]["samples"]:
+            repeat = sample["xlsx_repeat_store"]
+            repeat["query_elapsed_ns"] = [2, 3, 4, 5]
+            repeat["timed_elapsed_total_ns"] = 14
+            sample["elapsed_ns"] = 14
+        timing_only[1]["results"][0]["elapsed_ns"] = elapsed([14] * 15)
+        timing_only[1]["results"][0]["elapsed_ns"]["sample_order"] = list(range(15))
+        self.assertEqual(
+            perf_abba_summary.summarize_reports(timing_only)["verification"][
+                "filesystem_evidence_identity_verified"
+            ],
+            True,
+        )
+
+        structural_constant = copy.deepcopy(reports)
+        structural_constant[1]["filesystem_evidence"][0]["samples"][0][
+            "xlsx_repeat_store"
+        ]["cache_max_entries"] = 3
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "cache limits|identity differs"
+        ):
+            perf_abba_summary.summarize_reports(structural_constant)
+
+    def test_xlsx_repeated_store_timing_binds_to_sample_order_and_result(self):
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        primary_sample = reports[0]["filesystem_evidence"][0]["samples"][0]
+        primary_repeat = primary_sample["xlsx_repeat_store"]
+        primary_repeat["timed_elapsed_total_ns"] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "does not equal query_elapsed_ns",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        primary_sample = reports[0]["filesystem_evidence"][0]["samples"][0]
+        primary_sample["elapsed_ns"] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "must equal filesystem elapsed",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        elapsed_value = reports[0]["results"][0]["elapsed_ns"]
+        elapsed_value["samples"][0] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "must equal authoritative result elapsed",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        reports[0]["results"][0]["elapsed_ns"]["sample_order"][1] = 0
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "sample_order must be an exact permutation",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_repeated_store_requires_warm_fresh_samples_and_global_pids(self):
+        mutations = (
+            (
+                lambda reports: reports[0]["filesystem_evidence"][0].update(
+                    cache_states=["cold", "warm"]
+                ),
+                "cache_states must be exactly",
+            ),
+            (
+                lambda reports: reports[0]["filesystem_evidence"][0].update(
+                    fresh_child_per_sample=False
+                ),
+                "fresh_child_per_sample must be true",
+            ),
+        )
+        for mutation, message in mutations:
+            reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+            mutation(reports)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(reports)
+
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        duplicate_pid = reports[0]["filesystem_evidence"][0]["samples"][0][
+            "child_process_id"
+        ]
+        reports[1]["filesystem_evidence"][0]["samples"][0][
+            "child_process_id"
+        ] = duplicate_pid
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "globally unique across ABBA legs",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_repeated_store_rejects_semantic_source_string_and_schema_mutations(self):
+        mutations = (
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][0].update(
+                    xlsx_semantic_sha256="e" * 64
+                ),
+                "semantic hash",
+            ),
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][0].update(
+                    xlsx_source_sha256="e" * 64
+                ),
+                "source hash",
+            ),
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][0][
+                    "xlsx_repeat_store"
+                ]["query_names"].__setitem__(0, "changed"),
+                "query_names",
+            ),
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][0][
+                    "xlsx_repeat_store"
+                ].update(extra=True),
+                "keys mismatch",
+            ),
+        )
+        for mutation, message in mutations:
+            reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+            mutation(reports)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_repeated_store_rejects_stale_missing_extra_wrong_type_and_counter_arithmetic(self):
+        mutations = (
+            (
+                lambda reports: reports[0]["filesystem_evidence"][0]["samples"][0][
+                    "xlsx_repeat_store"
+                ].update(timed_elapsed_total_ns=11),
+                "does not equal query_elapsed_ns",
+            ),
+            (
+                lambda reports: reports[0]["filesystem_evidence"][0]["samples"][0][
+                    "xlsx_repeat_store"
+                ]["diagnostics_after"].update(cache_evictions=999),
+                "inconsistent for cache_evictions",
+            ),
+            (
+                lambda reports: reports[0]["filesystem_evidence"][0]["samples"][0][
+                    "xlsx_repeat_store"
+                ].pop("diagnostics_delta"),
+                "keys mismatch",
+            ),
+            (
+                lambda reports: reports[0]["filesystem_evidence"][0]["samples"][0][
+                    "xlsx_repeat_store"
+                ].update(query_iterations="8"),
+                "must be an unsigned 64-bit integer",
+            ),
+        )
+        for mutation, message in mutations:
+            reports = with_xlsx_repeat_store_evidence()
+            mutation(reports)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_repeated_store_allocation_and_child_pid_shapes_are_strict(self):
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        for leg in reports:
+            for sample in leg["filesystem_evidence"][0]["samples"]:
+                sample["allocation_metrics"] = {
+                    "status": "unavailable",
+                    "scope": "operation_global_system_allocator",
+                }
+        self.assertEqual(
+            perf_abba_summary.summarize_reports(reports)["verification"]["result_count"],
+            1,
+        )
+
+        malformed = copy.deepcopy(reports)
+        malformed[1]["filesystem_evidence"][0]["samples"][0][
+            "allocation_metrics"
+        ] = {"status": "unavailable", "scope": "wrong"}
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "allocator schema|scope"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        malformed[0]["filesystem_evidence"][0]["samples"][0]["child_process_id"] = 0
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "child_process_id.*positive"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+    def test_xlsx_repeated_store_structural_controls_are_excluded_and_cannot_masquerade(self):
+        primary = with_xlsx_repeat_store_evidence()
+        structural = with_xlsx_repeat_store_evidence(structural=True, pid_offset=10_000)
+        for primary_leg, structural_leg in zip(primary, structural):
+            primary_leg["results"].append(structural_leg["results"][0])
+            primary_leg["filesystem_evidence"].append(
+                structural_leg["filesystem_evidence"][0]
+            )
+            primary_leg["configuration"]["cases"].append(
+                structural_leg["configuration"]["cases"][0]
+            )
+            shape = structural_leg["configuration"]["corpus_shapes"][0]
+            if shape not in primary_leg["configuration"]["corpus_shapes"]:
+                primary_leg["configuration"]["corpus_shapes"].append(shape)
+            for evidence in primary_leg["filesystem_evidence"]:
+                evidence["configuration"] = copy.deepcopy(primary_leg["configuration"])
+            # Structural rows are validated for their own evidence contract but
+            # never enter the primary elapsed/source/sink summary path.
+            primary_leg["results"][1]["elapsed_ns"]["samples"] = [999] * 15
+            primary_leg["results"][1]["source"] = {"arbitrary": "structural-only"}
+        summary = perf_abba_summary.summarize_reports(primary)
+        self.assertEqual(summary["verification"]["result_count"], 1)
+        self.assertEqual(
+            [result["case"] for result in summary["results"]],
+            ["xlsx_source_repeated_store_medium"],
+        )
+
+        masquerading = with_xlsx_repeat_store_evidence(structural=True)
+        masquerading[0]["filesystem_evidence"][0]["samples"][0][
+            "xlsx_repeat_store"
+        ]["implementation"] = "source_backed_cached_store"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "does not match structural"
+        ):
+            perf_abba_summary.summarize_reports(masquerading)
+
+    def test_xlsx_repeated_store_selector_and_corpus_contracts_reject_renames_or_arbitrary_corpus(self):
+        mutations = (
+            (
+                lambda reports: (
+                    reports[0]["results"][0].update(
+                        case="xlsx_source_repeated_store_medium_renamed"
+                    ),
+                    reports[0]["filesystem_evidence"][0].update(
+                        case="xlsx_source_repeated_store_medium_renamed"
+                    ),
+                ),
+                "pinned repeated-store corpus|not permitted on filesystem case",
+            ),
+            (
+                lambda reports: (
+                    reports[0]["results"][0].update(
+                        case="xlsx_source_repeated_store_medium"
+                    ),
+                    reports[0]["filesystem_evidence"][0].update(
+                        case="xlsx_source_repeated_store_medium"
+                    ),
+                    reports[0]["filesystem_evidence"][0]["samples"][0][
+                        "xlsx_repeat_store"
+                    ].update(
+                        implementation="explicit_part_data_reacquisition_structural_control"
+                    ),
+                ),
+                "does not match",
+            ),
+            (
+                lambda reports: (
+                    reports[1]["results"][0]["corpus"].update(name="arbitrary-corpus"),
+                    reports[1]["filesystem_evidence"][0]["corpus"].update(
+                        name="arbitrary-corpus"
+                    ),
+                ),
+                "pinned.*corpus",
+            ),
+            (
+                lambda reports: (
+                    reports[1]["results"][0]["corpus"].update(archive_bytes=1),
+                    reports[1]["filesystem_evidence"][0]["corpus"].update(
+                        archive_bytes=1
+                    ),
+                ),
+                "pinned.*corpus",
+            ),
+            (
+                lambda reports: (
+                    reports[1]["results"][0]["corpus"].update(
+                        archive_sha256="e" * 64
+                    ),
+                    reports[1]["filesystem_evidence"][0]["corpus"].update(
+                        archive_sha256="e" * 64
+                    ),
+                ),
+                "pinned.*corpus",
+            ),
+        )
+        for mutation, message in mutations:
+            reports = with_xlsx_repeat_store_evidence()
+            mutation(reports)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_repeated_store_pins_full_corpus_and_distinct_semantic_identities(self):
+        smoke_path = Path("/tmp/xlsx-reconcile-A-four.aVHKkD.json")
+        if smoke_path.exists():
+            smoke = json.loads(smoke_path.read_text())
+            for evidence in smoke["filesystem_evidence"]:
+                case = evidence["case"]
+                self.assertEqual(
+                    evidence["corpus"],
+                    perf_abba_summary.FIXED_CASE_CORPUS_IDENTITIES[case],
+                )
+                sample = evidence["samples"][0]
+                self.assertEqual(
+                    sample["xlsx_semantic_sha256"],
+                    "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e",
+                )
+                self.assertEqual(
+                    sample["xlsx_repeat_store"]["semantic_projection_sha256"],
+                    "01c253bf3fc611835e0806414c6417a9cfbb012ff6e01f9bb55cec94236a6235",
+                )
+
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        sample = reports[0]["filesystem_evidence"][0]["samples"][0]
+        self.assertNotEqual(
+            sample["xlsx_semantic_sha256"],
+            sample["xlsx_repeat_store"]["semantic_projection_sha256"],
+        )
+        nested_mutations = (
+            lambda corpus: corpus["xlsx"]["source_members"]["worksheets"].append(
+                "xl/worksheets/extra.xml"
+            ),
+            lambda corpus: corpus["xlsx"].update(extra_nested=True),
+            lambda corpus: corpus.update(target_payload_bytes=2),
+        )
+        for mutate in nested_mutations:
+            mutated = with_xlsx_repeat_store_evidence(child_process_ids=True)
+            corpus = mutated[1]["filesystem_evidence"][0]["corpus"]
+            mutate(corpus)
+            mutated[1]["results"][0]["corpus"] = copy.deepcopy(corpus)
+            with self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError,
+                "does not match the pinned|pinned.*corpus",
+            ):
+                perf_abba_summary.summarize_reports(mutated)
+
+    def test_xlsx_repeated_store_corpus_rename_cannot_downgrade_to_ordinary_case(self):
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        renamed_case = "ordinary_case_with_repeated_corpus"
+        reports[0]["results"][0]["case"] = renamed_case
+        reports[0]["filesystem_evidence"][0]["case"] = renamed_case
+        reports[0]["configuration"]["cases"] = [renamed_case]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "pinned repeated-store corpus",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_repeated_store_marker_does_not_claim_shared_ordinary_archive(self):
+        # The medium repeated-store archive is byte-for-byte shared with the
+        # ordinary xlsx-cell-values-medium claim.  Archive SHA alone therefore
+        # cannot dispatch legacy evidence into the repeated-store contract.
+        ordinary_corpus = {
+            "name": "xlsx-cell-values-medium",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "archive_sha256": (
+                "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+            ),
+        }
+        self.assertFalse(
+            perf_abba_summary._looks_like_xlsx_repeat_store_corpus(ordinary_corpus)
+        )
+
+    def test_xlsx_repeated_store_full_rewrite_is_a_different_selector_and_hash(self):
+        """Generic JSON validation cannot authenticate a self-consistent rewrite.
+
+        The requested selector and the raw report canonical hashes are the
+        protocol boundary: a full rewrite that removes every repeated-store
+        marker may be summarized as a new generic claim, but it cannot satisfy
+        a package/registry claim that requested the original selector and pins
+        the original raw hashes.
+        """
+
+        reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+        original_hashes = [
+            perf_abba_summary._canonical_sha256(report, f"original[{index}]")
+            for index, report in enumerate(reports)
+        ]
+        generic_corpus = {
+            "name": "ordinary-rewritten-medium",
+            "generator": "ordinary-generator-v1",
+            "shape": "medium",
+            "archive_sha256": "f" * 64,
+        }
+        rewritten_case = "ordinary_rewritten_case"
+        for report in reports:
+            result = report["results"][0]
+            result["case"] = rewritten_case
+            result["corpus"] = copy.deepcopy(generic_corpus)
+            report["configuration"]["cases"] = [rewritten_case]
+            report["configuration"]["corpus_shapes"] = ["medium"]
+            evidence = report["filesystem_evidence"][0]
+            evidence["case"] = rewritten_case
+            evidence["corpus"] = copy.deepcopy(generic_corpus)
+            evidence["configuration"] = copy.deepcopy(report["configuration"])
+            for sample in evidence["samples"]:
+                for key in (
+                    "xlsx_repeat_store",
+                    "xlsx_source_sha256",
+                    "xlsx_semantic_sha256",
+                    "child_process_id",
+                ):
+                    sample.pop(key, None)
+
+        rewritten_hashes = [
+            perf_abba_summary._canonical_sha256(report, f"rewritten[{index}]")
+            for index, report in enumerate(reports)
+        ]
+        self.assertTrue(
+            all(
+                original != rewritten
+                for original, rewritten in zip(original_hashes, rewritten_hashes)
+            )
+        )
+        self.assertEqual(
+            perf_abba_summary.summarize_reports(reports)["verification"]["result_count"],
+            1,
+        )
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "selectors did not match any case/corpus result",
+        ):
+            perf_abba_summary.summarize_reports(
+                reports, cases=["xlsx_source_repeated_store_medium"]
+            )
+
+    def test_xlsx_repeated_store_rejects_forged_primary_result_channels(self):
+        for field, value in (
+            ("source", {"forged": True}),
+            ("sink", {"forged": True}),
+            ("output_sha256", "e" * 64),
+        ):
+            reports = with_xlsx_repeat_store_evidence(child_process_ids=True)
+            reports[0]["results"][0][field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError,
+                rf"results\[xlsx_source_repeated_store_medium\].{field} must be absent or null",
+            ):
+                perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_repeated_store_per_sample_scenario_size_and_pid_contracts_fail_closed(self):
+        mutations = (
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][1][
+                    "xlsx_repeat_store"
+                ].update(scenario="oversized"),
+                "scenario does not match",
+            ),
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][1][
+                    "xlsx_repeat_store"
+                ].update(selected_member_uncompressed_bytes=63_295),
+                "selected_member_uncompressed_bytes does not match",
+            ),
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][1].pop(
+                    "child_process_id"
+                ),
+                "must contain child_process_id",
+            ),
+            (
+                lambda reports: reports[1]["filesystem_evidence"][0]["samples"][1].update(
+                    child_process_id=reports[1]["filesystem_evidence"][0]["samples"][0][
+                        "child_process_id"
+                    ]
+                ),
+                "child_process_id values must be unique",
+            ),
+        )
+        for mutation, message in mutations:
+            reports = with_xlsx_repeat_store_evidence()
+            mutation(reports)
+            with self.subTest(message=message), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(reports)
+
+        missing = with_xlsx_repeat_store_evidence()
+        for sample in missing[0]["filesystem_evidence"][0]["samples"]:
+            sample.pop("xlsx_repeat_store")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "must contain xlsx_repeat_store"
+        ):
+            perf_abba_summary.summarize_reports(missing)
 
     def test_default_drift_ceilings_and_custom_ceilings_are_applied_per_statistic(self):
         legs = reports_for_values(
