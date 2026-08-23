@@ -180,6 +180,10 @@ pub mod shapes;
 /// The ordinary crate root is reserved for semantic document APIs. Consumers
 /// that intentionally need archive/package primitives must opt into this
 /// namespace so that the native boundary remains visible at every call site.
+#[deprecated(
+    since = "0.0.1",
+    note = "legacy migration-host raw IWA/package facade; use focused format-semantic APIs where available; retained for low-level compatibility"
+)]
 pub mod raw {
     /// Native iWork bundle parsing and metadata primitives.
     pub mod bundle {

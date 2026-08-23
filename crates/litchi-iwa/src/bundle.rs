@@ -450,6 +450,7 @@ impl Bundle {
     /// # Examples
     ///
     /// ```rust,no_run
+    /// #![allow(deprecated)]
     /// use litchi_iwa::raw::bundle::Bundle;
     /// use std::fs;
     ///

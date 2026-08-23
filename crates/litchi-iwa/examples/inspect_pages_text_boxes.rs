@@ -3,6 +3,7 @@
 use std::env;
 
 use litchi_iwa::pages::PagesEditor;
+#[allow(deprecated)]
 use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa_protos::tp::{DocumentArchive, DrawablesZOrderArchive, FloatingDrawablesArchive};
 use litchi_iwa_protos::tswp::{DrawableAttachmentArchive, ShapeInfoArchive, StorageArchive};

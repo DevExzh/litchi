@@ -432,8 +432,8 @@
       "order": 9,
       "dependent": "litchi-iwa",
       "dependency": "litchi-iwa-package",
-      "reason": "Legacy mutable package state still uses the extracted ordered entry store.",
-      "exit": "Finish concrete package transaction migration and delete litchi-iwa."
+      "reason": "Legacy mutable package state and its explicit raw facade still use the extracted ordered entry store.",
+      "exit": "Move remaining package transactions behind concrete format owners, remove the raw facade, and delete litchi-iwa."
     },
     {
       "order": 10,

@@ -1043,6 +1043,49 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_litchi_facade_source_topology(root), [])
 
+    def test_iwa_raw_facade_requires_an_explicit_deprecation_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text("pub mod raw { pub mod package {} }\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_raw_facade_source_topology(root),
+                [
+                    "litchi-iwa raw facade must remain deprecated: "
+                    "crates/litchi-iwa/src/lib.rs:1"
+                ],
+            )
+
+            facade.write_text(
+                "#[deprecated(note = \"compatibility only\")]\n"
+                "pub mod raw { pub mod package {} }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(boundaries.audit_iwa_raw_facade_source_topology(root), [])
+
+    def test_iwa_raw_facade_does_not_accept_an_unrelated_attribute(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "#[allow(deprecated)]\n"
+                "pub mod raw { pub mod package {} }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_raw_facade_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-iwa raw facade must remain deprecated: "
+                    "crates/litchi-iwa/src/lib.rs:2"
+                ],
+            )
+
     def test_litchi_semantic_facades_require_complete_checked_exports(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

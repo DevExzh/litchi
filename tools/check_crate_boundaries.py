@@ -96,6 +96,11 @@ LOCAL_CANONICAL_SHEET_VIEW_TYPE = re.compile(
 FACADE_PACKAGE = "litchi"
 FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
 RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
+IWA_FACADE_SOURCE = Path("crates/litchi-iwa/src/lib.rs")
+IWA_RAW_MODULE_DECLARATION = re.compile(
+    r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+(?:r#)?raw\b",
+    re.MULTILINE,
+)
 # The umbrella's iWork examples are semantic-reader examples. Keep the
 # compatibility host's old editor examples from becoming an accidental
 # recommendation for callers, even though the legacy crate itself remains
@@ -3819,6 +3824,38 @@ def audit_litchi_facade_source_topology(root: Path = ROOT) -> list[str]:
                     f"retired litchi facade public iwa {label}: "
                     f"{path.relative_to(root)}:{line_number}"
                 )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_raw_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the migration host's low-level raw facade explicitly deprecated."""
+
+    path = root / IWA_FACADE_SOURCE
+    if not path.is_file():
+        return []
+
+    source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+    violations: list[str] = []
+    module = IWA_RAW_MODULE_DECLARATION.search(source)
+    if module is None:
+        return []
+
+    # A deprecation attribute may span multiple lines. The nearest Rust
+    # attribute before `pub mod raw` must be `deprecated`; accepting any
+    # earlier marker would let an unrelated item accidentally satisfy this
+    # ratchet.
+    prefix = source[: module.start()]
+    attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
+    nearest = attributes[-1] if attributes else None
+    if nearest is None or not re.match(
+        r"[ \t]*#[ \t]*\[[ \t]*deprecated\b", prefix[nearest.start() :]
+    ):
+        line_number = source.count("\n", 0, module.start()) + 1
+        violations.append(
+            "litchi-iwa raw facade must remain deprecated: "
+            f"{IWA_FACADE_SOURCE}:{line_number}"
+        )
 
     return sorted(set(violations))
 
@@ -11046,6 +11083,7 @@ def main(argv: list[str] | None = None) -> int:
         audit_manifest_inventory(snapshot)
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
+        + audit_iwa_raw_facade_source_topology()
         + audit_litchi_semantic_facade_source_topology()
         + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()
