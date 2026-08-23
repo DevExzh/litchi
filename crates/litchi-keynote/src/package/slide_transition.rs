@@ -1805,9 +1805,8 @@ fn validate_requested_opaque_settings(
 /// nested-required-field checks.
 pub fn validate_opaque_transition_settings(
     settings: &Settings,
-    limits: WireLimits,
 ) -> Result<(), Error> {
-    validate_requested_opaque_settings(settings, limits)
+    validate_requested_opaque_settings(settings, WireLimits::default())
 }
 
 fn map_requested_opaque_error(error: Error) -> Error {
