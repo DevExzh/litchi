@@ -47,6 +47,20 @@ const PPTX_FILE_CORPUS_GENERATOR: &str = super::PPTX_SOURCE_EDIT_CORPUS_GENERATO
 const DOCX_FILE_CORPUS_GENERATOR: &str = super::DOCX_SOURCE_EDIT_CORPUS_GENERATOR;
 const DOCX_FILE_SOURCE_SHA256: &str =
     "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4";
+// The unified XLSX file selectors use one fixed, media-rich cell-CRUD input.
+// Keep these literals independent of the builder's computed manifest so a
+// generator or archive-shape drift cannot silently redefine the evidence.
+const XLSX_FILE_CORPUS_GENERATOR: &str = "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1";
+const XLSX_FILE_SOURCE_SHAPE: &str = "medium";
+const XLSX_FILE_SOURCE_SHA256: &str =
+    "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036";
+const XLSX_FILE_SOURCE_ARCHIVE_BYTES: usize = 4_226_429;
+const XLSX_FILE_SOURCE_ENTRY_COUNT: usize = 9_216;
+const XLSX_FILE_SOURCE_ARCHIVE_MEMBER_COUNT: usize = 17;
+const XLSX_FILE_SOURCE_UNCOMPRESSED_PAYLOAD_BYTES: usize = 4_231_168;
+const XLSX_FILE_SOURCE_SHEET_COUNT: usize = 4;
+const XLSX_FILE_SOURCE_ROWS_PER_SHEET: usize = 48;
+const XLSX_FILE_SOURCE_COLUMNS_PER_SHEET: usize = 48;
 static NEXT_PPTX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 static NEXT_DOCX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -287,6 +301,13 @@ struct ChildResult {
     pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_source_replay: Option<DocxSourceReplayEvidence>,
+    /// Source identity and semantic projection for the unified XLSX facade
+    /// path. These are collected after the timed operation so correctness I/O
+    /// does not enter measured latency.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_source_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_semantic_sha256: Option<String>,
 }
 
 impl ChildResult {
@@ -316,6 +337,8 @@ impl ChildResult {
             cfb_owned: None,
             pptx_source_replay: None,
             docx_source_replay: None,
+            xlsx_source_sha256: None,
+            xlsx_semantic_sha256: None,
         }
     }
 }
@@ -484,6 +507,10 @@ pub(crate) struct SampleEvidence {
     pub pptx_source_replay: Option<PptxSourceReplayEvidence>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub docx_source_replay: Option<DocxSourceReplayEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xlsx_source_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xlsx_semantic_sha256: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
@@ -655,6 +682,8 @@ enum Operation {
     DocxSourceOpenParagraphCountLifecycle,
     DocxEagerOpenFullTextLifecycle,
     DocxSourceOpenFullTextLifecycle,
+    XlsxFileOpen,
+    XlsxFileOpenLifecycle,
 }
 
 impl Operation {
@@ -706,6 +735,8 @@ impl Operation {
             "docx_file_source_open_full_text_lifecycle" => {
                 Some(Self::DocxSourceOpenFullTextLifecycle)
             },
+            "xlsx_file_open" => Some(Self::XlsxFileOpen),
+            "xlsx_file_open_lifecycle" => Some(Self::XlsxFileOpenLifecycle),
             _ => None,
         }
     }
@@ -756,6 +787,8 @@ impl Operation {
             Self::DocxSourceOpenFullTextLifecycle => {
                 super::Case::DocxFileSourceOpenFullTextLifecycle
             },
+            Self::XlsxFileOpen => super::Case::XlsxFileOpen,
+            Self::XlsxFileOpenLifecycle => super::Case::XlsxFileOpenLifecycle,
         }
     }
 
@@ -811,6 +844,10 @@ impl Operation {
                 | Self::DocxEagerOpenFullTextLifecycle
                 | Self::DocxSourceOpenFullTextLifecycle
         )
+    }
+
+    const fn is_xlsx(self) -> bool {
+        matches!(self, Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle)
     }
 
     const fn is_docx_lifecycle(self) -> bool {
@@ -953,9 +990,17 @@ pub(crate) fn run_selected(
             .any(|(_, operation)| operation.is_docx())
             .then(super::build_docx_source_edit_corpus)
             .transpose()?;
+        let xlsx = selected
+            .iter()
+            .any(|(_, operation)| operation.is_xlsx())
+            .then(|| super::build_xlsx_cell_crud_corpus(super::XlsxCellCrudShape::Medium))
+            .transpose()?;
         assert_pinned_corpora(&opc, &cfb)?;
         if let Some(docx) = docx.as_ref() {
             assert_pinned_docx_corpus(docx)?;
+        }
+        if let Some(xlsx) = xlsx.as_ref() {
+            assert_pinned_xlsx_corpus(xlsx)?;
         }
         let mut runs = Vec::with_capacity(selected.len());
         let mut opc_save_hashes: Option<Vec<(String, String)>> = None;
@@ -968,6 +1013,9 @@ pub(crate) fn run_selected(
             } else if operation.is_docx() {
                 docx.as_ref()
                     .ok_or("DOCX filesystem corpus was not prepared")?
+            } else if operation.is_xlsx() {
+                xlsx.as_ref()
+                    .ok_or("XLSX filesystem corpus was not prepared")?
             } else {
                 &opc
             };
@@ -1034,6 +1082,89 @@ fn assert_pinned_docx_corpus(corpus: &super::Corpus) -> Result<(), Box<dyn Error
     Ok(())
 }
 
+fn assert_pinned_xlsx_corpus(corpus: &super::Corpus) -> Result<(), Box<dyn Error>> {
+    let manifest = &corpus.manifest;
+    if manifest.generator != XLSX_FILE_CORPUS_GENERATOR {
+        return Err(format!(
+            "XLSX filesystem corpus has the wrong generator: expected {XLSX_FILE_CORPUS_GENERATOR}, got {}",
+            manifest.generator
+        )
+        .into());
+    }
+    if manifest.shape != XLSX_FILE_SOURCE_SHAPE {
+        return Err(format!(
+            "XLSX filesystem corpus has the wrong shape: expected {XLSX_FILE_SOURCE_SHAPE}, got {}",
+            manifest.shape
+        )
+        .into());
+    }
+    if manifest.archive_bytes != XLSX_FILE_SOURCE_ARCHIVE_BYTES
+        || corpus.archive.len() != XLSX_FILE_SOURCE_ARCHIVE_BYTES
+    {
+        return Err(format!(
+            "XLSX filesystem source byte count drifted: expected {XLSX_FILE_SOURCE_ARCHIVE_BYTES}, manifest {}, archive {}",
+            manifest.archive_bytes,
+            corpus.archive.len()
+        )
+        .into());
+    }
+    if manifest.archive_sha256 != XLSX_FILE_SOURCE_SHA256
+        || super::sha256_hex(&corpus.archive) != XLSX_FILE_SOURCE_SHA256
+    {
+        return Err(format!(
+            "XLSX filesystem source hash drifted: expected {XLSX_FILE_SOURCE_SHA256}, manifest {}, archive {}",
+            manifest.archive_sha256,
+            super::sha256_hex(&corpus.archive)
+        )
+        .into());
+    }
+    if manifest.entry_count != XLSX_FILE_SOURCE_ENTRY_COUNT
+        || manifest.archive_member_count != XLSX_FILE_SOURCE_ARCHIVE_MEMBER_COUNT
+        || manifest.uncompressed_payload_bytes != XLSX_FILE_SOURCE_UNCOMPRESSED_PAYLOAD_BYTES
+    {
+        return Err(format!(
+            "XLSX filesystem corpus topology drifted: entry_count {}, member_count {}, uncompressed_payload_bytes {}",
+            manifest.entry_count,
+            manifest.archive_member_count,
+            manifest.uncompressed_payload_bytes
+        )
+        .into());
+    }
+    let xlsx = manifest
+        .xlsx
+        .as_ref()
+        .ok_or("XLSX filesystem corpus omitted its typed shape manifest")?;
+    if xlsx.sheet_count != XLSX_FILE_SOURCE_SHEET_COUNT
+        || xlsx.rows_per_sheet != XLSX_FILE_SOURCE_ROWS_PER_SHEET
+        || xlsx.columns_per_sheet != XLSX_FILE_SOURCE_COLUMNS_PER_SHEET
+        || corpus.xlsx.as_ref().is_none_or(|spec| {
+            spec.sheet_count != XLSX_FILE_SOURCE_SHEET_COUNT
+                || spec.row_count != XLSX_FILE_SOURCE_ROWS_PER_SHEET
+                || spec.column_count != XLSX_FILE_SOURCE_COLUMNS_PER_SHEET
+        })
+    {
+        return Err(format!(
+            "XLSX filesystem corpus typed shape drifted: manifest {}x{}x{}, expected {}x{}x{}",
+            xlsx.sheet_count,
+            xlsx.rows_per_sheet,
+            xlsx.columns_per_sheet,
+            XLSX_FILE_SOURCE_SHEET_COUNT,
+            XLSX_FILE_SOURCE_ROWS_PER_SHEET,
+            XLSX_FILE_SOURCE_COLUMNS_PER_SHEET
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn source_sha256_for_operation<'a>(operation: Operation, corpus: &'a super::Corpus) -> &'a str {
+    if operation.is_xlsx() {
+        XLSX_FILE_SOURCE_SHA256
+    } else {
+        &corpus.manifest.archive_sha256
+    }
+}
+
 fn assert_pinned_corpora(opc: &super::Corpus, cfb: &super::Corpus) -> Result<(), Box<dyn Error>> {
     if opc.manifest.archive_sha256 != OPC_FILE_SOURCE_SHA256 {
         return Err(format!(
@@ -1093,11 +1224,14 @@ fn run_one(
         root.join(format!("{stem}.pptx"))
     } else if operation.is_docx() {
         root.join(format!("{stem}.docx"))
+    } else if operation.is_xlsx() {
+        root.join(format!("{stem}.xlsx"))
     } else {
         root.join(format!("{stem}.source"))
     };
+    let expected_source_sha256 = source_sha256_for_operation(operation, corpus);
     write_synced(&source_path, &corpus.archive)?;
-    assert_source_sha256(&source_path, &corpus.manifest.archive_sha256)?;
+    assert_source_sha256(&source_path, expected_source_sha256)?;
     let (verified_source_path, verified_source_sha256, mut cold_verified_status) =
         if cache_selection.cold_verified() && operation.supports_cold_verified() {
             match cold_verified::page_size_for_harness() {
@@ -1159,6 +1293,10 @@ fn run_one(
         cold_verified_status,
         verified_source_path.as_deref(),
     )?;
+    let expected_xlsx_semantic_sha256 = operation
+        .is_xlsx()
+        .then(|| xlsx_semantic_sha256(corpus))
+        .transpose()?;
 
     // Untimed warmups are independent children. Each measured sample then
     // primes with a separate child immediately before the selected measured
@@ -1173,7 +1311,7 @@ fn run_one(
             &source_path,
             &destination_path,
             ChildMode::Prime,
-            &corpus.manifest.archive_sha256,
+            expected_source_sha256,
         )?;
     }
 
@@ -1192,7 +1330,7 @@ fn run_one(
                 &source_path,
                 &destination_path,
                 ChildMode::Prime,
-                &corpus.manifest.archive_sha256,
+                expected_source_sha256,
             )?;
             if operation.is_save() {
                 seed_destination(&destination_path, &corpus.archive)?;
@@ -1202,7 +1340,7 @@ fn run_one(
                 &source_path,
                 &destination_path,
                 ChildMode::Warm,
-                &corpus.manifest.archive_sha256,
+                expected_source_sha256,
             )?;
             verify_child_output(operation, &source_path, &destination_path, corpus, false)?;
             warm_elapsed.push(warm.child.elapsed_ns);
@@ -1213,6 +1351,8 @@ fn run_one(
                 warm,
                 operation,
                 expected_digest.as_deref(),
+                expected_source_sha256,
+                expected_xlsx_semantic_sha256.as_deref(),
                 stem,
                 &mut cfb_owned_evidence,
             )?;
@@ -1227,7 +1367,7 @@ fn run_one(
                 &source_path,
                 &destination_path,
                 ChildMode::Prime,
-                &corpus.manifest.archive_sha256,
+                expected_source_sha256,
             )?;
             if operation.is_save() {
                 seed_destination(&destination_path, &corpus.archive)?;
@@ -1237,7 +1377,7 @@ fn run_one(
                 &source_path,
                 &destination_path,
                 ChildMode::Cold,
-                &corpus.manifest.archive_sha256,
+                expected_source_sha256,
             )?;
             verify_child_output(operation, &source_path, &destination_path, corpus, false)?;
             cold_elapsed.push(cold.child.elapsed_ns);
@@ -1248,6 +1388,8 @@ fn run_one(
                 cold,
                 operation,
                 expected_digest.as_deref(),
+                expected_source_sha256,
+                expected_xlsx_semantic_sha256.as_deref(),
                 stem,
                 &mut cfb_owned_evidence,
             )?;
@@ -1317,6 +1459,8 @@ fn run_one(
                 verified,
                 operation,
                 verified_expected_digest.as_deref(),
+                verified_sha256,
+                expected_xlsx_semantic_sha256.as_deref(),
                 stem,
                 &mut cfb_owned_evidence,
             )?;
@@ -1417,6 +1561,8 @@ fn record_sample(
     invocation: Invocation,
     operation: Operation,
     expected_digest: Option<&str>,
+    expected_source_sha256: &str,
+    expected_xlsx_semantic_sha256: Option<&str>,
     stem: &str,
     cfb_owned_evidence: &mut Vec<CfbOwnedSampleEvidence>,
 ) -> Result<(), Box<dyn Error>> {
@@ -1428,6 +1574,20 @@ fn record_sample(
             .ok_or("cold-verified sample omitted its proof")?;
         if !proof.status.is_eligible() || proof.read_bytes_delta.unwrap_or(0) == 0 {
             return Err("cold-verified sample did not prove a positive storage read".into());
+        }
+    }
+    if operation.is_xlsx() {
+        if invocation.child.xlsx_source_sha256.as_deref() != Some(expected_source_sha256) {
+            return Err(format!(
+                "{stem} {cache_state} child source hash differs from the expected source"
+            )
+            .into());
+        }
+        if invocation.child.xlsx_semantic_sha256.as_deref() != expected_xlsx_semantic_sha256 {
+            return Err(format!(
+                "{stem} {cache_state} child semantic projection differs from the deterministic corpus"
+            )
+            .into());
         }
     }
     validate_cfb_owned_evidence(operation, &invocation.child)?;
@@ -1480,6 +1640,8 @@ fn record_sample(
         cfb_phases: invocation.child.cfb_phases,
         pptx_source_replay: invocation.child.pptx_source_replay,
         docx_source_replay: invocation.child.docx_source_replay,
+        xlsx_source_sha256: invocation.child.xlsx_source_sha256,
+        xlsx_semantic_sha256: invocation.child.xlsx_semantic_sha256,
     });
     Ok(())
 }
@@ -1665,6 +1827,9 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         | Operation::DocxSourceOpenParagraphCountLifecycle
         | Operation::DocxEagerOpenFullTextLifecycle
         | Operation::DocxSourceOpenFullTextLifecycle => {
+            Err("open operation has no output digest".into())
+        },
+        Operation::XlsxFileOpen | Operation::XlsxFileOpenLifecycle => {
             Err("open operation has no output digest".into())
         },
     }
@@ -1897,6 +2062,7 @@ where
     let started = Instant::now();
     let mut details = OperationDetails::default();
     let mut deferred_source_open_package = None;
+    let mut deferred_xlsx_operation = None;
     let counter_result = (|| -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
         Ok(match operation {
             Operation::OpcEagerOpen => run_opc_eager_open(&source, &mut details)?,
@@ -1955,21 +2121,29 @@ where
                 run_docx_operation(operation, &source, prepared_docx.as_ref())?;
                 None
             },
+            Operation::XlsxFileOpen | Operation::XlsxFileOpenLifecycle => {
+                run_xlsx_operation(operation, &source, &mut deferred_xlsx_operation)?;
+                None
+            },
         })
     })();
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
     let allocation_metrics = allocation_region.finish();
     let counter = counter_result?;
-    if let Some(package) = deferred_source_open_package {
-        details.opc_materialized_parts = Some(package.try_cache_diagnostics()?.successful_loads);
-        std::hint::black_box(package);
-    }
     let after = process_metrics::Snapshot::read().ok();
     let process_delta = before.zip(after).map(|(before, after)| after.delta(before));
     let cold_verified = cold_verified_preparation
         .map(|preparation| cold_verified::complete(preparation, before, after));
     let snapshot =
         counter.map_or_else(|| Ok(ReadMetrics::default()), |counter| counter.snapshot())?;
+
+    // All operation-only evidence is now captured. Any package diagnostics,
+    // source replay, semantic projection, and source hashing below are
+    // deliberately untimed correctness work.
+    if let Some(package) = deferred_source_open_package {
+        details.opc_materialized_parts = Some(package.try_cache_diagnostics()?.successful_loads);
+        std::hint::black_box(package);
+    }
     let logical_read_counter_scope = if operation.is_cfb_owned() {
         "not_applicable_immutable_owned_slice"
     } else if matches!(operation, Operation::OpcEagerOpen | Operation::OpcEagerSave) {
@@ -1986,6 +2160,8 @@ where
         } else {
             "not_applicable_eager_docx"
         }
+    } else if operation.is_xlsx() {
+        "not_applicable_filesystem_xlsx"
     } else {
         "timed_read_at"
     }
@@ -2002,6 +2178,20 @@ where
     // Correctness and hashing are intentionally after the timed operation and
     // after the operation-only counters have been sampled.
     let corpus = filesystem_corpus(operation)?;
+    let xlsx_evidence = if operation.is_xlsx() {
+        let deferred = deferred_xlsx_operation
+            .as_ref()
+            .ok_or("XLSX child operation did not retain its timed workbook")?;
+        Some(verify_xlsx_operation(
+            operation,
+            &source,
+            &corpus,
+            matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
+            deferred,
+        )?)
+    } else {
+        None
+    };
     verify_child_output(
         operation,
         &source,
@@ -2009,6 +2199,12 @@ where
         &corpus,
         matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
     )?;
+    if let Some(deferred) = deferred_xlsx_operation.take() {
+        // Only release the exact timed workbook and lifecycle projection after
+        // their correctness validation and every operation-only snapshot.
+        std::hint::black_box(deferred.timed_projection);
+        std::hint::black_box(deferred.workbook);
+    }
     let output = operation
         .is_save()
         .then(|| fs::read(&destination))
@@ -2043,6 +2239,8 @@ where
         cfb_owned: details.cfb_owned,
         pptx_source_replay,
         docx_source_replay,
+        xlsx_source_sha256: xlsx_evidence.as_ref().map(|value| value.0.clone()),
+        xlsx_semantic_sha256: xlsx_evidence.map(|value| value.1),
     };
     serde_json::to_writer(io::stdout().lock(), &result)?;
     Ok(true)
@@ -2057,6 +2255,9 @@ fn filesystem_corpus(operation: Operation) -> Result<super::Corpus, Box<dyn Erro
     }
     if operation.is_docx() {
         return super::build_docx_source_edit_corpus();
+    }
+    if operation.is_xlsx() {
+        return super::build_xlsx_cell_crud_corpus(super::XlsxCellCrudShape::Medium);
     }
     let opc = super::build_opc_corpus(OPC_FILE_SHAPE, OPC_FILE_PAYLOAD)?;
     if operation.is_cfb() {
@@ -3455,6 +3656,152 @@ fn run_docx_operation(
     Ok(())
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct XlsxRootSemanticProjection {
+    worksheet_names: Vec<String>,
+    worksheet_count: usize,
+    full_text: String,
+    metadata_sha256: String,
+}
+
+/// Builds the expected XLSX projection through the typed owner and an
+/// independently opened OPC/property package. The facade never manufactures
+/// this oracle from bytes or from its own metadata implementation.
+fn xlsx_typed_semantic_oracle(
+    corpus: &super::Corpus,
+) -> Result<XlsxRootSemanticProjection, Box<dyn Error>> {
+    assert_pinned_xlsx_corpus(corpus)?;
+    let spec = corpus
+        .xlsx
+        .as_ref()
+        .ok_or("XLSX filesystem corpus omitted its typed specification")?;
+    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
+    super::verify_xlsx_cells(&typed, spec, &[])?;
+    let worksheet_names = typed
+        .sheets()
+        .map(|sheet| sheet.name().to_owned())
+        .collect::<Vec<_>>();
+    let worksheet_count = typed.len();
+    let full_text = super::xlsx_typed_full_text(&typed, spec)?;
+    if worksheet_names.len() != XLSX_FILE_SOURCE_SHEET_COUNT
+        || worksheet_count != XLSX_FILE_SOURCE_SHEET_COUNT
+    {
+        return Err("typed XLSX filesystem oracle worksheet shape differs from its pin".into());
+    }
+
+    let package = OpcPackage::from_bytes(&corpus.archive)?;
+    let metadata = litchi_ooxml_common::properties::read(&package)
+        .map_err(|error| error.to_string())?
+        .map(litchi_core::Metadata::from)
+        .unwrap_or_default();
+    let metadata_sha256 = super::xlsx_root_metadata_digest(&metadata)?;
+    Ok(XlsxRootSemanticProjection {
+        worksheet_names,
+        worksheet_count,
+        full_text,
+        metadata_sha256,
+    })
+}
+
+fn xlsx_semantic_sha256(corpus: &super::Corpus) -> Result<String, Box<dyn Error>> {
+    let oracle = xlsx_typed_semantic_oracle(corpus)?;
+    xlsx_semantic_projection_sha256(&oracle)
+}
+
+fn xlsx_semantic_projection_sha256(
+    projection: &XlsxRootSemanticProjection,
+) -> Result<String, Box<dyn Error>> {
+    Ok(super::sha256_hex(&serde_json::to_vec(&(
+        &projection.worksheet_names,
+        projection.worksheet_count,
+        &projection.full_text,
+        &projection.metadata_sha256,
+    ))?))
+}
+
+fn xlsx_timed_names_count_text(
+    workbook: &litchi::Workbook,
+) -> Result<(Vec<String>, usize, String), Box<dyn Error>> {
+    let worksheet_names = workbook
+        .worksheet_names()
+        .map_err(|error| error.to_string())?;
+    let worksheet_count = workbook
+        .worksheet_count()
+        .map_err(|error| error.to_string())?;
+    let full_text = workbook.text().map_err(|error| error.to_string())?;
+    Ok((worksheet_names, worksheet_count, full_text))
+}
+
+struct DeferredXlsxOperation {
+    workbook: litchi::Workbook,
+    timed_projection: Option<(Vec<String>, usize, String)>,
+}
+
+fn xlsx_deferred_semantic_projection(
+    operation: Operation,
+    deferred: &DeferredXlsxOperation,
+) -> Result<XlsxRootSemanticProjection, Box<dyn Error>> {
+    let (worksheet_names, worksheet_count, full_text) =
+        match (operation, deferred.timed_projection.as_ref()) {
+            (Operation::XlsxFileOpen, None) => xlsx_timed_names_count_text(&deferred.workbook)?,
+            (Operation::XlsxFileOpenLifecycle, Some((names, count, text))) => {
+                // Clone only after the timer and evidence snapshots: these are
+                // the exact names/count/text values produced by the timed scope.
+                (names.clone(), *count, text.clone())
+            },
+            (Operation::XlsxFileOpen, Some(_)) => {
+                return Err("XLSX open retained an unexpected lifecycle projection".into());
+            },
+            (Operation::XlsxFileOpenLifecycle, None) => {
+                return Err("XLSX lifecycle omitted its timed projection".into());
+            },
+            _ => return Err("non-XLSX operation passed to deferred XLSX projection".into()),
+        };
+    let metadata = deferred
+        .workbook
+        .metadata()
+        .map_err(|error| error.to_string())?;
+    let metadata_sha256 = super::xlsx_root_metadata_digest(&metadata)?;
+    Ok(XlsxRootSemanticProjection {
+        worksheet_names,
+        worksheet_count,
+        full_text,
+        metadata_sha256,
+    })
+}
+
+fn run_xlsx_operation(
+    operation: Operation,
+    source: &Path,
+    deferred: &mut Option<DeferredXlsxOperation>,
+) -> Result<(), Box<dyn Error>> {
+    match operation {
+        Operation::XlsxFileOpen => {
+            // The open-only selector measures only path open and root
+            // construction. Its full semantic projection is consumed after
+            // the timer in `run_child_arguments`.
+            *deferred = Some(DeferredXlsxOperation {
+                workbook: litchi::Workbook::open(source).map_err(|error| error.to_string())?,
+                timed_projection: None,
+            });
+        },
+        Operation::XlsxFileOpenLifecycle => {
+            // Keep this timed boundary to exactly path open plus the declared
+            // names/count/full-text projection. Semantic hashing, JSON
+            // serialization, and metadata I/O are deferred until after the
+            // operation-only evidence snapshots.
+            let workbook = litchi::Workbook::open(source).map_err(|error| error.to_string())?;
+            let projection = xlsx_timed_names_count_text(&workbook)?;
+            *deferred = Some(DeferredXlsxOperation {
+                workbook,
+                timed_projection: Some(projection),
+            });
+        },
+        _ => return Err("non-XLSX operation passed to run_xlsx_operation".into()),
+    }
+    Ok(())
+}
+
 fn run_opc_eager_save(
     source: &Path,
     destination: &Path,
@@ -3707,6 +4054,11 @@ fn verify_child_output(
         | Operation::DocxSourceOpenFullTextLifecycle => {
             verify_docx_operation(source, corpus, allow_page_aligned_source)
         },
+        Operation::XlsxFileOpen | Operation::XlsxFileOpenLifecycle => {
+            // XLSX correctness is validated once against the exact timed
+            // workbook before this output-only dispatch reaches this arm.
+            Ok(())
+        },
     }
 }
 
@@ -3777,6 +4129,46 @@ fn verify_docx_operation(
     }
     assert_source_sha256(source, &source_sha256)?;
     Ok(())
+}
+
+fn verify_xlsx_operation(
+    operation: Operation,
+    source: &Path,
+    corpus: &super::Corpus,
+    allow_page_aligned_source: bool,
+    deferred: &DeferredXlsxOperation,
+) -> Result<(String, String), Box<dyn Error>> {
+    assert_pinned_xlsx_corpus(corpus)?;
+    let initial_bytes = fs::read(source)?;
+    if !allow_page_aligned_source {
+        if initial_bytes.len() != XLSX_FILE_SOURCE_ARCHIVE_BYTES {
+            return Err("XLSX filesystem source length differs from corpus manifest".into());
+        }
+    }
+    // The typed owner and independent OPC package are both opened only after
+    // the operation evidence has been sampled. The exact facade workbook from
+    // the timed operation is checked against that oracle rather than a second
+    // path open or a facade-from-bytes oracle.
+    let expected = xlsx_typed_semantic_oracle(corpus)?;
+    let observed = xlsx_deferred_semantic_projection(operation, deferred)?;
+    if observed != expected {
+        return Err("XLSX filesystem semantic projection differs from deterministic corpus".into());
+    }
+    let semantic_sha256 = xlsx_semantic_projection_sha256(&observed)?;
+
+    // Read and hash the source only after semantic verification. This is the
+    // final exact source identity, including the aligned cold-verifier copy;
+    // the parent additionally checks it against the prepared aligned hash.
+    let final_bytes = fs::read(source)?;
+    let source_sha256 = super::sha256_hex(&final_bytes);
+    if !allow_page_aligned_source {
+        if final_bytes.len() != XLSX_FILE_SOURCE_ARCHIVE_BYTES
+            || source_sha256 != XLSX_FILE_SOURCE_SHA256
+        {
+            return Err("XLSX filesystem source hash or length differs from its fixed pin".into());
+        }
+    }
+    Ok((source_sha256, semantic_sha256))
 }
 
 fn docx_document_signature(document: &litchi::Document) -> Result<String, Box<dyn Error>> {
@@ -4081,6 +4473,7 @@ mod tests {
     use super::{
         CacheSelection, ChildMode, ColdAdvice, CountingReadAt, Operation, ReadPattern,
         ReadPatternState, ReadSizeBuckets, checked_atomic_add, checked_atomic_sub,
+        xlsx_semantic_sha256,
     };
 
     struct OverReturningSource;
@@ -4185,6 +4578,8 @@ mod tests {
             "docx_file_source_open_paragraph_count_lifecycle",
             "docx_file_eager_open_full_text_lifecycle",
             "docx_file_source_open_full_text_lifecycle",
+            "xlsx_file_open",
+            "xlsx_file_open_lifecycle",
         ] {
             assert!(Operation::parse(name).is_some(), "{name}");
         }
@@ -4528,6 +4923,34 @@ mod tests {
         assert!(Operation::PptxSourceOpen.supports_cold_verified());
         assert!(Operation::DocxSourceOpenFullTextLifecycle.supports_cold_verified());
         assert!(Operation::OpcSourceOpen.supports_cold_verified());
+        assert!(Operation::XlsxFileOpen.supports_cold_verified());
+        assert!(Operation::XlsxFileOpenLifecycle.supports_cold_verified());
+    }
+
+    #[test]
+    fn xlsx_filesystem_operations_preserve_open_vs_lifecycle_scopes() {
+        let open = Operation::parse("xlsx_file_open").expect("XLSX open selector parses");
+        let lifecycle =
+            Operation::parse("xlsx_file_open_lifecycle").expect("XLSX lifecycle selector parses");
+        assert!(open.is_xlsx());
+        assert!(lifecycle.is_xlsx());
+        assert_eq!(open.case().name(), "xlsx_file_open");
+        assert_eq!(lifecycle.case().name(), "xlsx_file_open_lifecycle");
+        assert_eq!(Operation::parse(open.case().name()), Some(open));
+        assert_eq!(Operation::parse(lifecycle.case().name()), Some(lifecycle));
+        assert!(!open.is_save());
+        assert!(!lifecycle.is_save());
+    }
+
+    #[test]
+    fn xlsx_semantic_oracle_hash_is_deterministic() {
+        let corpus = crate::build_xlsx_cell_crud_corpus(crate::XlsxCellCrudShape::Medium)
+            .expect("deterministic XLSX corpus builds");
+        let first = xlsx_semantic_sha256(&corpus).expect("XLSX semantic oracle hashes");
+        let second = xlsx_semantic_sha256(&corpus).expect("XLSX semantic oracle rehashes");
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 64);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit()));
     }
 
     #[test]
@@ -4613,6 +5036,49 @@ mod tests {
     }
 
     #[test]
+    fn padded_xlsx_archive_keeps_typed_semantics_and_reports_aligned_hash() {
+        let corpus = crate::build_xlsx_cell_crud_corpus(crate::XlsxCellCrudShape::Medium).unwrap();
+        super::assert_pinned_xlsx_corpus(&corpus).unwrap();
+        let aligned =
+            super::cold_verified::page_aligned_archive(&corpus.archive, 4096, true).unwrap();
+        assert_eq!(aligned.len() % 4096, 0);
+        assert_ne!(aligned, corpus.archive);
+
+        let package = super::OpcPackage::from_bytes(&aligned).unwrap();
+        assert!(package.part_count() > 0);
+        let spec = corpus.xlsx.as_ref().unwrap();
+        let typed = litchi_xlsx::Workbook::from_bytes(aligned.clone()).unwrap();
+        crate::verify_xlsx_cells(&typed, spec, &[]).unwrap();
+        let expected = super::xlsx_semantic_sha256(&corpus).unwrap();
+
+        let path = env::temp_dir().join(format!(
+            "litchi-perf-xlsx-padding-{}-{}",
+            std::process::id(),
+            super::SystemTime::now()
+                .duration_since(super::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::write(&path, &aligned).unwrap();
+        let deferred = super::DeferredXlsxOperation {
+            workbook: litchi::Workbook::open(&path).unwrap(),
+            timed_projection: None,
+        };
+        let (source_sha256, semantic_sha256) = super::verify_xlsx_operation(
+            super::Operation::XlsxFileOpen,
+            &path,
+            &corpus,
+            true,
+            &deferred,
+        )
+        .unwrap();
+        assert_eq!(source_sha256, crate::sha256_hex(&aligned));
+        assert_eq!(semantic_sha256, expected);
+        drop(deferred);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn pinned_filesystem_hash_literals_are_complete() {
         for hash in [
             super::OPC_FILE_SOURCE_SHA256,
@@ -4620,10 +5086,17 @@ mod tests {
             super::CFB_FILE_SOURCE_SHA256,
             super::CFB_FILE_EXPECTED_OUTPUT_SHA256,
             super::DOCX_FILE_SOURCE_SHA256,
+            super::XLSX_FILE_SOURCE_SHA256,
         ] {
             assert_eq!(hash.len(), 64);
             assert!(hash.bytes().all(|byte| byte.is_ascii_hexdigit()));
         }
+        assert_eq!(super::XLSX_FILE_SOURCE_ARCHIVE_BYTES, 4_226_429);
+        assert_eq!(super::XLSX_FILE_SOURCE_SHAPE, "medium");
+        assert_eq!(
+            super::XLSX_FILE_CORPUS_GENERATOR,
+            "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1"
+        );
     }
 
     #[test]
@@ -4667,6 +5140,8 @@ mod tests {
             cfb_owned: None,
             pptx_source_replay: None,
             docx_source_replay: None,
+            xlsx_source_sha256: None,
+            xlsx_semantic_sha256: None,
         };
         let sample = crate::allocation_metrics::Sample {
             status: crate::allocation_metrics::Status::Measured,
