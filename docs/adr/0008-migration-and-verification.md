@@ -11140,13 +11140,11 @@ Wave17 records the Buffa guard at 12/12, the Pages footnote codec at 11/11,
 and a successful associated fuzz-target check. Numbers TableDataList storage
 records 37/37. The reviewer’s post-strict-model-fix report recorded the
 `litchi-iwa-protos` result as 341/341 during wave17; this remains dated wave17
-evidence, not a current-worktree result. The current worktree contains 347
-`#[test]` declarations under `crates/litchi-iwa-protos`, but no current-wave
-execution result is admitted. This does not rewrite the historical 267/0
-baseline or the earlier 339/338+1 pre-gate observation.
+evidence, not a current-worktree result. This does not rewrite the historical
+267/0 baseline or the earlier 339/338+1 pre-gate observation.
 
-The wave’s native fixtures opened without repair. The Keynote
-focused report records 20+5 cases; its fixture is 503,480 bytes with SHA-256
+The supplied application record reports no repair for the named fixtures. The
+Keynote focused report records 20+5 cases; its fixture is 503,480 bytes with SHA-256
 `1d67d4263851487bc3868342884f77f46fa643e542e661951d222411c11d21d1`.
 The Pages fixture is 104,319 bytes with SHA-256
 `7e01c1caa6fe3b0f0b699d5a022c0f2daf3667a22896a53e65289f5297d3ddb2`; the
@@ -11156,11 +11154,16 @@ Numbers archive inspection found 24 type-6005 entries and 0 type-6011
 entries. The zero type-6011 result is explicitly a no-claim: it does not
 prove the native Segment path.
 
-These are bounded codec and compatibility results for the named fixtures.
-They do not establish byte-inert save behavior, native Segment support,
-performance, host-edge retirement, or monolith deletion. The historical
-counts and the authoritative 13-entry ordered migration-debt ledger remain
-unchanged; no debt or host dependency edge is retired by this amendment.
+The Numbers formula-category change recorded for this wave is preflight
+arithmetic only; category traversal and retained projection semantics are
+unchanged. Pages footnote evidence keeps the per-projection semantic budget
+separate from `TransactionBudget`; it does not account for staged `set` text,
+`after` values, or candidate-package retention.
+
+These dated results do not establish byte-inert save behavior, native Segment
+support, or type-6011 proof. They retire no debt or host dependency edge and
+make no monolith-deletion claim; the historical counts and authoritative
+13-entry ledger remain unchanged.
 
 ## 2026-08-23 amendment: Keynote text allocation shape and soundtrack-order scope
 
