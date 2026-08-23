@@ -14,6 +14,7 @@
     reason = "The transaction redacts lower-layer failures and keeps native graph adapters private."
 )]
 
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -702,6 +703,11 @@ fn chart_graphs(
         .map_err(|_error| ChartTitleError::Allocation {
             amount: z_order.len(),
         })?;
+    // The mutation guard below needs to prove that each selected non-style
+    // object has exactly one chart owner. Keep the package-wide index lazy so
+    // a slide with no charts never pays for the ownership scan, then share it
+    // across every chart in this graph build.
+    let mut non_style_owners = None;
     for identifier in z_order.iter().copied() {
         let Some((component_name, drawable)) = package.object_with_component(identifier) else {
             return Err(ChartTitleError::InvalidSource);
@@ -729,8 +735,20 @@ fn chart_graphs(
             &z_order,
             &chart_message.data,
             identifier,
-            mutation_guards,
         )?;
+        if mutation_guards {
+            if non_style_owners.is_none() {
+                non_style_owners = Some(scan_non_style_owners(package)?);
+            }
+            let owners = non_style_owners
+                .as_ref()
+                .ok_or(ChartTitleError::InvalidSource)?;
+            if owners.get(&graph.non_style_identifier).copied() != Some(1)
+                || graph.chart_identifier == 0
+            {
+                return Err(ChartTitleError::InvalidSource);
+            }
+        }
         graphs.push(graph);
     }
     Ok(graphs)
@@ -744,7 +762,6 @@ fn chart_graph(
     z_order: &[u64],
     chart_data: &[u8],
     chart_identifier: u64,
-    mutation_guards: bool,
 ) -> Result<ChartGraph, ChartTitleError> {
     if owned
         .iter()
@@ -794,9 +811,6 @@ fn chart_graph(
     }
     exactly_one_message(title_object, STANDIN_MESSAGE_TYPE)?;
     let non_style_message = exactly_one_message(non_style_object, CHART_NON_STYLE_MESSAGE_TYPE)?;
-    if mutation_guards {
-        ensure_non_style_exclusive(package, non_style_identifier, chart_identifier)?;
-    }
     let title = read_chart_title(non_style_message.data.as_slice(), limits)?;
     Ok(ChartGraph {
         slide_identifier: record.slide_identifier,
@@ -885,22 +899,56 @@ fn exactly_one_message(
     selected.ok_or(ChartTitleError::InvalidSource)
 }
 
-fn ensure_non_style_exclusive(
-    package: &Package,
-    non_style_identifier: u64,
-    chart_identifier: u64,
-) -> Result<(), ChartTitleError> {
-    let mut owners = 0usize;
-    let limits = package.wire_limits().map_err(map_wire_error)?;
+struct ChartGraphScanBudget {
+    limits: WireLimits,
+    work: usize,
+}
+
+impl ChartGraphScanBudget {
+    fn new(package: &Package) -> Result<Self, ChartTitleError> {
+        Ok(Self {
+            limits: package.wire_limits().map_err(map_wire_error)?,
+            work: 0,
+        })
+    }
+
+    fn charge(&mut self, amount: usize) -> Result<(), ChartTitleError> {
+        let observed = self
+            .work
+            .checked_add(amount)
+            .ok_or(ChartTitleError::InvalidSource)?;
+        if observed > self.limits.max_rewrite_work() {
+            return Err(ChartTitleError::LimitExceeded {
+                kind: ChartTitleLimitKind::WireWork,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(self.limits.max_rewrite_work()),
+            });
+        }
+        self.work = observed;
+        Ok(())
+    }
+
+    fn parse(&mut self, payload: &[u8]) -> Result<Vec<WireField>, ChartTitleError> {
+        self.charge(payload.len())?;
+        let fields = parse_wire_fields_with_limits(payload, self.limits).map_err(map_wire_error)?;
+        self.charge(fields.len())?;
+        Ok(fields)
+    }
+}
+
+fn scan_non_style_owners(package: &Package) -> Result<HashMap<u64, usize>, ChartTitleError> {
+    let mut budget = ChartGraphScanBudget::new(package)?;
+    let mut owners = HashMap::new();
     for component in package.state.source.components().iter() {
+        budget.charge(1)?;
         for object in &component.archive().objects {
-            for message in object
-                .messages
-                .iter()
-                .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
-            {
-                let fields = parse_wire_fields_with_limits(message.data.as_slice(), limits)
-                    .map_err(map_wire_error)?;
+            budget.charge(1)?;
+            for message in &object.messages {
+                budget.charge(1)?;
+                if message.type_ != CHART_MESSAGE_TYPE {
+                    continue;
+                }
+                let fields = budget.parse(message.data.as_slice())?;
                 let Some(chart_payload) = unique_length_delimited_field(
                     &fields,
                     message.data.as_slice(),
@@ -909,31 +957,25 @@ fn ensure_non_style_exclusive(
                 else {
                     return Err(ChartTitleError::InvalidSource);
                 };
-                let chart_fields =
-                    parse_wire_fields_with_limits(chart_payload, limits).map_err(map_wire_error)?;
-                if required_reference_field(
+                let chart_fields = budget.parse(chart_payload)?;
+                let non_style_identifier = required_reference_field(
                     &chart_fields,
                     chart_payload,
                     CHART_NON_STYLE_FIELD,
-                    limits,
-                )? == non_style_identifier
-                {
-                    owners = owners
-                        .checked_add(1)
-                        .ok_or(ChartTitleError::InvalidSource)?;
+                    budget.limits,
+                )?;
+                if let Some(count) = owners.get_mut(&non_style_identifier) {
+                    *count = count.checked_add(1).ok_or(ChartTitleError::InvalidSource)?;
+                } else {
+                    owners
+                        .try_reserve(1)
+                        .map_err(|_error| ChartTitleError::Allocation { amount: 1 })?;
+                    owners.insert(non_style_identifier, 1);
                 }
             }
         }
     }
-    if owners != 1 {
-        return Err(ChartTitleError::InvalidSource);
-    }
-    // Keep the selected chart identity in the guard so a caller cannot use a
-    // stale non-style slot after the selected graph has changed.
-    if chart_identifier == 0 {
-        return Err(ChartTitleError::InvalidSource);
-    }
-    Ok(())
+    Ok(owners)
 }
 
 fn rewrite_chart_title(
