@@ -164,40 +164,59 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
     /// between the reader and slice APIs is that the slice APIs will eagerly
     /// validate that the entire compressed data is present.
     pub fn get_entry(&self, entry: ZipArchiveEntryWayfinder) -> Result<ZipSliceEntry<'_>, Error> {
-        let data = self.data.as_ref();
-        let header_offset = usize::try_from(entry.local_header_offset)
-            .unwrap_or(data.len())
-            .min(data.len());
-        let header = &data[header_offset..];
-        let file_header = ZipLocalFileHeaderFixed::parse(header)?;
-        let variable_length = file_header.variable_length();
-
-        let header_size = (ZipLocalFileHeaderFixed::SIZE + variable_length) as u32;
-        let (total_size, o1) =
-            (u64::from(header_size)).overflowing_add(entry.compressed_size_hint());
-
-        if o1 || (header.len() as u64) < total_size {
-            return Err(Error::from(ErrorKind::Eof));
-        }
-
-        let (entire_entry, rest) = header.split_at(total_size as usize);
-
-        let expected_crc = if entry.has_data_descriptor {
-            DataDescriptor::parse(rest)?.crc
-        } else {
-            entry.crc
-        };
-
-        Ok(ZipSliceEntry {
-            data: entire_entry,
-            verifier: ZipVerification {
-                crc: expected_crc,
-                uncompressed_size: entry.uncompressed_size_hint(),
-            },
-            local_header_offset: entry.local_header_offset,
-            data_start_offset: header_size,
-        })
+        slice_entry(self.data.as_ref(), entry)
     }
+}
+
+impl<'data> ZipSliceArchive<&'data [u8]> {
+    /// Seeks to the given file entry, borrowing from the archive's source
+    /// slice for the source lifetime rather than the `&self` borrow.
+    ///
+    /// This behaves exactly like [`Self::get_entry`], but the returned entry
+    /// remains valid for the complete source lifetime, which lets a caller
+    /// retain borrowed member bytes beyond the archive borrow.
+    pub fn get_entry_borrowed(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+    ) -> Result<ZipSliceEntry<'data>, Error> {
+        slice_entry(self.data, entry)
+    }
+}
+
+/// Locates and validates one member's local record within a slice archive.
+fn slice_entry(data: &[u8], entry: ZipArchiveEntryWayfinder) -> Result<ZipSliceEntry<'_>, Error> {
+    let header_offset = usize::try_from(entry.local_header_offset)
+        .unwrap_or(data.len())
+        .min(data.len());
+    let header = &data[header_offset..];
+    let file_header = ZipLocalFileHeaderFixed::parse(header)?;
+    let variable_length = file_header.variable_length();
+
+    let header_size = (ZipLocalFileHeaderFixed::SIZE + variable_length) as u32;
+    let (total_size, o1) =
+        (u64::from(header_size)).overflowing_add(entry.compressed_size_hint());
+
+    if o1 || (header.len() as u64) < total_size {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+
+    let (entire_entry, rest) = header.split_at(total_size as usize);
+
+    let expected_crc = if entry.has_data_descriptor {
+        DataDescriptor::parse(rest)?.crc
+    } else {
+        entry.crc
+    };
+
+    Ok(ZipSliceEntry {
+        data: entire_entry,
+        verifier: ZipVerification {
+            crc: expected_crc,
+            uncompressed_size: entry.uncompressed_size_hint(),
+        },
+        local_header_offset: entry.local_header_offset,
+        data_start_offset: header_size,
+    })
 }
 
 /// Represents a single entry (file or directory) within a `ZipSliceArchive`.
