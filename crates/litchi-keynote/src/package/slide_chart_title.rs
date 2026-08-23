@@ -614,6 +614,7 @@ struct ChartGraph {
     slide_identifier: u64,
     chart_identifier: u64,
     non_style_identifier: u64,
+    title_identifier: u64,
     title: Option<String>,
     slide_component_name: String,
 }
@@ -708,10 +709,10 @@ fn chart_graphs(
             amount: z_order.len(),
         })?;
     // The mutation guard below needs to prove that each selected non-style
-    // object has exactly one chart owner. Keep the package-wide index lazy so
-    // a slide with no charts never pays for the ownership scan, then share it
-    // across every chart in this graph build.
-    let mut non_style_owners = None;
+    // object and title stand-in have exactly one chart owner. Keep the
+    // package-wide index lazy so a slide with no charts never pays for the
+    // ownership scan, then share it across every chart in this graph build.
+    let mut graph_owners = None;
     for identifier in z_order.iter().copied() {
         let Some((component_name, drawable)) = package.object_with_component(identifier) else {
             return Err(ChartTitleError::InvalidSource);
@@ -741,13 +742,14 @@ fn chart_graphs(
             identifier,
         )?;
         if mutation_guards {
-            if non_style_owners.is_none() {
-                non_style_owners = Some(scan_non_style_owners(package)?);
+            if graph_owners.is_none() {
+                graph_owners = Some(scan_chart_graph_owners(package)?);
             }
-            let owners = non_style_owners
+            let owners = graph_owners
                 .as_ref()
                 .ok_or(ChartTitleError::InvalidSource)?;
-            if owners.get(&graph.non_style_identifier).copied() != Some(1)
+            if owners.non_style.get(&graph.non_style_identifier).copied() != Some(1)
+                || owners.title_standin.get(&graph.title_identifier).copied() != Some(1)
                 || graph.chart_identifier == 0
             {
                 return Err(ChartTitleError::InvalidSource);
@@ -820,6 +822,7 @@ fn chart_graph(
         slide_identifier: record.slide_identifier,
         chart_identifier,
         non_style_identifier,
+        title_identifier,
         title,
         slide_component_name: slide_component_name.to_owned(),
     })
@@ -940,9 +943,15 @@ impl ChartGraphScanBudget {
     }
 }
 
-fn scan_non_style_owners(package: &Package) -> Result<HashMap<u64, usize>, ChartTitleError> {
+#[derive(Debug, Default)]
+struct ChartGraphOwners {
+    non_style: HashMap<u64, usize>,
+    title_standin: HashMap<u64, usize>,
+}
+
+fn scan_chart_graph_owners(package: &Package) -> Result<ChartGraphOwners, ChartTitleError> {
     let mut budget = ChartGraphScanBudget::new(package)?;
-    let mut owners = HashMap::new();
+    let mut owners = ChartGraphOwners::default();
     for component in package.state.source.components().iter() {
         budget.charge(1)?;
         for object in &component.archive().objects {
@@ -953,6 +962,19 @@ fn scan_non_style_owners(package: &Package) -> Result<HashMap<u64, usize>, Chart
                     continue;
                 }
                 let fields = budget.parse(message.data.as_slice())?;
+                let drawable_payload = unique_length_delimited_field(
+                    &fields,
+                    message.data.as_slice(),
+                    DRAWABLE_SUPER_FIELD,
+                )?
+                .ok_or(ChartTitleError::InvalidSource)?;
+                let drawable_fields = budget.parse(drawable_payload)?;
+                let title_identifier = required_reference_field(
+                    &drawable_fields,
+                    drawable_payload,
+                    DRAWABLE_TITLE_FIELD,
+                    budget.limits,
+                )?;
                 let Some(chart_payload) = unique_length_delimited_field(
                     &fields,
                     message.data.as_slice(),
@@ -968,18 +990,27 @@ fn scan_non_style_owners(package: &Package) -> Result<HashMap<u64, usize>, Chart
                     CHART_NON_STYLE_FIELD,
                     budget.limits,
                 )?;
-                if let Some(count) = owners.get_mut(&non_style_identifier) {
-                    *count = count.checked_add(1).ok_or(ChartTitleError::InvalidSource)?;
-                } else {
-                    owners
-                        .try_reserve(1)
-                        .map_err(|_error| ChartTitleError::Allocation { amount: 1 })?;
-                    owners.insert(non_style_identifier, 1);
-                }
+                increment_graph_owner(&mut owners.non_style, non_style_identifier)?;
+                increment_graph_owner(&mut owners.title_standin, title_identifier)?;
             }
         }
     }
     Ok(owners)
+}
+
+fn increment_graph_owner(
+    owners: &mut HashMap<u64, usize>,
+    identifier: u64,
+) -> Result<(), ChartTitleError> {
+    if let Some(count) = owners.get_mut(&identifier) {
+        *count = count.checked_add(1).ok_or(ChartTitleError::InvalidSource)?;
+    } else {
+        owners
+            .try_reserve(1)
+            .map_err(|_error| ChartTitleError::Allocation { amount: 1 })?;
+        owners.insert(identifier, 1);
+    }
+    Ok(())
 }
 
 fn rewrite_chart_title(
@@ -1142,6 +1173,7 @@ fn verify_chart_candidate(
         if source_graph.slide_identifier != candidate_graph.slide_identifier
             || source_graph.chart_identifier != candidate_graph.chart_identifier
             || source_graph.non_style_identifier != candidate_graph.non_style_identifier
+            || source_graph.title_identifier != candidate_graph.title_identifier
             || source_graph.slide_component_name != candidate_graph.slide_component_name
         {
             return Err(ChartTitleError::Verification);
