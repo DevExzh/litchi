@@ -2,6 +2,7 @@
 
 use std::env;
 
+#[allow(deprecated)]
 use litchi_iwa::charts::raw::IWorkChartArchive;
 use litchi_iwa::raw::package::IWorkPackage;
 use litchi_iwa::raw::theme::IWorkThemeArchive;
