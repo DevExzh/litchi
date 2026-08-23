@@ -548,7 +548,10 @@ struct FootnoteObjectLocations<'source> {
 }
 
 impl<'source> FootnoteObjectLocations<'source> {
-    fn new(components: &'source ComponentCatalog) -> Result<Self, FootnoteTextError> {
+    fn new(
+        components: &'source ComponentCatalog,
+        budget: &mut FootnoteGraphBudget,
+    ) -> Result<Self, FootnoteTextError> {
         let object_count = components.iter().try_fold(0usize, |count, component| {
             count.checked_add(component.archive().objects.len()).ok_or(
                 FootnoteTextError::LimitExceeded {
@@ -558,6 +561,8 @@ impl<'source> FootnoteObjectLocations<'source> {
                 },
             )
         })?;
+        budget.charge_references(object_count)?;
+        budget.charge_work(object_count)?;
         if object_count > super::MAX_OBJECTS {
             return Err(FootnoteTextError::LimitExceeded {
                 kind: FootnoteTextLimitKind::Entries,
@@ -587,6 +592,111 @@ impl<'source> FootnoteObjectLocations<'source> {
     }
 }
 
+/// Aggregate source, graph-reference, and scan work charged while a footnote
+/// graph is projected.  The ordinary package reader bounds each payload and
+/// the semantic projection bounds retained text, but the transaction keeps
+/// both its source and reopened candidate alive during verification.  Sharing
+/// this coordinator across those two graph passes prevents two individually
+/// valid walks from silently doubling the work and source allowance.
+#[derive(Debug, Clone, Copy)]
+struct FootnoteGraphBudget {
+    maximum_source_bytes: usize,
+    maximum_references: usize,
+    maximum_work: usize,
+    source_bytes: usize,
+    references: usize,
+    work: usize,
+}
+
+impl FootnoteGraphBudget {
+    fn new(limits: super::Limits) -> Result<Self, FootnoteTextError> {
+        let archive = limits
+            .effective_archive_limits()
+            .map_err(map_archive_error)?;
+        let maximum_source_bytes = usize::try_from(limits.max_input_bytes())
+            .unwrap_or(usize::MAX)
+            .checked_mul(2)
+            .unwrap_or(usize::MAX);
+        let maximum_references = archive
+            .max_metadata_items()
+            .checked_mul(limits.max_entries().max(1))
+            .unwrap_or(usize::MAX);
+        let maximum_work = limits
+            .max_iwa_stream_bytes()
+            .checked_mul(16)
+            .unwrap_or(usize::MAX);
+        Ok(Self {
+            maximum_source_bytes,
+            maximum_references,
+            maximum_work,
+            source_bytes: 0,
+            references: 0,
+            work: 0,
+        })
+    }
+
+    fn charge_source(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+        charge_graph_counter(
+            &mut self.source_bytes,
+            amount,
+            self.maximum_source_bytes,
+            FootnoteTextLimitKind::InputBytes,
+        )
+    }
+
+    fn charge_references(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+        charge_graph_counter(
+            &mut self.references,
+            amount,
+            self.maximum_references,
+            FootnoteTextLimitKind::Entries,
+        )
+    }
+
+    fn charge_work(&mut self, amount: usize) -> Result<(), FootnoteTextError> {
+        charge_graph_counter(
+            &mut self.work,
+            amount,
+            self.maximum_work,
+            FootnoteTextLimitKind::WireWork,
+        )
+    }
+
+    #[cfg(test)]
+    const fn with_test_limits(
+        maximum_source_bytes: usize,
+        maximum_references: usize,
+        maximum_work: usize,
+    ) -> Self {
+        Self {
+            maximum_source_bytes,
+            maximum_references,
+            maximum_work,
+            source_bytes: 0,
+            references: 0,
+            work: 0,
+        }
+    }
+}
+
+fn charge_graph_counter(
+    current: &mut usize,
+    amount: usize,
+    maximum: usize,
+    kind: FootnoteTextLimitKind,
+) -> Result<(), FootnoteTextError> {
+    let observed = current.checked_add(amount).unwrap_or(usize::MAX);
+    if observed > maximum {
+        return Err(FootnoteTextError::LimitExceeded {
+            kind,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        });
+    }
+    *current = observed;
+    Ok(())
+}
+
 fn resolve_footnote(
     package: &Package,
     selector: Selector,
@@ -608,9 +718,19 @@ fn resolve_footnote(
 }
 
 fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
+    let mut budget = FootnoteGraphBudget::new(package.state.source.limits())?;
+    native_footnotes_with_budget(package, &mut budget)
+}
+
+fn native_footnotes_with_budget(
+    package: &Package,
+    budget: &mut FootnoteGraphBudget,
+) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
     let mut semantic_budget =
         super::FootnoteSemanticBudget::new(effective_text_limit(package.state.source.limits()));
     let components = package.state.source.components();
+    budget.charge_source(package.state.source.source_bytes().len())?;
+    budget.charge_work(components.len())?;
     let root = root_references_with_limits(components, package.state.source.limits())
         .map_err(map_package_error)?;
     let Some(body_identifier) = root.body else {
@@ -620,6 +740,7 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
         find_object(components, body_identifier.get()).ok_or(FootnoteTextError::InvalidSource)?;
     let body_payload =
         unique_text_payload(&body.messages, body_identifier).map_err(map_package_error)?;
+    budget.charge_work(body_payload.len())?;
     let (body_storage, _) = decode_body_storage_with_wire_error(
         &body.messages,
         body_identifier,
@@ -628,7 +749,9 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
         package.state.source.limits(),
     )
     .map_err(map_body_storage_decode_error)?;
+    budget.charge_work(body_payload.len())?;
     checked_utf16_units(body_storage.text())?;
+    budget.charge_work(body_payload.len())?;
     let entries =
         super::footnote_table_entries(body_payload, body_identifier, package.state.source.limits())
             .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::Entries))?;
@@ -639,6 +762,8 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             maximum: usize_to_u64(MAX_BODY_FOOTNOTES),
         });
     }
+    budget.charge_references(entries.len())?;
+    budget.charge_work(entries.len())?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(entries.len())
@@ -654,7 +779,7 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
                 amount: entries.len(),
             })?;
     }
-    let object_locations = FootnoteObjectLocations::new(components)?;
+    let object_locations = FootnoteObjectLocations::new(components, budget)?;
     let mut previous = None;
     for entry in entries {
         if previous.is_some_and(|position| position >= entry.character_index) {
@@ -680,6 +805,7 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             "Pages footnote reference",
         )
         .map_err(map_package_error)?;
+        budget.charge_work(payload.len())?;
         let decoded = pages_footnote_codec::decode_footnote_reference(
             payload,
             footnote_decode_options(payload, package.state.source.limits())
@@ -705,6 +831,7 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             .ok_or(FootnoteTextError::InvalidSource)?;
         let storage_payload = unique_text_payload(&storage.messages, storage_identifier)
             .map_err(map_package_error)?;
+        budget.charge_work(storage_payload.len())?;
         let (storage_value, _) = decode_body_storage_with_wire_error(
             &storage.messages,
             storage_identifier,
@@ -713,6 +840,8 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             package.state.source.limits(),
         )
         .map_err(map_body_storage_decode_error)?;
+        budget.charge_work(storage_payload.len())?;
+        budget.charge_references(1)?;
         let text = storage_value
             .text()
             .strip_prefix(STORAGE_TEXT_PREFIX)
@@ -754,6 +883,8 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             "Pages footnote marker",
         )
         .map_err(map_package_error)?;
+        budget.charge_work(marker_payload.len())?;
+        budget.charge_references(1)?;
         let marker_value =
             litchi_iwa_protos::pages_footnote_marker_codec::decode_textual_attachment(
                 marker_payload,
@@ -803,7 +934,9 @@ fn rewrite_package_footnote(
     // its storage/reference/marker objects are exclusively owned by this
     // body-footnote graph, nor that the selected ZIP members are canonical
     // exact authorities.
-    prove_footnote_ownership(source, native_footnote)?;
+    let mut graph_budget = FootnoteGraphBudget::new(source_catalog.limits())?;
+    graph_budget.charge_source(source_catalog.source_bytes().len())?;
+    prove_footnote_ownership(source, native_footnote, &mut graph_budget)?;
     validate_mutation_component(source, first_component)?;
     if let Some(component) = second_component {
         validate_mutation_component(source, component)?;
@@ -958,10 +1091,13 @@ fn is_canonical_component_name(name: &str) -> bool {
 fn prove_footnote_ownership(
     package: &Package,
     native_footnote: NativeFootnote,
+    budget: &mut FootnoteGraphBudget,
 ) -> Result<(), FootnoteTextError> {
     let limits = package.state.source.limits();
     for component in package.state.source.components().iter() {
+        budget.charge_work(component.archive().objects.len())?;
         for object in &component.archive().objects {
+            budget.charge_work(object.messages.len())?;
             let owner = object
                 .archive_info
                 .identifier
@@ -969,10 +1105,16 @@ fn prove_footnote_ownership(
                 .ok_or(FootnoteTextError::InvalidSource)?;
 
             for message_info in &object.archive_info.message_infos {
+                budget.charge_references(message_info.object_references.len())?;
+                budget.charge_references(message_info.data_references.len())?;
+                budget.charge_work(message_info.field_infos.len())?;
                 for referenced in &message_info.object_references {
                     validate_graph_edge(owner.get(), *referenced, native_footnote)?;
                 }
                 for field_info in &message_info.field_infos {
+                    budget.charge_references(field_info.object_references.len())?;
+                    budget.charge_references(field_info.data_references.len())?;
+                    budget.charge_work(field_info.path.path.len())?;
                     for referenced in &field_info.object_references {
                         validate_graph_edge(owner.get(), *referenced, native_footnote)?;
                     }
@@ -980,6 +1122,7 @@ fn prove_footnote_ownership(
             }
 
             for message in &object.messages {
+                budget.charge_work(message.data.len())?;
                 if message.type_ == FOOTNOTE_REFERENCE_MESSAGE_TYPE {
                     let decoded = pages_footnote_codec::decode_footnote_reference(
                         &message.data,
@@ -1011,6 +1154,8 @@ fn prove_footnote_ownership(
                 };
                 match super::footnote_table_entries(&message.data, owner_identifier, limits) {
                     Ok(entries) => {
+                        budget.charge_references(entries.len())?;
+                        budget.charge_work(entries.len())?;
                         for entry in entries {
                             validate_graph_edge(
                                 owner.get(),
@@ -1439,8 +1584,9 @@ fn verify_candidate(
     // dedicated TextBytes diagnostic.  `body_footnotes` is still needed for
     // semantic readback, but its generic payload-limit mapping cannot tell an
     // aggregate semantic refusal from a wire-level refusal.
-    let source_graphs = native_footnotes(source)?;
-    let candidate_graphs = native_footnotes(candidate)?;
+    let mut graph_budget = FootnoteGraphBudget::new(source.state.source.limits())?;
+    let source_graphs = native_footnotes_with_budget(source, &mut graph_budget)?;
+    let candidate_graphs = native_footnotes_with_budget(candidate, &mut graph_budget)?;
     // The source and candidate are both retained until the complete semantic
     // readback below succeeds. Share one budget across their projections so
     // two individually-valid collections cannot exceed the retained-text
@@ -1821,10 +1967,11 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind, FootnoteTextPatch,
-        checked_utf16_units, is_canonical_component_name, map_body_footnote_projection_error,
-        map_body_storage_decode_error, map_package_error_with_kind, map_storage_wire_limits_error,
-        position_from_anchor, rewrite_custom_mark_wire,
+        FootnoteGraphBudget, FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind,
+        FootnoteTextPatch, checked_utf16_units, is_canonical_component_name,
+        map_body_footnote_projection_error, map_body_storage_decode_error,
+        map_package_error_with_kind, map_storage_wire_limits_error, position_from_anchor,
+        rewrite_custom_mark_wire,
     };
     use crate::footnote::body::{Footnote, Position};
     use crate::package::{BodyStorageDecodeError, StorageWireLimitsError};
@@ -1928,6 +2075,41 @@ mod tests {
                 maximum: 14,
             }
         );
+    }
+
+    #[test]
+    fn graph_budget_charges_source_references_and_work_without_partial_consumption() {
+        let mut budget = FootnoteGraphBudget::with_test_limits(8, 5, 7);
+        budget.charge_source(8).unwrap();
+        assert!(matches!(
+            budget.charge_source(1),
+            Err(FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::InputBytes,
+                observed: 9,
+                maximum: 8,
+            })
+        ));
+        budget.charge_references(5).unwrap();
+        assert!(matches!(
+            budget.charge_references(1),
+            Err(FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::Entries,
+                observed: 6,
+                maximum: 5,
+            })
+        ));
+        budget.charge_work(7).unwrap();
+        assert!(matches!(
+            budget.charge_work(1),
+            Err(FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::WireWork,
+                observed: 8,
+                maximum: 7,
+            })
+        ));
+        assert_eq!(budget.source_bytes, 8);
+        assert_eq!(budget.references, 5);
+        assert_eq!(budget.work, 7);
     }
 
     #[test]
