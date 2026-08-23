@@ -1153,17 +1153,12 @@ fn run_one(
         .is_save()
         .then(|| expected_digest(operation, corpus))
         .transpose()?;
-    let verified_expected_digest = if cache_selection.cold_verified()
-        && operation.supports_cold_verified()
-        && cold_verified_status == Some(cold_verified::Status::Eligible)
-    {
-        verified_source_path
-            .as_deref()
-            .map(|path| expected_digest_for_source(operation, path))
-            .transpose()?
-    } else {
-        None
-    };
+    let verified_expected_digest = verified_expected_digest(
+        operation,
+        cache_selection,
+        cold_verified_status,
+        verified_source_path.as_deref(),
+    )?;
 
     // Untimed warmups are independent children. Each measured sample then
     // primes with a separate child immediately before the selected measured
@@ -1395,6 +1390,24 @@ fn run_one(
         },
         cold_verified_result,
     })
+}
+
+fn verified_expected_digest(
+    operation: Operation,
+    cache_selection: CacheSelection,
+    cold_verified_status: Option<cold_verified::Status>,
+    verified_source_path: Option<&Path>,
+) -> Result<Option<String>, Box<dyn Error>> {
+    if !operation.is_save()
+        || !cache_selection.cold_verified()
+        || !operation.supports_cold_verified()
+        || cold_verified_status != Some(cold_verified::Status::Eligible)
+    {
+        return Ok(None);
+    }
+    verified_source_path
+        .map(|path| expected_digest_for_source(operation, path))
+        .transpose()
 }
 
 fn record_sample(
@@ -4057,6 +4070,7 @@ mod tests {
         ffi::OsString,
         fs,
         panic::{AssertUnwindSafe, catch_unwind},
+        path::Path,
         process::Command,
         sync::{Arc, Barrier, atomic::Ordering},
         thread,
@@ -4514,6 +4528,73 @@ mod tests {
         assert!(Operation::PptxSourceOpen.supports_cold_verified());
         assert!(Operation::DocxSourceOpenFullTextLifecycle.supports_cold_verified());
         assert!(Operation::OpcSourceOpen.supports_cold_verified());
+    }
+
+    #[test]
+    fn verified_digest_is_requested_only_for_eligible_save_operations() {
+        let path = std::env::temp_dir().join(format!(
+            "litchi-perf-verified-digest-test-{}-{}",
+            std::process::id(),
+            super::SystemTime::now()
+                .duration_since(super::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::write(&path, []).unwrap();
+        let cache_selection = CacheSelection::parse("cold-verified").unwrap();
+        let eligible = Some(super::cold_verified::Status::Eligible);
+
+        for operation in [
+            Operation::OpcEagerOpen,
+            Operation::OpcSourceOpen,
+            Operation::PptxEagerOpen,
+            Operation::PptxSourceOpen,
+            Operation::PptxEagerOpenSlideCountLifecycle,
+            Operation::PptxSourceOpenSlideCountLifecycle,
+            Operation::PptxEagerOpenSelectedSlideLifecycle,
+            Operation::PptxSourceOpenSelectedSlideLifecycle,
+            Operation::DocxEagerOpen,
+            Operation::DocxSourceOpen,
+            Operation::DocxEagerOpenParagraphCountLifecycle,
+            Operation::DocxSourceOpenParagraphCountLifecycle,
+            Operation::DocxEagerOpenFullTextLifecycle,
+            Operation::DocxSourceOpenFullTextLifecycle,
+        ] {
+            assert!(operation.supports_cold_verified());
+            assert!(!operation.is_save());
+            assert_eq!(
+                super::verified_expected_digest(
+                    operation,
+                    cache_selection,
+                    eligible,
+                    Some(Path::new(&path)),
+                )
+                .unwrap(),
+                None,
+                "{operation:?} must not request an output digest"
+            );
+        }
+
+        for operation in [
+            Operation::OpcEagerSave,
+            Operation::OpcSourceSave,
+            Operation::CfbOverlaySave,
+            Operation::CfbOwnedOverlaySave,
+        ] {
+            assert!(operation.is_save());
+            assert!(
+                super::verified_expected_digest(
+                    operation,
+                    cache_selection,
+                    eligible,
+                    Some(Path::new(&path)),
+                )
+                .is_err(),
+                "{operation:?} must request its output digest"
+            );
+        }
+
+        fs::remove_file(path).unwrap();
     }
 
     #[test]
