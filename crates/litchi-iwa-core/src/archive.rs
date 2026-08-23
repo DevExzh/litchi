@@ -1270,9 +1270,10 @@ impl ArchiveObject {
     /// positional semantics. The caller remains responsible for proving that
     /// the data references are safe to reorder. At most one nested
     /// `FieldInfo` may have a complete data-reference list matching the
-    /// aggregate list; that uniquely matching field is reordered with it.
-    /// Multiple matching fields are rejected as ambiguous, while unrelated
-    /// nested metadata remains untouched.
+    /// aggregate list when the order changes; that uniquely matching field is
+    /// reordered with it. Multiple matching fields are rejected as ambiguous
+    /// for an actual reorder, while a byte-identical no-op remains a header-
+    /// preserving replacement. Unrelated nested metadata remains untouched.
     pub fn replace_message_reordering_data_references_preserving_header(
         &mut self,
         index: usize,
@@ -1292,10 +1293,12 @@ impl ArchiveObject {
     /// Validation, raw-wire rewriting, neutral projection, and enclosing
     /// object sizing complete before mutation. Unknown fields, field order,
     /// non-canonical encodings, and unrelated metadata remain byte-for-byte
-    /// unchanged. The uniquely matching nested `FieldInfo` data-reference
-    /// list follows the aggregate reorder; nonmatching nested lists are
-    /// retained. If more than one nested list matches, the operation fails
-    /// atomically because the physical layer cannot select an owner.
+    /// unchanged. For an actual reorder, the uniquely matching nested
+    /// `FieldInfo` data-reference list follows the aggregate reorder;
+    /// nonmatching nested lists are retained. If more than one nested list
+    /// matches, an actual reorder fails atomically because the physical layer
+    /// cannot select an owner. A byte-identical request delegates to the
+    /// header-preserving replacement path without selecting a nested owner.
     #[allow(
         clippy::too_many_arguments,
         reason = "the physical rewrite keeps complete source and requested reference state explicit"
@@ -1327,6 +1330,12 @@ impl ArchiveObject {
             reordered_data_references,
             index,
         )?;
+        let replacement_length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
+        check_message_length(message.data.len(), limits)?;
+        if expected_data_references == reordered_data_references {
+            return self.replace_message_preserving_header_with_limits(index, message, limits);
+        }
         let matching_field_info_count = current_info
             .field_infos
             .iter()
@@ -1337,12 +1346,6 @@ impl ArchiveObject {
                 index,
                 "data-reference reorder has ambiguous matching FieldInfo metadata",
             ));
-        }
-        let replacement_length = u32::try_from(message.data.len())
-            .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
-        check_message_length(message.data.len(), limits)?;
-        if expected_data_references == reordered_data_references {
-            return self.replace_message_preserving_header_with_limits(index, message, limits);
         }
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
@@ -6332,6 +6335,43 @@ mod tests {
             })
         ));
         assert_eq!(object, before);
+        Ok(())
+    }
+
+    #[test]
+    fn data_reference_reorder_noop_preserves_source_with_ambiguous_field_infos() -> Result<()> {
+        let aggregate = [10, 20, 30];
+        let mut object = data_reorder_object(&aggregate, &[&aggregate, &aggregate, &[10, 30]])?;
+        let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
+        let unknown_archive_info = [0xb5, 0x0c, 1, 2, 3, 4];
+        let mut raw_header = canonical.clone();
+        raw_header.extend_from_slice(&unknown_archive_info);
+        object.original_header = Some(raw_header.clone().into_boxed_slice());
+        object.original_canonical_header = Some(canonical.into_boxed_slice());
+        let source = Archive {
+            objects: vec![object.clone()],
+        }
+        .to_bytes()?;
+        let replacement = object.messages[0].clone();
+
+        let old = object.replace_message_reordering_data_references_preserving_header(
+            0,
+            replacement.clone(),
+            &aggregate,
+        )?;
+
+        assert_eq!(old, replacement);
+        assert_eq!(
+            Archive {
+                objects: vec![object.clone()],
+            }
+            .to_bytes()?,
+            source
+        );
+        assert_eq!(
+            object.original_header.as_deref(),
+            Some(raw_header.as_slice())
+        );
         Ok(())
     }
 
