@@ -5040,42 +5040,6 @@ impl fmt::Debug for Patch {
     }
 }
 
-#[derive(Clone)]
-struct SnapshotSource {
-    bytes: Arc<[u8]>,
-    version: SourceVersion,
-}
-
-impl SnapshotSource {
-    fn new(bytes: Arc<[u8]>, version: SourceVersion) -> Self {
-        Self { bytes, version }
-    }
-}
-
-impl ReadAt for SnapshotSource {
-    fn len(&self) -> std::io::Result<u64> {
-        u64::try_from(self.bytes.len())
-            .map_err(|_error| std::io::Error::other("XLS snapshot length exceeds u64"))
-    }
-
-    fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
-        let start = match usize::try_from(offset) {
-            Ok(start) => start,
-            Err(_error) => return Ok(0),
-        };
-        let Some(source) = self.bytes.get(start..) else {
-            return Ok(0);
-        };
-        let count = source.len().min(output.len());
-        output[..count].copy_from_slice(&source[..count]);
-        Ok(count)
-    }
-
-    fn version(&self) -> std::io::Result<SourceVersion> {
-        Ok(self.version)
-    }
-}
-
 /// A seekable adapter for semantic validation over a lazy composed CFB view.
 ///
 /// `Workbook` is intentionally kept generic over `Read + Seek`, while the
@@ -5271,12 +5235,11 @@ fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBacked
     require_unprotected_workbook(&source_workbook)?;
     require_macro_free_workbook(&source_workbook)?;
 
-    let source_adapter: Arc<dyn ReadAt> = Arc::new(SnapshotSource::new(
+    let publisher = SourceBackedOverlayPublisher::open_owned(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
-    ));
-    let publisher =
-        SourceBackedOverlayPublisher::open(source_adapter).map_err(source_backed_overlay_error)?;
+    )
+    .map_err(source_backed_overlay_error)?;
     let source_version = publisher
         .source_version()
         .map_err(source_backed_overlay_error)?;
