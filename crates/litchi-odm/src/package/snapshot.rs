@@ -56,6 +56,14 @@ impl Snapshot {
         Self::from_package(package)
     }
 
+    pub(crate) fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let package = Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package(package)
+    }
+
     fn from_package(package: Package) -> Result<Self> {
         let semantics = crate::codec::parse(package.content_xml())?;
         let styles = crate::codec::parse_catalog(package.content_xml(), package.styles_xml())?;

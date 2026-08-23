@@ -1,10 +1,11 @@
 //! ODT package lifecycle, mutation, and lossless byte access.
 
 use super::model::Document;
-use crate::core::{Content, Meta, OwnedPackage, PreparedPackage, Styles};
+use crate::core::{Content, Meta, OwnedPackage, PreparedPackage, SourcePackageLimits, Styles};
 use crate::elements::style::{StyleElements, StyleRegistry};
 use litchi_core::{Error, Result};
 use std::path::Path;
+use zeroize::Zeroizing;
 
 impl Document {
     pub(crate) fn into_package(self) -> OwnedPackage {
@@ -77,8 +78,14 @@ impl Document {
     /// # }
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let bytes = std::fs::read(path.as_ref())?;
-        Self::from_bytes(bytes)
+        let file = std::fs::File::open(path)?;
+        Self::from_owned_package(OwnedPackage::from_reader(file)?)
+    }
+
+    /// Open an ODT document from a path under explicit finite package limits.
+    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: SourcePackageLimits) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        Self::from_owned_package(OwnedPackage::from_reader_with_limits(file, limits)?)
     }
 
     /// Open a password-encrypted ODT document.
@@ -86,8 +93,28 @@ impl Document {
         path: P,
         password: impl Into<String>,
     ) -> Result<Self> {
-        let bytes = std::fs::read(path.as_ref())?;
-        Self::from_bytes_with_password(bytes, password)
+        let mut password = Zeroizing::new(password.into());
+        let file = std::fs::File::open(path)?;
+        Self::from_owned_package(OwnedPackage::from_reader_with_password(
+            file,
+            std::mem::take(&mut *password),
+        )?)
+    }
+
+    /// Open a password-encrypted ODT document from a path with explicit finite
+    /// package limits.
+    pub fn open_with_limits_and_password<P: AsRef<Path>>(
+        path: P,
+        limits: SourcePackageLimits,
+        password: impl Into<String>,
+    ) -> Result<Self> {
+        let mut password = Zeroizing::new(password.into());
+        let file = std::fs::File::open(path)?;
+        Self::from_owned_package(OwnedPackage::from_reader_with_limits_and_password(
+            file,
+            limits,
+            std::mem::take(&mut *password),
+        )?)
     }
 
     /// Create a Document from a byte buffer.
@@ -115,13 +142,27 @@ impl Document {
     /// # }
     /// ```
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let owned_package = OwnedPackage::from_bytes(bytes)?;
-        Self::from_owned_package(owned_package)
+        // Let the prepared detector perform the local MIME probe exactly
+        // once.  A matching ODT result transfers its indexed archive; a
+        // different ODF family still follows the historical package owner so
+        // its MIME error is reported at the same boundary; rejected probes
+        // recover the original allocation for the ordinary parser.
+        match litchi_odf_common::detect::prepared_or_original(bytes) {
+            Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Odt => {
+                Self::from_prepared_package(prepared)
+            },
+            Ok(prepared) => Self::from_owned_package(prepared.into_package()),
+            Err(bytes) => Self::from_owned_package(OwnedPackage::from_bytes(bytes)?),
+        }
     }
 
     /// Create a document from password-encrypted ODT bytes.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Self::from_owned_package(OwnedPackage::from_bytes_with_password(bytes, password)?)
+        let mut password = Zeroizing::new(password.into());
+        Self::from_owned_package(OwnedPackage::from_bytes_with_password(
+            bytes,
+            std::mem::take(&mut *password),
+        )?)
     }
 
     /// Open a prepared packaged ODF result produced by smart detection.

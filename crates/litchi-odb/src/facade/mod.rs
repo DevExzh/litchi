@@ -40,7 +40,7 @@ impl Database {
     /// Returns an error if the file cannot be read, the password is incorrect,
     /// or the decrypted package is invalid.
     pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_bytes_with_password(std::fs::read(path)?, password)
+        crate::package::Snapshot::open_with_password(path, password).map(|package| Self { package })
     }
 
     /// Opens a password-encrypted database package from in-memory bytes.

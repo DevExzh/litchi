@@ -43,11 +43,7 @@ impl Package {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let package = family::Package::open(path, MIMETYPE, BODY_MARKER, "ODS")?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-        })
+        Self::from_bytes(std::fs::read(path.as_ref())?)
     }
 
     /// Open a password-encrypted ODS package and validate its decrypted semantic owners.
@@ -57,7 +53,12 @@ impl Package {
     /// Returns an error for file I/O, an incorrect password, malformed encryption metadata,
     /// MIME/body mismatch, invalid XML, or worksheet validation failure.
     pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_bytes_with_password(std::fs::read(path)?, password)
+        let package =
+            family::Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODS")?;
+        crate::authoring::validate_content_xml(package.content_xml())?;
+        Ok(Self {
+            inner: Arc::new(package),
+        })
     }
 
     ///
