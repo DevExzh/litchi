@@ -37,11 +37,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Construct a cursor after validating its raw limit profile.
-    pub fn try_with_limits(
-        data: &'a [u8],
-        context: &'static str,
-        limits: Limits,
-    ) -> Result<Self> {
+    pub fn try_with_limits(data: &'a [u8], context: &'static str, limits: Limits) -> Result<Self> {
         match limits.validate() {
             Ok(limits) => Ok(Self::with_limits(data, context, limits)),
             Err(error) => Err(error),

@@ -231,7 +231,7 @@ impl Editor {
             .stream(path)
             .is_some_and(|current| current == data.as_ref())
         {
-            return self.finish();
+            return self.clone().finish();
         }
         let mut candidate = self.clone();
         candidate.package.put_stream(path, data, self.limits)?;
@@ -502,7 +502,7 @@ impl Editor {
         Ok(Commit::new(snapshot, Patch::new(before, after)))
     }
 
-    fn commit_candidate(mut self) -> Result<Self, OleError> {
+    fn commit_candidate(self) -> Result<Self, OleError> {
         self.commit_candidate_with_rendered()
             .map(|(candidate, _rendered)| candidate)
     }

@@ -14089,7 +14089,7 @@ fn xlsb_names_digest(names: &[String]) -> Result<String, Box<dyn Error>> {
 fn xlsb_collect_cells_in_order(
     worksheets: &[litchi_xlsb::Worksheet],
 ) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
-    use litchi_core::sheet::{Cell as _, CellIterator as _, Worksheet as _};
+    use litchi_core::sheet::Worksheet as _;
 
     let mut cells = Vec::new();
     for (sheet, worksheet) in worksheets.iter().enumerate() {
@@ -14120,7 +14120,7 @@ fn xlsb_collect_cells_in_order(
 fn xlsb_scan_cells_in_order(
     worksheets: &[litchi_xlsb::Worksheet],
 ) -> Result<(usize, [u8; 32]), Box<dyn Error>> {
-    use litchi_core::sheet::{Cell as _, CellIterator as _, Worksheet as _};
+    use litchi_core::sheet::Worksheet as _;
 
     let mut digest = Sha256::new();
     digest.update(XLSB_CELL_DIGEST_DOMAIN);
@@ -43966,10 +43966,10 @@ mod tests {
 
     #[test]
     fn native_ole2_tiny_corpora_exercise_all_semantic_cases() {
-        let families = [
+        let families: [(Case, &[Case]); 3] = [
             (
                 Case::DocFreshWriteTo,
-                [
+                &[
                     Case::DocSemanticOpen,
                     Case::DocSemanticListParagraphs,
                     Case::DocSemanticOneParagraph,
@@ -43981,7 +43981,7 @@ mod tests {
             ),
             (
                 Case::XlsFreshWriteTo,
-                [
+                &[
                     Case::XlsSemanticOpen,
                     Case::XlsSemanticListWorksheets,
                     Case::XlsSemanticOneCell,
@@ -43992,7 +43992,7 @@ mod tests {
             ),
             (
                 Case::PptFreshWriteTo,
-                [
+                &[
                     Case::PptSemanticOpen,
                     Case::PptSemanticListSlides,
                     Case::PptSemanticOneShapeText,
@@ -44007,7 +44007,7 @@ mod tests {
             let corpus = build_writer_corpus(writer_case, WriterShape::Tiny).unwrap();
             let again = build_writer_corpus(writer_case, WriterShape::Tiny).unwrap();
             assert_eq!(corpus.archive, again.archive, "{}", writer_case.name());
-            for case in semantic_cases {
+            for case in semantic_cases.iter().copied() {
                 let measured = run_case(case, &corpus, 0, 1).unwrap();
                 assert_eq!(measured.case, case.name());
                 assert_eq!(measured.elapsed_ns.samples.len(), 1);
