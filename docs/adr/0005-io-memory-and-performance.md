@@ -565,3 +565,80 @@ are bounded source, test, deprecation, and fuzz-harness hardening:
 No test/build/Cargo execution, sanitizer campaign, native application
 result, performance/allocation measurement, dependency-edge or ordered-debt
 change, host-exit, or monolith-deletion result is admitted by this amendment.
+
+## 2026-08-23 amendment: current HEAD truth audit
+
+The preceding `4f2c14484` note is historical. At committed HEAD
+`51ca8eae7` (parent `9366d0a00`), the intervening source changes remain narrow:
+
+- `b316320c9` marks the `litchi-iwa::raw` compatibility facade deprecated and
+  makes the boundary checker require that marker. Its policy update only
+  clarifies ordered debt 9's reason and exit condition; it removes no edge or
+  debt item.
+- `e4533c17d` lets focused and migration-host Keynote chart-title setters take
+  `AsRef<str>`. `ChartTitleEdit::set` still copies through the existing
+  64-MiB visible-title ceiling before staging. The owned-input cases are
+  source-level tests, not an executed test gate.
+- `9366d0a00` only removes needless `&Cell` borrows in XLS test calls.
+- `51ca8eae7` changes Pages footnote edit publication to use fallible exact
+  reservations for staged text and custom-mark copies and adds typed mapping
+  cases. This is edit-local allocation hardening, not package-wide accounting
+  or a peak-memory bound.
+
+The archived HEAD metadata still contains 64 workspace packages, 239 internal
+dependency declarations, and 13 ordered debts. The complete boundary checker
+is not green at this HEAD: it reports 22 findings (two Keynote
+slide-transition validator exports, 18 Pages table-lock alias sites, and the
+two existing `TableLockState`/`TableSelector` aliases). These are inventory
+and source-audit observations only. No test/build/Cargo execution, native
+application result, performance measurement, Buffa/Prost or generated-schema
+boundary change, dependency-edge/debt retirement, host exit, or monolith
+deletion follows from these commits.
+
+## 2026-08-23 amendment: current HEAD extension after the truth audit
+
+The preceding `51ca8eae7` audit is historical. At current committed HEAD
+`ff782f2f5` (parent `dab07a09f`), `dab07a09f` extends the existing bounded
+Keynote chart-graph ownership scan to count both non-style owners and title
+stand-ins, rejecting a shared title stand-in before read or edit and adding a
+focused malformed-graph case. It changes no chart-title wire authority or
+package-wide limit profile. `ff782f2f5` marks the three legacy
+`KeynoteSlideInfo` native text-storage ID fields deprecated and adds a source
+ratchet; the migration-host compatibility value remains available.
+
+These are source-level ownership/deprecation changes. No test command, native
+application result, performance measurement, Buffa/Prost projection change,
+dependency-edge/debt retirement, host exit, or monolith deletion is admitted.
+
+## 2026-08-23 amendment: current HEAD extension after cache and stale-metadata fixes
+
+The preceding `ff782f2f5` note is historical. At current committed HEAD
+`8cddd44af`, `09286432e` charges the empty body-table metadata inventory
+before declaration reservation and rejects stale field-9 table declarations
+as invalid source rather than treating them as an ordinary selector miss.
+The focused and integration cases are source-level coverage only.
+`8cddd44af` adds a test-only moved/replaced-entry cache invalidation case; it
+does not change production cache behavior. These changes do not establish a
+package-wide memory, latency, or performance result.
+
+The current Cargo inventory remains 64 workspace packages, 239 internal
+declarations, and 13 ordered debts. The complete boundary checker remains
+non-green with 22 findings (two Keynote slide-transition validator exports,
+18 Pages table-lock alias sites, and the two existing
+`TableLockState`/`TableSelector` aliases). No test execution, native result,
+Buffa/Prost or generated-schema change, dependency-edge/debt retirement, host
+exit, or monolith deletion follows.
+
+## 2026-08-23 amendment: current HEAD extension after deprecation and alias guards
+
+The preceding `8cddd44af` note is historical. At current committed HEAD
+`546df8f04`, `406cff111` adds source ratchets requiring the retained Numbers
+cell-comment and Pages section-text compatibility methods to stay deprecated;
+it adds boundary unit cases but changes no runtime format path. `546df8f04`
+rejects aliased Keynote slide/show/node identities before transition reads or
+staging and adds malformed-topology coverage. The existing bounded owner-work
+profile is retained; no package-wide or performance result is implied.
+
+No test command, native application result, Buffa/Prost or generated-schema
+change, dependency-edge/debt retirement, host exit, or monolith deletion is
+admitted by these source and boundary-ratchet changes.

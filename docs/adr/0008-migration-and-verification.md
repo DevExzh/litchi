@@ -11870,3 +11870,77 @@ are bounded source, test, deprecation, and fuzz-harness hardening:
 No test/build/Cargo execution, sanitizer campaign, native application
 result, performance/allocation measurement, dependency-edge or ordered-debt
 change, host-exit, or monolith-deletion result is admitted by this amendment.
+
+## 2026-08-23 amendment: current HEAD truth audit
+
+The preceding `4f2c14484` note remains historical. At committed HEAD
+`51ca8eae7` (parent `9366d0a00`), `b316320c9` adds an explicit deprecation
+marker and source ratchet for the legacy `litchi-iwa::raw` facade;
+`e4533c17d` broadens chart-title setters to accept owned text while retaining
+the existing bounded copy; `9366d0a00` only cleans up XLS test-call borrows;
+and `51ca8eae7` makes staged Pages footnote/custom-mark copies fallible while
+adding typed error-mapping cases. These changes add focused source coverage,
+but no test command was run or recorded by this audit.
+
+No new native application artifact, save/reopen result, or Rust/native parity
+evidence is supplied. None of these commits changes a Buffa/Prost projection,
+generated decode/encode path, or the established physical/semantic limit
+profiles. The current Cargo inventory remains 64 workspace packages, 239
+internal declarations, and 13 ordered debts. A complete checker run against
+the archived HEAD is non-green with 22 findings: two Keynote
+slide-transition validator exports, 18 Pages table-lock alias sites, and the
+two existing `TableLockState`/`TableSelector` aliases. No verification gate,
+dependency edge, ordered debt, migration-host exit, or monolith deletion is
+retired here.
+
+## 2026-08-23 amendment: current HEAD extension after the truth audit
+
+The preceding `51ca8eae7` audit is historical. Current HEAD is
+`ff782f2f5` (parent `dab07a09f`): `dab07a09f` adds a bounded ownership check
+for shared Keynote chart title stand-ins and a focused malformed-graph case;
+`ff782f2f5` deprecates the migration-host `KeynoteSlideInfo` title, body, and
+speaker-notes storage-ID fields and adds a boundary source ratchet. No test
+command was run or recorded, and neither change supplies native application
+or Rust/native parity evidence.
+
+Cargo inventory remains 64 workspace packages, 239 internal declarations, and
+13 ordered debts. The archived HEAD boundary checker is still non-green with
+22 findings (two Keynote slide-transition validator exports, 18 Pages
+table-lock alias sites, and the two existing `TableLockState`/`TableSelector`
+aliases). No Buffa/Prost or generated-schema migration, verification gate,
+dependency edge, ordered debt, migration-host exit, or monolith deletion is
+retired.
+
+## 2026-08-23 amendment: current HEAD extension after cache and stale-metadata fixes
+
+The preceding `ff782f2f5` note is historical. At current HEAD `8cddd44af`,
+`09286432e` adds bounded empty-body metadata accounting and rejects stale
+table declarations, with focused source and integration cases; `8cddd44af`
+adds a test-only moved/replaced-entry cache invalidation case. No test command
+was run or recorded by this audit. No native application or Rust/native parity
+evidence is supplied, and these commits change neither the Buffa/Prost
+projection boundary nor generated-schema ownership.
+
+The 64-package, 239-internal-declaration, 13-debt inventory is unchanged. The
+archived HEAD boundary checker remains non-green with 22 findings: two
+Keynote slide-transition validator exports, 18 Pages table-lock alias sites,
+and the two existing `TableLockState`/`TableSelector` aliases. No verification
+gate, dependency edge, ordered debt, migration-host exit, or monolith deletion
+is retired.
+
+## 2026-08-23 amendment: current HEAD extension after deprecation and alias guards
+
+The preceding `8cddd44af` note is historical. At current HEAD `546df8f04`,
+`406cff111` adds boundary source checks for the retained Numbers cell-comment
+and Pages section-text deprecation markers, while `546df8f04` rejects aliased
+Keynote slide/show/node identities before transition reads or staging. The
+new focused cases are not an executed test gate; no test command was run or
+recorded. No native application or Rust/native parity evidence is supplied.
+
+Cargo inventory and policy remain 64 workspace packages, 239 internal
+declarations, and 13 ordered debts. The boundary checker remains non-green
+with 22 findings (two Keynote slide-transition validator exports, 18 Pages
+table-lock alias sites, and the two existing `TableLockState`/`TableSelector`
+aliases). No Buffa/Prost migration, generated-schema change, verification
+gate, dependency edge, ordered debt, migration-host exit, or monolith deletion
+is retired.
