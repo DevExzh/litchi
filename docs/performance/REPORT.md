@@ -11,6 +11,23 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## Real-producer security correctness corpus (change 0264)
+
+[Change 0264](changes/0264-real-producer-security-corpus.md), landed in
+`be46f6bf6b6491f451167a9adda6ec3fbcfa1c52`, adds an ignored locked CI gate
+over eight pinned public fixtures: signed DOCX/XLSX/PPTX, protected DOCX,
+two encrypted DOC files, a macro XLS, and an external-link XLSX. The source
+SHA-256 manifest is recorded in the change record and in
+`tools/perf-baseline/src/security_corpus.rs`.
+
+The gate checks valid signatures, exact signed and protected no-ops, zero
+output on signed mutation and protected-edit refusal, typed password behavior
+and semantic decryption digests, inert VBA CFB-stream preservation and typed
+edit refusal, external-target inventory without fetching, and one-under input
+plus zero-output budget/release behavior. This is bounded correctness-only
+evidence; it changes no selector or default count and makes no latency,
+allocation, RSS, physical-I/O, or resource-performance claim.
+
 ## DOCX story-hyperlink publication selectors (change 0263)
 
 [Change 0263](changes/0263-docx-story-hyperlink-publication.md), landed in
