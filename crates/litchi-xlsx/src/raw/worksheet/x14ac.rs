@@ -70,13 +70,11 @@ fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Resul
     let mut stack = Vec::<Context>::new();
     let mut values = Values::default();
     let mut previous_row = 0u32;
-    let mut buffer = Vec::new();
 
     loop {
-        let event = reader
-            .read_event_into(&mut buffer)
+        let (namespace, event) = reader
+            .read_resolved_event()
             .map_err(|error| invalid(format!("invalid worksheet extension XML: {error}")))?;
-        let (namespace, event) = reader.resolver().resolve_event(event);
         let decoder = reader.decoder();
         let resolver = reader.resolver();
         match event {
@@ -131,7 +129,6 @@ fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Resul
             | Event::DocType(_)
             | Event::GeneralRef(_) => {},
         }
-        buffer.clear();
     }
     Ok(values)
 }
@@ -223,13 +220,11 @@ fn rewrite_descent_attributes(content: &[u8]) -> Result<Vec<u8>> {
         .try_reserve_exact(content.len())
         .map_err(|source| allocation("worksheet extension rewrite", source))?;
     let mut writer = Writer::new(output);
-    let mut buffer = Vec::new();
 
     loop {
-        let event = reader
-            .read_event_into(&mut buffer)
+        let (_, event) = reader
+            .read_resolved_event()
             .map_err(|error| invalid(format!("invalid worksheet extension XML: {error}")))?;
-        let (_, event) = reader.resolver().resolve_event(event);
         let resolver = reader.resolver();
         match event {
             Event::Start(element) => writer
@@ -250,7 +245,6 @@ fn rewrite_descent_attributes(content: &[u8]) -> Result<Vec<u8>> {
                 .write_event(other)
                 .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
         }
-        buffer.clear();
     }
     Ok(writer.into_inner())
 }

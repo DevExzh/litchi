@@ -42,10 +42,16 @@ pub(super) fn parse_processed_defaults(
     let mut buffer = Vec::new();
 
     loop {
+<<<<<<< HEAD
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| invalid(error.to_string()))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
+=======
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(error.to_string()))?;
+>>>>>>> agent/0232-xlsx-xml-integration
         let decoder = reader.decoder();
         let resolver = reader.resolver();
         match event {
@@ -211,10 +217,16 @@ impl Parser {
         let mut buffer = Vec::new();
 
         loop {
+<<<<<<< HEAD
             let event = reader
                 .read_event_into(&mut buffer)
                 .map_err(|error| invalid(error.to_string()))?;
             let (namespace, event) = reader.resolver().resolve_event(event);
+=======
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| invalid(error.to_string()))?;
+>>>>>>> agent/0232-xlsx-xml-integration
             let decoder = reader.decoder();
             let resolver = reader.resolver();
             match event {

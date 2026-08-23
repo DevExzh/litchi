@@ -198,7 +198,10 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
     let mut scanner = Scanner::default();
     let mut stack = Vec::<Frame>::new();
     let mut events = 0usize;
+<<<<<<< HEAD
     let mut buffer = Vec::new();
+=======
+>>>>>>> agent/0232-xlsx-xml-integration
 
     loop {
         events = events
@@ -208,10 +211,16 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
             return Err(invalid("worksheet XML exceeds event limit"));
         }
         let event_start = position(&reader)?;
+<<<<<<< HEAD
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(|error| invalid(error.to_string()))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
+=======
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| invalid(error.to_string()))?;
+>>>>>>> agent/0232-xlsx-xml-integration
         let event_end = position(&reader)?;
         let decoder = reader.decoder();
         let resolver = reader.resolver();
