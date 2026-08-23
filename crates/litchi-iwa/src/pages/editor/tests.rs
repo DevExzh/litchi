@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use super::*;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
