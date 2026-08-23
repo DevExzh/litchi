@@ -28,6 +28,7 @@ const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const TILE_MESSAGE_TYPE: u32 = 6_002;
 const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
+const TABLE_DATA_LIST_ALT_MESSAGE_TYPE: u32 = 6_201;
 const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
 const RICH_TEXT_PAYLOAD_MESSAGE_TYPE: u32 = 6_218;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
@@ -63,6 +64,7 @@ enum Corruption {
     DuplicateRootKey,
     DuplicateSegmentKey,
     SelectedMalformedList,
+    NonCanonicalRootList,
     CommentMissingText,
     CommentMalformedNestedWire,
     CommentDuplicateCanonicalPayload,
@@ -306,7 +308,10 @@ fn list_message(
     }
 }
 
-fn sidecar_object(corruption: Corruption) -> TestResult<ArchiveObject> {
+fn sidecar_object_with_message_type(
+    corruption: Corruption,
+    table_data_list_message_type: u32,
+) -> TestResult<ArchiveObject> {
     let mut string_entries = bounded(
         [
             string_entry(17, "String root unused"),
@@ -353,23 +358,23 @@ fn sidecar_object(corruption: Corruption) -> TestResult<ArchiveObject> {
     let mut payloads = bounded(
         [
             RawMessage {
-                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                type_: table_data_list_message_type,
                 data: string_list.encode_to_vec(),
             },
             RawMessage {
-                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                type_: table_data_list_message_type,
                 data: formula_list.encode_to_vec(),
             },
             RawMessage {
-                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                type_: table_data_list_message_type,
                 data: formula_error_list.encode_to_vec(),
             },
             RawMessage {
-                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                type_: table_data_list_message_type,
                 data: rich_text_list.encode_to_vec(),
             },
             RawMessage {
-                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                type_: table_data_list_message_type,
                 data: comment_list.encode_to_vec(),
             },
         ],
@@ -377,6 +382,11 @@ fn sidecar_object(corruption: Corruption) -> TestResult<ArchiveObject> {
     )?;
     if matches!(corruption, Corruption::SelectedMalformedList) {
         payloads[0].data = vec![0xff];
+    }
+    if matches!(corruption, Corruption::NonCanonicalRootList) {
+        // Prost accepts a duplicate scalar field with last-wins semantics;
+        // the production strict list codec rejects this non-canonical wire.
+        payloads[0].data.extend_from_slice(&[0x08, 0x01]);
     }
     Ok(ArchiveObject::new(SIDECAR_ID, payloads)?)
 }
@@ -541,6 +551,15 @@ fn table_model() -> tst::TableModelArchive {
     tst::TableModelArchive {
         table_id: "table-data-list-table-id".to_owned(),
         table_name: "Mixed table-data-list table".to_owned(),
+        table_style: reference(SIDECAR_ID),
+        body_text_style: reference(SIDECAR_ID),
+        header_row_text_style: reference(SIDECAR_ID),
+        header_column_text_style: reference(SIDECAR_ID),
+        footer_row_text_style: reference(SIDECAR_ID),
+        body_cell_style: reference(SIDECAR_ID),
+        header_row_style: reference(SIDECAR_ID),
+        header_column_style: reference(SIDECAR_ID),
+        footer_row_style: reference(SIDECAR_ID),
         number_of_rows: 5,
         number_of_columns: 1,
         base_data_store: tst::DataStore {
@@ -600,6 +619,8 @@ fn table_tile(comment_identifier: u32) -> TestResult<tst::Tile> {
             tile_row_index: u32::try_from(row)?,
             cell_count: 1,
             storage_version: Some(5),
+            cell_storage_buffer_pre_bnc: storage.clone(),
+            cell_offsets_pre_bnc: vec![0, 0],
             cell_storage_buffer: Some(storage),
             cell_offsets: Some(vec![0, 0]),
             ..Default::default()
@@ -620,6 +641,18 @@ fn table_tile(comment_identifier: u32) -> TestResult<tst::Tile> {
 fn synthetic_table_data_list_package(
     corruption: Corruption,
     comment_identifier: u32,
+) -> TestResult<Vec<u8>> {
+    synthetic_table_data_list_package_with_message_type(
+        corruption,
+        comment_identifier,
+        TABLE_DATA_LIST_MESSAGE_TYPE,
+    )
+}
+
+fn synthetic_table_data_list_package_with_message_type(
+    corruption: Corruption,
+    comment_identifier: u32,
+    table_data_list_message_type: u32,
 ) -> TestResult<Vec<u8>> {
     let mut objects = Vec::new();
     objects.try_reserve(20)?;
@@ -656,7 +689,10 @@ fn synthetic_table_data_list_package(
         TABLE_MODEL_MESSAGE_TYPE,
         table_model().encode_to_vec(),
     )?);
-    objects.push(sidecar_object(corruption)?);
+    objects.push(sidecar_object_with_message_type(
+        corruption,
+        table_data_list_message_type,
+    )?);
 
     let tile = table_tile(comment_identifier)?;
     objects.push(object(TILE_ID, TILE_MESSAGE_TYPE, tile.encode_to_vec())?);
@@ -776,6 +812,62 @@ fn mixed_root_and_segments_project_all_selected_lists_through_package_and_reopen
     let reopened = Document::from_shared_bytes(Arc::from(bytes.clone()))?;
     assert_semantics(&reopened)?;
     assert_eq!(bytes, original, "Document reopen mutated its source copy");
+    Ok(())
+}
+
+#[test]
+fn type_6201_hosts_use_strict_lists_without_public_raw_ids() -> TestResult {
+    let bytes = synthetic_table_data_list_package_with_message_type(
+        Corruption::None,
+        12,
+        TABLE_DATA_LIST_ALT_MESSAGE_TYPE,
+    )?;
+    let original = bytes.clone();
+    let package = Package::from_bytes(&bytes)?;
+    assert_semantics(package.document())?;
+    assert_eq!(bytes, original, "Package parsing mutated its source");
+
+    // The public package/document boundary retains only semantic values. In
+    // particular, the alternate host message type and physical archive IDs
+    // from this fixture do not appear in either public debug representation.
+    assert_eq!(format!("{package:?}"), "Package { .. }");
+    let document_debug = format!("{:?}", package.document());
+    assert!(!document_debug.contains("6201"));
+    assert!(!document_debug.contains("identifier"));
+    assert!(!document_debug.contains("ArchiveObject"));
+    assert!(!document_debug.contains("RawMessage"));
+
+    let document = Document::from_bytes(&bytes)?;
+    assert_semantics(&document)?;
+    assert_eq!(bytes, original, "Document parsing mutated its source");
+
+    // This duplicate known scalar is accepted by generated Prost decoding,
+    // but strict canonical-wire ingress must reject it on the 6201 route.
+    let mut prost_accepted = list_message(
+        tst::table_data_list::ListType::String,
+        vec![string_entry(1, "strict")],
+        Vec::new(),
+    )
+    .encode_to_vec();
+    prost_accepted.extend_from_slice(&[0x08, 0x01]);
+    assert!(tst::TableDataList::decode(prost_accepted.as_slice()).is_ok());
+
+    let malformed = synthetic_table_data_list_package_with_message_type(
+        Corruption::NonCanonicalRootList,
+        12,
+        TABLE_DATA_LIST_ALT_MESSAGE_TYPE,
+    )?;
+    let malformed_original = malformed.clone();
+    let package_error = Package::from_bytes(&malformed)
+        .expect_err("6201 non-canonical list host must be rejected by strict ingress");
+    assert!(!package_error.to_string().contains("6201"));
+    assert_eq!(malformed, malformed_original);
+    let document_error = Document::from_bytes(&malformed)
+        .expect_err("Document must reject the same strict 6201 list host");
+    assert!(!document_error.to_string().contains("6201"));
+    assert_eq!(malformed, malformed_original);
+    // The 6011 objects above are synthetic segment fixtures only; this test
+    // makes no claim about native Segment extraction evidence.
     Ok(())
 }
 
