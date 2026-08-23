@@ -3,6 +3,15 @@
 Status: source-audited; initial ZIP/OPC and CFB substrate measurements captured
 Branch: `feat/office-format-completeness`
 Evidence through:
+[change 0263 — DOCX story-hyperlink publication selectors](changes/0263-docx-story-hyperlink-publication.md)
+(the opt-in no-op and shared-target redaction selectors cover seven Word story
+kinds, 15 Parts, 24 ZIP members, and a pinned 9,900-byte source. Their timer
+covers open, strict planning, commit, and sequential publication while the
+independent story XML/`.rels`, ZIP locality, deterministic-output,
+source-immutability, and refusal oracles stay outside. This is correctness and
+phase evidence only; no latency, allocation/RSS, physical-I/O, or broad DOCX
+claim is made.)
+
 [change 0260 — fresh-child XLSX filesystem roots](changes/0260-xlsx-fresh-child-filesystem-roots.md)
 (the existing path-open and open-plus-names/count/full-text selectors now run
 each sample in a fresh child over one pinned medium XLSX. Warm and explicit
@@ -1236,6 +1245,18 @@ forward pass, parse one candidate, and read back every selected paragraph. The
 10,000-paragraph / 100-edit save improves 94.99% p50 (19.97x) and allocation
 calls fall 94.11%. Scalar edits, unordered/nested selections, structural edits,
 and complete transaction-capture costs are unchanged.
+
+Change 0263 adds two opt-in end-to-end story-hyperlink publication selectors.
+The fixed corpus covers main, header, footer, footnotes, endnotes, comments,
+and glossary stories, with one selected shared target, one unselected target,
+media, and an opaque member per preservation path. The no-op requires exact
+archive bytes; redaction requires the exact story XML/`.rels` changes and raw
+ZIP local plus offset-normalized central identity for untouched members. Stale,
+foreign, signed, unknown-owner, partial-sink, and zero-sink refusals are
+checked. Source/sink preparation and all independent oracles are outside the
+open + plan + commit + sequential-publication timer. This is correctness and
+phase evidence only, not a speedup, allocation, RSS, physical-I/O, or broad
+DOCX claim.
 
 PPTX ordinary reads defer slide payload parsing, but repeatedly parse the
 presentation slide-reference list. Exact-name slide lookup resolves and parses

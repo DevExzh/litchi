@@ -11,6 +11,26 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## DOCX story-hyperlink publication selectors (change 0263)
+
+[Change 0263](changes/0263-docx-story-hyperlink-publication.md), landed in
+`b008784d6517fb30c9eabc318e831907c693b1dd`, adds the opt-in
+`docx_story_hyperlink_noop_save` and `docx_story_hyperlink_redaction_save`
+selectors. Their deterministic corpus covers seven stories (main, header,
+footer, footnotes, endnotes, comments, and glossary), 15 OPC Parts, 24 ZIP
+members, 9,900 archive bytes, and source SHA-256
+`457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac`.
+
+Source and sink preparation plus all story-XML, `.rels`, ZIP, deterministic
+replay, source-immutability, and refusal oracles are outside the timer. Each
+sample times open, strict target planning, commit, and sequential publication.
+The no-op requires exact archive bytes; redaction requires the exact changed
+story XML/`.rels` members and raw local plus offset-normalized central ZIP
+identity for untouched members. Stale, foreign, signed, unknown-owner,
+partial-sink, and zero-sink refusal gates are also required. This is
+correctness and phase evidence only; no latency, allocation, RSS,
+physical-I/O, or broad DOCX claim is registered.
+
 ## Fresh-child XLSX filesystem roots (change 0260)
 
 [Change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md) moves the
@@ -1160,7 +1180,7 @@ remote-range, before/after, and allocation-attribution claims remain open.
 ## Current stable tranche
 
 The original stage-1 results below remain historical evidence. The current
-harness contains **381 selectable cases**; 200 was the count before the
+harness contains **383 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
 do not inherit its performance results. Change 0188 adds eight opt-in
@@ -2628,7 +2648,7 @@ source-backed publisher instead returns a typed zero-output refusal.
 
 ## Evidence and verification
 
-The current standalone harness provides 381 selectable cases. Change
+The current standalone harness provides 383 selectable cases. Change
 0091 adds four committed opt-in XLS visibility selectors, change 0094 adds four
 committed opt-in CFB selective-range selectors, and change 0099 adds one opt-in
 ODF repair-plan selector. The visibility and repair selectors

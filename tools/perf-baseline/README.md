@@ -241,6 +241,35 @@ sample times eight repeated `Snapshot::plan_target_urls` calls on the prepared
 immutable snapshot. The case is opt-in and does not change the default 36-case
 matrix.
 
+Run the opt-in DOCX story-hyperlink publication selectors over the deterministic
+seven-story corpus:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml --release --bin litchi-perf-baseline -- \
+  --case docx_story_hyperlink_noop_save,docx_story_hyperlink_redaction_save \
+  --warmup 3 --samples 30 \
+  --json target/perf/docx-story-hyperlink-publication.json
+```
+
+The corpus contains main, header, footer, footnotes, endnotes, comments, and
+glossary stories, 15 OPC Parts, 24 ZIP members, 9,900 archive bytes, and source
+SHA-256
+`457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac`.
+The no-op selector publishes no selected targets; the redaction selector
+removes the shared external target while retaining one unselected link and one
+media relationship in each story. Source and sink preparation, semantic story
+XML and `.rels` namespace/membership/target/type/mode oracles, exact no-op and
+redaction locality checks, deterministic replay, source immutability, and
+stale/foreign/signed/unknown-owner/partial/zero-sink refusal checks are outside
+the timed interval. The timed interval is open, strict target planning, commit,
+and sequential publication. These selectors are correctness and phase evidence
+only: they make no latency, allocation, RSS, physical-I/O, or broad DOCX claim.
+The redaction locality gate requires exactly the 14 story XML/`.rels` members
+to change and compares every untouched member's raw ZIP local record and
+offset-normalized central-directory record byte-for-byte.
+They bring the selectable matrix to 383 names while leaving the default 36
+cases / 198 records unchanged.
+
 Run the complete default matrix (36 default cases; 198 result records: 144
 substrate records, nine writer records, and 45 XLSX records). The six simulated
 range cases, two execution-scaling cases, one low-level source-overlay save
