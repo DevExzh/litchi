@@ -570,10 +570,12 @@ fn select_transition(
     // traversal ambiguous while leaving the selected node's count at one.
     // Reject every repeated node identity before resolving any component-
     // backed archive.
-    for (index, candidate) in node_identifiers.iter().enumerate() {
-        if node_identifiers[..index].contains(candidate) {
-            return Err(Error::InvalidSource);
-        }
+    if node_identifiers
+        .iter()
+        .enumerate()
+        .any(|(index, candidate)| node_identifiers[..index].contains(candidate))
+    {
+        return Err(Error::InvalidSource);
     }
     let raw_node_identifiers = strict_show_slide_references(show_payload, wire_limits)?;
     if raw_node_identifiers.as_slice() != node_identifiers {
