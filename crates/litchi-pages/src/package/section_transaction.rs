@@ -578,12 +578,17 @@ pub(super) fn reassembly_cost(
     compressed_len: usize,
 ) -> Result<(usize, usize), Error> {
     let package_bound = source_len
-        .checked_add(compressed_len.saturating_mul(2))
+        .checked_add(compressed_len.checked_mul(2).ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?)
         .and_then(|value| value.checked_add(1_024))
         .ok_or(Error::InvalidSource {
             path: Path::Package,
         })?;
-    Ok((package_bound, package_bound.saturating_mul(3)))
+    let reassembly_work = package_bound.checked_mul(3).ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    Ok((package_bound, reassembly_work))
 }
 
 pub(super) fn editable_archive(
@@ -905,8 +910,8 @@ pub(super) fn usize_to_u64(value: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        Error, LimitKind, Package, TransactionBudget, resolve_target, rewrite_package,
-        selected_payload,
+        Error, LimitKind, Package, TransactionBudget, reassembly_cost, resolve_target,
+        rewrite_package, selected_payload,
     };
     use litchi_core::Position;
     use litchi_iwa_archive::{Limits, package};
@@ -1033,6 +1038,15 @@ mod tests {
         assert!(usage.references != 0);
         assert!(usage.transaction_work != 0);
         Ok(())
+    }
+
+    #[test]
+    fn reassembly_cost_rejects_work_bound_overflow() {
+        let compressed_len = usize::MAX / 3 + 1;
+        assert!(matches!(
+            reassembly_cost(0, compressed_len),
+            Err(Error::InvalidSource { .. })
+        ));
     }
 
     #[test]
