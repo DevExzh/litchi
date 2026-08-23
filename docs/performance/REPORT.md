@@ -67,14 +67,15 @@ allocation, RSS, resource, or general speedup claim.
 
 ## XLSX page-break projection ABBA evidence (change 0252)
 
-[Change 0252](changes/0252-xlsx-pagebreak-projection-abba.md) records the
+[Change 0252](changes/0252-xlsx-pagebreak-projection-abba.md) preserves a
 strict current-schema package for the fixed media-rich XLSX page-break edit
-selectors. The eager selector accepts p50/mean/p95/p99 with reductions of
-approximately 1.2%-2.0% in both paired directions. The source-backed selector
-accepts p50/mean/p95; p99 is excluded because its A2→B2 direction is a
-`-0.300698%` regression. All identity and drift gates pass, but production
-landing remains pending an independent code/oracle audit. This is narrow
-fixed-corpus evidence with no broad XLSX claim.
+selectors. At measured candidate `e619debe`, the eager selector accepts
+p50/mean/p95/p99 and the source-backed selector accepts p50/mean/p95. Current
+production includes later hardening and projection-cache commits, and the
+measured candidate is not its ancestor. A current-head audit found no immediate
+correctness blocker, but the old latency cells are historical and
+unattributable to current code. No current page-break performance claim is
+accepted pending a fresh edit/save and repeated-cache ABBA.
 
 ## PPTX named-slide selector ABBA evidence (change 0253)
 
