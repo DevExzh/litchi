@@ -67,6 +67,11 @@ pub(crate) const FORBIDDEN_BUFFA_OWNERSHIP_MARKERS: &[&str] = &[
     // private encoder's source validation may use a view without owning it.
     "decode::<",
     "merge::<",
+    // Focused codecs consistently construct Buffa options through their
+    // private `buffa()` adapter; keep inferred generic calls covered even
+    // when the caller omits a turbofish.
+    "buffa().decode(",
+    "buffa().merge(",
 ];
 
 #[cfg(test)]
@@ -688,6 +693,14 @@ pub fn decode_projection(bytes: &[u8]) {{
             (
                 "eager message merge",
                 "options.merge::<Archive>(&mut message, &mut input)",
+            ),
+            (
+                "inferred eager message decoder",
+                "options.buffa().decode(&mut input)",
+            ),
+            (
+                "inferred eager message merge",
+                "options.buffa().merge(&mut message, &mut input)",
             ),
         ];
 
