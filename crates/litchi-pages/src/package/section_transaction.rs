@@ -70,12 +70,27 @@ impl TransactionBudget {
             .map_err(map_archive_error)?;
         let components = physical.max_entries().max(1);
         Ok(Self {
-            maximum_fields: archive.max_header_fields().saturating_mul(components),
-            maximum_work: physical.max_iwa_stream_bytes().saturating_mul(16),
-            maximum_references: archive.max_metadata_items().saturating_mul(components),
-            maximum_transaction_work: usize::try_from(physical.max_total_bytes())
-                .unwrap_or(usize::MAX)
-                .saturating_mul(32),
+            maximum_fields: checked_derived_mul(
+                archive.max_header_fields(),
+                components,
+                LimitKind::WireFields,
+            )?,
+            maximum_work: checked_derived_mul(
+                physical.max_iwa_stream_bytes(),
+                16,
+                LimitKind::WireWork,
+            )?,
+            maximum_references: checked_derived_mul(
+                archive.max_metadata_items(),
+                components,
+                LimitKind::References,
+            )?,
+            maximum_transaction_work: checked_derived_mul(
+                usize::try_from(physical.max_total_bytes())
+                    .map_err(|_error| derived_limit_overflow(LimitKind::TransactionWork))?,
+                32,
+                LimitKind::TransactionWork,
+            )?,
             reserved_transaction_work: 0,
             usage: Usage::default(),
         })
@@ -128,7 +143,7 @@ impl TransactionBudget {
             .usage
             .transaction_work
             .checked_add(amount)
-            .unwrap_or(usize::MAX);
+            .ok_or_else(|| derived_limit_overflow(LimitKind::TransactionWork))?;
         if observed > self.maximum_transaction_work {
             return Err(Error::LimitExceeded {
                 path,
@@ -152,7 +167,7 @@ impl TransactionBudget {
             .transaction_work
             .checked_add(self.reserved_transaction_work)
             .and_then(|value| value.checked_add(amount))
-            .unwrap_or(usize::MAX);
+            .ok_or_else(|| derived_limit_overflow(LimitKind::TransactionWork))?;
         if observed > self.maximum_transaction_work {
             return Err(Error::LimitExceeded {
                 path,
@@ -164,7 +179,7 @@ impl TransactionBudget {
         self.reserved_transaction_work = self
             .reserved_transaction_work
             .checked_add(amount)
-            .ok_or(Error::InvalidSource { path })?;
+            .ok_or_else(|| derived_limit_overflow(LimitKind::TransactionWork))?;
         Ok(())
     }
 
@@ -200,7 +215,9 @@ fn charge(
     kind: LimitKind,
     path: Path,
 ) -> Result<(), Error> {
-    let observed = current.checked_add(amount).unwrap_or(usize::MAX);
+    let observed = current
+        .checked_add(amount)
+        .ok_or_else(|| derived_limit_overflow(kind))?;
     if observed > maximum {
         return Err(Error::LimitExceeded {
             path,
@@ -211,6 +228,21 @@ fn charge(
     }
     *current = observed;
     Ok(())
+}
+
+fn checked_derived_mul(value: usize, multiplier: usize, kind: LimitKind) -> Result<usize, Error> {
+    value
+        .checked_mul(multiplier)
+        .ok_or_else(|| derived_limit_overflow(kind))
+}
+
+const fn derived_limit_overflow(kind: LimitKind) -> Error {
+    Error::LimitExceeded {
+        path: Path::Package,
+        kind,
+        observed: u64::MAX,
+        maximum: u64::MAX - 1,
+    }
 }
 
 pub(super) fn resolve_position<'selector>(
