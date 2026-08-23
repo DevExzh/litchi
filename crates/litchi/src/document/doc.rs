@@ -946,10 +946,7 @@ impl Document {
             },
             #[cfg(feature = "rtf")]
             DetectedFormat::Rtf(bytes) => {
-                let text = String::from_utf8(bytes)
-                    .map_err(|e| Error::ParseError(format!("Invalid UTF-8 in RTF: {}", e)))?;
-
-                let doc = litchi_rtf::RtfDocument::parse(&text).map_err(|e| {
+                let doc = litchi_rtf::RtfDocument::parse_bytes(&bytes).map_err(|e| {
                     Error::ParseError(format!("Failed to parse RTF document: {}", e))
                 })?;
 
@@ -2689,6 +2686,77 @@ mod tests {
             "Failed to load RTF from bytes: {:?}",
             doc.err()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn unified_rtf_accepts_literal_cp1252_transport_bytes() {
+        let mut source = br#"{\rtf1\ansi\ansicpg1252 caf"#.to_vec();
+        source.extend_from_slice(&[0xe9, b'}']);
+
+        let document = Document::from_bytes(source).expect("literal CP-1252 RTF");
+        assert_eq!(document.text().expect("RTF text"), "café");
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn unified_rtf_compressed_transport_matches_plain_source_and_preserves_bytes() {
+        let source = br#"{\rtf1\ansi Plain source\par Second paragraph}"#.to_vec();
+        let native = litchi_rtf::Document::from_bytes(&source).expect("native RTF source");
+        assert_eq!(native.to_bytes().expect("native source bytes"), source);
+
+        let plain_document = Document::from_bytes(source.clone()).expect("plain RTF source");
+        assert_eq!(
+            plain_document.text().expect("plain RTF text"),
+            native.text()
+        );
+        assert_eq!(
+            plain_document
+                .paragraph_count()
+                .expect("plain paragraph count"),
+            native.paragraph_count()
+        );
+
+        for use_lzfu in [true, false] {
+            let compressed =
+                litchi_rtf::transport::compress(&source, use_lzfu).expect("compress RTF source");
+            let compressed_native = litchi_rtf::Document::from_bytes(&compressed)
+                .expect("native compressed RTF source");
+            assert_eq!(
+                compressed_native
+                    .to_bytes()
+                    .expect("native compressed source bytes"),
+                compressed
+            );
+            let document = Document::from_bytes(compressed).expect("compressed RTF source");
+
+            assert_eq!(document.text().expect("compressed RTF text"), native.text());
+            assert_eq!(
+                document
+                    .paragraph_count()
+                    .expect("compressed paragraph count"),
+                native.paragraph_count()
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "rtf")]
+    fn unified_rtf_malformed_compressed_frame_maps_to_parse_error() {
+        let source = br#"{\rtf1\ansi malformed compressed frame}"#;
+        let mut compressed =
+            litchi_rtf::transport::compress(source, true).expect("compress RTF source");
+        compressed.truncate(15);
+
+        let error = match Document::from_bytes(compressed) {
+            Ok(_) => panic!("truncated compressed RTF must fail"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::ParseError(message)
+                if message.starts_with("Failed to parse RTF document:")
+        ));
     }
 
     #[test]

@@ -7,7 +7,9 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use super::{ole2, ooxml};
+use super::ole2;
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+use super::ooxml;
 use litchi_core::detection::FileFormat;
 use litchi_core::detection::simd_utils::{check_office_signatures, signature_matches};
 use litchi_core::detection::{rtf, utils};
@@ -134,6 +136,13 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
         return None;
     }
 
+    // Check compressed RTF after container formats so ZIP/OLE precedence is
+    // unchanged for deliberately crafted polyglots.
+    #[cfg(feature = "rtf")]
+    if !mask.is_ole2() && !mask.is_zip() && super::is_compressed_rtf(bytes) {
+        return Some(FileFormat::Rtf);
+    }
+
     // Check RTF format (if matched)
     if mask.is_rtf()
         && let Some(result) = rtf::detect_rtf_format(bytes)
@@ -173,6 +182,9 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
     let original = reader.stream_position().ok()?;
     let detected = (|| {
         reader.seek(SeekFrom::Start(0)).ok()?;
+        #[cfg(feature = "rtf")]
+        let mut header = [0u8; 12];
+        #[cfg(not(feature = "rtf"))]
         let mut header = [0u8; 8];
         let mut header_len = 0;
         while header_len < header.len() {
@@ -182,6 +194,13 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             }
             header_len += read;
         }
+
+        // Keep container precedence available even in builds where the
+        // corresponding owner crates are feature-elided. Compressed RTF has
+        // a marker at offset eight, which may otherwise collide with a ZIP
+        // local-header payload in an RTF-only build.
+        #[cfg(feature = "rtf")]
+        let signature_mask = check_office_signatures(&header[..header_len]);
 
         if header_len >= utils::OLE2_SIGNATURE.len()
             && signature_matches(&header[..header_len], utils::OLE2_SIGNATURE)
@@ -244,6 +263,14 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
             }
 
             return None;
+        }
+
+        #[cfg(feature = "rtf")]
+        if !signature_mask.is_ole2()
+            && !signature_mask.is_zip()
+            && super::is_compressed_rtf(&header[..header_len])
+        {
+            return Some(FileFormat::Rtf);
         }
 
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
@@ -614,6 +641,51 @@ mod tests {
             Some(FileFormat::Rtf)
         );
         assert_eq!(reader.position(), 2);
+    }
+
+    #[cfg(feature = "rtf")]
+    #[test]
+    fn detects_compressed_rtf_bytes_and_reader_without_moving_reader_cursor() {
+        let source = br#"{\rtf1\ansi Compressed RTF\par}"#;
+        for use_lzfu in [true, false] {
+            let compressed = litchi_rtf::transport::compress(source, use_lzfu).unwrap();
+
+            assert_eq!(
+                detect_file_format_from_bytes(&compressed),
+                Some(FileFormat::Rtf)
+            );
+
+            let mut reader = std::io::Cursor::new(compressed);
+            reader.set_position(3);
+            assert_eq!(
+                detect_format_from_reader(&mut reader),
+                Some(FileFormat::Rtf)
+            );
+            assert_eq!(reader.position(), 3);
+        }
+
+        // A ZIP local header can carry the LZFu marker at offset eight. The
+        // container signature must retain precedence in both detector APIs,
+        // including an rtf-only build where ZIP owners are feature-elided.
+        let mut zip_polyglot = b"PK\x03\x04\x00\x00\x00\x00".to_vec();
+        zip_polyglot.extend_from_slice(b"LZFu");
+        assert_eq!(detect_file_format_from_bytes(&zip_polyglot), None);
+
+        let mut zip_reader = std::io::Cursor::new(zip_polyglot);
+        zip_reader.set_position(2);
+        assert_eq!(detect_format_from_reader(&mut zip_reader), None);
+        assert_eq!(zip_reader.position(), 2);
+
+        // Apply the same regression to the eight-byte OLE2 signature. An
+        // invalid OLE candidate must not fall through to compressed RTF.
+        let mut ole_polyglot = utils::OLE2_SIGNATURE.to_vec();
+        ole_polyglot.extend_from_slice(b"LZFu");
+        assert_eq!(detect_file_format_from_bytes(&ole_polyglot), None);
+
+        let mut ole_reader = std::io::Cursor::new(ole_polyglot);
+        ole_reader.set_position(1);
+        assert_eq!(detect_format_from_reader(&mut ole_reader), None);
+        assert_eq!(ole_reader.position(), 1);
     }
 
     // Helper function to create a minimal DOCX-like ZIP for testing
