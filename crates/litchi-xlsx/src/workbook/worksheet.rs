@@ -169,7 +169,7 @@ pub(crate) fn page_breaks(sheet: &Worksheet) -> Result<crate::page_breaks::PageB
     let value = sheet
         .data
         .page_breaks
-        .get_or_try_init(source, |content| crate::page_breaks::parse(content))?;
+        .get_or_try_init(source, crate::page_breaks::parse)?;
     Ok(value.as_ref().clone())
 }
 

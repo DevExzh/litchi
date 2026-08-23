@@ -227,7 +227,7 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
                     &namespace,
                     &element,
                     decoder,
-                    &resolver,
+                    resolver,
                     Span {
                         start: event_start,
                         end: event_end,
@@ -245,7 +245,7 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
                     &namespace,
                     &element,
                     decoder,
-                    &resolver,
+                    resolver,
                     Span {
                         start: event_start,
                         end: event_end,

@@ -90,7 +90,7 @@ fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Resul
                     &namespace,
                     &element,
                     decoder,
-                    &resolver,
+                    resolver,
                     &mut previous_row,
                     &mut values,
                     capture_rows,
@@ -104,7 +104,7 @@ fn capture_inner(content: &[u8], capture_rows: bool, marker_only: bool) -> Resul
                     &namespace,
                     &element,
                     decoder,
-                    &resolver,
+                    resolver,
                     &mut previous_row,
                     &mut values,
                     capture_rows,
@@ -229,10 +229,10 @@ fn rewrite_descent_attributes(content: &[u8]) -> Result<Vec<u8>> {
         let resolver = reader.resolver();
         match event {
             Event::Start(element) => writer
-                .write_event(Event::Start(rewrite_element(&element, &resolver)?))
+                .write_event(Event::Start(rewrite_element(&element, resolver)?))
                 .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
             Event::Empty(element) => writer
-                .write_event(Event::Empty(rewrite_element(&element, &resolver)?))
+                .write_event(Event::Empty(rewrite_element(&element, resolver)?))
                 .map_err(|error| invalid(format!("could not rewrite worksheet XML: {error}")))?,
             Event::Eof => break,
             other @ (Event::End(_)

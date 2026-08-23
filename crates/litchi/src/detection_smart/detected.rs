@@ -1878,7 +1878,10 @@ mod short_signature_tests {
         );
 
         super::super::reset_opc_probe_count();
-        let retained = super::detect_prepared_ods(bytes.clone()).unwrap_err();
+        let retained = match super::detect_prepared_ods(bytes.clone()) {
+            Ok(_prepared) => panic!("an uncertain catalog must not be accepted as ordinary ODS"),
+            Err(retained) => retained,
+        };
         assert_eq!(retained, bytes);
         assert_eq!(super::super::opc_probe_count(), 1);
     }
@@ -1926,7 +1929,10 @@ mod short_signature_tests {
         );
 
         super::super::reset_opc_probe_count();
-        let retained = super::detect_prepared_odp(bytes.clone()).unwrap_err();
+        let retained = match super::detect_prepared_odp(bytes.clone()) {
+            Ok(_prepared) => panic!("an uncertain catalog must not be accepted as ordinary ODP"),
+            Err(retained) => retained,
+        };
         assert_eq!(retained, bytes);
         assert_eq!(super::super::opc_probe_count(), 1);
     }
