@@ -21,7 +21,7 @@ const DOCUMENT_IDENTIFIER_ENTRY: &str = "Metadata/DocumentIdentifier";
 /// documents derived from a common source from being treated as revisions of
 /// one another by iWork or iCloud.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IWorkDocumentIdentity {
+pub(crate) struct IWorkDocumentIdentity {
     document_uuid: String,
     version_uuid: String,
     private_uuid: String,
@@ -29,7 +29,7 @@ pub struct IWorkDocumentIdentity {
 
 impl IWorkDocumentIdentity {
     /// Generate three fresh, mutually distinct RFC 4122 version 4 UUIDs.
-    pub fn generate() -> Self {
+    pub(crate) fn generate() -> Self {
         let document_uuid = generate_uuid_string();
         let version_uuid = generate_distinct_uuid(&[&document_uuid]);
         let private_uuid = generate_distinct_uuid(&[&document_uuid, &version_uuid]);
@@ -41,17 +41,17 @@ impl IWorkDocumentIdentity {
     }
 
     /// Stable UUID used by `Metadata/DocumentIdentifier` and sharing metadata.
-    pub fn document_uuid(&self) -> &str {
+    pub(crate) fn document_uuid(&self) -> &str {
         &self.document_uuid
     }
 
     /// UUID of the current saved version and package revision.
-    pub fn version_uuid(&self) -> &str {
+    pub(crate) fn version_uuid(&self) -> &str {
         &self.version_uuid
     }
 
     /// Private UUID used by iWork's local document bookkeeping.
-    pub fn private_uuid(&self) -> &str {
+    pub(crate) fn private_uuid(&self) -> &str {
         &self.private_uuid
     }
 }
@@ -63,7 +63,7 @@ impl IWorkPackage {
     /// required metadata entry is absent, malformed, or internally
     /// inconsistent. Object UUID maps are deliberately retained because Apple
     /// uses stable UUIDs for objects inherited from its built-in templates.
-    pub fn regenerate_document_identity(&mut self) -> Result<IWorkDocumentIdentity> {
+    pub(crate) fn regenerate_document_identity(&mut self) -> Result<IWorkDocumentIdentity> {
         self.regenerate_document_identity_with(|package, name, data| {
             package.insert_entry(name, data).map(|_| ())
         })
