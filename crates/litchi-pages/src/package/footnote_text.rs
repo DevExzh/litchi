@@ -241,8 +241,12 @@ impl<'a> FootnoteTextEdit<'a> {
         let before = clone_footnote(&self.before)?;
         let after = Footnote::with_custom_mark(
             self.position,
-            self.text.clone().into_boxed_str(),
-            self.custom_mark.clone().map(String::into_boxed_str),
+            try_owned_text(&self.text)?.into_boxed_str(),
+            self.custom_mark
+                .as_deref()
+                .map(try_owned_text)
+                .transpose()?
+                .map(String::into_boxed_str),
         )
         .map_err(map_footnote_value_error)?;
 
@@ -1886,6 +1890,38 @@ mod tests {
                 kind: FootnoteTextLimitKind::WireFields,
                 observed: 0,
                 maximum: 1_000,
+            }
+        );
+
+        let text = map_storage_wire_limits_error(StorageWireLimitsError::Wire(
+            RewriteError::LimitExceeded {
+                resource: "text bytes",
+                observed: 17,
+                limit: 16,
+            },
+        ));
+        assert_eq!(
+            text,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::TextBytes,
+                observed: 17,
+                maximum: 16,
+            }
+        );
+
+        let entries = map_storage_wire_limits_error(StorageWireLimitsError::Wire(
+            RewriteError::LimitExceeded {
+                resource: "table entries",
+                observed: 33,
+                limit: 32,
+            },
+        ));
+        assert_eq!(
+            entries,
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::Entries,
+                observed: 33,
+                maximum: 32,
             }
         );
     }
