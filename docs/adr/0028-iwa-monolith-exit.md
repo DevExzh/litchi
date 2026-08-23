@@ -3720,3 +3720,112 @@ This amendment records source-level guard hardening only. No Cargo/build/test
 or native result is claimed, and no `litchi-iwa` dependency edge or ordered
 debt is retired. It does not move ownership or satisfy any host-exit or
 monolith-deletion gate.
+
+## 2026-08-23 amendment: legacy Pages body-footnote borrowed read projection
+
+Commit `588abfb6d` is a bounded change to the legacy Pages footnote path in
+`crates/litchi-iwa/src/pages/editor/footnotes.rs`. A single
+`FootnoteGraphBudget` now accounts across one rooted body-footnote traversal:
+the body table, reference objects, storage payloads, marker tables, and the
+selected nested messages. `FootnoteStorageProjection<'source>` borrows the
+storage wire from package-owned bytes for reads and validation rather than
+constructing a generated `tswp::StorageArchive`. It canonical-checks only the
+selected storage kind, UTF-8 text, table framing/multiplicity, marker
+index/reference, and bounded footnote-entry/reference fields needed for the
+semantic footnote; the strict reference/body/marker codecs remain bounded
+validators for their selected messages.
+
+The budget applies checked cumulative input-byte, field, rewrite-work,
+nesting, and allocation charges, derives strict-codec options from wire
+preflight reports, maps preflight failures to typed limit/allocation errors,
+and uses fallible reservations for projected text, entries, reference sets,
+graphs, and owned strings. Body/table entries remain capped at 4096, and the
+mutation-side encoded table rewrite has its own checked byte ceiling.
+
+Generated Prost storage is confined to the mutation/template compatibility
+route. `decode_storage_for_mutation` preflights before decoding the temporary
+value; source-preserving wire rewrites retain unrelated fields and existing
+raw entry payloads, while the read projection retains unknown storage bytes in
+the original source instead of rebuilding them.
+
+The scope is deliberately narrower than the host deletion gate. The change
+does not provide a package-wide alias/ownership census: duplicate references
+within the selected body are rejected, but global non-aliasing is not proved.
+It does not claim canonicality for opaque nested unknown fields in table or
+attachment payloads, nor full aggregate safety for every package graph,
+archive, or mutation route. This records legacy-path bounded hardening only;
+no Cargo/build/test or native result is admitted, no host dependency edge or
+ordered debt is retired, and no migration-host or monolith-exit claim follows.
+
+## 2026-08-23 amendment: focused Numbers comment ownership census
+
+Commit `96539bf47` (`fix(numbers): prove global comment ownership`) is a
+narrow hardening slice in the concrete Numbers package, not a broad comment
+CRUD migration. `litchi-numbers::Package` now performs a package-wide census
+before publishing a changed existing comment text: it walks comment-list root
+messages (`6005`/`6201`), segment messages (`6011`), comment-storage payloads
+(`3056`), and all table-model cell stores that can carry comment keys. The
+census keeps bounded list, segment, table-reference, cell-key, storage,
+author, reply, and UUID facts and proves the selected root entry/storage/key
+chain is globally unique.
+
+The focused owner rejects zero or aliased IDs, duplicate list/storage routes,
+missing or duplicated selected entries, zero keys/refcounts/storage references,
+out-of-range or overflowing segment key envelopes, and incompatible archive
+message metadata. Payload references must be nonzero, unique, and consistent
+with the metadata; storage authors, replies, reply counts, storage IDs, UUIDs,
+table references, and cell keys are checked for self-edges, aliases,
+duplicates, and required cross-links before mutation.
+
+The only changed write admitted by this seam is text replacement on an
+existing root-list comment with refcount one, one global storage occurrence,
+and no replies. New comments and changed clears remain refused because the
+owner graph would need to be rewired and cleaned atomically. Segment entries
+are still readable after strict half-open range validation, but segment set
+and clear return `UnsupportedDependency` without changing source bytes. The
+updated selector-first integration case preserves root replacement/inverse
+coverage and asserts segment set/clear refusal plus semantic reread/reopen.
+
+The census and all refusal checks precede reassembly. A permitted replacement
+is built into a separate candidate, reopened and semantically verified, and
+returned as a reversible exact-source patch with source/target ownership and
+cell-byte checks. This documents focused Numbers package behavior only: no
+broad comment CRUD, Cargo/build/test result, native application result,
+dependency-edge or ordered-debt retirement, migration-host exit, or monolith
+deletion claim follows.
+
+## 2026-08-23 amendment: legacy Pages body-footnote borrowed read projection
+
+Commit `588abfb6d` is a bounded change to the legacy Pages footnote path in
+`crates/litchi-iwa/src/pages/editor/footnotes.rs`. A single
+`FootnoteGraphBudget` now accounts across one rooted body-footnote traversal:
+the body table, reference objects, storage payloads, marker tables, and the
+selected nested messages. `FootnoteStorageProjection<'source>` borrows the
+storage wire from package-owned bytes for reads and validation rather than
+constructing a generated `tswp::StorageArchive`. It canonical-checks only the
+selected storage kind, UTF-8 text, table framing/multiplicity, marker
+index/reference, and bounded footnote-entry/reference fields needed for the
+semantic footnote; the strict reference/body/marker codecs remain bounded
+validators for their selected messages.
+
+The budget applies checked cumulative input-byte, field, rewrite-work,
+nesting, and allocation charges, derives strict-codec options from wire
+preflight reports, maps preflight failures to typed limit/allocation errors,
+and uses fallible reservations for projected text, entries, reference sets,
+graphs, and owned strings. Body/table entries remain capped at 4096, and the
+mutation-side encoded table rewrite has its own checked byte ceiling.
+
+Generated Prost storage is confined to the mutation/template compatibility
+route. `decode_storage_for_mutation` preflights before decoding the temporary
+value; source-preserving wire rewrites retain unrelated fields and existing
+raw entry payloads, while the read projection retains unknown storage bytes in
+the original source instead of rebuilding them.
+
+The scope is deliberately narrower than the host deletion gate. The change
+does not provide a package-wide alias/ownership census: duplicate references
+within the selected body are rejected, but global non-aliasing is not proved.
+It does not claim canonicality for opaque nested unknown fields in table or
+attachment payloads, nor full aggregate safety for every package graph,
+archive, or mutation route. This records legacy-path bounded hardening only;
+no Cargo/build/test or native result is admitted, no host dependency edge or
+ordered debt is retired, and no migration-host or monolith-exit claim follows.

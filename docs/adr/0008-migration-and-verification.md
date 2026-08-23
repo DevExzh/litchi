@@ -11362,3 +11362,137 @@ authority.
 This is source-level provenance-guard hardening only. No Cargo/build/test or
 native result is admitted, and no dependency edge or ordered debt is retired;
 there is no host-exit or monolith-deletion claim.
+
+## 2026-08-23 amendment: Pages body-footnote borrowed storage projection
+
+Commit `588abfb6d` changes only the legacy Pages body-footnote implementation
+in `crates/litchi-iwa/src/pages/editor/footnotes.rs`. Read and validation
+traversal now carries one `FootnoteGraphBudget` across the rooted body table,
+footnote references, storage payloads, marker tables, and selected nested
+messages. `FootnoteStorageProjection<'source>` borrows the storage wire from
+the package-owned source instead of constructing a generated
+`tswp::StorageArchive` for reads. It canonical-checks and interprets the
+selected storage kind, UTF-8 text fragments, table framing and multiplicity,
+marker index/reference, and the bounded footnote-entry/reference fields needed
+for the semantic `Footnote` value; the strict reference/body/marker codecs
+remain bounded validators for their selected messages.
+
+The aggregate coordinator uses checked cumulative input-byte, field,
+rewrite-work, nesting, and allocation charges. It derives each strict codec's
+options from its wire preflight, maps preflight limit/allocation failures into
+the existing typed error categories, and uses fallible reservations for text,
+table entries, reference sets, graph collections, and owned semantic strings.
+The body/table entry count remains capped at `MAX_BODY_FOOTNOTES` (4096).
+Mutation-side table rewrites additionally cap the encoded footnote-table bytes
+and revalidate the patched source.
+
+Prost `StorageArchive` decoding is now a mutation/template compatibility route
+only: `decode_storage_for_mutation` preflights the source before the generated
+value is admitted, while the read projection never reconstructs that value.
+The mutation path keeps the original source as authority and uses wire-level
+field/table rewrites that retain unrelated fields and existing raw entry
+payloads; the borrowed projection likewise leaves unknown storage bytes in the
+source rather than normalizing or reserializing them.
+
+This is a bounded rooted body-footnote graph read, not a package-wide alias or
+ownership proof. Local duplicate body references are rejected, but the change
+does not census every package component or prove global non-aliasing. Canonical
+interpretation is limited to selected fields and the framing needed to reach
+them: opaque nested unknown fields inside attachment/table payloads and other
+uninterpreted nested messages are not claimed canonical. The counters also do
+not constitute full aggregate safety for every package graph, archive, or
+mutation operation. No Cargo/build/test or native result is admitted; no
+dependency edge or ordered debt is retired, and no migration-host or
+monolith-exit claim follows.
+
+## 2026-08-23 amendment: focused Numbers comment ownership census
+
+Commit `96539bf47` (`fix(numbers): prove global comment ownership`) narrows
+the exact-source comment seam in
+`crates/litchi-numbers/src/package/comments.rs`. Before a changed existing
+comment text is published, the focused package performs one package-wide
+ownership census over the comment-relevant table-list roots (`6005`/`6201`),
+list segments (`6011`), comment-storage payloads (`3056`), and table-model
+cell stores needed to find every comment key. It retains only bounded,
+format-owned facts for list/table references, segment identities, list
+entries, cell keys, storage objects, authors, replies, and storage UUIDs, and
+then proves the selected root entry, storage, and cell key are unique across
+the package rather than merely unique in the selected table.
+
+The census fails closed on zero or aliased identifiers, duplicate relevant
+objects or payload routes, missing or duplicated selected list entries, zero comment
+keys/refcounts/storage references, invalid or overflowing segment key ranges,
+and inconsistent archive message metadata. Message-info references must be
+nonzero, unique, and agree with the references discovered in the payload;
+merge/diff/field-removal metadata is not accepted on these routes. Storage
+author/reply IDs, reply cardinality, storage IDs, UUIDs, table references, and
+cell keys are cross-checked for self-edges, aliases, duplicates, and missing
+required cross-links before any rewrite is attempted.
+
+The publication seam remains deliberately root-only. A changed `set` may
+replace the text of an existing root-list comment only when its entry has
+refcount one, its storage occurs once globally, the storage has no replies,
+and the census proves the complete ownership chain. New-comment creation and
+changed `clear` remain refused; the latter cannot be reduced to a cell-only
+pointer edit without cleaning the owning comment graph. Segment-backed
+comments remain readable, including bounded half-open segment-range
+validation, but segment text replacement and segment clear return the typed
+unsupported-dependency error before reassembly. This is not broad comment
+CRUD, reply mutation, or comment-graph ownership.
+
+All selector, metadata, alias, census, and refusal checks run before source
+reassembly. Refused operations leave the exact source bytes and semantic
+readback unchanged. A permitted root text replacement builds a separate
+candidate package, reopens and verifies the requested comment, and returns an
+exact-source reversible patch whose source/target ownership, cell bytes, and
+inverse checks prevent publication against another snapshot. The updated
+`package_cell_comment_edit_clear_and_inverse_are_selector_first` integration
+case records root replacement/inverse behavior and asserts segment set/clear
+refusal, byte preservation, and reread/reopen preservation.
+
+This amendment records focused Numbers source and test scope only; no
+Cargo/build/test result or native application result is admitted. It makes no
+dependency-edge, ordered-debt, migration-host, host-exit, or monolith-deletion
+claim.
+
+## 2026-08-23 amendment: Pages body-footnote borrowed storage projection
+
+Commit `588abfb6d` changes only the legacy Pages body-footnote implementation
+in `crates/litchi-iwa/src/pages/editor/footnotes.rs`. Read and validation
+traversal now carries one `FootnoteGraphBudget` across the rooted body table,
+footnote references, storage payloads, marker tables, and selected nested
+messages. `FootnoteStorageProjection<'source>` borrows the storage wire from
+the package-owned source instead of constructing a generated
+`tswp::StorageArchive` for reads. It canonical-checks and interprets the
+selected storage kind, UTF-8 text fragments, table framing and multiplicity,
+marker index/reference, and the bounded footnote-entry/reference fields needed
+for the semantic `Footnote` value; the strict reference/body/marker codecs
+remain bounded validators for their selected messages.
+
+The aggregate coordinator uses checked cumulative input-byte, field,
+rewrite-work, nesting, and allocation charges. It derives each strict codec's
+options from its wire preflight, maps preflight limit/allocation failures into
+the existing typed error categories, and uses fallible reservations for text,
+table entries, reference sets, graph collections, and owned semantic strings.
+The body/table entry count remains capped at `MAX_BODY_FOOTNOTES` (4096).
+Mutation-side table rewrites additionally cap the encoded footnote-table bytes
+and revalidate the patched source.
+
+Prost `StorageArchive` decoding is now a mutation/template compatibility route
+only: `decode_storage_for_mutation` preflights the source before the generated
+value is admitted, while the read projection never reconstructs that value.
+The mutation path keeps the original source as authority and uses wire-level
+field/table rewrites that retain unrelated fields and existing raw entry
+payloads; the borrowed projection likewise leaves unknown storage bytes in the
+source rather than normalizing or reserializing them.
+
+This is a bounded rooted body-footnote graph read, not a package-wide alias or
+ownership proof. Local duplicate body references are rejected, but the change
+does not census every package component or prove global non-aliasing. Canonical
+interpretation is limited to selected fields and the framing needed to reach
+them: opaque nested unknown fields inside attachment/table payloads and other
+uninterpreted nested messages are not claimed canonical. The counters also do
+not constitute full aggregate safety for every package graph, archive, or
+mutation operation. No Cargo/build/test or native result is admitted; no
+dependency edge or ordered debt is retired, and no migration-host or
+monolith-exit claim follows.
