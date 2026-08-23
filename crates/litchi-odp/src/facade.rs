@@ -3,8 +3,9 @@
 /// Unified source-checked presentation package transactions and history.
 pub mod edit {
     pub use crate::authoring::edit::{
-        Commit, CryptoCapability, CryptoOperation, CryptoRefusal, Domain, History, MergePlan,
-        Patch, SecurityPolicy, Selector, SlidePosition, Snapshot, Transaction,
+        Commit, CryptoCapability, CryptoOperation, CryptoRefusal, Domain, History,
+        MAX_MEDIA_CHANGES, MediaChange, MergePlan, Patch, SecurityPolicy, Selector, SlidePosition,
+        Snapshot, Transaction,
     };
 }
 

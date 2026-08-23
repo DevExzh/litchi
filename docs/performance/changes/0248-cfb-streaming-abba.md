@@ -5,6 +5,8 @@ Date: 2026-08-21
 Status: latency evidence rejects landing the production CFB streaming
 optimization; the candidate is retained only for allocation follow-up
 
+Claim registry ID: `claim-0248-cfb-streaming`
+
 ## Evidence-package identity
 
 The independently audited package is retained outside the repository at

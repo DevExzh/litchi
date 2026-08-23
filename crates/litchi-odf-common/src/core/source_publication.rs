@@ -7,7 +7,9 @@
 //! Unsupported source layouts are refused before the first sink write.  The
 //! method does not materialize an owning package and has no logical fallback.
 
-use super::package::{SourceBackedPackage, SourceChangedIo, SourceExecutionIo, SourceReadIo};
+use super::package::{
+    SourceBackedPackage, SourceChangedIo, SourceExecutionIo, SourceReadIo, is_signature_owner_path,
+};
 use crate::constants;
 use litchi_core::{
     CancellationToken, Error, ExecutionContext, ExecutionError, Resource, Result, SourceVersion,
@@ -676,7 +678,37 @@ impl SourceBackedPackage {
         options: SourceContentPublicationOptions,
     ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
         let replacement_bytes = replacement.as_ref();
-        let result = self.write_content_xml_to_stream_inner(writer, replacement_bytes, &options);
+        let result =
+            self.write_content_xml_to_stream_inner(writer, replacement_bytes, &options, false);
+        match result {
+            Ok(report) => Ok(report),
+            Err(error) => match reconcile_source_state(self, error.progress()) {
+                Ok(()) => Err(error),
+                Err(source_error) => Err(source_error),
+            },
+        }
+    }
+
+    /// Publish a replacement that the caller has already proved differs from
+    /// this source's `content.xml`.
+    ///
+    /// This is a deliberately explicit fast path for source-backed semantic
+    /// transactions. It skips only the decompression/read used to rediscover
+    /// whether the replacement is an exact no-op; every changed-publication
+    /// preflight, source-version fence, signature refusal, preservation check,
+    /// and sink-progress rule still applies. Callers must use this entry point
+    /// only when their source-bound transaction has compared the candidate with
+    /// the retained source member. The ordinary methods remain the safe choice
+    /// when that proof is unavailable.
+    pub fn write_content_xml_to_stream_with_known_change<W: Write>(
+        &self,
+        writer: W,
+        replacement: impl AsRef<[u8]>,
+        options: SourceContentPublicationOptions,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        let replacement_bytes = replacement.as_ref();
+        let result =
+            self.write_content_xml_to_stream_inner(writer, replacement_bytes, &options, true);
         match result {
             Ok(report) => Ok(report),
             Err(error) => match reconcile_source_state(self, error.progress()) {
@@ -691,6 +723,7 @@ impl SourceBackedPackage {
         writer: W,
         replacement_bytes: &[u8],
         options: &SourceContentPublicationOptions,
+        known_change: bool,
     ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
         check_cancellation(options, SourceContentPublicationProgress::Untouched)?;
         let replacement_len = u64::try_from(replacement_bytes.len()).unwrap_or(u64::MAX);
@@ -741,13 +774,19 @@ impl SourceBackedPackage {
             SourceContentPublicationProgress::Untouched,
         )?;
 
-        let source_content = self
-            .get_file(constants::ODF_CONTENT)
-            .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
-        self.ensure_current_for_publication()
-            .map_err(|error| map_core_error(error, SourceContentPublicationProgress::Untouched))?;
-        let no_op = source_content == replacement_bytes;
-        drop(source_content);
+        let no_op = if known_change {
+            false
+        } else {
+            let source_content = self.get_file(constants::ODF_CONTENT).map_err(|error| {
+                map_core_error(error, SourceContentPublicationProgress::Untouched)
+            })?;
+            self.ensure_current_for_publication().map_err(|error| {
+                map_core_error(error, SourceContentPublicationProgress::Untouched)
+            })?;
+            let no_op = source_content == replacement_bytes;
+            drop(source_content);
+            no_op
+        };
 
         if no_op {
             consume_execution_resource(
@@ -950,7 +989,7 @@ fn preflight_changed_publication(
     }
     debug_assert!(!manifest.has_encrypted_entries());
     for path in package.publication_file_names() {
-        if path.starts_with("META-INF/") && path.ends_with("signatures.xml") {
+        if is_signature_owner_path(path) {
             return Err(unsupported(
                 "signed ODF packages require an explicit signature policy",
             ));

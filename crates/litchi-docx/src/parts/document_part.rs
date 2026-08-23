@@ -24,6 +24,67 @@ use smallvec::SmallVec;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+/// Maximum number of paragraph ranges retained by the reusable semantic
+/// index.  Documents beyond this bound continue to use the established
+/// streaming selectors; the cache is an optimization and never changes the
+/// accepted document surface.
+const MAX_PARAGRAPH_INDEX_RANGES: usize = 1_000_000;
+
+/// One byte range for a visible `w:p` element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ParagraphRange {
+    pub(crate) start: u32,
+    pub(crate) length: u32,
+}
+
+/// Bounded, source-independent paragraph offsets for one visible XML view.
+///
+/// The index retains offsets only.  It never owns or exposes XML bytes, so a
+/// cached lookup cannot extend the lifetime of a payload or bypass the
+/// existing semantic/lossless ownership boundaries.
+#[derive(Debug, Clone)]
+pub(crate) struct ParagraphIndex {
+    ranges: Arc<[ParagraphRange]>,
+}
+
+impl ParagraphIndex {
+    /// Build an index using the same bounded namespace scanner as the legacy
+    /// paragraph selectors.
+    pub(crate) fn from_xml(xml: &[u8]) -> Result<Self> {
+        let mut ranges = Vec::new();
+        scan_word_element_ranges(xml, &[b"p".as_slice()], |_, start, length| {
+            if ranges.len() >= MAX_PARAGRAPH_INDEX_RANGES {
+                return Err(crate::Error::InvalidFormat(format!(
+                    "document paragraph index exceeds {MAX_PARAGRAPH_INDEX_RANGES} ranges"
+                )));
+            }
+            ranges
+                .try_reserve(1)
+                .map_err(|source| crate::Error::Allocation {
+                    resource: "document paragraph index",
+                    source,
+                })?;
+            ranges.push(ParagraphRange { start, length });
+            Ok(())
+        })?;
+        Ok(Self {
+            ranges: ranges.into(),
+        })
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.ranges.len()
+    }
+
+    pub(crate) fn get(&self, index: usize) -> Option<ParagraphRange> {
+        self.ranges.get(index).copied()
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = ParagraphRange> + '_ {
+        self.ranges.iter().copied()
+    }
+}
+
 const MAX_DOCUMENT_SEMANTIC_VALUES: usize = 1_000_000;
 
 fn reserve_document_value<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
@@ -85,6 +146,10 @@ pub struct DocumentPart<'a> {
     /// Reference to the underlying part
     part: &'a dyn Part,
     xml: Arc<Vec<u8>>,
+    /// Best-effort cache built from the validated visible XML. A malformed
+    /// or over-bound payload leaves this empty so the legacy query path keeps
+    /// reporting the same error at query time.
+    paragraph_index: Option<Arc<ParagraphIndex>>,
 }
 
 /// Select markup-compatibility branches for a main-document payload.
@@ -127,6 +192,38 @@ pub(crate) fn document_paragraphs(xml: Arc<Vec<u8>>) -> Result<SmallVec<[Paragra
         Some(values) => Ok(SmallVec::from_vec(values)),
         None => Ok(inline),
     }
+}
+
+/// Materialize paragraph views from an already validated range index.
+pub(crate) fn document_paragraphs_from_index(
+    xml: Arc<Vec<u8>>,
+    index: &ParagraphIndex,
+) -> Result<SmallVec<[Paragraph; 32]>> {
+    let mut inline = SmallVec::new();
+    let mut spill = None;
+    for range in index.iter() {
+        push_document_smallvec(
+            &mut inline,
+            &mut spill,
+            Paragraph::from_arc_range(Arc::clone(&xml), range.start, range.length),
+            "document paragraph views",
+        )?;
+    }
+    match spill {
+        Some(values) => Ok(SmallVec::from_vec(values)),
+        None => Ok(inline),
+    }
+}
+
+/// Select one paragraph from an already validated range index.
+pub(crate) fn document_paragraph_from_index(
+    xml: Arc<Vec<u8>>,
+    index: &ParagraphIndex,
+    position: usize,
+) -> Option<Paragraph> {
+    index
+        .get(position)
+        .map(|range| Paragraph::from_arc_range(xml, range.start, range.length))
 }
 
 /// Select one visible paragraph without materializing every paragraph view.
@@ -478,7 +575,16 @@ impl<'a> DocumentPart<'a> {
     /// Returns an error if the operation cannot be completed.
     pub fn from_part(part: &'a dyn Part) -> Result<Self> {
         let xml = visible_document_xml(part.blob_arc())?;
-        Ok(Self { part, xml })
+        // Index construction is deliberately best-effort. `DocumentPart`
+        // historically deferred structural XML errors until the first
+        // paragraph query; preserving that timing is more important than
+        // caching a malformed payload.
+        let paragraph_index = ParagraphIndex::from_xml(xml.as_slice()).ok().map(Arc::new);
+        Ok(Self {
+            part,
+            xml,
+            paragraph_index,
+        })
     }
 
     /// Get the shared Arc of XML bytes (zero-copy from Part).
@@ -519,6 +625,9 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraph_count(&self) -> Result<usize> {
+        if let Some(index) = self.paragraph_index.as_deref() {
+            return Ok(index.len());
+        }
         document_paragraph_count(self.xml_bytes())
     }
 
@@ -550,6 +659,9 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraphs(&self) -> Result<SmallVec<[Paragraph; 32]>> {
+        if let Some(index) = self.paragraph_index.as_deref() {
+            return document_paragraphs_from_index(self.get_xml_arc(), index);
+        }
         document_paragraphs(self.get_xml_arc())
     }
 
@@ -560,6 +672,13 @@ impl<'a> DocumentPart<'a> {
     ///
     /// Returns an error if the document XML is malformed or exceeds bounds.
     pub fn paragraph(&self, index: usize) -> Result<Option<Paragraph>> {
+        if let Some(paragraph_index) = self.paragraph_index.as_deref() {
+            return Ok(document_paragraph_from_index(
+                self.get_xml_arc(),
+                paragraph_index,
+                index,
+            ));
+        }
         document_paragraph(self.get_xml_arc(), index)
     }
 
@@ -705,5 +824,21 @@ mod tests {
         assert!(document.paragraphs().is_err());
         assert!(document.paragraph(0).is_err());
         assert!(document.elements().is_err());
+    }
+
+    #[test]
+    fn paragraph_index_matches_independent_text_oracle() {
+        let xml = br#"<wp:document xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><wp:body><wp:p><wp:r><wp:t>outer</wp:t></wp:r></wp:p><wp:tbl><wp:tr><wp:tc><wp:p><wp:r><wp:t>cell</wp:t></wp:r></wp:p></wp:tc></wp:tr></wp:tbl><wp:p><wp:r><wp:t>tail</wp:t></wp:r></wp:p><wp:p/></wp:body></wp:document>"#;
+        let index = ParagraphIndex::from_xml(xml).unwrap();
+        let source = Arc::new(xml.to_vec());
+        let expected = ["outer", "cell", "tail", ""];
+
+        assert_eq!(index.len(), expected.len());
+        for (position, expected_text) in expected.into_iter().enumerate() {
+            let paragraph = document_paragraph_from_index(Arc::clone(&source), &index, position)
+                .expect("indexed paragraph is present");
+            assert_eq!(paragraph.text().unwrap(), expected_text);
+        }
+        assert!(document_paragraph_from_index(source, &index, expected.len()).is_none());
     }
 }

@@ -603,6 +603,8 @@ impl<'data> ArchiveReader<'data> {
         let mut total_metadata_bytes = 0u64;
         let mut total_uncompressed_size = 0u64;
         let mut ordered_names = Vec::new();
+        let mut local_offsets_strictly_increasing = true;
+        let mut previous_local_header_offset = None;
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
@@ -710,11 +712,16 @@ impl<'data> ArchiveReader<'data> {
                 continue;
             }
 
+            let local_header_offset = entry.local_header_offset();
+            if previous_local_header_offset.is_some_and(|previous| local_header_offset <= previous)
+            {
+                local_offsets_strictly_increasing = false;
+            }
+            previous_local_header_offset = Some(local_header_offset);
             if directories.contains_key(&name) {
                 return Err(file_directory_collision_error(&name, lossy_name));
             }
 
-            let local_header_offset = entry.local_header_offset();
             if index.contains_key(&name) {
                 return Err(duplicate_member_error(
                     &name,
@@ -733,7 +740,9 @@ impl<'data> ArchiveReader<'data> {
             ordered_names.push((local_header_offset, name));
         }
 
-        ordered_names.sort_by_key(|(offset, _)| *offset);
+        if !local_offsets_strictly_increasing {
+            ordered_names.sort_by_key(|(offset, _)| *offset);
+        }
         let order = ordered_names.into_iter().map(|(_, name)| name).collect();
 
         Ok(Self {
@@ -864,6 +873,41 @@ impl<'data> ArchiveReader<'data> {
                 other.as_id().as_u16(),
             ))),
         }
+    }
+
+    /// Borrow and verify a stored member without materializing a second copy.
+    ///
+    /// `Some` is returned only for ZIP Store members. Deflated and otherwise
+    /// unsupported members return `None`, allowing a caller to fall back to
+    /// [`Self::read`]. Before the borrowed slice is published, the local
+    /// header, data descriptor (when present), declared size, and CRC are
+    /// validated. The returned bytes borrow the source archive for the
+    /// lifetime of this reader and are never inserted into a decompression
+    /// cache.
+    ///
+    /// Archive limits are admission limits: the member's declared metadata
+    /// and size were checked by [`Self::new_with_limits`] before this method
+    /// can be called. Since this method does not allocate payload storage, it
+    /// does not create a separate materialization budget charge.
+    pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        let lookup = lookup_member_name(name);
+
+        let info = self
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+        if info.compression_method != CompressionMethod::Store {
+            return Ok(None);
+        }
+
+        let entry = self.archive.get_entry_borrowed(info.wayfinder)?;
+        let data = entry.data();
+        entry.claim_verifier().valid(ZipVerification {
+            crc: crate::crc32(data),
+            uncompressed_size: data.len() as u64,
+        })?;
+        Ok(Some(data))
     }
 
     /// Decompress and verify one member directly into a caller-owned sink.
@@ -1008,7 +1052,21 @@ where
         &'archive self,
         scratch: &mut [u8],
     ) -> Result<PreservationIndex<'archive, R>, Error> {
-        PreservationIndex::new(&self.archive, scratch)
+        self.preservation_index_with_limits(scratch, ArchiveLimits::default())
+    }
+
+    /// Build a raw-member preservation index under explicit archive limits.
+    ///
+    /// Metadata and member-name limits are applied to every retained source
+    /// central record, including directory records, because preservation must
+    /// own their exact raw metadata even though ordinary file indexes exclude
+    /// directories. The file-count limit retains its non-directory meaning.
+    pub fn preservation_index_with_limits<'archive>(
+        &'archive self,
+        scratch: &mut [u8],
+        limits: ArchiveLimits,
+    ) -> Result<PreservationIndex<'archive, R>, Error> {
+        PreservationIndex::new_with_limits(&self.archive, scratch, limits)
     }
 
     /// Locate and index a positional ZIP source with default resource limits.
@@ -1092,6 +1150,8 @@ where
         let mut strict_mimetype = None;
         let mut has_encrypted_entries = false;
         let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
+        let mut local_offsets_strictly_increasing = true;
+        let mut previous_local_header_offset = None;
 
         {
             let mut central_entries =
@@ -1214,6 +1274,13 @@ where
                 }
 
                 let entry_id = EntryId(entries.len());
+                let local_header_offset = entry.local_header_offset();
+                if previous_local_header_offset
+                    .is_some_and(|previous| local_header_offset <= previous)
+                {
+                    local_offsets_strictly_increasing = false;
+                }
+                previous_local_header_offset = Some(local_header_offset);
                 if index.contains_key(&name) {
                     return Err(duplicate_member_error(
                         &name,
@@ -1222,7 +1289,7 @@ where
                     ));
                 }
                 index.insert(name.clone(), entry_id);
-                ordered_entries.push((entry.local_header_offset(), entry_id));
+                ordered_entries.push((local_header_offset, entry_id));
                 entries.push(IndexedEntry {
                     name,
                     info: EntryInfo {
@@ -1238,7 +1305,9 @@ where
             validate_strict_mimetype(&archive, strict_mimetype)?;
         }
 
-        ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
+        if !local_offsets_strictly_increasing {
+            ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
+        }
         let order = ordered_entries.into_iter().map(|(_, id)| id).collect();
 
         Ok(Self {
@@ -2155,6 +2224,42 @@ impl<W: Write> Write for LimitedEntryWriter<'_, '_, W> {
     }
 }
 
+/// Bounded in-memory scratch for one deflated member.
+///
+/// The scratch enforces the same compressed-size budget as
+/// [`LimitedEntryWriter`], but before any archive byte is emitted so a limit
+/// breach cannot poison the archive mid-entry.
+struct CompressedScratch<'a> {
+    inner: &'a mut Vec<u8>,
+    maximum: u64,
+}
+
+impl<'a> CompressedScratch<'a> {
+    fn new(inner: &'a mut Vec<u8>, maximum: u64) -> Self {
+        Self { inner, maximum }
+    }
+}
+
+impl Write for CompressedScratch<'_> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        let written = u64::try_from(self.inner.len()).unwrap_or(u64::MAX);
+        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let remaining = self.maximum.saturating_sub(written);
+        if requested > remaining {
+            return Err(streaming_limit_io_error(
+                StreamingLimitResource::CompressedBytes,
+                written.saturating_add(requested),
+                self.maximum,
+            ));
+        }
+        self.inner.write(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 /// Bounded ZIP transport writer for sequential Office package members.
 ///
 /// This substrate does not construct semantic XLSX, DOCX, PPTX, or ODF
@@ -2959,6 +3064,11 @@ impl<W: Write> StreamingArchiveWriter<W> {
     }
 
     /// Write a file with Deflate compression.
+    ///
+    /// The member is written through the streaming entry API, so the local
+    /// header carries a data descriptor. Callers that already hold the full
+    /// payload and need a canonical local header with upfront CRC-32 and
+    /// sizes can use [`Self::write_deflated_sized`] instead.
     pub fn write_deflated(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
         let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
@@ -2993,6 +3103,68 @@ impl<W: Write> StreamingArchiveWriter<W> {
         self.record_streaming_entry(normalized_name, name_bytes);
         self.refresh_output_bytes();
         Ok(())
+    }
+
+    /// Write an in-memory payload with Deflate compression and upfront sizes.
+    ///
+    /// The payload is compressed into a bounded scratch buffer before any
+    /// archive byte is emitted, so the local header declares the final CRC-32
+    /// and both sizes and no data descriptor is needed. A compressed-size
+    /// limit breach is therefore reported before the archive changes, leaving
+    /// the writer usable instead of poisoned mid-entry. Prefer this over
+    /// [`Self::write_deflated`] when the produced archive should be probeable
+    /// from its central directory alone.
+    pub fn write_deflated_sized(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
+        let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        self.reserve_streaming_entry()?;
+        let mut compressed = Vec::new();
+        compressed
+            .try_reserve(
+                data.len()
+                    .min(usize::try_from(self.limits.max_compressed_size).unwrap_or(usize::MAX)),
+            )
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "deflated member scratch buffer",
+                    source,
+                })
+            })?;
+        let compression = (|| {
+            let mut scratch =
+                CompressedScratch::new(&mut compressed, self.limits.max_compressed_size);
+            let mut encoder = DeflateEncoder::new(&mut scratch, Compression::default());
+            encoder.write_all(data)?;
+            encoder.finish().map(|_scratch| ())
+        })();
+        if let Err(error) = compression {
+            let error = Error::from(error);
+            return Err(match streaming_limit_from_error(&error) {
+                Some(StreamingLimitExceeded {
+                    resource: StreamingLimitResource::CompressedBytes,
+                    actual,
+                    maximum,
+                }) => limit_error(LimitResource::CompressedSize, actual, maximum),
+                _ => error,
+            });
+        }
+        let crc32 = crate::crc32(data);
+        match self.archive.write_precompressed_file(
+            &normalized_name,
+            CompressionMethod::Deflate,
+            crc32,
+            data_bytes,
+            &compressed,
+        ) {
+            Ok(()) => {
+                self.total_uncompressed_bytes =
+                    self.total_uncompressed_bytes.saturating_add(data_bytes);
+                self.record_streaming_entry(normalized_name, name_bytes);
+                self.refresh_output_bytes();
+                Ok(())
+            },
+            Err(error) => Err(self.poison(error)),
+        }
     }
 
     /// Consume a reader value into a stored ZIP member.
@@ -3562,6 +3734,17 @@ impl<'data> LazyArchiveReader<'data> {
     /// use `read_shared()` which returns an Arc.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
         self.read_shared(name).map(|arc| (*arc).clone())
+    }
+
+    /// Borrow and verify a stored member without populating the lazy cache.
+    ///
+    /// This is the zero-copy structural-ingress fast path for callers that
+    /// consume a stored XML member immediately. Deflated members return
+    /// `None` and should use [`Self::read`] instead. The returned slice remains
+    /// tied to the source bytes borrowed by this reader.
+    #[inline]
+    pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        self.inner.read_stored_borrowed(name)
     }
 
     /// Read and decompress a file, returning a shared reference.
@@ -4805,6 +4988,58 @@ mod tests {
         assert_eq!(reader.read("mimetype").unwrap(), b"application/test");
         assert_eq!(reader.read("content.xml").unwrap(), b"<content/>");
         assert_eq!(reader.read("styles.xml").unwrap(), b"<styles/>");
+    }
+
+    #[test]
+    fn sized_deflated_members_declare_upfront_sizes_without_a_data_descriptor() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("mimetype", b"application/test")
+            .unwrap();
+        writer
+            .write_deflated_sized("content.xml", b"<content>Hello</content>")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        assert!(!local_member_has_data_descriptor(&bytes, b"content.xml"));
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.len(), 2);
+        assert_eq!(reader.read("mimetype").unwrap(), b"application/test");
+        assert_eq!(
+            reader.read("content.xml").unwrap(),
+            b"<content>Hello</content>"
+        );
+    }
+
+    #[test]
+    fn sized_deflated_limit_breach_leaves_the_writer_usable() {
+        let limits = StreamingArchiveLimits::default().with_compressed_size_limit(1024);
+        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        writer
+            .write_stored("mimetype", b"application/test")
+            .unwrap();
+        // xorshift64* output is effectively incompressible, so the 4 KiB
+        // payload must exceed the 1 KiB compressed-size budget.
+        let mut state = 0x1234_5678_9abc_def0u64;
+        let payload: Vec<u8> = (0..4096)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                (state >> 32) as u8
+            })
+            .collect();
+        let error = writer
+            .write_deflated_sized("content.xml", &payload)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::LimitExceeded { .. }));
+        assert!(!writer.is_poisoned());
+        // The archive never observed the rejected member, so a follow-up
+        // in-budget write still succeeds.
+        writer.write_deflated_sized("ok.xml", b"<ok/>").unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.read("ok.xml").unwrap(), b"<ok/>");
     }
 
     #[test]
@@ -6140,6 +6375,12 @@ mod tests {
             FixtureEntry::stored(b"folder/", b""),
             FixtureEntry::stored(b"second.bin", b"second"),
         ]);
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
+
         let archive = ZipArchive::from_slice(&bytes).unwrap();
         let central = archive.directory_offset() as usize;
         let eocd = archive.eocd_offset() as usize;
@@ -6150,6 +6391,11 @@ mod tests {
         let third = bytes[central + first_len + second_len..eocd].to_vec();
         bytes[central..eocd].copy_from_slice(&[third, second, first].concat());
 
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
         let indexed = indexed_archive(bytes);
         assert_eq!(
             indexed.file_names().collect::<Vec<_>>(),
@@ -6170,6 +6416,30 @@ mod tests {
                 b"folder/".to_vec(),
                 b"first.bin".to_vec(),
             ]
+        );
+    }
+
+    #[test]
+    fn equal_local_header_offsets_keep_existing_reader_ordering() {
+        let mut bytes = fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"second.bin", b"second"),
+        ]);
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let central = archive.directory_offset() as usize;
+        let first_len = central_record_len(&bytes, central);
+        let second = central + first_len;
+        bytes[second + 42..second + 46].copy_from_slice(&0u32.to_le_bytes());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
+        let indexed = indexed_archive(bytes);
+        assert_eq!(
+            indexed.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
         );
     }
 

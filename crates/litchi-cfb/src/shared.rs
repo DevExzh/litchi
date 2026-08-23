@@ -4,7 +4,7 @@ use crate::shared_bulk::SharedOleBulkRead;
 use crate::{
     consts::{ENDOFCHAIN, MAXREGSECT, STGTY_STREAM},
     directory_name::directory_name_data,
-    file::{DirectoryEntry, OleError, OleFile, ParsedOleIndex},
+    file::{DirectoryEntry, OleError, OleFile, OleFileLimits, ParsedOleIndex},
 };
 use litchi_core::{ExecutionContext, ReadAt, SourceVersion};
 use std::{
@@ -24,7 +24,7 @@ pub struct SharedOleFileLimits {
 
 impl SharedOleFileLimits {
     /// Largest CFB input accepted by the default shared reader.
-    pub const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    pub const MAX_INPUT_BYTES: u64 = OleFileLimits::MAX_INPUT_BYTES;
 
     /// Creates a finite input ceiling for one positional CFB source.
     ///
@@ -33,13 +33,10 @@ impl SharedOleFileLimits {
     /// Returns an error if the ceiling is zero or exceeds the CFB shared
     /// reader's hard ingress ceiling.
     pub fn new(max_input_bytes: u64) -> Result<Self, OleError> {
-        if max_input_bytes == 0 || max_input_bytes > Self::MAX_INPUT_BYTES {
-            return Err(OleError::InvalidData(format!(
-                "shared CFB input limit must be between 1 and {} bytes",
-                Self::MAX_INPUT_BYTES
-            )));
-        }
-        Ok(Self { max_input_bytes })
+        let limits = OleFileLimits::new(max_input_bytes)?;
+        Ok(Self {
+            max_input_bytes: limits.max_input_bytes(),
+        })
     }
 
     /// Maximum source length accepted before parsing begins.
@@ -439,13 +436,18 @@ impl SharedOleFile {
         }
         let source_length = source_length?;
         if source_length > limits.max_input_bytes() {
-            return Err(OleError::InvalidData(format!(
-                "shared CFB input length {source_length} exceeds configured limit {}",
-                limits.max_input_bytes()
-            )));
+            return Err(OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: source_length,
+                maximum: limits.max_input_bytes(),
+            });
         }
 
-        let parsed = OleFile::open(ReadAtCursor::new(source.clone(), source_length));
+        let parser_limits = OleFileLimits::new(limits.max_input_bytes())?;
+        let parsed = OleFile::open_with_limits(
+            ReadAtCursor::new(source.clone(), source_length),
+            parser_limits,
+        );
         let observed = source.version()?;
         if observed != expected_version {
             return Err(OleError::SourceChanged {
@@ -2735,8 +2737,48 @@ mod tests {
 
         assert!(matches!(
             SharedOleFile::open_with_limits(source, limits),
-            Err(OleError::InvalidData(message)) if message.contains("exceeds configured limit")
+            Err(OleError::LimitExceeded {
+                resource: "input bytes",
+                observed,
+                maximum: 512,
+            }) if observed > 512
         ));
+    }
+
+    #[test]
+    fn shared_limits_reuse_typed_low_level_limit_validation() {
+        assert!(matches!(
+            SharedOleFileLimits::new(0),
+            Err(OleError::InvalidLimit {
+                resource: "CFB input bytes",
+                value: 0,
+                maximum: OleFileLimits::MAX_INPUT_BYTES,
+            })
+        ));
+        assert!(matches!(
+            SharedOleFileLimits::new(SharedOleFileLimits::MAX_INPUT_BYTES + 1),
+            Err(OleError::InvalidLimit {
+                resource: "CFB input bytes",
+                value,
+                maximum: OleFileLimits::MAX_INPUT_BYTES,
+            }) if value == OleFileLimits::MAX_INPUT_BYTES + 1
+        ));
+    }
+
+    #[test]
+    fn shared_limit_rejects_oversized_source_before_positional_reads() {
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let limits = SharedOleFileLimits::new(512).unwrap();
+
+        assert!(matches!(
+            SharedOleFile::open_with_limits(source.clone(), limits),
+            Err(OleError::LimitExceeded {
+                resource: "input bytes",
+                observed,
+                maximum: 512,
+            }) if observed == source.bytes.len() as u64
+        ));
+        assert_eq!(source.reads.load(AtomicOrdering::SeqCst), 0);
     }
 
     #[test]

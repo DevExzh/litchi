@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 
-use super::model::{Slide, Snapshot, capture, invalid, package_fingerprint};
+use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid, package_fingerprint};
 use super::patch::Patch;
 use crate::{Error, Result};
 
@@ -14,6 +14,7 @@ pub struct Transaction {
     source: Snapshot,
     working: OpcPackage,
     slides: Vec<Slide>,
+    slide_name_index: SlideNameIndex,
 }
 
 impl std::fmt::Debug for Transaction {
@@ -31,6 +32,7 @@ impl Transaction {
         Self {
             working: source.package.as_ref().clone(),
             slides: source.slides.clone(),
+            slide_name_index: source.slide_name_index.clone(),
             source,
         }
     }
@@ -110,10 +112,12 @@ impl Transaction {
                     .ok_or_else(|| invalid("opened-presentation slide order lost an identity"))?,
             );
         }
+        let slide_name_index = SlideNameIndex::build(&reordered)?;
         self.working
             .get_part_mut(&self.source.presentation_name)?
             .set_blob(xml);
         self.slides = reordered;
+        self.slide_name_index = slide_name_index;
         Ok(true)
     }
 
@@ -144,6 +148,7 @@ impl Transaction {
             self.source.physical_source_provenance,
         )?;
         self.slides = published.slides;
+        self.slide_name_index = published.slide_name_index;
         Ok(selected)
     }
 
@@ -1262,21 +1267,7 @@ impl Transaction {
                         len: self.slides.len(),
                     })
             },
-            crate::slide::Key::Name(name) => {
-                let mut matches = self.slides.iter().filter(|slide| slide.name == name);
-                let selected = matches.next().cloned();
-                if matches.next().is_some() {
-                    return Err(Error::AmbiguousSlideName {
-                        name: name.to_owned(),
-                        matches: self
-                            .slides
-                            .iter()
-                            .filter(|slide| slide.name == name)
-                            .count(),
-                    });
-                }
-                selected.ok_or_else(|| Error::SlideNameNotFound(name.to_owned()))
-            },
+            crate::slide::Key::Name(name) => self.slide_name_index.resolve(&self.slides, name),
         }
     }
 }
@@ -1489,34 +1480,7 @@ fn plan_shape_identity_transfer(
 }
 
 fn resolve_snapshot_slide(source: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
-    match key {
-        crate::slide::Key::Index(index) => {
-            source
-                .slides
-                .get(index)
-                .cloned()
-                .ok_or(Error::SlideIndexOutOfBounds {
-                    index,
-                    len: source.slides.len(),
-                })
-        },
-        crate::slide::Key::Name(name) => {
-            let matches: Vec<_> = source
-                .slides
-                .iter()
-                .filter(|slide| slide.name == name)
-                .cloned()
-                .collect();
-            match matches.as_slice() {
-                [slide] => Ok(slide.clone()),
-                [] => Err(Error::SlideNameNotFound(name.to_owned())),
-                _ => Err(Error::AmbiguousSlideName {
-                    name: name.to_owned(),
-                    matches: matches.len(),
-                }),
-            }
-        },
-    }
+    source.resolve_slide(key)
 }
 
 fn ensure_shape_id(xml: &[u8], shape_id: u32, label: &str) -> Result<()> {

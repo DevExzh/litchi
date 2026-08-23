@@ -14,7 +14,7 @@
 
 use crate::error::{Error, Result};
 use quick_xml::events::Event;
-use quick_xml::name::ResolveResult;
+use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::fmt::Write as _;
 
@@ -35,6 +35,7 @@ struct Layout {
     ppr_close_start: Option<usize>,
     ppr_empty: Option<ByteRange>,
     spacing: Option<ByteRange>,
+    spacing_has_unsupported_content: bool,
 }
 
 impl Paragraph {
@@ -61,6 +62,13 @@ impl Paragraph {
 
 fn rewrite_spacing(xml_bytes: &[u8], spacing: Option<ParagraphSpacing>) -> Result<Vec<u8>> {
     let layout = locate_layout(xml_bytes)?;
+    if layout.spacing_has_unsupported_content {
+        return Err(Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "set_spacing",
+            reason: "the existing paragraph spacing contains unsupported attributes or child content",
+        });
+    }
     match (layout.spacing, spacing) {
         (Some(range), Some(spacing)) => {
             let replacement = render_spacing(&layout.root_prefix, spacing)?;
@@ -158,6 +166,15 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
                         }
                         spacing_depth = Some(depth);
                         spacing_start = Some(event_start);
+                        if spacing_has_unsupported_attributes(
+                            &element,
+                            &resolver,
+                            &fragment_prefix,
+                        )? {
+                            layout.spacing_has_unsupported_content = true;
+                        }
+                    } else if spacing_depth.is_some() {
+                        layout.spacing_has_unsupported_content = true;
                     }
                 }
             },
@@ -209,6 +226,15 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
                             start: event_start,
                             end: event_end,
                         });
+                        if spacing_has_unsupported_attributes(
+                            &element,
+                            &resolver,
+                            &fragment_prefix,
+                        )? {
+                            layout.spacing_has_unsupported_content = true;
+                        }
+                    } else if spacing_depth.is_some() {
+                        layout.spacing_has_unsupported_content = true;
                     }
                 }
             },
@@ -243,7 +269,11 @@ fn locate_layout(xml_bytes: &[u8]) -> Result<Layout> {
             | Event::Decl(_)
             | Event::PI(_)
             | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+            | Event::GeneralRef(_) => {
+                if spacing_depth == Some(depth) {
+                    layout.spacing_has_unsupported_content = true;
+                }
+            },
         }
     }
 
@@ -292,6 +322,42 @@ fn validate_root(
     }
     layout.root_empty = empty;
     Ok(())
+}
+
+fn spacing_has_unsupported_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    resolver: &NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> Result<bool> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let raw_name = attribute.key.as_ref();
+        if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {
+            return Ok(true);
+        }
+        let local_name = attribute.key.local_name();
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        let known = is_fragment_word_name(
+            &namespace,
+            attribute.key,
+            local_name.as_ref(),
+            fragment_prefix,
+        ) && matches!(
+            local_name.as_ref(),
+            b"before"
+                | b"beforeLines"
+                | b"beforeAutospacing"
+                | b"after"
+                | b"afterLines"
+                | b"afterAutospacing"
+                | b"line"
+                | b"lineRule"
+        );
+        if !known {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn qualified_name(prefix: &[u8], local: &str) -> Result<String> {

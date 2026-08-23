@@ -9,6 +9,7 @@
 
 use std::{collections::HashSet, error::Error, fmt, str};
 
+use crate::package::MAX_MANIFEST_ENTRIES;
 use litchi_core::{
     CheckCapabilityId, CheckStatus, CompatibilityImpact, EvidenceDigest, EvidenceValue,
     IssueEvidence, IssueLocation, IssueSeverity, RepairAvailability, ValidateReport,
@@ -56,7 +57,7 @@ pub const DEFAULT_ODF_VALIDATION_LIMITS: OdfValidationLimits = OdfValidationLimi
     },
     max_mimetype_bytes: 512,
     max_manifest_bytes: 16 * 1024 * 1024,
-    max_manifest_entries: 100_000,
+    max_manifest_entries: MAX_MANIFEST_ENTRIES,
     max_root_xml_bytes: 64 * 1024 * 1024,
     max_xml_events: 4_000_000,
     max_xml_depth: 4_096,

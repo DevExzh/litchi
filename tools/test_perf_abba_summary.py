@@ -877,6 +877,29 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             ):
                 perf_abba_summary.summarize_reports(legs)
 
+    def test_xlsx_page_break_fixed_corpus_identity_is_exact(self):
+        fixed_page_break = four_legs()
+        for leg in fixed_page_break:
+            leg["configuration"]["cases"] = [
+                "xlsx_eager_page_break_edit_save",
+                "xlsx_source_backed_page_break_edit_save",
+            ]
+            for index, result in enumerate(leg["results"]):
+                result["case"] = leg["configuration"]["cases"][index]
+                result["corpus"].update(
+                    name="xlsx-page-break-media",
+                    generator="litchi-xlsx-page-break-source-edit-media-v1",
+                    shape="media-rich",
+                )
+        perf_abba_summary.summarize_reports(fixed_page_break)
+
+        for leg in fixed_page_break:
+            leg["results"][0]["corpus"]["generator"] = "unknown-generator"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "cover result shapes"
+        ):
+            perf_abba_summary.summarize_reports(fixed_page_break)
+
     def test_allocator_instrumentation_is_not_accepted_for_latency_abba(self):
         legs = four_legs()
         for leg in legs:

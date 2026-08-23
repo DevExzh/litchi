@@ -1,6 +1,41 @@
 use super::prelude::*;
 
 impl Document {
+    /// Get one paragraph by its zero-based position without materializing the full collection.
+    ///
+    /// The position spans the subdocuments in the same order as [`Self::paragraphs`]. Missing
+    /// positions return `Ok(None)`.
+    pub fn paragraph_at(&self, position: Position) -> Result<Option<Paragraph>> {
+        let mut remaining = position.get();
+        let text = self.text_extractor.text_shared();
+        let text_ranges = self.text_extractor.cp_to_byte_shared();
+
+        for (_, start_cp, end_cp) in self.fib.get_all_subdoc_ranges() {
+            if start_cp >= end_cp {
+                continue;
+            }
+
+            let para_extractor =
+                ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
+                    Arc::clone(&text),
+                    Arc::clone(&text_ranges),
+                    self.pap_bin_table.as_ref(),
+                    self.chp_bin_table.as_ref(),
+                    (start_cp, end_cp),
+                    self.stylesheet.as_ref(),
+                )?;
+            let (extracted, available) = para_extractor.extract_paragraph_at(remaining)?;
+            if let Some(extracted) = extracted {
+                let mut paragraphs = Vec::with_capacity(1);
+                self.convert_to_paragraphs(vec![extracted], &mut paragraphs)?;
+                return Ok(paragraphs.pop());
+            }
+            remaining = remaining.saturating_sub(available);
+        }
+
+        Ok(None)
+    }
+
     /// Get all paragraphs in the document.
     ///
     /// Returns a vector of `Paragraph` objects representing paragraphs
@@ -22,8 +57,9 @@ impl Document {
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
         let mut all_paragraphs = Vec::new();
 
-        // Wrap text in Arc to share across all extractors without cloning (thread-safe)
-        let text = Arc::new(self.text()?);
+        // Reuse the decoded text and CP boundary map across all subdocument extractors.
+        let text = self.text_extractor.text_shared();
+        let text_ranges = self.text_extractor.cp_to_byte_shared();
 
         // Get all subdocument ranges from FIB
         let subdoc_ranges = self.fib.get_all_subdoc_ranges();
@@ -41,15 +77,17 @@ impl Document {
                 continue;
             }
 
-            // Create extractor for this CP range - text is shared via Arc::clone (cheap pointer copy)
-            // Pass ChpBinTable reference to avoid re-parsing
-            let para_extractor = ParagraphExtractor::new_with_range_and_stylesheet(
-                Arc::clone(&text),
-                self.pap_bin_table.as_ref(),
-                self.chp_bin_table.as_ref(),
-                (start_cp, end_cp),
-                self.stylesheet.as_ref(),
-            )?;
+            // Create extractor for this CP range - text and CP boundaries are shared via Arc
+            // clones (cheap pointer copies). Pass bin-table references to avoid re-parsing.
+            let para_extractor =
+                ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
+                    Arc::clone(&text),
+                    Arc::clone(&text_ranges),
+                    self.pap_bin_table.as_ref(),
+                    self.chp_bin_table.as_ref(),
+                    (start_cp, end_cp),
+                    self.stylesheet.as_ref(),
+                )?;
 
             let extracted_paras = para_extractor.extract_paragraphs()?;
 

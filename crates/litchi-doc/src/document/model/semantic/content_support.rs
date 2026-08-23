@@ -18,10 +18,12 @@ impl Document {
             return Ok(Vec::new());
         }
 
-        let text = Arc::new(self.text()?);
+        let text = self.text_extractor.text_shared();
+        let text_ranges = self.text_extractor.cp_to_byte_shared();
 
-        let para_extractor = ParagraphExtractor::new_with_range_and_stylesheet(
+        let para_extractor = ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
             Arc::clone(&text),
+            Arc::clone(&text_ranges),
             self.pap_bin_table.as_ref(),
             self.chp_bin_table.as_ref(),
             (start_cp, end_cp),

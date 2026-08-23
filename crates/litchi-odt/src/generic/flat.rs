@@ -3,9 +3,14 @@
 use super::codec::{classify_mimetype, validate_flat_document};
 use super::model::{Family, FlatDocument};
 use crate::core::Meta;
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Error, Metadata, Resource, ResourceLimit, Result};
 use std::io::Read;
 use std::path::Path;
+
+/// Default maximum encoded size for a generic flat OpenDocument snapshot.
+pub(super) const DEFAULT_MAX_FLAT_DOCUMENT_BYTES: u64 = 256 * 1024 * 1024;
+/// Hard maximum encoded size accepted by the generic flat-document reader.
+pub(super) const HARD_MAX_FLAT_DOCUMENT_BYTES: u64 = 512 * 1024 * 1024;
 
 impl FlatDocument {
     /// Parses the optional flat-document `office:settings` inventory.
@@ -20,14 +25,38 @@ impl FlatDocument {
     }
 
     /// Read and validate a flat `OpenDocument` XML stream.
-    pub fn from_reader(mut reader: impl Read) -> Result<Self> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes)?;
-        Self::from_bytes(bytes)
+    pub fn from_reader(reader: impl Read) -> Result<Self> {
+        Self::from_reader_with_limit(reader, DEFAULT_MAX_FLAT_DOCUMENT_BYTES)
+    }
+
+    /// Read and validate a flat `OpenDocument` XML stream under a finite
+    /// encoded-byte limit.
+    pub fn from_reader_with_limit(reader: impl Read, maximum: u64) -> Result<Self> {
+        validate_flat_limit(maximum)?;
+        let bytes = read_flat_input(reader, maximum)?;
+        Self::from_bytes_with_limit(bytes, maximum)
     }
 
     /// Validate flat `OpenDocument` XML from owned bytes.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_bytes_with_limit(bytes, DEFAULT_MAX_FLAT_DOCUMENT_BYTES)
+    }
+
+    /// Validate flat `OpenDocument` XML from owned bytes under an explicit
+    /// finite encoded-byte limit.
+    pub fn from_bytes_with_limit(bytes: Vec<u8>, maximum: u64) -> Result<Self> {
+        validate_flat_limit(maximum)?;
+        let observed = u64::try_from(bytes.len()).map_err(|_| {
+            Error::InvalidFormat("flat OpenDocument input exceeds platform limits".to_string())
+        })?;
+        if observed > maximum {
+            return Err(Error::ResourceLimit(ResourceLimit {
+                resource: Resource::InputBytes,
+                observed,
+                limit: maximum,
+                scope: "flat OpenDocument input".into(),
+            }));
+        }
         let mimetype = crate::detect::flat_mime(&bytes)
             .ok_or_else(|| Error::InvalidFormat("invalid flat OpenDocument root".to_string()))?;
         let (family, template) = classify_mimetype(&mimetype).ok_or_else(|| {
@@ -195,4 +224,48 @@ impl FlatDocument {
         std::fs::write(path, self.as_bytes())?;
         Ok(())
     }
+}
+
+fn validate_flat_limit(maximum: u64) -> Result<()> {
+    if maximum == 0 || maximum > HARD_MAX_FLAT_DOCUMENT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "flat OpenDocument input limit must be between 1 and {HARD_MAX_FLAT_DOCUMENT_BYTES}"
+        )));
+    }
+    usize::try_from(maximum).map(|_| ()).map_err(|_| {
+        Error::InvalidFormat("flat OpenDocument input limit exceeds platform limits".to_string())
+    })
+}
+
+fn read_flat_input(reader: impl Read, maximum: u64) -> Result<Vec<u8>> {
+    let read_limit = maximum.checked_add(1).ok_or_else(|| {
+        Error::InvalidFormat("flat OpenDocument input limit overflows".to_string())
+    })?;
+    let reserve = usize::try_from(read_limit.min(64 * 1024)).map_err(|_| {
+        Error::InvalidFormat("flat OpenDocument input exceeds platform limits".to_string())
+    })?;
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(reserve)
+        .map_err(|source| Error::Allocation {
+            resource: "flat OpenDocument input",
+            source,
+        })?;
+
+    let mut reader = reader.take(read_limit);
+    let mut chunk = [0_u8; 8 * 1024];
+    loop {
+        let read = reader.read(&mut chunk)?;
+        if read == 0 {
+            break;
+        }
+        bytes
+            .try_reserve(read)
+            .map_err(|source| Error::Allocation {
+                resource: "flat OpenDocument input",
+                source,
+            })?;
+        bytes.extend_from_slice(&chunk[..read]);
+    }
+    Ok(bytes)
 }

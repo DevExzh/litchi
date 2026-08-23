@@ -37,6 +37,7 @@ use std::{
 use litchi_cfb::{
     OleError, OleFile, OleWriter, SharedOleBulkError, SharedOleFile, SharedOleFileLimits,
 };
+use litchi_core::detection::FileFormat;
 use litchi_core::{
     Budget, CancellationSource, CancellationToken, CheckStatus, ExecutionContext, ExecutionError,
     ExecutionLimits, Limits, ReadAt, SourceVersion, ValidateReport,
@@ -45,20 +46,30 @@ use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
     Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
+use litchi_ooxml_common::xml::{
+    OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
+};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, PartData, ReadLimits,
     Relationships, SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics,
     SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
+use litchi_pptx::shape::text::{
+    extract as extract_drawingml_text, scan_ranges as scan_drawingml_ranges,
+};
 use litchi_xlsx::{
     Cell as XlsxCell, MergeChoice, MergeLimits, Rect, RowIndex, SourceBackedWorkbook,
     StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
     Value as XlsxValue, Workbook,
 };
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesRef, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use soapberry_zip::office::ArchiveReader;
+use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
 const SCHEMA_VERSION: u32 = 1;
@@ -75,11 +86,14 @@ const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
 const CFB_SELECTIVE_CORPUS_GENERATOR: &str = "litchi-cfb-selective-read-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
+const XLSB_CORPUS_GENERATOR: &str = "litchi-xlsb-synthetic-v1";
 const PPT_PICTURES_CORPUS_GENERATOR: &str = "litchi-ppt-pictures-lazy-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
+const XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR: &str = "litchi-xlsx-named-sheet-lookup-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
 const DOCX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-docx-source-edit-media-v1";
 const SEMANTIC_PPTX_CORPUS_GENERATOR: &str = "litchi-pptx-semantic-v1";
+const PPTX_SLIDE_NAME_INDEX_CORPUS_GENERATOR: &str = "litchi-pptx-slide-name-index-v1";
 const PPTX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-pptx-source-edit-media-v1";
 const PPTX_CROSS_COPY_CORPUS_GENERATOR: &str = "litchi-pptx-cross-slide-copy-evidence-v1";
 const PPTX_SOURCE_BACKED_CROSS_COPY_CORPUS_GENERATOR: &str =
@@ -90,6 +104,8 @@ const XLSX_DEFINED_NAMES_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-defined-names-source-edit-media-v1";
 const XLSX_PAGE_BREAK_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-break-source-edit-media-v1";
+const XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-page-break-projection-media-v1";
 const XLSX_PAGE_MARGIN_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-margin-source-edit-media-v1";
 const XLSX_PAGE_SETUP_SOURCE_EDIT_CORPUS_GENERATOR: &str =
@@ -110,6 +126,7 @@ const XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1";
 const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
+const DETECTION_ODF_CORPUS_GENERATOR: &str = "litchi-detection-odf-catalog-v1";
 const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
 const ODF_REPAIR_LOCAL_EXTRA: &[u8] = &[0x55, 0x54, 0x05, 0x00, 0x01, 0, 0, 0, 0];
 const ODF_REPAIR_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
@@ -129,6 +146,18 @@ const ODP_TEXT_BOX_BATCH_CORPUS_GENERATOR: &str = "litchi-odp-cross-slide-textbo
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1";
 const RTF_PICTURE_CRUD_CORPUS_GENERATOR: &str = "litchi-rtf-picture-crud-v1";
+const OOXML_TRACKER_CORPUS_GENERATOR: &str = "litchi-ooxml-namespace-tracker-v1";
+const OOXML_TRACKER_OMML_NAMESPACE: &[u8] = OMML_NAMESPACE_URI.as_bytes();
+const OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/math";
+const OOXML_TRACKER_STRICT_OMML_NAMESPACE: &[u8] =
+    OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI.as_bytes();
+const OOXML_TRACKER_DRAWINGML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const OOXML_TRACKER_STRICT_DRAWINGML_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/drawingml/main";
+const OOXML_TRACKER_OMML_FORMULA_COUNT: usize = 256;
+const OOXML_TRACKER_DRAWINGML_PARAGRAPH_COUNT: usize = 256;
 const XLSX_STREAMING_CORPUS_GENERATOR: &str = "litchi-xlsx-streaming-create-v1";
 const RTF_STREAMING_CORPUS_GENERATOR: &str = "litchi-rtf-streaming-create-v1";
 const RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES: usize = 16 * 1024;
@@ -166,8 +195,12 @@ const PPT_PICTURE_COUNT: usize = 32;
 const PPT_PICTURE_BYTES: usize = 256 * 1024;
 const ODP_TEXT_BOX_BATCH_COUNT: usize = 8;
 const ODP_REPEATED_TEXT_CALLS: usize = 4;
-const ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS: u64 = 12;
-const ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] = [3, 3, 3, 3];
+// The source-backed slide projection cache publishes after
+// `SLIDES_CACHE_QUERY_THRESHOLD` queries; the threshold-crossing call pays two
+// additional freshness checks (before and after publication), so the uncached
+// control observes [3, 5, 3, 3] while the text-cache candidate observes
+// [3, 5, 2, 2] once its own cache is retained.
+const ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] = [3, 5, 3, 3];
 const ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS: [u64; ODP_REPEATED_TEXT_CALLS] =
     [3, 5, 2, 2];
 const ODT_RESOURCE_BATCH_COUNT: usize = 64;
@@ -178,6 +211,7 @@ const ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_C
     [2, 2, 2, 2];
 const ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_CALLS] =
     [2, 4, 2, 2];
+const XLSX_REPEATED_PAGE_BREAK_CALLS: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT: usize = 8;
@@ -248,6 +282,66 @@ enum XlsxShape {
     DenseWide,
 }
 
+/// Deterministic BIFF12 workbook shapes for the opt-in XLSB lifecycle matrix.
+///
+/// The sparse shape keeps a large declared extent while storing only a fixed
+/// row/column lattice.  This exercises the distinction between worksheet
+/// dimensions and stored-cell traversal without relying on external files.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum XlsbShape {
+    Tiny,
+    Medium,
+    Large,
+    Sparse,
+}
+
+impl XlsbShape {
+    const ALL: [Self; 4] = [Self::Tiny, Self::Medium, Self::Large, Self::Sparse];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Tiny => "tiny",
+            Self::Medium => "medium",
+            Self::Large => "large",
+            Self::Sparse => "sparse",
+        }
+    }
+
+    const fn sheet_count(self) -> usize {
+        match self {
+            Self::Tiny => 1,
+            Self::Medium => 2,
+            Self::Large => 4,
+            Self::Sparse => 3,
+        }
+    }
+
+    const fn row_count(self) -> usize {
+        match self {
+            Self::Tiny => 8,
+            Self::Medium => 32,
+            Self::Large => 128,
+            Self::Sparse => 512,
+        }
+    }
+
+    const fn column_count(self) -> usize {
+        match self {
+            Self::Tiny => 8,
+            Self::Medium => 32,
+            Self::Large => 64,
+            Self::Sparse => 128,
+        }
+    }
+
+    const fn stores_cell(self, row: usize, column: usize) -> bool {
+        match self {
+            Self::Tiny | Self::Medium | Self::Large => true,
+            Self::Sparse => (row == 0 && column == 0) || (row % 17 == 0 && column % 19 == 0),
+        }
+    }
+}
+
 /// Deterministic media-rich multi-sheet corpora for scalar-cell CRUD.
 ///
 /// This matrix is opt-in because it intentionally exercises the new bounded
@@ -311,6 +405,109 @@ enum SemanticShape {
     Tiny,
     Medium,
     Large,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DetectionOdfFamily {
+    Odt,
+    Ods,
+    Odp,
+}
+
+impl DetectionOdfFamily {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Odt => "odt",
+            Self::Ods => "ods",
+            Self::Odp => "odp",
+        }
+    }
+
+    const fn odf_format(self) -> FileFormat {
+        match self {
+            Self::Odt => FileFormat::Odt,
+            Self::Ods => FileFormat::Ods,
+            Self::Odp => FileFormat::Odp,
+        }
+    }
+
+    const fn ooxml_format(self) -> FileFormat {
+        match self {
+            Self::Odt => FileFormat::Docx,
+            Self::Ods => FileFormat::Xlsx,
+            Self::Odp => FileFormat::Pptx,
+        }
+    }
+
+    const fn odf_mimetype(self) -> &'static str {
+        match self {
+            Self::Odt => "application/vnd.oasis.opendocument.text",
+            Self::Ods => "application/vnd.oasis.opendocument.spreadsheet",
+            Self::Odp => "application/vnd.oasis.opendocument.presentation",
+        }
+    }
+
+    const fn ooxml_part(self) -> &'static str {
+        match self {
+            Self::Odt => "word/document.xml",
+            Self::Ods => "xl/workbook.xml",
+            Self::Odp => "ppt/presentation.xml",
+        }
+    }
+
+    const fn ooxml_content_type(self) -> &'static str {
+        match self {
+            Self::Odt => {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+            },
+            Self::Ods => {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+            },
+            Self::Odp => {
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+            },
+        }
+    }
+
+    const fn ooxml_payload(self) -> &'static [u8] {
+        match self {
+            Self::Odt => {
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+            },
+            Self::Ods => {
+                br#"<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+            },
+            Self::Odp => {
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DetectionMode {
+    Bytes,
+    Reader,
+    Polyglot,
+    CatalogAlias,
+}
+
+impl DetectionMode {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Bytes => "bytes",
+            Self::Reader => "reader",
+            Self::Polyglot => "polyglot",
+            Self::CatalogAlias => "catalog-alias",
+        }
+    }
+
+    const fn expected_format(self, family: DetectionOdfFamily) -> FileFormat {
+        match self {
+            Self::Bytes | Self::Reader => family.odf_format(),
+            Self::Polyglot | Self::CatalogAlias => family.ooxml_format(),
+        }
+    }
 }
 
 /// Transport and producer variants for the opt-in semantic RTF matrix.
@@ -467,6 +664,39 @@ impl XlsxShape {
             Self::Tiny => 8,
             Self::Medium => 32,
             Self::DenseWide => 256,
+        }
+    }
+}
+
+/// Deterministic worksheet-catalog sizes for the opt-in named-selector probe.
+///
+/// These are deliberately separate from `XlsxShape`: the ordinary XLSX
+/// matrix measures cell workloads, while this probe isolates catalog lookup
+/// cost with one small cell per sheet and prepares each workbook before the
+/// timed selector loop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum XlsxNamedSheetCatalog {
+    Four,
+    SixtyFour,
+    Large,
+}
+
+impl XlsxNamedSheetCatalog {
+    const ALL: [Self; 3] = [Self::Four, Self::SixtyFour, Self::Large];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Four => "4",
+            Self::SixtyFour => "64",
+            Self::Large => "large",
+        }
+    }
+
+    const fn sheet_count(self) -> usize {
+        match self {
+            Self::Four => 4,
+            Self::SixtyFour => 64,
+            Self::Large => 256,
         }
     }
 }
@@ -647,6 +877,10 @@ enum Case {
     DocxSourceBackedOneEditSave,
     DocxStoryHyperlinkPlan,
     PptxSourceBackedOneEditSave,
+    OmmlFormulaRangeScan,
+    OmmlFormulaExtract,
+    PptxDrawingmlExtract,
+    PptxDrawingmlRangeScan,
     PptxEagerBatchEditSave,
     PptxSourceBackedBatchEditSave,
     PptxEagerMultiSlideBatchEditSave,
@@ -660,6 +894,8 @@ enum Case {
     XlsxSourceBackedDefinedNamesEditSave,
     XlsxEagerPageBreakEditSave,
     XlsxSourceBackedPageBreakEditSave,
+    XlsxWorksheetRepeatedPageBreaks,
+    XlsxPackageRepeatedPageBreaks,
     XlsxEagerPageMarginEditSave,
     XlsxSourceBackedPageMarginEditSave,
     XlsxEagerPageSetupEditSave,
@@ -746,7 +982,9 @@ enum Case {
     PptFreshWriteTo,
     DocSemanticOpen,
     DocSemanticListParagraphs,
+    DocSemanticParagraphCount,
     DocSemanticOneParagraph,
+    DocSemanticOneParagraphAt,
     DocSemanticFullText,
     DocSemanticNoopEditSave,
     DocSemanticOneEditSave,
@@ -758,6 +996,10 @@ enum Case {
     XlsSemanticFullCellScan,
     XlsSemanticNoopEditSave,
     XlsSemanticOneEditSave,
+    XlsbSemanticOpen,
+    XlsbSemanticListWorksheets,
+    XlsbSemanticOneCell,
+    XlsbSemanticFullCellScan,
     XlsValidationReport,
     XlsCommentsEagerEditSave,
     XlsCommentsSourceBackedEditSave,
@@ -796,6 +1038,12 @@ enum Case {
     PptPicturesSourceBackedOpenAllImages,
     XlsxOpenOwned,
     XlsxListSheets,
+    XlsxEagerNamedSheetLookup4,
+    XlsxSourceNamedSheetLookup4,
+    XlsxEagerNamedSheetLookup64,
+    XlsxSourceNamedSheetLookup64,
+    XlsxEagerNamedSheetLookupLarge,
+    XlsxSourceNamedSheetLookupLarge,
     XlsxFirstCell,
     XlsxFullCellScan,
     XlsxNarrowColumnRangeScan,
@@ -867,6 +1115,9 @@ enum Case {
     PptxSemanticNoopEditSave,
     PptxSemanticOneEditSave,
     PptxSemanticOnePercentEditSave,
+    PptxNamedOneEditSave,
+    PptxNamedRepeatedEditSave,
+    PptxNumericRepeatedEditSave,
     PptxValidationReport,
     OdtSemanticOpen,
     OdtSemanticListParagraphs,
@@ -880,6 +1131,10 @@ enum Case {
     OdtMixedModelContentBatchEditSave,
     OdfValidationReport,
     OdfMimetypeRepairPlan,
+    DetectOdtBytes,
+    DetectOdtReader,
+    DetectOdtPolyglot,
+    DetectOdtCatalogAlias,
     OdtMediaParagraphEditSave,
     OdtMediaLineBreakEditSave,
     OdtMediaAppendRunEditSave,
@@ -909,6 +1164,10 @@ enum Case {
     OdsMediaOneEditSave,
     OdsContentCowOwnedRebuild,
     OdsContentCowPositional,
+    DetectOdsBytes,
+    DetectOdsReader,
+    DetectOdsPolyglot,
+    DetectOdsCatalogAlias,
     OdpSemanticOpen,
     OdpSemanticListSlides,
     OdpSemanticOneSlide,
@@ -925,6 +1184,10 @@ enum Case {
     OdpMediaSourceBackedOpen,
     OdpMediaEagerOneSlide,
     OdpMediaSourceBackedOneSlide,
+    DetectOdpBytes,
+    DetectOdpReader,
+    DetectOdpPolyglot,
+    DetectOdpCatalogAlias,
     OdpFileEagerOpen,
     OdpFileSourceOpen,
     OdpFileEagerSelectedSlide,
@@ -1052,6 +1315,10 @@ impl Case {
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::DocxStoryHyperlinkPlan => "docx_story_hyperlink_plan",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
+            Self::OmmlFormulaRangeScan => "omml_formula_range_scan",
+            Self::OmmlFormulaExtract => "omml_formula_extract",
+            Self::PptxDrawingmlExtract => "pptx_drawingml_extract",
+            Self::PptxDrawingmlRangeScan => "pptx_drawingml_range_scan",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
             Self::PptxSourceBackedBatchEditSave => "pptx_source_backed_batch_edit_save",
             Self::PptxEagerMultiSlideBatchEditSave => "pptx_eager_multi_slide_batch_edit_save",
@@ -1073,6 +1340,8 @@ impl Case {
             },
             Self::XlsxEagerPageBreakEditSave => "xlsx_eager_page_break_edit_save",
             Self::XlsxSourceBackedPageBreakEditSave => "xlsx_source_backed_page_break_edit_save",
+            Self::XlsxWorksheetRepeatedPageBreaks => "xlsx_worksheet_repeated_page_breaks",
+            Self::XlsxPackageRepeatedPageBreaks => "xlsx_package_repeated_page_breaks",
             Self::XlsxEagerPageMarginEditSave => "xlsx_eager_page_margin_edit_save",
             Self::XlsxSourceBackedPageMarginEditSave => "xlsx_source_backed_page_margin_edit_save",
             Self::XlsxEagerPageSetupEditSave => "xlsx_eager_page_setup_edit_save",
@@ -1215,7 +1484,9 @@ impl Case {
             Self::PptFreshWriteTo => "ppt_fresh_write_to",
             Self::DocSemanticOpen => "doc_semantic_open",
             Self::DocSemanticListParagraphs => "doc_semantic_list_paragraphs",
+            Self::DocSemanticParagraphCount => "doc_semantic_paragraph_count",
             Self::DocSemanticOneParagraph => "doc_semantic_one_paragraph",
+            Self::DocSemanticOneParagraphAt => "doc_semantic_one_paragraph_at",
             Self::DocSemanticFullText => "doc_semantic_full_text",
             Self::DocSemanticNoopEditSave => "doc_semantic_noop_edit_save",
             Self::DocSemanticOneEditSave => "doc_semantic_one_edit_save",
@@ -1227,6 +1498,10 @@ impl Case {
             Self::XlsSemanticFullCellScan => "xls_semantic_full_cell_scan",
             Self::XlsSemanticNoopEditSave => "xls_semantic_noop_edit_save",
             Self::XlsSemanticOneEditSave => "xls_semantic_one_edit_save",
+            Self::XlsbSemanticOpen => "xlsb_semantic_open",
+            Self::XlsbSemanticListWorksheets => "xlsb_semantic_list_worksheets",
+            Self::XlsbSemanticOneCell => "xlsb_semantic_one_cell",
+            Self::XlsbSemanticFullCellScan => "xlsb_semantic_full_cell_scan",
             Self::XlsValidationReport => "xls_validation_report",
             Self::XlsCommentsEagerEditSave => "xls_comments_eager_edit_save",
             Self::XlsCommentsSourceBackedEditSave => "xls_comments_source_backed_edit_save",
@@ -1277,6 +1552,12 @@ impl Case {
             },
             Self::XlsxOpenOwned => "xlsx_open_owned",
             Self::XlsxListSheets => "xlsx_list_sheets",
+            Self::XlsxEagerNamedSheetLookup4 => "xlsx_eager_named_sheet_lookup_4",
+            Self::XlsxSourceNamedSheetLookup4 => "xlsx_source_named_sheet_lookup_4",
+            Self::XlsxEagerNamedSheetLookup64 => "xlsx_eager_named_sheet_lookup_64",
+            Self::XlsxSourceNamedSheetLookup64 => "xlsx_source_named_sheet_lookup_64",
+            Self::XlsxEagerNamedSheetLookupLarge => "xlsx_eager_named_sheet_lookup_large",
+            Self::XlsxSourceNamedSheetLookupLarge => "xlsx_source_named_sheet_lookup_large",
             Self::XlsxFirstCell => "xlsx_first_cell",
             Self::XlsxFullCellScan => "xlsx_full_cell_scan",
             Self::XlsxNarrowColumnRangeScan => "xlsx_narrow_column_range_scan",
@@ -1350,6 +1631,9 @@ impl Case {
             Self::PptxSemanticNoopEditSave => "pptx_semantic_noop_edit_save",
             Self::PptxSemanticOneEditSave => "pptx_semantic_one_edit_save",
             Self::PptxSemanticOnePercentEditSave => "pptx_semantic_one_percent_edit_save",
+            Self::PptxNamedOneEditSave => "pptx_named_one_edit_save",
+            Self::PptxNamedRepeatedEditSave => "pptx_named_repeated_edit_save",
+            Self::PptxNumericRepeatedEditSave => "pptx_numeric_repeated_edit_save",
             Self::PptxValidationReport => "pptx_validation_report",
             Self::OdtSemanticOpen => "odt_semantic_open",
             Self::OdtSemanticListParagraphs => "odt_semantic_list_paragraphs",
@@ -1363,6 +1647,10 @@ impl Case {
             Self::OdtMixedModelContentBatchEditSave => "odt_mixed_model_content_batch_edit_save",
             Self::OdfValidationReport => "odf_validation_report",
             Self::OdfMimetypeRepairPlan => "odf_mimetype_repair_plan",
+            Self::DetectOdtBytes => "detect_odt_bytes",
+            Self::DetectOdtReader => "detect_odt_reader",
+            Self::DetectOdtPolyglot => "detect_odt_polyglot",
+            Self::DetectOdtCatalogAlias => "detect_odt_catalog_alias",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdtMediaLineBreakEditSave => "odt_media_line_break_edit_save",
             Self::OdtMediaAppendRunEditSave => "odt_media_append_run_edit_save",
@@ -1394,6 +1682,10 @@ impl Case {
             Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
             Self::OdsContentCowOwnedRebuild => "ods_content_cow_owned_rebuild",
             Self::OdsContentCowPositional => "ods_content_cow_positional",
+            Self::DetectOdsBytes => "detect_ods_bytes",
+            Self::DetectOdsReader => "detect_ods_reader",
+            Self::DetectOdsPolyglot => "detect_ods_polyglot",
+            Self::DetectOdsCatalogAlias => "detect_ods_catalog_alias",
             Self::OdpSemanticOpen => "odp_semantic_open",
             Self::OdpSemanticListSlides => "odp_semantic_list_slides",
             Self::OdpSemanticOneSlide => "odp_semantic_one_slide",
@@ -1410,6 +1702,10 @@ impl Case {
             Self::OdpMediaSourceBackedOpen => "odp_media_source_backed_open",
             Self::OdpMediaEagerOneSlide => "odp_media_eager_one_slide",
             Self::OdpMediaSourceBackedOneSlide => "odp_media_source_backed_one_slide",
+            Self::DetectOdpBytes => "detect_odp_bytes",
+            Self::DetectOdpReader => "detect_odp_reader",
+            Self::DetectOdpPolyglot => "detect_odp_polyglot",
+            Self::DetectOdpCatalogAlias => "detect_odp_catalog_alias",
             Self::OdpFileEagerOpen => "odp_file_eager_open",
             Self::OdpFileSourceOpen => "odp_file_source_open",
             Self::OdpFileEagerSelectedSlide => "odp_file_eager_selected_slide",
@@ -1509,7 +1805,9 @@ impl Case {
             self,
             Self::DocSemanticOpen
                 | Self::DocSemanticListParagraphs
+                | Self::DocSemanticParagraphCount
                 | Self::DocSemanticOneParagraph
+                | Self::DocSemanticOneParagraphAt
                 | Self::DocSemanticFullText
                 | Self::DocSemanticNoopEditSave
                 | Self::DocSemanticOneEditSave
@@ -1530,6 +1828,16 @@ impl Case {
                 | Self::XlsSemanticFullCellScan
                 | Self::XlsSemanticNoopEditSave
                 | Self::XlsSemanticOneEditSave
+        )
+    }
+
+    const fn uses_semantic_xlsb(self) -> bool {
+        matches!(
+            self,
+            Self::XlsbSemanticOpen
+                | Self::XlsbSemanticListWorksheets
+                | Self::XlsbSemanticOneCell
+                | Self::XlsbSemanticFullCellScan
         )
     }
 
@@ -1621,6 +1929,42 @@ impl Case {
                 | Self::XlsxRangeSourceListSheets
                 | Self::XlsxRangeSourceFirstCell
                 | Self::XlsxRangeSourceNarrowColumnRangeScan
+        )
+    }
+
+    const fn is_xlsx_named_sheet_lookup(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxEagerNamedSheetLookup4
+                | Self::XlsxSourceNamedSheetLookup4
+                | Self::XlsxEagerNamedSheetLookup64
+                | Self::XlsxSourceNamedSheetLookup64
+                | Self::XlsxEagerNamedSheetLookupLarge
+                | Self::XlsxSourceNamedSheetLookupLarge
+        )
+    }
+
+    const fn xlsx_named_sheet_catalog(self) -> Option<XlsxNamedSheetCatalog> {
+        match self {
+            Self::XlsxEagerNamedSheetLookup4 | Self::XlsxSourceNamedSheetLookup4 => {
+                Some(XlsxNamedSheetCatalog::Four)
+            },
+            Self::XlsxEagerNamedSheetLookup64 | Self::XlsxSourceNamedSheetLookup64 => {
+                Some(XlsxNamedSheetCatalog::SixtyFour)
+            },
+            Self::XlsxEagerNamedSheetLookupLarge | Self::XlsxSourceNamedSheetLookupLarge => {
+                Some(XlsxNamedSheetCatalog::Large)
+            },
+            _ => None,
+        }
+    }
+
+    const fn is_xlsx_named_sheet_source_backed(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceNamedSheetLookup4
+                | Self::XlsxSourceNamedSheetLookup64
+                | Self::XlsxSourceNamedSheetLookupLarge
         )
     }
 
@@ -1718,6 +2062,15 @@ impl Case {
                 | Self::PptxSemanticNoopEditSave
                 | Self::PptxSemanticOneEditSave
                 | Self::PptxSemanticOnePercentEditSave
+        )
+    }
+
+    const fn uses_pptx_slide_name_index(self) -> bool {
+        matches!(
+            self,
+            Self::PptxNamedOneEditSave
+                | Self::PptxNamedRepeatedEditSave
+                | Self::PptxNumericRepeatedEditSave
         )
     }
 
@@ -1865,6 +2218,48 @@ impl Case {
 
     const fn uses_odf_repair(self) -> bool {
         matches!(self, Self::OdfMimetypeRepairPlan)
+    }
+
+    const fn is_detection(self) -> bool {
+        matches!(
+            self,
+            Self::DetectOdtBytes
+                | Self::DetectOdtReader
+                | Self::DetectOdtPolyglot
+                | Self::DetectOdtCatalogAlias
+                | Self::DetectOdsBytes
+                | Self::DetectOdsReader
+                | Self::DetectOdsPolyglot
+                | Self::DetectOdsCatalogAlias
+                | Self::DetectOdpBytes
+                | Self::DetectOdpReader
+                | Self::DetectOdpPolyglot
+                | Self::DetectOdpCatalogAlias
+        )
+    }
+
+    fn detection_spec(self) -> Option<(DetectionOdfFamily, DetectionMode)> {
+        match self {
+            Self::DetectOdtBytes => Some((DetectionOdfFamily::Odt, DetectionMode::Bytes)),
+            Self::DetectOdtReader => Some((DetectionOdfFamily::Odt, DetectionMode::Reader)),
+            Self::DetectOdtPolyglot => Some((DetectionOdfFamily::Odt, DetectionMode::Polyglot)),
+            Self::DetectOdtCatalogAlias => {
+                Some((DetectionOdfFamily::Odt, DetectionMode::CatalogAlias))
+            },
+            Self::DetectOdsBytes => Some((DetectionOdfFamily::Ods, DetectionMode::Bytes)),
+            Self::DetectOdsReader => Some((DetectionOdfFamily::Ods, DetectionMode::Reader)),
+            Self::DetectOdsPolyglot => Some((DetectionOdfFamily::Ods, DetectionMode::Polyglot)),
+            Self::DetectOdsCatalogAlias => {
+                Some((DetectionOdfFamily::Ods, DetectionMode::CatalogAlias))
+            },
+            Self::DetectOdpBytes => Some((DetectionOdfFamily::Odp, DetectionMode::Bytes)),
+            Self::DetectOdpReader => Some((DetectionOdfFamily::Odp, DetectionMode::Reader)),
+            Self::DetectOdpPolyglot => Some((DetectionOdfFamily::Odp, DetectionMode::Polyglot)),
+            Self::DetectOdpCatalogAlias => {
+                Some((DetectionOdfFamily::Odp, DetectionMode::CatalogAlias))
+            },
+            _ => None,
+        }
     }
 
     const fn uses_ods_media(self) -> bool {
@@ -2165,6 +2560,16 @@ impl Case {
         matches!(self, Self::DocxStoryHyperlinkPlan)
     }
 
+    const fn is_ooxml_tracker_scan(self) -> bool {
+        matches!(
+            self,
+            Self::OmmlFormulaRangeScan
+                | Self::OmmlFormulaExtract
+                | Self::PptxDrawingmlExtract
+                | Self::PptxDrawingmlRangeScan
+        )
+    }
+
     const fn is_pptx_source_edit_save(self) -> bool {
         matches!(
             self,
@@ -2206,6 +2611,13 @@ impl Case {
         matches!(
             self,
             Self::XlsxEagerPageBreakEditSave | Self::XlsxSourceBackedPageBreakEditSave
+        )
+    }
+
+    const fn is_xlsx_page_break_projection(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxWorksheetRepeatedPageBreaks | Self::XlsxPackageRepeatedPageBreaks
         )
     }
 
@@ -2398,6 +2810,7 @@ struct Options {
     payloads: Vec<PayloadKind>,
     writer_shapes: Vec<WriterShape>,
     xlsx_shapes: Vec<XlsxShape>,
+    xlsb_shapes: Vec<XlsbShape>,
     xlsx_cell_crud_shapes: Vec<XlsxCellCrudShape>,
     xlsx_row_visibility_shapes: Vec<XlsxRowVisibilityShape>,
     semantic_shapes: Vec<SemanticShape>,
@@ -2415,6 +2828,21 @@ struct Corpus {
     target_name: String,
     target_payload: Vec<u8>,
     xlsx: Option<XlsxCorpus>,
+}
+
+/// Fixed XML fragments for the hidden OOXML namespace-tracker selectors.
+///
+/// The expected projections are produced by the independent `NsReader` oracle
+/// before any timed iteration.  The timed functions only scan the already
+/// materialized bytes and compare their result after the clock stops.
+struct OoxmlTrackerCorpus {
+    manifest: CorpusManifest,
+    omml: Vec<u8>,
+    drawingml: Vec<u8>,
+    expected_omml_ranges: Vec<(u32, u32)>,
+    expected_omml_formulas: Vec<String>,
+    expected_drawingml_text: String,
+    expected_drawingml_ranges: Vec<(u32, u32)>,
 }
 
 #[derive(Debug)]
@@ -2590,6 +3018,7 @@ struct Configuration {
     payload_kinds: Vec<&'static str>,
     writer_shapes: Vec<&'static str>,
     xlsx_shapes: Vec<&'static str>,
+    xlsb_shapes: Vec<&'static str>,
     xlsx_cell_crud_shapes: Vec<&'static str>,
     xlsx_row_visibility_shapes: Vec<&'static str>,
     semantic_shapes: Vec<&'static str>,
@@ -6665,6 +7094,27 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_xlsx_page_break_projection())
+    {
+        let corpus = build_xlsx_page_break_projection_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_xlsx_page_break_projection())
+        {
+            results.push(run_xlsx_page_break_projection(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.is_opc_source_cache_evidence())
     {
         let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible)?;
@@ -6724,7 +7174,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 !case.is_fresh_writer()
                     && !case.uses_semantic_doc()
                     && !case.uses_semantic_xls()
+                    && !case.uses_semantic_xlsb()
                     && !case.uses_semantic_ppt()
+                    && !case.uses_semantic_xlsb()
                     && !case.is_ppt_pictures()
                     && !case.uses_xlsx()
                     && !case.uses_xlsx_cell_values()
@@ -6734,6 +7186,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_rtf_picture_crud()
                     && !case.uses_semantic_docx()
                     && !case.uses_semantic_pptx()
+                    && !case.uses_pptx_slide_name_index()
                     && !case.uses_semantic_odt()
                     && !case.uses_odt_media()
                     && !case.is_odt_repeated_text()
@@ -6757,6 +7210,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
                     && !case.is_docx_story_hyperlink_plan()
+                    && !case.is_ooxml_tracker_scan()
                     && !case.is_doc_owner_public_phases()
                     && !case.is_pptx_source_edit_save()
                     && !case.is_pptx_cross_copy()
@@ -6764,6 +7218,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_calculation_metadata_edit_save()
                     && !case.is_xlsx_defined_names_edit_save()
                     && !case.is_xlsx_page_break_edit_save()
+                    && !case.is_xlsx_page_break_projection()
                     && !case.is_xlsx_page_margin_edit_save()
                     && !case.is_xlsx_page_setup_edit_save()
                     && !case.is_xlsx_print_options_edit_save()
@@ -6782,6 +7237,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_validation_pptx()
                     && !case.uses_validation_odf()
                     && !case.uses_odf_repair()
+                    && !case.is_detection()
                     && !case.is_cfb_selective()
                     && !case.is_cfb_open_stream_evidence()
             }) {
@@ -7160,6 +7616,27 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_ooxml_tracker_scan())
+    {
+        let corpus = build_ooxml_tracker_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_ooxml_tracker_scan())
+        {
+            results.push(run_ooxml_tracker_case(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.is_pptx_source_edit_save())
     {
         let corpus = build_pptx_source_edit_corpus()?;
@@ -7373,6 +7850,26 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options.cases.iter().any(|case| case.uses_semantic_xlsb()) {
+        for shape in &options.xlsb_shapes {
+            let corpus = build_xlsb_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_semantic_xlsb())
+            {
+                results.push(run_case_with_config(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
     if options
         .cases
         .iter()
@@ -7407,12 +7904,59 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_xlsx_named_sheet_lookup())
+    {
+        // Keep selector correctness and all archive/source construction out of
+        // the measured loops. The oracle also exercises the Unicode/case,
+        // missing-name, and duplicate-canonical-name invariants once per run.
+        verify_xlsx_named_sheet_lookup_oracle()?;
+        for catalog in XlsxNamedSheetCatalog::ALL {
+            let corpus = build_xlsx_named_sheet_lookup_corpus(catalog)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.xlsx_named_sheet_catalog() == Some(catalog))
+            {
+                results.push(run_xlsx_named_sheet_lookup(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
     if options.cases.iter().any(|case| case.uses_xlsx()) {
         for shape in &options.xlsx_shapes {
             let corpus = build_xlsx_corpus(*shape)?;
             for case in options.cases.iter().filter(|case| case.uses_xlsx()) {
                 results.push(run_case_with_config(
                     *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_xlsb()) {
+        for shape in &options.xlsb_shapes {
+            let corpus = build_xlsb_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_semantic_xlsb())
+            {
+                results.push(run_case_with_config(
+                    case,
                     &corpus,
                     options.warmup_iterations,
                     options.samples,
@@ -7604,6 +8148,48 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     options.warmup_iterations,
                     options.samples,
                     options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.uses_pptx_slide_name_index())
+    {
+        for shape in &options.semantic_shapes {
+            let corpus = build_pptx_slide_name_index_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .filter(|case| case.uses_pptx_slide_name_index())
+            {
+                results.push(run_case_with_config(
+                    *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_detection()) {
+        for shape in &options.semantic_shapes {
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.is_detection())
+            {
+                let corpus = build_detection_corpus(case, *shape)?;
+                results.push(run_detection_case(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
                 )?);
             }
         }
@@ -8120,6 +8706,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             .iter()
             .map(|shape| shape.name())
             .collect(),
+        xlsb_shapes: options
+            .xlsb_shapes
+            .iter()
+            .map(|shape| shape.name())
+            .collect(),
         xlsx_cell_crud_shapes: options
             .xlsx_cell_crud_shapes
             .iter()
@@ -8212,6 +8803,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut payloads = PayloadKind::ALL.to_vec();
     let mut writer_shapes = WriterShape::ALL.to_vec();
     let mut xlsx_shapes = XlsxShape::ALL.to_vec();
+    let mut xlsb_shapes = XlsbShape::ALL.to_vec();
     let mut xlsx_cell_crud_shapes = XlsxCellCrudShape::ALL.to_vec();
     let mut xlsx_row_visibility_shapes = XlsxRowVisibilityShape::ALL.to_vec();
     let mut semantic_shapes = SemanticShape::ALL.to_vec();
@@ -8260,6 +8852,9 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
             },
             "--xlsx-shape" => {
                 xlsx_shapes = parse_selection(arguments.next(), "--xlsx-shape", parse_xlsx_shape)?;
+            },
+            "--xlsb-shape" => {
+                xlsb_shapes = parse_selection(arguments.next(), "--xlsb-shape", parse_xlsb_shape)?;
             },
             "--xlsx-cell-crud-shape" => {
                 xlsx_cell_crud_shapes = parse_selection(
@@ -8334,6 +8929,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         payloads,
         writer_shapes,
         xlsx_shapes,
+        xlsb_shapes,
         xlsx_cell_crud_shapes,
         xlsx_row_visibility_shapes,
         semantic_shapes,
@@ -8543,6 +9139,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "docx_story_hyperlink_plan" => Some(Case::DocxStoryHyperlinkPlan),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
+        "omml_formula_range_scan" => Some(Case::OmmlFormulaRangeScan),
+        "omml_formula_extract" => Some(Case::OmmlFormulaExtract),
+        "pptx_drawingml_extract" => Some(Case::PptxDrawingmlExtract),
+        "pptx_drawingml_range_scan" => Some(Case::PptxDrawingmlRangeScan),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
         "pptx_source_backed_batch_edit_save" => Some(Case::PptxSourceBackedBatchEditSave),
         "pptx_eager_multi_slide_batch_edit_save" => Some(Case::PptxEagerMultiSlideBatchEditSave),
@@ -8564,6 +9164,8 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_eager_page_break_edit_save" => Some(Case::XlsxEagerPageBreakEditSave),
         "xlsx_source_backed_page_break_edit_save" => Some(Case::XlsxSourceBackedPageBreakEditSave),
+        "xlsx_worksheet_repeated_page_breaks" => Some(Case::XlsxWorksheetRepeatedPageBreaks),
+        "xlsx_package_repeated_page_breaks" => Some(Case::XlsxPackageRepeatedPageBreaks),
         "xlsx_eager_page_margin_edit_save" => Some(Case::XlsxEagerPageMarginEditSave),
         "xlsx_source_backed_page_margin_edit_save" => {
             Some(Case::XlsxSourceBackedPageMarginEditSave)
@@ -8660,7 +9262,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_fresh_write_to" => Some(Case::PptFreshWriteTo),
         "doc_semantic_open" => Some(Case::DocSemanticOpen),
         "doc_semantic_list_paragraphs" => Some(Case::DocSemanticListParagraphs),
+        "doc_semantic_paragraph_count" => Some(Case::DocSemanticParagraphCount),
         "doc_semantic_one_paragraph" => Some(Case::DocSemanticOneParagraph),
+        "doc_semantic_one_paragraph_at" => Some(Case::DocSemanticOneParagraphAt),
         "doc_semantic_full_text" => Some(Case::DocSemanticFullText),
         "doc_semantic_noop_edit_save" => Some(Case::DocSemanticNoopEditSave),
         "doc_semantic_one_edit_save" => Some(Case::DocSemanticOneEditSave),
@@ -8672,6 +9276,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_semantic_full_cell_scan" => Some(Case::XlsSemanticFullCellScan),
         "xls_semantic_noop_edit_save" => Some(Case::XlsSemanticNoopEditSave),
         "xls_semantic_one_edit_save" => Some(Case::XlsSemanticOneEditSave),
+        "xlsb_semantic_open" => Some(Case::XlsbSemanticOpen),
+        "xlsb_semantic_list_worksheets" => Some(Case::XlsbSemanticListWorksheets),
+        "xlsb_semantic_one_cell" => Some(Case::XlsbSemanticOneCell),
+        "xlsb_semantic_full_cell_scan" => Some(Case::XlsbSemanticFullCellScan),
         "xls_validation_report" => Some(Case::XlsValidationReport),
         "xls_comments_eager_edit_save" => Some(Case::XlsCommentsEagerEditSave),
         "xls_comments_source_backed_edit_save" => Some(Case::XlsCommentsSourceBackedEditSave),
@@ -8724,6 +9332,12 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_open_owned" => Some(Case::XlsxOpenOwned),
         "xlsx_list_sheets" => Some(Case::XlsxListSheets),
+        "xlsx_eager_named_sheet_lookup_4" => Some(Case::XlsxEagerNamedSheetLookup4),
+        "xlsx_source_named_sheet_lookup_4" => Some(Case::XlsxSourceNamedSheetLookup4),
+        "xlsx_eager_named_sheet_lookup_64" => Some(Case::XlsxEagerNamedSheetLookup64),
+        "xlsx_source_named_sheet_lookup_64" => Some(Case::XlsxSourceNamedSheetLookup64),
+        "xlsx_eager_named_sheet_lookup_large" => Some(Case::XlsxEagerNamedSheetLookupLarge),
+        "xlsx_source_named_sheet_lookup_large" => Some(Case::XlsxSourceNamedSheetLookupLarge),
         "xlsx_first_cell" => Some(Case::XlsxFirstCell),
         "xlsx_full_cell_scan" => Some(Case::XlsxFullCellScan),
         "xlsx_narrow_column_range_scan" => Some(Case::XlsxNarrowColumnRangeScan),
@@ -8797,6 +9411,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_semantic_noop_edit_save" => Some(Case::PptxSemanticNoopEditSave),
         "pptx_semantic_one_edit_save" => Some(Case::PptxSemanticOneEditSave),
         "pptx_semantic_one_percent_edit_save" => Some(Case::PptxSemanticOnePercentEditSave),
+        "pptx_named_one_edit_save" => Some(Case::PptxNamedOneEditSave),
+        "pptx_named_repeated_edit_save" => Some(Case::PptxNamedRepeatedEditSave),
+        "pptx_numeric_repeated_edit_save" => Some(Case::PptxNumericRepeatedEditSave),
         "pptx_validation_report" => Some(Case::PptxValidationReport),
         "odt_semantic_open" => Some(Case::OdtSemanticOpen),
         "odt_semantic_list_paragraphs" => Some(Case::OdtSemanticListParagraphs),
@@ -8812,6 +9429,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_mixed_model_content_batch_edit_save" => Some(Case::OdtMixedModelContentBatchEditSave),
         "odf_validation_report" => Some(Case::OdfValidationReport),
         "odf_mimetype_repair_plan" => Some(Case::OdfMimetypeRepairPlan),
+        "detect_odt_bytes" => Some(Case::DetectOdtBytes),
+        "detect_odt_reader" => Some(Case::DetectOdtReader),
+        "detect_odt_polyglot" => Some(Case::DetectOdtPolyglot),
+        "detect_odt_catalog_alias" => Some(Case::DetectOdtCatalogAlias),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "odt_media_line_break_edit_save" => Some(Case::OdtMediaLineBreakEditSave),
         "odt_media_append_run_edit_save" => Some(Case::OdtMediaAppendRunEditSave),
@@ -8847,6 +9468,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
         "ods_content_cow_owned_rebuild" => Some(Case::OdsContentCowOwnedRebuild),
         "ods_content_cow_positional" => Some(Case::OdsContentCowPositional),
+        "detect_ods_bytes" => Some(Case::DetectOdsBytes),
+        "detect_ods_reader" => Some(Case::DetectOdsReader),
+        "detect_ods_polyglot" => Some(Case::DetectOdsPolyglot),
+        "detect_ods_catalog_alias" => Some(Case::DetectOdsCatalogAlias),
         "odp_semantic_open" => Some(Case::OdpSemanticOpen),
         "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
         "odp_semantic_one_slide" => Some(Case::OdpSemanticOneSlide),
@@ -8863,6 +9488,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_media_source_backed_open" => Some(Case::OdpMediaSourceBackedOpen),
         "odp_media_eager_one_slide" => Some(Case::OdpMediaEagerOneSlide),
         "odp_media_source_backed_one_slide" => Some(Case::OdpMediaSourceBackedOneSlide),
+        "detect_odp_bytes" => Some(Case::DetectOdpBytes),
+        "detect_odp_reader" => Some(Case::DetectOdpReader),
+        "detect_odp_polyglot" => Some(Case::DetectOdpPolyglot),
+        "detect_odp_catalog_alias" => Some(Case::DetectOdpCatalogAlias),
         "odp_file_eager_open" => Some(Case::OdpFileEagerOpen),
         "odp_file_source_open" => Some(Case::OdpFileSourceOpen),
         "odp_file_eager_selected_slide" => Some(Case::OdpFileEagerSelectedSlide),
@@ -8917,6 +9546,16 @@ fn parse_xlsx_shape(value: &str) -> Option<XlsxShape> {
         "tiny" => Some(XlsxShape::Tiny),
         "medium" => Some(XlsxShape::Medium),
         "dense-wide" => Some(XlsxShape::DenseWide),
+        _ => None,
+    }
+}
+
+fn parse_xlsb_shape(value: &str) -> Option<XlsbShape> {
+    match value {
+        "tiny" => Some(XlsbShape::Tiny),
+        "medium" => Some(XlsbShape::Medium),
+        "large" => Some(XlsbShape::Large),
+        "sparse" => Some(XlsbShape::Sparse),
         _ => None,
     }
 }
@@ -8999,6 +9638,9 @@ fn print_usage() {
                                        docx_source_backed_one_edit_save,\n\
                                        docx_story_hyperlink_plan,\n\
                                        pptx_source_backed_one_edit_save,\n\
+                                       omml_formula_range_scan,\n\
+                                       omml_formula_extract,\n\
+                                       pptx_drawingml_extract,pptx_drawingml_range_scan,\n\
                                        pptx_eager_batch_edit_save,\n\
                                        pptx_source_backed_batch_edit_save,\n\
                                        pptx_eager_multi_slide_batch_edit_save,\n\
@@ -9011,6 +9653,8 @@ fn print_usage() {
                                        xlsx_source_backed_defined_names_edit_save,\n\
                                        xlsx_eager_page_break_edit_save,\n\
                                        xlsx_source_backed_page_break_edit_save,\n\
+                                       xlsx_worksheet_repeated_page_breaks,\n\
+                                       xlsx_package_repeated_page_breaks,\n\
                                        xlsx_eager_page_margin_edit_save,\n\
                                        xlsx_source_backed_page_margin_edit_save,\n\
                                        xlsx_eager_page_setup_edit_save,\n\
@@ -9070,13 +9714,17 @@ fn print_usage() {
                                        cfb_open_stream_simulated_mini_4095_shared_repeat8,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
                                        doc_semantic_open,doc_semantic_list_paragraphs,\n\
-                                       doc_semantic_one_paragraph,doc_semantic_full_text,\n\
+                                       doc_semantic_paragraph_count,\n\
+                                       doc_semantic_one_paragraph,doc_semantic_one_paragraph_at,\n\
+                                       doc_semantic_full_text,\n\
                                        doc_semantic_noop_edit_save,doc_semantic_one_edit_save,\n\
                                        doc_body_snapshot_list_paragraphs,\n\
                                        doc_owner_public_phases,\n\
                                        xls_semantic_open,xls_semantic_list_worksheets,\n\
                                        xls_semantic_one_cell,xls_semantic_full_cell_scan,\n\
                                        xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
+                                       xlsb_semantic_open,xlsb_semantic_list_worksheets,\n\
+                                       xlsb_semantic_one_cell,xlsb_semantic_full_cell_scan,\n\
                                        xls_comments_eager_edit_save,\n\
                                        xls_comments_source_backed_edit_save,\n\
                                        xls_comments_eager_batch_edit_save,\n\
@@ -9109,7 +9757,11 @@ fn print_usage() {
                                        ppt_pictures_source_backed_cached_repeat,\n\
                                        ppt_pictures_eager_open_all_images,\n\
                                        ppt_pictures_source_backed_open_all_images,\n\
-                                       xlsx_open_owned,xlsx_list_sheets,xlsx_first_cell,\n\
+                                       xlsx_open_owned,xlsx_list_sheets,\n\
+                                       xlsx_eager_named_sheet_lookup_4,\n\
+                                       xlsx_eager_named_sheet_lookup_64,\n\
+                                       xlsx_eager_named_sheet_lookup_large,\n\
+                                       xlsx_first_cell,\n\
                                        xlsx_full_cell_scan,xlsx_narrow_column_range_scan,\n\
                                        xlsx_noop_commit,xlsx_noop_commit_save,\n\
                                        xlsx_one_cell_commit,xlsx_one_cell_commit_first_read,\n\
@@ -9135,6 +9787,9 @@ fn print_usage() {
                                        xlsx_eager_row_visibility_batch_edit_save,\n\
                                        xlsx_source_backed_row_visibility_batch_edit_save,\n\
                                        xlsx_source_open,xlsx_source_list_sheets,\n\
+                                       xlsx_source_named_sheet_lookup_4,\n\
+                                       xlsx_source_named_sheet_lookup_64,\n\
+                                       xlsx_source_named_sheet_lookup_large,\n\
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
                                        xlsx_file_open,xlsx_file_open_lifecycle,\n\
@@ -9165,12 +9820,16 @@ fn print_usage() {
                                        pptx_semantic_one_slide,pptx_semantic_full_text,\n\
                                        pptx_semantic_create_small,pptx_semantic_noop_edit_save,\n\
                                        pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save,\n\
+                                       pptx_named_one_edit_save,pptx_named_repeated_edit_save,\n\
+                                       pptx_numeric_repeated_edit_save,\n\
                                        odt_semantic_open,odt_semantic_list_paragraphs,\n\
                                        odt_semantic_one_paragraph,odt_semantic_full_text,\n\
                                        odt_semantic_create_small,odt_semantic_noop_edit_save,\n\
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
                                        odt_mixed_model_content_scalar_edit_save,\n\
                                        odt_mixed_model_content_batch_edit_save,\n\
+                                       detect_odt_bytes,detect_odt_reader,\n\
+                                       detect_odt_polyglot,detect_odt_catalog_alias,\n\
                                        odt_media_paragraph_edit_save,odt_media_line_break_edit_save,\n\
                                        odt_media_append_run_edit_save,\n\
                                        odt_media_append_hyperlink_edit_save,\n\
@@ -9194,6 +9853,8 @@ fn print_usage() {
                                        ods_source_backed_repeated_edit,\n\
                                        ods_media_one_edit_save,\n\
                                        ods_content_cow_owned_rebuild,ods_content_cow_positional,\n\
+                                       detect_ods_bytes,detect_ods_reader,\n\
+                                       detect_ods_polyglot,detect_ods_catalog_alias,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
@@ -9203,6 +9864,8 @@ fn print_usage() {
                                        odp_content_cow_owned_rebuild,odp_content_cow_positional,\n\
                                        odp_media_eager_open,odp_media_source_backed_open,\n\
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
+                                       detect_odp_bytes,detect_odp_reader,\n\
+                                       detect_odp_polyglot,detect_odp_catalog_alias,\n\
                                        odp_file_eager_open,odp_file_source_open,\n\
                                        odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
                                        odp_source_backed_repeated_text_uncached,\n\
@@ -9216,6 +9879,7 @@ fn print_usage() {
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
+           --xlsb-shape LIST           tiny,medium,large,sparse (only used by opt-in XLSB semantic cases)\n\
            --xlsx-cell-crud-shape LIST medium,dense-sparse (used by matched scalar-cell and edit-composition cases)\n\
            --xlsx-row-visibility-shape LIST medium,large (only used by matched row-visibility cases)\n\
            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
@@ -12464,6 +13128,35 @@ fn build_xlsx_page_break_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     Ok(corpus)
 }
 
+fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut corpus = build_xlsx_page_break_edit_corpus()?;
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let replaced = xlsx_page_break_oracle_rewrite(opc.get_part(&target_uri)?.blob())?;
+    opc.get_part_mut(&target_uri)?.set_blob(replaced);
+    let archive = PackageWriter::to_bytes(&opc)?;
+    let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
+    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("XLSX page-break projection logical byte count overflows usize")
+    })?;
+    corpus.manifest.name = "xlsx-page-break-projection-media".to_owned();
+    corpus.manifest.generator = XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR;
+    corpus.manifest.entry_count = opc.part_count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    corpus.manifest.uncompressed_payload_bytes = uncompressed_payload_bytes;
+    corpus.manifest.archive_bytes = archive.len();
+    corpus.manifest.archive_sha256 = sha256_hex(&archive);
+    corpus.manifest.target_entry = "worksheet:Sheet1:rowBreaks".to_owned();
+    corpus.manifest.target_payload_bytes = target_payload.len();
+    corpus.manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    corpus.archive = archive;
+    corpus.target_name = "xl/worksheets/sheet1.xml".to_owned();
+    corpus.target_payload = target_payload;
+    Ok(corpus)
+}
+
 fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -12697,6 +13390,72 @@ fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
         target_payload,
         xlsx: None,
     })
+}
+
+#[derive(Clone, Debug)]
+struct PptxSelectorEdit {
+    slide_index: usize,
+    shape_index: usize,
+    name: String,
+    text: String,
+}
+
+fn pptx_named_slide_name(index: usize) -> String {
+    format!("litchi-perf-pptx-slide-name-index-{index:03}")
+}
+
+fn pptx_slide_member_index(member: &str) -> Option<usize> {
+    let stem = member.strip_prefix("ppt/slides/")?.strip_suffix(".xml")?;
+    let number = stem.strip_prefix("slide")?;
+    if number.is_empty() || !number.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    number.parse::<usize>().ok()?.checked_sub(1)
+}
+
+fn rename_pptx_slide_payload(payload: &[u8], name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    let xml = std::str::from_utf8(payload)?;
+    let marker = r#"<p:cSld name=""#;
+    let start = xml
+        .find(marker)
+        .map(|offset| offset + marker.len())
+        .ok_or("generated PPTX slide has no cSld name")?;
+    let end = start
+        .checked_add(
+            xml.get(start..)
+                .ok_or("generated PPTX slide name starts outside XML")?
+                .find('"')
+                .ok_or("generated PPTX slide cSld name is unterminated")?,
+        )
+        .ok_or("generated PPTX slide name offset overflows usize")?;
+    let mut renamed = String::with_capacity(xml.len() + name.len());
+    renamed.push_str(
+        xml.get(..start)
+            .ok_or("generated PPTX slide name prefix is out of bounds")?,
+    );
+    renamed.push_str(name);
+    renamed.push_str(
+        xml.get(end..)
+            .ok_or("generated PPTX slide name suffix is out of bounds")?,
+    );
+    Ok(renamed.into_bytes())
+}
+
+fn rewrite_pptx_slide_names(
+    archive: &[u8],
+    mut replacement: impl FnMut(usize) -> Option<String>,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let reader = ArchiveReader::new(archive)?;
+    let mut writer = StreamingArchiveWriter::new();
+    for member in reader.file_names() {
+        let payload = reader.read(member)?;
+        let payload = match pptx_slide_member_index(member).and_then(&mut replacement) {
+            Some(name) => rename_pptx_slide_payload(&payload, &name)?,
+            None => payload,
+        };
+        writer.write_stored(member, &payload)?;
+    }
+    Ok(writer.finish_to_bytes()?)
 }
 
 fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -13615,6 +14374,295 @@ fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
     })
 }
 
+fn detection_format_name(format: FileFormat) -> &'static str {
+    match format {
+        FileFormat::Docx => "docx",
+        FileFormat::Xlsx => "xlsx",
+        FileFormat::Pptx => "pptx",
+        FileFormat::Odt => "odt",
+        FileFormat::Ods => "ods",
+        FileFormat::Odp => "odp",
+        _ => "other",
+    }
+}
+
+fn build_detection_corpus(case: Case, shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let (family, mode) = case
+        .detection_spec()
+        .ok_or("non-detection case passed to detection corpus builder")?;
+    let base = match family {
+        DetectionOdfFamily::Odt => build_semantic_odt_corpus(shape)?,
+        DetectionOdfFamily::Ods => build_semantic_ods_corpus(shape)?,
+        DetectionOdfFamily::Odp => build_semantic_odp_corpus(shape)?,
+    };
+    let archive = match mode {
+        DetectionMode::Bytes | DetectionMode::Reader => base.archive.clone(),
+        DetectionMode::Polyglot => detection_polyglot_archive(family, &base.archive)?,
+        DetectionMode::CatalogAlias => detection_catalog_alias_archive(family, &base.archive)?,
+    };
+    let expected = mode.expected_format(family);
+    let observed = litchi::common::detection::detect_file_format_from_bytes(&archive);
+    if observed != Some(expected) {
+        return Err(format!(
+            "{} detection corpus oracle differs: expected {}, observed {}",
+            case.name(),
+            detection_format_name(expected),
+            observed.map_or("none", detection_format_name),
+        )
+        .into());
+    }
+    let (archive_member_count, logical_bytes) = zip_logical_work(&archive)?;
+    let target_payload = detection_format_name(expected).as_bytes().to_vec();
+    let mut manifest = base.manifest;
+    manifest.name = format!("{}-{}-{}", family.name(), mode.name(), shape.name());
+    manifest.generator = DETECTION_ODF_CORPUS_GENERATOR;
+    manifest.package_format = "ODF/OOXML/ZIP";
+    manifest.shape = shape.name();
+    manifest.payload_kind = mode.payload_kind();
+    manifest.compression = "deflate-and-stored";
+    manifest.entry_count = archive_member_count;
+    manifest.archive_member_count = archive_member_count;
+    manifest.entry_bytes = target_payload.len();
+    manifest.uncompressed_payload_bytes = usize::try_from(logical_bytes)?;
+    manifest.archive_bytes = archive.len();
+    manifest.archive_sha256 = sha256_hex(&archive);
+    manifest.target_entry = format!("detected-format:{}", detection_format_name(expected));
+    manifest.target_payload_bytes = target_payload.len();
+    manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    Ok(Corpus {
+        manifest,
+        archive,
+        target_name: "detected-format".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+impl DetectionMode {
+    const fn payload_kind(self) -> &'static str {
+        match self {
+            Self::Bytes => "canonical-odf",
+            Self::Reader => "canonical-odf-reader",
+            Self::Polyglot => "ooxml-odf-polyglot",
+            Self::CatalogAlias => "ooxml-odf-catalog-alias",
+        }
+    }
+}
+
+fn detection_polyglot_archive(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    detection_merge_ooxml_members(family, odf_archive, true)
+}
+
+fn detection_catalog_alias_archive(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    // A leading slash is a ZIP/OPC alias. The conservative ODF catalog probe
+    // must classify this layout as unknown so the OOXML fallback gets a turn.
+    detection_merge_ooxml_members(family, odf_archive, false)
+}
+
+fn detection_merge_ooxml_members(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+    include_catalog: bool,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let odf = ArchiveReader::new(odf_archive)?;
+    let ooxml_archive = detection_ooxml_archive(family)?;
+    let ooxml = ArchiveReader::new(&ooxml_archive)?;
+    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    writer.set_mimetype(family.odf_mimetype())?;
+    for path in odf.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer.add_file(path, &odf.read(path)?)?;
+    }
+    for path in ooxml.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml")
+            || path.ends_with('/')
+            || (!include_catalog && path == "[Content_Types].xml")
+        {
+            continue;
+        }
+        writer.add_file(path, &ooxml.read(path)?)?;
+    }
+    let merged = writer.finish_to_bytes()?;
+    if include_catalog {
+        Ok(merged)
+    } else {
+        let catalog = ooxml.read("[Content_Types].xml")?;
+        append_stored_zip_member(&merged, "/[Content_Types].xml", &catalog)
+    }
+}
+
+fn detection_ooxml_archive(family: DetectionOdfFamily) -> Result<Vec<u8>, Box<dyn Error>> {
+    let part_name = family.ooxml_part();
+    let mut package = OpcPackage::new();
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new(format!("/{part_name}"))?,
+        family.ooxml_content_type().to_owned(),
+        family.ooxml_payload().to_vec(),
+    )))?;
+    package.rels_mut().try_add_relationship(
+        relationship_type::OFFICE_DOCUMENT.to_owned(),
+        part_name.to_owned(),
+        "rIdDetectionMain".to_owned(),
+        TargetMode::Internal,
+    )?;
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn append_stored_zip_member(
+    source: &[u8],
+    name: &str,
+    data: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    const EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
+    const LOCAL_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x03, 0x04];
+    const CENTRAL_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
+    const EOCD_BYTES: usize = 22;
+    const LOCAL_FIXED_BYTES: usize = 30;
+    const CENTRAL_FIXED_BYTES: usize = 46;
+
+    if source.len() < EOCD_BYTES {
+        return Err("ZIP alias source has no end-of-central-directory record".into());
+    }
+    let minimum_eocd = source.len().saturating_sub(EOCD_BYTES + u16::MAX as usize);
+    let last_candidate = source.len() - EOCD_BYTES;
+    let eocd_offset = (minimum_eocd..=last_candidate)
+        .rev()
+        .find(|offset| {
+            source.get(*offset..*offset + 4) == Some(EOCD_SIGNATURE.as_slice())
+                && read_zip_u16(source, *offset + 20).is_some_and(|comment| {
+                    *offset + EOCD_BYTES + usize::from(comment) == source.len()
+                })
+        })
+        .ok_or("ZIP alias source has no bounded end-of-central-directory record")?;
+    let central_size = usize::try_from(
+        read_zip_u32(source, eocd_offset + 12).ok_or("ZIP alias central size is truncated")?,
+    )?;
+    let central_offset = usize::try_from(
+        read_zip_u32(source, eocd_offset + 16).ok_or("ZIP alias central offset is truncated")?,
+    )?;
+    let entry_count =
+        read_zip_u16(source, eocd_offset + 10).ok_or("ZIP alias entry count is truncated")?;
+    if central_offset.checked_add(central_size) != Some(eocd_offset)
+        || entry_count == u16::MAX
+        || central_offset > u32::MAX as usize
+    {
+        return Err("ZIP alias source is not a classic single-disk archive".into());
+    }
+    let name_bytes = name.as_bytes();
+    let name_len = u16::try_from(name_bytes.len())?;
+    let data_len = u32::try_from(data.len())?;
+    let crc = soapberry_zip::crc32(data);
+    let local_len = LOCAL_FIXED_BYTES
+        .checked_add(name_bytes.len())
+        .and_then(|length| length.checked_add(data.len()))
+        .ok_or("ZIP alias local entry length overflows usize")?;
+    let central_len = CENTRAL_FIXED_BYTES
+        .checked_add(name_bytes.len())
+        .ok_or("ZIP alias central entry length overflows usize")?;
+
+    let mut local = Vec::with_capacity(local_len);
+    local.extend_from_slice(&LOCAL_SIGNATURE);
+    push_zip_u16(&mut local, 20);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u32(&mut local, crc);
+    push_zip_u32(&mut local, data_len);
+    push_zip_u32(&mut local, data_len);
+    push_zip_u16(&mut local, name_len);
+    push_zip_u16(&mut local, 0);
+    local.extend_from_slice(name_bytes);
+    local.extend_from_slice(data);
+
+    let mut central = Vec::with_capacity(central_len);
+    central.extend_from_slice(&CENTRAL_SIGNATURE);
+    push_zip_u16(&mut central, 20);
+    push_zip_u16(&mut central, 20);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u32(&mut central, crc);
+    push_zip_u32(&mut central, data_len);
+    push_zip_u32(&mut central, data_len);
+    push_zip_u16(&mut central, name_len);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u32(&mut central, 0);
+    push_zip_u32(&mut central, u32::try_from(central_offset)?);
+    central.extend_from_slice(name_bytes);
+
+    let new_central_offset = central_offset
+        .checked_add(local.len())
+        .ok_or("ZIP alias central offset overflows usize")?;
+    let new_central_size = central_size
+        .checked_add(central.len())
+        .ok_or("ZIP alias central size overflows usize")?;
+    let mut eocd = source[eocd_offset..].to_vec();
+    let next_entry_count = entry_count + 1;
+    write_zip_u16(&mut eocd, 8, next_entry_count)?;
+    write_zip_u16(&mut eocd, 10, next_entry_count)?;
+    write_zip_u32(&mut eocd, 12, u32::try_from(new_central_size)?)?;
+    write_zip_u32(&mut eocd, 16, u32::try_from(new_central_offset)?)?;
+
+    let output_len = source
+        .len()
+        .checked_add(local.len())
+        .and_then(|length| length.checked_add(central.len()))
+        .ok_or("ZIP alias output length overflows usize")?;
+    let mut output = Vec::with_capacity(output_len);
+    output.extend_from_slice(&source[..central_offset]);
+    output.extend_from_slice(&local);
+    output.extend_from_slice(&source[central_offset..eocd_offset]);
+    output.extend_from_slice(&central);
+    output.extend_from_slice(&eocd);
+    Ok(output)
+}
+
+fn read_zip_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+    let bytes = bytes.get(offset..offset.checked_add(2)?)?;
+    Some(u16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn read_zip_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    let bytes = bytes.get(offset..offset.checked_add(4)?)?;
+    Some(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn push_zip_u16(bytes: &mut Vec<u8>, value: u16) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_zip_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_zip_u16(bytes: &mut [u8], offset: usize, value: u16) -> Result<(), Box<dyn Error>> {
+    let target = bytes
+        .get_mut(offset..offset.checked_add(2).ok_or("ZIP field offset overflow")?)
+        .ok_or("ZIP field is truncated")?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_zip_u32(bytes: &mut [u8], offset: usize, value: u32) -> Result<(), Box<dyn Error>> {
+    let target = bytes
+        .get_mut(offset..offset.checked_add(4).ok_or("ZIP field offset overflow")?)
+        .ok_or("ZIP field is truncated")?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
 fn build_odp_media_corpus() -> Result<Corpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let archive = odp_media_archive()?;
@@ -13844,6 +14892,325 @@ fn build_semantic_pptx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
     })
 }
 
+type XlsbCellRecord = (usize, usize, usize, u64);
+const XLSB_CELL_DIGEST_DOMAIN: &[u8] = b"litchi-xlsb-cell-projection-v1";
+
+fn xlsb_shape(corpus: &Corpus) -> Result<XlsbShape, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSB_CORPUS_GENERATOR {
+        return Err("corpus is not an XLSB semantic corpus".into());
+    }
+    match corpus.manifest.shape {
+        "tiny" => Ok(XlsbShape::Tiny),
+        "medium" => Ok(XlsbShape::Medium),
+        "large" => Ok(XlsbShape::Large),
+        "sparse" => Ok(XlsbShape::Sparse),
+        _ => Err("XLSB semantic corpus has an unknown shape".into()),
+    }
+}
+
+fn xlsb_cell_value(
+    shape: XlsbShape,
+    sheet: usize,
+    row: usize,
+    column: usize,
+) -> Result<f64, Box<dyn Error>> {
+    let sheet_stride = shape
+        .row_count()
+        .checked_mul(shape.column_count())
+        .ok_or("XLSB cell ordinal sheet stride overflows usize")?;
+    let row_offset = row
+        .checked_mul(shape.column_count())
+        .ok_or("XLSB cell ordinal row offset overflows usize")?;
+    let ordinal = sheet
+        .checked_mul(sheet_stride)
+        .and_then(|offset| offset.checked_add(row_offset))
+        .and_then(|offset| offset.checked_add(column))
+        .ok_or("XLSB cell ordinal overflows usize")?;
+    let ordinal = u32::try_from(ordinal)?;
+    Ok(f64::from(ordinal) + 0.25)
+}
+
+fn xlsb_expected_cells(shape: XlsbShape) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
+    let capacity = (0..shape.sheet_count()).try_fold(0usize, |total, _sheet| {
+        (0..shape.row_count()).try_fold(total, |total, row| {
+            (0..shape.column_count()).try_fold(total, |total, column| {
+                if shape.stores_cell(row, column) {
+                    total
+                        .checked_add(1)
+                        .ok_or("XLSB expected cell count overflows usize")
+                } else {
+                    Ok(total)
+                }
+            })
+        })
+    })?;
+    let mut cells = Vec::with_capacity(capacity);
+    for sheet in 0..shape.sheet_count() {
+        for row in 0..shape.row_count() {
+            for column in 0..shape.column_count() {
+                if shape.stores_cell(row, column) {
+                    cells.push((
+                        sheet,
+                        row,
+                        column,
+                        xlsb_cell_value(shape, sheet, row, column)?.to_bits(),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(cells)
+}
+
+fn xlsb_cells_digest(cells: &[XlsbCellRecord]) -> Result<String, Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    digest.update(XLSB_CELL_DIGEST_DOMAIN);
+    for &(sheet, row, column, value_bits) in cells {
+        xlsb_update_cell_digest(&mut digest, sheet, row, column, value_bits)?;
+    }
+    Ok(fingerprint_hex(&digest.finalize().into()))
+}
+
+#[inline]
+fn xlsb_update_cell_digest(
+    digest: &mut Sha256,
+    sheet: usize,
+    row: usize,
+    column: usize,
+    value_bits: u64,
+) -> Result<(), Box<dyn Error>> {
+    digest.update(u64::try_from(sheet)?.to_le_bytes());
+    digest.update(u64::try_from(row)?.to_le_bytes());
+    digest.update(u64::try_from(column)?.to_le_bytes());
+    digest.update(value_bits.to_le_bytes());
+    Ok(())
+}
+
+fn xlsb_names_digest(names: &[String]) -> Result<String, Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    digest.update(b"litchi-xlsb-worksheet-names-v1");
+    for name in names {
+        digest.update(u64::try_from(name.len())?.to_le_bytes());
+        digest.update(name.as_bytes());
+    }
+    Ok(fingerprint_hex(&digest.finalize().into()))
+}
+
+/// Consume worksheet cells in their native row/column order.
+///
+/// The XLSB worksheet stores cells in a `BTreeMap`; preserving the emitted
+/// order here makes the post-timer oracle reject iterator-order regressions.
+fn xlsb_collect_cells_in_order(
+    worksheets: &[litchi_xlsb::Worksheet],
+) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
+    use litchi_core::sheet::Worksheet as _;
+
+    let mut cells = Vec::new();
+    for (sheet, worksheet) in worksheets.iter().enumerate() {
+        let mut iterator = worksheet.cells();
+        while let Some(cell) = iterator.next() {
+            let cell = cell.map_err(|error| io::Error::other(error.to_string()))?;
+            let value = cell
+                .value()
+                .as_float()
+                .ok_or("XLSB cell projection contains a non-numeric value")?;
+            cells.push((
+                sheet,
+                usize::try_from(cell.row())?,
+                usize::try_from(cell.column())?,
+                value.to_bits(),
+            ));
+        }
+    }
+    Ok(cells)
+}
+
+/// Stream worksheet cells in their native row/column order.
+///
+/// This is the timed full-scan path: it retains only a deterministic digest
+/// state and a checked count. The exact emitted-order vector oracle remains in
+/// [`xlsb_collect_cells_in_order`] and is used by corpus verification outside
+/// the timer.
+fn xlsb_scan_cells_in_order(
+    worksheets: &[litchi_xlsb::Worksheet],
+) -> Result<(usize, [u8; 32]), Box<dyn Error>> {
+    use litchi_core::sheet::Worksheet as _;
+
+    let mut digest = Sha256::new();
+    digest.update(XLSB_CELL_DIGEST_DOMAIN);
+    let mut count = 0usize;
+    for (sheet, worksheet) in worksheets.iter().enumerate() {
+        let mut iterator = worksheet.cells();
+        while let Some(cell) = iterator.next() {
+            let cell = cell.map_err(|error| io::Error::other(error.to_string()))?;
+            let value = cell
+                .value()
+                .as_float()
+                .ok_or("XLSB cell projection contains a non-numeric value")?;
+            count = count
+                .checked_add(1)
+                .ok_or("XLSB cell scan count overflows usize")?;
+            xlsb_update_cell_digest(
+                &mut digest,
+                sheet,
+                usize::try_from(cell.row())?,
+                usize::try_from(cell.column())?,
+                value.to_bits(),
+            )?;
+        }
+    }
+    Ok((count, digest.finalize().into()))
+}
+
+fn verify_xlsb_corpus(corpus: &Corpus, shape: XlsbShape) -> Result<(), Box<dyn Error>> {
+    use litchi_core::sheet::WorkbookTrait as _;
+
+    let expected = xlsb_expected_cells(shape)?;
+    let expected_payload_bytes = expected
+        .len()
+        .checked_mul(std::mem::size_of::<f64>())
+        .ok_or("XLSB expected payload size overflows usize")?;
+    if corpus.manifest.entry_count != expected.len()
+        || corpus.manifest.uncompressed_payload_bytes != expected_payload_bytes
+        || sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
+    {
+        return Err("XLSB corpus manifest differs from deterministic specification".into());
+    }
+    let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+    let expected_names = (0..shape.sheet_count())
+        .map(|sheet| format!("Sheet{sheet:02}"))
+        .collect::<Vec<_>>();
+    if workbook.worksheet_count() != shape.sheet_count()
+        || workbook.worksheet_names() != expected_names.as_slice()
+    {
+        return Err("XLSB worksheet identity differs from deterministic specification".into());
+    }
+    let mut worksheets = Vec::with_capacity(shape.sheet_count());
+    for sheet in 0..shape.sheet_count() {
+        worksheets.push(workbook.worksheet(sheet)?);
+    }
+    let actual = xlsb_collect_cells_in_order(&worksheets)?;
+    if actual != expected || xlsb_cells_digest(&actual)? != xlsb_cells_digest(&expected)? {
+        return Err("XLSB corpus cell projection differs from deterministic specification".into());
+    }
+    let target_payload = xlsb_cell_value(shape, 0, 0, 0)?.to_bits().to_le_bytes();
+    if corpus.target_name != "Sheet00!A1"
+        || corpus.target_payload.as_slice() != target_payload.as_slice()
+        || corpus.manifest.target_payload_sha256 != sha256_hex(&target_payload)
+    {
+        return Err("XLSB target cell differs from deterministic specification".into());
+    }
+    Ok(())
+}
+
+fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
+    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+
+    let expected = xlsb_expected_cells(shape)?;
+    let mut writer = WorkbookWriter::new();
+    for sheet in 0..shape.sheet_count() {
+        let mut worksheet = MutableWorksheet::new(format!("Sheet{sheet:02}"));
+        for row in 0..shape.row_count() {
+            for column in 0..shape.column_count() {
+                if shape.stores_cell(row, column) {
+                    worksheet.set_cell(
+                        u32::try_from(row)?,
+                        u32::try_from(column)?,
+                        xlsb_cell_value(shape, sheet, row, column)?,
+                    );
+                }
+            }
+        }
+        writer.add_worksheet(worksheet);
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.save(&mut output)?;
+    let archive = output.into_inner();
+    let target_payload = xlsb_cell_value(shape, 0, 0, 0)?
+        .to_bits()
+        .to_le_bytes()
+        .to_vec();
+    let corpus = Corpus {
+        manifest: CorpusManifest {
+            name: format!("xlsb-{}", shape.name()),
+            generator: XLSB_CORPUS_GENERATOR,
+            package_format: "XLSB/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: if shape == XlsbShape::Sparse {
+                "deterministic-sparse-numeric-grid"
+            } else {
+                "deterministic-dense-numeric-grid"
+            },
+            compression: "deflate",
+            entry_count: expected.len(),
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: std::mem::size_of::<f64>(),
+            uncompressed_payload_bytes: expected
+                .len()
+                .checked_mul(std::mem::size_of::<f64>())
+                .ok_or("XLSB logical payload size overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "Sheet00!A1".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "Sheet00!A1".to_owned(),
+        target_payload,
+        xlsx: None,
+    };
+    verify_xlsb_corpus(&corpus, shape)?;
+    Ok(corpus)
+}
+
+fn build_pptx_slide_name_index_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let source = semantic_pptx_bytes(shape)?;
+    let archive = rewrite_pptx_slide_names(&source, |index| Some(pptx_named_slide_name(index)))?;
+    let package = litchi_pptx::Package::from_bytes(&archive)?;
+    verify_semantic_pptx(&package, shape, &[])?;
+    verify_pptx_named_slide_names(&package, shape)?;
+    let count = shape
+        .pptx_slides()
+        .checked_mul(shape.pptx_text_boxes_per_slide())
+        .ok_or("PPTX slide-name index shape count overflows usize")?;
+    let content_bytes = (0..shape.pptx_slides())
+        .try_fold(0usize, |total, slide| {
+            (0..shape.pptx_text_boxes_per_slide()).try_fold(total, |total, object| {
+                total.checked_add(semantic_pptx_text(slide, object, false).len())
+            })
+        })
+        .ok_or("PPTX slide-name index text byte count overflows usize")?;
+    let target_payload = pptx_named_slide_name(0).into_bytes();
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("pptx-slide-name-index-{}", shape.name()),
+            generator: PPTX_SLIDE_NAME_INDEX_CORPUS_GENERATOR,
+            package_format: "PPTX/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: "deterministic-named-slide-text",
+            compression: "stored",
+            entry_count: count,
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: semantic_pptx_text(0, 0, false).len(),
+            uncompressed_payload_bytes: content_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "slide:0/name".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "slide:0/name".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
 fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     let spec = XlsxCorpus {
         sheet_count: shape.sheet_count(),
@@ -13901,6 +15268,170 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
         target_payload,
         xlsx: Some(spec),
     })
+}
+
+fn build_xlsx_named_sheet_lookup_corpus(
+    catalog: XlsxNamedSheetCatalog,
+) -> Result<Corpus, Box<dyn Error>> {
+    let spec = XlsxCorpus {
+        sheet_count: catalog.sheet_count(),
+        row_count: 1,
+        column_count: 1,
+        one_percent_updates: Vec::new(),
+        cell_inventory: None,
+    };
+    let workbook = build_xlsx_workbook(&spec)?;
+    let archive = workbook.to_bytes()?;
+    let reopened = Workbook::from_bytes(archive.clone())?;
+    verify_xlsx_cells(&reopened, &spec, &[])?;
+
+    let cell_count = xlsx_cell_count(&spec)?;
+    let target = XlsxCoordinate {
+        sheet: spec.sheet_count - 1,
+        row: 0,
+        column: 0,
+    };
+    let target_name = xlsx_cell_name(target);
+    let target_payload = xlsx_value(target).to_string().into_bytes();
+    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
+
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("xlsx-named-sheet-lookup-{}", catalog.name()),
+            generator: XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR,
+            package_format: "XLSX/OPC/ZIP",
+            shape: "named-sheet-catalog",
+            payload_kind: "deterministic-one-cell-per-sheet",
+            compression: "deflate",
+            entry_count: cell_count,
+            archive_member_count,
+            entry_bytes: std::mem::size_of::<i32>(),
+            uncompressed_payload_bytes: cell_count
+                .checked_mul(std::mem::size_of::<i32>())
+                .ok_or("XLSX named-sheet logical payload size overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: target_name.clone(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: Some(XlsxManifest {
+                sheet_count: spec.sheet_count,
+                rows_per_sheet: spec.row_count,
+                columns_per_sheet: spec.column_count,
+                one_percent_update_count: spec.one_percent_updates.len(),
+                source_members,
+            }),
+        },
+        archive,
+        target_name,
+        target_payload,
+        xlsx: Some(spec),
+    })
+}
+
+/// Prove the selector contract on a small non-ASCII catalog before any timed
+/// named-sheet run. The same archive is checked through eager and source-backed
+/// facades, while the duplicate check exercises the authoring-side invariant
+/// that makes the sorted production index unambiguous.
+fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
+    let workbook = Workbook::new()?;
+    let mut edit = workbook.edit()?;
+    {
+        let mut first = edit
+            .tab("Sheet1")?
+            .ok_or("XLSX selector oracle is missing the initial sheet")?;
+        first.rename("Résumé")?;
+    }
+    edit.add("Στοιχεία")?;
+    edit.add("数据")?;
+    let committed = edit.commit()?.workbook().clone();
+    let bytes = committed.to_bytes()?;
+    let owned = Workbook::from_bytes(bytes.clone())?;
+    let source = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))?;
+    // On native targets, the umbrella byte facade retains this same source-backed
+    // catalog. Check its lightweight projection so the index stays compatible
+    // with that newly landed ingress path without adding another timed selector.
+    let facade = litchi::Workbook::from_bytes(bytes).map_err(|error| error.to_string())?;
+    let expected = [
+        "Résumé".to_owned(),
+        "Στοιχεία".to_owned(),
+        "数据".to_owned(),
+    ];
+
+    let owned_names = owned
+        .sheets()
+        .map(|sheet| sheet.name().to_owned())
+        .collect::<Vec<_>>();
+    let source_names = source
+        .sheets()
+        .map(|sheet| sheet.name().to_owned())
+        .collect::<Vec<_>>();
+    let facade_names = facade
+        .worksheet_names()
+        .map_err(|error| error.to_string())?;
+    let facade_count = facade
+        .worksheet_count()
+        .map_err(|error| error.to_string())?;
+    if owned_names != expected
+        || source_names != expected
+        || facade_names != expected
+        || facade_count != expected.len()
+    {
+        return Err("XLSX selector oracle changed Unicode sheet spelling or order".into());
+    }
+
+    for (query, expected_name) in [
+        ("rE\u{301}SUME\u{301}", "Résumé"),
+        ("ΣΤΟΙΧΕΊΑ", "Στοιχεία"),
+        ("数据", "数据"),
+    ] {
+        let owned_sheet = owned
+            .sheet(query)?
+            .ok_or("XLSX eager selector oracle missed an existing sheet")?;
+        let source_sheet = source
+            .sheet(query)?
+            .ok_or("XLSX source selector oracle missed an existing sheet")?;
+        if owned_sheet.name() != expected_name || source_sheet.name() != expected_name {
+            return Err("XLSX selector oracle changed case-folded Unicode matching".into());
+        }
+    }
+    if owned.sheet("missing-selector")?.is_some() || source.sheet("missing-selector")?.is_some() {
+        return Err("XLSX selector oracle changed missing-name behavior".into());
+    }
+
+    let duplicate = Workbook::new()?;
+    let mut duplicate_edit = duplicate.edit()?;
+    duplicate_edit.add("Data")?;
+    duplicate_edit.add("data")?;
+    if duplicate_edit.commit().is_ok() {
+        return Err("XLSX selector oracle accepted duplicate canonical sheet names".into());
+    }
+
+    let duplicate_seed = Workbook::new()?;
+    let mut duplicate_seed_edit = duplicate_seed.edit()?;
+    duplicate_seed_edit.add("Data")?;
+    let duplicate_seed = duplicate_seed_edit.commit()?.workbook().clone();
+    let mut duplicate_package = OpcPackage::from_bytes(&duplicate_seed.to_bytes()?)?;
+    let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+    let workbook_xml =
+        String::from_utf8(duplicate_package.get_part(&workbook_uri)?.blob().to_vec())?;
+    let duplicate_xml = workbook_xml.replacen("name=\"Data\"", "name=\"sheet1\"", 1);
+    if duplicate_xml == workbook_xml {
+        return Err("XLSX selector oracle could not construct duplicate fixture".into());
+    }
+    duplicate_package
+        .get_part_mut(&workbook_uri)?
+        .set_blob(duplicate_xml.into_bytes());
+    let duplicate_archive = PackageWriter::to_bytes(&duplicate_package)?;
+    if Workbook::from_bytes(duplicate_archive.clone()).is_ok()
+        || litchi::Workbook::from_bytes(duplicate_archive.clone()).is_ok()
+        || SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(duplicate_archive))).is_ok()
+    {
+        return Err("XLSX selector oracle accepted duplicate parsed catalog names".into());
+    }
+    Ok(())
 }
 
 fn xlsx_cell_crud_inventory(shape: XlsxCellCrudShape) -> Vec<Vec<XlsxCoordinate>> {
@@ -15244,6 +16775,610 @@ fn payload_bytes(kind: PayloadKind, index: usize, length: usize) -> Vec<u8> {
     }
     bytes
 }
+fn oracle_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    if name.local_name().as_ref() != b"oMath" {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == OOXML_TRACKER_OMML_NAMESPACE || *value == OOXML_TRACKER_STRICT_OMML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => prefix.as_slice() == b"m",
+        ResolveResult::Unbound => false,
+    }
+}
+
+fn oracle_drawingml_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> bool {
+    if name.local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == OOXML_TRACKER_DRAWINGML_NAMESPACE
+                || *value == OOXML_TRACKER_STRICT_DRAWINGML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => {
+            prefix.as_slice() == b"a"
+                || fragment_prefix
+                    .as_ref()
+                    .and_then(|prefix| prefix.as_deref())
+                    == Some(prefix.as_slice())
+        },
+        ResolveResult::Unbound => fragment_prefix == &Some(None),
+    }
+}
+
+fn oracle_range(start: usize, end: usize, label: &str) -> Result<(u32, u32), Box<dyn Error>> {
+    let length = end
+        .checked_sub(start)
+        .ok_or_else(|| io::Error::other(format!("{label} range underflows")))?;
+    Ok((
+        u32::try_from(start)
+            .map_err(|error| io::Error::other(format!("{label} offset exceeds u32: {error}")))?,
+        u32::try_from(length)
+            .map_err(|error| io::Error::other(format!("{label} length exceeds u32: {error}")))?,
+    ))
+}
+
+fn oracle_omml_ranges(xml: &[u8]) -> Result<Vec<(u32, u32)>, Box<dyn Error>> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut capture: Option<(usize, usize)> = None;
+    let mut ranges = Vec::new();
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element) if oracle_omml_name(&namespace, element.name()) => {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none() && oracle_omml_name(&namespace, element.name()) =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position())?;
+        match event {
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(io::Error::other("OMML oracle lost its captured formula").into());
+                };
+                *captured_depth = captured_depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("OMML oracle depth overflows"))?;
+            },
+            ScanEvent::Empty => ranges.push(oracle_range(event_start, event_end, "OMML")?),
+            ScanEvent::End => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(io::Error::other("OMML oracle ended without a formula").into());
+                };
+                *captured_depth = captured_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("OMML oracle depth underflows"))?;
+                if *captured_depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        return Err(io::Error::other("OMML oracle lost its formula range").into());
+                    };
+                    ranges.push(oracle_range(start, event_end, "OMML")?);
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(io::Error::other("OMML oracle saw an unterminated formula").into());
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(ranges)
+}
+
+fn oracle_omml_formulas(xml: &[u8]) -> Result<Vec<String>, Box<dyn Error>> {
+    let ranges = oracle_omml_ranges(xml)?;
+    let mut formulas = Vec::with_capacity(ranges.len());
+    for (start, length) in ranges {
+        let start = usize::try_from(start)?;
+        let length = usize::try_from(length)?;
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| io::Error::other("OMML oracle formula range overflows"))?;
+        let formula = xml
+            .get(start..end)
+            .ok_or_else(|| io::Error::other("OMML oracle formula range is invalid"))?;
+        formulas.push(
+            std::str::from_utf8(formula)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+                .to_owned(),
+        );
+    }
+    Ok(formulas)
+}
+
+fn oracle_decode_reference(reference: &BytesRef<'_>) -> Result<String, Box<dyn Error>> {
+    if let Some(character) = reference
+        .resolve_char_ref()
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+    {
+        return Ok(character.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_owned()),
+        "lt" => Ok("<".to_owned()),
+        "gt" => Ok(">".to_owned()),
+        "quot" => Ok("\"".to_owned()),
+        "apos" => Ok("'".to_owned()),
+        _ => Err(io::Error::other(format!("unsupported XML entity '&{name};'")).into()),
+    }
+}
+
+fn oracle_drawingml_text(
+    xml: &[u8],
+    paragraph_separator: Option<char>,
+) -> Result<String, Box<dyn Error>> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut result = String::with_capacity(xml.len() / 8);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut text_depth = None;
+    let mut seen_paragraph = false;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+        if fragment_prefix.is_none()
+            && let Event::Start(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            fragment_prefix = Some(
+                element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().to_vec()),
+            );
+        }
+        match event {
+            Event::Start(element) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth overflows"))?;
+                if oracle_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if text_depth.is_none()
+                    && oracle_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = Some(depth);
+                } else if oracle_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
+                {
+                    result.push('\n');
+                } else if oracle_drawingml_name(
+                    &namespace,
+                    element.name(),
+                    b"tab",
+                    &fragment_prefix,
+                ) {
+                    result.push('\t');
+                }
+            },
+            Event::Empty(element) => {
+                if oracle_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if oracle_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
+                {
+                    result.push('\n');
+                } else if oracle_drawingml_name(
+                    &namespace,
+                    element.name(),
+                    b"tab",
+                    &fragment_prefix,
+                ) {
+                    result.push('\t');
+                }
+            },
+            Event::Text(text) if text_depth.is_some() => {
+                let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?;
+                result.push_str(&quick_xml::escape::unescape(&decoded).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?);
+            },
+            Event::CData(text) if text_depth.is_some() => {
+                result.push_str(&text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?);
+            },
+            Event::GeneralRef(reference) if text_depth.is_some() => {
+                result.push_str(&oracle_decode_reference(&reference)?);
+            },
+            Event::End(element) => {
+                if text_depth == Some(depth)
+                    && oracle_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth underflows"))?;
+            },
+            Event::Eof if depth != 0 || text_depth.is_some() => {
+                return Err(io::Error::other("DrawingML oracle saw unterminated XML").into());
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(result)
+}
+
+fn oracle_drawingml_ranges(xml: &[u8], target: &[u8]) -> Result<Vec<(u32, u32)>, Box<dyn Error>> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut capture: Option<(usize, usize)> = None;
+    let mut ranges = Vec::new();
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            if fragment_prefix.is_none()
+                && let Event::Start(element) = &event
+                && !matches!(namespace, ResolveResult::Bound(_))
+            {
+                fragment_prefix = Some(
+                    element
+                        .name()
+                        .prefix()
+                        .map(|prefix| prefix.into_inner().to_vec()),
+                );
+            }
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element)
+                    if oracle_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        target,
+                        &fragment_prefix,
+                    ) =>
+                {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none()
+                        && oracle_drawingml_name(
+                            &namespace,
+                            element.name(),
+                            target,
+                            &fragment_prefix,
+                        ) =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position())?;
+        match event {
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(
+                        io::Error::other("DrawingML oracle lost its captured element").into(),
+                    );
+                };
+                *captured_depth = captured_depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth overflows"))?;
+            },
+            ScanEvent::Empty => ranges.push(oracle_range(event_start, event_end, "DrawingML")?),
+            ScanEvent::End => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(
+                        io::Error::other("DrawingML oracle ended without an element").into(),
+                    );
+                };
+                *captured_depth = captured_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth underflows"))?;
+                if *captured_depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        return Err(
+                            io::Error::other("DrawingML oracle lost its element range").into()
+                        );
+                    };
+                    ranges.push(oracle_range(start, event_end, "DrawingML")?);
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(
+                    io::Error::other("DrawingML oracle saw an unterminated element").into(),
+                );
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(ranges)
+}
+
+fn build_ooxml_tracker_corpus() -> Result<OoxmlTrackerCorpus, Box<dyn Error>> {
+    let mut omml = format!(
+        r#"<root xmlns:m="{}" xmlns:s="{}" xmlns:q="urn:outer"><!-- fixed tracker corpus -->"#,
+        OMML_NAMESPACE_URI, OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI,
+    );
+    for index in 0..OOXML_TRACKER_OMML_FORMULA_COUNT {
+        if index % 32 == 0 {
+            omml.push_str(r#"<q:holder xmlns:q="urn:inner"><m:oMath/></q:holder>"#);
+        }
+        if index % 64 == 0 {
+            omml.push_str(r#"<scope xmlns:m="urn:foreign"><m:oMath/></scope>"#);
+        }
+        omml.push_str(&format!(
+            r#"<m:oMath><m:r><m:t>x{index}</m:t></m:r></m:oMath><s:oMath><s:r/></s:oMath>"#
+        ));
+    }
+    omml.push_str("</root>");
+
+    let mut drawingml = format!(
+        r#"<root xmlns:a="{}" xmlns:q="urn:outer"><!-- fixed tracker corpus -->"#,
+        std::str::from_utf8(OOXML_TRACKER_DRAWINGML_NAMESPACE)?
+    );
+    for index in 0..OOXML_TRACKER_DRAWINGML_PARAGRAPH_COUNT {
+        if index % 32 == 0 {
+            drawingml.push_str(
+                r#"<q:holder xmlns:q="urn:inner"><a:p><a:t>ignored</a:t></a:p></q:holder>"#,
+            );
+        }
+        drawingml.push_str(&format!(
+            r#"<a:p><a:r><a:t>text-{index} &amp; value</a:t><a:tab/><a:br/></a:r></a:p>"#
+        ));
+    }
+    drawingml.push_str("</root>");
+
+    let omml = omml.into_bytes();
+    let drawingml = drawingml.into_bytes();
+    let expected_omml_ranges = oracle_omml_ranges(&omml)?;
+    let expected_omml_formulas = oracle_omml_formulas(&omml)?;
+    let expected_drawingml_text = oracle_drawingml_text(&drawingml, Some('\n'))?;
+    let expected_drawingml_ranges = oracle_drawingml_ranges(&drawingml, b"p")?;
+
+    let mut actual_omml_ranges = Vec::new();
+    scan_omml_formula_ranges::<litchi_ooxml_common::XmlError>(&omml, |start, length| {
+        actual_omml_ranges.push((start, length));
+        Ok(())
+    })?;
+    if actual_omml_ranges != expected_omml_ranges {
+        return Err(io::Error::other("OMML tracker setup disagrees with NsReader oracle").into());
+    }
+    let actual_omml_formulas = extract_omml_formulas(&omml)?;
+    if actual_omml_formulas != expected_omml_formulas {
+        return Err(io::Error::other(
+            "OMML formula extractor setup disagrees with NsReader oracle",
+        )
+        .into());
+    }
+    let actual_drawingml_text = extract_drawingml_text(&drawingml, Some('\n'))?;
+    if actual_drawingml_text != expected_drawingml_text {
+        return Err(
+            io::Error::other("DrawingML extractor setup disagrees with NsReader oracle").into(),
+        );
+    }
+    let mut actual_drawingml_ranges = Vec::new();
+    scan_drawingml_ranges(&drawingml, b"p", |start, length| {
+        actual_drawingml_ranges.push((start, length));
+        Ok(())
+    })?;
+    if actual_drawingml_ranges != expected_drawingml_ranges {
+        return Err(
+            io::Error::other("DrawingML range setup disagrees with NsReader oracle").into(),
+        );
+    }
+
+    let mut identity = Vec::with_capacity(
+        16usize
+            .checked_add(omml.len())
+            .and_then(|value| value.checked_add(drawingml.len()))
+            .ok_or_else(|| io::Error::other("OOXML tracker corpus size overflows"))?,
+    );
+    identity.extend_from_slice(&u64::try_from(omml.len())?.to_le_bytes());
+    identity.extend_from_slice(&omml);
+    identity.extend_from_slice(&u64::try_from(drawingml.len())?.to_le_bytes());
+    identity.extend_from_slice(&drawingml);
+    let entry_bytes = omml
+        .len()
+        .checked_add(drawingml.len())
+        .ok_or_else(|| io::Error::other("OOXML tracker entry size overflows"))?;
+    let manifest = CorpusManifest {
+        name: "ooxml-namespace-tracker-fixed".to_owned(),
+        generator: OOXML_TRACKER_CORPUS_GENERATOR,
+        package_format: "OOXML XML fragments",
+        shape: "fixed",
+        payload_kind: "namespace-tracker-adversarial",
+        compression: "none",
+        entry_count: 2,
+        archive_member_count: 2,
+        entry_bytes,
+        uncompressed_payload_bytes: entry_bytes,
+        archive_bytes: identity.len(),
+        archive_sha256: sha256_hex(&identity),
+        target_entry: "omml.xml+presentation.xml".to_owned(),
+        target_payload_bytes: identity.len(),
+        target_payload_sha256: sha256_hex(&identity),
+        rtf_variant: None,
+        xlsx: None,
+    };
+    Ok(OoxmlTrackerCorpus {
+        manifest,
+        omml,
+        drawingml,
+        expected_omml_ranges,
+        expected_omml_formulas,
+        expected_drawingml_text,
+        expected_drawingml_ranges,
+    })
+}
+
+enum OoxmlTrackerProjection {
+    Formulas(Vec<String>),
+    Text(String),
+    Ranges(Vec<(u32, u32)>),
+}
+
+fn ooxml_tracker_range_digest(ranges: &[(u32, u32)]) -> String {
+    let mut bytes = Vec::with_capacity(ranges.len().saturating_mul(8));
+    for &(start, length) in ranges {
+        bytes.extend_from_slice(&start.to_le_bytes());
+        bytes.extend_from_slice(&length.to_le_bytes());
+    }
+    sha256_hex(&bytes)
+}
+
+fn ooxml_tracker_formula_digest(formulas: &[String]) -> Result<String, Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    for formula in formulas {
+        bytes.extend_from_slice(&u64::try_from(formula.len())?.to_le_bytes());
+        bytes.extend_from_slice(formula.as_bytes());
+    }
+    Ok(sha256_hex(&bytes))
+}
+
+fn run_ooxml_tracker_case(
+    case: Case,
+    corpus: &OoxmlTrackerCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let expected_digest = match case {
+        Case::OmmlFormulaRangeScan => ooxml_tracker_range_digest(&corpus.expected_omml_ranges),
+        Case::OmmlFormulaExtract => ooxml_tracker_formula_digest(&corpus.expected_omml_formulas)?,
+        Case::PptxDrawingmlExtract => sha256_hex(corpus.expected_drawingml_text.as_bytes()),
+        Case::PptxDrawingmlRangeScan => {
+            ooxml_tracker_range_digest(&corpus.expected_drawingml_ranges)
+        },
+        _ => return Err("non-OOXML tracker case passed to its dedicated runner".into()),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let started = Instant::now();
+        let projection = match case {
+            Case::OmmlFormulaRangeScan => {
+                let mut ranges = Vec::with_capacity(corpus.expected_omml_ranges.len());
+                scan_omml_formula_ranges::<litchi_ooxml_common::XmlError>(
+                    &corpus.omml,
+                    |start, length| {
+                        ranges.push((start, length));
+                        Ok(())
+                    },
+                )?;
+                OoxmlTrackerProjection::Ranges(ranges)
+            },
+            Case::OmmlFormulaExtract => {
+                OoxmlTrackerProjection::Formulas(extract_omml_formulas(&corpus.omml)?)
+            },
+            Case::PptxDrawingmlExtract => {
+                OoxmlTrackerProjection::Text(extract_drawingml_text(&corpus.drawingml, Some('\n'))?)
+            },
+            Case::PptxDrawingmlRangeScan => {
+                let mut ranges = Vec::with_capacity(corpus.expected_drawingml_ranges.len());
+                scan_drawingml_ranges(&corpus.drawingml, b"p", |start, length| {
+                    ranges.push((start, length));
+                    Ok(())
+                })?;
+                OoxmlTrackerProjection::Ranges(ranges)
+            },
+            _ => return Err("non-OOXML tracker case passed to its timed loop".into()),
+        };
+        std::hint::black_box(&projection);
+        let duration = started.elapsed();
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+
+        let matches_oracle = match (&projection, case) {
+            (OoxmlTrackerProjection::Ranges(actual), Case::OmmlFormulaRangeScan) => {
+                actual == &corpus.expected_omml_ranges
+            },
+            (OoxmlTrackerProjection::Formulas(actual), Case::OmmlFormulaExtract) => {
+                actual == &corpus.expected_omml_formulas
+            },
+            (OoxmlTrackerProjection::Text(actual), Case::PptxDrawingmlExtract) => {
+                actual == &corpus.expected_drawingml_text
+            },
+            (OoxmlTrackerProjection::Ranges(actual), Case::PptxDrawingmlRangeScan) => {
+                actual == &corpus.expected_drawingml_ranges
+            },
+            _ => false,
+        };
+        if !matches_oracle {
+            return Err(io::Error::other(format!(
+                "{} disagrees with its NsReader oracle",
+                case.name()
+            ))
+            .into());
+        }
+    }
+
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: None,
+        source: None,
+        execution: None,
+        output_sha256: Some(expected_digest),
+        operation_metrics: None,
+    })
+}
 
 #[cfg(test)]
 fn run_case(
@@ -15340,6 +17475,12 @@ fn run_case_with_config(
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
         },
+        Case::OmmlFormulaRangeScan
+        | Case::OmmlFormulaExtract
+        | Case::PptxDrawingmlExtract
+        | Case::PptxDrawingmlRangeScan => {
+            Err("OOXML namespace-tracker cases use their dedicated fixed corpus runner".into())
+        },
         Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave => {
             run_pptx_batch_edit_save(case, corpus, warmup_iterations, samples)
         },
@@ -15360,6 +17501,9 @@ fn run_case_with_config(
         },
         Case::XlsxEagerPageBreakEditSave | Case::XlsxSourceBackedPageBreakEditSave => {
             run_xlsx_page_break_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxWorksheetRepeatedPageBreaks | Case::XlsxPackageRepeatedPageBreaks => {
+            Err("XLSX page-break projection cases use their dedicated corpus runner".into())
         },
         Case::XlsxEagerPageMarginEditSave | Case::XlsxSourceBackedPageMarginEditSave => {
             run_xlsx_page_margin_edit_save(case, corpus, warmup_iterations, samples)
@@ -15463,7 +17607,9 @@ fn run_case_with_config(
         },
         Case::DocSemanticOpen
         | Case::DocSemanticListParagraphs
+        | Case::DocSemanticParagraphCount
         | Case::DocSemanticOneParagraph
+        | Case::DocSemanticOneParagraphAt
         | Case::DocSemanticFullText
         | Case::DocSemanticNoopEditSave
         | Case::DocSemanticOneEditSave => {
@@ -15482,6 +17628,12 @@ fn run_case_with_config(
         | Case::XlsSemanticNoopEditSave
         | Case::XlsSemanticOneEditSave => {
             run_semantic_xls(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsbSemanticOpen
+        | Case::XlsbSemanticListWorksheets
+        | Case::XlsbSemanticOneCell
+        | Case::XlsbSemanticFullCellScan => {
+            run_semantic_xlsb(case, corpus, warmup_iterations, samples)
         },
         Case::XlsValidationReport => run_xls_validation_report(corpus, warmup_iterations, samples),
         Case::XlsCommentsEagerEditSave
@@ -15528,6 +17680,14 @@ fn run_case_with_config(
         },
         Case::XlsxOpenOwned => run_xlsx_open_owned(corpus, warmup_iterations, samples),
         Case::XlsxListSheets => run_xlsx_list_sheets(corpus, warmup_iterations, samples),
+        Case::XlsxEagerNamedSheetLookup4
+        | Case::XlsxSourceNamedSheetLookup4
+        | Case::XlsxEagerNamedSheetLookup64
+        | Case::XlsxSourceNamedSheetLookup64
+        | Case::XlsxEagerNamedSheetLookupLarge
+        | Case::XlsxSourceNamedSheetLookupLarge => {
+            Err("XLSX named-sheet cases use their dedicated catalog runner".into())
+        },
         Case::XlsxFirstCell => run_xlsx_first_cell(corpus, warmup_iterations, samples),
         Case::XlsxFullCellScan => run_xlsx_full_cell_scan(corpus, warmup_iterations, samples),
         Case::XlsxNarrowColumnRangeScan => {
@@ -15669,6 +17829,11 @@ fn run_case_with_config(
         | Case::PptxSemanticOnePercentEditSave => {
             run_semantic_pptx(case, corpus, warmup_iterations, samples)
         },
+        Case::PptxNamedOneEditSave
+        | Case::PptxNamedRepeatedEditSave
+        | Case::PptxNumericRepeatedEditSave => {
+            run_pptx_slide_name_index(case, corpus, warmup_iterations, samples)
+        },
         Case::PptxValidationReport => {
             run_pptx_validation_report(corpus, warmup_iterations, samples)
         },
@@ -15688,6 +17853,20 @@ fn run_case_with_config(
         Case::OdfValidationReport => run_odf_validation_report(corpus, warmup_iterations, samples),
         Case::OdfMimetypeRepairPlan => {
             run_odf_mimetype_repair_plan(corpus, warmup_iterations, samples)
+        },
+        Case::DetectOdtBytes
+        | Case::DetectOdtReader
+        | Case::DetectOdtPolyglot
+        | Case::DetectOdtCatalogAlias
+        | Case::DetectOdsBytes
+        | Case::DetectOdsReader
+        | Case::DetectOdsPolyglot
+        | Case::DetectOdsCatalogAlias
+        | Case::DetectOdpBytes
+        | Case::DetectOdpReader
+        | Case::DetectOdpPolyglot
+        | Case::DetectOdpCatalogAlias => {
+            run_detection_case(case, corpus, warmup_iterations, samples)
         },
         Case::OdtMediaParagraphEditSave => {
             run_odt_media_paragraph_edit_save(corpus, warmup_iterations, samples)
@@ -16255,6 +18434,173 @@ fn verify_semantic_pptx(
         return Err("semantic PPTX full text differs from slide scan".into());
     }
     Ok(())
+}
+
+fn verify_pptx_named_slide_names(
+    package: &litchi_pptx::Package,
+    shape: SemanticShape,
+) -> Result<(), Box<dyn Error>> {
+    let presentation = package.presentation()?;
+    for slide_index in 0..shape.pptx_slides() {
+        let slide = presentation
+            .slide(slide_index)?
+            .ok_or("PPTX named-selector slide is missing")?;
+        let expected = pptx_named_slide_name(slide_index);
+        if slide.name()? != expected {
+            return Err("PPTX named-selector slide name differs from specification".into());
+        }
+    }
+    Ok(())
+}
+
+fn pptx_selector_edits(shape: SemanticShape, repeated: bool) -> Vec<PptxSelectorEdit> {
+    let slide_indices = if repeated {
+        (0..shape.pptx_slides()).collect::<Vec<_>>()
+    } else {
+        vec![shape.pptx_slides() / 2]
+    };
+    slide_indices
+        .into_iter()
+        .map(|slide_index| PptxSelectorEdit {
+            slide_index,
+            shape_index: 0,
+            name: pptx_named_slide_name(slide_index),
+            text: semantic_pptx_text(slide_index, 0, true),
+        })
+        .collect()
+}
+
+fn verify_pptx_selector_error_oracle(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
+    let missing_name = "litchi-perf-pptx-slide-name-index-missing";
+    let package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+    let snapshot = package.opened_presentation()?;
+    let mut missing_edit = snapshot.edit();
+    match missing_edit.set_shape_text(missing_name, 0usize, "missing") {
+        Err(litchi_pptx::Error::SlideNameNotFound(name)) if name == missing_name => {},
+        Err(error) => {
+            return Err(
+                format!("PPTX named-selector missing-name oracle returned {error:?}").into(),
+            );
+        },
+        Ok(changed) => {
+            return Err(format!(
+                "PPTX named-selector missing-name oracle unexpectedly changed {changed} shapes"
+            )
+            .into());
+        },
+    }
+
+    let duplicate_name = pptx_named_slide_name(0);
+    let duplicate_archive = rewrite_pptx_slide_names(&corpus.archive, |index| {
+        (index == 1).then(|| duplicate_name.clone())
+    })?;
+    let duplicate_package = litchi_pptx::Package::from_vec(duplicate_archive)?;
+    let duplicate_snapshot = duplicate_package.opened_presentation()?;
+    let mut duplicate_edit = duplicate_snapshot.edit();
+    match duplicate_edit.set_shape_text(duplicate_name.as_str(), 0usize, "duplicate") {
+        Err(litchi_pptx::Error::AmbiguousSlideName { name, matches })
+            if name == duplicate_name && matches == 2 => {},
+        Err(error) => {
+            return Err(
+                format!("PPTX named-selector duplicate-name oracle returned {error:?}").into(),
+            );
+        },
+        Ok(changed) => {
+            return Err(format!(
+                "PPTX named-selector duplicate-name oracle unexpectedly changed {changed} shapes"
+            )
+            .into());
+        },
+    }
+    Ok(())
+}
+
+fn escape_pptx_xml_text(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+fn rewrite_pptx_shape_text(
+    payload: &[u8],
+    shape_index: usize,
+    source_text: &str,
+    replacement: &str,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let xml = std::str::from_utf8(payload)?;
+    let (start, marker) = xml
+        .match_indices("<a:t>")
+        .nth(shape_index)
+        .ok_or("PPTX selector oracle target shape text is missing")?;
+    let content_start = start
+        .checked_add(marker.len())
+        .ok_or("PPTX selector oracle text start overflows usize")?;
+    let content_end = content_start
+        .checked_add(
+            xml.get(content_start..)
+                .ok_or("PPTX selector oracle text start is outside XML")?
+                .find("</a:t>")
+                .ok_or("PPTX selector oracle target shape text is unterminated")?,
+        )
+        .ok_or("PPTX selector oracle text end overflows usize")?;
+    if xml.get(content_start..content_end) != Some(source_text) {
+        return Err("PPTX selector oracle source shape text differs from specification".into());
+    }
+    let replacement = escape_pptx_xml_text(replacement);
+    let mut output = String::with_capacity(
+        xml.len()
+            .checked_sub(content_end - content_start)
+            .and_then(|length| length.checked_add(replacement.len()))
+            .ok_or("PPTX selector oracle output size overflows usize")?,
+    );
+    output.push_str(
+        xml.get(..content_start)
+            .ok_or("PPTX selector oracle text prefix is outside XML")?,
+    );
+    output.push_str(&replacement);
+    output.push_str(
+        xml.get(content_end..)
+            .ok_or("PPTX selector oracle text suffix is outside XML")?,
+    );
+    Ok(output.into_bytes())
+}
+
+/// Build the expected publication through the raw OPC graph rather than the
+/// opened-presentation transaction used by the measured candidate.
+fn build_pptx_selector_oracle(
+    corpus: &Corpus,
+    shape: SemanticShape,
+    edits: &[PptxSelectorEdit],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = OpcPackage::from_vec(corpus.archive.clone())?;
+    for operation in edits {
+        let part_name = PackURI::new(format!(
+            "/ppt/slides/slide{}.xml",
+            operation.slide_index + 1
+        ))?;
+        let source = package.get_part(&part_name)?.blob().to_vec();
+        let replacement = rewrite_pptx_shape_text(
+            &source,
+            operation.shape_index,
+            &semantic_pptx_text(operation.slide_index, operation.shape_index, false),
+            operation.text.as_str(),
+        )?;
+        package.get_part_mut(&part_name)?.set_blob(replacement);
+    }
+    let output = PackageWriter::to_bytes(&package)?;
+    let reopened = litchi_pptx::Package::from_bytes(&output)?;
+    let mut updated = Vec::with_capacity(edits.len());
+    for operation in edits {
+        let linear = operation
+            .slide_index
+            .checked_mul(shape.pptx_text_boxes_per_slide())
+            .and_then(|base| base.checked_add(operation.shape_index))
+            .ok_or("PPTX selector oracle update index overflows usize")?;
+        updated.push(linear);
+    }
+    verify_semantic_pptx(&reopened, shape, &updated)?;
+    verify_pptx_named_slide_names(&reopened, shape)?;
+    Ok(output)
 }
 
 fn verify_pptx_source_edit_semantics(
@@ -17691,6 +20037,21 @@ fn run_semantic_doc(
         return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
     }
     let selected = shape.doc_paragraph_count() / 2;
+    let expected_paragraph_count = if case == Case::DocSemanticParagraphCount {
+        let mut oracle_package =
+            litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+        let oracle_document = oracle_package.document()?;
+        let oracle_paragraphs = oracle_document.paragraphs()?;
+        let expected = oracle_paragraphs.len();
+        if expected != corpus.manifest.entry_count || expected != shape.doc_paragraph_count() {
+            return Err(
+                "semantic DOC paragraph-count oracle differs from writer specification".into(),
+            );
+        }
+        expected
+    } else {
+        shape.doc_paragraph_count()
+    };
     let expected_changed = if case == Case::DocSemanticOneEditSave {
         let source = Snapshot::from_bytes(corpus.archive.clone())?;
         let mut edit = source.edit()?;
@@ -17731,6 +20092,23 @@ fn run_semantic_doc(
                 std::hint::black_box(paragraphs);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
+            Case::DocSemanticParagraphCount => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let count = document.paragraph_count()?;
+                let duration = started.elapsed();
+                if count != expected_paragraph_count {
+                    return Err(
+                        "semantic DOC paragraph count differs from independent paragraph oracle"
+                            .into(),
+                    );
+                }
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(count);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
             Case::DocSemanticOneParagraph => {
                 let mut package =
                     litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
@@ -17740,6 +20118,24 @@ fn run_semantic_doc(
                     .paragraphs()?
                     .into_iter()
                     .nth(selected)
+                    .ok_or("semantic DOC selected paragraph is missing")?;
+                let duration = started.elapsed();
+                if paragraph.text()? != writer_text("doc", 0, selected, 0) {
+                    return Err(
+                        "semantic DOC selected paragraph differs from writer specification".into(),
+                    );
+                }
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(paragraph);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticOneParagraphAt => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let paragraph = document
+                    .paragraph_at(Position::new(selected))?
                     .ok_or("semantic DOC selected paragraph is missing")?;
                 let duration = started.elapsed();
                 if paragraph.text()? != writer_text("doc", 0, selected, 0) {
@@ -19248,6 +21644,127 @@ fn run_semantic_xls(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_xlsb(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_core::sheet::{Cell as _, WorkbookTrait as _};
+
+    let shape = xlsb_shape(corpus)?;
+    let expected_cells = xlsb_expected_cells(shape)?;
+    let expected_names = (0..shape.sheet_count())
+        .map(|sheet| format!("Sheet{sheet:02}"))
+        .collect::<Vec<_>>();
+    let expected_full_digest = xlsb_cells_digest(&expected_cells)?;
+    let expected_names_digest = xlsb_names_digest(&expected_names)?;
+    let expected_one_digest = sha256_hex(&corpus.target_payload);
+    let expected_digest = match case {
+        Case::XlsbSemanticOpen => corpus.manifest.archive_sha256.clone(),
+        Case::XlsbSemanticListWorksheets => expected_names_digest.clone(),
+        Case::XlsbSemanticOneCell => expected_one_digest.clone(),
+        Case::XlsbSemanticFullCellScan => expected_full_digest.clone(),
+        _ => return Err("non-XLSB semantic case passed to XLSB runner".into()),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut measured_digests = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (duration, digest) = match case {
+            Case::XlsbSemanticOpen => {
+                // The archive clone is setup, not measured; the open timer is the
+                // fresh XLSB lifecycle boundary for this selector.
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(owned))?;
+                let duration = started.elapsed();
+                if workbook.worksheet_count() != shape.sheet_count()
+                    || workbook.worksheet_names() != expected_names.as_slice()
+                {
+                    return Err("XLSB open projection differs from corpus specification".into());
+                }
+                std::hint::black_box(workbook);
+                (duration, corpus.manifest.archive_sha256.clone())
+            },
+            Case::XlsbSemanticListWorksheets => {
+                // Prepare a fresh workbook outside the query timer so this case
+                // measures worksheet-name materialization only.
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let started = Instant::now();
+                let names = workbook.worksheet_names().to_owned();
+                let duration = started.elapsed();
+                if names != expected_names {
+                    return Err("XLSB worksheet list differs from corpus specification".into());
+                }
+                let digest = xlsb_names_digest(&names)?;
+                std::hint::black_box(names);
+                (duration, digest)
+            },
+            Case::XlsbSemanticOneCell => {
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let started = Instant::now();
+                let worksheet = workbook.worksheet(0)?;
+                let cell = worksheet
+                    .get_cell(0, 0)
+                    .ok_or("XLSB selected cell is missing")?;
+                let value = cell
+                    .value()
+                    .as_float()
+                    .ok_or("XLSB selected cell is not numeric")?;
+                let duration = started.elapsed();
+                if value.to_bits() != xlsb_cell_value(shape, 0, 0, 0)?.to_bits() {
+                    return Err("XLSB selected cell differs from corpus specification".into());
+                }
+                let digest = sha256_hex(&value.to_bits().to_le_bytes());
+                std::hint::black_box(value);
+                (duration, digest)
+            },
+            Case::XlsbSemanticFullCellScan => {
+                // Prepare the archive clone, workbook, and worksheet values
+                // outside the timer. The timed region deliberately includes
+                // only worksheet.cells() creation and consumption, including
+                // its boxed iterator and boxed cell values. The scan retains
+                // only a deterministic digest and count; exact emitted-order
+                // vector verification belongs to verify_xlsb_corpus().
+                let owned = corpus.archive.clone();
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(owned))?;
+                let mut worksheets = Vec::with_capacity(shape.sheet_count());
+                for sheet in 0..shape.sheet_count() {
+                    worksheets.push(workbook.worksheet(sheet)?);
+                }
+                let started = Instant::now();
+                let scan = xlsb_scan_cells_in_order(&worksheets)?;
+                let duration = started.elapsed();
+                if scan.0 != expected_cells.len() {
+                    return Err(
+                        "XLSB full cell scan count differs from corpus specification".into(),
+                    );
+                }
+                let digest = fingerprint_hex(&scan.1);
+                std::hint::black_box(scan);
+                (duration, digest)
+            },
+            _ => return Err("non-XLSB semantic case passed to XLSB runner".into()),
+        };
+        if digest != expected_digest {
+            return Err("XLSB semantic result hash differs from independent oracle".into());
+        }
+        if iteration >= warmup_iterations {
+            measured_digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLSB semantic result hashes are unstable across samples".into());
+    }
+    let mut measured = result(case, corpus, elapsed, None);
+    measured.output_sha256 = Some(expected_digest);
+    Ok(measured)
 }
 
 fn verify_semantic_ppt(
@@ -22716,6 +25233,82 @@ fn run_semantic_pptx(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_pptx_slide_name_index(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let shape = semantic_shape(corpus)?;
+    let repeated = matches!(
+        case,
+        Case::PptxNamedRepeatedEditSave | Case::PptxNumericRepeatedEditSave
+    );
+    let named = matches!(
+        case,
+        Case::PptxNamedOneEditSave | Case::PptxNamedRepeatedEditSave
+    );
+    if !named && !matches!(case, Case::PptxNumericRepeatedEditSave) {
+        return Err("non-PPTX slide-name index case passed to slide-name runner".into());
+    }
+    let edits = pptx_selector_edits(shape, repeated);
+    // Build the independent publication and exercise selector refusals once
+    // before the sample loop; neither setup path belongs to the timed edit.
+    let expected_output = build_pptx_selector_oracle(corpus, shape, &edits)?;
+    verify_pptx_selector_error_oracle(corpus)?;
+    let mut updated = Vec::with_capacity(edits.len());
+    for operation in &edits {
+        let linear = operation
+            .slide_index
+            .checked_mul(shape.pptx_text_boxes_per_slide())
+            .and_then(|base| base.checked_add(operation.shape_index))
+            .ok_or("PPTX selector update index overflows usize")?;
+        updated.push(linear);
+    }
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
+        let started = Instant::now();
+        let mut edit = package.opened_presentation_transaction()?;
+        for operation in &edits {
+            let changed = if named {
+                edit.set_shape_text(
+                    operation.name.as_str(),
+                    operation.shape_index,
+                    operation.text.as_str(),
+                )?
+            } else {
+                edit.set_shape_text(
+                    operation.slide_index,
+                    operation.shape_index,
+                    operation.text.as_str(),
+                )?
+            };
+            if !changed {
+                return Err("PPTX selector edit unexpectedly reported no change".into());
+            }
+        }
+        let commit = edit.commit()?;
+        if !commit.is_changed() {
+            return Err("PPTX selector edit did not produce a changed commit".into());
+        }
+        package.apply_opened_presentation_commit(commit)?;
+        let output = package.to_bytes()?;
+        let duration = started.elapsed();
+        if output != expected_output {
+            return Err("PPTX selector output differs from the independent raw OPC oracle".into());
+        }
+        let reopened = litchi_pptx::Package::from_bytes(&output)?;
+        verify_semantic_pptx(&reopened, shape, &updated)?;
+        verify_pptx_named_slide_names(&reopened, shape)?;
+        std::hint::black_box(output);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    let mut result = result(case, corpus, elapsed, None);
+    result.output_sha256 = Some(sha256_hex(&expected_output));
+    Ok(result)
 }
 
 fn run_semantic_odt(
@@ -27651,12 +30244,6 @@ fn run_odp_repeated_text(
                 "ODP repeated-text replay read source or media payload after preparation".into(),
             );
         }
-        if replay_versions != ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS {
-            return Err(format!(
-                "ODP repeated-text replay observed {replay_versions} version checks, expected {ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS}"
-            )
-            .into());
-        }
         let expected_per_call = match case {
             Case::OdpSourceBackedRepeatedTextUncached => {
                 &ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS
@@ -27666,6 +30253,13 @@ fn run_odp_repeated_text(
             },
             _ => unreachable!("repeated-text case validated above"),
         };
+        let expected_versions = expected_per_call.iter().sum::<u64>();
+        if replay_versions != expected_versions {
+            return Err(format!(
+                "ODP repeated-text replay observed {replay_versions} version checks, expected {expected_versions}"
+            )
+            .into());
+        }
         if per_call_version_observations.as_slice() != expected_per_call.as_slice() {
             return Err(format!(
                 "ODP repeated-text replay observed per-call version checks {:?}, expected {:?}",
@@ -27680,8 +30274,8 @@ fn run_odp_repeated_text(
             return Err("ODP repeated-text source replay differs from canonical text".into());
         }
         // The semantic parity check is deliberately after the exact four-call
-        // freshness observation, so it does not alter the recorded 12-check
-        // replay contract.
+        // freshness observation, so it does not alter the recorded replay
+        // version-check contract.
         if presentation.slides()? != expected_slides {
             return Err(
                 "ODP repeated-text source replay slides differ from canonical slides".into(),
@@ -29283,6 +31877,114 @@ fn run_xlsx_open_owned(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     Ok(result(Case::XlsxOpenOwned, corpus, elapsed, None))
+}
+
+fn run_xlsx_named_sheet_lookup(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let catalog = case
+        .xlsx_named_sheet_catalog()
+        .ok_or("non-named-sheet case passed to XLSX named selector runner")?;
+    if spec.sheet_count != catalog.sheet_count() {
+        return Err("XLSX named selector catalog differs from case selection".into());
+    }
+    let target_name = xlsx_sheet_name(spec.sheet_count - 1);
+    let target_address = xlsx_address(0, 0)?;
+    let target_payload = xlsx_value(XlsxCoordinate {
+        sheet: spec.sheet_count - 1,
+        row: 0,
+        column: 0,
+    })
+    .to_string();
+    if corpus.target_payload.as_slice() != target_payload.as_bytes() {
+        return Err("XLSX named selector target witness differs from its corpus".into());
+    }
+    let target_query = target_name.to_ascii_lowercase();
+    let iteration_count = iteration_count(warmup_iterations, samples)?;
+
+    if case.is_xlsx_named_sheet_source_backed() {
+        // Workbook catalog construction and source instrumentation are setup,
+        // not selector work. Reset before the first timed query so the source
+        // vector proves that named lookup remains metadata-only.
+        let source = xlsx_instrumented_source(corpus)?;
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+        if workbook.len() != spec.sheet_count {
+            return Err("source-backed named selector catalog has the wrong sheet count".into());
+        }
+        let target = workbook
+            .sheet(target_name.as_str())?
+            .ok_or("source-backed named selector target sheet is missing")?;
+        if target.name() != target_name
+            || !matches!(
+                target.cell(target_address.as_str())?.stored(),
+                Some(XlsxCell::Value(XlsxValue::Number(value)))
+                    if value.as_str() == target_payload.as_str()
+            )
+        {
+            return Err("source-backed named selector target witness differs".into());
+        }
+        source.reset();
+        let mut elapsed = Vec::with_capacity(samples);
+        let mut source_summary = SourceSummary::default();
+        for iteration in 0..iteration_count {
+            source.reset();
+            let started = Instant::now();
+            let sheet = workbook
+                .sheet(std::hint::black_box(target_query.as_str()))?
+                .ok_or("source-backed named selector missed its target sheet")?;
+            let duration = started.elapsed();
+            let metrics = source.snapshot();
+            if metrics != SourceSnapshot::default() {
+                return Err("source-backed named selector performed worksheet I/O".into());
+            }
+            if sheet.name() != target_name {
+                return Err("source-backed named selector returned the wrong sheet".into());
+            }
+            std::hint::black_box(sheet);
+            if iteration >= warmup_iterations {
+                source_summary.record_xlsx(metrics);
+            }
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+        Ok(result_with_source(case, corpus, elapsed, source_summary))
+    } else {
+        // Parse and catalog the owned workbook once; only the immutable named
+        // selector itself belongs to the timed loop.
+        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        if workbook.len() != spec.sheet_count {
+            return Err("owned named selector catalog has the wrong sheet count".into());
+        }
+        let target = workbook
+            .sheet(target_name.as_str())?
+            .ok_or("owned named selector target sheet is missing")?;
+        if target.name() != target_name
+            || !matches!(
+                target.cell(target_address.as_str())?.stored(),
+                Some(XlsxCell::Value(XlsxValue::Number(value)))
+                    if value.as_str() == target_payload.as_str()
+            )
+        {
+            return Err("owned named selector target witness differs".into());
+        }
+        let mut elapsed = Vec::with_capacity(samples);
+        for iteration in 0..iteration_count {
+            let started = Instant::now();
+            let sheet = workbook
+                .sheet(std::hint::black_box(target_query.as_str()))?
+                .ok_or("owned named selector missed its target sheet")?;
+            let duration = started.elapsed();
+            if sheet.name() != target_name {
+                return Err("owned named selector returned the wrong sheet".into());
+            }
+            std::hint::black_box(sheet);
+            record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        }
+        Ok(result(case, corpus, elapsed, None))
+    }
 }
 
 fn run_xlsx_list_sheets(
@@ -32352,6 +35054,78 @@ fn run_zip_index(
             ..SourceSummary::default()
         },
     ))
+}
+
+fn run_detection_case(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let (family, mode) = case
+        .detection_spec()
+        .ok_or("non-detection case passed to detection runner")?;
+    let expected = mode.expected_format(family);
+    let preflight = litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+    if preflight != Some(expected) {
+        return Err(format!(
+            "{} detection preflight differs from expected {}: {:?}",
+            case.name(),
+            detection_format_name(expected),
+            preflight,
+        )
+        .into());
+    }
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Corpus setup, the exact-format oracle, and reader-contract checks are
+        // deliberately outside the timed detector call. This keeps optional
+        // test-only probe instrumentation from becoming benchmark work.
+        let (observed, duration, cursor_position) = match mode {
+            DetectionMode::Reader => {
+                let original_position = 7_u64;
+                let mut reader = Cursor::new(corpus.archive.as_slice());
+                reader.set_position(original_position);
+                let started = Instant::now();
+                let observed = litchi::common::detection::detect_format_from_reader(&mut reader);
+                let duration = started.elapsed();
+                (
+                    observed,
+                    duration,
+                    Some((reader.position(), original_position)),
+                )
+            },
+            DetectionMode::Bytes | DetectionMode::Polyglot | DetectionMode::CatalogAlias => {
+                let started = Instant::now();
+                let observed =
+                    litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+                let duration = started.elapsed();
+                (observed, duration, None)
+            },
+        };
+        if observed != Some(expected) {
+            return Err(format!(
+                "{} detection sample differs from expected {}: {:?}",
+                case.name(),
+                detection_format_name(expected),
+                observed,
+            )
+            .into());
+        }
+        if let Some((observed_position, original_position)) = cursor_position
+            && observed_position != original_position
+        {
+            return Err(format!(
+                "{} detection changed reader cursor from {original_position} to {observed_position}",
+                case.name(),
+            )
+            .into());
+        }
+        std::hint::black_box(observed);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result(case, corpus, elapsed, None))
 }
 
 fn run_zip_read_one(
@@ -36062,10 +38836,996 @@ fn run_xlsx_calculation_metadata_edit_save(
     })
 }
 
+// This benchmark oracle intentionally has no dependency on the XLSX page-break
+// codec. It scans only bounded worksheet XML and keeps its own semantic model.
+const XLSX_PAGE_BREAK_ORACLE_MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const XLSX_PAGE_BREAK_ORACLE_MAX_EVENTS: usize = 1_000_000;
+const XLSX_PAGE_BREAK_ORACLE_MAX_DEPTH: usize = 256;
+const XLSX_PAGE_BREAK_ORACLE_MAX_HORIZONTAL_BREAKS: usize = 1_022;
+const XLSX_PAGE_BREAK_ORACLE_MAX_VERTICAL_BREAKS: usize = 1_023;
+const XLSX_PAGE_BREAK_ORACLE_CORE_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const XLSX_PAGE_BREAK_ORACLE_STRICT_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const XLSX_PAGE_BREAK_ORACLE_FRAGMENT: &[u8] =
+    br#"<rowBreaks count="1" manualBreakCount="1"><brk id="100" max="16383" man="1"/></rowBreaks>"#;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct XlsxPageBreakOracle {
+    horizontal: Option<XlsxPageBreakOracleCollection>,
+    vertical: Option<XlsxPageBreakOracleCollection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct XlsxPageBreakOracleCollection {
+    breaks: Vec<XlsxPageBreakOracleBreak>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct XlsxPageBreakOracleBreak {
+    id: u32,
+    minimum: u32,
+    maximum: u32,
+    manual: bool,
+    pivot: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct XlsxPageBreakOracleTag<'a> {
+    name: &'a [u8],
+    attributes: &'a [u8],
+    start: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum XlsxPageBreakOracleToken<'a> {
+    Start(XlsxPageBreakOracleTag<'a>),
+    Empty(XlsxPageBreakOracleTag<'a>),
+    End { name: &'a [u8], start: usize },
+    Text(&'a [u8]),
+    Comment,
+    CData,
+    Declaration,
+    Processing,
+}
+
+#[derive(Debug)]
+struct XlsxPageBreakOracleOpenCollection {
+    horizontal: bool,
+    count: Option<usize>,
+    manual_count: Option<usize>,
+    breaks: Vec<XlsxPageBreakOracleBreak>,
+}
+
+#[derive(Debug)]
+struct XlsxPageBreakOracleOpenBreak {
+    value: XlsxPageBreakOracleBreak,
+}
+
 fn xlsx_page_break_target() -> Result<litchi_xlsx::page_breaks::Collection, Box<dyn Error>> {
     Ok(litchi_xlsx::page_breaks::Collection::horizontal([
         litchi_xlsx::page_breaks::Break::new(100, 0, 16_383)?.with_manual(true),
     ])?)
+}
+
+fn xlsx_page_break_oracle_target() -> XlsxPageBreakOracle {
+    XlsxPageBreakOracle {
+        horizontal: Some(XlsxPageBreakOracleCollection {
+            breaks: vec![XlsxPageBreakOracleBreak {
+                id: 100,
+                minimum: 0,
+                maximum: 16_383,
+                manual: true,
+                pivot: false,
+            }],
+        }),
+        vertical: None,
+    }
+}
+
+fn xlsx_page_break_oracle_error(message: impl Into<String>) -> Box<dyn Error> {
+    message.into().into()
+}
+
+fn xlsx_page_break_oracle_parse(xml: &[u8]) -> Result<XlsxPageBreakOracle, Box<dyn Error>> {
+    if xml.len() > XLSX_PAGE_BREAK_ORACLE_MAX_XML_BYTES {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle XML exceeds its bounded input size",
+        ));
+    }
+
+    let mut cursor = 0usize;
+    let mut events = 0usize;
+    let mut stack: Vec<&[u8]> = Vec::new();
+    let mut result = XlsxPageBreakOracle {
+        horizontal: None,
+        vertical: None,
+    };
+    let mut open_collection: Option<XlsxPageBreakOracleOpenCollection> = None;
+    let mut open_break: Option<XlsxPageBreakOracleOpenBreak> = None;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
+
+    loop {
+        let Some(token) = xlsx_page_break_oracle_next_token(xml, &mut cursor)? else {
+            break;
+        };
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| xlsx_page_break_oracle_error("XLSX page-break oracle event overflow"))?;
+        if events > XLSX_PAGE_BREAK_ORACLE_MAX_EVENTS {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle exceeds its event bound",
+            ));
+        }
+
+        match token {
+            XlsxPageBreakOracleToken::Start(tag) => {
+                if root_closed {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found content after the worksheet root",
+                    ));
+                }
+                if stack.is_empty() {
+                    if root_seen || !xlsx_page_break_oracle_unqualified(tag.name, b"worksheet") {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle requires one worksheet root",
+                        ));
+                    }
+                    xlsx_page_break_oracle_validate_root(tag.attributes)?;
+                    root_seen = true;
+                    stack.push(tag.name);
+                    continue;
+                }
+                if let Some(collection) = open_collection.as_mut() {
+                    if stack.len() == 2 && xlsx_page_break_oracle_unqualified(tag.name, b"brk") {
+                        if open_break.is_some() {
+                            return Err(xlsx_page_break_oracle_error(
+                                "XLSX page-break oracle found a nested break",
+                            ));
+                        }
+                        open_break = Some(XlsxPageBreakOracleOpenBreak {
+                            value: xlsx_page_break_oracle_parse_break(
+                                tag.attributes,
+                                collection.horizontal,
+                            )?,
+                        });
+                    } else {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found an unexpected collection child",
+                        ));
+                    }
+                } else if stack.len() == 1
+                    && (xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks")
+                        || xlsx_page_break_oracle_unqualified(tag.name, b"colBreaks"))
+                {
+                    let horizontal = xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks");
+                    if (horizontal && result.horizontal.is_some())
+                        || (!horizontal && result.vertical.is_some())
+                    {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found a duplicate collection",
+                        ));
+                    }
+                    open_collection = Some(xlsx_page_break_oracle_open_collection(
+                        tag.attributes,
+                        horizontal,
+                    )?);
+                }
+                if stack.len() >= XLSX_PAGE_BREAK_ORACLE_MAX_DEPTH {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle nesting exceeds its depth bound",
+                    ));
+                }
+                stack.push(tag.name);
+            },
+            XlsxPageBreakOracleToken::Empty(tag) => {
+                if stack.is_empty() || root_closed {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found an element outside the worksheet root",
+                    ));
+                }
+                if let Some(collection) = open_collection.as_mut() {
+                    if stack.len() == 2 && xlsx_page_break_oracle_unqualified(tag.name, b"brk") {
+                        let value = xlsx_page_break_oracle_parse_break(
+                            tag.attributes,
+                            collection.horizontal,
+                        )?;
+                        xlsx_page_break_oracle_push_break(collection, value)?;
+                    } else {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found an unexpected empty collection child",
+                        ));
+                    }
+                } else if stack.len() == 1
+                    && (xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks")
+                        || xlsx_page_break_oracle_unqualified(tag.name, b"colBreaks"))
+                {
+                    let horizontal = xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks");
+                    if (horizontal && result.horizontal.is_some())
+                        || (!horizontal && result.vertical.is_some())
+                    {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found a duplicate collection",
+                        ));
+                    }
+                    let collection =
+                        xlsx_page_break_oracle_open_collection(tag.attributes, horizontal)?;
+                    let collection = xlsx_page_break_oracle_finish_collection(collection)?;
+                    if horizontal {
+                        result.horizontal = Some(collection);
+                    } else {
+                        result.vertical = Some(collection);
+                    }
+                }
+            },
+            XlsxPageBreakOracleToken::End { name, .. } => {
+                let Some(open_name) = stack.last() else {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found an unexpected closing element",
+                    ));
+                };
+                if *open_name != name {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found mismatched XML elements",
+                    ));
+                }
+                if open_collection.is_some() {
+                    match stack.len() {
+                        3 => {
+                            let open = open_break.take().ok_or_else(|| {
+                                xlsx_page_break_oracle_error(
+                                    "XLSX page-break oracle lost an open break",
+                                )
+                            })?;
+                            xlsx_page_break_oracle_push_break(
+                                open_collection.as_mut().ok_or_else(|| {
+                                    xlsx_page_break_oracle_error(
+                                        "XLSX page-break oracle lost its collection",
+                                    )
+                                })?,
+                                open.value,
+                            )?;
+                        },
+                        2 => {
+                            if open_break.is_some() {
+                                return Err(xlsx_page_break_oracle_error(
+                                    "XLSX page-break oracle closed a collection with an open break",
+                                ));
+                            }
+                            let collection = open_collection.take().ok_or_else(|| {
+                                xlsx_page_break_oracle_error(
+                                    "XLSX page-break oracle lost its open collection",
+                                )
+                            })?;
+                            let horizontal = collection.horizontal;
+                            let collection = xlsx_page_break_oracle_finish_collection(collection)?;
+                            if horizontal {
+                                result.horizontal = Some(collection);
+                            } else {
+                                result.vertical = Some(collection);
+                            }
+                        },
+                        _ => {
+                            return Err(xlsx_page_break_oracle_error(
+                                "XLSX page-break oracle has invalid collection state",
+                            ));
+                        },
+                    }
+                }
+                stack.pop();
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            XlsxPageBreakOracleToken::Text(value) => {
+                let non_whitespace = value.iter().any(|byte| !byte.is_ascii_whitespace());
+                if non_whitespace
+                    && (stack.is_empty()
+                        || root_closed
+                        || stack.len() == 1
+                        || open_collection.is_some())
+                {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found unexpected XML text",
+                    ));
+                }
+            },
+            XlsxPageBreakOracleToken::CData => {
+                if stack.len() <= 1 || open_collection.is_some() {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle rejects CDATA in worksheet control XML",
+                    ));
+                }
+            },
+            XlsxPageBreakOracleToken::Comment => {},
+            XlsxPageBreakOracleToken::Declaration => {
+                if declaration_seen || root_seen || !stack.is_empty() {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found an invalid XML declaration",
+                    ));
+                }
+                declaration_seen = true;
+            },
+            XlsxPageBreakOracleToken::Processing => {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle rejects processing instructions",
+                ));
+            },
+        }
+    }
+
+    if !root_seen
+        || !root_closed
+        || !stack.is_empty()
+        || open_collection.is_some()
+        || open_break.is_some()
+    {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an unterminated worksheet",
+        ));
+    }
+    Ok(result)
+}
+
+fn xlsx_page_break_oracle_next_token<'a>(
+    xml: &'a [u8],
+    cursor: &mut usize,
+) -> Result<Option<XlsxPageBreakOracleToken<'a>>, Box<dyn Error>> {
+    if *cursor >= xml.len() {
+        return Ok(None);
+    }
+    let start = *cursor;
+    if xml[start] != b'<' {
+        let end = xml[start..]
+            .iter()
+            .position(|byte| *byte == b'<')
+            .map_or(xml.len(), |offset| start + offset);
+        *cursor = end;
+        return Ok(Some(XlsxPageBreakOracleToken::Text(&xml[start..end])));
+    }
+    if xml[start..].starts_with(b"<!--") {
+        let body_start = start + 4;
+        let end = xlsx_page_break_oracle_find(xml, body_start, b"-->").ok_or_else(|| {
+            xlsx_page_break_oracle_error("XLSX page-break oracle found an unterminated comment")
+        })?;
+        *cursor = end + 3;
+        return Ok(Some(XlsxPageBreakOracleToken::Comment));
+    }
+    if xml[start..].starts_with(b"<![CDATA[") {
+        let body_start = start + 9;
+        let end = xlsx_page_break_oracle_find(xml, body_start, b"]]>").ok_or_else(|| {
+            xlsx_page_break_oracle_error("XLSX page-break oracle found unterminated CDATA")
+        })?;
+        *cursor = end + 3;
+        return Ok(Some(XlsxPageBreakOracleToken::CData));
+    }
+    if xml[start..].starts_with(b"<?") {
+        let end = xlsx_page_break_oracle_find(xml, start + 2, b"?>").ok_or_else(|| {
+            xlsx_page_break_oracle_error("XLSX page-break oracle found an unterminated instruction")
+        })?;
+        let declaration = xml[start..].get(5).is_some_and(|byte| {
+            *byte == b' ' || *byte == b'\t' || *byte == b'\r' || *byte == b'\n'
+        }) && xml[start..].starts_with(b"<?xml");
+        *cursor = end + 2;
+        return Ok(Some(if declaration {
+            XlsxPageBreakOracleToken::Declaration
+        } else {
+            XlsxPageBreakOracleToken::Processing
+        }));
+    }
+    if xml[start..].starts_with(b"<!") {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle rejects DTD and unknown declarations",
+        ));
+    }
+    if xml[start..].starts_with(b"</") {
+        let end = xlsx_page_break_oracle_tag_end(xml, start + 2)?;
+        let body = xlsx_page_break_oracle_trim(&xml[start + 2..end]);
+        if body.is_empty() || body.iter().any(|byte| byte.is_ascii_whitespace()) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an invalid closing tag",
+            ));
+        }
+        if !xlsx_page_break_oracle_valid_name(body) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an invalid XML name",
+            ));
+        }
+        *cursor = end + 1;
+        return Ok(Some(XlsxPageBreakOracleToken::End { name: body, start }));
+    }
+
+    let end = xlsx_page_break_oracle_tag_end(xml, start + 1)?;
+    let mut body = xlsx_page_break_oracle_trim(&xml[start + 1..end]);
+    let empty = body.last() == Some(&b'/');
+    if empty {
+        body = xlsx_page_break_oracle_trim(&body[..body.len() - 1]);
+    }
+    let name_end = body
+        .iter()
+        .position(|byte| byte.is_ascii_whitespace())
+        .unwrap_or(body.len());
+    let name = &body[..name_end];
+    if name.is_empty() || !xlsx_page_break_oracle_valid_name(name) {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an invalid opening tag",
+        ));
+    }
+    let attributes = xlsx_page_break_oracle_trim_start(&body[name_end..]);
+    *cursor = end + 1;
+    let tag = XlsxPageBreakOracleTag {
+        name,
+        attributes,
+        start,
+    };
+    Ok(Some(if empty {
+        XlsxPageBreakOracleToken::Empty(tag)
+    } else {
+        XlsxPageBreakOracleToken::Start(tag)
+    }))
+}
+
+fn xlsx_page_break_oracle_tag_end(xml: &[u8], mut cursor: usize) -> Result<usize, Box<dyn Error>> {
+    let mut quote = None;
+    while cursor < xml.len() {
+        match (quote, xml[cursor]) {
+            (Some(delimiter), byte) if byte == delimiter => quote = None,
+            (None, b'\'' | b'"') => quote = Some(xml[cursor]),
+            (None, b'>') => return Ok(cursor),
+            _ => {},
+        }
+        cursor += 1;
+    }
+    Err(xlsx_page_break_oracle_error(
+        "XLSX page-break oracle found an unterminated tag",
+    ))
+}
+
+fn xlsx_page_break_oracle_find(haystack: &[u8], start: usize, needle: &[u8]) -> Option<usize> {
+    haystack
+        .get(start..)?
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|offset| start + offset)
+}
+
+fn xlsx_page_break_oracle_trim(value: &[u8]) -> &[u8] {
+    xlsx_page_break_oracle_trim_start(value)
+        .iter()
+        .rposition(|byte| !byte.is_ascii_whitespace())
+        .map_or(&[], |end| {
+            &xlsx_page_break_oracle_trim_start(value)[..end + 1]
+        })
+}
+
+fn xlsx_page_break_oracle_trim_start(value: &[u8]) -> &[u8] {
+    value
+        .iter()
+        .position(|byte| !byte.is_ascii_whitespace())
+        .map_or(&[], |start| &value[start..])
+}
+
+fn xlsx_page_break_oracle_valid_name(name: &[u8]) -> bool {
+    name.first()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_' || *byte == b':')
+        && name
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b':' | b'-' | b'.'))
+}
+
+fn xlsx_page_break_oracle_unqualified(name: &[u8], expected: &[u8]) -> bool {
+    name == expected
+}
+
+fn xlsx_page_break_oracle_each_attribute<F>(
+    attributes: &[u8],
+    mut visitor: F,
+) -> Result<(), Box<dyn Error>>
+where
+    F: FnMut(&[u8], &[u8]) -> Result<(), Box<dyn Error>>,
+{
+    let mut cursor = 0usize;
+    while cursor < attributes.len() {
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if cursor == attributes.len() {
+            break;
+        }
+        let name_start = cursor;
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'=')
+        {
+            cursor += 1;
+        }
+        let name = &attributes[name_start..cursor];
+        if !xlsx_page_break_oracle_valid_name(name) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an invalid attribute name",
+            ));
+        }
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if attributes.get(cursor) != Some(&b'=') {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle requires quoted XML attributes",
+            ));
+        }
+        cursor += 1;
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        let Some(&delimiter) = attributes.get(cursor) else {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found a missing attribute value",
+            ));
+        };
+        if delimiter != b'\'' && delimiter != b'"' {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle requires quoted XML attributes",
+            ));
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| *byte != delimiter)
+        {
+            if attributes[cursor] == b'<' {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found '<' in an attribute value",
+                ));
+            }
+            cursor += 1;
+        }
+        let Some(_) = attributes.get(cursor) else {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an unterminated attribute value",
+            ));
+        };
+        visitor(name, &attributes[value_start..cursor])?;
+        cursor += 1;
+    }
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_validate_root(attributes: &[u8]) -> Result<(), Box<dyn Error>> {
+    let mut namespace = None::<Vec<u8>>;
+    xlsx_page_break_oracle_each_attribute(attributes, |name, value| {
+        if name == b"xmlns" {
+            if namespace.is_some() {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found duplicate worksheet namespaces",
+                ));
+            }
+            namespace = Some(value.to_vec());
+        }
+        Ok(())
+    })?;
+    if !namespace.as_deref().is_some_and(|value| {
+        value == XLSX_PAGE_BREAK_ORACLE_CORE_NAMESPACE
+            || value == XLSX_PAGE_BREAK_ORACLE_STRICT_NAMESPACE
+    }) {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found a non-SpreadsheetML worksheet namespace",
+        ));
+    }
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_open_collection(
+    attributes: &[u8],
+    horizontal: bool,
+) -> Result<XlsxPageBreakOracleOpenCollection, Box<dyn Error>> {
+    let mut count = None;
+    let mut manual_count = None;
+    xlsx_page_break_oracle_each_attribute(attributes, |name, value| {
+        if name == b"xmlns" || name.contains(&b':') {
+            return Ok(());
+        }
+        let target = match name {
+            b"count" => &mut count,
+            b"manualBreakCount" => &mut manual_count,
+            _ => {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found an unknown collection attribute",
+                ));
+            },
+        };
+        if target.is_some() {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found a duplicate collection attribute",
+            ));
+        }
+        *target = Some(xlsx_page_break_oracle_usize(value, "collection count")?);
+        Ok(())
+    })?;
+    Ok(XlsxPageBreakOracleOpenCollection {
+        horizontal,
+        count,
+        manual_count,
+        breaks: Vec::new(),
+    })
+}
+
+fn xlsx_page_break_oracle_parse_break(
+    attributes: &[u8],
+    horizontal: bool,
+) -> Result<XlsxPageBreakOracleBreak, Box<dyn Error>> {
+    let mut id = None;
+    let mut minimum = None;
+    let mut maximum = None;
+    let mut manual = None;
+    let mut pivot = None;
+    xlsx_page_break_oracle_each_attribute(attributes, |name, value| {
+        if name == b"xmlns" || name.contains(&b':') {
+            return Ok(());
+        }
+        match name {
+            b"id" => xlsx_page_break_oracle_set_once(
+                &mut id,
+                xlsx_page_break_oracle_u32(value, "break coordinate")?,
+            )?,
+            b"min" => xlsx_page_break_oracle_set_once(
+                &mut minimum,
+                xlsx_page_break_oracle_u32(value, "break coordinate")?,
+            )?,
+            b"max" => xlsx_page_break_oracle_set_once(
+                &mut maximum,
+                xlsx_page_break_oracle_u32(value, "break coordinate")?,
+            )?,
+            b"man" => {
+                xlsx_page_break_oracle_set_once(&mut manual, xlsx_page_break_oracle_bool(value)?)?
+            },
+            b"pt" => {
+                xlsx_page_break_oracle_set_once(&mut pivot, xlsx_page_break_oracle_bool(value)?)?
+            },
+            _ => {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found an unknown break attribute",
+                ));
+            },
+        }
+        Ok(())
+    })?;
+    let value = XlsxPageBreakOracleBreak {
+        id: id.unwrap_or(0),
+        minimum: minimum.unwrap_or(0),
+        maximum: maximum.unwrap_or(0),
+        manual: manual.unwrap_or(false),
+        pivot: pivot.unwrap_or(false),
+    };
+    let (maximum_id, maximum_span) = if horizontal {
+        (1_048_575, 16_383)
+    } else {
+        (16_383, 1_048_575)
+    };
+    if value.minimum > value.maximum || value.id > maximum_id || value.maximum > maximum_span {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an out-of-grid break",
+        ));
+    }
+    Ok(value)
+}
+
+fn xlsx_page_break_oracle_set_once<T>(
+    target: &mut Option<T>,
+    value: T,
+) -> Result<(), Box<dyn Error>> {
+    if target.is_some() {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found a duplicate break attribute",
+        ));
+    }
+    *target = Some(value);
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_push_break(
+    collection: &mut XlsxPageBreakOracleOpenCollection,
+    value: XlsxPageBreakOracleBreak,
+) -> Result<(), Box<dyn Error>> {
+    let maximum = if collection.horizontal {
+        XLSX_PAGE_BREAK_ORACLE_MAX_HORIZONTAL_BREAKS
+    } else {
+        XLSX_PAGE_BREAK_ORACLE_MAX_VERTICAL_BREAKS
+    };
+    if collection.breaks.len() >= maximum {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle collection exceeds its Office bound",
+        ));
+    }
+    collection.breaks.push(value);
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_finish_collection(
+    collection: XlsxPageBreakOracleOpenCollection,
+) -> Result<XlsxPageBreakOracleCollection, Box<dyn Error>> {
+    if collection.count.unwrap_or(0) != collection.breaks.len()
+        || collection.manual_count.unwrap_or(0)
+            != collection
+                .breaks
+                .iter()
+                .filter(|value| value.manual)
+                .count()
+    {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle collection counts do not match its children",
+        ));
+    }
+    Ok(XlsxPageBreakOracleCollection {
+        breaks: collection.breaks,
+    })
+}
+
+fn xlsx_page_break_oracle_u32(value: &[u8], what: &str) -> Result<u32, Box<dyn Error>> {
+    if value.is_empty() {
+        return Err(xlsx_page_break_oracle_error(format!(
+            "XLSX page-break oracle found an empty {what}"
+        )));
+    }
+    let mut result = 0u32;
+    for byte in value {
+        if !byte.is_ascii_digit() {
+            return Err(xlsx_page_break_oracle_error(format!(
+                "XLSX page-break oracle found an invalid {what}"
+            )));
+        }
+        result = result
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(u32::from(*byte - b'0')))
+            .ok_or_else(|| {
+                xlsx_page_break_oracle_error(format!("XLSX page-break oracle {what} overflows u32"))
+            })?;
+    }
+    Ok(result)
+}
+
+fn xlsx_page_break_oracle_usize(value: &[u8], what: &str) -> Result<usize, Box<dyn Error>> {
+    usize::try_from(xlsx_page_break_oracle_u32(value, what)?).map_err(|error| {
+        xlsx_page_break_oracle_error(format!(
+            "XLSX page-break oracle {what} does not fit usize: {error}"
+        ))
+    })
+}
+
+fn xlsx_page_break_oracle_bool(value: &[u8]) -> Result<bool, Box<dyn Error>> {
+    match value {
+        b"0" | b"false" => Ok(false),
+        b"1" | b"true" => Ok(true),
+        _ => Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an invalid boolean",
+        )),
+    }
+}
+
+fn xlsx_page_break_oracle_drawing_start(xml: &[u8]) -> Result<Option<usize>, Box<dyn Error>> {
+    let mut cursor = 0usize;
+    let mut depth = 0usize;
+    let mut root_close = None;
+    while let Some(token) = xlsx_page_break_oracle_next_token(xml, &mut cursor)? {
+        match token {
+            XlsxPageBreakOracleToken::Start(tag) => {
+                if depth == 1 && xlsx_page_break_oracle_unqualified(tag.name, b"drawing") {
+                    return Ok(Some(tag.start));
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    xlsx_page_break_oracle_error("XLSX page-break oracle depth overflow")
+                })?;
+            },
+            XlsxPageBreakOracleToken::Empty(tag) => {
+                if depth == 1 && xlsx_page_break_oracle_unqualified(tag.name, b"drawing") {
+                    return Ok(Some(tag.start));
+                }
+            },
+            XlsxPageBreakOracleToken::End { start, .. } => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    xlsx_page_break_oracle_error("XLSX page-break oracle depth underflow")
+                })?;
+                if depth == 0 {
+                    root_close = Some(start);
+                }
+            },
+            XlsxPageBreakOracleToken::Text(_)
+            | XlsxPageBreakOracleToken::Comment
+            | XlsxPageBreakOracleToken::CData
+            | XlsxPageBreakOracleToken::Declaration
+            | XlsxPageBreakOracleToken::Processing => {},
+        }
+    }
+    Ok(root_close)
+}
+
+fn xlsx_page_break_oracle_rewrite(xml: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+    if xlsx_page_break_oracle_parse(xml)?
+        != (XlsxPageBreakOracle {
+            horizontal: None,
+            vertical: None,
+        })
+    {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle fixture already contains authored breaks",
+        ));
+    }
+    let insertion = xlsx_page_break_oracle_drawing_start(xml)?.ok_or_else(|| {
+        xlsx_page_break_oracle_error(
+            "XLSX page-break oracle fixture has no bounded drawing insertion point",
+        )
+    })?;
+    let capacity = xml
+        .len()
+        .checked_add(XLSX_PAGE_BREAK_ORACLE_FRAGMENT.len())
+        .ok_or_else(|| xlsx_page_break_oracle_error("XLSX page-break oracle output overflows"))?;
+    if capacity > XLSX_PAGE_BREAK_ORACLE_MAX_XML_BYTES {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle output exceeds its bounded size",
+        ));
+    }
+    let mut output = Vec::with_capacity(capacity);
+    output.extend_from_slice(&xml[..insertion]);
+    output.extend_from_slice(XLSX_PAGE_BREAK_ORACLE_FRAGMENT);
+    output.extend_from_slice(&xml[insertion..]);
+    if xlsx_page_break_oracle_parse(&output)? != xlsx_page_break_oracle_target() {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle rewrite did not produce its target",
+        ));
+    }
+    Ok(output)
+}
+
+fn xlsx_page_break_expected_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
+    // Construct the expected package from independently rewritten worksheet
+    // bytes; do not call either page-break publication implementation here.
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let rewritten = xlsx_page_break_oracle_rewrite(package.get_part(&target_uri)?.blob())?;
+    package.get_part_mut(&target_uri)?.set_blob(rewritten);
+    PackageWriter::to_bytes(&package).map_err(Into::into)
+}
+
+fn xlsx_page_break_oracle_matches_public(
+    actual: &litchi_xlsx::page_breaks::PageBreaks,
+    expected: &XlsxPageBreakOracle,
+) -> bool {
+    fn matches_collection(
+        actual: Option<&litchi_xlsx::page_breaks::Collection>,
+        expected: Option<&XlsxPageBreakOracleCollection>,
+    ) -> bool {
+        match (actual, expected) {
+            (None, None) => true,
+            (Some(actual), Some(expected)) => {
+                actual.len() == expected.breaks.len()
+                    && actual
+                        .breaks()
+                        .iter()
+                        .zip(&expected.breaks)
+                        .all(|(actual, expected)| {
+                            actual.id() == expected.id
+                                && actual.minimum() == expected.minimum
+                                && actual.maximum() == expected.maximum
+                                && actual.is_manual() == expected.manual
+                                && actual.is_pivot() == expected.pivot
+                        })
+            },
+            _ => false,
+        }
+    }
+
+    matches_collection(actual.horizontal(), expected.horizontal.as_ref())
+        && matches_collection(actual.vertical(), expected.vertical.as_ref())
+}
+
+fn xlsx_page_break_oracle_append(encoded: &mut Vec<u8>, value: &XlsxPageBreakOracle) {
+    fn append_collection(
+        encoded: &mut Vec<u8>,
+        name: &[u8],
+        collection: Option<&XlsxPageBreakOracleCollection>,
+    ) {
+        encoded.extend_from_slice(name);
+        match collection {
+            None => encoded.push(b'-'),
+            Some(collection) => {
+                encoded.push(b'[');
+                for value in &collection.breaks {
+                    encoded.extend_from_slice(&value.id.to_le_bytes());
+                    encoded.extend_from_slice(&value.minimum.to_le_bytes());
+                    encoded.extend_from_slice(&value.maximum.to_le_bytes());
+                    encoded.push(u8::from(value.manual));
+                    encoded.push(u8::from(value.pivot));
+                }
+                encoded.push(b']');
+            },
+        }
+        encoded.push(b';');
+    }
+
+    append_collection(encoded, b"row", value.horizontal.as_ref());
+    append_collection(encoded, b"col", value.vertical.as_ref());
+}
+
+fn xlsx_page_break_oracle_append_public(
+    encoded: &mut Vec<u8>,
+    value: &litchi_xlsx::page_breaks::PageBreaks,
+) {
+    let mut oracle = XlsxPageBreakOracle {
+        horizontal: None,
+        vertical: None,
+    };
+    if let Some(collection) = value.horizontal() {
+        oracle.horizontal = Some(XlsxPageBreakOracleCollection {
+            breaks: collection
+                .breaks()
+                .iter()
+                .map(|value| XlsxPageBreakOracleBreak {
+                    id: value.id(),
+                    minimum: value.minimum(),
+                    maximum: value.maximum(),
+                    manual: value.is_manual(),
+                    pivot: value.is_pivot(),
+                })
+                .collect(),
+        });
+    }
+    if let Some(collection) = value.vertical() {
+        oracle.vertical = Some(XlsxPageBreakOracleCollection {
+            breaks: collection
+                .breaks()
+                .iter()
+                .map(|value| XlsxPageBreakOracleBreak {
+                    id: value.id(),
+                    minimum: value.minimum(),
+                    maximum: value.maximum(),
+                    manual: value.is_manual(),
+                    pivot: value.is_pivot(),
+                })
+                .collect(),
+        });
+    }
+    xlsx_page_break_oracle_append(encoded, &oracle);
+}
+
+fn xlsx_repeated_page_break_digest(value: &XlsxPageBreakOracle) -> Result<String, Box<dyn Error>> {
+    let mut encoded = Vec::new();
+    xlsx_page_break_oracle_append(&mut encoded, value);
+    let capacity = encoded
+        .len()
+        .checked_mul(XLSX_REPEATED_PAGE_BREAK_CALLS)
+        .ok_or("XLSX repeated page-break digest size overflows usize")?;
+    let mut repeated = Vec::with_capacity(capacity);
+    for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+        repeated.extend_from_slice(&encoded);
+    }
+    Ok(sha256_hex(&repeated))
+}
+
+fn xlsx_page_break_outputs_digest(
+    values: &[litchi_xlsx::page_breaks::PageBreaks],
+    expected: &XlsxPageBreakOracle,
+) -> Result<String, Box<dyn Error>> {
+    let mut encoded = Vec::new();
+    for value in values {
+        if !xlsx_page_break_oracle_matches_public(value, expected) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX repeated page-break projection differs from the bounded XML oracle",
+            ));
+        }
+        xlsx_page_break_oracle_append_public(&mut encoded, value);
+    }
+    Ok(sha256_hex(&encoded))
 }
 
 fn verify_xlsx_page_break_edit_output(
@@ -36073,12 +39833,6 @@ fn verify_xlsx_page_break_edit_output(
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
     let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let page_breaks = reopened.page_breaks("Sheet1")?;
-    if page_breaks.page_breaks().horizontal() != Some(&xlsx_page_break_target()?)
-        || page_breaks.page_breaks().vertical().is_some()
-    {
-        return Err("XLSX page-break output has unexpected authored breaks".into());
-    }
     if reopened
         .calculation_metadata()?
         .properties()
@@ -36107,8 +39861,17 @@ fn verify_xlsx_page_break_edit_output(
             return Err("XLSX page-break Part metadata differs from source".into());
         }
         if source_part.partname() == &target_uri {
-            if source_part.blob() == candidate_part.blob() {
-                return Err("XLSX page-break worksheet XML did not change".into());
+            let expected = xlsx_page_break_oracle_rewrite(source_part.blob())?;
+            if candidate_part.blob() != expected {
+                return Err(
+                    "XLSX page-break worksheet XML differs from the independent expected bytes"
+                        .into(),
+                );
+            }
+            if xlsx_page_break_oracle_parse(candidate_part.blob())?
+                != xlsx_page_break_oracle_target()
+            {
+                return Err("XLSX page-break output has unexpected authored breaks".into());
             }
         } else if source_part.blob() != candidate_part.blob() {
             return Err("XLSX page-break edit changed an unselected Part payload".into());
@@ -36177,10 +39940,12 @@ fn run_xlsx_page_break_edit_save(
         return Err("XLSX page-break case requires its fixed media-rich corpus".into());
     }
     let source_backed = case == Case::XlsxSourceBackedPageBreakEditSave;
-    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let mut expected = Vec::new();
-    let expected_materializations =
-        publish_xlsx_page_break_edit(expected_source, &mut expected, source_backed)?;
+    let expected = xlsx_page_break_expected_output(corpus)?;
+    let expected_materializations = if source_backed {
+        2
+    } else {
+        corpus.manifest.entry_count
+    };
     let required_materializations = if source_backed {
         2
     } else {
@@ -36255,6 +40020,94 @@ fn run_xlsx_page_break_edit_save(
         output_sha256: Some(expected_digest),
         operation_metrics: None,
     })
+}
+
+/// Measure repeated page-break reads on the concrete immutable `Worksheet`
+/// handle, alongside the public `Package::page_breaks` control. Package and
+/// workbook setup, the exact raw-XML oracle, and the first projection/warm-up
+/// call all stay outside the timed repeated-query interval.
+fn run_xlsx_page_break_projection(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR
+        || !case.is_xlsx_page_break_projection()
+    {
+        return Err("XLSX page-break projection case requires its fixed projection corpus".into());
+    }
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let expected = xlsx_page_break_oracle_parse(opc.get_part(&target_uri)?.blob())?;
+    let expected_digest = xlsx_repeated_page_break_digest(&expected)?;
+
+    // Verify both public entry points against the independent raw-XML oracle
+    // before any timed work. This makes the Package path an explicit control
+    // and ensures the direct Worksheet selector cannot hide a semantic drift.
+    let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+    let package_projection = package.page_breaks("Sheet1")?;
+    if !xlsx_page_break_oracle_matches_public(package_projection.page_breaks(), &expected) {
+        return Err("XLSX Package page-break projection differs from raw oracle".into());
+    }
+    let workbook = package.workbook()?;
+    let worksheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX worksheet page-break oracle has no Sheet1")?;
+    let worksheet_projection = worksheet.page_breaks()?;
+    if !xlsx_page_break_oracle_matches_public(&worksheet_projection, &expected) {
+        return Err("XLSX Worksheet page-break projection differs from raw oracle".into());
+    }
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+        let mut outputs = Vec::with_capacity(XLSX_REPEATED_PAGE_BREAK_CALLS);
+        let started = match case {
+            Case::XlsxWorksheetRepeatedPageBreaks => {
+                let workbook = package.workbook()?;
+                let worksheet = workbook
+                    .sheet("Sheet1")?
+                    .ok_or("XLSX Worksheet repeated-query setup has no Sheet1")?;
+                let warmed = worksheet.page_breaks()?;
+                if !xlsx_page_break_oracle_matches_public(&warmed, &expected) {
+                    return Err("XLSX Worksheet warm projection differs from raw oracle".into());
+                }
+                let started = Instant::now();
+                for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+                    outputs.push(worksheet.page_breaks()?);
+                }
+                started
+            },
+            Case::XlsxPackageRepeatedPageBreaks => {
+                let warmed = package.page_breaks("Sheet1")?;
+                if !xlsx_page_break_oracle_matches_public(warmed.page_breaks(), &expected) {
+                    return Err("XLSX Package warm projection differs from raw oracle".into());
+                }
+                let started = Instant::now();
+                for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+                    outputs.push(package.page_breaks("Sheet1")?.page_breaks().clone());
+                }
+                started
+            },
+            _ => unreachable!("filtered XLSX page-break projection case"),
+        };
+        let duration = started.elapsed();
+        if outputs.len() != XLSX_REPEATED_PAGE_BREAK_CALLS
+            || outputs
+                .iter()
+                .any(|value| !xlsx_page_break_oracle_matches_public(value, &expected))
+            || xlsx_page_break_outputs_digest(&outputs, &expected)? != expected_digest
+        {
+            return Err("XLSX repeated page-break projections differ from raw oracle".into());
+        }
+        std::hint::black_box(outputs);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let mut result = result(case, corpus, elapsed, None);
+    result.output_sha256 = Some(expected_digest);
+    Ok(result)
 }
 
 fn xlsx_page_margin_target() -> Result<litchi_xlsx::page_margins::Margins, Box<dyn Error>> {
@@ -40942,37 +44795,41 @@ mod tests {
         Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
         CountingSeekSink, CountingSink, HashingDiscardSink, InstrumentedSource,
         ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT,
-        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT,
-        PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT,
-        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
-        SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
+        ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR, OpcCacheMode, PPT_PICTURE_BYTES,
+        PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
+        PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
+        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink, Workbook,
+        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+        XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
-        build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
-        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
-        build_odt_repeated_text_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
-        build_opc_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
-        build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
-        build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
-        build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
-        build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
-        build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
-        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
-        build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
-        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
-        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
+        build_detection_corpus, build_docx_source_edit_corpus, build_odf_repair_corpus,
+        build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
+        build_odt_media_corpus, build_odt_repeated_text_corpus, build_odt_resource_batch_corpus,
+        build_ole_common_corpus, build_ooxml_tracker_corpus, build_opc_corpus,
+        build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
+        build_pptx_slide_name_index_corpus, build_pptx_source_backed_cross_copy_corpus,
+        build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_rtf_picture_corpus,
+        build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
+        build_semantic_odt_corpus, build_semantic_pptx_corpus, build_semantic_rtf_corpus,
+        build_streaming_corpus, build_writer_corpus, build_xls_comments_edit_corpus,
+        build_xls_visibility_edit_corpus, build_xlsb_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
+        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
+        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
+        build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
+        build_xlsx_page_break_projection_corpus, build_xlsx_page_margin_edit_corpus,
         build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
         build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
         cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
-        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        parse_case, payload_bytes, pptx_named_slide_name, resolve_execution_workers, run_case,
+        run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
+        run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -40980,11 +44837,53 @@ mod tests {
         run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
-        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
-        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
-        run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
-        updated_writer_text, verify_xlsx_cells, writer_shape, xlsx_cell_count, xlsx_spec,
+        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_break_projection,
+        run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
+        run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
+        simulated_request_delay, statistics, updated_writer_text, verify_xlsx_cells, writer_shape,
+        xlsb_cells_digest, xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
     };
+
+    #[test]
+    fn detection_selectors_are_opt_in_with_exact_oracles() {
+        let cases = [
+            Case::DetectOdtBytes,
+            Case::DetectOdtReader,
+            Case::DetectOdtPolyglot,
+            Case::DetectOdtCatalogAlias,
+            Case::DetectOdsBytes,
+            Case::DetectOdsReader,
+            Case::DetectOdsPolyglot,
+            Case::DetectOdsCatalogAlias,
+            Case::DetectOdpBytes,
+            Case::DetectOdpReader,
+            Case::DetectOdpPolyglot,
+            Case::DetectOdpCatalogAlias,
+        ];
+        for case in cases {
+            assert!(!Case::DEFAULT.contains(&case));
+            assert_eq!(parse_case(case.name()), Some(case));
+            let (family, mode) = case
+                .detection_spec()
+                .expect("detection selector has a family and mode");
+            let expected = mode.expected_format(family);
+            let corpus = build_detection_corpus(case, SemanticShape::Tiny)
+                .expect("detection corpus has a deterministic oracle");
+            assert_eq!(
+                litchi::common::detection::detect_file_format_from_bytes(&corpus.archive),
+                Some(expected)
+            );
+            if mode == super::DetectionMode::Reader {
+                let mut reader = std::io::Cursor::new(corpus.archive.as_slice());
+                reader.set_position(7);
+                assert_eq!(
+                    litchi::common::detection::detect_format_from_reader(&mut reader),
+                    Some(expected)
+                );
+                assert_eq!(reader.position(), 7);
+            }
+        }
+    }
 
     #[test]
     fn ppt_picture_selectors_preserve_semantics_and_phase_read_evidence() {
@@ -41417,7 +45316,29 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 344);
+        assert_eq!(selectable_count, 378);
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn ooxml_tracker_selectors_are_opt_in_and_nsreader_verified() {
+        let cases = [
+            Case::OmmlFormulaRangeScan,
+            Case::OmmlFormulaExtract,
+            Case::PptxDrawingmlExtract,
+            Case::PptxDrawingmlRangeScan,
+        ];
+        let corpus = build_ooxml_tracker_corpus().unwrap();
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.is_ooxml_tracker_scan());
+            assert!(!Case::DEFAULT.contains(&case));
+            let result = run_ooxml_tracker_case(case, &corpus, 0, 1).unwrap();
+            assert_eq!(result.case, case.name());
+            assert_eq!(result.elapsed_ns.samples.len(), 1);
+            assert_eq!(result.corpus.generator, OOXML_TRACKER_CORPUS_GENERATOR);
+            assert!(result.output_sha256.is_some());
+        }
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -41473,6 +45394,54 @@ mod tests {
     }
 
     #[test]
+    fn xlsb_lifecycle_selectors_are_opt_in_and_hash_stable() {
+        let cases = [
+            Case::XlsbSemanticOpen,
+            Case::XlsbSemanticListWorksheets,
+            Case::XlsbSemanticOneCell,
+            Case::XlsbSemanticFullCellScan,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.uses_semantic_xlsb());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let mut corpora = Vec::with_capacity(XlsbShape::ALL.len());
+        for shape in XlsbShape::ALL {
+            let first = build_xlsb_corpus(shape).unwrap();
+            let second = build_xlsb_corpus(shape).unwrap();
+            assert_eq!(first.archive, second.archive);
+            assert_eq!(
+                first.manifest.archive_sha256,
+                second.manifest.archive_sha256
+            );
+            assert_eq!(
+                first.manifest.entry_count,
+                xlsb_expected_cells(shape).unwrap().len()
+            );
+            corpora.push(first);
+        }
+
+        for case in cases {
+            for corpus in [&corpora[0], &corpora[3]] {
+                let measured = run_case(case, corpus, 0, 1).unwrap();
+                assert_eq!(measured.elapsed_ns.samples.len(), 1);
+                assert!(measured.output_sha256.is_some());
+                assert_eq!(
+                    measured.corpus.archive_sha256,
+                    corpus.manifest.archive_sha256
+                );
+            }
+        }
+        let expected_scan =
+            xlsb_cells_digest(&xlsb_expected_cells(XlsbShape::Tiny).unwrap()).unwrap();
+        let scan = run_case(Case::XlsbSemanticFullCellScan, &corpora[0], 0, 1).unwrap();
+        assert_eq!(scan.output_sha256.as_deref(), Some(expected_scan.as_str()));
+    }
+
+    #[test]
     fn docx_semantic_paragraph_selectors_have_distinct_opt_in_mappings() {
         let scanner = Case::DocxSemanticOneParagraph;
         let text = Case::DocxSemanticOneParagraphText;
@@ -41485,6 +45454,22 @@ mod tests {
         assert!(text.uses_semantic_docx());
         assert!(!Case::DEFAULT.contains(&scanner));
         assert!(!Case::DEFAULT.contains(&text));
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn native_doc_paragraph_selectors_have_distinct_opt_in_mappings() {
+        let materializing = Case::DocSemanticOneParagraph;
+        let direct = Case::DocSemanticOneParagraphAt;
+        assert_eq!(parse_case(materializing.name()), Some(materializing));
+        assert_eq!(parse_case(direct.name()), Some(direct));
+        assert_eq!(materializing.name(), "doc_semantic_one_paragraph");
+        assert_eq!(direct.name(), "doc_semantic_one_paragraph_at");
+        assert_ne!(materializing, direct);
+        assert!(materializing.uses_semantic_doc());
+        assert!(direct.uses_semantic_doc());
+        assert!(!Case::DEFAULT.contains(&materializing));
+        assert!(!Case::DEFAULT.contains(&direct));
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -42238,6 +46223,8 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedDefinedNamesEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageBreakEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageBreakEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxWorksheetRepeatedPageBreaks));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxPackageRepeatedPageBreaks));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageMarginEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageMarginEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageSetupEditSave));
@@ -43077,6 +47064,45 @@ mod tests {
     }
 
     #[test]
+    fn xlsx_repeated_page_break_selectors_match_the_exact_oracle() {
+        for (name, case) in [
+            (
+                "xlsx_worksheet_repeated_page_breaks",
+                Case::XlsxWorksheetRepeatedPageBreaks,
+            ),
+            (
+                "xlsx_package_repeated_page_breaks",
+                Case::XlsxPackageRepeatedPageBreaks,
+            ),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(!case.uses_xlsx());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        let corpus = build_xlsx_page_break_projection_corpus().unwrap();
+        let again = build_xlsx_page_break_projection_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(
+            corpus.manifest.generator,
+            XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR
+        );
+        assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
+
+        let worksheet =
+            run_xlsx_page_break_projection(Case::XlsxWorksheetRepeatedPageBreaks, &corpus, 0, 1)
+                .unwrap();
+        let package =
+            run_xlsx_page_break_projection(Case::XlsxPackageRepeatedPageBreaks, &corpus, 0, 1)
+                .unwrap();
+        assert_eq!(worksheet.case, "xlsx_worksheet_repeated_page_breaks");
+        assert_eq!(package.case, "xlsx_package_repeated_page_breaks");
+        assert_eq!(worksheet.output_sha256, package.output_sha256);
+        assert_eq!(worksheet.elapsed_ns.samples.len(), 1);
+        assert_eq!(package.elapsed_ns.samples.len(), 1);
+    }
+
+    #[test]
     fn xlsx_page_margin_edit_controls_are_deterministic_and_equivalent() {
         let corpus = build_xlsx_page_margin_edit_corpus().unwrap();
         let again = build_xlsx_page_margin_edit_corpus().unwrap();
@@ -43345,14 +47371,47 @@ mod tests {
     }
 
     #[test]
+    fn pptx_slide_name_index_selectors_have_exact_output_and_error_oracles() {
+        for case in [
+            Case::PptxNamedOneEditSave,
+            Case::PptxNamedRepeatedEditSave,
+            Case::PptxNumericRepeatedEditSave,
+        ] {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        let tiny = build_pptx_slide_name_index_corpus(SemanticShape::Tiny).unwrap();
+        let tiny_again = build_pptx_slide_name_index_corpus(SemanticShape::Tiny).unwrap();
+        assert_eq!(tiny.archive, tiny_again.archive);
+        assert_eq!(tiny.manifest.entry_count, 12);
+        assert_eq!(tiny.manifest.target_entry, "slide:0/name");
+        assert_eq!(tiny.target_name, "slide:0/name");
+        assert_eq!(tiny.target_payload, pptx_named_slide_name(0).as_bytes());
+        assert_eq!(
+            tiny.manifest.target_payload_sha256,
+            sha256_hex(pptx_named_slide_name(0).as_bytes())
+        );
+        let named_one = run_case(Case::PptxNamedOneEditSave, &tiny, 0, 1).unwrap();
+        assert!(named_one.output_sha256.is_some());
+
+        let large = build_pptx_slide_name_index_corpus(SemanticShape::Large).unwrap();
+        assert_eq!(large.manifest.shape, "large");
+        assert_eq!(large.manifest.entry_count, 10_000);
+        let named_repeated = run_case(Case::PptxNamedRepeatedEditSave, &large, 0, 1).unwrap();
+        let numeric_repeated = run_case(Case::PptxNumericRepeatedEditSave, &large, 0, 1).unwrap();
+        assert_eq!(named_repeated.output_sha256, numeric_repeated.output_sha256);
+    }
+
+    #[test]
     fn native_ole2_tiny_corpora_exercise_all_semantic_cases() {
-        let families = [
+        let families: [(Case, &[Case]); 3] = [
             (
                 Case::DocFreshWriteTo,
-                [
+                &[
                     Case::DocSemanticOpen,
                     Case::DocSemanticListParagraphs,
                     Case::DocSemanticOneParagraph,
+                    Case::DocSemanticOneParagraphAt,
                     Case::DocSemanticFullText,
                     Case::DocSemanticNoopEditSave,
                     Case::DocSemanticOneEditSave,
@@ -43360,7 +47419,7 @@ mod tests {
             ),
             (
                 Case::XlsFreshWriteTo,
-                [
+                &[
                     Case::XlsSemanticOpen,
                     Case::XlsSemanticListWorksheets,
                     Case::XlsSemanticOneCell,
@@ -43371,7 +47430,7 @@ mod tests {
             ),
             (
                 Case::PptFreshWriteTo,
-                [
+                &[
                     Case::PptSemanticOpen,
                     Case::PptSemanticListSlides,
                     Case::PptSemanticOneShapeText,
@@ -43386,7 +47445,7 @@ mod tests {
             let corpus = build_writer_corpus(writer_case, WriterShape::Tiny).unwrap();
             let again = build_writer_corpus(writer_case, WriterShape::Tiny).unwrap();
             assert_eq!(corpus.archive, again.archive, "{}", writer_case.name());
-            for case in semantic_cases {
+            for case in semantic_cases.iter().copied() {
                 let measured = run_case(case, &corpus, 0, 1).unwrap();
                 assert_eq!(measured.case, case.name());
                 assert_eq!(measured.elapsed_ns.samples.len(), 1);
@@ -45003,10 +49062,10 @@ mod tests {
         assert_eq!(first.archive, second.archive);
         assert_eq!(first.manifest.entry_count, 272);
         assert_eq!(first.manifest.archive_member_count, 77);
-        assert_eq!(first.manifest.archive_bytes, 17_061_898);
+        assert_eq!(first.manifest.archive_bytes, 17_060_208);
         assert_eq!(
             first.manifest.archive_sha256,
-            "7b0ddd1c00ef91d24e60f30bf4a0ca0045807d537329e213f2f03020dfb0750b"
+            "1f7a0b4a3029c60fc8538e9aca55b2a675d7eaee2ef0c402aac73f67fbf1dae7"
         );
         assert_eq!(first.manifest.shape, "media-rich-64-image-owners");
         assert_eq!(
@@ -45018,7 +49077,7 @@ mod tests {
         let batch = run_case(Case::OdtEmbeddedResourceBatchReplaceSave, &first, 0, 1).unwrap();
         assert_eq!(
             scalar.output_sha256.as_deref(),
-            Some("2da19ec3aff1f8cf76a2690a498bb9582b604c0aab25cd40c3b688efa5888a1d")
+            Some("919b75555215beca0c992bd8ad8646ef43e10969a4f4ec67777c43ae9c431524")
         );
         assert_eq!(
             batch.output_sha256.as_deref(),
@@ -45406,11 +49465,21 @@ mod tests {
         assert_eq!(cached.source_replay_payload_read_bytes, vec![0, 0]);
         assert_eq!(
             uncached.source_replay_version_observations,
-            vec![super::ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS; 2]
+            vec![
+                super::ODP_REPEATED_TEXT_CONTROL_VERSION_OBSERVATIONS
+                    .iter()
+                    .sum::<u64>();
+                2
+            ]
         );
         assert_eq!(
             cached.source_replay_version_observations,
-            vec![super::ODP_REPEATED_TEXT_EXPECTED_VERSION_OBSERVATIONS; 2]
+            vec![
+                super::ODP_REPEATED_TEXT_CANDIDATE_VERSION_OBSERVATIONS
+                    .iter()
+                    .sum::<u64>();
+                2
+            ]
         );
         assert_eq!(
             uncached.source_replay_version_observations_per_call,
@@ -45834,10 +49903,10 @@ mod tests {
         assert_eq!(first.manifest.entry_count, 28);
         assert_eq!(first.manifest.archive_member_count, 13);
         assert_eq!(first.manifest.uncompressed_payload_bytes, 16_778_604);
-        assert_eq!(first.manifest.archive_bytes, 16_786_244);
+        assert_eq!(first.manifest.archive_bytes, 16_786_027);
         assert_eq!(
             first.manifest.archive_sha256,
-            "dcbb1f88da9366f2eab8eb6029dcc73930ea2fc03552b78dd4922689f8a9655d"
+            "14ee72736a6ad24ea4eac4c7d73875dc051132f50d4d1811becffd6a9887e4a5"
         );
         assert_eq!(first.manifest.shape, "media-rich-cross-slide");
         assert_eq!(
@@ -45849,7 +49918,7 @@ mod tests {
         let batch = run_case(Case::OdpMediaTextBoxBatchReplaceSave, &first, 0, 1).unwrap();
         assert_eq!(
             scalar.output_sha256.as_deref(),
-            Some("ee31f8c046af7b99819b183ca4fc56e00b97d2f97b36fa776c7d4c96dee3614b")
+            Some("203e8c893bbe9d22e16b7edb66d06b2f103f24c3a6bf017f29606f1aaa22cdf8")
         );
         assert_eq!(
             batch.output_sha256.as_deref(),
@@ -46035,6 +50104,37 @@ mod tests {
         let measured = run_case(Case::XlsxOneCellCommitFirstRead, &first, 0, 1).unwrap();
         assert_eq!(measured.case, "xlsx_one_cell_commit_first_read");
         assert_eq!(measured.elapsed_ns.samples.len(), 1);
+    }
+
+    #[test]
+    fn xlsx_named_sheet_selectors_are_opt_in_and_cover_catalog_oracle() {
+        super::verify_xlsx_named_sheet_lookup_oracle().unwrap();
+        let cases = [
+            Case::XlsxEagerNamedSheetLookup4,
+            Case::XlsxSourceNamedSheetLookup4,
+            Case::XlsxEagerNamedSheetLookup64,
+            Case::XlsxSourceNamedSheetLookup64,
+            Case::XlsxEagerNamedSheetLookupLarge,
+            Case::XlsxSourceNamedSheetLookupLarge,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.is_xlsx_named_sheet_lookup());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        for catalog in super::XlsxNamedSheetCatalog::ALL {
+            let first = super::build_xlsx_named_sheet_lookup_corpus(catalog).unwrap();
+            let second = super::build_xlsx_named_sheet_lookup_corpus(catalog).unwrap();
+            assert_eq!(first.archive, second.archive, "catalog {}", catalog.name());
+            assert_eq!(
+                first.manifest.generator,
+                super::XLSX_NAMED_SHEET_LOOKUP_CORPUS_GENERATOR
+            );
+            assert_eq!(
+                first.manifest.xlsx.as_ref().unwrap().sheet_count,
+                catalog.sheet_count()
+            );
+        }
     }
 
     #[test]

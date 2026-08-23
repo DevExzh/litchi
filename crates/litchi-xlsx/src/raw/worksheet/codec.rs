@@ -39,11 +39,10 @@ pub(super) fn parse_processed_defaults(
     let mut stack = Vec::new();
     let mut closed_root = false;
     let mut defaults = None;
-    let mut buffer = Vec::new();
 
     loop {
         let event = reader
-            .read_event_into(&mut buffer)
+            .read_event()
             .map_err(|error| invalid(error.to_string()))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         let decoder = reader.decoder();
@@ -86,7 +85,7 @@ pub(super) fn parse_processed_defaults(
                     defaults = Some(parse_defaults_element(
                         &element,
                         decoder,
-                        &resolver,
+                        resolver,
                         descent.take(),
                     )?);
                     stack.push(Context::SheetFormat);
@@ -110,7 +109,7 @@ pub(super) fn parse_processed_defaults(
                     defaults = Some(parse_defaults_element(
                         &element,
                         decoder,
-                        &resolver,
+                        resolver,
                         descent.take(),
                     )?);
                 }
@@ -164,7 +163,6 @@ pub(super) fn parse_processed_defaults(
             Event::Eof => break,
             Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::Decl(_) => {},
         }
-        buffer.clear();
     }
 
     Ok(defaults)
@@ -208,11 +206,10 @@ impl Parser {
         let mut parser = Self::new(extensions);
         let mut stack = Vec::new();
         let mut closed_root = false;
-        let mut buffer = Vec::new();
 
         loop {
             let event = reader
-                .read_event_into(&mut buffer)
+                .read_event()
                 .map_err(|error| invalid(error.to_string()))?;
             let (namespace, event) = reader.resolver().resolve_event(event);
             let decoder = reader.decoder();
@@ -245,12 +242,12 @@ impl Parser {
                         )));
                     }
                     let parent = current(&stack)?;
-                    let child = parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
                     stack.push(child);
                 },
                 Event::Empty(element) => {
                     let parent = current(&stack)?;
-                    let child = parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
                     parser.finish(child)?;
                 },
                 Event::Text(value) => {
@@ -313,7 +310,6 @@ impl Parser {
                 Event::Eof => break,
                 Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
             }
-            buffer.clear();
         }
 
         resolve_shared_formulas(&mut parser.cells)?;

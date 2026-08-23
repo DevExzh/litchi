@@ -5,9 +5,10 @@
 //! before writing to the destination, so an unsupported layout never produces
 //! a partial preserved archive.
 
+use crate::office::ArchiveLimits;
 use crate::{
-    CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, ReaderAt, ZipArchive,
-    ZipArchiveWriter, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
+    CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, LimitResource, ReaderAt,
+    ZipArchive, ZipArchiveWriter, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
 };
 use std::io::Write;
 use std::ops::Range;
@@ -237,6 +238,23 @@ where
     /// layouts are rejected with [`ErrorKind::UnsupportedPreservation`] before
     /// a caller can begin writing a plan.
     pub fn new(archive: &'source ZipArchive<R>, buffer: &mut [u8]) -> Result<Self, Error> {
+        Self::new_with_limits(archive, buffer, ArchiveLimits::default())
+    }
+
+    /// Builds a preservation index under explicit archive metadata limits.
+    ///
+    /// Preservation retains every source central-directory record verbatim,
+    /// including records for directory members and the EOCD comment. The
+    /// archive profile's `max_files` bounds non-directory source members;
+    /// directory records are retained too, but consume only the metadata
+    /// budget. `max_metadata_bytes` covers the aggregate variable central
+    /// metadata plus the EOCD comment. Limits are validated in a metadata-only
+    /// pass before any owned entry or raw-record buffers are reserved.
+    pub fn new_with_limits(
+        archive: &'source ZipArchive<R>,
+        buffer: &mut [u8],
+        limits: ArchiveLimits,
+    ) -> Result<Self, Error> {
         if archive.is_zip64() {
             return Err(unsupported("ZIP64 source archives"));
         }
@@ -257,41 +275,123 @@ where
             return Err(unsupported("multi-disk archives"));
         }
 
-        let comment_len = usize::try_from(archive_end - eocd_offset - eocd_bytes.len() as u64)
-            .map_err(|_| unsupported("archive comment length"))?;
-        let archive_comment = read_vec(
-            archive.get_ref(),
-            eocd_offset + EndOfCentralDirectoryRecordFixed::SIZE as u64,
-            comment_len,
-        )?;
+        let comment_len_u64 = archive_end
+            .checked_sub(eocd_offset)
+            .and_then(|length| length.checked_sub(eocd_bytes.len() as u64))
+            .ok_or_else(|| unsupported("archive comment length"))?;
+        let comment_len =
+            usize::try_from(comment_len_u64).map_err(|_| unsupported("archive comment length"))?;
+        if comment_len_u64 > limits.max_metadata_bytes {
+            return Err(limit_error(
+                LimitResource::MetadataBytes,
+                comment_len_u64,
+                limits.max_metadata_bytes,
+            ));
+        }
 
-        let entry_count = usize::try_from(archive.entries_hint())
+        let entry_count_hint = archive.entries_hint();
+        let max_files_u64 = u64::try_from(limits.max_files).unwrap_or(u64::MAX);
+        let central_metadata_budget = limits
+            .max_metadata_bytes
+            .checked_sub(comment_len_u64)
+            .ok_or_else(|| unsupported("central-directory metadata budget"))?;
+
+        // Validate every central record's bounded metadata and structural
+        // declaration before reserving the owned preservation index. This
+        // keeps a hostile count or oversized metadata from causing ownership
+        // allocation before the corresponding limit is reported.
+        let mut iterator = archive.entries_with_metadata_limit(buffer, central_metadata_budget);
+        let mut entry_count_u64 = 0u64;
+        let mut file_count_u64 = 0u64;
+        while let Some(record) = iterator
+            .next_entry()
+            .map_err(|error| map_metadata_limit_error(error, comment_len_u64, limits))?
+        {
+            if record.is_zip64() {
+                return Err(unsupported("ZIP64 entry records"));
+            }
+
+            let raw_name_bytes = u64::try_from(record.file_path().as_ref().len())
+                .map_err(|_| unsupported("member name length"))?;
+            if raw_name_bytes > limits.max_member_name_bytes {
+                return Err(limit_error(
+                    LimitResource::MemberNameBytes,
+                    raw_name_bytes,
+                    limits.max_member_name_bytes,
+                ));
+            }
+
+            if !record.is_dir() {
+                file_count_u64 = file_count_u64
+                    .checked_add(1)
+                    .ok_or_else(|| unsupported("central-directory file count"))?;
+                if file_count_u64 > max_files_u64 {
+                    return Err(limit_error(
+                        LimitResource::FileCount,
+                        file_count_u64,
+                        max_files_u64,
+                    ));
+                }
+            }
+
+            central_record_span(&record, eocd_offset)?;
+            entry_count_u64 = entry_count_u64
+                .checked_add(1)
+                .ok_or_else(|| unsupported("central-directory entry count"))?;
+        }
+
+        if entry_count_u64 != entry_count_hint {
+            return Err(unsupported("central-directory entry count mismatch"));
+        }
+
+        // Fixed central headers are retained alongside variable metadata. The
+        // saturated arithmetic intentionally preserves UNBOUNDED semantics,
+        // while the checked multiplication still rejects impossible ownership
+        // sizes before any reservation.
+        let fixed_central_bytes = entry_count_u64
+            .checked_mul(ZipFileHeaderFixed::SIZE as u64)
+            .ok_or_else(|| unsupported("central-directory source budget"))?;
+        let source_budget = limits
+            .max_metadata_bytes
+            .saturating_add(fixed_central_bytes);
+
+        let comment_offset = eocd_offset
+            .checked_add(EndOfCentralDirectoryRecordFixed::SIZE as u64)
+            .ok_or_else(|| unsupported("archive comment offset"))?;
+        let archive_comment = read_vec(archive.get_ref(), comment_offset, comment_len)?;
+
+        let entry_count = usize::try_from(entry_count_u64)
             .map_err(|_| unsupported("central-directory entry count"))?;
         let mut entries = Vec::new();
         entries
             .try_reserve_exact(entry_count)
             .map_err(|source| allocation("preservation-index entries", source))?;
-        let mut iterator = archive.entries(buffer);
-        while let Some(record) = iterator.next_entry()? {
+
+        let mut iterator = archive.entries_with_metadata_limit(buffer, central_metadata_budget);
+        let mut retained_source_bytes = comment_len_u64;
+        while let Some(record) = iterator
+            .next_entry()
+            .map_err(|error| map_metadata_limit_error(error, comment_len_u64, limits))?
+        {
             if record.is_zip64() {
                 return Err(unsupported("ZIP64 entry records"));
             }
 
-            let central_offset = record.central_directory_offset();
-            let central_len = ZipFileHeaderFixed::SIZE
-                .checked_add(
-                    usize::try_from(record.metadata_size_hint())
-                        .map_err(|_| unsupported("central-directory record length"))?,
-                )
-                .ok_or_else(|| unsupported("central-directory record length"))?;
-            let central_end = central_offset
+            let (central_offset, central_len, central_end) =
+                central_record_span(&record, eocd_offset)?;
+            let next_retained_source_bytes = retained_source_bytes
                 .checked_add(central_len as u64)
-                .ok_or_else(|| unsupported("central-directory record range"))?;
-            if central_end > eocd_offset {
-                return Err(unsupported("truncated central-directory record"));
+                .ok_or_else(|| unsupported("central-directory source budget"))?;
+            if next_retained_source_bytes > source_budget {
+                return Err(limit_error(
+                    LimitResource::MetadataBytes,
+                    next_retained_source_bytes,
+                    source_budget,
+                ));
             }
 
             let central_bytes = read_vec(archive.get_ref(), central_offset, central_len)?;
+            retained_source_bytes = next_retained_source_bytes;
             let central_fixed = ZipFileHeaderFixed::parse(&central_bytes)?;
             if central_fixed.disk_number_start != 0 {
                 return Err(unsupported("multi-disk entry records"));
@@ -315,7 +415,7 @@ where
             });
         }
 
-        if entries.len() as u64 != archive.entries_hint() {
+        if entries.len() as u64 != entry_count_u64 {
             return Err(unsupported("central-directory entry count mismatch"));
         }
 
@@ -413,6 +513,13 @@ where
                         .checked_add(bytes.len() as u64)
                         .ok_or_else(|| unsupported("output offset overflow"))?;
                 },
+                PreparedLocal::Shared { bytes, range } => {
+                    let generated = &bytes[range.clone()];
+                    sink.write_all(generated)?;
+                    output_offset = output_offset
+                        .checked_add(generated.len() as u64)
+                        .ok_or_else(|| unsupported("output offset overflow"))?;
+                },
             }
         }
         for index in self.entries.len()..prepared.len() {
@@ -431,6 +538,13 @@ where
                     sink.write_all(bytes)?;
                     output_offset = output_offset
                         .checked_add(bytes.len() as u64)
+                        .ok_or_else(|| unsupported("output offset overflow"))?;
+                },
+                PreparedLocal::Shared { bytes, range } => {
+                    let generated = &bytes[range.clone()];
+                    sink.write_all(generated)?;
+                    output_offset = output_offset
+                        .checked_add(generated.len() as u64)
                         .ok_or_else(|| unsupported("output offset overflow"))?;
                 },
             }
@@ -597,6 +711,15 @@ fn retained_entry_count(prepared: &[PreparedEntry]) -> usize {
 enum PreparedCentral {
     Copy(usize),
     Generated(Vec<u8>),
+    /// Generated local and central records may share the one archive buffer.
+    ///
+    /// Keeping ranges into the finished one-entry archive avoids copying the
+    /// central record into a second allocation merely to retain it while the
+    /// local record is emitted to a forward-only sink.
+    Shared {
+        bytes: Arc<Vec<u8>>,
+        range: Range<usize>,
+    },
 }
 
 impl PreparedCentral {
@@ -604,6 +727,7 @@ impl PreparedCentral {
         match self {
             Self::Copy(index) => &entries[*index].central_bytes,
             Self::Generated(bytes) => bytes,
+            Self::Shared { bytes, range } => &bytes[range.clone()],
         }
     }
 }
@@ -611,6 +735,13 @@ impl PreparedCentral {
 enum PreparedLocal {
     Copy(Range<u64>),
     Generated(Vec<u8>),
+    /// A range into the same finished archive buffer retained by the central
+    /// record. This keeps generated-member publication forward-only without
+    /// copying the central directory bytes.
+    Shared {
+        bytes: Arc<Vec<u8>>,
+        range: Range<usize>,
+    },
 }
 
 impl PreparedLocal {
@@ -618,6 +749,7 @@ impl PreparedLocal {
         match self {
             Self::Copy(range) => range.end - range.start,
             Self::Generated(bytes) => bytes.len() as u64,
+            Self::Shared { range, .. } => (range.end - range.start) as u64,
         }
     }
 }
@@ -658,7 +790,7 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         },
         _ => return Err(unsupported("generated compression method")),
     }
-    let mut bytes = writer.finish()?;
+    let bytes = writer.finish()?;
     let (directory_offset, eocd_offset) = {
         let archive = ZipArchive::from_slice(&bytes)?;
         if archive.is_zip64() || archive.entries_hint() != 1 {
@@ -680,16 +812,20 @@ fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
         }
         (directory_offset, eocd_offset)
     };
-    let central_len = eocd_offset - directory_offset;
-    let mut central = Vec::new();
-    central
-        .try_reserve_exact(central_len)
-        .map_err(|source| allocation("generated central record", source))?;
-    central.extend_from_slice(&bytes[directory_offset..eocd_offset]);
-    bytes.truncate(directory_offset);
+    // Retain one owned archive buffer and publish disjoint ranges from it.
+    // The previous implementation copied the central record into another
+    // `Vec`, even though the finished one-entry archive already contained the
+    // exact bytes needed for both forward-only output phases.
+    let bytes = Arc::new(bytes);
     Ok(PreparedEntry {
-        local: PreparedLocal::Generated(bytes),
-        central: PreparedCentral::Generated(central),
+        local: PreparedLocal::Shared {
+            bytes: Arc::clone(&bytes),
+            range: 0..directory_offset,
+        },
+        central: PreparedCentral::Shared {
+            bytes,
+            range: directory_offset..eocd_offset,
+        },
         omitted: false,
     })
 }
@@ -759,8 +895,53 @@ fn read_vec<R: ReaderAt>(source: &R, offset: u64, len: usize) -> Result<Vec<u8>,
     Ok(bytes)
 }
 
+fn central_record_span(
+    record: &crate::ZipFileHeaderRecord<'_>,
+    eocd_offset: u64,
+) -> Result<(u64, usize, u64), Error> {
+    let central_offset = record.central_directory_offset();
+    let central_len = ZipFileHeaderFixed::SIZE
+        .checked_add(
+            usize::try_from(record.metadata_size_hint())
+                .map_err(|_| unsupported("central-directory record length"))?,
+        )
+        .ok_or_else(|| unsupported("central-directory record length"))?;
+    let central_end = central_offset
+        .checked_add(central_len as u64)
+        .ok_or_else(|| unsupported("central-directory record range"))?;
+    if central_end > eocd_offset {
+        return Err(unsupported("truncated central-directory record"));
+    }
+    Ok((central_offset, central_len, central_end))
+}
+
+fn map_metadata_limit_error(error: Error, comment_len: u64, limits: ArchiveLimits) -> Error {
+    if let ErrorKind::LimitExceeded {
+        resource: LimitResource::MetadataBytes,
+        actual,
+        ..
+    } = error.kind()
+    {
+        let actual = comment_len.saturating_add(*actual);
+        return limit_error(
+            LimitResource::MetadataBytes,
+            actual,
+            limits.max_metadata_bytes,
+        );
+    }
+    error
+}
+
 fn unsupported(reason: &'static str) -> Error {
     Error::from(ErrorKind::UnsupportedPreservation { reason })
+}
+
+fn limit_error(resource: LimitResource, actual: u64, maximum: u64) -> Error {
+    Error::from(ErrorKind::LimitExceeded {
+        resource,
+        actual,
+        maximum,
+    })
 }
 
 fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {
@@ -913,6 +1094,55 @@ mod tests {
         data
     }
 
+    fn with_file_comment(mut data: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = usize::try_from(archive.directory_offset()).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        data[central + 32..central + 34].copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        let central_size = u32::from_le_bytes(data[eocd + 12..eocd + 16].try_into().unwrap());
+        data[eocd + 12..eocd + 16]
+            .copy_from_slice(&(central_size + comment.len() as u32).to_le_bytes());
+        data.splice(eocd..eocd, comment.iter().copied());
+        data
+    }
+
+    fn central_metadata_bytes(data: &[u8]) -> u64 {
+        let archive = ZipArchive::from_slice(data).unwrap();
+        archive
+            .entries()
+            .map(|entry| entry.unwrap().metadata_size_hint())
+            .sum::<u64>()
+            + archive.comment().as_bytes().len() as u64
+    }
+
+    fn stored_archive_with_metadata(name: &str, extra: &[u8]) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let (mut file, config) = writer
+            .new_file(name)
+            .extra_field(
+                crate::extra_fields::ExtraFieldId::new(0xaaaa),
+                extra,
+                crate::Header::CENTRAL,
+            )
+            .unwrap()
+            .start()
+            .unwrap();
+        let mut data_writer = config.wrap(&mut file);
+        data_writer.write_all(b"payload").unwrap();
+        let (_, descriptor) = data_writer.finish().unwrap();
+        file.finish(descriptor).unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn many_small_archive(count: usize) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        for index in 0..count {
+            let name = format!("f{index}");
+            writer.write_stored_file(&name, &[]).unwrap();
+        }
+        writer.finish().unwrap()
+    }
+
     fn with_reordered_central(mut data: Vec<u8>) -> Vec<u8> {
         let archive = ZipArchive::from_slice(&data).unwrap();
         let central = usize::try_from(archive.directory_offset()).unwrap();
@@ -937,6 +1167,131 @@ mod tests {
             .unwrap();
 
         assert_eq!(output, data);
+    }
+
+    #[test]
+    fn bounded_preservation_counts_files_not_directory_records() {
+        let data = with_comment(ordinary_archive(), b"preserved comment");
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_files = 2;
+
+        let index = PreservationIndex::new_with_limits(&archive, &mut buffer, limits).unwrap();
+        assert_eq!(index.entries().len(), 3);
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+    }
+
+    #[test]
+    fn bounded_preservation_reports_member_and_metadata_limits_before_ownership() {
+        let data = stored_archive_with_metadata("payload.bin", b"metadata");
+        let metadata_bytes = central_metadata_bytes(&data);
+
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_member_name_bytes = b"payload.bi".len() as u64;
+        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("member-name limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MemberNameBytes,
+                actual,
+                maximum,
+            } if *actual == b"payload.bin".len() as u64 && *maximum == b"payload.bi".len() as u64
+        ));
+
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_metadata_bytes = metadata_bytes - 1;
+        let (archive, mut buffer) = indexed(&data);
+        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("metadata limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MetadataBytes,
+                actual,
+                maximum,
+            } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
+        ));
+    }
+
+    #[test]
+    fn bounded_preservation_includes_eocd_comment_in_metadata_and_unbounded_is_exact() {
+        let data = with_file_comment(
+            with_comment(
+                stored_archive_with_metadata("payload.bin", b"metadata"),
+                b"eocd",
+            ),
+            b"file",
+        );
+        let metadata_bytes = central_metadata_bytes(&data);
+
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_metadata_bytes = metadata_bytes - 1;
+        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("EOCD/comment metadata limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MetadataBytes,
+                actual,
+                maximum,
+            } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
+        ));
+
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new_with_limits(&archive, &mut buffer, ArchiveLimits::UNBOUNDED)
+                .unwrap();
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+    }
+
+    #[test]
+    fn bounded_preservation_rejects_file_count_before_owned_entry_reservation() {
+        let data = many_small_archive(4);
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_files = 0;
+        let error = match PreservationIndex::new_with_limits(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("file-count limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::FileCount,
+                actual: 1,
+                maximum: 0,
+            }
+        ));
+    }
+
+    #[test]
+    fn bounded_preservation_keeps_non_metadata_error_identity() {
+        let original = Error::from(io::Error::new(io::ErrorKind::BrokenPipe, "central read"));
+        let mapped = map_metadata_limit_error(original, 7, ArchiveLimits::UNBOUNDED);
+        assert!(matches!(
+            mapped.kind(),
+            ErrorKind::IO(error)
+                if error.kind() == io::ErrorKind::BrokenPipe && error.to_string() == "central read"
+        ));
     }
 
     #[test]
@@ -1107,7 +1462,20 @@ mod tests {
         assert_eq!(Arc::strong_count(&data), 2);
 
         let prepared = generated_entry(&entry).unwrap();
-        assert!(matches!(prepared.local, PreparedLocal::Generated(_)));
+        let PreparedLocal::Shared {
+            bytes: local_bytes, ..
+        } = &prepared.local
+        else {
+            panic!("generated entry must retain the shared archive buffer");
+        };
+        let PreparedCentral::Shared {
+            bytes: central_bytes,
+            ..
+        } = &prepared.central
+        else {
+            panic!("generated entry must retain the shared archive buffer");
+        };
+        assert!(Arc::ptr_eq(local_bytes, central_bytes));
         assert_eq!(Arc::strong_count(&data), 2);
     }
 
@@ -1122,10 +1490,15 @@ mod tests {
             .compression_method(CompressionMethod::Deflate);
 
         let prepared = generated_entry(&entry).unwrap();
-        let PreparedLocal::Generated(local) = prepared.local else {
-            panic!("generated entry must retain generated local bytes");
+        let PreparedLocal::Shared {
+            bytes: local_bytes,
+            range: local_range,
+        } = &prepared.local
+        else {
+            panic!("generated entry must retain the shared archive buffer");
         };
-        let local_header = ZipLocalFileHeaderFixed::parse(&local).unwrap();
+        let local = &local_bytes[local_range.clone()];
+        let local_header = ZipLocalFileHeaderFixed::parse(local).unwrap();
         let central = prepared.central.bytes(&[]);
         let central_header = ZipFileHeaderFixed::parse(central).unwrap();
 
@@ -1149,8 +1522,8 @@ mod tests {
         let name = "n".repeat(u16::MAX as usize);
         let entry = RegeneratedEntry::new(name.clone(), Vec::new());
         let prepared = generated_entry(&entry).unwrap();
-        let PreparedLocal::Generated(bytes) = prepared.local else {
-            panic!("generated entry must retain generated local bytes");
+        let PreparedLocal::Shared { bytes, range } = &prepared.local else {
+            panic!("generated entry must retain the shared archive buffer");
         };
         let expected_capacity = name
             .len()
@@ -1158,7 +1531,7 @@ mod tests {
             .and_then(|size| size.checked_add(4 * 1024))
             .unwrap();
         assert!(bytes.capacity() >= expected_capacity);
-        assert!(bytes.len() <= expected_capacity);
+        assert!(range.end - range.start <= expected_capacity);
     }
 
     #[test]

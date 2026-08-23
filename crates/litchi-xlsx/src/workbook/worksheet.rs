@@ -161,7 +161,16 @@ pub(crate) fn page_margins(sheet: &Worksheet) -> Result<Option<crate::page_margi
 
 /// Parse worksheet row and column page breaks.
 pub(crate) fn page_breaks(sheet: &Worksheet) -> Result<crate::page_breaks::PageBreaks> {
-    crate::page_breaks::parse(xml(sheet)?)
+    // Validate the semantic sheet kind and resolve the current part before
+    // consulting the cache. A descendant snapshot can retain the same bytes
+    // while changing a workbook relationship to an unsupported sheet kind;
+    // cache hits must preserve the historical `NotWorksheet` error.
+    let source = part(sheet)?.blob_arc();
+    let value = sheet
+        .data
+        .page_breaks
+        .get_or_try_init(source, crate::page_breaks::parse)?;
+    Ok(value.as_ref().clone())
 }
 
 /// Parse worksheet page setup.

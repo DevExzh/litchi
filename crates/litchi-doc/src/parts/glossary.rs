@@ -439,14 +439,16 @@ impl AttachedGlossary {
 
     /// Extract formatted paragraphs from every stored glossary subdocument.
     pub fn paragraphs(&self) -> Result<Vec<Paragraph>> {
-        let text = Arc::new(self.text_extractor.text().to_string());
+        let text = self.text_extractor.text_shared();
+        let text_ranges = self.text_extractor.cp_to_byte_shared();
         let mut output = Vec::new();
         for (_, start_cp, end_cp) in self.fib.get_all_subdoc_ranges() {
             if start_cp >= end_cp {
                 continue;
             }
-            let extractor = ParagraphExtractor::new_with_range_and_stylesheet(
+            let extractor = ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
                 Arc::clone(&text),
+                Arc::clone(&text_ranges),
                 self.pap_bin_table.as_ref(),
                 self.chp_bin_table.as_ref(),
                 (start_cp, end_cp),

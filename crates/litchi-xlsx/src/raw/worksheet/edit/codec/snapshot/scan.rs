@@ -198,7 +198,6 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
     let mut scanner = Scanner::default();
     let mut stack = Vec::<Frame>::new();
     let mut events = 0usize;
-    let mut buffer = Vec::new();
 
     loop {
         events = events
@@ -209,7 +208,7 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
         }
         let event_start = position(&reader)?;
         let event = reader
-            .read_event_into(&mut buffer)
+            .read_event()
             .map_err(|error| invalid(error.to_string()))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         let event_end = position(&reader)?;
@@ -228,7 +227,7 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
                     &namespace,
                     &element,
                     decoder,
-                    &resolver,
+                    resolver,
                     Span {
                         start: event_start,
                         end: event_end,
@@ -246,7 +245,7 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
                     &namespace,
                     &element,
                     decoder,
-                    &resolver,
+                    resolver,
                     Span {
                         start: event_start,
                         end: event_end,
@@ -281,7 +280,6 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
             Event::Eof => break,
             Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
         }
-        buffer.clear();
     }
     if !stack.is_empty() {
         return Err(invalid("worksheet edit scan ended inside an element"));

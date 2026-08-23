@@ -233,6 +233,14 @@ and times only `Paragraph::text()` for the tiny, medium, and large shapes; exact
 text and error guards remain outside the timed interval. This brings the
 selectable matrix to 342 names while leaving the default 36 cases / 198 records
 unchanged.
+Four additional opt-in XLSB lifecycle selectors (`xlsb_semantic_open`,
+`xlsb_semantic_list_worksheets`, `xlsb_semantic_one_cell`, and
+`xlsb_semantic_full_cell_scan`) use deterministic tiny, medium, large, and
+sparse BIFF12 corpora. Archive cloning, workbook/worksheet preparation, and
+verification stay outside the timer; the full scan times only boxed
+`worksheet.cells()` consumption and verifies an exact canonical cell digest.
+These selectors bring the matrix to 348 names while leaving the default 36
+cases / 198 records unchanged.
 Two additional high-level XLSX filesystem selectors (`xlsx_file_open` and
 `xlsx_file_open_lifecycle`) use the deterministic medium cell-CRUD XLSX corpus
 and a temporary source file. The first times exactly
@@ -251,6 +259,22 @@ text), archive SHA-256, and independently opened eager OPC/property metadata
 digest guard each case. These selectors bring the
 selectable matrix to 344 names while leaving the default 36 cases / 198
 records unchanged.
+One additional opt-in native DOC semantic selector
+(`doc_semantic_paragraph_count`) times `Document::paragraph_count()` over the
+same deterministic writer corpora as `doc_semantic_list_paragraphs`. An
+independent untimed paragraph-list oracle checks the exact cardinality, and
+the selector leaves the default 36 cases / 198 records unchanged. This brings
+the selectable matrix to 345 names.
+Four additional opt-in OOXML wire selectors (`omml_formula_range_scan`,
+`omml_formula_extract`, `pptx_drawingml_extract`, and
+`pptx_drawingml_range_scan`) use one fixed, namespace-adversarial XML corpus.
+Their independent `quick_xml::NsReader` projections are prepared and checked
+before timing; each timed iteration only executes the selected production
+scanner or public extractor and verifies its exact ranges, formula strings, or
+text after the clock stops. The formula-string digest is length-delimited and
+computed before timing. These selectors bring the
+selectable matrix to 349 names while leaving the default 36 cases / 198 records
+unchanged.
 Eight additional
 PPTX ordinary-root filesystem selectors (`pptx_file_{eager,source}_{open,
 list_slides,slide_count,selected_slide}`) are opt-in and do not alter the
@@ -1068,6 +1092,26 @@ readback, calculation-metadata stability, package topology, relationships,
 media payloads, output hash, and sequential-sink bounds are verified outside
 timing.
 
+Measure repeated page-break projections on the concrete immutable worksheet
+handle and the public package control:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 10 --samples 100 \
+  --case xlsx_worksheet_repeated_page_breaks,xlsx_package_repeated_page_breaks \
+  --json target/perf/xlsx-page-break-projection.json
+```
+
+Both selectors prepare the package, exact raw-XML oracle, and first projection
+outside the timed interval. `xlsx_worksheet_repeated_page_breaks` retains one
+concrete `Workbook::sheet(...).page_breaks()` handle and times eight repeated
+calls, exercising the worksheet projection cache. The
+`xlsx_package_repeated_page_breaks` control calls the public
+`Package::page_breaks(...)` path separately; that path intentionally rebuilds
+its source snapshot and bypasses the workbook worksheet cache. Every output is
+checked against the exact raw-XML `PageBreaks` oracle and the defaults remain
+unchanged.
+
 Measure the matched XLSX page-margin publication controls on the same fixed
 media-rich archive:
 
@@ -1349,12 +1393,12 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 ```
 
 Run the complete native DOC/XLS/PPT semantic matrix over the same deterministic
-tiny and large writer artifacts (46 records):
+tiny and large writer artifacts (48 records):
 
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 --writer-shape tiny,large \
-  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_source_backed_one_shape_text,ppt_semantic_repeated_shape_text,ppt_source_backed_repeated_shape_text,ppt_semantic_fresh_open_one_shape_text,ppt_source_backed_fresh_open_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
+  --case doc_semantic_open,doc_semantic_list_paragraphs,doc_semantic_one_paragraph,doc_semantic_one_paragraph_at,doc_semantic_full_text,doc_semantic_noop_edit_save,doc_semantic_one_edit_save,xls_semantic_open,xls_semantic_list_worksheets,xls_semantic_one_cell,xls_semantic_full_cell_scan,xls_semantic_noop_edit_save,xls_semantic_one_edit_save,ppt_semantic_open,ppt_semantic_list_slides,ppt_semantic_one_shape_text,ppt_source_backed_one_shape_text,ppt_semantic_repeated_shape_text,ppt_source_backed_repeated_shape_text,ppt_semantic_fresh_open_one_shape_text,ppt_source_backed_fresh_open_one_shape_text,ppt_semantic_full_text,ppt_slide_order_snapshot_open,ppt_text_edit_one_edit_save,ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save \
   --json target/perf/ole2-semantic-baseline.json
 ```
 
@@ -1382,6 +1426,22 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 0 --samples 1 --semantic-shape tiny \
   --case docx_semantic_open,docx_semantic_list_paragraphs,docx_semantic_one_paragraph,docx_semantic_one_paragraph_text,docx_semantic_full_text,docx_semantic_create_small,docx_semantic_noop_edit_save,docx_semantic_one_edit_save,docx_semantic_one_percent_edit_save,pptx_semantic_open,pptx_semantic_list_slides,pptx_semantic_one_slide,pptx_semantic_full_text,pptx_semantic_create_small,pptx_semantic_noop_edit_save,pptx_semantic_one_edit_save,pptx_semantic_one_percent_edit_save \
   --json target/perf/semantic-office-smoke.json
+```
+
+Measure the opt-in opened-PPTX slide-name selector controls. The first command
+isolates one-edit index construction on the tiny three-slide corpus; the
+second compares repeated named resolution with the matching numeric control on
+the 100-slide corpus:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --semantic-shape tiny \
+  --case pptx_named_one_edit_save --json target/perf/pptx-named-small.json
+
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 30 --semantic-shape large \
+  --case pptx_named_repeated_edit_save,pptx_numeric_repeated_edit_save \
+  --json target/perf/pptx-named-repeated.json
 ```
 
 Measure the bounded validation reports and source-backed DOCX section inventory
@@ -2291,6 +2351,12 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   while materializing only `xl/workbook.xml` and
   `xl/worksheets/sheet1.xml`. The other ten ordinary Parts remain deferred and
   are physically raw-copied during one-Part overlay publication.
+- `xlsx_worksheet_repeated_page_breaks`: prepare one immutable workbook and
+  worksheet handle outside timing, warm its exact page-break projection, then
+  time eight repeated concrete `Worksheet::page_breaks()` calls.
+- `xlsx_package_repeated_page_breaks`: run the same eight-query oracle through
+  public `Package::page_breaks(...)` as a separate bypass guardrail; it does
+  not claim to use the workbook worksheet cache.
 - `xlsx_eager_merge_commit_save` / `xlsx_eager_unmerge_commit_save`: on the
   deterministic sparse A1:B2 fixture, prepare the merge or unmerge transaction
   outside timing, then time only eager semantic commit plus bounded sequential
@@ -2396,10 +2462,14 @@ native-Office claim is made.
   public `write_to`.
 - `doc_semantic_open`: open the generated DOC container and its document model
   through `litchi_doc::Package`.
-- `doc_semantic_list_paragraphs` / `doc_semantic_one_paragraph` /
-  `doc_semantic_full_text`: time ordinary document paragraph enumeration,
-  middle-paragraph selection, or complete text extraction. The public
-  one-paragraph path necessarily materializes the paragraph collection.
+- `doc_semantic_list_paragraphs` / `doc_semantic_paragraph_count` /
+  `doc_semantic_one_paragraph` / `doc_semantic_one_paragraph_at` /
+  `doc_semantic_full_text`: time ordinary document paragraph enumeration, the
+  exact public paragraph cardinality query, the materializing middle-paragraph
+  control, the direct ordinal middle-paragraph query, or complete text
+  extraction. The count selector uses an independent untimed paragraph-list
+  oracle; the two one-paragraph selectors are independent controls for the
+  collection materialization candidate.
 - `doc_semantic_noop_edit_save` / `doc_semantic_one_edit_save`: start from an
   already-open exact-source `body_text::Snapshot`, publish zero or one middle
   paragraph replacement, and materialize owned bytes. Exact no-op bytes,
@@ -2481,6 +2551,13 @@ native-Office claim is made.
   `Workbook::from_bytes`; the input clone happens before timing.
 - `xlsx_list_sheets`: enumerate sheet names after an already-open workbook,
   without asking any worksheet for cell semantics.
+- `xlsx_eager_named_sheet_lookup_4` / `_64` / `_large`: opt-in eager lookup of
+  the final sheet by a case-folded name in deterministic 4-, 64-, and 256-sheet
+  catalogs. Workbook construction, catalog validation, and the Unicode/case,
+  missing-name, and duplicate-name oracle are outside the timed selector loop.
+- `xlsx_source_named_sheet_lookup_4` / `_64` / `_large`: matched source-backed
+  selectors over the same catalogs. Source reads are reset and checked outside
+  the timing boundary; the selector is expected to remain metadata-only.
 - `xlsx_first_cell`: access the first stored cell (`Sheet1!A1`) from an
   already-open workbook, measuring the first worksheet semantic access.
 - `xlsx_full_cell_scan`: enumerate every stored cell in `Sheet1` through the
@@ -2557,6 +2634,18 @@ native-Office claim is made.
 - `docx_semantic_one_paragraph_text`: locate the middle paragraph before timing
   and time only its `Paragraph::text()` call; exact text/error checks and the
   complete semantic verification remain outside the timed interval.
+- `omml_formula_range_scan`: scan the fixed OMML fragment corpus through
+  `litchi_ooxml_common::xml::scan_omml_formula_ranges`; exact byte ranges are
+  checked against an untimed `NsReader` oracle.
+- `omml_formula_extract`: extract the same corpus through the public
+  `litchi_ooxml_common::xml::extract_omml_formulas`; exact formula XML strings
+  are independently reconstructed from the oracle's byte ranges and hashed
+  outside the timed interval.
+- `pptx_drawingml_extract`: extract text from the fixed DrawingML fragment
+  corpus; exact text is checked against an untimed `NsReader` oracle.
+- `pptx_drawingml_range_scan`: scan `p` element ranges from the same fixed
+  DrawingML corpus; exact ranges are checked against an untimed `NsReader`
+  oracle.
 - `docx_semantic_create_small`: author and serialize the tiny corpus entirely
   through public DOCX APIs, then reopen and fully verify it.
 - `docx_semantic_noop_edit_save`, `docx_semantic_one_edit_save`, and
@@ -2577,6 +2666,14 @@ native-Office claim is made.
   time opened-presentation transaction capture, no-op/one/~1% text-box edits,
   commit, publication, and `to_bytes`, then reopen and verify all slides,
   shapes, and text. The public API has no save-to-sink method.
+- `pptx_named_one_edit_save`: on the named-slide corpus, time one named
+  selector/edit/save (use `--semantic-shape tiny` for the small-deck overhead
+  guard).
+- `pptx_named_repeated_edit_save` and `pptx_numeric_repeated_edit_save`: run
+  the same prepared one-shape edit on every named slide (the large semantic
+  shape has 100 slides); the numeric case is the selector control. Both
+  outputs are compared byte-for-byte with the untimed numeric oracle, while
+  missing and duplicate names are checked against their exact typed errors.
 - `rtf_semantic_open`: parse deterministic owned transport bytes through
   public `Document::from_bytes`.
 - `rtf_semantic_paragraph_count`: query the public exact paragraph cardinality.
