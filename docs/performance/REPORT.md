@@ -47,6 +47,26 @@ source and semantic hashes remained exact. The dirty-worktree smoke is
 validation only. No latency, allocation, RSS, physical-I/O, storage-media, or
 XLSX speedup claim is registered.
 
+## XLSX vendor-extension preservation corpus (change 0262)
+
+[Change 0262](changes/0262-xlsx-vendor-extension-preservation.md) adds an
+explicit `vendor-extension` shape to the existing XLSX cell-value selectors.
+The shape is excluded from `XlsxCellCrudShape::ALL` and adds no `Case`; the
+selectable count remains 381 and the default matrix remains 36 cases / 198
+records.
+
+Its deterministic four-sheet, 48-by-48, eight-media corpus adds orphan XML
+and binary vendor Parts plus one XML-local internal relationship. The generated
+archive has exactly 20 ZIP members, 4,227,295 bytes, and source SHA-256
+`b031d236b0f48b45ab357126ff238a40e2a2e147c1471cf82e429ab6f6d250fb`.
+Source-backed and managed one-cell edits verify exact no-op/lifecycle behavior,
+typed stale/foreign and sink refusal behavior, managed Budget boundaries,
+semantic/package/content-type/relationship preservation, and raw local plus
+central-directory identity for all 19 untouched members. Existing signed,
+protected, formula, markup-compatibility, macro, and unsupported-owner refusal
+contracts remain inherited. This is correctness-only evidence with no latency,
+allocation, RSS, decompression, physical-I/O, or producer claim.
+
 ## Shared lazy OPC structural members (change 0259)
 
 [Change 0259](changes/0259-opc-shared-structural-members.md) carries the lazy

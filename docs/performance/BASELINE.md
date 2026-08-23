@@ -57,6 +57,28 @@ physical device I/O. This is harness correctness and reproducibility coverage,
 not retained before/after evidence. See
 [change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md).
 
+## Latest retained XLSX vendor-extension correctness shape (change 0262)
+
+The opt-in `vendor-extension` shape extends the existing four-sheet, 48-by-48,
+eight-media cell-values corpus with orphan XML and binary vendor Parts plus one
+XML-local internal relationship. It is selected through
+`--xlsx-cell-crud-shape vendor-extension`, is excluded from
+`XlsxCellCrudShape::ALL`, and adds no `Case`; the selectable count remains 381
+and the default matrix remains 36 cases / 198 records.
+
+The generated source archive has exactly 20 ZIP members, 4,227,295 bytes, and
+4,231,356 logical uncompressed payload bytes. Its source SHA-256 is
+`b031d236b0f48b45ab357126ff238a40e2a2e147c1471cf82e429ab6f6d250fb`.
+Independent OPC/topology/content-type/relationship checks reject a package
+root, workbook, or selected-worksheet vendor relationship. Source-backed and
+managed one-cell edits retain all 19 untouched raw ZIP local and
+central-directory records after local-offset normalization, while exact
+no-op, lifecycle, stale/foreign, semantic reopen, managed Budget, and typed
+sink refusal gates remain active. Existing signed/protected/unknown/MCE and
+other unsupported-owner refusals are inherited production contracts. This is
+correctness-only evidence: no latency, allocation, RSS, decompression,
+physical-I/O, or producer claim follows.
+
 ## Latest retained OPC structural ownership result (change 0259)
 
 Private OPC structural parsing now reuses the lazy ZIP reader's validated
