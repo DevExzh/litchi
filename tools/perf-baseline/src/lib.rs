@@ -75,6 +75,7 @@ const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const CFB_CORPUS_GENERATOR: &str = "litchi-cfb-synthetic-v1";
 const CFB_SELECTIVE_CORPUS_GENERATOR: &str = "litchi-cfb-selective-read-v1";
 const LEGACY_WRITER_CORPUS_GENERATOR: &str = "litchi-legacy-writer-v1";
+const XLSB_CORPUS_GENERATOR: &str = "litchi-xlsb-synthetic-v1";
 const PPT_PICTURES_CORPUS_GENERATOR: &str = "litchi-ppt-pictures-lazy-v1";
 const XLSX_CORPUS_GENERATOR: &str = "litchi-xlsx-synthetic-v1";
 const SEMANTIC_DOCX_CORPUS_GENERATOR: &str = "litchi-docx-semantic-v1";
@@ -246,6 +247,66 @@ enum XlsxShape {
     Tiny,
     Medium,
     DenseWide,
+}
+
+/// Deterministic BIFF12 workbook shapes for the opt-in XLSB lifecycle matrix.
+///
+/// The sparse shape keeps a large declared extent while storing only a fixed
+/// row/column lattice.  This exercises the distinction between worksheet
+/// dimensions and stored-cell traversal without relying on external files.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum XlsbShape {
+    Tiny,
+    Medium,
+    Large,
+    Sparse,
+}
+
+impl XlsbShape {
+    const ALL: [Self; 4] = [Self::Tiny, Self::Medium, Self::Large, Self::Sparse];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Tiny => "tiny",
+            Self::Medium => "medium",
+            Self::Large => "large",
+            Self::Sparse => "sparse",
+        }
+    }
+
+    const fn sheet_count(self) -> usize {
+        match self {
+            Self::Tiny => 1,
+            Self::Medium => 2,
+            Self::Large => 4,
+            Self::Sparse => 3,
+        }
+    }
+
+    const fn row_count(self) -> usize {
+        match self {
+            Self::Tiny => 8,
+            Self::Medium => 32,
+            Self::Large => 128,
+            Self::Sparse => 512,
+        }
+    }
+
+    const fn column_count(self) -> usize {
+        match self {
+            Self::Tiny => 8,
+            Self::Medium => 32,
+            Self::Large => 64,
+            Self::Sparse => 128,
+        }
+    }
+
+    const fn stores_cell(self, row: usize, column: usize) -> bool {
+        match self {
+            Self::Tiny | Self::Medium | Self::Large => true,
+            Self::Sparse => (row == 0 && column == 0) || (row % 17 == 0 && column % 19 == 0),
+        }
+    }
 }
 
 /// Deterministic media-rich multi-sheet corpora for scalar-cell CRUD.
@@ -758,6 +819,10 @@ enum Case {
     XlsSemanticFullCellScan,
     XlsSemanticNoopEditSave,
     XlsSemanticOneEditSave,
+    XlsbSemanticOpen,
+    XlsbSemanticListWorksheets,
+    XlsbSemanticOneCell,
+    XlsbSemanticFullCellScan,
     XlsValidationReport,
     XlsCommentsEagerEditSave,
     XlsCommentsSourceBackedEditSave,
@@ -1227,6 +1292,10 @@ impl Case {
             Self::XlsSemanticFullCellScan => "xls_semantic_full_cell_scan",
             Self::XlsSemanticNoopEditSave => "xls_semantic_noop_edit_save",
             Self::XlsSemanticOneEditSave => "xls_semantic_one_edit_save",
+            Self::XlsbSemanticOpen => "xlsb_semantic_open",
+            Self::XlsbSemanticListWorksheets => "xlsb_semantic_list_worksheets",
+            Self::XlsbSemanticOneCell => "xlsb_semantic_one_cell",
+            Self::XlsbSemanticFullCellScan => "xlsb_semantic_full_cell_scan",
             Self::XlsValidationReport => "xls_validation_report",
             Self::XlsCommentsEagerEditSave => "xls_comments_eager_edit_save",
             Self::XlsCommentsSourceBackedEditSave => "xls_comments_source_backed_edit_save",
@@ -1530,6 +1599,16 @@ impl Case {
                 | Self::XlsSemanticFullCellScan
                 | Self::XlsSemanticNoopEditSave
                 | Self::XlsSemanticOneEditSave
+        )
+    }
+
+    const fn uses_semantic_xlsb(self) -> bool {
+        matches!(
+            self,
+            Self::XlsbSemanticOpen
+                | Self::XlsbSemanticListWorksheets
+                | Self::XlsbSemanticOneCell
+                | Self::XlsbSemanticFullCellScan
         )
     }
 
@@ -2398,6 +2477,7 @@ struct Options {
     payloads: Vec<PayloadKind>,
     writer_shapes: Vec<WriterShape>,
     xlsx_shapes: Vec<XlsxShape>,
+    xlsb_shapes: Vec<XlsbShape>,
     xlsx_cell_crud_shapes: Vec<XlsxCellCrudShape>,
     xlsx_row_visibility_shapes: Vec<XlsxRowVisibilityShape>,
     semantic_shapes: Vec<SemanticShape>,
@@ -2590,6 +2670,7 @@ struct Configuration {
     payload_kinds: Vec<&'static str>,
     writer_shapes: Vec<&'static str>,
     xlsx_shapes: Vec<&'static str>,
+    xlsb_shapes: Vec<&'static str>,
     xlsx_cell_crud_shapes: Vec<&'static str>,
     xlsx_row_visibility_shapes: Vec<&'static str>,
     semantic_shapes: Vec<&'static str>,
@@ -6724,6 +6805,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 !case.is_fresh_writer()
                     && !case.uses_semantic_doc()
                     && !case.uses_semantic_xls()
+                    && !case.uses_semantic_xlsb()
                     && !case.uses_semantic_ppt()
                     && !case.is_ppt_pictures()
                     && !case.uses_xlsx()
@@ -7413,6 +7495,26 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             for case in options.cases.iter().filter(|case| case.uses_xlsx()) {
                 results.push(run_case_with_config(
                     *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_xlsb()) {
+        for shape in &options.xlsb_shapes {
+            let corpus = build_xlsb_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_semantic_xlsb())
+            {
+                results.push(run_case_with_config(
+                    case,
                     &corpus,
                     options.warmup_iterations,
                     options.samples,
@@ -8120,6 +8222,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             .iter()
             .map(|shape| shape.name())
             .collect(),
+        xlsb_shapes: options
+            .xlsb_shapes
+            .iter()
+            .map(|shape| shape.name())
+            .collect(),
         xlsx_cell_crud_shapes: options
             .xlsx_cell_crud_shapes
             .iter()
@@ -8212,6 +8319,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut payloads = PayloadKind::ALL.to_vec();
     let mut writer_shapes = WriterShape::ALL.to_vec();
     let mut xlsx_shapes = XlsxShape::ALL.to_vec();
+    let mut xlsb_shapes = XlsbShape::ALL.to_vec();
     let mut xlsx_cell_crud_shapes = XlsxCellCrudShape::ALL.to_vec();
     let mut xlsx_row_visibility_shapes = XlsxRowVisibilityShape::ALL.to_vec();
     let mut semantic_shapes = SemanticShape::ALL.to_vec();
@@ -8260,6 +8368,9 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
             },
             "--xlsx-shape" => {
                 xlsx_shapes = parse_selection(arguments.next(), "--xlsx-shape", parse_xlsx_shape)?;
+            },
+            "--xlsb-shape" => {
+                xlsb_shapes = parse_selection(arguments.next(), "--xlsb-shape", parse_xlsb_shape)?;
             },
             "--xlsx-cell-crud-shape" => {
                 xlsx_cell_crud_shapes = parse_selection(
@@ -8334,6 +8445,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         payloads,
         writer_shapes,
         xlsx_shapes,
+        xlsb_shapes,
         xlsx_cell_crud_shapes,
         xlsx_row_visibility_shapes,
         semantic_shapes,
@@ -8672,6 +8784,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_semantic_full_cell_scan" => Some(Case::XlsSemanticFullCellScan),
         "xls_semantic_noop_edit_save" => Some(Case::XlsSemanticNoopEditSave),
         "xls_semantic_one_edit_save" => Some(Case::XlsSemanticOneEditSave),
+        "xlsb_semantic_open" => Some(Case::XlsbSemanticOpen),
+        "xlsb_semantic_list_worksheets" => Some(Case::XlsbSemanticListWorksheets),
+        "xlsb_semantic_one_cell" => Some(Case::XlsbSemanticOneCell),
+        "xlsb_semantic_full_cell_scan" => Some(Case::XlsbSemanticFullCellScan),
         "xls_validation_report" => Some(Case::XlsValidationReport),
         "xls_comments_eager_edit_save" => Some(Case::XlsCommentsEagerEditSave),
         "xls_comments_source_backed_edit_save" => Some(Case::XlsCommentsSourceBackedEditSave),
@@ -8921,6 +9037,16 @@ fn parse_xlsx_shape(value: &str) -> Option<XlsxShape> {
     }
 }
 
+fn parse_xlsb_shape(value: &str) -> Option<XlsbShape> {
+    match value {
+        "tiny" => Some(XlsbShape::Tiny),
+        "medium" => Some(XlsbShape::Medium),
+        "large" => Some(XlsbShape::Large),
+        "sparse" => Some(XlsbShape::Sparse),
+        _ => None,
+    }
+}
+
 fn parse_xlsx_cell_crud_shape(value: &str) -> Option<XlsxCellCrudShape> {
     match value {
         "medium" => Some(XlsxCellCrudShape::Medium),
@@ -9077,6 +9203,8 @@ fn print_usage() {
                                        xls_semantic_open,xls_semantic_list_worksheets,\n\
                                        xls_semantic_one_cell,xls_semantic_full_cell_scan,\n\
                                        xls_semantic_noop_edit_save,xls_semantic_one_edit_save,\n\
+                                       xlsb_semantic_open,xlsb_semantic_list_worksheets,\n\
+                                       xlsb_semantic_one_cell,xlsb_semantic_full_cell_scan,\n\
                                        xls_comments_eager_edit_save,\n\
                                        xls_comments_source_backed_edit_save,\n\
                                        xls_comments_eager_batch_edit_save,\n\
@@ -9216,6 +9344,7 @@ fn print_usage() {
            --payload LIST              compressible,incompressible\n\
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
+           --xlsb-shape LIST           tiny,medium,large,sparse (only used by opt-in XLSB semantic cases)\n\
            --xlsx-cell-crud-shape LIST medium,dense-sparse (used by matched scalar-cell and edit-composition cases)\n\
            --xlsx-row-visibility-shape LIST medium,large (only used by matched row-visibility cases)\n\
            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
@@ -13844,6 +13973,280 @@ fn build_semantic_pptx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
     })
 }
 
+type XlsbCellRecord = (usize, usize, usize, u64);
+const XLSB_CELL_DIGEST_DOMAIN: &[u8] = b"litchi-xlsb-cell-projection-v1";
+
+fn xlsb_shape(corpus: &Corpus) -> Result<XlsbShape, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSB_CORPUS_GENERATOR {
+        return Err("corpus is not an XLSB semantic corpus".into());
+    }
+    match corpus.manifest.shape {
+        "tiny" => Ok(XlsbShape::Tiny),
+        "medium" => Ok(XlsbShape::Medium),
+        "large" => Ok(XlsbShape::Large),
+        "sparse" => Ok(XlsbShape::Sparse),
+        _ => Err("XLSB semantic corpus has an unknown shape".into()),
+    }
+}
+
+fn xlsb_cell_value(
+    shape: XlsbShape,
+    sheet: usize,
+    row: usize,
+    column: usize,
+) -> Result<f64, Box<dyn Error>> {
+    let sheet_stride = shape
+        .row_count()
+        .checked_mul(shape.column_count())
+        .ok_or("XLSB cell ordinal sheet stride overflows usize")?;
+    let row_offset = row
+        .checked_mul(shape.column_count())
+        .ok_or("XLSB cell ordinal row offset overflows usize")?;
+    let ordinal = sheet
+        .checked_mul(sheet_stride)
+        .and_then(|offset| offset.checked_add(row_offset))
+        .and_then(|offset| offset.checked_add(column))
+        .ok_or("XLSB cell ordinal overflows usize")?;
+    let ordinal = u32::try_from(ordinal)?;
+    Ok(f64::from(ordinal) + 0.25)
+}
+
+fn xlsb_expected_cells(shape: XlsbShape) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
+    let capacity = (0..shape.sheet_count()).try_fold(0usize, |total, _sheet| {
+        (0..shape.row_count()).try_fold(total, |total, row| {
+            (0..shape.column_count()).try_fold(total, |total, column| {
+                if shape.stores_cell(row, column) {
+                    total
+                        .checked_add(1)
+                        .ok_or("XLSB expected cell count overflows usize")
+                } else {
+                    Ok(total)
+                }
+            })
+        })
+    })?;
+    let mut cells = Vec::with_capacity(capacity);
+    for sheet in 0..shape.sheet_count() {
+        for row in 0..shape.row_count() {
+            for column in 0..shape.column_count() {
+                if shape.stores_cell(row, column) {
+                    cells.push((
+                        sheet,
+                        row,
+                        column,
+                        xlsb_cell_value(shape, sheet, row, column)?.to_bits(),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(cells)
+}
+
+fn xlsb_cells_digest(cells: &[XlsbCellRecord]) -> Result<String, Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    digest.update(XLSB_CELL_DIGEST_DOMAIN);
+    for &(sheet, row, column, value_bits) in cells {
+        xlsb_update_cell_digest(&mut digest, sheet, row, column, value_bits)?;
+    }
+    Ok(fingerprint_hex(&digest.finalize().into()))
+}
+
+#[inline]
+fn xlsb_update_cell_digest(
+    digest: &mut Sha256,
+    sheet: usize,
+    row: usize,
+    column: usize,
+    value_bits: u64,
+) -> Result<(), Box<dyn Error>> {
+    digest.update(u64::try_from(sheet)?.to_le_bytes());
+    digest.update(u64::try_from(row)?.to_le_bytes());
+    digest.update(u64::try_from(column)?.to_le_bytes());
+    digest.update(value_bits.to_le_bytes());
+    Ok(())
+}
+
+fn xlsb_names_digest(names: &[String]) -> Result<String, Box<dyn Error>> {
+    let mut digest = Sha256::new();
+    digest.update(b"litchi-xlsb-worksheet-names-v1");
+    for name in names {
+        digest.update(u64::try_from(name.len())?.to_le_bytes());
+        digest.update(name.as_bytes());
+    }
+    Ok(fingerprint_hex(&digest.finalize().into()))
+}
+
+/// Consume worksheet cells in their native row/column order.
+///
+/// The XLSB worksheet stores cells in a `BTreeMap`; preserving the emitted
+/// order here makes the post-timer oracle reject iterator-order regressions.
+fn xlsb_collect_cells_in_order(
+    worksheets: &[litchi_xlsb::Worksheet],
+) -> Result<Vec<XlsbCellRecord>, Box<dyn Error>> {
+    use litchi_core::sheet::{Cell as _, CellIterator as _, Worksheet as _};
+
+    let mut cells = Vec::new();
+    for (sheet, worksheet) in worksheets.iter().enumerate() {
+        let mut iterator = worksheet.cells();
+        while let Some(cell) = iterator.next() {
+            let cell = cell.map_err(|error| io::Error::other(error.to_string()))?;
+            let value = cell
+                .value()
+                .as_float()
+                .ok_or("XLSB cell projection contains a non-numeric value")?;
+            cells.push((
+                sheet,
+                usize::try_from(cell.row())?,
+                usize::try_from(cell.column())?,
+                value.to_bits(),
+            ));
+        }
+    }
+    Ok(cells)
+}
+
+/// Stream worksheet cells in their native row/column order.
+///
+/// This is the timed full-scan path: it retains only a deterministic digest
+/// state and a checked count. The exact emitted-order vector oracle remains in
+/// [`xlsb_collect_cells_in_order`] and is used by corpus verification outside
+/// the timer.
+fn xlsb_scan_cells_in_order(
+    worksheets: &[litchi_xlsb::Worksheet],
+) -> Result<(usize, [u8; 32]), Box<dyn Error>> {
+    use litchi_core::sheet::{Cell as _, CellIterator as _, Worksheet as _};
+
+    let mut digest = Sha256::new();
+    digest.update(XLSB_CELL_DIGEST_DOMAIN);
+    let mut count = 0usize;
+    for (sheet, worksheet) in worksheets.iter().enumerate() {
+        let mut iterator = worksheet.cells();
+        while let Some(cell) = iterator.next() {
+            let cell = cell.map_err(|error| io::Error::other(error.to_string()))?;
+            let value = cell
+                .value()
+                .as_float()
+                .ok_or("XLSB cell projection contains a non-numeric value")?;
+            count = count
+                .checked_add(1)
+                .ok_or("XLSB cell scan count overflows usize")?;
+            xlsb_update_cell_digest(
+                &mut digest,
+                sheet,
+                usize::try_from(cell.row())?,
+                usize::try_from(cell.column())?,
+                value.to_bits(),
+            )?;
+        }
+    }
+    Ok((count, digest.finalize().into()))
+}
+
+fn verify_xlsb_corpus(corpus: &Corpus, shape: XlsbShape) -> Result<(), Box<dyn Error>> {
+    use litchi_core::sheet::WorkbookTrait as _;
+
+    let expected = xlsb_expected_cells(shape)?;
+    let expected_payload_bytes = expected
+        .len()
+        .checked_mul(std::mem::size_of::<f64>())
+        .ok_or("XLSB expected payload size overflows usize")?;
+    if corpus.manifest.entry_count != expected.len()
+        || corpus.manifest.uncompressed_payload_bytes != expected_payload_bytes
+        || sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
+    {
+        return Err("XLSB corpus manifest differs from deterministic specification".into());
+    }
+    let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+    let expected_names = (0..shape.sheet_count())
+        .map(|sheet| format!("Sheet{sheet:02}"))
+        .collect::<Vec<_>>();
+    if workbook.worksheet_count() != shape.sheet_count()
+        || workbook.worksheet_names() != expected_names.as_slice()
+    {
+        return Err("XLSB worksheet identity differs from deterministic specification".into());
+    }
+    let mut worksheets = Vec::with_capacity(shape.sheet_count());
+    for sheet in 0..shape.sheet_count() {
+        worksheets.push(workbook.worksheet(sheet)?);
+    }
+    let actual = xlsb_collect_cells_in_order(&worksheets)?;
+    if actual != expected || xlsb_cells_digest(&actual)? != xlsb_cells_digest(&expected)? {
+        return Err("XLSB corpus cell projection differs from deterministic specification".into());
+    }
+    let target_payload = xlsb_cell_value(shape, 0, 0, 0)?.to_bits().to_le_bytes();
+    if corpus.target_name != "Sheet00!A1"
+        || corpus.target_payload.as_slice() != target_payload.as_slice()
+        || corpus.manifest.target_payload_sha256 != sha256_hex(&target_payload)
+    {
+        return Err("XLSB target cell differs from deterministic specification".into());
+    }
+    Ok(())
+}
+
+fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
+    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+
+    let expected = xlsb_expected_cells(shape)?;
+    let mut writer = WorkbookWriter::new();
+    for sheet in 0..shape.sheet_count() {
+        let mut worksheet = MutableWorksheet::new(format!("Sheet{sheet:02}"));
+        for row in 0..shape.row_count() {
+            for column in 0..shape.column_count() {
+                if shape.stores_cell(row, column) {
+                    worksheet.set_cell(
+                        u32::try_from(row)?,
+                        u32::try_from(column)?,
+                        xlsb_cell_value(shape, sheet, row, column)?,
+                    );
+                }
+            }
+        }
+        writer.add_worksheet(worksheet);
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.save(&mut output)?;
+    let archive = output.into_inner();
+    let target_payload = xlsb_cell_value(shape, 0, 0, 0)?
+        .to_bits()
+        .to_le_bytes()
+        .to_vec();
+    let corpus = Corpus {
+        manifest: CorpusManifest {
+            name: format!("xlsb-{}", shape.name()),
+            generator: XLSB_CORPUS_GENERATOR,
+            package_format: "XLSB/OPC/ZIP",
+            shape: shape.name(),
+            payload_kind: if shape == XlsbShape::Sparse {
+                "deterministic-sparse-numeric-grid"
+            } else {
+                "deterministic-dense-numeric-grid"
+            },
+            compression: "deflate",
+            entry_count: expected.len(),
+            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            entry_bytes: std::mem::size_of::<f64>(),
+            uncompressed_payload_bytes: expected
+                .len()
+                .checked_mul(std::mem::size_of::<f64>())
+                .ok_or("XLSB logical payload size overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "Sheet00!A1".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "Sheet00!A1".to_owned(),
+        target_payload,
+        xlsx: None,
+    };
+    verify_xlsb_corpus(&corpus, shape)?;
+    Ok(corpus)
+}
+
 fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     let spec = XlsxCorpus {
         sheet_count: shape.sheet_count(),
@@ -15482,6 +15885,12 @@ fn run_case_with_config(
         | Case::XlsSemanticNoopEditSave
         | Case::XlsSemanticOneEditSave => {
             run_semantic_xls(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsbSemanticOpen
+        | Case::XlsbSemanticListWorksheets
+        | Case::XlsbSemanticOneCell
+        | Case::XlsbSemanticFullCellScan => {
+            run_semantic_xlsb(case, corpus, warmup_iterations, samples)
         },
         Case::XlsValidationReport => run_xls_validation_report(corpus, warmup_iterations, samples),
         Case::XlsCommentsEagerEditSave
@@ -19248,6 +19657,127 @@ fn run_semantic_xls(
         }
     }
     Ok(result(case, corpus, elapsed, None))
+}
+
+fn run_semantic_xlsb(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    use litchi_core::sheet::{Cell as _, WorkbookTrait as _};
+
+    let shape = xlsb_shape(corpus)?;
+    let expected_cells = xlsb_expected_cells(shape)?;
+    let expected_names = (0..shape.sheet_count())
+        .map(|sheet| format!("Sheet{sheet:02}"))
+        .collect::<Vec<_>>();
+    let expected_full_digest = xlsb_cells_digest(&expected_cells)?;
+    let expected_names_digest = xlsb_names_digest(&expected_names)?;
+    let expected_one_digest = sha256_hex(&corpus.target_payload);
+    let expected_digest = match case {
+        Case::XlsbSemanticOpen => corpus.manifest.archive_sha256.clone(),
+        Case::XlsbSemanticListWorksheets => expected_names_digest.clone(),
+        Case::XlsbSemanticOneCell => expected_one_digest.clone(),
+        Case::XlsbSemanticFullCellScan => expected_full_digest.clone(),
+        _ => return Err("non-XLSB semantic case passed to XLSB runner".into()),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut measured_digests = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (duration, digest) = match case {
+            Case::XlsbSemanticOpen => {
+                // The archive clone is setup, not measured; the open timer is the
+                // fresh XLSB lifecycle boundary for this selector.
+                let owned = corpus.archive.clone();
+                let started = Instant::now();
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(owned))?;
+                let duration = started.elapsed();
+                if workbook.worksheet_count() != shape.sheet_count()
+                    || workbook.worksheet_names() != expected_names.as_slice()
+                {
+                    return Err("XLSB open projection differs from corpus specification".into());
+                }
+                std::hint::black_box(workbook);
+                (duration, corpus.manifest.archive_sha256.clone())
+            },
+            Case::XlsbSemanticListWorksheets => {
+                // Prepare a fresh workbook outside the query timer so this case
+                // measures worksheet-name materialization only.
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let started = Instant::now();
+                let names = workbook.worksheet_names().to_owned();
+                let duration = started.elapsed();
+                if names != expected_names {
+                    return Err("XLSB worksheet list differs from corpus specification".into());
+                }
+                let digest = xlsb_names_digest(&names)?;
+                std::hint::black_box(names);
+                (duration, digest)
+            },
+            Case::XlsbSemanticOneCell => {
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let started = Instant::now();
+                let worksheet = workbook.worksheet(0)?;
+                let cell = worksheet
+                    .get_cell(0, 0)
+                    .ok_or("XLSB selected cell is missing")?;
+                let value = cell
+                    .value()
+                    .as_float()
+                    .ok_or("XLSB selected cell is not numeric")?;
+                let duration = started.elapsed();
+                if value.to_bits() != xlsb_cell_value(shape, 0, 0, 0)?.to_bits() {
+                    return Err("XLSB selected cell differs from corpus specification".into());
+                }
+                let digest = sha256_hex(&value.to_bits().to_le_bytes());
+                std::hint::black_box(value);
+                (duration, digest)
+            },
+            Case::XlsbSemanticFullCellScan => {
+                // Prepare the archive clone, workbook, and worksheet values
+                // outside the timer. The timed region deliberately includes
+                // only worksheet.cells() creation and consumption, including
+                // its boxed iterator and boxed cell values. The scan retains
+                // only a deterministic digest and count; exact emitted-order
+                // vector verification belongs to verify_xlsb_corpus().
+                let owned = corpus.archive.clone();
+                let workbook = litchi_xlsb::Workbook::new(Cursor::new(owned))?;
+                let mut worksheets = Vec::with_capacity(shape.sheet_count());
+                for sheet in 0..shape.sheet_count() {
+                    worksheets.push(workbook.worksheet(sheet)?);
+                }
+                let started = Instant::now();
+                let scan = xlsb_scan_cells_in_order(&worksheets)?;
+                let duration = started.elapsed();
+                if scan.0 != expected_cells.len() {
+                    return Err(
+                        "XLSB full cell scan count differs from corpus specification".into(),
+                    );
+                }
+                let digest = fingerprint_hex(&scan.1);
+                std::hint::black_box(scan);
+                (duration, digest)
+            },
+            _ => return Err("non-XLSB semantic case passed to XLSB runner".into()),
+        };
+        if digest != expected_digest {
+            return Err("XLSB semantic result hash differs from independent oracle".into());
+        }
+        if iteration >= warmup_iterations {
+            measured_digests.push(digest);
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
+        return Err("XLSB semantic result hashes are unstable across samples".into());
+    }
+    let mut measured = result(case, corpus, elapsed, None);
+    measured.output_sha256 = Some(expected_digest);
+    Ok(measured)
 }
 
 fn verify_semantic_ppt(
@@ -40949,7 +41479,7 @@ mod tests {
         SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
         SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
         XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
+        XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
         build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
@@ -40960,19 +41490,20 @@ mod tests {
         build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
         build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
         build_writer_corpus, build_xls_comments_edit_corpus, build_xls_visibility_edit_corpus,
-        build_xlsx_auto_filter_edit_corpus, build_xlsx_calculation_metadata_edit_corpus,
-        build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
-        build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
-        build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
-        cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
-        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        build_xlsb_corpus, build_xlsx_auto_filter_edit_corpus,
+        build_xlsx_calculation_metadata_edit_corpus, build_xlsx_cell_crud_corpus,
+        build_xlsx_conditional_formatting_edit_corpus, build_xlsx_corpus,
+        build_xlsx_data_validation_edit_corpus, build_xlsx_defined_names_edit_corpus,
+        build_xlsx_merge_edit_corpus, build_xlsx_page_break_edit_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, build_xlsx_row_visibility_corpus,
+        build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
+        cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
+        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_one_edit_save, run_odf_content_cow,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -40983,7 +41514,8 @@ mod tests {
         run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
         run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
-        updated_writer_text, verify_xlsx_cells, writer_shape, xlsx_cell_count, xlsx_spec,
+        updated_writer_text, verify_xlsx_cells, writer_shape, xlsb_cells_digest,
+        xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
     };
 
     #[test]
@@ -41417,7 +41949,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 344);
+        assert_eq!(selectable_count, 348);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -41470,6 +42002,54 @@ mod tests {
                 "Case::{variant} is missing from parse_case"
             );
         }
+    }
+
+    #[test]
+    fn xlsb_lifecycle_selectors_are_opt_in_and_hash_stable() {
+        let cases = [
+            Case::XlsbSemanticOpen,
+            Case::XlsbSemanticListWorksheets,
+            Case::XlsbSemanticOneCell,
+            Case::XlsbSemanticFullCellScan,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.uses_semantic_xlsb());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let mut corpora = Vec::with_capacity(XlsbShape::ALL.len());
+        for shape in XlsbShape::ALL {
+            let first = build_xlsb_corpus(shape).unwrap();
+            let second = build_xlsb_corpus(shape).unwrap();
+            assert_eq!(first.archive, second.archive);
+            assert_eq!(
+                first.manifest.archive_sha256,
+                second.manifest.archive_sha256
+            );
+            assert_eq!(
+                first.manifest.entry_count,
+                xlsb_expected_cells(shape).unwrap().len()
+            );
+            corpora.push(first);
+        }
+
+        for case in cases {
+            for corpus in [&corpora[0], &corpora[3]] {
+                let measured = run_case(case, corpus, 0, 1).unwrap();
+                assert_eq!(measured.elapsed_ns.samples.len(), 1);
+                assert!(measured.output_sha256.is_some());
+                assert_eq!(
+                    measured.corpus.archive_sha256,
+                    corpus.manifest.archive_sha256
+                );
+            }
+        }
+        let expected_scan =
+            xlsb_cells_digest(&xlsb_expected_cells(XlsbShape::Tiny).unwrap()).unwrap();
+        let scan = run_case(Case::XlsbSemanticFullCellScan, &corpora[0], 0, 1).unwrap();
+        assert_eq!(scan.output_sha256.as_deref(), Some(expected_scan.as_str()));
     }
 
     #[test]

@@ -404,8 +404,7 @@ impl SheetWorksheet for Worksheet {
 
     fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
         Box::new(XlsbCellIterator {
-            cells: self.cells.values().collect(),
-            index: 0,
+            cells: self.cells.values(),
         })
     }
 
@@ -440,19 +439,14 @@ impl SheetWorksheet for Worksheet {
 
 /// Cell iterator for XLSB worksheets
 struct XlsbCellIterator<'a> {
-    cells: Vec<&'a Cell>,
-    index: usize,
+    cells: std::collections::btree_map::Values<'a, (u32, u32), Cell>,
 }
 
 impl<'a> CellIterator<'a> for XlsbCellIterator<'a> {
     fn next(&mut self) -> Option<Result<Box<dyn SheetCell + 'a>>> {
-        if self.index >= self.cells.len() {
-            None
-        } else {
-            let cell = self.cells[self.index];
-            self.index += 1;
-            Some(Ok(Box::new(cell.clone())))
-        }
+        self.cells
+            .next()
+            .map(|cell| Ok(Box::new(cell.clone()) as Box<dyn SheetCell + 'a>))
     }
 }
 
@@ -471,5 +465,59 @@ impl<'a> RowIterator<'a> for XlsbRowIterator<'a> {
             self.current_row += 1;
             Some(result)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cells_iterator_preserves_row_column_order() {
+        let mut worksheet = Worksheet::new("Sheet1".to_string());
+        worksheet.add_cell(Cell::new(2, 1, CellValue::Int(21)));
+        worksheet.add_cell(Cell::new(0, 3, CellValue::Int(3)));
+        worksheet.add_cell(Cell::new(0, 1, CellValue::Int(1)));
+
+        let mut cells = worksheet.cells();
+        let mut coordinates = Vec::new();
+        let mut values = Vec::new();
+        while let Some(cell) = cells.next() {
+            let cell = cell.unwrap();
+            coordinates.push((cell.row(), cell.column()));
+            values.push(cell.value().clone());
+        }
+
+        assert_eq!(coordinates, [(0, 1), (0, 3), (2, 1)]);
+        assert_eq!(
+            values,
+            [CellValue::Int(1), CellValue::Int(3), CellValue::Int(21)]
+        );
+        assert!(cells.next().is_none());
+    }
+
+    #[test]
+    fn empty_cells_iterator_is_exhausted() {
+        let worksheet = Worksheet::new("Empty".to_string());
+
+        assert!(worksheet.cells().next().is_none());
+    }
+
+    #[test]
+    fn cells_iterator_returns_clones_and_observes_replacement() {
+        let mut worksheet = Worksheet::new("Sheet1".to_string());
+        worksheet.add_cell(Cell::new(0, 0, CellValue::Int(1)));
+
+        let original_value = {
+            let mut cells = worksheet.cells();
+            cells.next().unwrap().unwrap().value().clone()
+        };
+        worksheet.add_cell(Cell::new(0, 0, CellValue::Int(2)));
+
+        assert_eq!(original_value, CellValue::Int(1));
+        let mut cells = worksheet.cells();
+        let replacement = cells.next().unwrap().unwrap();
+        assert_eq!(replacement.value(), &CellValue::Int(2));
+        assert!(cells.next().is_none());
     }
 }
