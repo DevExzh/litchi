@@ -1930,6 +1930,19 @@ mod tests {
         super::rewrite_chart_title_with_report(&source, write, exact)
             .expect("the exact aggregate work ceiling is inclusive");
 
+        let exact_fields = DecodeOptions::new(1024, 8, usize::MAX, 8)
+            .with_max_output_bytes(output.len())
+            .with_max_title_bytes(9);
+        super::rewrite_chart_title_with_report(&source, write, exact_fields)
+            .expect("the exact aggregate field ceiling is inclusive");
+
+        let below_fields = DecodeOptions::new(1024, 7, usize::MAX, 8)
+            .with_max_output_bytes(output.len())
+            .with_max_title_bytes(9);
+        let field_error = super::rewrite_chart_title_with_report(&source, write, below_fields)
+            .expect_err("one field below aggregate accounting must fail");
+        assert_eq!(field_error.field_limit_values(), Some((8, 7)));
+
         let below = DecodeOptions::new(1024, usize::MAX, expected_work - 1, 8)
             .with_max_output_bytes(output.len())
             .with_max_title_bytes(9);
