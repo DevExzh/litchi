@@ -1085,6 +1085,10 @@ enum Case {
     XlsxSourceNarrowColumnRangeScan,
     XlsxFileOpen,
     XlsxFileOpenLifecycle,
+    XlsxSourceRepeatedStoreMedium,
+    XlsxSourceRepeatedStoreMediumReacquisitionControl,
+    XlsxSourceRepeatedStoreOversized,
+    XlsxSourceRepeatedStoreOversizedReacquisitionControl,
     XlsxBytesOpen,
     XlsxBytesOpenLifecycle,
     XlsxStreamingCreate,
@@ -1606,6 +1610,14 @@ impl Case {
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
             Self::XlsxFileOpen => "xlsx_file_open",
             Self::XlsxFileOpenLifecycle => "xlsx_file_open_lifecycle",
+            Self::XlsxSourceRepeatedStoreMedium => "xlsx_source_repeated_store_medium",
+            Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => {
+                "xlsx_source_repeated_store_medium_reacquisition_control"
+            },
+            Self::XlsxSourceRepeatedStoreOversized => "xlsx_source_repeated_store_oversized",
+            Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
+                "xlsx_source_repeated_store_oversized_reacquisition_control"
+            },
             Self::XlsxBytesOpen => "xlsx_bytes_open",
             Self::XlsxBytesOpenLifecycle => "xlsx_bytes_open_lifecycle",
             Self::XlsxStreamingCreate => "xlsx_streaming_create",
@@ -2550,6 +2562,10 @@ impl Case {
                 | Self::DocxFileSourceOpenFullTextLifecycle
                 | Self::XlsxFileOpen
                 | Self::XlsxFileOpenLifecycle
+                | Self::XlsxSourceRepeatedStoreMedium
+                | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
+                | Self::XlsxSourceRepeatedStoreOversized
+                | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
                 | Self::OdtFileEagerOpen
                 | Self::OdtFileSourceOpen
                 | Self::OdtFileEagerOpenFullTextLifecycle
@@ -9609,6 +9625,14 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
         "xlsx_file_open" => Some(Case::XlsxFileOpen),
         "xlsx_file_open_lifecycle" => Some(Case::XlsxFileOpenLifecycle),
+        "xlsx_source_repeated_store_medium" => Some(Case::XlsxSourceRepeatedStoreMedium),
+        "xlsx_source_repeated_store_medium_reacquisition_control" => {
+            Some(Case::XlsxSourceRepeatedStoreMediumReacquisitionControl)
+        },
+        "xlsx_source_repeated_store_oversized" => Some(Case::XlsxSourceRepeatedStoreOversized),
+        "xlsx_source_repeated_store_oversized_reacquisition_control" => {
+            Some(Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl)
+        },
         "xlsx_bytes_open" => Some(Case::XlsxBytesOpen),
         "xlsx_bytes_open_lifecycle" => Some(Case::XlsxBytesOpenLifecycle),
         "xlsx_streaming_create" => Some(Case::XlsxStreamingCreate),
@@ -10056,6 +10080,10 @@ fn usage_text() -> String {
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
                                        xlsx_file_open,xlsx_file_open_lifecycle,\n\
+                                       xlsx_source_repeated_store_medium,\n\
+                                       xlsx_source_repeated_store_medium_reacquisition_control,\n\
+                                       xlsx_source_repeated_store_oversized,\n\
+                                       xlsx_source_repeated_store_oversized_reacquisition_control,\n\
                                        xlsx_bytes_open,xlsx_bytes_open_lifecycle,\n\
                                        xlsx_streaming_create,\n\
                                        opc_range_source_open,opc_range_source_open_main_read,\n\
@@ -18361,7 +18389,12 @@ fn run_case_with_config(
         Case::XlsxSourceNarrowColumnRangeScan => {
             run_xlsx_source_narrow_column_range_scan(corpus, warmup_iterations, samples)
         },
-        Case::XlsxFileOpen | Case::XlsxFileOpenLifecycle => {
+        Case::XlsxFileOpen
+        | Case::XlsxFileOpenLifecycle
+        | Case::XlsxSourceRepeatedStoreMedium
+        | Case::XlsxSourceRepeatedStoreMediumReacquisitionControl
+        | Case::XlsxSourceRepeatedStoreOversized
+        | Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
             Err("XLSX filesystem cases are dispatched by the child-process evidence runner".into())
         },
         Case::XlsxBytesOpen | Case::XlsxBytesOpenLifecycle => {
@@ -45601,7 +45634,7 @@ mod tests {
         cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
         parse_case, payload_bytes, pptx_named_slide_name, resolve_execution_workers, run_case,
-        run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
+        run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated, usage_text,
         run_cfb_selective_read, run_cfb_selective_simulated_read,
         run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
         run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
@@ -46182,7 +46215,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 383);
+        assert_eq!(selectable_count, 389);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -50579,6 +50612,23 @@ mod tests {
             assert!(case.is_xlsx_root_file());
             assert!(case.is_filesystem());
             assert!(!case.uses_xlsx());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn xlsx_repeated_store_selectors_are_in_usage_and_roundtrip() {
+        for name in [
+            "xlsx_source_repeated_store_medium",
+            "xlsx_source_repeated_store_medium_reacquisition_control",
+            "xlsx_source_repeated_store_oversized",
+            "xlsx_source_repeated_store_oversized_reacquisition_control",
+        ] {
+            let case = parse_case(name).expect("repeated-store usage selector parses");
+            assert_eq!(case.name(), name);
+            assert!(usage_text().contains(name));
+            assert!(case.is_filesystem());
             assert!(!Case::DEFAULT.contains(&case));
         }
         assert_eq!(Case::DEFAULT.len(), 36);

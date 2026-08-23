@@ -152,3 +152,96 @@ fn xlsx_file_cold_verified_is_eligible_or_explicitly_ineligible() {
     }
     fs::remove_dir_all(root).expect("remove cold-verified test directory");
 }
+
+#[test]
+fn xlsx_repeated_store_reacquisition_controls_report_structural_scope() {
+    let (root, report) = temporary_report_path();
+    let output = Command::new(env!("CARGO_BIN_EXE_litchi-perf-baseline"))
+        .args([
+            "--case",
+            "xlsx_source_repeated_store_medium_reacquisition_control,xlsx_source_repeated_store_oversized_reacquisition_control",
+            "--samples",
+            "1",
+            "--warmup",
+            "0",
+            "--filesystem-cache",
+            "warm",
+            "--json",
+            report.to_str().expect("report path is UTF-8"),
+        ])
+        .output()
+        .expect("run repeated-store structural controls");
+    assert!(
+        output.status.success(),
+        "repeated-store controls failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report_value: serde_json::Value =
+        serde_json::from_slice(&fs::read(&report).expect("read repeated-store report"))
+            .expect("parse repeated-store report");
+    let results = report_value["results"]
+        .as_array()
+        .expect("repeated-store result array");
+    assert_eq!(
+        results
+            .iter()
+            .map(|entry| entry["case"].as_str().expect("result case"))
+            .collect::<Vec<_>>(),
+        [
+            "xlsx_source_repeated_store_medium_reacquisition_control",
+            "xlsx_source_repeated_store_oversized_reacquisition_control",
+        ]
+    );
+    let evidence = report_value["filesystem_evidence"]
+        .as_array()
+        .expect("filesystem evidence array");
+    assert_eq!(evidence.len(), 2);
+    for entry in evidence {
+        let sample = &entry["samples"][0];
+        let repeated = &sample["xlsx_repeat_store"];
+        assert_eq!(
+            repeated["timing_scope"],
+            "semantic_query_only; explicit PartData reacquisition excluded"
+        );
+        assert_eq!(
+            repeated["claim_scope"],
+            "structural cache/read control only; elapsed/query_ns must not be compared with candidate"
+        );
+        assert_eq!(repeated["implementation"], "explicit_part_data_reacquisition_structural_control");
+        assert_eq!(repeated["query_iterations"], 8);
+        assert_eq!(repeated["control_reacquire_count"], 32);
+        assert_eq!(
+            repeated["query_names"],
+            serde_json::json!(["cell", "cells", "visit", "stored_extent"])
+        );
+        let query_elapsed = repeated["query_elapsed_ns"]
+            .as_array()
+            .expect("query timing array");
+        assert_eq!(query_elapsed.len(), 4);
+        let query_total = query_elapsed
+            .iter()
+            .map(|elapsed| elapsed.as_u64().expect("query timing"))
+            .sum::<u64>();
+        assert_eq!(repeated["timed_elapsed_total_ns"], query_total);
+        let selected_member_read_calls = repeated["diagnostics_delta"]
+            ["selected_member_read_calls"]
+            .as_u64()
+            .expect("selected-member read calls");
+        let source_read_calls = repeated["diagnostics_delta"]["source_read_calls"]
+            .as_u64()
+            .expect("source read calls");
+        assert!(selected_member_read_calls <= source_read_calls);
+        match repeated["scenario"].as_str().expect("scenario") {
+            "medium" => {
+                assert_eq!(repeated["diagnostics_delta"]["cache_evictions"], 96);
+                assert_eq!(repeated["diagnostics_delta"]["cache_bypasses"], 0);
+            },
+            "oversized" => {
+                assert_eq!(repeated["diagnostics_delta"]["cache_oversized_bypasses"], 32);
+                assert_eq!(repeated["diagnostics_delta"]["cache_evictions"], 0);
+            },
+            scenario => panic!("unexpected repeated-store scenario {scenario}"),
+        }
+    }
+    fs::remove_dir_all(root).expect("remove repeated-store test directory");
+}

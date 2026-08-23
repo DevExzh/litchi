@@ -1027,6 +1027,37 @@ Use `--filesystem-root PATH` to place the source, destination, and sibling
 temporary files under a caller-selected filesystem; the report records only
 that a root was selected, not the path itself.
 
+### XLSX repeated-store structural controls
+
+The opt-in repeated-query selectors are:
+
+- `xlsx_source_repeated_store_medium`
+- `xlsx_source_repeated_store_oversized`
+- `xlsx_source_repeated_store_medium_reacquisition_control`
+- `xlsx_source_repeated_store_oversized_reacquisition_control`
+
+The two non-control selectors are the primary future ABBA comparison path:
+compare the same selector across baseline and candidate binaries. The two
+`reacquisition_control` selectors are structural-only controls. They force
+explicit `PartData` reacquisition to prove medium-cache eviction and
+oversized-payload bypass behavior; their elapsed/query vectors are not latency
+comparators for the candidate. Their evidence records the exact timing scope
+`semantic_query_only; explicit PartData reacquisition excluded` and claim
+scope `structural cache/read control only; elapsed/query_ns must not be compared
+with candidate`.
+
+For a warm one-sample structural smoke:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 0 --samples 1 --filesystem-cache warm \
+  --case xlsx_source_repeated_store_medium,\
+xlsx_source_repeated_store_medium_reacquisition_control,\
+xlsx_source_repeated_store_oversized,\
+xlsx_source_repeated_store_oversized_reacquisition_control \
+  --json target/perf/xlsx-repeated-store-structural.json
+```
+
 `cold-requested` remains the existing advisory state.  It records an accepted
 Linux `posix_fadvise(DONTNEED)` request and does not imply that the source was
 evicted.  The opt-in `--filesystem-cache cold-verified` state is stricter and
