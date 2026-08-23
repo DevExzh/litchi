@@ -3893,3 +3893,38 @@ or native result is admitted and no performance, allocation-count, RSS, or
 throughput claim is made. No `litchi-iwa` dependency edge or ordered debt
 is retired, no host-exit claim follows, and the monolith deletion gate
 remains open.
+
+## 2026-08-23 amendment: Pages body-table lock ownership proof hardening
+
+Commit `2219b53b4` changes only
+`crates/litchi-pages/src/package/table_lock.rs`. Body-table discovery proves
+the rooted body’s complete field-9 (`TABLE_BODY_FIELD`) attachment inventory
+once before walking each table’s attachment, drawable, and model graph. That
+single coalesced proof requires one aggregate occurrence, exact field-9
+declarations, and a declaration set equal to the parsed body-table entries;
+the selected table still receives independent physical-slot and message
+checks.
+
+The field-9 prefix check uses checked capacity for aggregate plus field-local
+object references, charges it, and `try_reserve`s one declaration map whose
+counters cover both sources. The body inventory separately checked-counts all
+field-9 declarations and `try_reserve`s before checking duplicates and
+entry correspondence. Aggregate/field-local declaration work, declaration
+and entry checks, and duplicate-prefix comparisons are charged, with each
+prefix length accounted before its comparison. Wrong paths, aliases,
+duplicate declarations, and unaccounted references fail closed.
+
+Strict TableInfo parent metadata remains part of the proof: the selected
+TableInfo payload/metadata must carry the exact model reference and nested
+body-parent path, strict selected archive/message metadata is required, and
+the terminal model archive slot and supported message type are rechecked. The
+resolved target proof is carried through rewrite, patch, inverse, and
+candidate verification. Exact source bytes and fingerprints plus the
+before-state are checked before apply; the target is reopened and its
+after-state verified before an immutable candidate is returned.
+
+This is Pages table-lock ownership/work hardening only. It makes no
+full-transaction accounting or performance claim and admits no
+Cargo/build/test or native result. It retires no `litchi-iwa` dependency edge
+or ordered debt and makes no migration-host, host-exit, or monolith-exit
+claim; the deletion gate is unchanged.

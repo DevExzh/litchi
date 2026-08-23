@@ -11568,3 +11568,39 @@ or native result is admitted, and no performance, allocation-count, RSS, or
 throughput claim is made. It retires no dependency edge or ordered debt,
 makes no migration-host or host-exit claim, and does not satisfy the IWA
 monolith-deletion gate.
+
+## 2026-08-23 amendment: Pages body-table lock ownership proof hardening
+
+Commit `2219b53b4` changes only
+`crates/litchi-pages/src/package/table_lock.rs`. Body-table discovery now
+proves the rooted body’s complete field-9 (`TABLE_BODY_FIELD`) attachment
+inventory once, before the per-table attachment/drawable/model walks. The
+coalesced proof requires the selected aggregate reference to occur exactly
+once, each field-9 declaration to be exact, and the declaration set to match
+the parsed body-table entries; each selected table still checks its own
+physical attachment, drawable, model, and message slots.
+
+The field-9 prefix validator computes checked declaration capacity from the
+aggregate and field-local object references, charges that work, and uses
+`HashMap::try_reserve` before building one aggregate/field-local declaration
+counter. The body inventory separately computes checked capacity for every
+field-9 declaration and reserves it before rejecting duplicate or missing
+entries. Aggregate and field-local references, declaration/entry checks, and
+the duplicate-prefix comparisons are charged explicitly, including the
+compared prefix length; malformed data paths, aliases, duplicate declarations,
+and unaccounted aggregate references fail closed.
+
+The retained TableInfo proof remains strict: the selected TableInfo
+payload/metadata must carry the exact model reference and nested body-parent
+path, with strict selected message/header metadata and the terminal model
+archive slot and message type rechecked. The edit and patch now carry the
+complete resolved target proof rather than only a table position. Commit and
+patch-apply paths check the exact source bytes and fingerprints, revalidate
+the proof and pre-state, reopen the separate candidate, and verify its
+post-state before returning the immutable result; the inverse preserves the
+same proof.
+
+This records Pages table-lock ownership and bounded work hardening only. It
+makes no full-transaction accounting or performance claim, and admits no
+Cargo/build/test or native result. It retires no dependency edge or ordered
+debt and makes no migration-host, host-exit, or monolith-deletion claim.
