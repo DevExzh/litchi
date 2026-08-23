@@ -1,6 +1,6 @@
 use crate::{
-    OleFile, OleWriter, OutputProgress, OverlayError, OverlayLimits, SameLengthStreamOverlay,
-    SharedOleFile,
+    OleFile, OleWriter, OutputProgress, OverlayError, OverlayLimits, OverlaySourceMode,
+    SameLengthStreamOverlay, SharedOleFile,
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use std::io::{self, Cursor, Write};
@@ -73,6 +73,124 @@ fn publication_chunks(file_size: u64) -> usize {
 
 fn fingerprint_chunks(file_size: u64) -> usize {
     usize::try_from(file_size).unwrap().div_ceil(1024 * 1024)
+}
+
+fn assert_operation_shape(
+    shape: crate::OverlayOperationShape,
+    source_mode: OverlaySourceMode,
+    source_bytes: u64,
+) {
+    let fingerprint_chunks = source_bytes.div_ceil(1024 * 1024);
+    let publication_chunks = source_bytes.div_ceil(65_536);
+    let fingerprint_bytes = source_bytes * 2;
+    let fenced = u64::from(source_mode == OverlaySourceMode::GenericReadAt);
+    assert_eq!(
+        shape.counter_scope,
+        "validated overlay logical pass shape; no runtime, allocator, or syscall counters"
+    );
+    assert_eq!(shape.source_mode, source_mode);
+    assert_eq!(shape.source_bytes, source_bytes);
+    assert_eq!(shape.fingerprint_chunk_bytes, 1024 * 1024);
+    assert_eq!(shape.publication_chunk_bytes, 65_536);
+    assert_eq!(
+        shape.fingerprint_buffer_bytes,
+        source_bytes.min(1024 * 1024)
+    );
+    assert_eq!(shape.publication_buffer_bytes, 65_536);
+    assert_eq!(shape.planning_fingerprint_scans, 1 + fenced);
+    assert_eq!(
+        shape.planning_fingerprint_bytes,
+        fingerprint_bytes * (1 + fenced)
+    );
+    assert_eq!(
+        shape.planning_fingerprint_chunks,
+        fingerprint_chunks * (1 + fenced)
+    );
+    assert_eq!(shape.composed_source_preflight_scans, 1);
+    assert_eq!(shape.composed_source_preflight_bytes, fingerprint_bytes);
+    assert_eq!(shape.composed_source_preflight_chunks, fingerprint_chunks);
+    assert_eq!(shape.target_materialization_write_pre_scans, fenced);
+    assert_eq!(
+        shape.target_materialization_write_pre_bytes,
+        fingerprint_bytes * fenced
+    );
+    assert_eq!(
+        shape.target_materialization_write_pre_chunks,
+        fingerprint_chunks * fenced
+    );
+    assert_eq!(shape.target_materialization_emission_scans, 1);
+    assert_eq!(
+        shape.target_materialization_emission_bytes,
+        fingerprint_bytes
+    );
+    assert_eq!(
+        shape.target_materialization_emission_chunks,
+        publication_chunks
+    );
+    assert_eq!(shape.target_materialization_write_post_scans, fenced);
+    assert_eq!(
+        shape.target_materialization_write_post_bytes,
+        fingerprint_bytes * fenced
+    );
+    assert_eq!(
+        shape.target_materialization_write_post_chunks,
+        fingerprint_chunks * fenced
+    );
+    assert_eq!(shape.direct_write_pre_scans, fenced);
+    assert_eq!(shape.direct_write_pre_bytes, fingerprint_bytes * fenced);
+    assert_eq!(shape.direct_write_pre_chunks, fingerprint_chunks * fenced);
+    assert_eq!(shape.direct_emission_scans, 1);
+    assert_eq!(shape.direct_emission_bytes, fingerprint_bytes);
+    assert_eq!(shape.direct_emission_chunks, publication_chunks);
+    assert_eq!(shape.direct_write_post_scans, fenced);
+    assert_eq!(shape.direct_write_post_bytes, fingerprint_bytes * fenced);
+    assert_eq!(shape.direct_write_post_chunks, fingerprint_chunks * fenced);
+    assert_eq!(shape.atomic_save_pre_temp_scans, fenced);
+    assert_eq!(shape.atomic_save_pre_temp_bytes, fingerprint_bytes * fenced);
+    assert_eq!(
+        shape.atomic_save_pre_temp_chunks,
+        fingerprint_chunks * fenced
+    );
+    assert_eq!(shape.atomic_save_emission_scans, 1);
+    assert_eq!(shape.atomic_save_emission_bytes, fingerprint_bytes);
+    assert_eq!(shape.atomic_save_emission_chunks, publication_chunks);
+    assert_eq!(shape.atomic_save_pre_rename_scans, fenced);
+    assert_eq!(
+        shape.atomic_save_pre_rename_bytes,
+        fingerprint_bytes * fenced
+    );
+    assert_eq!(
+        shape.atomic_save_pre_rename_chunks,
+        fingerprint_chunks * fenced
+    );
+    assert_eq!(
+        shape.atomic_save_event_scope,
+        "public save durability contract; temporary-file, flush, fsync, rename, and parent-sync stage counters are not observable"
+    );
+}
+
+#[test]
+fn operation_shape_matches_generic_and_owned_overlay_policy() {
+    let bytes = sample_bytes();
+    let generic = shared(bytes.clone())
+        .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
+        .unwrap();
+    let owned =
+        SharedOleFile::open_owned(Arc::from(bytes.clone()), SourceVersion::new(0xcafe_0261, 0))
+            .unwrap()
+            .plan_same_length_stream_overlays(vec![replacement("Fat4096", 0x66, 4_096)], limits())
+            .unwrap();
+
+    assert_operation_shape(
+        generic.operation_shape(),
+        OverlaySourceMode::GenericReadAt,
+        bytes.len() as u64,
+    );
+    assert_operation_shape(
+        owned.operation_shape(),
+        OverlaySourceMode::OwnedImmutableArc,
+        bytes.len() as u64,
+    );
 }
 
 #[test]

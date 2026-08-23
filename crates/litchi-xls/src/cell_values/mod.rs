@@ -29,7 +29,7 @@ use crate::{Error, Result, SheetKind, Workbook};
 use litchi_biff::Records;
 use litchi_cfb::consts::STGTY_STORAGE;
 use litchi_cfb::{
-    ArtifactFingerprint, ComposedOverlaySource, OverlayError, PublishReport,
+    ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayOperationShape, PublishReport,
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
@@ -3136,8 +3136,10 @@ impl Commit {
 /// Content-free evidence for a source-backed fixed-width numeric publication.
 ///
 /// The value retains bounded counts, lengths, opaque CFB fingerprints, and
-/// source lineage tokens only. It never copies workbook payloads or semantic
-/// cell values.
+/// source lineage tokens only. Its operation shape is a low-level contract
+/// derived from the validated CFB plan; it reports logical pass scopes rather
+/// than runtime counters or allocator/syscall activity. It never copies
+/// workbook payloads or semantic cell values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceBackedDiagnostics {
     changed_cells: usize,
@@ -3152,6 +3154,7 @@ pub struct SourceBackedDiagnostics {
     target_version: SourceVersion,
     source_fingerprint: ArtifactFingerprint,
     target_fingerprint: ArtifactFingerprint,
+    operation_shape: OverlayOperationShape,
 }
 
 impl SourceBackedDiagnostics {
@@ -3225,6 +3228,12 @@ impl SourceBackedDiagnostics {
     #[must_use]
     pub const fn target_fingerprint(self) -> ArtifactFingerprint {
         self.target_fingerprint
+    }
+
+    /// Exact low-level CFB pass shape for this source-backed operation.
+    #[must_use]
+    pub const fn operation_shape(self) -> OverlayOperationShape {
+        self.operation_shape
     }
 }
 
@@ -5213,6 +5222,7 @@ fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceB
         target_version,
         source_fingerprint: plan.source_fingerprint(),
         target_fingerprint: plan.target_fingerprint(),
+        operation_shape: plan.operation_shape(),
     };
     Ok(SourceBackedPlanCommit {
         source,
@@ -5348,6 +5358,7 @@ fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBacked
         target_version,
         source_fingerprint: plan.source_fingerprint(),
         target_fingerprint: plan.target_fingerprint(),
+        operation_shape: plan.operation_shape(),
     };
     Ok(SourceBackedCommit {
         source,

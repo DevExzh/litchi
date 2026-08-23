@@ -243,6 +243,36 @@ FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
     "xlsx_source_repeated_store_oversized_reacquisition_control": (
         _XLSX_REPEAT_STORE_OVERSIZED_CORPUS
     ),
+    "xls_numeric_eager_number_edit_save": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_numeric_source_backed_number_edit_save": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_numeric_plan_only_number_edit_save": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "shape": "256-comments-opaque-heavy",
+    },
+    "xls_numeric_eager_rk_mulrk_edit_save": {
+        "name": "xls-rk-mulrk-deterministic",
+        "generator": "litchi-xls-rk-mulrk-publication-v1",
+        "shape": "one-rk-one-mulrk",
+    },
+    "xls_numeric_source_backed_rk_mulrk_edit_save": {
+        "name": "xls-rk-mulrk-deterministic",
+        "generator": "litchi-xls-rk-mulrk-publication-v1",
+        "shape": "one-rk-one-mulrk",
+    },
+    "xls_numeric_plan_only_rk_mulrk_edit_save": {
+        "name": "xls-rk-mulrk-deterministic",
+        "generator": "litchi-xls-rk-mulrk-publication-v1",
+        "shape": "one-rk-one-mulrk",
+    },
 }
 
 _MISSING = object()
@@ -2477,6 +2507,8 @@ def _validate_report(
         raise AbbaSummaryInputError(f"{label}.configuration must not be empty")
     _validate_configuration(configuration, label)
     indexed = _index_results(root, label)
+    _validate_xls_numeric_source_summary(indexed, label)
+    _validate_xls_numeric_operation_evidence(indexed, label)
     filesystem_present, filesystem_shapes, filesystem_identity, filesystem_child_process_ids = (
         _validate_filesystem_evidence(root, configuration, tool, indexed, label)
     )
@@ -2645,6 +2677,981 @@ XLSX_CELL_VALUES_SOURCE_MEASUREMENTS = (
     "reopen_ns",
 )
 
+XLS_NUMERIC_OPERATION_COUNTER_SCOPE = (
+    "validated overlay logical pass shape; no runtime, allocator, or syscall counters"
+)
+XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA = "xls_numeric.operation_evidence.v1"
+XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE = "owned-source-ingress-only"
+XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE = (
+    "owned-source-ingress-only; xls-overlay-operation-evidence-v1"
+)
+XLS_NUMERIC_OWNED_INPUT_SCOPE = (
+    "complete in-memory CFB bytes; no positional/physical I/O"
+)
+XLS_NUMERIC_OPERATION_ATOMIC_SCOPE = (
+    "public save durability contract; temporary-file, flush, fsync, rename, and parent-sync stage counters are not observable"
+)
+XLS_NUMERIC_CFB_MAX_BYTES = 2 * 1024 * 1024 * 1024
+XLS_NUMERIC_CASE_CONTRACTS = {
+    "xls_numeric_eager_number_edit_save": ("eager", "Number", 1),
+    "xls_numeric_source_backed_number_edit_save": ("source_backed", "Number", 1),
+    "xls_numeric_plan_only_number_edit_save": ("plan_only", "Number", 1),
+    "xls_numeric_eager_rk_mulrk_edit_save": ("eager", "RK+MulRK", 3),
+    "xls_numeric_source_backed_rk_mulrk_edit_save": (
+        "source_backed",
+        "RK+MulRK",
+        3,
+    ),
+    "xls_numeric_plan_only_rk_mulrk_edit_save": ("plan_only", "RK+MulRK", 3),
+}
+# Native corpus manifests are part of the selector identity.  Keep the
+# complete producer shape here so a report cannot replace a native corpus
+# with a renamed or partially described synthetic one while preserving only
+# its archive length.
+XLS_NUMERIC_CORPUS_CONTRACTS = {
+    "Number": {
+        "name": "xls-comments-opaque-heavy",
+        "generator": "litchi-xls-comments-opaque-heavy-v1",
+        "package_format": "XLS/CFB",
+        "shape": "256-comments-opaque-heavy",
+        "payload_kind": "incompressible",
+        "compression": "none",
+        "entry_count": 257,
+        "archive_member_count": 10,
+        "entry_bytes": 2_097_152,
+        "uncompressed_payload_bytes": 16_858_200,
+        "archive_bytes": 16_995_840,
+        "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 80_946,
+        "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+        "xlsx": None,
+    },
+    "RK+MulRK": {
+        "name": "xls-rk-mulrk-deterministic",
+        "generator": "litchi-xls-rk-mulrk-publication-v1",
+        "package_format": "XLS/CFB",
+        "shape": "one-rk-one-mulrk",
+        "payload_kind": "incompressible",
+        "compression": "none",
+        "entry_count": 4,
+        "archive_member_count": 4,
+        "entry_bytes": 98_304,
+        "uncompressed_payload_bytes": 198_311,
+        "archive_bytes": 202_752,
+        "archive_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 1_665,
+        "target_payload_sha256": "1b57f77d776cc8d0ed0f5154f7f7db2abca7f5fa7e23ecc69dd316c1c0b65967",
+        "xlsx": None,
+    },
+}
+XLS_NUMERIC_WORKBOOK_SIZE_CONTRACTS = {
+    "Number": {"source_workbook_bytes": 80_946, "target_workbook_bytes": 80_946},
+    "RK+MulRK": {"source_workbook_bytes": 1_665, "target_workbook_bytes": 1_665},
+}
+XLS_NUMERIC_OUTPUT_CONTRACTS = {
+    "Number": {
+        "output_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+        "source_fingerprint_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+        "target_fingerprint_sha256": "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+        "replacement_bytes": 8,
+        "changed_spans": 1,
+        "sink_write_calls": 260,
+        "source_read_calls": 260,
+        "source_read_bytes": 16_995_840,
+    },
+    "RK+MulRK": {
+        "output_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+        "source_fingerprint_sha256": "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594",
+        "target_fingerprint_sha256": "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+        "replacement_bytes": 12,
+        "changed_spans": 3,
+        "sink_write_calls": 4,
+        "source_read_calls": 4,
+        "source_read_bytes": 202_752,
+    },
+}
+XLS_NUMERIC_OPERATION_KEYS = frozenset(
+    {
+        "counter_scope",
+        "source_mode",
+        "source_bytes",
+        "fingerprint_chunk_bytes",
+        "publication_chunk_bytes",
+        "fingerprint_buffer_bytes",
+        "publication_buffer_bytes",
+        "planning_fingerprint_scans",
+        "planning_fingerprint_bytes",
+        "planning_fingerprint_chunks",
+        "composed_source_preflight_scans",
+        "composed_source_preflight_bytes",
+        "composed_source_preflight_chunks",
+        "target_materialization_write_pre_scans",
+        "target_materialization_write_pre_bytes",
+        "target_materialization_write_pre_chunks",
+        "target_materialization_emission_scans",
+        "target_materialization_emission_bytes",
+        "target_materialization_emission_chunks",
+        "target_materialization_write_post_scans",
+        "target_materialization_write_post_bytes",
+        "target_materialization_write_post_chunks",
+        "direct_write_pre_scans",
+        "direct_write_pre_bytes",
+        "direct_write_pre_chunks",
+        "direct_emission_scans",
+        "direct_emission_bytes",
+        "direct_emission_chunks",
+        "direct_write_post_scans",
+        "direct_write_post_bytes",
+        "direct_write_post_chunks",
+        "atomic_save_pre_temp_scans",
+        "atomic_save_pre_temp_bytes",
+        "atomic_save_pre_temp_chunks",
+        "atomic_save_emission_scans",
+        "atomic_save_emission_bytes",
+        "atomic_save_emission_chunks",
+        "atomic_save_pre_rename_scans",
+        "atomic_save_pre_rename_bytes",
+        "atomic_save_pre_rename_chunks",
+        "candidate_reopen_logical_artifact_bytes",
+        "selected_stream_logical_bytes",
+        "splice_count",
+        "changed_span_count",
+        "replacement_bytes",
+        "target_materialization_vec_bytes",
+        "target_materialization_clone_bytes",
+        "publication_write_calls",
+        "atomic_save_event_scope",
+    }
+)
+XLS_NUMERIC_OPERATION_MEASUREMENT_FIELDS = frozenset(
+    {
+        "source_mode",
+        "planning_fingerprint_scans",
+        "planning_fingerprint_bytes",
+        "planning_fingerprint_chunks",
+        "composed_source_preflight_scans",
+        "composed_source_preflight_bytes",
+        "composed_source_preflight_chunks",
+        "target_materialization_write_pre_scans",
+        "target_materialization_write_pre_bytes",
+        "target_materialization_write_pre_chunks",
+        "target_materialization_emission_scans",
+        "target_materialization_emission_bytes",
+        "target_materialization_emission_chunks",
+        "target_materialization_write_post_scans",
+        "target_materialization_write_post_bytes",
+        "target_materialization_write_post_chunks",
+        "direct_write_pre_scans",
+        "direct_write_pre_bytes",
+        "direct_write_pre_chunks",
+        "direct_emission_scans",
+        "direct_emission_bytes",
+        "direct_emission_chunks",
+        "direct_write_post_scans",
+        "direct_write_post_bytes",
+        "direct_write_post_chunks",
+        "atomic_save_pre_temp_scans",
+        "atomic_save_pre_temp_bytes",
+        "atomic_save_pre_temp_chunks",
+        "atomic_save_emission_scans",
+        "atomic_save_emission_bytes",
+        "atomic_save_emission_chunks",
+        "atomic_save_pre_rename_scans",
+        "atomic_save_pre_rename_bytes",
+        "atomic_save_pre_rename_chunks",
+    }
+)
+XLS_NUMERIC_TIMING_VECTOR_FIELDS = frozenset(
+    {"edit_ns", "set_ns", "commit_ns", "publication_ns", "total_ns"}
+)
+XLS_NUMERIC_SOURCE_COMMON_KEYS = frozenset(
+    {
+        "source_counter_scope",
+        "implementation",
+        "family",
+        "source_backed",
+        "target_artifact_retained_at_commit",
+        "target_artifact_materialized_at_commit",
+        "patch_or_inverse_supported",
+        "update_count",
+        "sample_count",
+        "input_cfb_bytes",
+        "output_cfb_bytes",
+        "source_workbook_bytes",
+        "target_workbook_bytes",
+        "sink_capacity_bytes",
+        "expected_output_sha256",
+        "owned_input_scope",
+        *XLS_NUMERIC_TIMING_VECTOR_FIELDS,
+        "complete_target_materialized_bytes",
+        "sink_bytes",
+        "sink_write_calls",
+        "sink_digests",
+        "source_bytes",
+        "source_workbook_bytes_per_sample",
+        "target_workbook_bytes_per_sample",
+    }
+)
+XLS_NUMERIC_SOURCE_OPTIONAL_KEYS = frozenset(
+    {
+        "splice_count",
+        "replacement_bytes",
+        "changed_spans",
+        "source_fingerprints",
+        "target_fingerprints",
+        "operation_evidence_schema",
+        "operation_evidence",
+    }
+)
+
+
+def _validate_xls_numeric_vector(
+    value: Any, location: str, sample_count: int, *, digest: bool = False
+) -> list[Any]:
+    if not isinstance(value, list) or len(value) != sample_count:
+        raise AbbaSummaryInputError(
+            f"{location} must be a list with {sample_count} samples"
+        )
+    for index, item in enumerate(value):
+        item_location = f"{location}[{index}]"
+        if digest:
+            _validate_output_sha256(item, item_location)
+        else:
+            _u64(item, item_location)
+    return value
+
+
+def _validate_xls_numeric_sample_order(
+    elapsed: dict[str, Any], location: str, sample_count: int
+) -> tuple[list[int], list[int]]:
+    samples = elapsed.get("samples")
+    if not isinstance(samples, list) or len(samples) != sample_count:
+        raise AbbaSummaryInputError(
+            f"{location}.samples must be a list with {sample_count} samples"
+        )
+    sample_values = [
+        _u64(value, f"{location}.samples[{index}]")
+        for index, value in enumerate(samples)
+    ]
+    sample_order = elapsed.get("sample_order")
+    if not isinstance(sample_order, list) or len(sample_order) != sample_count:
+        raise AbbaSummaryInputError(
+            f"{location}.sample_order must be a list with {sample_count} samples"
+        )
+    order_values = [
+        _u64(value, f"{location}.sample_order[{index}]")
+        for index, value in enumerate(sample_order)
+    ]
+    expected_order = set(range(sample_count))
+    if set(order_values) != expected_order:
+        raise AbbaSummaryInputError(
+            f"{location}.sample_order must be a complete permutation of retained samples"
+        )
+    return sample_values, order_values
+
+
+def _validate_xls_numeric_source_summary(
+    indexed: Mapping[tuple[str, str], dict[str, Any]], label: str
+) -> None:
+    """Validate the native-XLS source-summary envelope and its cardinalities."""
+
+    allowed_keys = XLS_NUMERIC_SOURCE_COMMON_KEYS | XLS_NUMERIC_SOURCE_OPTIONAL_KEYS
+    for (case, corpus_identity), row in indexed.items():
+        is_native_selector = case in XLS_NUMERIC_CASE_CONTRACTS
+        corpus_value = row.get("corpus")
+        native_corpus_family = next(
+            (
+                family
+                for family, expected in XLS_NUMERIC_CORPUS_CONTRACTS.items()
+                if corpus_value == expected
+            ),
+            None,
+        )
+        if native_corpus_family is not None and not is_native_selector:
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.corpus is a native XLS numeric corpus but the selector is not native"
+            )
+        source = row.get("source", _MISSING)
+        if is_native_selector and (source is _MISSING or source is None):
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source is required for native XLS numeric evidence"
+            )
+        if source is _MISSING or source is None:
+            continue
+        source_object = _require_object(source, f"{label}.{case}.source")
+        numeric = source_object.get("xls_numeric", _MISSING)
+        if is_native_selector and (numeric is _MISSING or numeric is None):
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source.xls_numeric is required for native XLS numeric evidence"
+            )
+        if numeric is _MISSING or numeric is None:
+            continue
+        location = f"{label}.{case}.source.xls_numeric"
+        numeric_object = _require_object(numeric, location)
+        contract = XLS_NUMERIC_CASE_CONTRACTS.get(case)
+        if contract is None:
+            raise AbbaSummaryInputError(
+                f"{location}.case is not one of the six XLS numeric selectors"
+            )
+        expected_implementation, expected_family, expected_updates = contract
+        corpus = _require_object(row.get("corpus"), f"{label}.{case}.corpus")
+        try:
+            parsed_corpus_identity = json.loads(corpus_identity)
+        except (TypeError, ValueError) as error:
+            raise AbbaSummaryInputError(
+                f"{location} corpus identity is not valid canonical JSON"
+            ) from error
+        if parsed_corpus_identity != corpus:
+            raise AbbaSummaryInputError(
+                f"{location} corpus identity does not match result.corpus"
+            )
+        expected_corpus = XLS_NUMERIC_CORPUS_CONTRACTS[expected_family]
+        if corpus != expected_corpus:
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.corpus does not match the exact {expected_family} native corpus manifest"
+            )
+        corpus_bytes = _u64(
+            corpus.get("archive_bytes"),
+            f"{label}.{case}.corpus.archive_bytes",
+            positive=True,
+        )
+        if corpus_bytes > XLS_NUMERIC_CFB_MAX_BYTES:
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.corpus.archive_bytes exceeds the 2 GiB CFB limit"
+            )
+        _validate_output_sha256(
+            corpus.get("archive_sha256"),
+            f"{label}.{case}.corpus.archive_sha256",
+        )
+        authoritative_output_digest = _validate_output_sha256(
+            row.get("output_sha256"), f"{label}.{case}.output_sha256"
+        )
+        output_contract = XLS_NUMERIC_OUTPUT_CONTRACTS[expected_family]
+        if authoritative_output_digest != output_contract["output_sha256"]:
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.output_sha256 differs from the exact {expected_family} native output"
+            )
+        sink = _require_object(row.get("sink"), f"{label}.{case}.sink")
+        authoritative_sink_bytes = _u64(
+            sink.get("accepted_bytes"),
+            f"{label}.{case}.sink.accepted_bytes",
+            positive=True,
+        )
+        authoritative_sink_writes = _u64(
+            sink.get("write_calls"),
+            f"{label}.{case}.sink.write_calls",
+            positive=True,
+        )
+        if authoritative_sink_writes != output_contract["sink_write_calls"]:
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.sink.write_calls differs from the exact {expected_family} native sink contract"
+            )
+        missing = XLS_NUMERIC_SOURCE_COMMON_KEYS - set(numeric_object)
+        if missing:
+            raise AbbaSummaryInputError(
+                f"{location} is missing required keys: {sorted(missing)}"
+            )
+        unknown = set(numeric_object) - allowed_keys
+        if unknown:
+            raise AbbaSummaryInputError(
+                f"{location} has unknown keys: {sorted(unknown)}"
+            )
+        implementation = _required_nonempty_string(
+            numeric_object["implementation"], location, "implementation"
+        )
+        if implementation not in {"eager", "source_backed", "plan_only"}:
+            raise AbbaSummaryInputError(f"{location}.implementation has an unknown value")
+        if implementation != expected_implementation:
+            raise AbbaSummaryInputError(
+                f"{location}.implementation disagrees with selector {case!r}"
+            )
+        source_backed = _required_bool(
+            numeric_object["source_backed"], location, "source_backed"
+        )
+        if source_backed != (implementation != "eager"):
+            raise AbbaSummaryInputError(
+                f"{location}.source_backed disagrees with implementation"
+            )
+        family = _required_nonempty_string(numeric_object["family"], location, "family")
+        if family not in {"Number", "RK+MulRK"}:
+            raise AbbaSummaryInputError(f"{location}.family has an unknown value")
+        if family != expected_family:
+            raise AbbaSummaryInputError(
+                f"{location}.family disagrees with selector {case!r}"
+            )
+        _required_nonempty_string(numeric_object["source_counter_scope"], location, "source_counter_scope")
+        owned_input_scope = _required_nonempty_string(
+            numeric_object["owned_input_scope"], location, "owned_input_scope"
+        )
+        if owned_input_scope != XLS_NUMERIC_OWNED_INPUT_SCOPE:
+            raise AbbaSummaryInputError(
+                f"{location}.owned_input_scope is not the complete in-memory CFB contract"
+            )
+        update_count = _u64(numeric_object["update_count"], f"{location}.update_count", positive=True)
+        if update_count != expected_updates:
+            raise AbbaSummaryInputError(
+                f"{location}.update_count disagrees with selector {case!r}"
+            )
+        sample_count = _u64(numeric_object["sample_count"], f"{location}.sample_count", positive=True)
+        elapsed = _require_object(row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns")
+        elapsed_samples, sample_order = _validate_xls_numeric_sample_order(
+            elapsed, f"{label}.{case}.elapsed_ns", sample_count
+        )
+        source_read_calls = _validate_xls_numeric_vector(
+            source_object.get("read_calls", _MISSING),
+            f"{label}.{case}.source.read_calls",
+            sample_count,
+        )
+        source_read_bytes = _validate_xls_numeric_vector(
+            source_object.get("read_bytes", _MISSING),
+            f"{label}.{case}.source.read_bytes",
+            sample_count,
+        )
+        input_bytes = _u64(numeric_object["input_cfb_bytes"], f"{location}.input_cfb_bytes", positive=True)
+        output_bytes = _u64(numeric_object["output_cfb_bytes"], f"{location}.output_cfb_bytes", positive=True)
+        if input_bytes != corpus_bytes:
+            raise AbbaSummaryInputError(
+                f"{location}.input_cfb_bytes differs from corpus.archive_bytes"
+            )
+        if output_bytes != input_bytes:
+            raise AbbaSummaryInputError(
+                f"{location}.output_cfb_bytes differs from input_cfb_bytes"
+            )
+        expected_source_read_calls = output_contract["source_read_calls"]
+        expected_source_read_bytes = output_contract["source_read_bytes"]
+        if expected_source_read_bytes != input_bytes:
+            raise AbbaSummaryInputError(
+                f"{location} native source-read byte contract disagrees with input_cfb_bytes"
+            )
+        if expected_source_read_calls != authoritative_sink_writes:
+            raise AbbaSummaryInputError(
+                f"{location} native source-read call contract disagrees with result.sink.write_calls"
+            )
+        for index in range(sample_count):
+            if source_read_calls[index] == 0:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.read_calls must be positive"
+                )
+            if source_read_calls[index] != expected_source_read_calls:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.read_calls differs from the exact {expected_family} native contract and source identity"
+                )
+            if source_read_bytes[index] != input_bytes:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.read_bytes disagrees with input_cfb_bytes"
+                )
+            if source_read_bytes[index] != expected_source_read_bytes:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.read_bytes differs from the exact {expected_family} native contract"
+                )
+        source_workbook_bytes = _u64(
+            numeric_object["source_workbook_bytes"], f"{location}.source_workbook_bytes", positive=True
+        )
+        target_workbook_bytes = _u64(
+            numeric_object["target_workbook_bytes"], f"{location}.target_workbook_bytes", positive=True
+        )
+        expected_workbook_sizes = XLS_NUMERIC_WORKBOOK_SIZE_CONTRACTS[expected_family]
+        if source_workbook_bytes != expected_workbook_sizes["source_workbook_bytes"]:
+            raise AbbaSummaryInputError(
+                f"{location}.source_workbook_bytes disagrees with the native {expected_family} corpus"
+            )
+        if target_workbook_bytes != expected_workbook_sizes["target_workbook_bytes"]:
+            raise AbbaSummaryInputError(
+                f"{location}.target_workbook_bytes disagrees with the native {expected_family} corpus"
+            )
+        sink_capacity = _u64(
+            numeric_object["sink_capacity_bytes"], f"{location}.sink_capacity_bytes", positive=True
+        )
+        if sink_capacity != output_bytes:
+            raise AbbaSummaryInputError(f"{location}.sink_capacity_bytes differs from output_cfb_bytes")
+        expected_digest = _validate_output_sha256(
+            numeric_object["expected_output_sha256"], f"{location}.expected_output_sha256"
+        )
+        if expected_digest != authoritative_output_digest:
+            raise AbbaSummaryInputError(
+                f"{location}.expected_output_sha256 differs from result.output_sha256"
+            )
+        if authoritative_sink_bytes != output_bytes:
+            raise AbbaSummaryInputError(
+                f"{location}.result.sink.accepted_bytes differs from output_cfb_bytes"
+            )
+        expected_retained = implementation != "plan_only"
+        for field, expected in (
+            ("target_artifact_retained_at_commit", expected_retained),
+            ("target_artifact_materialized_at_commit", expected_retained),
+            ("patch_or_inverse_supported", expected_retained),
+        ):
+            if _required_bool(numeric_object[field], location, field) != expected:
+                raise AbbaSummaryInputError(
+                    f"{location}.{field} disagrees with implementation"
+                )
+
+        timing_vectors = {
+            field: _validate_xls_numeric_vector(
+                numeric_object[field], f"{location}.{field}", sample_count
+            )
+            for field in XLS_NUMERIC_TIMING_VECTOR_FIELDS
+        }
+        complete = _validate_xls_numeric_vector(
+            numeric_object["complete_target_materialized_bytes"],
+            f"{location}.complete_target_materialized_bytes",
+            sample_count,
+        )
+        sink_bytes = _validate_xls_numeric_vector(
+            numeric_object["sink_bytes"], f"{location}.sink_bytes", sample_count
+        )
+        sink_writes = _validate_xls_numeric_vector(
+            numeric_object["sink_write_calls"], f"{location}.sink_write_calls", sample_count
+        )
+        sink_digests = _validate_xls_numeric_vector(
+            numeric_object["sink_digests"], f"{location}.sink_digests", sample_count, digest=True
+        )
+        source_sizes = _validate_xls_numeric_vector(
+            numeric_object["source_bytes"], f"{location}.source_bytes", sample_count
+        )
+        source_stream_sizes = _validate_xls_numeric_vector(
+            numeric_object["source_workbook_bytes_per_sample"],
+            f"{location}.source_workbook_bytes_per_sample",
+            sample_count,
+        )
+        target_stream_sizes = _validate_xls_numeric_vector(
+            numeric_object["target_workbook_bytes_per_sample"],
+            f"{location}.target_workbook_bytes_per_sample",
+            sample_count,
+        )
+        expected_materialized = output_bytes if expected_retained else 0
+        for index in range(sample_count):
+            phase_sum = sum(
+                timing_vectors[field][index]
+                for field in ("edit_ns", "set_ns", "commit_ns", "publication_ns")
+            )
+            if phase_sum > U64_MAX:
+                raise AbbaSummaryInputError(
+                    f"{location}.total_ns phase sum exceeds u64"
+                )
+            if timing_vectors["total_ns"][index] != phase_sum:
+                raise AbbaSummaryInputError(
+                    f"{location}.total_ns must equal the per-sample phase sum"
+                )
+            if complete[index] != expected_materialized:
+                raise AbbaSummaryInputError(f"{location}.complete_target_materialized_bytes disagrees with implementation")
+            if sink_bytes[index] != output_bytes:
+                raise AbbaSummaryInputError(f"{location}.sink_bytes disagrees with output_cfb_bytes")
+            if sink_writes[index] == 0:
+                raise AbbaSummaryInputError(f"{location}.sink_write_calls must be positive")
+            if sink_writes[index] != authoritative_sink_writes:
+                raise AbbaSummaryInputError(
+                    f"{location}.sink_write_calls differs from result.sink.write_calls"
+                )
+            if sink_writes[index] != output_contract["sink_write_calls"]:
+                raise AbbaSummaryInputError(
+                    f"{location}.sink_write_calls differs from the exact {expected_family} native sink contract"
+                )
+            if sink_digests[index] != expected_digest:
+                raise AbbaSummaryInputError(f"{location}.sink_digests disagrees with expected_output_sha256")
+            if sink_digests[index] != output_contract["target_fingerprint_sha256"]:
+                raise AbbaSummaryInputError(
+                    f"{location}.sink_digests differs from the exact {expected_family} native output"
+                )
+            if source_sizes[index] != input_bytes:
+                raise AbbaSummaryInputError(f"{location}.source_bytes disagrees with input_cfb_bytes")
+            if source_stream_sizes[index] != source_workbook_bytes:
+                raise AbbaSummaryInputError(f"{location}.source_workbook_bytes_per_sample disagrees with source_workbook_bytes")
+            if target_stream_sizes[index] != target_workbook_bytes:
+                raise AbbaSummaryInputError(f"{location}.target_workbook_bytes_per_sample disagrees with target_workbook_bytes")
+        for sorted_index, original_index in enumerate(sample_order):
+            if timing_vectors["total_ns"][original_index] != elapsed_samples[sorted_index]:
+                raise AbbaSummaryInputError(
+                    f"{location}.total_ns does not bind to elapsed_ns.samples via sample_order"
+                )
+
+        optional_vector_fields = (
+            "splice_count",
+            "replacement_bytes",
+            "changed_spans",
+            "source_fingerprints",
+            "target_fingerprints",
+        )
+        optional_present = {field: field in numeric_object for field in optional_vector_fields}
+        if any(value != source_backed for value in optional_present.values()):
+            raise AbbaSummaryInputError(
+                f"{location} source-backed optional vector presence is inconsistent"
+            )
+        for field in optional_vector_fields:
+            if field not in numeric_object:
+                continue
+            values = _validate_xls_numeric_vector(
+                numeric_object[field],
+                f"{location}.{field}",
+                sample_count,
+                digest=field.endswith("fingerprints"),
+            )
+            if field == "splice_count" and any(value != update_count for value in values):
+                raise AbbaSummaryInputError(f"{location}.splice_count disagrees with update_count")
+            if field == "replacement_bytes":
+                if any(value == 0 for value in values):
+                    raise AbbaSummaryInputError(f"{location}.replacement_bytes must be positive")
+                if any(value != output_contract["replacement_bytes"] for value in values):
+                    raise AbbaSummaryInputError(
+                        f"{location}.replacement_bytes differs from the exact {expected_family} native contract"
+                    )
+            if field == "changed_spans":
+                if any(value == 0 for value in values):
+                    raise AbbaSummaryInputError(f"{location}.changed_spans must be positive")
+                if any(value != output_contract["changed_spans"] for value in values):
+                    raise AbbaSummaryInputError(
+                        f"{location}.changed_spans differs from the exact {expected_family} native contract"
+                    )
+            if field == "source_fingerprints" and any(
+                value != output_contract["source_fingerprint_sha256"] for value in values
+            ):
+                raise AbbaSummaryInputError(
+                    f"{location}.source_fingerprints differs from the exact {expected_family} native corpus"
+                )
+            if field == "target_fingerprints" and any(
+                value != output_contract["target_fingerprint_sha256"] for value in values
+            ):
+                raise AbbaSummaryInputError(
+                    f"{location}.target_fingerprints differs from the exact {expected_family} native output"
+                )
+
+        schema = numeric_object.get("operation_evidence_schema", _MISSING)
+        operation_present = "operation_evidence" in numeric_object
+        if implementation == "eager":
+            if numeric_object["source_counter_scope"] != XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE:
+                raise AbbaSummaryInputError(
+                    f"{location}.source_counter_scope is invalid for eager implementation"
+                )
+            if schema is not _MISSING or operation_present:
+                raise AbbaSummaryInputError(
+                    f"{location} eager implementation must not carry operation evidence"
+                )
+        else:
+            if numeric_object["source_counter_scope"] != XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE:
+                raise AbbaSummaryInputError(
+                    f"{location}.source_counter_scope is not the current operation-evidence discriminator"
+                )
+            if schema is _MISSING:
+                raise AbbaSummaryInputError(
+                    f"{location} source-backed implementation requires operation_evidence_schema"
+                )
+            if schema != XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA:
+                raise AbbaSummaryInputError(f"{location}.operation_evidence_schema is invalid")
+            if not operation_present:
+                raise AbbaSummaryInputError(
+                    f"{location} current source-backed row requires operation_evidence"
+                )
+            if not isinstance(numeric_object["operation_evidence"], list):
+                raise AbbaSummaryInputError(f"{location}.operation_evidence must be a list")
+
+
+def _validate_xls_numeric_operation_evidence(
+    indexed: Mapping[tuple[str, str], dict[str, Any]], label: str
+) -> None:
+    """Validate additive native-XLS logical operation-shape evidence.
+
+    The low-level CFB shape is deliberately redundant with its source length:
+    recomputing every phase here catches report tampering and accidental
+    generic/owned policy drift.  This validator does not infer timings or
+    speedups, and it accepts historical rows that predate the additive field
+    by validating only rows that actually carry ``operation_evidence``.
+    """
+
+    numeric_fields = XLS_NUMERIC_OPERATION_KEYS - {
+        "counter_scope",
+        "source_mode",
+        "atomic_save_event_scope",
+    }
+
+    def phase_shape(
+        evidence: dict[str, Any],
+        prefix: str,
+        scans: int,
+        source_bytes: int,
+        fingerprint_chunks: int,
+        emission: bool = False,
+    ) -> None:
+        _u64(evidence[f"{prefix}_scans"], f"{prefix}.scans")
+        _u64(evidence[f"{prefix}_bytes"], f"{prefix}.bytes")
+        _u64(evidence[f"{prefix}_chunks"], f"{prefix}.chunks")
+        expected_bytes = source_bytes * 2
+        expected_chunks = (source_bytes + (65_536 if emission else 1_048_576) - 1) // (
+            65_536 if emission else 1_048_576
+        )
+        if evidence[f"{prefix}_scans"] != scans:
+            raise AbbaSummaryInputError(
+                f"{prefix} scan count does not match source-mode contract"
+            )
+        if evidence[f"{prefix}_bytes"] != expected_bytes * scans:
+            raise AbbaSummaryInputError(
+                f"{prefix} logical bytes do not match source-mode contract"
+            )
+        if evidence[f"{prefix}_chunks"] != expected_chunks * scans:
+            raise AbbaSummaryInputError(
+                f"{prefix} logical chunks do not match source-mode contract"
+            )
+
+    for (case, _corpus_identity), row in indexed.items():
+        source = row.get("source")
+        if source is None:
+            continue
+        source_object = _require_object(source, f"{label}.{case}.source")
+        numeric = source_object.get("xls_numeric")
+        if numeric is None:
+            continue
+        numeric_object = _require_object(numeric, f"{label}.{case}.source.xls_numeric")
+        schema = numeric_object.get("operation_evidence_schema", _MISSING)
+        if schema is _MISSING:
+            # Historical schema-1 operation evidence used a different field
+            # shape. The explicit absence of the new schema marker, together
+            # with the top-level legacy discriminator, keeps it opaque here.
+            continue
+        if schema != XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA:
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source.xls_numeric.operation_evidence_schema is invalid"
+            )
+        operation = numeric_object.get("operation_evidence", _MISSING)
+        if operation is _MISSING:
+            continue
+        location = f"{label}.{case}.source.xls_numeric.operation_evidence"
+        if operation is None or not isinstance(operation, list):
+            raise AbbaSummaryInputError(f"{location} must be a list when present")
+        if numeric_object.get("source_backed") is not True:
+            raise AbbaSummaryInputError(
+                f"{location} requires source.xls_numeric.source_backed=true"
+            )
+        implementation = numeric_object.get("implementation")
+        if implementation not in {"source_backed", "plan_only"}:
+            raise AbbaSummaryInputError(
+                f"{location} requires source.xls_numeric implementation source_backed or plan_only"
+            )
+        elapsed = _require_object(row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns")
+        elapsed_samples = elapsed.get("samples")
+        if not isinstance(elapsed_samples, list) or len(operation) != len(elapsed_samples):
+            raise AbbaSummaryInputError(
+                f"{location} cardinality must equal elapsed_ns.samples"
+            )
+        sample_count = numeric_object.get("sample_count")
+        if isinstance(sample_count, bool) or not isinstance(sample_count, int):
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source.xls_numeric.sample_count must be an integer"
+            )
+        if sample_count != len(operation):
+            raise AbbaSummaryInputError(
+                f"{location} cardinality must equal source.xls_numeric.sample_count"
+            )
+
+        source_bytes = _u64(
+            numeric_object.get("input_cfb_bytes"),
+            f"{label}.{case}.source.xls_numeric.input_cfb_bytes",
+        )
+        output_bytes = _u64(
+            numeric_object.get("output_cfb_bytes"),
+            f"{label}.{case}.source.xls_numeric.output_cfb_bytes",
+        )
+        target_workbook_bytes = _u64(
+            numeric_object.get("target_workbook_bytes"),
+            f"{label}.{case}.source.xls_numeric.target_workbook_bytes",
+        )
+        splice_values = numeric_object.get("splice_count")
+        replacement_values = numeric_object.get("replacement_bytes")
+        changed_values = numeric_object.get("changed_spans")
+        sink_write_values = numeric_object.get("sink_write_calls")
+        sink = _require_object(row.get("sink"), f"{label}.{case}.sink")
+        authoritative_sink_writes = _u64(
+            sink.get("write_calls"),
+            f"{label}.{case}.sink.write_calls",
+            positive=True,
+        )
+        for field, values in (
+            ("splice_count", splice_values),
+            ("replacement_bytes", replacement_values),
+            ("changed_spans", changed_values),
+            ("sink_write_calls", sink_write_values),
+        ):
+            if not isinstance(values, list) or len(values) != len(operation):
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.xls_numeric.{field} cardinality differs from operation_evidence"
+                )
+            for index, value in enumerate(values):
+                _u64(value, f"{label}.{case}.source.xls_numeric.{field}[{index}]")
+        if any(value != authoritative_sink_writes for value in sink_write_values):
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source.xls_numeric.sink_write_calls differs from result.sink.write_calls"
+            )
+
+        materialized = numeric_object.get("target_artifact_materialized_at_commit")
+        if not isinstance(materialized, bool):
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source.xls_numeric.target_artifact_materialized_at_commit must be a boolean"
+            )
+        complete_materialized = numeric_object.get("complete_target_materialized_bytes")
+        if not isinstance(complete_materialized, list) or len(complete_materialized) != len(operation):
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.source.xls_numeric.complete_target_materialized_bytes cardinality is invalid"
+            )
+
+        for index, item in enumerate(operation):
+            item_location = f"{location}[{index}]"
+            evidence = _require_object(item, item_location)
+            if set(evidence) != XLS_NUMERIC_OPERATION_KEYS:
+                raise AbbaSummaryInputError(
+                    f"{item_location} keys mismatch: expected {sorted(XLS_NUMERIC_OPERATION_KEYS)}"
+                )
+            for field in numeric_fields:
+                _u64(evidence[field], f"{item_location}.{field}")
+            counter_scope = _required_nonempty_string(
+                evidence["counter_scope"], item_location, "counter_scope"
+            )
+            if counter_scope != XLS_NUMERIC_OPERATION_COUNTER_SCOPE:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.counter_scope is not the validated CFB scope"
+                )
+            mode = _required_nonempty_string(
+                evidence["source_mode"], item_location, "source_mode"
+            )
+            if mode not in {"generic_read_at", "owned_immutable_arc"}:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.source_mode has an unknown value"
+                )
+            if implementation == "plan_only":
+                expected_mode = "owned_immutable_arc"
+            else:
+                expected_mode = (
+                    "generic_read_at" if label in {"a1", "a2"} else "owned_immutable_arc"
+                )
+            if mode != expected_mode:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.source_mode violates the ABBA implementation-role contract"
+                )
+            atomic_scope = _required_nonempty_string(
+                evidence["atomic_save_event_scope"], item_location, "atomic_save_event_scope"
+            )
+            if atomic_scope != XLS_NUMERIC_OPERATION_ATOMIC_SCOPE:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.atomic_save_event_scope is not the public-save contract"
+                )
+            if evidence["source_bytes"] != source_bytes:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.source_bytes differs from input_cfb_bytes"
+                )
+            if evidence["fingerprint_chunk_bytes"] != 1_048_576:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.fingerprint_chunk_bytes has an invalid contract"
+                )
+            if evidence["publication_chunk_bytes"] != 65_536:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.publication_chunk_bytes has an invalid contract"
+                )
+            if evidence["fingerprint_buffer_bytes"] != min(source_bytes, 1_048_576):
+                raise AbbaSummaryInputError(
+                    f"{item_location}.fingerprint_buffer_bytes has an invalid scope"
+                )
+            if evidence["publication_buffer_bytes"] != 65_536:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.publication_buffer_bytes has an invalid scope"
+                )
+            fingerprint_chunks = (source_bytes + 1_048_576 - 1) // 1_048_576
+            publication_chunks = (source_bytes + 65_536 - 1) // 65_536
+            planning_scans = 2 if mode == "generic_read_at" else 1
+            fenced_scans = 1 if mode == "generic_read_at" else 0
+            if evidence["planning_fingerprint_scans"] != planning_scans:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.planning_fingerprint_scans violates source-mode policy"
+                )
+            if evidence["planning_fingerprint_bytes"] != source_bytes * 2 * planning_scans:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.planning_fingerprint_bytes violates source-mode policy"
+                )
+            if evidence["planning_fingerprint_chunks"] != fingerprint_chunks * planning_scans:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.planning_fingerprint_chunks violates source-mode policy"
+                )
+            phase_shape(
+                evidence,
+                "composed_source_preflight",
+                1,
+                source_bytes,
+                fingerprint_chunks,
+            )
+            for prefix in (
+                "target_materialization_write_pre",
+                "target_materialization_write_post",
+                "direct_write_pre",
+                "direct_write_post",
+                "atomic_save_pre_temp",
+                "atomic_save_pre_rename",
+            ):
+                phase_shape(
+                    evidence,
+                    prefix,
+                    fenced_scans,
+                    source_bytes,
+                    fingerprint_chunks,
+                )
+            for prefix in (
+                "target_materialization_emission",
+                "direct_emission",
+                "atomic_save_emission",
+            ):
+                phase_shape(
+                    evidence,
+                    prefix,
+                    1,
+                    source_bytes,
+                    fingerprint_chunks,
+                    emission=True,
+                )
+            if evidence["candidate_reopen_logical_artifact_bytes"] != (
+                output_bytes if implementation == "source_backed" else source_bytes
+            ):
+                raise AbbaSummaryInputError(
+                    f"{item_location}.candidate_reopen_logical_artifact_bytes violates publication contract"
+                )
+            if evidence["selected_stream_logical_bytes"] != target_workbook_bytes:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.selected_stream_logical_bytes differs from target workbook length"
+                )
+            if evidence["splice_count"] != splice_values[index]:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.splice_count differs from source summary"
+                )
+            if evidence["replacement_bytes"] != replacement_values[index]:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.replacement_bytes differs from source summary"
+                )
+            if evidence["changed_span_count"] != changed_values[index]:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.changed_span_count differs from source summary"
+                )
+            if evidence["publication_write_calls"] != sink_write_values[index]:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.publication_write_calls differs from sink summary"
+                )
+            if evidence["publication_write_calls"] != authoritative_sink_writes:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.publication_write_calls differs from result.sink.write_calls"
+                )
+            expected_materialized = output_bytes if materialized else 0
+            if evidence["target_materialization_vec_bytes"] != expected_materialized:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.target_materialization_vec_bytes violates materialization contract"
+                )
+            if evidence["target_materialization_clone_bytes"] != expected_materialized:
+                raise AbbaSummaryInputError(
+                    f"{item_location}.target_materialization_clone_bytes violates materialization contract"
+                )
+            _u64(
+                complete_materialized[index],
+                f"{label}.{case}.source.xls_numeric.complete_target_materialized_bytes[{index}]",
+            )
+            if complete_materialized[index] != expected_materialized:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.source.xls_numeric.complete_target_materialized_bytes disagrees with operation evidence"
+                )
+
 
 def _source_identity_projection(value: Any) -> Any:
     """Remove named measurements while retaining every source identity field."""
@@ -2673,6 +3680,24 @@ def _source_identity_projection(value: Any) -> Any:
         for field in XLSX_CELL_VALUES_SOURCE_MEASUREMENTS:
             projected_xlsx.pop(field, None)
         projected["xlsx_cell_values"] = projected_xlsx
+    xls_numeric = projected.get("xls_numeric")
+    if isinstance(xls_numeric, dict):
+        projected_xls = dict(xls_numeric)
+        for field in XLS_NUMERIC_TIMING_VECTOR_FIELDS:
+            projected_xls.pop(field, None)
+        operation_evidence = projected_xls.get("operation_evidence")
+        if isinstance(operation_evidence, list):
+            projected_xls["operation_evidence"] = [
+                {
+                    key: item[key]
+                    for key in item
+                    if key not in XLS_NUMERIC_OPERATION_MEASUREMENT_FIELDS
+                }
+                if isinstance(item, dict)
+                else item
+                for item in operation_evidence
+            ]
+        projected["xls_numeric"] = projected_xls
     return projected
 
 
@@ -3488,6 +4513,15 @@ def _summarize_reports_impl(
         )
         for status in ("verified_equal", "consistently_absent")
     }
+    native_xls_result_count = sum(
+        result["case"] in XLS_NUMERIC_CASE_CONTRACTS for result in results
+    )
+    if native_xls_result_count and (
+        status_counts["source"]["verified_equal"] != native_xls_result_count
+    ):
+        raise AbbaSummaryInputError(
+            "native XLS numeric source_identity_verified must be exactly true"
+        )
     implementation_identity: dict[str, Any] = {
         "control": {
             "git_revision": control_revision,
@@ -3499,6 +4533,9 @@ def _summarize_reports_impl(
         },
         "distinct": True,
     }
+    # The strict claim/evidence package uses these raw report hashes together
+    # with the binary identities below as its external binding.  They are
+    # fingerprints of untrusted JSON, not an authenticity mechanism.
     verification: dict[str, Any] = {
         "result_count": len(results),
         "tool_identity_verified": True,

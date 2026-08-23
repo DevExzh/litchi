@@ -29,7 +29,8 @@ pub mod writer;
 pub use file::{DirectoryEntry, OleError, OleFile, OleFileLimits, is_ole_file};
 pub use overlay::{
     ArtifactFingerprint, ComposedOverlaySource, OutputProgress, OverlayError, OverlayLimits,
-    PublishReport, SameLengthStreamOverlay, ValidatedOverlayPlan,
+    OverlayOperationShape, OverlaySourceMode, PublishReport, SameLengthStreamOverlay,
+    ValidatedOverlayPlan,
 };
 pub use shared::{SharedOleFile, SharedOleFileLimits};
 pub use shared_bulk::{SharedOleBulkError, SharedOleBulkRead};
