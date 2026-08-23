@@ -1534,6 +1534,7 @@ fn message_declares_reference(
 ) -> Result<bool, BodyTableLockError> {
     budget.charge_payload_items(message.field_infos.len())?;
     budget.charge_payload_references(message.object_references.len())?;
+    budget.charge_payload_references(message.data_references.len())?;
     budget.charge_payload_work(message.field_infos.len())?;
     let aggregate_occurrences = message
         .object_references
@@ -1554,6 +1555,7 @@ fn message_declares_reference(
     let mut accepted_fields = 0usize;
     for field in &message.field_infos {
         budget.charge_payload_references(field.object_references.len())?;
+        budget.charge_payload_references(field.data_references.len())?;
         budget.charge_payload_work(field.path.path.len())?;
         if field
             .data_references
@@ -1671,6 +1673,7 @@ fn message_declares_reference_prefix(
 ) -> Result<bool, BodyTableLockError> {
     budget.charge_payload_items(message.field_infos.len())?;
     budget.charge_payload_references(message.object_references.len())?;
+    budget.charge_payload_references(message.data_references.len())?;
     budget.charge_payload_work(message.field_infos.len())?;
     // Retain one aggregate occurrence/declaration counter for this complete
     // message. It is shared by every field check below, avoiding a fresh
@@ -1719,6 +1722,7 @@ fn message_declares_reference_prefix(
     let mut field_declarations = 0usize;
     for field in &message.field_infos {
         budget.charge_payload_references(field.object_references.len())?;
+        budget.charge_payload_references(field.data_references.len())?;
         budget.charge_payload_work(field.path.path.len())?;
         if field.data_references.iter().any(|candidate| {
             declarations
@@ -2890,6 +2894,83 @@ mod tests {
                 &mut strict_budget,
             ),
             Err(BodyTableLockError::InvalidSource)
+        ));
+    }
+
+    #[test]
+    fn data_reference_scans_are_bounded_before_semantic_checks() {
+        let mut message_data = litchi_iwa_core::MessageInfo::new(2_002, 0);
+        message_data.object_references = vec![100];
+        message_data.data_references = vec![100];
+        message_data.field_infos = vec![FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]))];
+
+        let mut message_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
+        message_budget.maximum_payload_references = 1;
+        assert!(matches!(
+            message_declares_reference(
+                &message_data,
+                100,
+                &[TABLE_BODY_FIELD],
+                false,
+                &mut message_budget,
+            ),
+            Err(BodyTableLockError::LimitExceeded {
+                kind: BodyTableLockLimitKind::PayloadReferences,
+                ..
+            })
+        ));
+
+        let mut prefix_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
+        prefix_budget.maximum_payload_references = 1;
+        assert!(matches!(
+            message_declares_reference_prefix(
+                &message_data,
+                100,
+                &[TABLE_BODY_FIELD],
+                &mut prefix_budget,
+            ),
+            Err(BodyTableLockError::LimitExceeded {
+                kind: BodyTableLockLimitKind::PayloadReferences,
+                ..
+            })
+        ));
+
+        let mut field_data = litchi_iwa_core::MessageInfo::new(2_003, 0);
+        field_data.object_references = vec![100];
+        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        field.object_references = vec![100];
+        field.data_references = vec![100];
+        field_data.field_infos = vec![field];
+
+        let mut field_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
+        field_budget.maximum_payload_references = 2;
+        assert!(matches!(
+            message_declares_reference(
+                &field_data,
+                100,
+                &[TABLE_BODY_FIELD],
+                true,
+                &mut field_budget,
+            ),
+            Err(BodyTableLockError::LimitExceeded {
+                kind: BodyTableLockLimitKind::PayloadReferences,
+                ..
+            })
+        ));
+
+        let mut field_prefix_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
+        field_prefix_budget.maximum_payload_references = 2;
+        assert!(matches!(
+            message_declares_reference_prefix(
+                &field_data,
+                100,
+                &[TABLE_BODY_FIELD],
+                &mut field_prefix_budget,
+            ),
+            Err(BodyTableLockError::LimitExceeded {
+                kind: BodyTableLockLimitKind::PayloadReferences,
+                ..
+            })
         ));
     }
 
