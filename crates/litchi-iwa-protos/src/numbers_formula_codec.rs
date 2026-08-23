@@ -12,6 +12,10 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 use crate::buffa_formula_generated::LitchiIwaFormulaProjection as projection;
 
 const MAX_DEPTH: u32 = 32;
+/// The compatibility renderer historically accepted deeply nested thunk
+/// arrays through Prost's recursive message decoder.  Keep its ceiling
+/// independent from the compact evaluator's deliberately smaller depth.
+const MAX_RENDER_DEPTH: u32 = 256;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 const DECIMAL128_EXPONENT_BIAS: i32 = 0x1820;
 const DECIMAL128_COEFFICIENT_BITS: u32 = 113;
@@ -28,6 +32,8 @@ pub struct DecodeOptions {
     max_text_bytes: usize,
     allow_opaque_unknown_fields: bool,
     allow_unknown_functions: bool,
+    render_recursion_limit: u32,
+    render_mode: bool,
 }
 
 impl DecodeOptions {
@@ -49,6 +55,8 @@ impl DecodeOptions {
             max_text_bytes,
             allow_opaque_unknown_fields: false,
             allow_unknown_functions: false,
+            render_recursion_limit: MAX_RENDER_DEPTH,
+            render_mode: false,
         }
     }
 
@@ -69,12 +77,29 @@ impl DecodeOptions {
         self.allow_unknown_functions = allow;
         self
     }
+
+    /// Set the independent recursion ceiling used by the compatibility
+    /// renderer.  The evaluator keeps using the constructor's
+    /// `recursion_limit`; render callers can therefore preserve legacy thunk
+    /// depth without widening the compact scalar path.
+    #[must_use]
+    pub const fn with_render_recursion_limit(mut self, limit: u32) -> Self {
+        self.render_recursion_limit = limit;
+        self
+    }
     fn buffa(self) -> BuffaDecodeOptions {
         BuffaDecodeOptions::new()
             .with_max_message_size(self.max_bytes)
             .with_unknown_field_limit(self.max_fields)
             .with_element_memory_limit(0)
             .with_recursion_limit(self.recursion_limit)
+    }
+
+    const fn for_render(self) -> Self {
+        Self {
+            render_mode: true,
+            ..self
+        }
     }
 }
 
@@ -853,6 +878,182 @@ pub trait FormulaVisitor {
 
 impl FormulaVisitor for () {}
 
+/// A UUID-shaped value borrowed from a formula's cross-table metadata.
+///
+/// Numbers uses the four 32-bit words of `TSP.CFUUIDArchive` for table
+/// references.  The words remain optional because native archives may carry
+/// only an opaque/partial CFUUID; callers can use [`Self::is_complete`] before
+/// looking the value up in their owner map.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderCfuuid {
+    pub word0: Option<u32>,
+    pub word1: Option<u32>,
+    pub word2: Option<u32>,
+    pub word3: Option<u32>,
+}
+
+impl FormulaRenderCfuuid {
+    #[must_use]
+    pub const fn is_complete(self) -> bool {
+        self.word0.is_some() && self.word1.is_some() && self.word2.is_some() && self.word3.is_some()
+    }
+}
+
+/// A required `TSP.UUID` value used by category-reference nodes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FormulaRenderUuid {
+    pub lower: u64,
+    pub upper: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderAxis {
+    pub coordinate: i32,
+    pub absolute: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderCoordinatePair {
+    pub column: FormulaRenderAxis,
+    pub row: FormulaRenderAxis,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderLocalCellReference {
+    pub row_handle: u32,
+    pub column_handle: u32,
+    pub row_is_sticky: u32,
+    pub column_is_sticky: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderCrossTableCellReference {
+    pub row_handle: u32,
+    pub column_handle: u32,
+    pub row_is_sticky: u32,
+    pub column_is_sticky: u32,
+    pub table_id: FormulaRenderCfuuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderCrossTableExtra {
+    pub table_id: FormulaRenderCfuuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderCellReference {
+    pub coordinates: Option<FormulaRenderCoordinatePair>,
+    pub local: Option<FormulaRenderLocalCellReference>,
+    pub cross_table: Option<FormulaRenderCrossTableCellReference>,
+    pub cross_table_extra: Option<FormulaRenderCrossTableExtra>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderStickyBits {
+    pub begin_row_is_absolute: bool,
+    pub begin_column_is_absolute: bool,
+    pub end_row_is_absolute: bool,
+    pub end_column_is_absolute: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderRangeSummary {
+    pub count: usize,
+    pub first_begin: Option<i64>,
+    pub first_end: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderColonTract {
+    pub relative_column: FormulaRenderRangeSummary,
+    pub relative_row: FormulaRenderRangeSummary,
+    pub absolute_column: FormulaRenderRangeSummary,
+    pub absolute_row: FormulaRenderRangeSummary,
+    pub preserve_rectangular: bool,
+    pub sticky: FormulaRenderStickyBits,
+    pub cross_table_extra: Option<FormulaRenderCrossTableExtra>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaRenderCategoryReference {
+    pub group_by_uid: Option<FormulaRenderUuid>,
+    pub column_uid: Option<FormulaRenderUuid>,
+    pub absolute_group_uid: Option<FormulaRenderUuid>,
+    pub relative_group_uid: Option<FormulaRenderUuid>,
+    pub last_group_uid: Option<FormulaRenderUuid>,
+    pub group_uid_count: usize,
+}
+
+/// Generated-free events emitted by the compatibility FormulaArchive reader.
+///
+/// Events are source ordered.  `BeginArray`/`EndArray` delimit the root AST
+/// and every nested thunk array; a thunk has an additional pair of markers so
+/// a caller can treat its nested result as one postfix operand.  All string
+/// data is borrowed directly from the caller's archive bytes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FormulaRenderEvent<'source> {
+    BeginArray {
+        depth: u32,
+    },
+    EndArray,
+    ThunkBegin,
+    ThunkEnd,
+    Binary(BinaryOperator),
+    Negation,
+    PlusSign,
+    Percent,
+    Number {
+        value: f64,
+    },
+    String(&'source str),
+    Boolean(bool),
+    Token(bool),
+    Date {
+        value: f64,
+    },
+    Duration {
+        value: f64,
+    },
+    EmptyArgument,
+    Function {
+        identifier: u32,
+        argument_count: u32,
+    },
+    List {
+        argument_count: u32,
+    },
+    Array {
+        columns: u32,
+        rows: u32,
+    },
+    UnknownFunction {
+        name: Option<&'source str>,
+        argument_count: u32,
+    },
+    CellReference(FormulaRenderCellReference),
+    LocalCellReference(Option<FormulaRenderLocalCellReference>),
+    CrossTableCellReference(Option<FormulaRenderCrossTableCellReference>),
+    Colon,
+    ColonWithUids,
+    ColonTract(FormulaRenderColonTract),
+    CategoryReference(Option<FormulaRenderCategoryReference>),
+    ReferenceError,
+    AppendWhitespace,
+    PrependWhitespace,
+    Ignored {
+        raw_node_type: u32,
+    },
+}
+
+/// Fallible sink for the generated-free compatibility event stream.
+pub trait FormulaRenderVisitor {
+    fn visit(&mut self, _event: FormulaRenderEvent<'_>) -> Result<(), DecodeError> {
+        Ok(())
+    }
+}
+
+impl FormulaRenderVisitor for () {}
+
 /// Dependency-only sink. Supported evaluator nodes are intentionally omitted.
 pub trait FormulaDependencyVisitor {
     fn visit_precedent(&mut self, _precedent: LocalPrecedent) -> Result<(), DecodeError> {
@@ -1090,6 +1291,28 @@ pub fn decode_formula_archive_with_visitor<V: FormulaVisitor>(
         true,
         DecodeMode::Evaluator,
     )?;
+    Ok(budget.report())
+}
+
+/// Strictly preflight and stream the legacy-compatible FormulaArchive AST.
+///
+/// Unlike [`decode_formula_archive_with_visitor`], this route intentionally
+/// models the complete text-rendering surface of the native AST, including
+/// dates, arrays, unknown functions, category references, and recursive
+/// thunks. The preflight pass fully validates wire framing, UTF-8, required
+/// nested messages, and resource ceilings before the first caller callback.
+pub fn decode_formula_archive_for_render<V: FormulaRenderVisitor + ?Sized>(
+    source: &[u8],
+    context: FormulaContext,
+    options: DecodeOptions,
+    visitor: &mut V,
+) -> Result<DecodeReport, DecodeError> {
+    validate_context(context)?;
+    let render_options = options.for_render();
+    let mut budget = Budget::new(source, render_options)?;
+    decode_render_archive(source, context, &mut budget, &mut (), false)?;
+    budget.preflight_callback_pass()?;
+    decode_render_archive(source, context, &mut budget, visitor, true)?;
     Ok(budget.report())
 }
 
@@ -3336,11 +3559,10 @@ fn decode_range_pair(
             }
             return Err(malformed());
         }
-        let value = field.varint()?;
         let value = if relative {
-            i64::from(value as i32)
+            i64::from(canonical_render_int32(field.varint()?)?)
         } else {
-            i64::try_from(value).map_err(|_error| malformed())?
+            i64::from(canonical_render_u32(field.varint()?)?)
         };
         match field.number {
             1 => set_once(&mut begin, value)?,
@@ -3423,6 +3645,1222 @@ fn validate_context(context: FormulaContext) -> Result<(), DecodeError> {
     {
         return Err(DecodeError::invalid(InvalidReason::InvalidCoordinate));
     }
+    Ok(())
+}
+
+struct RenderPayloads {
+    cell: FormulaRenderCellReference,
+    local: Option<FormulaRenderLocalCellReference>,
+    cross_table: Option<FormulaRenderCrossTableCellReference>,
+    colon: Option<FormulaRenderColonTract>,
+    category: Option<FormulaRenderCategoryReference>,
+}
+
+fn decode_render_archive<V: FormulaRenderVisitor + ?Sized>(
+    source: &[u8],
+    context: FormulaContext,
+    budget: &mut Budget,
+    visitor: &mut V,
+    emit: bool,
+) -> Result<(), DecodeError> {
+    // Prost's compatibility path historically admitted the serialized
+    // default FormulaArchive.  Keep that exact empty-message behavior.
+    if source.is_empty() {
+        if emit {
+            visitor.visit(FormulaRenderEvent::BeginArray { depth: 1 })?;
+            visitor.visit(FormulaRenderEvent::EndArray)?;
+        }
+        return Ok(());
+    }
+
+    // Match the package wire preflight exactly: the root message is depth 0,
+    // its AST array is depth 1, and each thunk adds an array/node pair.
+    budget.message(source, 0)?;
+    let mut ast = None;
+    let mut host_column = None;
+    let mut host_row = None;
+    let mut column_negative = None;
+    let mut row_negative = None;
+    let mut opaque = [None; 4];
+    let mut seen = [false; 9];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, 0)? {
+        if !(1..=9).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize - 1)?;
+        match field.number {
+            1 => ast = Some(field.bytes()?),
+            2 => host_column = Some(field.varint_u32()?),
+            3 => host_row = Some(field.varint_u32()?),
+            4 => column_negative = Some(field.boolean()?),
+            5 => row_negative = Some(field.boolean()?),
+            6..=9 => opaque[field.number as usize - 6] = Some(field.bytes()?),
+            _ => unreachable!(),
+        }
+    }
+    let ast = ast.ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
+    let view: projection::FormulaArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid(InvalidReason::MalformedWire))?;
+    if !view.has_ast_node_array()
+        || view.ast_node_array != ast
+        || view.host_column != host_column
+        || view.host_row != host_row
+        || view.host_column_is_negative != column_negative
+        || view.host_row_is_negative != row_negative
+        || view.translation_flags != opaque[0]
+        || view.host_table_uid != opaque[1]
+        || view.host_column_uid != opaque[2]
+        || view.host_row_uid != opaque[3]
+    {
+        return Err(DecodeError::invalid(InvalidReason::MalformedWire));
+    }
+    parse_render_root_auxiliary(&opaque, budget, 1)?;
+    decode_render_array(ast, context, budget, visitor, emit, 1)
+}
+
+fn parse_render_root_auxiliary(
+    opaque: &[Option<&[u8]>; 4],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    if let Some(source) = opaque[0] {
+        parse_render_translation_flags(source, budget, depth)?;
+    }
+    for source in opaque[1..].iter().flatten() {
+        let _ = parse_render_uuid(source, budget, depth)?;
+    }
+    Ok(())
+}
+
+// Protobuf int32 values are encoded as the sign-extended uint64 representation
+// for negative numbers.  Keep the same admission rule as the Numbers envelope
+// preflight: values in the low u32 range and values in the sign-extended
+// negative range are valid; the gap between them is not an int32.
+fn canonical_render_int32(value: u64) -> Result<i32, DecodeError> {
+    if value <= i32::MAX as u64 || value >= 0xffff_ffff_8000_0000 {
+        Ok(value as i32)
+    } else {
+        Err(malformed())
+    }
+}
+
+fn canonical_render_u32(value: u64) -> Result<u32, DecodeError> {
+    u32::try_from(value).map_err(|_error| malformed())
+}
+
+fn canonical_render_sint32(value: u64) -> Result<i32, DecodeError> {
+    Ok(zigzag32(canonical_render_u32(value)?))
+}
+
+fn parse_render_translation_flags(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let mut seen = [false; 6];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=5).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize)?;
+        let _ = field.boolean()?;
+    }
+    Ok(())
+}
+
+fn decode_render_array<V: FormulaRenderVisitor + ?Sized>(
+    source: &[u8],
+    context: FormulaContext,
+    budget: &mut Budget,
+    visitor: &mut V,
+    emit: bool,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    let logical_depth = budget.render_array_depth(depth)?;
+    budget.message(source, depth)?;
+    if emit {
+        visitor.visit(FormulaRenderEvent::BeginArray {
+            depth: logical_depth,
+        })?;
+    }
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 1 {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        if !emit {
+            budget.node()?;
+        }
+        decode_render_node(field.bytes()?, context, budget, visitor, emit, depth + 1)?;
+    }
+    if emit {
+        visitor.visit(FormulaRenderEvent::EndArray)?;
+    }
+    Ok(())
+}
+
+fn decode_render_node<V: FormulaRenderVisitor + ?Sized>(
+    source: &[u8],
+    context: FormulaContext,
+    budget: &mut Budget,
+    visitor: &mut V,
+    emit: bool,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let fields = parse_render_node_fields(source, budget, depth)?;
+    let kind = fields
+        .kind
+        .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
+    let payloads = parse_render_payloads(&fields, kind, context, budget, emit, depth)?;
+    let view: projection::ASTNodeArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| DecodeError::invalid(InvalidReason::MalformedWire))?;
+    if !view.has_node_type()
+        || view.node_type as u32 != kind
+        || view.function_index != fields.function
+        || view.function_num_args != fields.arguments
+        || view.number.map(f64::to_bits) != fields.number
+        || view.boolean != fields.boolean
+        || view.string != fields.text
+        || view.date.map(f64::to_bits) != fields.date
+        || view.duration.map(f64::to_bits) != fields.duration
+        || view.token_boolean != fields.token
+        || view.array_num_col != fields.array_num_col
+        || view.array_num_row != fields.array_num_row
+        || view.list_num_args != fields.list_num_args
+        || view.thunk_array != fields.thunk
+        || view.local_cell_reference != fields.local
+        || view.cross_table_cell_reference != fields.cross
+        || view.unknown_function_string != fields.unknown_function
+        || view.unknown_function_num_args != fields.unknown_function_args
+        || view.whitespace != fields.whitespace
+        || view.column != fields.column
+        || view.row != fields.row
+        || view.cross_table_extra != fields.cross_extra
+        || view.uid_coordinate != fields.uid
+        || view.sticky_bits != fields.sticky
+        || view.tract_list != fields.tract
+        || view.category_ref != fields.category
+        || view.colon_tract != fields.colon
+        || view.decimal_low != fields.decimal_low
+        || view.decimal_high != fields.decimal_high
+    {
+        return Err(DecodeError::invalid(InvalidReason::MalformedWire));
+    }
+
+    if !emit {
+        return emit_render_node(
+            kind, &fields, payloads, context, budget, visitor, false, depth,
+        );
+    }
+    emit_render_node(
+        kind, &fields, payloads, context, budget, visitor, true, depth,
+    )
+}
+
+fn parse_render_node_fields<'source>(
+    source: &'source [u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<NodeFields<'source>, DecodeError> {
+    let mut fields = NodeFields::default();
+    let mut seen = [false; 48];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number == 0 || field.number > 47 {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        let schema_known = is_schema_known_node_field(field.number);
+        if schema_known {
+            singular(&mut seen, field.number as usize)?;
+            fields.present |= field_bit(field.number);
+        }
+        match field.number {
+            // `node_type` is a proto `int32`, not a `uint32`.  Prost casts
+            // sign-extended negative enum values back to `i32` and its enum
+            // accessor then maps the unknown value to AdditionNode.  Retain
+            // the low 32 bits here so that compatibility behavior is exact.
+            1 => fields.kind = Some(canonical_render_int32(field.varint()?)? as u32),
+            2 => fields.function = Some(field.varint_u32()?),
+            3 => fields.arguments = Some(field.varint_u32()?),
+            4 => fields.number = Some(field.fixed64()?),
+            5 => fields.boolean = Some(field.boolean()?),
+            6 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+                fields.text = Some(value);
+            },
+            7 => fields.date = Some(field.fixed64()?),
+            8 => fields.duration = Some(field.fixed64()?),
+            9 => {
+                let _ = canonical_render_int32(field.varint()?)?;
+            },
+            10 => fields.token = Some(field.boolean()?),
+            11 => fields.array_num_col = Some(field.varint_u32()?),
+            12 => fields.array_num_row = Some(field.varint_u32()?),
+            13 => fields.list_num_args = Some(field.varint_u32()?),
+            14 => fields.thunk = Some(field.bytes()?),
+            15 => fields.local = Some(field.bytes()?),
+            16 => fields.cross = Some(field.bytes()?),
+            17 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+                fields.unknown_function = Some(value);
+            },
+            18 => fields.unknown_function_args = Some(field.varint_u32()?),
+            19 | 20 => {
+                let _ = field.boolean()?;
+            },
+            21 | 34 | 35 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+            },
+            22 | 23 | 24 | 37 | 46 => {
+                let _ = canonical_render_u32(field.varint()?)?;
+            },
+            42 | 43 => {
+                let _ = field.varint()?;
+            },
+            47 => {
+                let _ = canonical_render_int32(field.varint()?)?;
+            },
+            25 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+                fields.whitespace = Some(value);
+            },
+            26 => fields.column = Some(field.bytes()?),
+            27 => fields.row = Some(field.bytes()?),
+            28 => fields.cross_extra = Some(field.bytes()?),
+            29 => {
+                let _ = field.boolean()?;
+            },
+            30 => fields.uid = Some(field.bytes()?),
+            31 | 32 => {
+                if !budget.options.allow_opaque_unknown_fields {
+                    return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+                }
+            },
+            33 => fields.sticky = Some(field.bytes()?),
+            36 => {
+                let _ = field.boolean()?;
+            },
+            38 => fields.tract = Some(field.bytes()?),
+            39 => fields.category = Some(field.bytes()?),
+            40 => fields.colon = Some(field.bytes()?),
+            41 => fields.frozen_sticky = Some(field.bytes()?),
+            44 => fields.category_levels = Some(field.bytes()?),
+            45 => fields.lambda_idents = Some(field.bytes()?),
+            _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
+        }
+    }
+    Ok(fields)
+}
+
+fn parse_render_payloads<'source>(
+    fields: &NodeFields<'source>,
+    kind: u32,
+    context: FormulaContext,
+    budget: &mut Budget,
+    emit: bool,
+    depth: u32,
+) -> Result<RenderPayloads, DecodeError> {
+    let child_depth = depth.checked_add(1).ok_or_else(malformed)?;
+    if kind != 26 {
+        if let Some(thunk) = fields.thunk {
+            // A thunk field on another node kind is ignored by the legacy
+            // renderer, but its nested proto2 messages are still part of the
+            // admitted archive. Scan them in both passes. The callback pass
+            // emits only to the no-op visitor, so caller-visible events retain
+            // the legacy node-kind semantics while aggregate accounting stays
+            // exact.
+            decode_render_array(thunk, context, budget, &mut (), emit, child_depth)?;
+        }
+    }
+    parse_render_node_auxiliary(fields, budget, child_depth)?;
+    let local = fields
+        .local
+        .map(|source| parse_render_local(source, budget, child_depth))
+        .transpose()?;
+    let cross_table = fields
+        .cross
+        .map(|source| parse_render_cross_cell(source, budget, child_depth))
+        .transpose()?;
+    let coordinates = match (fields.column, fields.row) {
+        (Some(column), Some(row)) => Some(FormulaRenderCoordinatePair {
+            column: parse_render_axis(column, true, budget, child_depth)?,
+            row: parse_render_axis(row, false, budget, child_depth)?,
+        }),
+        (Some(column), None) => {
+            let _ = parse_render_axis(column, true, budget, child_depth)?;
+            None
+        },
+        (None, Some(row)) => {
+            let _ = parse_render_axis(row, false, budget, child_depth)?;
+            None
+        },
+        (None, None) => None,
+    };
+    let cross_table_extra = fields
+        .cross_extra
+        .map(|source| parse_render_cross_extra(source, budget, child_depth))
+        .transpose()?;
+    let sticky = fields
+        .sticky
+        .map(|source| parse_render_sticky(source, budget, child_depth))
+        .transpose()?;
+    let colon_summary = fields
+        .colon
+        .map(|source| parse_render_colon(source, budget, child_depth))
+        .transpose()?;
+    let colon = match kind {
+        67 => Some(FormulaRenderColonTract {
+            relative_column: colon_summary
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?
+                .relative_column,
+            relative_row: colon_summary
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?
+                .relative_row,
+            absolute_column: colon_summary
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?
+                .absolute_column,
+            absolute_row: colon_summary
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?
+                .absolute_row,
+            preserve_rectangular: colon_summary
+                .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?
+                .preserve_rectangular,
+            sticky: sticky.ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?,
+            cross_table_extra,
+        }),
+        _ => None,
+    };
+    if kind == 24 {
+        let columns = fields.array_num_col.unwrap_or(0);
+        let rows = fields.array_num_row.unwrap_or(0);
+        let count = columns.checked_mul(rows).ok_or_else(malformed)?;
+        ensure_render_argument_count(count, budget)?;
+    }
+    if kind == 16 {
+        ensure_render_argument_count(fields.arguments.unwrap_or(0), budget)?;
+    }
+    if kind == 25 {
+        ensure_render_argument_count(fields.list_num_args.unwrap_or(0), budget)?;
+    }
+    if kind == 31 {
+        ensure_render_argument_count(fields.unknown_function_args.unwrap_or(0), budget)?;
+    }
+    let category = fields
+        .category
+        .map(|source| parse_render_category(source, budget, child_depth))
+        .transpose()?;
+    Ok(RenderPayloads {
+        cell: FormulaRenderCellReference {
+            coordinates,
+            local,
+            cross_table,
+            cross_table_extra,
+        },
+        local,
+        cross_table,
+        colon,
+        category,
+    })
+}
+
+fn ensure_render_argument_count(value: u32, budget: &Budget) -> Result<(), DecodeError> {
+    let value = usize::try_from(value).map_err(|_error| malformed())?;
+    if value > budget.options.max_nodes {
+        return Err(DecodeError::limited(DecodeLimit::Nodes {
+            observed: value,
+            maximum: budget.options.max_nodes,
+        }));
+    }
+    Ok(())
+}
+
+fn emit_render_node<V: FormulaRenderVisitor + ?Sized>(
+    kind: u32,
+    fields: &NodeFields<'_>,
+    payloads: RenderPayloads,
+    context: FormulaContext,
+    budget: &mut Budget,
+    visitor: &mut V,
+    emit: bool,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    if kind == 26 {
+        let Some(thunk) = fields.thunk else {
+            if emit {
+                visitor.visit(FormulaRenderEvent::Ignored {
+                    raw_node_type: kind,
+                })?;
+            }
+            return Ok(());
+        };
+        if emit {
+            visitor.visit(FormulaRenderEvent::ThunkBegin)?;
+        }
+        decode_render_array(thunk, context, budget, visitor, emit, depth + 1)?;
+        if emit {
+            visitor.visit(FormulaRenderEvent::ThunkEnd)?;
+        }
+        return Ok(());
+    }
+    if !emit {
+        // The preflight pass still descends into every nested thunk.  Other
+        // nested payloads were forced by `parse_render_payloads` above.
+        return Ok(());
+    }
+    let event = match kind {
+        1 => FormulaRenderEvent::Binary(BinaryOperator::Add),
+        2 => FormulaRenderEvent::Binary(BinaryOperator::Subtract),
+        3 => FormulaRenderEvent::Binary(BinaryOperator::Multiply),
+        4 => FormulaRenderEvent::Binary(BinaryOperator::Divide),
+        5 => FormulaRenderEvent::Binary(BinaryOperator::Power),
+        6 => FormulaRenderEvent::Binary(BinaryOperator::Concatenate),
+        7 => FormulaRenderEvent::Binary(BinaryOperator::GreaterThan),
+        8 => FormulaRenderEvent::Binary(BinaryOperator::GreaterThanOrEqual),
+        9 => FormulaRenderEvent::Binary(BinaryOperator::LessThan),
+        10 => FormulaRenderEvent::Binary(BinaryOperator::LessThanOrEqual),
+        11 => FormulaRenderEvent::Binary(BinaryOperator::Equal),
+        12 => FormulaRenderEvent::Binary(BinaryOperator::NotEqual),
+        13 => FormulaRenderEvent::Negation,
+        14 => FormulaRenderEvent::PlusSign,
+        15 => FormulaRenderEvent::Percent,
+        16 => match fields.function {
+            Some(identifier) => FormulaRenderEvent::Function {
+                identifier,
+                argument_count: fields.arguments.unwrap_or(0),
+            },
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        17 => match fields.number {
+            Some(bits) => FormulaRenderEvent::Number {
+                value: f64::from_bits(bits),
+            },
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        18 => match fields.boolean {
+            Some(value) => FormulaRenderEvent::Boolean(value),
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        19 => match fields.text {
+            Some(value) => FormulaRenderEvent::String(value),
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        20 => match fields.date {
+            Some(bits) => FormulaRenderEvent::Date {
+                value: f64::from_bits(bits),
+            },
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        21 => match fields.duration {
+            Some(bits) => FormulaRenderEvent::Duration {
+                value: f64::from_bits(bits),
+            },
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        22 => FormulaRenderEvent::EmptyArgument,
+        23 => match fields.token {
+            Some(value) => FormulaRenderEvent::Token(value),
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        24 => FormulaRenderEvent::Array {
+            columns: fields.array_num_col.unwrap_or(0),
+            rows: fields.array_num_row.unwrap_or(0),
+        },
+        25 => match fields.list_num_args {
+            Some(argument_count) => FormulaRenderEvent::List { argument_count },
+            None => FormulaRenderEvent::Ignored {
+                raw_node_type: kind,
+            },
+        },
+        27 => FormulaRenderEvent::LocalCellReference(payloads.local),
+        28 => FormulaRenderEvent::CrossTableCellReference(payloads.cross_table),
+        29 => FormulaRenderEvent::Colon,
+        30 | 46 => FormulaRenderEvent::ReferenceError,
+        31 => FormulaRenderEvent::UnknownFunction {
+            name: fields.unknown_function,
+            argument_count: fields.unknown_function_args.unwrap_or(0),
+        },
+        32 => FormulaRenderEvent::AppendWhitespace,
+        33 => FormulaRenderEvent::PrependWhitespace,
+        34 | 35 | 48 | 52..=57 | 63..=65 | 68..=70 => FormulaRenderEvent::Ignored {
+            raw_node_type: kind,
+        },
+        36 => FormulaRenderEvent::CellReference(payloads.cell),
+        45 => FormulaRenderEvent::ColonWithUids,
+        66 => FormulaRenderEvent::CategoryReference(payloads.category),
+        67 => FormulaRenderEvent::ColonTract(payloads.colon.ok_or_else(malformed)?),
+        _ => {
+            // `prost`'s generated enum accessor maps every unknown integer,
+            // including zero, to the enum's default AdditionNode.
+            FormulaRenderEvent::Binary(BinaryOperator::Add)
+        },
+    };
+    visitor.visit(event)
+}
+
+fn parse_render_node_auxiliary(
+    fields: &NodeFields<'_>,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    if let Some(source) = fields.uid {
+        parse_render_uid_coordinate(source, budget, depth)?;
+    }
+    if let Some(source) = fields.tract {
+        parse_render_tract_list(source, budget, depth)?;
+    }
+    if let Some(source) = fields.frozen_sticky {
+        let _ = parse_render_sticky(source, budget, depth)?;
+    }
+    if let Some(source) = fields.category_levels {
+        parse_render_category_levels(source, budget, depth)?;
+    }
+    if let Some(source) = fields.lambda_idents {
+        parse_render_lambda_idents(source, budget, depth)?;
+    }
+    Ok(())
+}
+
+fn parse_render_uid_coordinate(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let mut column = None;
+    let mut row = None;
+    let mut column_absolute = None;
+    let mut row_absolute = None;
+    let mut seen = [false; 5];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=4).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize)?;
+        match field.number {
+            1 => column = Some(parse_render_uuid(field.bytes()?, budget, depth + 1)?),
+            2 => row = Some(parse_render_uuid(field.bytes()?, budget, depth + 1)?),
+            3 => column_absolute = Some(field.boolean()?),
+            4 => row_absolute = Some(field.boolean()?),
+            _ => unreachable!(),
+        }
+    }
+    let _ = required(column)?;
+    let _ = required(row)?;
+    let _ = required(column_absolute)?;
+    let _ = required(row_absolute)?;
+    Ok(())
+}
+
+fn parse_render_tract_list(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let mut sticky = None;
+    let mut sticky_seen = false;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => parse_render_uid_tract(field.bytes()?, budget, depth + 1)?,
+            2 => {
+                if sticky_seen {
+                    return Err(DecodeError::invalid(InvalidReason::DuplicateField));
+                }
+                sticky_seen = true;
+                sticky = Some(parse_render_sticky(field.bytes()?, budget, depth + 1)?);
+            },
+            _ if budget.options.allow_opaque_unknown_fields => continue,
+            _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
+        }
+    }
+    let _ = required(sticky)?;
+    Ok(())
+}
+
+fn parse_render_uid_tract(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let mut columns = None;
+    let mut rows = None;
+    let mut seen = [false; 6];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=5).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize)?;
+        match field.number {
+            1 => columns = Some(parse_render_uid_list(field.bytes()?, budget, depth + 1)?),
+            2 => rows = Some(parse_render_uid_list(field.bytes()?, budget, depth + 1)?),
+            3 | 5 => {
+                let _ = field.boolean()?;
+            },
+            4 => {
+                let _ = canonical_render_int32(field.varint()?)?;
+            },
+            _ => unreachable!(),
+        }
+    }
+    let _ = required(columns)?;
+    let _ = required(rows)?;
+    Ok(())
+}
+
+fn parse_render_category_levels(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let mut column = None;
+    let mut row = None;
+    let mut seen = [false; 4];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=3).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize)?;
+        match field.number {
+            1 => column = Some(field.varint_u32()?),
+            2 => row = Some(field.varint_u32()?),
+            3 => {
+                let _ = field.varint_u32()?;
+            },
+            _ => unreachable!(),
+        }
+    }
+    let _ = required(column)?;
+    let _ = required(row)?;
+    Ok(())
+}
+
+fn parse_render_lambda_idents(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let mut first_symbol = None;
+    let mut before = None;
+    let mut after = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+            },
+            2 => set_once(&mut first_symbol, field.varint_u32()?)?,
+            3 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+                set_once(&mut before, value)?;
+            },
+            4 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+                set_once(&mut after, value)?;
+            },
+            _ if budget.options.allow_opaque_unknown_fields => continue,
+            _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
+        }
+    }
+    Ok(())
+}
+
+fn parse_render_local(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderLocalCellReference, DecodeError> {
+    budget.message(source, depth)?;
+    let mut values = [None; 4];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=4).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        set_once(&mut values[field.number as usize - 1], field.varint_u32()?)?;
+    }
+    Ok(FormulaRenderLocalCellReference {
+        row_handle: required(values[0])?,
+        column_handle: required(values[1])?,
+        row_is_sticky: required(values[2])?,
+        column_is_sticky: required(values[3])?,
+    })
+}
+
+fn parse_render_cross_cell(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderCrossTableCellReference, DecodeError> {
+    budget.message(source, depth)?;
+    let mut values = [None; 4];
+    let mut table = None;
+    let mut seen = [false; 10];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=9).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize)?;
+        match field.number {
+            1..=4 => values[field.number as usize - 1] = Some(field.varint_u32()?),
+            5 => table = Some(parse_render_cfuuid(field.bytes()?, budget, depth + 1)?),
+            6..=9 => {
+                let value = strict_utf8(field.bytes()?)?;
+                budget.text(value.len())?;
+            },
+            _ => unreachable!(),
+        }
+    }
+    Ok(FormulaRenderCrossTableCellReference {
+        row_handle: required(values[0])?,
+        column_handle: required(values[1])?,
+        row_is_sticky: required(values[2])?,
+        column_is_sticky: required(values[3])?,
+        table_id: required(table)?,
+    })
+}
+
+fn parse_render_axis(
+    source: &[u8],
+    _column: bool,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderAxis, DecodeError> {
+    budget.message(source, depth)?;
+    let mut coordinate = None;
+    let mut absolute = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => set_once(&mut coordinate, zigzag32(field.varint_u32()?))?,
+            2 => set_once(&mut absolute, field.boolean()?)?,
+            _ if budget.options.allow_opaque_unknown_fields => continue,
+            _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
+        }
+    }
+    let coordinate = required(coordinate)?;
+    Ok(FormulaRenderAxis {
+        coordinate,
+        absolute: absolute.unwrap_or(false),
+    })
+}
+
+fn parse_render_cross_extra(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderCrossTableExtra, DecodeError> {
+    budget.message(source, depth)?;
+    let mut table = None;
+    let mut seen = [false; 2];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 1 {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, 1)?;
+        table = Some(parse_render_cfuuid(field.bytes()?, budget, depth + 1)?);
+    }
+    Ok(FormulaRenderCrossTableExtra {
+        table_id: required(table)?,
+    })
+}
+
+fn parse_render_cfuuid(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderCfuuid, DecodeError> {
+    budget.message(source, depth)?;
+    let mut words = [None; 4];
+    let mut seen = [false; 6];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=5).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize)?;
+        match field.number {
+            1 => {
+                let _ = field.bytes()?;
+            },
+            2..=5 => words[field.number as usize - 2] = Some(field.varint_u32()?),
+            _ => unreachable!(),
+        }
+    }
+    Ok(FormulaRenderCfuuid {
+        word0: words[0],
+        word1: words[1],
+        word2: words[2],
+        word3: words[3],
+    })
+}
+
+fn parse_render_sticky(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderStickyBits, DecodeError> {
+    budget.message(source, depth)?;
+    let mut values = [None; 4];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=4).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(malformed());
+        }
+        set_once(&mut values[field.number as usize - 1], field.boolean()?)?;
+    }
+    let bits = [
+        required(values[0])?,
+        required(values[1])?,
+        required(values[2])?,
+        required(values[3])?,
+    ];
+    let view: projection::StickyBitsArchiveLazyView<'_> = budget
+        .options
+        .buffa()
+        .decode_lazy_view(source)
+        .map_err(|_error| malformed())?;
+    if !view.has_begin_row_absolute()
+        || !view.has_begin_column_absolute()
+        || !view.has_end_row_absolute()
+        || !view.has_end_column_absolute()
+        || view.begin_row_absolute != bits[0]
+        || view.begin_column_absolute != bits[1]
+        || view.end_row_absolute != bits[2]
+        || view.end_column_absolute != bits[3]
+    {
+        return Err(malformed());
+    }
+    Ok(FormulaRenderStickyBits {
+        begin_row_is_absolute: bits[0],
+        begin_column_is_absolute: bits[1],
+        end_row_is_absolute: bits[2],
+        end_column_is_absolute: bits[3],
+    })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RenderColonSummary {
+    relative_column: FormulaRenderRangeSummary,
+    relative_row: FormulaRenderRangeSummary,
+    absolute_column: FormulaRenderRangeSummary,
+    absolute_row: FormulaRenderRangeSummary,
+    preserve_rectangular: bool,
+}
+
+fn parse_render_colon(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<RenderColonSummary, DecodeError> {
+    budget.message(source, depth)?;
+    let mut summaries = [FormulaRenderRangeSummary {
+        count: 0,
+        first_begin: None,
+        first_end: None,
+    }; 4];
+    let mut preserve = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1..=4 => {
+                let bytes = field.bytes()?;
+                let (begin, end) = parse_render_range_pair(
+                    bytes,
+                    field.number <= 2,
+                    budget,
+                    depth.checked_add(1).ok_or_else(malformed)?,
+                )?;
+                let summary = &mut summaries[field.number as usize - 1];
+                summary.count = summary.count.checked_add(1).ok_or_else(malformed)?;
+                if summary.first_begin.is_none() {
+                    summary.first_begin = Some(begin);
+                    summary.first_end = end;
+                }
+            },
+            5 => set_once(&mut preserve, field.boolean()?)?,
+            _ if budget.options.allow_opaque_unknown_fields => continue,
+            _ => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
+        }
+    }
+    Ok(RenderColonSummary {
+        relative_column: summaries[0],
+        relative_row: summaries[1],
+        absolute_column: summaries[2],
+        absolute_row: summaries[3],
+        preserve_rectangular: preserve.unwrap_or(true),
+    })
+}
+
+fn parse_render_range_pair(
+    source: &[u8],
+    relative: bool,
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(i64, Option<i64>), DecodeError> {
+    budget.message(source, depth)?;
+    let mut begin = None;
+    let mut end = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !matches!(field.number, 1 | 2) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(malformed());
+        }
+        let value = if relative {
+            i64::from(canonical_render_int32(field.varint()?)?)
+        } else {
+            i64::from(canonical_render_u32(field.varint()?)?)
+        };
+        match field.number {
+            1 => set_once(&mut begin, value)?,
+            2 => set_once(&mut end, value)?,
+            _ => unreachable!(),
+        }
+    }
+    Ok((required(begin)?, end))
+}
+
+fn parse_render_category(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderCategoryReference, DecodeError> {
+    budget.message(source, depth)?;
+    let mut category = None;
+    let mut seen = [false; 2];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 1 {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, 1)?;
+        category = Some(parse_render_category_archive(
+            field.bytes()?,
+            budget,
+            depth + 1,
+        )?);
+    }
+    required(category)
+}
+
+fn parse_render_category_archive(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderCategoryReference, DecodeError> {
+    budget.message(source, depth)?;
+    let mut group_by_uid = None;
+    let mut column_uid = None;
+    let mut absolute_group_uid = None;
+    let mut relative_group_uid = None;
+    let mut last_group_uid = None;
+    let mut group_uid_count = 0usize;
+    let mut seen = [false; 15];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=14).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        if field.number == 5 && budget.options.allow_opaque_unknown_fields {
+            continue;
+        }
+        singular(&mut seen, field.number as usize)?;
+        match field.number {
+            1 => group_by_uid = Some(parse_render_uuid(field.bytes()?, budget, depth + 1)?),
+            2 => column_uid = Some(parse_render_uuid(field.bytes()?, budget, depth + 1)?),
+            3 => {
+                let _ = field.varint_u32()?;
+            },
+            4 => {
+                let _ = canonical_render_sint32(field.varint()?)?;
+            },
+            6 => {
+                let (count, last) = parse_render_uid_list(field.bytes()?, budget, depth + 1)?;
+                group_uid_count = count;
+                last_group_uid = last;
+            },
+            7 => parse_render_preserve_flags(field.bytes()?, budget, depth + 1)?,
+            8 => {
+                let _ = canonical_render_int32(field.varint()?)?;
+            },
+            9 => relative_group_uid = Some(parse_render_uuid(field.bytes()?, budget, depth + 1)?),
+            10 => absolute_group_uid = Some(parse_render_uuid(field.bytes()?, budget, depth + 1)?),
+            11 | 12 | 14 => {
+                let _ = field.boolean()?;
+            },
+            13 => {
+                let _ = field.varint_u32()?;
+            },
+            5 => return Err(DecodeError::invalid(InvalidReason::UnexpectedField)),
+            _ => unreachable!(),
+        }
+    }
+    Ok(FormulaRenderCategoryReference {
+        group_by_uid: Some(required(group_by_uid)?),
+        column_uid: Some(required(column_uid)?),
+        absolute_group_uid,
+        relative_group_uid,
+        last_group_uid,
+        group_uid_count,
+    })
+}
+
+fn parse_render_uid_list(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(usize, Option<FormulaRenderUuid>), DecodeError> {
+    budget.message(source, depth)?;
+    let mut count = 0usize;
+    let mut last = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if field.number != 1 {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        let uid = parse_render_uuid(field.bytes()?, budget, depth + 1)?;
+        count = count.checked_add(1).ok_or_else(malformed)?;
+        last = Some(uid);
+    }
+    Ok((count, last))
+}
+
+fn parse_render_uuid(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<FormulaRenderUuid, DecodeError> {
+    budget.message(source, depth)?;
+    let mut lower = None;
+    let mut upper = None;
+    let mut seen = [false; 3];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=2).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        singular(&mut seen, field.number as usize)?;
+        match field.number {
+            1 => lower = Some(field.varint()?),
+            2 => upper = Some(field.varint()?),
+            _ => unreachable!(),
+        }
+    }
+    Ok(FormulaRenderUuid {
+        lower: required(lower)?,
+        upper: required(upper)?,
+    })
+}
+
+fn parse_render_preserve_flags(
+    source: &[u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<(), DecodeError> {
+    budget.message(source, depth)?;
+    let mut values = [None; 4];
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        if !(1..=4).contains(&field.number) {
+            if budget.options.allow_opaque_unknown_fields {
+                continue;
+            }
+            return Err(DecodeError::invalid(InvalidReason::UnexpectedField));
+        }
+        set_once(&mut values[field.number as usize - 1], field.boolean()?)?;
+    }
+    let _ = required(values[0])?;
+    let _ = required(values[1])?;
     Ok(())
 }
 
@@ -3536,9 +4974,17 @@ struct NodeFields<'source> {
     number: Option<u64>,
     boolean: Option<bool>,
     text: Option<&'source str>,
+    date: Option<u64>,
+    duration: Option<u64>,
     token: Option<bool>,
+    array_num_col: Option<u32>,
+    array_num_row: Option<u32>,
+    list_num_args: Option<u32>,
+    thunk: Option<&'source [u8]>,
     local: Option<&'source [u8]>,
     cross: Option<&'source [u8]>,
+    unknown_function: Option<&'source str>,
+    unknown_function_args: Option<u32>,
     column: Option<&'source [u8]>,
     row: Option<&'source [u8]>,
     cross_extra: Option<&'source [u8]>,
@@ -3548,6 +4994,10 @@ struct NodeFields<'source> {
     decimal_high: Option<u64>,
     uid: Option<&'source [u8]>,
     tract: Option<&'source [u8]>,
+    category: Option<&'source [u8]>,
+    frozen_sticky: Option<&'source [u8]>,
+    category_levels: Option<&'source [u8]>,
+    lambda_idents: Option<&'source [u8]>,
     whitespace: Option<&'source str>,
     unmodeled: bool,
     present: u64,
@@ -3593,13 +5043,43 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
                 budget.text(text.len())?;
                 fields.text = Some(text);
             },
+            7 => {
+                fields.date = Some(field.fixed64()?);
+                fields.unmodeled = true;
+            },
+            8 => {
+                fields.duration = Some(field.fixed64()?);
+                fields.unmodeled = true;
+            },
             10 => fields.token = Some(field.boolean()?),
+            11 => {
+                fields.array_num_col = Some(field.varint_u32()?);
+                fields.unmodeled = true;
+            },
+            12 => {
+                fields.array_num_row = Some(field.varint_u32()?);
+                fields.unmodeled = true;
+            },
+            13 => {
+                fields.list_num_args = Some(field.varint_u32()?);
+                fields.unmodeled = true;
+            },
             14 => {
-                let _thunk = field.bytes()?;
+                fields.thunk = Some(field.bytes()?);
                 fields.unmodeled = true;
             },
             15 => fields.local = Some(field.bytes()?),
             16 => fields.cross = Some(field.bytes()?),
+            17 => {
+                let text = strict_utf8(field.bytes()?)?;
+                budget.text(text.len())?;
+                fields.unknown_function = Some(text);
+                fields.unmodeled = true;
+            },
+            18 => {
+                fields.unknown_function_args = Some(field.varint_u32()?);
+                fields.unmodeled = true;
+            },
             25 => {
                 let text = strict_utf8(field.bytes()?)?;
                 budget.text(text.len())?;
@@ -3611,7 +5091,23 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
             30 => fields.uid = Some(field.bytes()?),
             33 => fields.sticky = Some(field.bytes()?),
             38 => fields.tract = Some(field.bytes()?),
+            39 => {
+                fields.category = Some(field.bytes()?);
+                fields.unmodeled = true;
+            },
             40 => fields.colon = Some(field.bytes()?),
+            41 => {
+                fields.frozen_sticky = Some(field.bytes()?);
+                fields.unmodeled = true;
+            },
+            44 => {
+                fields.category_levels = Some(field.bytes()?);
+                fields.unmodeled = true;
+            },
+            45 => {
+                fields.lambda_idents = Some(field.bytes()?);
+                fields.unmodeled = true;
+            },
             42 => fields.decimal_low = Some(field.varint()?),
             43 => fields.decimal_high = Some(field.varint()?),
             // Fields 31 and 32 are not present in the current TSCE schema;
@@ -3647,9 +5143,17 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
         || view.number.map(f64::to_bits) != fields.number
         || view.boolean != fields.boolean
         || view.string != fields.text
+        || view.date.map(f64::to_bits) != fields.date
+        || view.duration.map(f64::to_bits) != fields.duration
         || view.token_boolean != fields.token
+        || view.array_num_col != fields.array_num_col
+        || view.array_num_row != fields.array_num_row
+        || view.list_num_args != fields.list_num_args
+        || view.thunk_array != fields.thunk
         || view.local_cell_reference != fields.local
         || view.cross_table_cell_reference != fields.cross
+        || view.unknown_function_string != fields.unknown_function
+        || view.unknown_function_num_args != fields.unknown_function_args
         || view.whitespace != fields.whitespace
         || view.column != fields.column
         || view.row != fields.row
@@ -3660,6 +5164,7 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
         || view.decimal_high != fields.decimal_high
         || view.uid_coordinate != fields.uid
         || view.tract_list != fields.tract
+        || view.category_ref != fields.category
     {
         return Err(DecodeError::invalid(InvalidReason::MalformedWire));
     }
@@ -4705,10 +6210,24 @@ impl Budget {
                 maximum: options.max_bytes,
             }));
         }
-        if options.recursion_limit == 0 || options.recursion_limit > MAX_DEPTH {
+        let maximum_depth = if options.render_mode {
+            MAX_RENDER_DEPTH
+        } else {
+            MAX_DEPTH
+        };
+        if options.recursion_limit == 0 || options.recursion_limit > maximum_depth {
             return Err(DecodeError::limited(DecodeLimit::Nesting {
                 observed: options.recursion_limit,
-                maximum: MAX_DEPTH,
+                maximum: maximum_depth,
+            }));
+        }
+        if options.render_mode
+            && (options.render_recursion_limit == 0
+                || options.render_recursion_limit > MAX_RENDER_DEPTH)
+        {
+            return Err(DecodeError::limited(DecodeLimit::Nesting {
+                observed: options.render_recursion_limit,
+                maximum: MAX_RENDER_DEPTH,
             }));
         }
         Ok(Self {
@@ -4763,6 +6282,19 @@ impl Budget {
         }
         self.max_depth = self.max_depth.max(depth);
         Ok(())
+    }
+    fn render_array_depth(&self, wire_depth: u32) -> Result<u32, DecodeError> {
+        let logical_depth = wire_depth
+            .checked_sub(1)
+            .map(|depth| 1 + depth / 2)
+            .ok_or_else(malformed)?;
+        if logical_depth > self.options.render_recursion_limit {
+            return Err(DecodeError::limited(DecodeLimit::Nesting {
+                observed: logical_depth,
+                maximum: self.options.render_recursion_limit,
+            }));
+        }
+        Ok(logical_depth)
     }
     fn node(&mut self) -> Result<(), DecodeError> {
         self.nodes = checked(self.nodes, 1)?;
@@ -5100,6 +6632,423 @@ mod tests {
         fn visit_precedent(&mut self, precedent: LocalPrecedent) -> Result<(), DecodeError> {
             self.precedents.push(precedent);
             Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct RenderCalls {
+        events: Vec<&'static str>,
+        strings: Vec<String>,
+        numbers: Vec<u64>,
+        arrays: Vec<(u32, u32)>,
+        unknown_functions: Vec<(Option<String>, u32)>,
+        categories: usize,
+        colon_tracts: usize,
+    }
+
+    impl FormulaRenderVisitor for RenderCalls {
+        fn visit(&mut self, event: FormulaRenderEvent<'_>) -> Result<(), DecodeError> {
+            match event {
+                FormulaRenderEvent::BeginArray { .. } => self.events.push("begin-array"),
+                FormulaRenderEvent::EndArray => self.events.push("end-array"),
+                FormulaRenderEvent::ThunkBegin => self.events.push("thunk-begin"),
+                FormulaRenderEvent::ThunkEnd => self.events.push("thunk-end"),
+                FormulaRenderEvent::Binary(BinaryOperator::Add) => self.events.push("add"),
+                FormulaRenderEvent::Binary(_) => self.events.push("binary"),
+                FormulaRenderEvent::Negation => self.events.push("negation"),
+                FormulaRenderEvent::PlusSign => self.events.push("plus"),
+                FormulaRenderEvent::Percent => self.events.push("percent"),
+                FormulaRenderEvent::Number { value } => {
+                    self.events.push("number");
+                    self.numbers.push(value.to_bits());
+                },
+                FormulaRenderEvent::String(value) => {
+                    self.events.push("string");
+                    self.strings.push(value.to_owned());
+                },
+                FormulaRenderEvent::Boolean(_) => self.events.push("boolean"),
+                FormulaRenderEvent::Token(_) => self.events.push("token"),
+                FormulaRenderEvent::Date { value } => {
+                    self.events.push("date");
+                    self.numbers.push(value.to_bits());
+                },
+                FormulaRenderEvent::Duration { value } => {
+                    self.events.push("duration");
+                    self.numbers.push(value.to_bits());
+                },
+                FormulaRenderEvent::EmptyArgument => self.events.push("empty"),
+                FormulaRenderEvent::Function { .. } => self.events.push("function"),
+                FormulaRenderEvent::List { .. } => self.events.push("list"),
+                FormulaRenderEvent::Array { columns, rows } => {
+                    self.events.push("array");
+                    self.arrays.push((columns, rows));
+                },
+                FormulaRenderEvent::UnknownFunction {
+                    name,
+                    argument_count,
+                } => {
+                    self.events.push("unknown-function");
+                    self.unknown_functions
+                        .push((name.map(str::to_owned), argument_count));
+                },
+                FormulaRenderEvent::CellReference(_) => self.events.push("cell-reference"),
+                FormulaRenderEvent::LocalCellReference(_) => self.events.push("local"),
+                FormulaRenderEvent::CrossTableCellReference(_) => self.events.push("cross"),
+                FormulaRenderEvent::Colon => self.events.push("colon"),
+                FormulaRenderEvent::ColonWithUids => self.events.push("colon-uids"),
+                FormulaRenderEvent::ColonTract(_) => {
+                    self.events.push("colon-tract");
+                    self.colon_tracts += 1;
+                },
+                FormulaRenderEvent::CategoryReference(_) => {
+                    self.events.push("category");
+                    self.categories += 1;
+                },
+                FormulaRenderEvent::ReferenceError => self.events.push("ref-error"),
+                FormulaRenderEvent::AppendWhitespace => self.events.push("append-whitespace"),
+                FormulaRenderEvent::PrependWhitespace => self.events.push("prepend-whitespace"),
+                FormulaRenderEvent::Ignored { .. } => self.events.push("ignored"),
+            }
+            Ok(())
+        }
+    }
+
+    fn render_options(source: &[u8]) -> DecodeOptions {
+        options(source)
+            .with_opaque_unknown_fields(true)
+            .with_render_recursion_limit(64)
+    }
+
+    fn ast_array(nodes: &[Vec<u8>]) -> Vec<u8> {
+        let mut output = Vec::new();
+        for node in nodes {
+            bytes(&mut output, 1, node);
+        }
+        output
+    }
+
+    fn uuid(lower: u64, upper: u64) -> Vec<u8> {
+        let mut output = Vec::new();
+        varint(&mut output, 1, lower);
+        varint(&mut output, 2, upper);
+        output
+    }
+
+    #[test]
+    fn render_visitor_streams_legacy_fields_and_nested_thunks() {
+        let string = node(19, |node| bytes(node, 6, b"borrowed"));
+        let date = node(20, |node| fixed64(node, 7, 86_400.5f64.to_bits()));
+        let duration = node(21, |node| fixed64(node, 8, 3.25f64.to_bits()));
+        let array = node(24, |node| {
+            varint(node, 11, 2);
+            varint(node, 12, 1);
+        });
+        let list = node(25, |node| varint(node, 13, 2));
+        let unknown_function = node(31, |node| {
+            bytes(node, 17, b"NATIVE_FN");
+            varint(node, 18, 2);
+        });
+        let local = node(27, |node| {
+            let mut reference = Vec::new();
+            varint(&mut reference, 1, 2);
+            varint(&mut reference, 2, 3);
+            varint(&mut reference, 3, 1);
+            varint(&mut reference, 4, 0);
+            bytes(node, 15, &reference);
+        });
+        let cross = node(28, |node| {
+            let mut reference = Vec::new();
+            varint(&mut reference, 1, 2);
+            varint(&mut reference, 2, 3);
+            varint(&mut reference, 3, 0);
+            varint(&mut reference, 4, 1);
+            let mut table = Vec::new();
+            varint(&mut table, 2, 11);
+            varint(&mut table, 3, 12);
+            varint(&mut table, 4, 13);
+            varint(&mut table, 5, 14);
+            bytes(&mut reference, 5, &table);
+            bytes(node, 16, &reference);
+        });
+        let coordinate = node(36, |node| {
+            let mut column = Vec::new();
+            varint(&mut column, 1, u64::from(zigzag(1)));
+            varint(&mut column, 2, 1);
+            let mut row = Vec::new();
+            varint(&mut row, 1, u64::from(zigzag(-1)));
+            bytes(node, 26, &column);
+            bytes(node, 27, &row);
+        });
+        let category = node(66, |node| {
+            let mut category = Vec::new();
+            bytes(&mut category, 1, &uuid(1, 2));
+            bytes(&mut category, 2, &uuid(3, 4));
+            varint(&mut category, 3, 1);
+            varint(&mut category, 4, 0);
+            let mut uid_list = Vec::new();
+            bytes(&mut uid_list, 1, &uuid(5, 6));
+            bytes(&mut category, 6, &uid_list);
+            let mut preserve = Vec::new();
+            varint(&mut preserve, 1, 1);
+            varint(&mut preserve, 2, 0);
+            bytes(&mut category, 7, &preserve);
+            bytes(&mut category, 9, &uuid(7, 8));
+            bytes(&mut category, 10, &uuid(9, 10));
+            bytes(node, 39, &{
+                let mut wrapper = Vec::new();
+                bytes(&mut wrapper, 1, &category);
+                wrapper
+            });
+        });
+        let colon_tract = node(67, |node| {
+            let mut sticky = Vec::new();
+            varint(&mut sticky, 1, 0);
+            varint(&mut sticky, 2, 0);
+            varint(&mut sticky, 3, 0);
+            varint(&mut sticky, 4, 0);
+            bytes(node, 33, &sticky);
+            let mut colon = Vec::new();
+            let mut column = Vec::new();
+            varint(&mut column, 1, (-1i64) as u64);
+            bytes(&mut colon, 1, &column);
+            let mut row = Vec::new();
+            varint(&mut row, 1, (-2i64) as u64);
+            bytes(&mut colon, 2, &row);
+            bytes(node, 40, &colon);
+        });
+        let thunk = node(26, |output| {
+            let empty = node(22, |_| {});
+            let nested = ast_array(&[string.clone(), empty]);
+            bytes(output, 14, &nested);
+        });
+        let unknown_enum = node(0, |_| {});
+        let unknown_negative_enum = {
+            let mut output = Vec::new();
+            varint(&mut output, 1, u64::MAX);
+            output
+        };
+        let source = formula(&[
+            date,
+            duration,
+            array,
+            list,
+            unknown_function,
+            local,
+            cross,
+            coordinate,
+            category,
+            colon_tract,
+            thunk,
+            unknown_enum,
+            unknown_negative_enum,
+        ]);
+        let mut calls = RenderCalls::default();
+        decode_formula_archive_for_render(&source, context(), render_options(&source), &mut calls)
+            .unwrap();
+        assert!(
+            calls
+                .events
+                .windows(2)
+                .any(|pair| pair == ["thunk-begin", "begin-array"])
+        );
+        assert!(calls.events.contains(&"date"));
+        assert!(calls.events.contains(&"duration"));
+        assert!(calls.events.contains(&"array"));
+        assert!(calls.events.contains(&"list"));
+        assert!(calls.events.contains(&"local"));
+        assert!(calls.events.contains(&"cross"));
+        assert!(calls.events.contains(&"cell-reference"));
+        assert!(calls.events.contains(&"category"));
+        assert!(calls.events.contains(&"colon-tract"));
+        assert!(calls.events.contains(&"add"));
+        assert_eq!(calls.strings, ["borrowed"]);
+        assert_eq!(calls.unknown_functions, [(Some("NATIVE_FN".to_owned()), 2)]);
+        assert_eq!(calls.arrays, [(2, 1)]);
+        assert_eq!(calls.colon_tracts, 1);
+        assert_eq!(calls.categories, 1);
+    }
+
+    #[test]
+    fn render_visitor_is_atomic_for_malformed_nested_payload_and_limits() {
+        let malformed_category = node(66, |node| {
+            let mut category = Vec::new();
+            bytes(&mut category, 1, &uuid(1, 2));
+            bytes(&mut category, 2, &uuid(3, 4));
+            varint(&mut category, 3, 1);
+            varint(&mut category, 4, 0);
+            let mut preserve = Vec::new();
+            varint(&mut preserve, 1, 1);
+            bytes(&mut category, 7, &preserve);
+            let mut wrapper = Vec::new();
+            bytes(&mut wrapper, 1, &category);
+            bytes(node, 39, &wrapper);
+        });
+        let source = formula(&[malformed_category]);
+        let mut calls = RenderCalls::default();
+        assert!(
+            decode_formula_archive_for_render(
+                &source,
+                context(),
+                render_options(&source),
+                &mut calls,
+            )
+            .is_err()
+        );
+        assert!(calls.events.is_empty());
+
+        let thunk = node(26, |output| {
+            let inner = node(17, |node| fixed64(node, 4, 1.0f64.to_bits()));
+            let middle = node(26, |node| {
+                let nested = ast_array(&[inner]);
+                bytes(node, 14, &nested);
+            });
+            let nested = ast_array(&[middle]);
+            bytes(output, 14, &nested);
+        });
+        let source = formula(&[thunk]);
+        let mut calls = RenderCalls::default();
+        decode_formula_archive_for_render(
+            &source,
+            context(),
+            render_options(&source).with_render_recursion_limit(3),
+            &mut calls,
+        )
+        .unwrap();
+        assert!(!calls.events.is_empty());
+        let mut calls = RenderCalls::default();
+        assert!(
+            decode_formula_archive_for_render(
+                &source,
+                context(),
+                render_options(&source).with_render_recursion_limit(2),
+                &mut calls,
+            )
+            .is_err()
+        );
+        assert!(calls.events.is_empty());
+    }
+
+    #[test]
+    fn render_scalar_and_unknown_gap_parity_is_strict_and_atomic() {
+        let invalid_node_type = {
+            let mut output = Vec::new();
+            // 0x8000_0000 is neither a positive int32 nor a sign-extended
+            // negative int32; the package envelope rejects this mid-range
+            // representation before Prost projection.
+            varint(&mut output, 1, 0x8000_0000);
+            output
+        };
+        let source = formula(&[invalid_node_type]);
+        let mut calls = RenderCalls::default();
+        assert!(
+            decode_formula_archive_for_render(
+                &source,
+                context(),
+                render_options(&source),
+                &mut calls,
+            )
+            .is_err()
+        );
+        assert!(calls.events.is_empty());
+
+        let invalid_int32_scalar = node(20, |node| varint(node, 9, 0x8000_0000));
+        let source = formula(&[invalid_int32_scalar]);
+        let mut calls = RenderCalls::default();
+        assert!(
+            decode_formula_archive_for_render(
+                &source,
+                context(),
+                render_options(&source),
+                &mut calls,
+            )
+            .is_err()
+        );
+        assert!(calls.events.is_empty());
+
+        let non_kind_thunk = node(1, |node| {
+            // The nested array contains a node without its required type.
+            let malformed_array = ast_array(&[Vec::new()]);
+            bytes(node, 14, &malformed_array);
+        });
+        let source = formula(&[non_kind_thunk]);
+        let mut calls = RenderCalls::default();
+        assert!(
+            decode_formula_archive_for_render(
+                &source,
+                context(),
+                render_options(&source),
+                &mut calls,
+            )
+            .is_err()
+        );
+        assert!(calls.events.is_empty());
+
+        let repeated_unknown_gap = node(1, |node| {
+            varint(node, 31, 1);
+            varint(node, 31, 2);
+        });
+        let source = formula(&[repeated_unknown_gap]);
+        let mut calls = RenderCalls::default();
+        decode_formula_archive_for_render(&source, context(), render_options(&source), &mut calls)
+            .unwrap();
+        assert!(calls.events.contains(&"add"));
+    }
+
+    #[test]
+    fn render_ignored_thunks_have_exact_two_pass_accounting_and_wire_depth() {
+        let nested = node(19, |node| bytes(node, 6, b"ignored"));
+        let outer = node(1, |node| bytes(node, 14, &ast_array(&[nested])));
+        let source = formula(&[outer]);
+
+        let mut probe_calls = RenderCalls::default();
+        let report = decode_formula_archive_for_render(
+            &source,
+            context(),
+            render_options(&source),
+            &mut probe_calls,
+        )
+        .unwrap();
+        assert_eq!(report.node_count(), 2);
+        assert_eq!(report.max_depth(), 4);
+        assert_eq!(report.text_bytes(), "ignored".len() * 2);
+        assert_eq!(probe_calls.events, ["begin-array", "add", "end-array"]);
+        assert!(probe_calls.strings.is_empty());
+
+        let limits = |fields, work, text, raw_depth| {
+            DecodeOptions::new(
+                source.len(),
+                fields,
+                work,
+                raw_depth,
+                report.node_count(),
+                text,
+            )
+            .with_opaque_unknown_fields(true)
+            .with_render_recursion_limit(2)
+        };
+
+        let mut exact_calls = RenderCalls::default();
+        let exact = decode_formula_archive_for_render(
+            &source,
+            context(),
+            limits(report.fields(), report.work(), report.text_bytes(), 4),
+            &mut exact_calls,
+        )
+        .unwrap();
+        assert_eq!(exact, report);
+        assert_eq!(exact_calls.events, probe_calls.events);
+
+        for options in [
+            limits(report.fields() - 1, report.work(), report.text_bytes(), 4),
+            limits(report.fields(), report.work() - 1, report.text_bytes(), 4),
+            limits(report.fields(), report.work(), report.text_bytes() - 1, 4),
+            limits(report.fields(), report.work(), report.text_bytes(), 3),
+        ] {
+            let mut calls = RenderCalls::default();
+            assert!(
+                decode_formula_archive_for_render(&source, context(), options, &mut calls).is_err()
+            );
+            assert!(calls.events.is_empty());
         }
     }
 

@@ -68,16 +68,12 @@ fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022()
     assert_eq!(projected.text(), "firstlast");
     assert_eq!(projected.runs().len(), 3);
     assert_eq!(
-        projected.runs()[0],
-        litchi_iwa_text::storage::Run::new(0, 5)
-    );
-    assert_eq!(
-        projected.runs()[1],
-        litchi_iwa_text::storage::Run::new(5, 0)
-    );
-    assert_eq!(
-        projected.runs()[2],
-        litchi_iwa_text::storage::Run::new(5, 4)
+        projected
+            .runs()
+            .iter()
+            .map(|run| (run.start(), run.len()))
+            .collect::<Vec<_>>(),
+        [(0, 5), (5, 0), (5, 4)]
     );
 
     // The compatibility decoder intentionally accepts a noncanonical length

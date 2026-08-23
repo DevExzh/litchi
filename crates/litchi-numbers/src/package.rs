@@ -355,6 +355,7 @@ impl Error {
         }
     }
 
+    #[cfg(test)]
     fn protobuf(_error: prost::DecodeError) -> Self {
         Self::MalformedPayload {
             path: SemanticPath::StructuredTables,

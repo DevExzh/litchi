@@ -9627,6 +9627,59 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_package_no_eager_prost_allows_dev_only_manifest(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "thiserror = { workspace = true }\n"
+                "prost-types = { workspace = true }\n"
+                "# prost = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n"
+                "\n"
+                "[target.'cfg(unix)'.dev-dependencies]\n"
+                "prost.workspace = true\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_package_no_eager_prost_rejects_normal_manifest_dependency(
+        self,
+    ) -> None:
+        for section in ("[dependencies]", "[target.'cfg(unix)'.dependencies]"):
+            with self.subTest(section=section):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True)
+                    manifest.write_text(
+                        f"{section}\nprost = {{ workspace = true }}\n\n"
+                        "[dev-dependencies]\nprost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers Cargo manifest retains normal prost "
+                        "dependency: crates/litchi-numbers/Cargo.toml:2",
+                        violations,
+                    )
+
     def test_focused_numbers_package_no_eager_prost_rejects_production_markers(
         self,
     ) -> None:
@@ -9686,6 +9739,15 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    use litchi_iwa_protos::tn;\n"
                 "    use prost::Message;\n"
                 "}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "# prost = { workspace = true }\n"
+                "# \"prost\" = { workspace = true }\n"
+                "prost-types = { workspace = true }\n",
                 encoding="utf-8",
             )
 
@@ -10283,6 +10345,37 @@ class BoundaryPolicyTests(unittest.TestCase):
                 [],
             )
 
+    def test_focused_numbers_extractor_cfg_test_import_does_not_hide_production(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use litchi_iwa_protos::tsce;\n"
+                "fn production(bytes: &[u8]) {\n"
+                "    let _ = tsce::FormulaArchive::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn oracle(bytes: &[u8]) {\n"
+                "    let _ = tsce::FormulaArchive::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "FormulaArchive::decode: "
+                    "crates/litchi-numbers/src/package/extractor.rs:4",
+                ],
+            )
+
     def test_focused_numbers_extractor_no_eager_formula_rejects_production_marker(
         self,
     ) -> None:
@@ -10310,7 +10403,33 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
-    def test_focused_numbers_extractor_allows_bounded_formula_compatibility_fallback(
+    def test_focused_numbers_extractor_rejects_production_formula_type_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn retain_generated_formula(archive: tsce::FormulaArchive) {\n"
+                "    let _ = archive;\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "generated FormulaArchive type: "
+                    "crates/litchi-numbers/src/package/extractor.rs:1",
+                ],
+            )
+
+    def test_focused_numbers_extractor_rejects_bounded_formula_compatibility_fallback(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -10333,10 +10452,17 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
                     root
                 ),
-                [],
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "FormulaArchive::decode: "
+                    "crates/litchi-numbers/src/package/extractor.rs:4",
+                    "focused litchi-numbers extractor production source uses "
+                    "generated FormulaArchive type: "
+                    "crates/litchi-numbers/src/package/extractor.rs:3",
+                ],
             )
 
-    def test_focused_numbers_extractor_formula_fallback_requires_source_bytes(
+    def test_focused_numbers_extractor_rejects_formula_decode_with_arbitrary_bytes(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -10360,8 +10486,9 @@ class BoundaryPolicyTests(unittest.TestCase):
                     root
                 )
             )
-            self.assertEqual(len(violations), 1, violations)
+            self.assertEqual(len(violations), 2, violations)
             self.assertIn("FormulaArchive::decode", violations[0])
+            self.assertIn("generated FormulaArchive type", violations[1])
 
     def test_focused_numbers_names_package_no_eager_prost_rejects_production_markers(
         self,
