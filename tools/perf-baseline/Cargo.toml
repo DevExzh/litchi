@@ -29,6 +29,7 @@ litchi-odp = { path = "../../crates/litchi-odp" }
 litchi-ods = { path = "../../crates/litchi-ods" }
 litchi-odt = { path = "../../crates/litchi-odt" }
 litchi-ole-common = { path = "../../crates/litchi-ole-common" }
+litchi-ooxml-common = { path = "../../crates/litchi-ooxml-common" }
 litchi-opc = { path = "../../crates/litchi-opc" }
 litchi = { path = "../../crates/litchi", features = ["docx", "ods", "odt", "odp", "pptx", "xlsx"] }
 litchi-ppt = { path = "../../crates/litchi-ppt" }
@@ -37,6 +38,7 @@ litchi-rtf = { path = "../../crates/litchi-rtf" }
 litchi-xls = { path = "../../crates/litchi-xls" }
 litchi-xlsb = { path = "../../crates/litchi-xlsb", optional = true }
 litchi-xlsx = { path = "../../crates/litchi-xlsx" }
+quick-xml = "0.41"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
