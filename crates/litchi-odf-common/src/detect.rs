@@ -19,6 +19,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::collections::HashSet;
 use std::io::{Read, Seek, SeekFrom};
 
 /// Neutral file classification returned by the detector.
@@ -29,7 +30,63 @@ const ZIP_SIGNATURE: &[u8] = b"PK\x03\x04";
 const LOCAL_HEADER_BYTES: usize = 30;
 const MIMETYPE_PATH: &str = "mimetype";
 const MIMETYPE_NAME: &[u8] = MIMETYPE_PATH.as_bytes();
+const OOXML_CATALOG_NAME: &str = "[Content_Types].xml";
 const MAX_MIMETYPE_BYTES: usize = 256;
+
+/// Resource ceilings for the metadata-only OPC catalog probe.
+///
+/// The probe is deliberately conservative: a ceiling hit returns `None` so
+/// the caller can run its normal bounded OPC path. The fields mirror the ZIP
+/// portion of the facade's OPC `ReadLimits` but remain owned by this crate to
+/// avoid a dependency cycle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CatalogProbeLimits {
+    max_input_bytes: u64,
+    max_members: usize,
+    max_member_name_bytes: u64,
+    max_metadata_bytes: u64,
+    max_compressed_bytes: u64,
+    max_entry_bytes: u64,
+    max_total_bytes: u64,
+}
+
+impl CatalogProbeLimits {
+    /// Construct a catalog-probe policy from the input and ZIP ceilings.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: u64,
+        max_members: usize,
+        max_member_name_bytes: u64,
+        max_metadata_bytes: u64,
+        max_compressed_bytes: u64,
+        max_entry_bytes: u64,
+        max_total_bytes: u64,
+    ) -> Self {
+        Self {
+            max_input_bytes,
+            max_members,
+            max_member_name_bytes,
+            max_metadata_bytes,
+            max_compressed_bytes,
+            max_entry_bytes,
+            max_total_bytes,
+        }
+    }
+}
+
+impl Default for CatalogProbeLimits {
+    fn default() -> Self {
+        Self::new(
+            512 * 1024 * 1024,
+            100_000,
+            4 * 1024,
+            64 * 1024 * 1024,
+            512 * 1024 * 1024,
+            512 * 1024 * 1024,
+            2 * 1024 * 1024 * 1024,
+        )
+    }
+}
 
 /// Classify the raw contents of an ODF `mimetype` member.
 ///
@@ -139,6 +196,259 @@ pub fn bytes(value: &[u8]) -> Option<Format> {
 #[must_use]
 pub fn packaged_mime(value: &[u8]) -> Option<Format> {
     mime(packaged_mime_bytes(value)?)
+}
+
+/// Check whether a ZIP candidate has the reserved OPC content-types member.
+///
+/// This inspects only the central-directory catalog. It does not read or
+/// decompress a member and does not build an owned archive index, so a normal
+/// ODF package can avoid an unrelated full OPC probe. `Some(false)` means the
+/// ZIP catalog was valid and had no exact content-types member; `None` means
+/// the candidate was not a canonical, in-budget ZIP catalog. Any malformed,
+/// aliased, duplicate, encrypted, data-descriptor, ZIP64, prefixed, or
+/// trailing layout is deliberately unknown so the caller can invoke its
+/// existing bounded OPC path.
+#[must_use]
+pub fn packaged_has_ooxml_catalog(value: &[u8]) -> Option<bool> {
+    packaged_has_ooxml_catalog_with_limits(value, CatalogProbeLimits::default())
+}
+
+/// Check the OPC content-types member with explicit input and ZIP budgets.
+///
+/// A successful `Some(false)` is reserved for a canonical catalog that stays
+/// within every supplied ceiling. Returning `None` is intentionally
+/// conservative: callers must continue with their ordinary bounded OPC
+/// detector rather than treating the candidate as ordinary ODF.
+#[must_use]
+pub fn packaged_has_ooxml_catalog_with_limits(
+    value: &[u8],
+    limits: CatalogProbeLimits,
+) -> Option<bool> {
+    let length = u64::try_from(value.len()).ok()?;
+    if length > limits.max_input_bytes {
+        return None;
+    }
+    if !value.starts_with(ZIP_SIGNATURE) {
+        return None;
+    }
+
+    let archive = soapberry_zip::ZipArchive::from_slice(value).ok()?;
+    if archive.is_zip64() || archive.end_offset() != length {
+        return None;
+    }
+
+    let mut seen = HashSet::<&[u8]>::new();
+    let mut state = CatalogProbeState::default();
+    let mut entries = archive.entries();
+    while let Some(entry) = entries.next_entry().ok()? {
+        let raw = entry.file_path().as_bytes();
+        let normalized = entry.file_path().try_normalize().ok()?;
+        if normalized.as_str().as_bytes() != raw {
+            return None;
+        }
+        if !catalog_probe_range_is_bounded(&entry, archive.directory_offset()) {
+            return None;
+        }
+        if !catalog_probe_entry_with_limits(&mut state, &entry, limits) {
+            return None;
+        }
+        if !entry.is_dir() {
+            seen.try_reserve(1).ok()?;
+            if !seen.insert(raw) {
+                return None;
+            }
+        }
+        if !entry.is_dir() && normalized.as_str().eq_ignore_ascii_case(OOXML_CATALOG_NAME) {
+            state.found_catalog = true;
+        }
+    }
+    state.finish()
+}
+
+/// Check the reserved OPC content-types member from a positional ZIP source.
+///
+/// This is the source-backed counterpart to [`packaged_has_ooxml_catalog`]. It
+/// reads only ZIP metadata through [`ReadAt`], retaining the caller's source
+/// identity check and never materializing or decompressing a member. ZIP
+/// layout errors are reported as `Ok(None)` so an owning facade can retain its
+/// existing fallback/error policy for malformed candidates.
+///
+/// # Errors
+///
+/// Returns source I/O, source-change, or bounded scratch-buffer allocation
+/// errors.
+pub fn packaged_has_ooxml_catalog_read_at(
+    source: &dyn ReadAt,
+) -> litchi_core::Result<Option<bool>> {
+    packaged_has_ooxml_catalog_read_at_with_limits(source, CatalogProbeLimits::default())
+}
+
+/// Check the OPC content-types member from a positional source under bounds.
+///
+/// ZIP layout errors become `Ok(None)`, while source-provider I/O and source
+/// identity changes remain typed errors. This distinction prevents a failing
+/// source from being silently reclassified as an ordinary ODF package.
+pub fn packaged_has_ooxml_catalog_read_at_with_limits(
+    source: &dyn ReadAt,
+    limits: CatalogProbeLimits,
+) -> litchi_core::Result<Option<bool>> {
+    let expected = source.version()?;
+    let detected = (|| {
+        let length = source.len()?;
+        if length > limits.max_input_bytes {
+            return Ok(None);
+        }
+        if length < u64::try_from(ZIP_SIGNATURE.len()).expect("ZIP signature fits in u64") {
+            return Ok(None);
+        }
+
+        let mut signature = [0_u8; ZIP_SIGNATURE.len()];
+        if !read_at_catalog_exact(source, 0, &mut signature)? {
+            return Ok(None);
+        }
+        if signature.as_slice() != ZIP_SIGNATURE {
+            return Ok(None);
+        }
+
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+            .map_err(|source| Error::Allocation {
+                resource: "ODF ZIP catalog probe",
+                source,
+            })?;
+        buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let archive = match soapberry_zip::ZipLocator::new().locate_in_reader(
+            ReadAtZipSource { source },
+            &mut buffer,
+            length,
+        ) {
+            Ok(archive) => archive,
+            Err((_reader, error)) => return map_catalog_probe_zip_error(error),
+        };
+        if archive.is_zip64() || archive.end_offset() != length {
+            return Ok(None);
+        }
+
+        let mut seen = HashSet::<Vec<u8>>::new();
+        let mut state = CatalogProbeState::default();
+        let mut entries = archive.entries(&mut buffer);
+        while let Some(entry) = match entries.next_entry() {
+            Ok(entry) => entry,
+            Err(error) => return map_catalog_probe_zip_error(error),
+        } {
+            let raw = entry.file_path().as_bytes();
+            let normalized = match entry.file_path().try_normalize() {
+                Ok(normalized) => normalized,
+                Err(_error) => return Ok(None),
+            };
+            if normalized.as_str().as_bytes() != raw {
+                return Ok(None);
+            }
+            if !catalog_probe_range_is_bounded(&entry, archive.directory_offset()) {
+                return Ok(None);
+            }
+            if !catalog_probe_entry_with_limits(&mut state, &entry, limits) {
+                return Ok(None);
+            }
+            if !entry.is_dir() {
+                seen.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "ODF ZIP catalog names",
+                    source,
+                })?;
+                let mut owned = Vec::new();
+                owned
+                    .try_reserve_exact(raw.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODF ZIP catalog name",
+                        source,
+                    })?;
+                owned.extend_from_slice(raw);
+                if !seen.insert(owned) {
+                    return Ok(None);
+                }
+                if normalized.as_str().eq_ignore_ascii_case(OOXML_CATALOG_NAME) {
+                    state.found_catalog = true;
+                }
+            }
+        }
+        Ok(state.finish())
+    })();
+    let observed = source.version()?;
+    ensure_source_current(expected, observed)?;
+    detected
+}
+
+/// Check the reserved OPC content-types member from a seekable reader.
+///
+/// The reader's original position is restored before returning. As with the
+/// other catalog probes, this reads ZIP central-directory metadata only and
+/// returns `None` for non-ZIP or malformed candidates.
+pub fn packaged_has_ooxml_catalog_from_reader<R: Read + Seek>(reader: &mut R) -> Option<bool> {
+    packaged_has_ooxml_catalog_from_reader_with_limits(reader, CatalogProbeLimits::default())
+}
+
+/// Check the OPC content-types member from a seekable reader under bounds.
+///
+/// The reader's cursor is restored even when the bounded metadata probe is
+/// uncertain or an underlying read/seek operation fails.
+pub fn packaged_has_ooxml_catalog_from_reader_with_limits<R: Read + Seek>(
+    reader: &mut R,
+    limits: CatalogProbeLimits,
+) -> Option<bool> {
+    let original = reader.stream_position().ok()?;
+    let detected = (|| {
+        let end = reader.seek(SeekFrom::End(0)).ok()?;
+        if end > limits.max_input_bytes {
+            return None;
+        }
+        reader.seek(SeekFrom::Start(0)).ok()?;
+        let mut signature = [0_u8; ZIP_SIGNATURE.len()];
+        reader.read_exact(&mut signature).ok()?;
+        if signature.as_slice() != ZIP_SIGNATURE {
+            return None;
+        }
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+            .ok()?;
+        buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let archive = soapberry_zip::ZipArchive::from_seekable(&mut *reader, &mut buffer).ok()?;
+        if archive.is_zip64() || archive.end_offset() != end {
+            return None;
+        }
+        let mut seen = HashSet::<Vec<u8>>::new();
+        let mut state = CatalogProbeState::default();
+        let mut entries = archive.entries(&mut buffer);
+        while let Some(entry) = entries.next_entry().ok()? {
+            let raw = entry.file_path().as_bytes();
+            let normalized = entry.file_path().try_normalize().ok()?;
+            if normalized.as_str().as_bytes() != raw {
+                return None;
+            }
+            if !catalog_probe_range_is_bounded(&entry, archive.directory_offset()) {
+                return None;
+            }
+            if !catalog_probe_entry_with_limits(&mut state, &entry, limits) {
+                return None;
+            }
+            if !entry.is_dir() {
+                seen.try_reserve(1).ok()?;
+                let mut owned = Vec::new();
+                owned.try_reserve_exact(raw.len()).ok()?;
+                owned.extend_from_slice(raw);
+                if !seen.insert(owned) {
+                    return None;
+                }
+                if normalized.as_str().eq_ignore_ascii_case(OOXML_CATALOG_NAME) {
+                    state.found_catalog = true;
+                }
+            }
+        }
+        state.finish()
+    })();
+    reader.seek(SeekFrom::Start(original)).ok()?;
+    detected
 }
 
 /// Detect a packaged ODF MIME type from a positional source.
@@ -318,6 +628,185 @@ fn trim_ascii(mut value: &[u8]) -> &[u8] {
         value = &value[..value.len() - 1];
     }
     value
+}
+
+#[derive(Default)]
+struct CatalogProbeState {
+    file_count: usize,
+    metadata_bytes: u64,
+    total_uncompressed_bytes: u64,
+    first_local_header_offset: Option<u64>,
+    found_catalog: bool,
+}
+
+impl CatalogProbeState {
+    fn finish(self) -> Option<bool> {
+        (self.first_local_header_offset == Some(0)).then_some(self.found_catalog)
+    }
+}
+
+fn catalog_probe_entry_with_limits(
+    state: &mut CatalogProbeState,
+    entry: &soapberry_zip::ZipFileHeaderRecord<'_>,
+    limits: CatalogProbeLimits,
+) -> bool {
+    let Ok(name_bytes) = u64::try_from(entry.file_path().as_bytes().len()) else {
+        return false;
+    };
+    if name_bytes > limits.max_member_name_bytes {
+        return false;
+    }
+    let Some(metadata_bytes) = state.metadata_bytes.checked_add(entry.metadata_size_hint()) else {
+        return false;
+    };
+    if metadata_bytes > limits.max_metadata_bytes {
+        return false;
+    }
+    state.metadata_bytes = metadata_bytes;
+
+    state.first_local_header_offset = Some(
+        state
+            .first_local_header_offset
+            .map_or(entry.local_header_offset(), |offset| {
+                offset.min(entry.local_header_offset())
+            }),
+    );
+
+    // These layouts require the full bounded OPC path to validate before a
+    // facade can make any precedence decision.
+    if entry.is_zip64() || entry.has_data_descriptor() || entry.is_encrypted() {
+        return false;
+    }
+
+    if entry.is_dir() {
+        return true;
+    }
+    if state.file_count >= limits.max_members
+        || entry.compressed_size_hint() > limits.max_compressed_bytes
+        || entry.uncompressed_size_hint() > limits.max_entry_bytes
+    {
+        return false;
+    }
+    let Some(total_uncompressed_bytes) = state
+        .total_uncompressed_bytes
+        .checked_add(entry.uncompressed_size_hint())
+    else {
+        return false;
+    };
+    if total_uncompressed_bytes > limits.max_total_bytes {
+        return false;
+    }
+    state.file_count += 1;
+    state.total_uncompressed_bytes = total_uncompressed_bytes;
+    true
+}
+
+fn catalog_probe_range_is_bounded(
+    entry: &soapberry_zip::ZipFileHeaderRecord<'_>,
+    directory_offset: u64,
+) -> bool {
+    let Some(end) = entry
+        .local_header_offset()
+        .checked_add(30)
+        .and_then(|offset| offset.checked_add(entry.metadata_size_hint()))
+        .and_then(|offset| offset.checked_add(entry.compressed_size_hint()))
+    else {
+        return false;
+    };
+    end <= directory_offset
+}
+
+fn map_catalog_probe_zip_error(error: soapberry_zip::Error) -> litchi_core::Result<Option<bool>> {
+    match error.into_kind() {
+        soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
+            map_catalog_probe_io_error(error)
+        },
+        soapberry_zip::ErrorKind::Allocation { resource, source } => {
+            Err(Error::Allocation { resource, source })
+        },
+        _ => Ok(None),
+    }
+}
+
+fn map_catalog_probe_io_error(error: std::io::Error) -> litchi_core::Result<Option<bool>> {
+    if error
+        .get_ref()
+        .is_some_and(|source| source.is::<ReadAtProviderError>())
+    {
+        let source = error
+            .into_inner()
+            .expect("a provider marker has an inner error")
+            .downcast::<ReadAtProviderError>()
+            .expect("provider marker type was checked above");
+        return Err(Error::Io(source.0));
+    }
+    if error.kind() == std::io::ErrorKind::UnexpectedEof {
+        return Ok(None);
+    }
+    Err(Error::Io(error))
+}
+
+fn read_at_catalog_exact(
+    source: &dyn ReadAt,
+    mut offset: u64,
+    mut output: &mut [u8],
+) -> litchi_core::Result<bool> {
+    while !output.is_empty() {
+        match source.read_at(offset, output) {
+            Ok(0) => return Ok(false),
+            Ok(read) if read > output.len() => {
+                return Err(Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "positional source reported more bytes than requested",
+                )));
+            },
+            Ok(read) => {
+                let read_u64 = u64::try_from(read).map_err(|_| {
+                    Error::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "source read length does not fit u64",
+                    ))
+                })?;
+                offset = offset.checked_add(read_u64).ok_or_else(|| {
+                    Error::Io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "source offset overflow",
+                    ))
+                })?;
+                output = &mut output[read..];
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {},
+            Err(error) => return Err(Error::Io(error)),
+        }
+    }
+    Ok(true)
+}
+
+#[derive(Debug)]
+struct ReadAtProviderError(std::io::Error);
+
+impl std::fmt::Display for ReadAtProviderError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl std::error::Error for ReadAtProviderError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+struct ReadAtZipSource<'a> {
+    source: &'a dyn ReadAt,
+}
+
+impl soapberry_zip::ReaderAt for ReadAtZipSource<'_> {
+    fn read_at(&self, buffer: &mut [u8], offset: u64) -> std::io::Result<usize> {
+        self.source
+            .read_at(offset, buffer)
+            .map_err(|error| std::io::Error::new(error.kind(), ReadAtProviderError(error)))
+    }
 }
 
 #[cfg(test)]
@@ -536,6 +1025,276 @@ mod tests {
     }
 
     #[test]
+    fn central_catalog_probe_is_exact_and_conservative() {
+        let ordinary = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"[Content_Types].xml"),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&ordinary), Some(false));
+
+        let case_insensitive = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("[content_types].xml", b"<broken>"),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&case_insensitive), Some(true));
+
+        let normalized = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("/[Content_Types].xml", b"<broken>"),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&normalized), None);
+
+        let directory = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("[Content_Types].xml/", b""),
+        ]);
+        assert_eq!(packaged_has_ooxml_catalog(&directory), Some(false));
+
+        let mut malformed = ordinary;
+        malformed.truncate(malformed.len() - 1);
+        assert_eq!(packaged_has_ooxml_catalog(&malformed), None);
+        assert_eq!(packaged_has_ooxml_catalog(b"not a ZIP"), None);
+    }
+
+    #[test]
+    fn central_catalog_probe_applies_caller_budgets() {
+        let ordinary = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"<content/>"),
+        ]);
+        let limits = CatalogProbeLimits::new(
+            u64::MAX,
+            1,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        );
+        assert_eq!(
+            packaged_has_ooxml_catalog_with_limits(&ordinary, limits),
+            None
+        );
+
+        let input_limited = CatalogProbeLimits::new(
+            u64::try_from(ordinary.len() - 1).expect("test ZIP length"),
+            usize::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        );
+        assert_eq!(
+            packaged_has_ooxml_catalog_with_limits(&ordinary, input_limited),
+            None
+        );
+    }
+
+    #[derive(Debug)]
+    struct ProviderFailure;
+
+    impl ReadAt for ProviderFailure {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(128)
+        }
+
+        fn read_at(&self, _offset: u64, _output: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "catalog provider failed",
+            ))
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(17, 0))
+        }
+    }
+
+    struct CentralProviderFailure {
+        signature: [u8; ZIP_SIGNATURE.len()],
+        first_read: std::sync::atomic::AtomicBool,
+    }
+
+    impl ReadAt for CentralProviderFailure {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(128)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            if offset == 0
+                && self
+                    .first_read
+                    .swap(false, std::sync::atomic::Ordering::Relaxed)
+            {
+                let count = output.len().min(self.signature.len());
+                output[..count].copy_from_slice(&self.signature[..count]);
+                return Ok(count);
+            }
+            Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "central catalog provider failed",
+            ))
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(20, 0))
+        }
+    }
+
+    struct ShortReadAt {
+        length: u64,
+    }
+
+    impl ReadAt for ShortReadAt {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.length)
+        }
+
+        fn read_at(&self, _offset: u64, _output: &mut [u8]) -> std::io::Result<usize> {
+            Ok(0)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(19, 0))
+        }
+    }
+
+    struct ChangingSource {
+        bytes: Vec<u8>,
+        revision: std::sync::atomic::AtomicU64,
+    }
+
+    impl ReadAt for ChangingSource {
+        fn len(&self) -> std::io::Result<u64> {
+            u64::try_from(self.bytes.len()).map_err(|_| std::io::Error::other("test source length"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "test offset")
+            })?;
+            let Some(input) = self.bytes.get(offset..) else {
+                return Ok(0);
+            };
+            let count = input.len().min(output.len());
+            output[..count].copy_from_slice(&input[..count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                18,
+                self.revision
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            ))
+        }
+    }
+
+    #[test]
+    fn positional_catalog_probe_preserves_provider_errors_and_source_changes() {
+        assert_eq!(
+            packaged_has_ooxml_catalog_read_at(&ShortReadAt { length: 128 })
+                .expect("short source is a layout uncertainty"),
+            None
+        );
+        assert!(matches!(
+            packaged_has_ooxml_catalog_read_at(&ProviderFailure),
+            Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::PermissionDenied
+        ));
+        assert!(matches!(
+            packaged_has_ooxml_catalog_read_at(&CentralProviderFailure {
+                signature: *b"PK\x03\x04",
+                first_read: std::sync::atomic::AtomicBool::new(true),
+            }),
+            Err(Error::Io(error)) if error.kind() == std::io::ErrorKind::ConnectionReset
+        ));
+
+        let ordinary = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"<content/>"),
+        ]);
+        let source = ChangingSource {
+            bytes: ordinary,
+            revision: std::sync::atomic::AtomicU64::new(0),
+        };
+        assert!(matches!(
+            packaged_has_ooxml_catalog_read_at(&source),
+            Err(Error::SourceChanged { .. })
+        ));
+    }
+
+    struct ShortReadReader {
+        cursor: Cursor<Vec<u8>>,
+    }
+
+    impl Read for ShortReadReader {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            if output.is_empty() {
+                return Ok(0);
+            }
+            let mut one = [0_u8; 1];
+            let read = self.cursor.read(&mut one)?;
+            if read == 1 {
+                output[0] = one[0];
+            }
+            Ok(read)
+        }
+    }
+
+    impl Seek for ShortReadReader {
+        fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+            self.cursor.seek(position)
+        }
+    }
+
+    struct RestoreFailReader {
+        cursor: Cursor<Vec<u8>>,
+        refused_position: u64,
+    }
+
+    impl Read for RestoreFailReader {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            self.cursor.read(output)
+        }
+    }
+
+    impl Seek for RestoreFailReader {
+        fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+            if let SeekFrom::Start(offset) = position
+                && offset == self.refused_position
+            {
+                return Err(std::io::Error::other("cursor restore refused"));
+            }
+            self.cursor.seek(position)
+        }
+    }
+
+    #[test]
+    fn reader_catalog_probe_handles_short_reads_and_restore_failures() {
+        let ordinary = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"<content/>"),
+        ]);
+        let mut short = ShortReadReader {
+            cursor: Cursor::new(ordinary.clone()),
+        };
+        short.seek(SeekFrom::Start(7)).expect("test cursor");
+        assert_eq!(
+            packaged_has_ooxml_catalog_from_reader(&mut short),
+            Some(false)
+        );
+        assert_eq!(short.cursor.position(), 7);
+
+        let mut failing = RestoreFailReader {
+            cursor: Cursor::new(ordinary),
+            refused_position: 11,
+        };
+        failing.cursor.set_position(failing.refused_position);
+        assert_eq!(packaged_has_ooxml_catalog_from_reader(&mut failing), None);
+    }
+
+    #[test]
     fn positional_packaged_probe_reuses_strict_local_mimetype_grammar() {
         let mut writer = crate::core::PackageWriter::new();
         writer
@@ -550,6 +1309,24 @@ mod tests {
         assert_eq!(
             packaged_mime_read_at(&source).expect("positional probe"),
             packaged_mime(&package)
+        );
+        assert_eq!(
+            packaged_has_ooxml_catalog_read_at(&source).expect("positional catalog probe"),
+            packaged_has_ooxml_catalog(&package)
+        );
+        let mut seekable = Cursor::new(package.clone());
+        seekable.set_position(5);
+        assert_eq!(
+            packaged_has_ooxml_catalog_from_reader(&mut seekable),
+            Some(false)
+        );
+        assert_eq!(seekable.position(), 5);
+        let mut malformed = package.clone();
+        malformed.truncate(malformed.len() - 1);
+        assert_eq!(
+            packaged_has_ooxml_catalog_read_at(&litchi_core::OwnedSource::new(malformed))
+                .expect("malformed positional catalog probe"),
+            None
         );
         assert_eq!(
             packaged_mime_read_at(&litchi_core::OwnedSource::new(
