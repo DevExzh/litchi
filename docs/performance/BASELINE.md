@@ -21,6 +21,22 @@ The schema-1 corpus objects and the comparator's case/corpus identity digest are
 unchanged; V2 fields that are not represented by the historical report remain
 explicitly unknown rather than being inferred.
 
+## Latest retained XLSX filesystem input-mode coverage (change 0260)
+
+The opt-in `xlsx_file_open` and `xlsx_file_open_lifecycle` selectors now run
+each warmup and retained sample in a fresh child over one pinned medium XLSX.
+The former selector times path open/root construction; the latter adds
+worksheet names, count, and full text. The exact measured workbook and saved
+lifecycle projection remain live through operation-only evidence snapshots and
+are validated afterward against typed XLSX and OPC/property oracles.
+
+Warm, cold-requested, and admitted cold-verified cache states are explicit.
+Cold verification proves initial page-cache state plus positive process
+`read_bytes` on a page-aligned, independently hashed source; it does not prove
+physical device I/O. This is harness correctness and reproducibility coverage,
+not retained before/after evidence. See
+[change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md).
+
 ## Latest retained OPC structural ownership result (change 0259)
 
 Private OPC structural parsing now reuses the lazy ZIP reader's validated

@@ -11,6 +11,22 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## Fresh-child XLSX filesystem roots (change 0260)
+
+[Change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md) moves the
+existing `xlsx_file_open` and `xlsx_file_open_lifecycle` selectors into the
+fresh-child filesystem runner over one pinned 4,226,429-byte, four-sheet
+media-rich corpus. The exact measured workbook and lifecycle projection remain
+live through elapsed, allocation, procfs, and cold-proof snapshots, then are
+checked against typed XLSX and independent OPC/property oracles.
+
+Focused tests and a debug disk-root smoke cover warm and `cold-verified`
+execution. Both smoke selectors admitted cold proof with zero initial
+resident/dirty/writeback bytes and positive process `read_bytes`; the aligned
+source and semantic hashes remained exact. The dirty-worktree smoke is
+validation only. No latency, allocation, RSS, physical-I/O, storage-media, or
+XLSX speedup claim is registered.
+
 ## Shared lazy OPC structural members (change 0259)
 
 [Change 0259](changes/0259-opc-shared-structural-members.md) carries the lazy
