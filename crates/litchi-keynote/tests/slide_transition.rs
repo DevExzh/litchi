@@ -1272,6 +1272,10 @@ fn duplicate_unselected_root_node_is_rejected_before_staging() -> TestResult<()>
     let malformed = duplicate_rooted_node_package(&source)?;
     let package = Package::from_bytes(&malformed)?;
     assert!(matches!(
+        package.slide_transition(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert!(matches!(
         package.edit_slide_transition(0usize),
         Err(Error::InvalidSource)
     ));
