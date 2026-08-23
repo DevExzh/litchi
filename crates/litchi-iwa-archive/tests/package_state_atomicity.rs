@@ -312,6 +312,50 @@ fn exact_noop_reuses_completed_cache_and_inverse_restores_ordered_bytes() {
 }
 
 #[test]
+fn reordered_patch_retains_name_keyed_archive_cache() {
+    let source = state();
+    let source_document = parse(&source, "Index/Document.iwa");
+    let source_metadata = parse(&source, "Index/Metadata.iwa");
+
+    let mut reordered = source.clone();
+    let document = reordered
+        .remove_entry("Index/Document.iwa")
+        .unwrap_or_else(|| panic!("document entry should exist"));
+    reordered
+        .try_insert_entry_at(1, document)
+        .unwrap_or_else(|error| panic!("reinserted document should be accepted: {error}"));
+    assert_eq!(
+        reordered.iter().map(Entry::name).collect::<Vec<_>>(),
+        ["Index/Metadata.iwa", "Index/Document.iwa"]
+    );
+
+    let patch = source.patch_to(&reordered);
+    assert_eq!(patch.len(), 2);
+    assert!(
+        patch
+            .changes()
+            .iter()
+            .all(|change| change.kind() == litchi_iwa_package::EntryChangeKind::Reordered)
+    );
+    let published = source
+        .apply_patch(&patch)
+        .unwrap_or_else(|error| panic!("reorder patch should publish: {error}"));
+
+    let retained_document = published
+        .get_or_parse_archive("Index/Document.iwa", |_| {
+            panic!("reordering must retain the document archive cache")
+        })
+        .unwrap_or_else(|error| panic!("retained document cache should be usable: {error}"));
+    let retained_metadata = published
+        .get_or_parse_archive("Index/Metadata.iwa", |_| {
+            panic!("reordering must retain the metadata archive cache")
+        })
+        .unwrap_or_else(|error| panic!("retained metadata cache should be usable: {error}"));
+    assert!(Arc::ptr_eq(&source_document, &retained_document));
+    assert!(Arc::ptr_eq(&source_metadata, &retained_metadata));
+}
+
+#[test]
 fn speculative_and_oversized_archives_are_rejected_with_typed_limits() {
     let limits = ArchiveLimits::default()
         .with_archive_bytes(4)
