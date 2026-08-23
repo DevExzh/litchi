@@ -278,7 +278,7 @@ mod tests {
     use std::thread;
 
     use litchi_iwa_core::{Archive, ArchiveLimits};
-    use litchi_iwa_package::Entry;
+    use litchi_iwa_package::{Entry, EntryChangeKind};
 
     use super::{EntryStoreError, PackageState};
 
@@ -461,6 +461,58 @@ mod tests {
             source.get("Index/Document.iwa").map(Entry::data),
             Some([1].as_slice())
         );
+    }
+
+    #[test]
+    fn moved_and_replaced_entry_invalidates_only_its_name_cache() {
+        let source = PackageState::from_entries(
+            vec![
+                Entry::new("Index/Document.iwa".to_owned(), vec![1]),
+                Entry::new("Index/Metadata.iwa".to_owned(), vec![2]),
+            ],
+            ArchiveLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("source entries should be valid: {error}"));
+        let source_document = source
+            .get_or_parse_archive("Index/Document.iwa", |_| Ok((archive(), 1)))
+            .unwrap_or_else(|error| panic!("source document should parse: {error}"));
+        let source_metadata = source
+            .get_or_parse_archive("Index/Metadata.iwa", |_| Ok((archive(), 1)))
+            .unwrap_or_else(|error| panic!("source metadata should parse: {error}"));
+
+        let mut target = source.clone();
+        let document = target
+            .remove_entry("Index/Document.iwa")
+            .unwrap_or_else(|| panic!("source document should exist"));
+        target
+            .try_insert_entry_at(1, Entry::new(document.name().to_owned(), vec![9]))
+            .unwrap_or_else(|error| panic!("replaced document should be accepted: {error}"));
+
+        let patch = source.patch_to(&target);
+        assert_eq!(patch.len(), 2);
+        assert_eq!(patch.changes()[0].kind(), EntryChangeKind::Replaced);
+        assert_eq!(patch.changes()[1].kind(), EntryChangeKind::Reordered);
+
+        let published = source
+            .apply_patch(&patch)
+            .unwrap_or_else(|error| panic!("matching patch should publish: {error}"));
+
+        let document_parse_count = std::sync::atomic::AtomicUsize::new(0);
+        let replaced_document = published
+            .get_or_parse_archive("Index/Document.iwa", |_| {
+                document_parse_count.fetch_add(1, Ordering::SeqCst);
+                Ok((archive(), 1))
+            })
+            .unwrap_or_else(|error| panic!("replaced document should parse: {error}"));
+        assert!(!Arc::ptr_eq(&source_document, &replaced_document));
+        assert_eq!(document_parse_count.load(Ordering::SeqCst), 1);
+
+        let retained_metadata = published
+            .get_or_parse_archive("Index/Metadata.iwa", |_| {
+                panic!("unchanged metadata should retain its parsed cache")
+            })
+            .unwrap_or_else(|error| panic!("unchanged metadata cache should survive: {error}"));
+        assert!(Arc::ptr_eq(&source_metadata, &retained_metadata));
     }
 
     #[test]
