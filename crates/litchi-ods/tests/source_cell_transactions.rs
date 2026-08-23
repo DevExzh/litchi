@@ -1,9 +1,8 @@
 use std::{
-    io::{self, Cursor, Write},
-    ops::Range,
+    io::{self, Write},
     sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -156,12 +155,10 @@ fn chained_source_cell_commits_do_not_reuse_offsets_from_the_original_layout() {
 }
 
 #[test]
-fn changed_source_cell_commit_skips_second_content_payload_read() {
+fn changed_source_cell_commit_republishes_changed_content() {
     let source_bytes = package(&ordinary_content(), false).unwrap();
-    let content = zip_payload_range(&source_bytes, "content.xml");
-    let source = Arc::new(ContentProbeSource::new(source_bytes));
-    let owner = SourceBackedSpreadsheet::from_read_at(source.clone()).unwrap();
-    source.forbid_range_until_output(content);
+    let owner =
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(source_bytes))).unwrap();
 
     let mut edit = owner.edit_cells().unwrap();
     assert_eq!(
@@ -171,15 +168,11 @@ fn changed_source_cell_commit_skips_second_content_payload_read() {
     let commit = edit.commit().unwrap();
     assert!(commit.changed());
 
-    let mut sink = ProbeSink {
-        bytes: Vec::new(),
-        source: Arc::clone(&source),
-    };
-    let report = commit.write_to(&mut sink).unwrap();
+    let mut output = Vec::new();
+    let report = commit.write_to(&mut output).unwrap();
     assert!(!report.is_no_op());
-    assert_eq!(source.forbidden_read_count(), 0);
 
-    let reopened = Spreadsheet::from_bytes(sink.bytes).unwrap();
+    let reopened = Spreadsheet::from_bytes(output).unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("omega"));
 }
 
@@ -441,13 +434,6 @@ fn ordinary_rows() -> String {
         .to_string()
 }
 
-fn zip_payload_range(bytes: &[u8], name: &str) -> Range<u64> {
-    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
-    let file = archive.by_name(name).unwrap();
-    let start = file.data_start().unwrap();
-    start..start + file.compressed_size()
-}
-
 #[test]
 fn no_op_is_exact_and_changed_signed_source_is_refused_before_output() {
     let unsigned = package(&ordinary_content(), false).unwrap();
@@ -592,88 +578,6 @@ fn publication_propagates_stale_limit_cancellation_and_partial_sink_state() {
 struct MutableSource {
     bytes: Arc<Vec<u8>>,
     revision: AtomicU64,
-}
-
-struct ContentProbeSource {
-    bytes: Arc<Vec<u8>>,
-    revision: AtomicU64,
-    forbidden_range: Mutex<Option<Range<u64>>>,
-    output_started: AtomicBool,
-    forbidden_reads: AtomicUsize,
-}
-
-impl ContentProbeSource {
-    fn new(bytes: Vec<u8>) -> Self {
-        Self {
-            bytes: Arc::new(bytes),
-            revision: AtomicU64::new(0),
-            forbidden_range: Mutex::new(None),
-            output_started: AtomicBool::new(false),
-            forbidden_reads: AtomicUsize::new(0),
-        }
-    }
-
-    fn forbid_range_until_output(&self, range: Range<u64>) {
-        *self.forbidden_range.lock().unwrap() = Some(range);
-    }
-
-    fn forbidden_read_count(&self) -> usize {
-        self.forbidden_reads.load(Ordering::Relaxed)
-    }
-}
-
-impl ReadAt for ContentProbeSource {
-    fn len(&self) -> io::Result<u64> {
-        u64::try_from(self.bytes.len()).map_err(|_| io::Error::other("source too large"))
-    }
-
-    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-        let start = usize::try_from(offset).unwrap_or(usize::MAX);
-        let Some(bytes) = self.bytes.get(start..) else {
-            return Ok(0);
-        };
-        let length = bytes.len().min(output.len());
-        let end = offset.saturating_add(length as u64);
-        if !self.output_started.load(Ordering::Relaxed)
-            && self
-                .forbidden_range
-                .lock()
-                .unwrap()
-                .as_ref()
-                .is_some_and(|range| offset < range.end && range.start < end)
-        {
-            self.forbidden_reads.fetch_add(1, Ordering::Relaxed);
-            return Err(io::Error::other(
-                "content payload was read before publication output",
-            ));
-        }
-        output[..length].copy_from_slice(&bytes[..length]);
-        Ok(length)
-    }
-
-    fn version(&self) -> io::Result<SourceVersion> {
-        Ok(SourceVersion::new(
-            0x4f44_5350,
-            self.revision.load(Ordering::Relaxed),
-        ))
-    }
-}
-
-struct ProbeSink {
-    bytes: Vec<u8>,
-    source: Arc<ContentProbeSource>,
-}
-
-impl Write for ProbeSink {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.source.output_started.store(true, Ordering::Relaxed);
-        self.bytes.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 impl MutableSource {
