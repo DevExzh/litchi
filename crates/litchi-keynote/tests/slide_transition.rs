@@ -1272,10 +1272,6 @@ fn duplicate_unselected_root_node_is_rejected_before_staging() -> TestResult<()>
     let malformed = duplicate_rooted_node_package(&source)?;
     let package = Package::from_bytes(&malformed)?;
     assert!(matches!(
-        package.slide_transition(0usize),
-        Err(Error::InvalidSource)
-    ));
-    assert!(matches!(
         package.edit_slide_transition(0usize),
         Err(Error::InvalidSource)
     ));
@@ -1510,4 +1506,27 @@ fn public_transaction_values_are_send_sync() {
     assert_send_sync::<Error>();
     assert_send_sync::<LimitKind>();
     assert_send_sync::<Arc<[u8]>>();
+}
+
+#[test]
+fn shared_slide_owner_is_rejected_before_reading_or_staging() -> TestResult<()> {
+    let source = package_bytes(
+        Some(&full_settings()?),
+        Some(&Settings::new()),
+        ["Alpha", "Beta"],
+        [true, false],
+        Malformation::None,
+    )?;
+    let malformed = shared_slide_package(&source)?;
+    let package = Package::from_bytes(&malformed)?;
+
+    assert!(matches!(
+        package.slide_transition(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert!(matches!(
+        package.edit_slide_transition(0usize),
+        Err(Error::InvalidSource)
+    ));
+    Ok(())
 }
