@@ -57,6 +57,21 @@ impl Comment {
         }
     }
 
+    /// Fallibly construct a bounded semantic comment value.
+    ///
+    /// This constructor applies the hard Numbers semantic text ceiling. A
+    /// package edit may impose a lower configured ceiling; [`Edit::set`]
+    /// performs that package-specific validation before staging. The text is
+    /// copied with a fallible reservation, so oversized or allocation-failed
+    /// values are rejected without publishing a partial comment value.
+    pub fn try_new(text: impl AsRef<str>) -> Result<Self, Error> {
+        Self::try_from_text(
+            text.as_ref(),
+            super::SemanticLimits::MAX_OUTPUT_TEXT_BYTES,
+            Path::Package,
+        )
+    }
+
     /// Borrow the comment text.
     #[must_use]
     pub fn text(&self) -> &str {
@@ -3119,5 +3134,28 @@ mod tests {
 
         assert!(std::sync::Arc::ptr_eq(&original.text, &cloned.text));
         assert_eq!(cloned.text(), "shared text");
+    }
+
+    #[test]
+    fn comment_try_new_copies_bounded_text() {
+        let comment = Comment::try_new("fallible text").expect("bounded comment allocation");
+
+        assert_eq!(comment.text(), "fallible text");
+    }
+
+    #[test]
+    fn comment_try_from_text_rejects_selected_limit_before_allocation() {
+        let error = Comment::try_from_text("too long", 3, Path::Package)
+            .expect_err("the selected text ceiling must be enforced");
+
+        assert_eq!(
+            error,
+            Error::LimitExceeded {
+                kind: LimitKind::TextBytes,
+                observed: 8,
+                maximum: 3,
+                path: Path::Package,
+            }
+        );
     }
 }
