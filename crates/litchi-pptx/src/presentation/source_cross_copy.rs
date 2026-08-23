@@ -595,18 +595,6 @@ fn prepare(
     let target_slide_uri = allocate_slide_uri(&editor.package)?;
     let presentation_relationship_type = destination_anchor_relationship.reltype().to_owned();
     let layout_relationship_type = destination_layout_relationship.reltype().to_owned();
-    let mut bindings = Vec::new();
-    bindings
-        .try_reserve_exact(destination_refs.len())
-        .map_err(|source| Error::Allocation {
-            resource: "source-backed destination slide bindings",
-            source,
-        })?;
-    bindings.extend(
-        destination_refs
-            .iter()
-            .map(|reference| (reference.id(), reference.relationship_id().to_owned())),
-    );
     let staging_request = source_slide_data
         .as_bytes()
         .len()
@@ -619,9 +607,9 @@ fn prepare(
     )?;
     let target_presentation_xml = crate::opened::insert_slide_binding(
         destination_presentation_data.as_bytes(),
-        bindings
+        destination_refs
             .iter()
-            .map(|(slide_id, relationship_id)| (*slide_id, relationship_id.as_str())),
+            .map(|reference| (reference.id(), reference.relationship_id())),
         insertion_position,
         slide_id,
         &presentation_relationship_id,
@@ -645,7 +633,9 @@ fn prepare(
     }
     validate_candidate_bindings(
         &target_presentation_xml,
-        &bindings,
+        destination_refs
+            .iter()
+            .map(|reference| (reference.id(), reference.relationship_id())),
         insertion_position,
         slide_id,
         &presentation_relationship_id,
@@ -711,22 +701,12 @@ fn verify_candidate(
             "macro-enabled destination presentation is unsupported",
         );
     }
-    let mut expected = Vec::new();
-    expected
-        .try_reserve_exact(editor.slides.len())
-        .map_err(|source| Error::Allocation {
-            resource: "source-backed candidate slide bindings",
-            source,
-        })?;
-    expected.extend(
+    validate_candidate_bindings(
+        &prepared.target_presentation_xml,
         editor
             .slides
             .iter()
-            .map(|slide| (slide.slide_id, slide.binding.slide_reference_id.clone())),
-    );
-    validate_candidate_bindings(
-        &prepared.target_presentation_xml,
-        &expected,
+            .map(|slide| (slide.slide_id, slide.binding.slide_reference_id.as_str())),
         prepared.insertion_position,
         prepared.slide_id,
         &prepared.presentation_relationship_id,
@@ -2050,9 +2030,9 @@ fn slide_elements(xml: &[u8]) -> Result<Vec<SlideElement>> {
     Ok(elements)
 }
 
-fn validate_candidate_bindings(
+fn validate_candidate_bindings<'a>(
     xml: &[u8],
-    current: &[(u32, String)],
+    current: impl ExactSizeIterator<Item = (u32, &'a str)>,
     position: usize,
     id: u32,
     relationship_id: &str,
@@ -2067,19 +2047,28 @@ fn validate_candidate_bindings(
             "staged presentation slide bindings differ from plan".into(),
         ));
     }
+    let mut current = current;
     for (index, actual) in actual.iter().enumerate() {
         let matches = if index == position {
             actual.id == id && actual.relationship_id == relationship_id
         } else {
-            let source_index = if index < position { index } else { index - 1 };
-            let (expected_id, expected_relationship_id) = &current[source_index];
-            actual.id == *expected_id && actual.relationship_id == *expected_relationship_id
+            let Some((expected_id, expected_relationship_id)) = current.next() else {
+                return Err(Error::Invalid(
+                    "staged presentation slide bindings differ from plan".into(),
+                ));
+            };
+            actual.id == expected_id && actual.relationship_id == expected_relationship_id
         };
         if !matches {
             return Err(Error::Invalid(
                 "staged presentation slide bindings differ from plan".into(),
             ));
         }
+    }
+    if current.next().is_some() {
+        return Err(Error::Invalid(
+            "staged presentation slide bindings differ from plan".into(),
+        ));
     }
     Ok(())
 }

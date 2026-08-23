@@ -3086,7 +3086,7 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Vec<u8>,
     ) -> Result<()> {
-        self.write_part_overlays_to_stream(writer, vec![(partname.clone(), replacement)])
+        self.write_single_part_overlay_to_stream(writer, partname, replacement, Arc::new)
     }
 
     /// Replace one existing ordinary Part with caller-owned shared bytes and
@@ -3104,7 +3104,65 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Arc<Vec<u8>>,
     ) -> Result<()> {
-        self.write_part_overlays_shared_to_stream(writer, vec![(partname.clone(), replacement)])
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            std::convert::identity,
+        )
+    }
+
+    /// Publish one existing Part without constructing the general replacement
+    /// vector and its intermediate overlay plans.
+    ///
+    /// The one-Part entry points are used by the format-owned source editors
+    /// for the common single-slide/single-cell publication case. Keeping this
+    /// path on the same validation and preservation machinery as the bounded
+    /// multi-Part path avoids changing semantics while removing short-lived
+    /// one-element vectors from the publication setup.
+    fn write_single_part_overlay_to_stream<W: Write, P, F>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: P,
+        into_shared: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(P) -> Arc<Vec<u8>>,
+    {
+        let target = self
+            .parts_by_name
+            .get(partname)
+            .copied()
+            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+        let replacement = into_shared(replacement);
+        self.validate_overlay_limits(std::iter::once((target, replacement.len())))?;
+
+        // Reading the original before any XML audit preserves the exact
+        // no-op contract: malformed but byte-identical source payloads still
+        // reproduce the source artifact without being parsed.
+        let original = self.read_part(target)?;
+        if original.as_bytes() == replacement.as_slice() {
+            return self.write_exact_source(writer);
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+
+        let target_part = &self.parts[target];
+        if xml_minifier::audit::package::is_xml_part(
+            target_part.partname.as_str(),
+            &target_part.content_type,
+        ) {
+            validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
+            validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
+        }
+
+        let changed = [ChangedOverlay {
+            target: ChangedOverlayTarget::Part(target),
+            replacement,
+        }];
+        self.write_changed_overlays(writer, &changed)
     }
 
     /// Replace one ordinary Part while removing a bounded set of external
