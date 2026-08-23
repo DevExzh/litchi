@@ -415,7 +415,7 @@ fn decode_base64(value: &str, field: &str) -> Result<Vec<u8>> {
 }
 
 fn parse_checksum(attributes: &HashMap<Vec<u8>, String>) -> Result<ManifestChecksum> {
-    let algorithm = match required(&attributes, b"checksum-type")? {
+    let algorithm = match required(attributes, b"checksum-type")? {
         "SHA1/1K" | "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0#sha1-1k" => {
             ManifestChecksumAlgorithm::Sha1First1024
         },
@@ -428,7 +428,7 @@ fn parse_checksum(attributes: &HashMap<Vec<u8>, String>) -> Result<ManifestCheck
             )));
         },
     };
-    let value = decode_base64(required(&attributes, b"checksum")?, "checksum")?;
+    let value = decode_base64(required(attributes, b"checksum")?, "checksum")?;
     let expected = match algorithm {
         ManifestChecksumAlgorithm::Sha1First1024 => 20,
         ManifestChecksumAlgorithm::Sha256First1024 => 32,
