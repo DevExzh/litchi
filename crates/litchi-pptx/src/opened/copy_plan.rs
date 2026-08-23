@@ -1363,33 +1363,7 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
 }
 
 pub(super) fn resolve_slide(snapshot: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
-    match key {
-        crate::slide::Key::Index(index) => {
-            snapshot
-                .slides
-                .get(index)
-                .cloned()
-                .ok_or(Error::SlideIndexOutOfBounds {
-                    index,
-                    len: snapshot.slides.len(),
-                })
-        },
-        crate::slide::Key::Name(name) => {
-            let mut matches = snapshot.slides.iter().filter(|slide| slide.name == name);
-            let selected = matches.next().cloned();
-            if matches.next().is_some() {
-                return Err(Error::AmbiguousSlideName {
-                    name: name.to_owned(),
-                    matches: snapshot
-                        .slides
-                        .iter()
-                        .filter(|slide| slide.name == name)
-                        .count(),
-                });
-            }
-            selected.ok_or_else(|| Error::SlideNameNotFound(name.to_owned()))
-        },
-    }
+    snapshot.resolve_slide(key)
 }
 
 fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {

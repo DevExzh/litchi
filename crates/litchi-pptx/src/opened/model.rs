@@ -1,5 +1,6 @@
 //! Immutable opened-package state and finite resource policy.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -145,6 +146,72 @@ pub struct Slide {
     pub(crate) name: String,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct SlideNameMatch {
+    first: usize,
+    count: usize,
+}
+
+/// Immutable exact-name lookup for one captured slide list.
+///
+/// Names are not required to be unique by the package model: the public
+/// selector reports an ambiguity when more than one slide has the requested
+/// name. Keeping the first position and match count preserves that behavior
+/// without rescanning the slide list for every selector.
+#[derive(Debug, Clone)]
+pub(crate) struct SlideNameIndex {
+    by_name: HashMap<String, SlideNameMatch>,
+}
+
+impl SlideNameIndex {
+    pub(crate) fn build(slides: &[Slide]) -> Result<Self> {
+        let mut by_name: HashMap<String, SlideNameMatch> = HashMap::new();
+        by_name
+            .try_reserve(slides.len())
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation slide name index",
+                source,
+            })?;
+        for (index, slide) in slides.iter().enumerate() {
+            if let Some(existing) = by_name.get_mut(slide.name.as_str()) {
+                existing.count = existing.count.saturating_add(1);
+                continue;
+            }
+            let mut name = String::new();
+            name.try_reserve(slide.name.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "opened-presentation slide name index key",
+                    source,
+                })?;
+            name.push_str(&slide.name);
+            by_name.insert(
+                name,
+                SlideNameMatch {
+                    first: index,
+                    count: 1,
+                },
+            );
+        }
+        Ok(Self { by_name })
+    }
+
+    pub(crate) fn resolve(&self, slides: &[Slide], name: &str) -> Result<Slide> {
+        let Some(matched) = self.by_name.get(name) else {
+            return Err(Error::SlideNameNotFound(name.to_owned()));
+        };
+        if matched.count != 1 {
+            return Err(Error::AmbiguousSlideName {
+                name: name.to_owned(),
+                matches: matched.count,
+            });
+        }
+        slides
+            .get(matched.first)
+            .cloned()
+            .ok_or_else(|| invalid("opened-presentation slide name index lost its position"))
+    }
+}
+
 impl Slide {
     /// Stable `p:sldId@id` identity.
     #[must_use]
@@ -171,6 +238,7 @@ pub struct Snapshot {
     pub(crate) package: Arc<OpcPackage>,
     pub(crate) presentation_name: PackURI,
     pub(crate) slides: Vec<Slide>,
+    pub(crate) slide_name_index: SlideNameIndex,
     pub(crate) revision: [u8; 32],
     pub(crate) limits: Limits,
     pub(crate) physical_source_provenance: bool,
@@ -211,6 +279,21 @@ impl Snapshot {
     #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    pub(crate) fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<Slide> {
+        match key {
+            crate::slide::Key::Index(index) => {
+                self.slides
+                    .get(index)
+                    .cloned()
+                    .ok_or(Error::SlideIndexOutOfBounds {
+                        index,
+                        len: self.slides.len(),
+                    })
+            },
+            crate::slide::Key::Name(name) => self.slide_name_index.resolve(&self.slides, name),
+        }
     }
 }
 
@@ -289,11 +372,13 @@ pub(crate) fn capture_with_provenance(
         });
     }
     let _notes = crate::notes::load_snapshot(package, &presentation_name)?;
+    let slide_name_index = SlideNameIndex::build(&slides)?;
     let revision = package_fingerprint(package)?;
     Ok(Snapshot {
         package: Arc::new(package.clone()),
         presentation_name,
         slides,
+        slide_name_index,
         revision,
         limits,
         physical_source_provenance,
