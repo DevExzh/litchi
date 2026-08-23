@@ -1,0 +1,1068 @@
+{
+  "schema_version": 1,
+  "registry_kind": "litchi-performance-report-claim-classification",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "scope": {
+    "kind": "two_historical_report_tables",
+    "description": "Only the two audited historical tables in docs/performance/REPORT.md are classified; other report prose and tables are outside this registry."
+  },
+  "report": {
+    "path": "docs/performance/REPORT.md",
+    "tables": [
+      {
+        "id": "historical-stable-tranche",
+        "section_heading": "### Historical stable-tranche table (descriptive; not current claims)",
+        "header": [
+          "Change",
+          "Historical/descriptive evidence (not a current claim)",
+          "Historical scope / limitation"
+        ],
+        "header_sha256": "434657e89ddf07acebbd74f250315858d20100a1eb6a2069d472f85371bcd64c",
+        "row_count": 88,
+        "rows": [
+          {
+            "ordinal": 1,
+            "label": "XLSX row-start index",
+            "row_sha256": "81338eaee5e51f550ef453c6b1317554ca0545e2b66b0a934278b5d99ef6d207",
+            "state": "historical"
+          },
+          {
+            "ordinal": 2,
+            "label": "Targeted OPC raw publication",
+            "row_sha256": "c8e761ad9a755ea799f7f4a85517213283ebaae0becb328cb9ebc1a6496e5163",
+            "state": "historical"
+          },
+          {
+            "ordinal": 3,
+            "label": "Positional CFB/ZIP and explicit execution",
+            "row_sha256": "d9b80c2b56d9a01bbfc7113469e889383da3f2bc7a9bee2b3b239f8e3e9fd436",
+            "state": "historical"
+          },
+          {
+            "ordinal": 4,
+            "label": "CFB selective exact-range read",
+            "row_sha256": "865a7206adb5c59db622266d626a5f323656b8ad217e8d83b319425a048fe58c",
+            "state": "historical"
+          },
+          {
+            "ordinal": 5,
+            "label": "CFB selective simulated-range read",
+            "row_sha256": "1e36512547b5da0d5db1a7691ade545fde1438e19bac094d4f0aabf4178678a5",
+            "state": "historical"
+          },
+          {
+            "ordinal": 6,
+            "label": "CFB same-target MiniFAT repeat policy",
+            "row_sha256": "17fdf3df093bc699d8bbff4d9a249f8c01bb341867e972aeeaa11461f2005fa1",
+            "state": "historical"
+          },
+          {
+            "ordinal": 7,
+            "label": "CFB MiniFAT 4095-byte physical-run evidence",
+
+            "row_sha256": "4622956d2cf12df51ee20cde79cae1668b8cf0ebdbde227321eaf3e0a137d45c",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 8,
+            "label": "Ordinary-root DOCX source-path evidence",
+            "row_sha256": "bb423fead47b65146955494b1cb581fae592a8469b32922ac070b6e5859390d2",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 9,
+            "label": "Source-backed OPC and DOCX/XLSX/PPTX facades",
+            "row_sha256": "cae4d895970d1f089c240ca7e146d27a20100f7a616753bece260048d2e193b3",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 10,
+            "label": "Source-backed PPTX selected-slide publication",
+            "row_sha256": "71453a8793d63f49cfd908aec45f83f4d7d138a14a9e173a3c14f69b100508e5",
+            "state": "historical"
+          },
+          {
+            "ordinal": 11,
+            "label": "Source-backed XLSX calculation-metadata publication",
+            "row_sha256": "8aba22871b95d7e3b4e3e6dab8f4efc7cff2398983fe04cf7507b72f5e56b1f2",
+            "state": "historical"
+          },
+          {
+            "ordinal": 12,
+            "label": "Source-backed XLSX defined-name publication",
+            "row_sha256": "e26c33940854e9b703def9092e97d0a15c6665463b33638d0ce38be6813287cb",
+            "state": "historical"
+          },
+          {
+            "ordinal": 13,
+            "label": "Source-backed XLSX page-break publication",
+            "row_sha256": "e269886cf77432234654122588ea8ff2d459f25d5f9a8d41def1e1afcecf6d8f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 14,
+            "label": "Source-backed XLSX page-margin publication",
+            "row_sha256": "e3ca0f57a5e52b2879f0c52857b8af6ac97cbc853bed3bc0f6e09354f2974334",
+            "state": "historical"
+          },
+          {
+            "ordinal": 15,
+            "label": "Source-backed XLSX print-options publication",
+            "row_sha256": "83fb8512c755bb51862fb8e4eb24a9bc7b247927254b994fc92e6eb0bb3fa80a",
+            "state": "historical"
+          },
+          {
+            "ordinal": 16,
+            "label": "Source-backed XLSX page-setup publication",
+            "row_sha256": "78d025d3c71db85b95ebfcc72c227dd59ac04ec42047cdf7243c7e67d9b9995d",
+            "state": "historical"
+          },
+          {
+            "ordinal": 17,
+            "label": "Source-backed XLSX sheet-protection publication",
+
+            "row_sha256": "d3a5ab4ac915dcb4b6d2d2dd716632c5d49edb5d900e9b29196b195f3cb9e86f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 18,
+            "label": "Source-backed XLSX data-validation publication",
+            "row_sha256": "bf48f2a96e4f4d9fb16627c0471400477a2dadac83f2ee7f23ff4ce4f23d5326",
+            "state": "historical"
+          },
+          {
+            "ordinal": 19,
+            "label": "Source-backed XLSX auto-filter publication",
+            "row_sha256": "de971166e5da5d31ae6fb72ecbaa8f6f1bfce4bc2cbe27cb66c0ad55fd88eff7",
+            "state": "historical"
+          },
+          {
+            "ordinal": 20,
+            "label": "Deterministic range simulation",
+            "row_sha256": "bb419217a3604998ac4dbc42b8d87bf15c857bff243294f31bc289406aee99a1",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 21,
+            "label": "[Filesystem cache-state smoke](changes/0087-filesystem-cache-state-evidence.md)",
+            "row_sha256": "cc91f8d90b335ae60a36dcdcffcf58f54e0b8a8d49a0ff8fe1d2f6432577f0c5",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 22,
+            "label": "[Filesystem repeated release evidence](changes/0089-filesystem-release-repeated-evidence.md)",
+            "row_sha256": "3e0f55612e803d82f2eb1409a9cc4011b1c5792b3ccaa71afd4164fb2a450dd4",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 23,
+            "label": "[Managed OPC source cache](changes/0086-opc-source-cache-budget-management.md) and [release contention](changes/0088-opc-source-cache-contention-evidence.md)",
+            "row_sha256": "1f0024f50d1f37d4ebe98571e9aabe5c1d6d773c29129b5a1bafd586f04c68b8",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 24,
+            "label": "XLSX source-provenance publication reuse",
+            "row_sha256": "772822e520fc001420eb5e7f1f9b6c7fc1ffa6bb66ee019be5ed198f79e19822",
+            "state": "historical"
+          },
+          {
+            "ordinal": 25,
+            "label": "Rejected generic XLSX publisher provenance reuse",
+            "row_sha256": "1f7a2edea721149641f821ceab9b18dbdd4bbb76aa078db87c06ebc345b5717e",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 26,
+            "label": "Bounded forward-only XLSX/RTF creation",
+            "row_sha256": "8adcdd29fb0b05660c7d5ccf259adacb2df2183f13475ccd7400b16316405230",
+            "state": "historical"
+          },
+          {
+            "ordinal": 27,
+            "label": "Bounded semantic validation and ODF repair",
+
+            "row_sha256": "ed4e256b27d08be1c0312968aa1b0d98aad25b40da689297e3102b96101093e6",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 28,
+            "label": "RTF logical-tail append",
+            "row_sha256": "10d57cc50e161a9450ff9760980ad13adc4951e53c51388852ff386326be4f99",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 29,
+            "label": "DOCX/PPTX semantic selectors and edits",
+            "row_sha256": "bc307d7131d5cdcbacc71370fadef4e3059b392774cb51cfe5199086d8010a91",
+            "state": "historical"
+          },
+          {
+            "ordinal": 30,
+            "label": "Coalesced DOCX paragraph edits",
+            "row_sha256": "46295d447f97c2c0da08dd00a477f7157b735838a034f92ffd3491697c058284",
+            "state": "historical"
+          },
+          {
+            "ordinal": 31,
+            "label": "ODF semantic baselines and ODS snapshot reuse",
+            "row_sha256": "6948fc45e25f51730d09a87e470e36a738f6eafa90f8afede11d517b2e3455a7",
+            "state": "historical"
+          },
+          {
+            "ordinal": 32,
+            "label": "ODP cross-slide text-box batch evidence",
+            "row_sha256": "d8b6100548a73ddb6f3e877c97f81faf0e189d736b29e6afc13a110d4f4d20a8",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 33,
+            "label": "RTF semantic baseline and text paths",
+            "row_sha256": "a16f3a91a79da9df8e8233e7b90ed84ebeeb3a73eca7772f3801aeda66ec5f0f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 34,
+            "label": "RTF retained story length",
+            "row_sha256": "6e02e3ed7de794ea3aa13f706c0379b78d9b83baf296b142029d804834862a7a",
+            "state": "historical"
+          },
+          {
+            "ordinal": 35,
+            "label": "RTF sparse paragraph selection",
+            "row_sha256": "7d21f154e01faa42af6eb679d92cfbdcae3faa11189aa0e12aec7ebffcc5dca6",
+            "state": "historical"
+          },
+          {
+            "ordinal": 36,
+            "label": "RTF retained paragraph cardinality",
+            "row_sha256": "8edf8fd759b99d37a916e1e3c24e1cdbc010b420c1a2fc45de992b04f12a0e9a",
+            "state": "historical"
+          },
+          {
+            "ordinal": 37,
+            "label": "ODT shared transaction bytes",
+
+            "row_sha256": "e249b674ed56e966e915c2af41715f377d6804d059da4ccf33837e45a611fc24",
+            "state": "historical"
+          },
+          {
+            "ordinal": 38,
+            "label": "ODT consuming full-text blocks",
+            "row_sha256": "0d5c3cc79113de11ab815f4fceb7e7b7c2bb7855b40f3b385b81220c10ab18dc",
+            "state": "historical"
+          },
+          {
+            "ordinal": 39,
+            "label": "ODT indexed paragraph selector",
+            "row_sha256": "47c3f160cc3837110978427759986f2d8cc78743263ffd4bd328184ad00085b8",
+            "state": "historical"
+          },
+          {
+            "ordinal": 40,
+            "label": "ODT content-only unchanged-media publication",
+            "row_sha256": "dd030ea2f06b6213322557edfc28e09dcf3eba0f3e87b5cbecb72a911acd05e5",
+            "state": "historical"
+          },
+          {
+            "ordinal": 41,
+            "label": "ODT content-only line-break publication",
+            "row_sha256": "1b80f12540df21eb2b9344592e066c01f5ff88022133952869223256f3eed061",
+            "state": "historical"
+          },
+          {
+            "ordinal": 42,
+            "label": "ODT content-only inline-run publication",
+            "row_sha256": "c129e486792dac22e75de1d94d896119969c1c1ce09ef34572699a5d47d568f9",
+            "state": "historical"
+          },
+          {
+            "ordinal": 43,
+            "label": "ODT content-only hyperlink publication",
+            "row_sha256": "e566886f416f96d2d09dcb71d0c01c6fdc710aab6e03dd915d1b76604f59fdab",
+            "state": "historical"
+          },
+          {
+            "ordinal": 44,
+            "label": "ODT content-only structural paragraph publication",
+            "row_sha256": "cee7d1169149e00c00bba0b6391acd1455e24fa581348eb5034dde5686378f19",
+            "state": "historical"
+          },
+          {
+            "ordinal": 45,
+            "label": "ODT direct snapshot byte sharing",
+            "row_sha256": "07bbe7ab4cd8aac876765214d279c589f9fd95a5c6175f2dc88455f111a5b72f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 46,
+            "label": "ODT compact-audit package sharing",
+            "row_sha256": "ef0e9674954d256a0d5ac58c6d80b75aabc7dc29b0b7fb484f31e2c5ea549171",
+            "state": "historical"
+          },
+          {
+            "ordinal": 47,
+            "label": "ODT envelope-classification package sharing",
+
+            "row_sha256": "951f8e23a3a52f4af20395f9cd283a0a56ec464fd4a5bb659cecc63d3cf88246",
+            "state": "historical"
+          },
+          {
+            "ordinal": 48,
+            "label": "ODT final changed-result byte handoff",
+            "row_sha256": "df35e89449cc3478fefff04e7485b0e922e7fa3fbaee0445f946ac6057cc2594",
+            "state": "historical"
+          },
+          {
+            "ordinal": 49,
+            "label": "Coalesced ODT paragraph publication",
+            "row_sha256": "95c6a6bba11e538e5b0433b7e9cf018f8bee5519675d87467a539dacb20bb958",
+            "state": "historical"
+          },
+          {
+            "ordinal": 50,
+            "label": "Native DOC/XLS/PPT semantic baseline",
+            "row_sha256": "1be11092255fa723ad2117bddda8911423493cceccd1a464dee63c8ba5a8d519",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 51,
+            "label": "Native XLS validated-editor reuse",
+            "row_sha256": "ff55e9de6cdc0b8bc845bf5a775be13044ba45e59a1f508257d6f0cc66de3da0",
+            "state": "historical"
+          },
+          {
+            "ordinal": 52,
+            "label": "Native XLS fixed-width numeric inventory carry-forward",
+            "row_sha256": "a98b691aa28e8fa1de7710149198221e3fc16467c37246897df95ccd8001afba",
+            "state": "historical"
+          },
+          {
+            "ordinal": 53,
+            "label": "XLS comment/visibility source-splice publication",
+            "row_sha256": "6bc00277921abecf49564a4d5a0527907763a0d6042c05695e5fb92119b9c91b",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 54,
+            "label": "XLS fixed-width numeric publication evidence",
+            "row_sha256": "834f31d04abaef4aec89c4bf368c4846fa9f1a8794991c3277fe3fa3fce64831",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 55,
+            "label": "XLS plan-only fixed-width numeric publication",
+            "row_sha256": "0036d2f337945d145bd835d1fefd1ccca3c099a48557737dd1f1321d5b934af1",
+            "state": "historical"
+          },
+          {
+            "ordinal": 56,
+            "label": "Rejected XLS terminal-render handoff",
+            "row_sha256": "3fda62652b2443846ac7a0272238467b56956ab1fc4830292396ecb44223f4e6",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 57,
+            "label": "Common OLE2 publication stages and rejected handoffs",
+
+            "row_sha256": "29cf576ffd0140debd162e2341f8969422f5b7f9ebcc5b61823bfe1c77fa8efd",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 58,
+            "label": "Native DOC batched stream publication",
+            "row_sha256": "1ffdffaee8f84cd9ce7214dfb80747577fbb0f21db6f86645cbd737db53f6ee5",
+            "state": "historical"
+          },
+          {
+            "ordinal": 59,
+            "label": "Native DOC PieceTable physical index",
+            "row_sha256": "8fcdf5dd9f6bb7f9b5caa6d0b60c350d676bd3a9ed6e9329059a4384528521b1",
+            "state": "historical"
+          },
+          {
+            "ordinal": 60,
+            "label": "Native DOC paragraph-style baseline cache",
+            "row_sha256": "be24de495fda7d8f70a99642050d59f24127758bdf71338d7b6aeb12d17ee4a3",
+            "state": "historical"
+          },
+          {
+            "ordinal": 61,
+            "label": "Native DOC CHPX range index",
+            "row_sha256": "733c37da9c7902f37224ed06c8854e881048942f89f1380590ba5cd8726d659a",
+            "state": "historical"
+          },
+          {
+            "ordinal": 62,
+            "label": "Native PPT root snapshot CFB reuse",
+            "row_sha256": "eb1c4df06556402b988b055f3fdff7add5442839064a6cf899959a596ea2616f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 63,
+            "label": "Native PPT text-edit resolver reuse",
+            "row_sha256": "d4eb89ba44c71b26f13035038d5a95d8960512dfdc75f02db9e90503e0f29256",
+            "state": "historical"
+          },
+          {
+            "ordinal": 64,
+            "label": "Native PPT root text-publication adoption",
+            "row_sha256": "76e294fb8bac12006332ebc720ca3334213dec0d011b60363f27d1ee48b4d528",
+            "state": "historical"
+          },
+          {
+            "ordinal": 65,
+            "label": "Bounded XLSX validated-store handoff",
+            "row_sha256": "d354f298e9af283453cbf2f3253d2ce627a10790dcf82f69d96e16a10454d1f6",
+            "state": "historical"
+          },
+          {
+            "ordinal": 66,
+            "label": "Rejected direct XLSX action-plan flattening",
+            "row_sha256": "6baaa3d2998748f533be841a35f312ea2e9d8bd11b5acf5d485c7f95484cb44c",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 67,
+            "label": "XLSX no-extension worksheet scan",
+
+            "row_sha256": "19f5488b0c5720a969b901d354f9dd3ba3c1d9e906757cacd3f56742552a64f2",
+            "state": "historical"
+          },
+          {
+            "ordinal": 68,
+            "label": "ODS row-local publication",
+            "row_sha256": "26973206335e6da60345ce5854d9afd3d68d9690c57004c4a4635a87ecc6384b",
+            "state": "historical"
+          },
+          {
+            "ordinal": 69,
+            "label": "ODS unchanged-media publication",
+            "row_sha256": "e010033252ad4e8b08fbf264dcaa5170f733c2914262d330575426e41565c10f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 70,
+            "label": "ODS shared durable-patch blobs",
+            "row_sha256": "f2e0c8337c427cf077a112ccab950edf0cae4045665111afb2caed75c8b1dc38",
+            "state": "historical"
+          },
+          {
+            "ordinal": 71,
+            "label": "ODS row-splice raw publication",
+            "row_sha256": "8740d1c51a36b186c20feccf1dd1a8ab6904264d7d53a8caeb4de5085268c802",
+            "state": "historical"
+          },
+          {
+            "ordinal": 72,
+            "label": "ODS shared worksheet archive handoff",
+            "row_sha256": "0d67b0a24e8869791e46b39416240a90adebb3046a961adc6ec2b57b5cddc920",
+            "state": "historical"
+          },
+          {
+            "ordinal": 73,
+            "label": "ODP content-only unchanged-media publication",
+            "row_sha256": "1647658ef9ee160e4f28dae560d32c299407b42103f3651db3e51f7291ed047c",
+            "state": "historical"
+          },
+          {
+            "ordinal": 74,
+            "label": "ODS exact no-op handoff",
+            "row_sha256": "4a937801fa390131668dfd816e98480c6a9149ec55b07f15d5107c7f46e26a6d",
+            "state": "historical"
+          },
+          {
+            "ordinal": 75,
+            "label": "ODP indexed slide selector",
+            "row_sha256": "828698be4e7dbc02c62cf5f794ba2998263bcdac3c220f9c0fb79381e78ac3f1",
+            "state": "historical"
+          },
+          {
+            "ordinal": 76,
+            "label": "ODP snapshot slide-projection reuse",
+            "row_sha256": "03d4a5363f681a04df2d15f16c871ca51bf1f70841472df43320a00e65a9cb09",
+            "state": "historical"
+          },
+          {
+            "ordinal": 77,
+            "label": "ODP final slide-snapshot handoff",
+
+            "row_sha256": "6e2d42e55f51444b327a9365653f293c958b0457b71464a49d36b8d4b6b40b6a",
+            "state": "historical"
+          },
+          {
+            "ordinal": 78,
+            "label": "ODS adaptive cell locator",
+            "row_sha256": "e8ee6dff7e2e746df3830e608e799a524be866c86322b7a9c26ef7071d0494ee",
+            "state": "historical"
+          },
+          {
+            "ordinal": 79,
+            "label": "RTF parser-state specialization",
+            "row_sha256": "8f89d005c1aab63a70060402c01265711fcf56fc0f58e4ba093c0bf8e568216a",
+            "state": "historical"
+          },
+          {
+            "ordinal": 80,
+            "label": "RTF ASCII transport batching",
+            "row_sha256": "360830105d124d14a9cbae9160d7496dc36ad99b844bc855f3ffa5afcb274758",
+            "state": "historical"
+          },
+          {
+            "ordinal": 81,
+            "label": "RTF byte delimiter scanning",
+            "row_sha256": "7b44de8838786fee83904f784df621cfc9207518282f05adff69dd810f75b63a",
+            "state": "historical"
+          },
+          {
+            "ordinal": 82,
+            "label": "RTF retained body source span",
+            "row_sha256": "80cd9bec64cd8bc5396d4b4c7587b65ff455fe8b80f40c928daf2752b12f51ca",
+            "state": "historical"
+          },
+          {
+            "ordinal": 83,
+            "label": "RTF bounded body-block reservation",
+            "row_sha256": "c4ebce49db1af03488cf08d08257a12d18097cb3365599dbb49d0c50bc744d99",
+            "state": "historical"
+          },
+          {
+            "ordinal": 84,
+            "label": "Rejected RTF decoded-body ownership",
+            "row_sha256": "04f2d3b6125bb91df5351e4481c3b794f970084ad36790a07980763c55a40430",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 85,
+            "label": "OPC shared changed-Part payload",
+            "row_sha256": "5472cd0c1339bc406aaecf9815b725068307b27f83052581451006260b2a60f3",
+            "state": "historical"
+          },
+          {
+            "ordinal": 86,
+            "label": "ZIP generated local-span move",
+            "row_sha256": "cc6ef4fcda3bd933573bb16f39cc329fa529dba5d7a1b608189308966c111f87",
+            "state": "historical"
+          },
+          {
+            "ordinal": 87,
+            "label": "Source-backed OPC one-Part publication",
+
+            "row_sha256": "e7e9b4c643a3b2846bd2a197fc1c8546329c7802280b6f273bad2dc64699a2ac",
+            "state": "historical"
+          },
+          {
+            "ordinal": 88,
+            "label": "Source-backed DOCX semantic publication",
+            "row_sha256": "b0bd446023ed2a6b8e869b838e814586c61524d9b20c64751ec3910d39d27d50",
+            "state": "historical"
+          }
+        ]
+      },
+      {
+        "id": "historical-accepted-results",
+        "section_heading": "## Historical accepted results (descriptive; not current claims)",
+        "header": [
+          "Workload group",
+          "Historical before",
+          "Historical after",
+          "Historical result (not a current claim)",
+          "Historical memory result"
+        ],
+        "header_sha256": "83d8a3d3fe21fe45601fc630860de590944b3d891f3b50772fd6437a1fdfe18f",
+        "row_count": 79,
+        "rows": [
+          {
+            "ordinal": 1,
+            "label": "Targeted OPC mutation, four synthetic cells",
+            "row_sha256": "4c9f3a3e43939012faa4168b0b1405198cf97212e898a285c07232a58a395bff",
+            "state": "historical"
+          },
+          {
+            "ordinal": 2,
+            "label": "Shared changed-Part handoff, few-large compressible",
+            "row_sha256": "b6ccd4ff66ebb8a437c43fe5523c5e432b8bd21d0a598ba261b8ce02663f7a4e",
+            "state": "historical"
+          },
+          {
+            "ordinal": 3,
+            "label": "Exact owned OPC no-op, 16.78 MB incompressible archive",
+            "row_sha256": "36c005c7e7fdb439e5a458f825e4bf4a6ed87d253bb73844c5bfe56faf96528c",
+            "state": "historical"
+          },
+          {
+            "ordinal": 4,
+            "label": "Exact owned OPC no-op, six named many-Part/large-Part cells",
+            "row_sha256": "a2f0554c9fb412c1cf458fe56c84ca1dfd00e9bd4163ca198f4194e47d2bcd95",
+            "state": "historical"
+          },
+          {
+            "ordinal": 5,
+            "label": "CFB final-root-stream lookup, four 256/2,048-sibling cells",
+            "row_sha256": "045359a174a203819c6944181652487c75f4eb0e9262f5dc1434b882df9870e9",
+            "state": "historical"
+          },
+          {
+            "ordinal": 6,
+            "label": "CFB open, four 256/2,048-stream cells",
+            "row_sha256": "3fbdab27cb12befcd51e4fa7617b614674dbb95bb94fb67a51f8751c2017a6cd",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 7,
+            "label": "Rejected common OLE2 inline recapture allocation reuse, 16 MiB opaque streams",
+            "row_sha256": "ced3ccccdbec02f67d1ec33c3ec397cbd190c9d8420015cdb18762619e2c1afc",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 8,
+            "label": "OPC rewritten publication, eight named cells",
+            "row_sha256": "0f3c026ed0169961bfb0fb87fad1fa42be67a0ed0711a4992573e7f1dbb47828",
+            "state": "historical"
+          },
+          {
+            "ordinal": 9,
+            "label": "Payload-heavy PPT fresh writer",
+            "row_sha256": "89f926ce004e3a4336f0f16eea1e5db7f75c2197953e9668f2f5cc40c71bbf42",
+            "state": "historical"
+          },
+          {
+            "ordinal": 10,
+            "label": "Payload-heavy XLS fresh writer",
+            "row_sha256": "bb6b99621cf33bf9d9731ff4b7d4b85a83f1dfec7f3eabc0fede91e9c17a374e",
+            "state": "historical"
+          },
+          {
+            "ordinal": 11,
+            "label": "DOCX one paragraph, 10,000-paragraph corpus",
+            "row_sha256": "3ff9268ba88810eb5bc5f1430f27976045c17b5dcc6abd92d32edeb386b0e0ef",
+            "state": "historical"
+          },
+          {
+            "ordinal": 12,
+            "label": "DOCX 1% edit/save, 10,000 paragraphs / 100 edits",
+            "row_sha256": "17c3131a2050b35ec42338a32fa087a5a41156dc831791bc9976d17ea305c091",
+            "state": "historical"
+          },
+          {
+            "ordinal": 13,
+            "label": "PPTX 1% edit/save, 10,000 text boxes",
+            "row_sha256": "aca8c84299f33cb43d026e4eac44f93e71b644c4928a102ac4d81b79d6a11aa5",
+            "state": "historical"
+          },
+          {
+            "ordinal": 14,
+            "label": "ODS no-op edit/save, 32,768 cells",
+            "row_sha256": "b9febe23363addbcbc20a1b953cb4e0960047e77e163c3866a5e78233a919984",
+            "state": "historical"
+          },
+          {
+            "ordinal": 15,
+            "label": "ODS one-cell edit/save, 32,768 cells",
+            "row_sha256": "4f48bbedb15f05bb2103b376d9dca402d7c7b9e2c97ec0fc5c6e495407ac9c22",
+            "state": "historical"
+          },
+          {
+            "ordinal": 16,
+            "label": "ODS row-local one-cell edit/save, 32,768 cells",
+            "row_sha256": "02c1ff727184ffd22dc61ed8c210d39af44175f897ed46fb1ca8fbba68907df7",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 17,
+            "label": "ODS media-rich one-cell edit/save, 2,048 cells + 16 MiB media",
+            "row_sha256": "08ba15a54308f8d1bda2a66aff681f3844cd222c9e43757272166d64a094c64e",
+            "state": "historical"
+          },
+          {
+            "ordinal": 18,
+            "label": "ODS durable-patch sharing, 2,048 cells + 16 MiB media",
+            "row_sha256": "90380d0449f875fa68b415069f1c72fb625a54324861ddf8f469871a379fcda4",
+            "state": "historical"
+          },
+          {
+            "ordinal": 19,
+            "label": "ODS checked row-splice raw publication, 2,048 cells + 16 MiB media",
+            "row_sha256": "8cd56a1b7c747ecfea5e648abcf8272f4b84e1de2add4b8babb18b12b2106128",
+            "state": "historical"
+          },
+          {
+            "ordinal": 20,
+            "label": "ODS shared worksheet archive handoff, 2,048 cells + 16 MiB media",
+            "row_sha256": "c43b750bb14f316371a4887c4fd36c45d226f34f707b218b72df34336bb0846b",
+            "state": "historical"
+          },
+          {
+            "ordinal": 21,
+            "label": "ODP media-rich text-box edit/save, 12 slides + 16 MiB media",
+            "row_sha256": "608cb59ce3e89d633d1c044dcb16055e497b5f35ee09d4452571c3ab00a8ec98",
+            "state": "historical"
+          },
+          {
+            "ordinal": 22,
+            "label": "ODS public cell sweep, 32,768 cells",
+            "row_sha256": "7bc40bbb3566a4a2a2af72878b37379ae79ebdb31ef64f497a76b37e82d2ce70",
+            "state": "historical"
+          },
+          {
+            "ordinal": 23,
+            "label": "ODS full cell text, 32,768 cells",
+            "row_sha256": "d8e43f33090d6b743b07384e810a1836f2fcb2ae21fb5ae82b28dd9236598b82",
+            "state": "historical"
+          },
+          {
+            "ordinal": 24,
+            "label": "RTF full text, 10,000 paragraphs",
+            "row_sha256": "5d0d7360387dec548c92b6e71438736c023f3c95cbeeb84f3d1f6100d7825e60",
+            "state": "historical"
+          },
+          {
+            "ordinal": 25,
+            "label": "RTF one paragraph edit/save, 10,000 paragraphs",
+            "row_sha256": "ab8064c755add851a09569bd9c5581d3d6ac5438fd56d4d623aeb29615ac72db",
+            "state": "historical"
+          },
+          {
+            "ordinal": 26,
+            "label": "RTF parser-state follow-up, one paragraph edit/save, 10,000 paragraphs",
+            "row_sha256": "0cc73734a2d602caedb10d2f70ff474e7e64c0f22abb70646273833e37a36ec6",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 27,
+            "label": "RTF transport batching, open, 10,000 paragraphs",
+            "row_sha256": "ba9d8ea9e04c7fafd4a1a0423e4f605e71cbb6ef0d0ad2f170a2bd4c6e047c18",
+            "state": "historical"
+          },
+          {
+            "ordinal": 28,
+            "label": "RTF transport batching, one paragraph edit/save, 10,000 paragraphs",
+            "row_sha256": "84fbd4a27aa9f1ec89c463d883df395d21b89b37dc917ca0ce2882a7ecdb0764",
+            "state": "historical"
+          },
+          {
+            "ordinal": 29,
+            "label": "RTF byte-delimiter scan, open, 10,000 paragraphs",
+            "row_sha256": "aadc3640b612a7cb5c75826d2161c8afd1acfc8805fdab80af9535bfeead6aba",
+            "state": "historical"
+          },
+          {
+            "ordinal": 30,
+            "label": "RTF byte-delimiter scan, one paragraph edit/save, 10,000 paragraphs",
+            "row_sha256": "d11bbc4031cec820ef2e17d6a4314173f4a60e73127bfdd7749209ee4782c42f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 31,
+            "label": "RTF retained body span, one paragraph edit/save, 10,000 paragraphs",
+            "row_sha256": "a5bee40abecb2be105ba38b946e9a2ea1ec2620fb10aab4dd82a86091152aa21",
+            "state": "historical"
+          },
+          {
+            "ordinal": 32,
+            "label": "RTF bounded body-block reservation, open, 10,000 paragraphs",
+            "row_sha256": "0ac485974c419a1b4b607284730c2e0efe58e5df5a490527e137614e941d03b1",
+            "state": "historical"
+          },
+          {
+            "ordinal": 33,
+            "label": "RTF bounded body-block reservation, one paragraph edit/save",
+            "row_sha256": "69bcb9a32e0781a810e791959fc07b24fa31d4b4853ff6cc60a10c703d3369cd",
+            "state": "historical"
+          },
+          {
+            "ordinal": 34,
+            "label": "RTF paragraph list, already-open 10,000-block story",
+            "row_sha256": "db3312321ce66bb9fbcd5c3574990a89f2da622d70ae54bf70274655cbc6da38",
+            "state": "historical"
+          },
+          {
+            "ordinal": 35,
+            "label": "RTF middle paragraph, already-open 10,000-block story",
+            "row_sha256": "996415dc7e0f435929e30f5c1affa9afbf377b28cdaa8472fa003270b11960c9",
+            "state": "historical"
+          },
+          {
+            "ordinal": 36,
+            "label": "RTF public paragraph count, already-open 10,000-block story",
+            "row_sha256": "3a0a5ea2dca55eb8c6e1b77fc0c7303231978b76891e2fb4655673c6e167f47c",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 37,
+            "label": "ODT no-op edit/save, 10,000 paragraphs",
+            "row_sha256": "b3c299520817a193c5f1e4e6a63b36fc1f52259c0cbaf3329ff4b65a02b287fe",
+            "state": "historical"
+          },
+          {
+            "ordinal": 38,
+            "label": "ODT full text, 10,000 blocks",
+            "row_sha256": "f527cba70402fd333f4e08e05d6757bcd0519f8ccaab72407b46a896cf5c6be9",
+            "state": "historical"
+          },
+          {
+            "ordinal": 39,
+            "label": "ODT middle paragraph, 10,000 paragraphs",
+            "row_sha256": "a05c12cf06943529d97228274efc6f398c1d5be5c4d384eac2efb0733a63f692",
+            "state": "historical"
+          },
+          {
+            "ordinal": 40,
+            "label": "ODP middle slide, 100 slides",
+            "row_sha256": "e78e4f358ccfaa24655c4c0b07419b70c222404bff36e4645994a8ac5fddf516",
+            "state": "historical"
+          },
+          {
+            "ordinal": 41,
+            "label": "ODP exact no-op transaction/save, 100 slides",
+            "row_sha256": "109d775d4a178317965b017891092f4634f35f0fa13db21adffd9fd61bb17dc4",
+            "state": "historical"
+          },
+          {
+            "ordinal": 42,
+            "label": "ODP one-slide edit/save, 100 source slides",
+            "row_sha256": "85fe82bae3f2a320b5961d400eb3882aac267b37c289b53c43dccbf73583da60",
+            "state": "historical"
+          },
+          {
+            "ordinal": 43,
+            "label": "ODT media-rich paragraph edit/save, 200 paragraphs + 16 MiB media",
+            "row_sha256": "2ea85b1508c9a5571d4183acfb421091e2a1c1640c9817162336333f4a2e172c",
+            "state": "historical"
+          },
+          {
+            "ordinal": 44,
+            "label": "ODT media-rich line-break edit/save, 200 paragraphs + 16 MiB media",
+            "row_sha256": "23ec6ac6e388afeb17e19c06c940571a27ddc5b2897a5d13170ffb15f6b1fc4c",
+            "state": "historical"
+          },
+          {
+            "ordinal": 45,
+            "label": "ODT media-rich append-run edit/save, 200 paragraphs + 16 MiB media",
+            "row_sha256": "ee00764cffd2699d815895fd860ca983c04f114611f295b53fc1545c9d44113b",
+            "state": "historical"
+          },
+          {
+            "ordinal": 46,
+            "label": "ODT media-rich insert paragraph, 200 paragraphs + 16 MiB media",
+            "row_sha256": "667f25bfac58fc3e1344d13c2d7b4ce87ebb5cf056aface0cc6cd1c9d42823a4",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 47,
+            "label": "ODT media-rich remove paragraph, 200 paragraphs + 16 MiB media",
+            "row_sha256": "c9f23858f8e1bd000771da2a333acb0ac8ccc463e4606e06e9e8b7fcf4973768",
+            "state": "historical"
+          },
+          {
+            "ordinal": 48,
+            "label": "ODT direct snapshot sharing, 200 paragraphs + 16 MiB media",
+            "row_sha256": "c72c26709809165852d38a20801bea625ec1ffbcb57c95d01d3750a3bb29dfe5",
+            "state": "historical"
+          },
+          {
+            "ordinal": 49,
+            "label": "ODT compact-audit package sharing, 200 paragraphs + 16 MiB media",
+            "row_sha256": "b5a5516562c7966fb1f581c5bdde65205998cbcbf8db7ec48c2659441a4b18c8",
+            "state": "historical"
+          },
+          {
+            "ordinal": 50,
+            "label": "ODT envelope-classification sharing, 200 paragraphs + 16 MiB media",
+            "row_sha256": "cc7bdf08b195eb47920f271387940b69d15eb2ae86a4d667c8ed8281e9696c58",
+            "state": "historical"
+          },
+          {
+            "ordinal": 51,
+            "label": "ODT final changed-result byte handoff, 200 paragraphs + 16 MiB media",
+            "row_sha256": "d68289377e7cb87b6463cdc60a74093c85a6e5c810cb33bc4a40b2776efe2627",
+            "state": "historical"
+          },
+          {
+            "ordinal": 52,
+            "label": "ODT 1% paragraph edit/save, 10,000 paragraphs / 100 replacements",
+            "row_sha256": "b0428716406d429776f4c22cce85da697ab22ee6e99513f66c31217c25516546",
+            "state": "historical"
+          },
+          {
+            "ordinal": 53,
+            "label": "ODT mixed model-content publication, medium/large 80/320 operations",
+            "row_sha256": "e30be5987d1d6525e5dd42cb288205fce6519f468573927d41e875b90463844c",
+            "state": "historical"
+          },
+          {
+            "ordinal": 54,
+            "label": "Native XLS one-cell edit/save, 8,192 cells",
+            "row_sha256": "7eb974a2536f86d413296bb9964414240c365b236dfc8b26b8a29a5a06ac13d4",
+            "state": "historical"
+          },
+          {
+            "ordinal": 55,
+            "label": "Native XLS fixed-width numeric edit/save, 8,192 cells",
+            "row_sha256": "dac096188d694d655f6dbb286ace19dc2175ba60d61e2eec4032f41277037154",
+            "state": "historical"
+          },
+          {
+            "ordinal": 56,
+            "label": "Native DOC one-paragraph edit/save, 512 paragraphs",
+            "row_sha256": "3a2d34dab0a06b11fc50b03ae37c30a6997fda6eca6f4f7805be94b15ff402d3",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 57,
+            "label": "Native DOC open, 512 paragraphs",
+            "row_sha256": "6e44c1b37e1159a839d11b119a8fff5629400f97cf021b9f8393cc2db2d8a634",
+            "state": "historical"
+          },
+          {
+            "ordinal": 58,
+            "label": "Native DOC one-paragraph edit/save after PieceTable index, 512 paragraphs",
+            "row_sha256": "ce1f6bfcbf6da16b49cf4f64aa287653b110a3f682e9415faa98f0a64c57cf08",
+            "state": "historical"
+          },
+          {
+            "ordinal": 59,
+            "label": "Native DOC open after PieceTable index, 512 paragraphs",
+            "row_sha256": "57000fd7801077aa24c986280628f80f5796f39da38160ffbdb92939fbb80d08",
+            "state": "historical"
+          },
+          {
+            "ordinal": 60,
+            "label": "Native DOC one-paragraph edit/save after style cache, 512 paragraphs",
+            "row_sha256": "be3d98c3db779119f80fe1fe435a8018ca7c512e3bd8abc391ae62368cd5441d",
+            "state": "historical"
+          },
+          {
+            "ordinal": 61,
+            "label": "Native DOC paragraph list after style cache, 512 paragraphs",
+            "row_sha256": "0c6554e0a693e8b5b386f783e3a30ad8142271bbe1110450d15a3899636dce9d",
+            "state": "historical"
+          },
+          {
+            "ordinal": 62,
+            "label": "Native DOC exact-source paragraph list after CHPX index, 512 paragraphs",
+            "row_sha256": "2335bc0d62ed1a7d332b1a13c60d14977a60255a9eb0422b2f77a3553609187f",
+            "state": "historical"
+          },
+          {
+            "ordinal": 63,
+            "label": "Native DOC one-paragraph edit/save after PAPX containment index",
+            "row_sha256": "c3cc5654741c8eb4ec3360f60ed73fd15d657f62b9b6fb16c15c8724a336a8ca",
+            "state": "historical"
+          },
+          {
+            "ordinal": 64,
+            "label": "Source-backed DOC Word97+ paragraph splice",
+            "row_sha256": "5ebb2bb5fbe224d483c58c14cee0c56b0fff47e86965d7981e0bf52c3a5311c5",
+            "state": "descriptive"
+          },
+          {
+            "ordinal": 65,
+            "label": "Native PPT root snapshot open, 144 shapes",
+            "row_sha256": "8ed59a86de7c2da01a7a198f5ef1dceb17e0643fd2ee704893a03e7cc77360fb",
+            "state": "historical"
+          },
+          {
+            "ordinal": 66,
+            "label": "Native PPT direct text edit/save, 144 shapes",
+            "row_sha256": "9995e493646dfb0d5081ed0bd036ce5ff3aff401f061b27f57d5ff26aed522a7",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 67,
+            "label": "Native PPT root text edit/save, 144 shapes",
+            "row_sha256": "f9159f9ac527cda0f402567cff37a1a7e42adbadb6ef9ffface712ffe6e13a18",
+            "state": "historical"
+          },
+          {
+            "ordinal": 68,
+            "label": "XLSX one-cell commit + first read, 4,096 cells",
+            "row_sha256": "c67d243bfc9cc1f9d66e14ab77eb74de034d8046f0137d70d0653779a76beb2b",
+            "state": "historical"
+          },
+          {
+            "ordinal": 69,
+            "label": "Rejected XLSX 1% commit + save, 4,096 cells",
+            "row_sha256": "28f75d60daf70f66ea679b242d770ec90e9591911e4477f51328c709b7bc4e79",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 70,
+            "label": "Rejected XLSX 1% commit + save, 131,072 cells",
+            "row_sha256": "768d30c296904b1db5065dbfef2e12e61d8168e0113a7b68965a46a91497185a",
+            "state": "withheld"
+          },
+          {
+            "ordinal": 71,
+            "label": "Source-backed XLSX calculation-metadata publication, 12 Parts + 16 MiB media",
+            "row_sha256": "cc5eccd40893724a771c3029326990aa9d247782e66be89883d4310de2eaac63",
+            "state": "historical"
+          },
+          {
+            "ordinal": 72,
+            "label": "Source-backed XLSX defined-name publication, 12 Parts + 16 MiB media",
+            "row_sha256": "c58d639b9d70cceb86f87fee3ad19722209dfe7b96206eeaa442a8988037b24b",
+            "state": "historical"
+          },
+          {
+            "ordinal": 73,
+            "label": "Source-backed XLSX page-break publication, 12 Parts + 16 MiB media",
+            "row_sha256": "dc767e391f11e4701682c20531ede27b98002fcfc057252a2781a1b34d3c0184",
+            "state": "historical"
+          },
+          {
+            "ordinal": 74,
+            "label": "Source-backed XLSX page-margin publication, 12 Parts + 16 MiB media",
+            "row_sha256": "76137cbd1724dffb87917bfd6cfb2f1bc079ba7cb9017027d01aa7b1b992624b",
+            "state": "historical"
+          },
+          {
+            "ordinal": 75,
+            "label": "Source-backed XLSX print-options publication, 12 Parts + 16 MiB media",
+            "row_sha256": "735fdc956ae25bba1a6dbdfda074c910c58be1d9afc7f74bb33aeceadb1d63f2",
+            "state": "historical"
+          },
+          {
+            "ordinal": 76,
+            "label": "Source-backed XLSX page-setup publication, 12 Parts + 16 MiB media",
+            "row_sha256": "7ad2ebf464fe31ceddceac05a386e97bdff809c7d19936e20276123c06db50a5",
+            "state": "historical"
+          },
+
+          {
+            "ordinal": 77,
+            "label": "Source-backed XLSX sheet-protection publication, 12 Parts + 16 MiB media",
+            "row_sha256": "ea60f354030ece37a05728935c1cb6da833101cf1d639080288d3300d650ef61",
+            "state": "historical"
+          },
+          {
+            "ordinal": 78,
+            "label": "Source-backed XLSX data-validation publication, 12 Parts + 16 MiB media",
+            "row_sha256": "d81a227a409936bf1b96f9d6dda70a856a0ce678821fb7b2cbde8ce582260ba9",
+            "state": "historical"
+          },
+          {
+            "ordinal": 79,
+            "label": "Source-backed XLSX auto-filter publication, 12 Parts + 16 MiB media",
+            "row_sha256": "a82c8bbc37cd243bd941395ee8f1c3c0323bb65cdfe2239bd5ee6c13e58290b4",
+            "state": "historical"
+          }
+        ]
+      }
+    ]
+  },
+  "strict_claim_registry": {
+    "path": "docs/performance/claim-registry-v1.json",
+    "links": []
+  }
+}

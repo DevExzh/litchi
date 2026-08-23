@@ -1269,9 +1269,10 @@ conclusion about all documents or hardware.  Syscall counts are whole-process
 decompressed bytes, recompressed bytes, or memory-copy volume.  Cold-cache,
 remote-range, before/after, and allocation-attribution claims remain open.
 
-## Current stable tranche
+## Historical stable tranche (descriptive; not current claims)
 
-The original stage-1 results below remain historical evidence. The current
+The original stage-1 results below remain historical and descriptive evidence;
+the rows below are not current performance claims. The current
 harness contains **385 selectable cases**; 200 was the count before the
 opt-in ODF `mimetype` repair-plan selector was added. The measured 36-default-case,
 198-default-record tranche remains historical evidence; newer selectable cases
@@ -1783,7 +1784,13 @@ decompression, generic OPC/PPTX, real-producer, and iWork claims remain open.
 See the [summary](results/pptx-additive-topology-abba-0158-summary.json) and
 [artifact manifest](results/pptx-additive-topology-0158.sha256).
 
-| Change | Current evidence | Scope / limitation |
+### Historical stable-tranche table (descriptive; not current claims)
+
+This aggregate table is the only stable-tranche table covered by the
+classification sidecar; surrounding report prose and change sections remain
+outside its scope.
+
+| Change | Historical/descriptive evidence (not a current claim) | Historical scope / limitation |
 |---|---|---|
 | XLSX row-start index | ABBA p50 geomean **-80.499%**, mean geomean **-79.962%**; full scan **+0.03%** mean; first cell **-1.31%** mean | Heap allocations **+17**, RSS **+0.25%**; narrow-range query only |
 | Targeted OPC raw publication | Four-cell ABBA p50 geomean **-84.98%**; few-large/incompressible **-71.70%**; matched cycles **-69.21%** | Initial peak heap **+37.18%**, one-shot RSS **+22.26%** from retained source/provenance and a changed-payload copy; the copy is removed by the shared-payload follow-up below |
@@ -2423,13 +2430,16 @@ current policy now classifies every resolved edge, including the canonical
 run because iWork was explicitly excluded while its crates are changing
 independently.
 
-## Accepted results
+## Historical accepted results (descriptive; not current claims)
 
-All latency figures below are warm-memory release-build p50 results from
-matched before/after binaries. Each linked change record contains raw-sample
-counts, ABBA ordering, mean or interval context, hashes, and memory profiles.
+The measurements below are retained historical results, presented for
+descriptive context rather than as current performance claims. They are warm-
+memory release-build p50 results from matched before/after binaries. Each
+linked change record contains raw-sample counts, ABBA ordering, mean or
+interval context, hashes, and memory profiles; this table does not promote any
+row into the strict claim registry.
 
-| Workload group | Before | After | Result | Memory result |
+| Workload group | Historical before | Historical after | Historical result (not a current claim) | Historical memory result |
 |---|---:|---:|---:|---|
 | Targeted OPC mutation, four synthetic cells | individual rows in record | individual rows in record | **-84.98% p50 geometric mean**; range -58.24% to -96.41% | Few-large/incompressible peak heap +37.18%; one-shot RSS +22.26% |
 | Shared changed-Part handoff, few-large compressible | 1.342 ms | 1.063 ms | **-20.73% p50 / -18.49% mean** | One 4.19 MiB allocation removed; peak heap -3.42%; uninstrumented RSS +0.22% (flat) |

@@ -52,7 +52,11 @@ on:
       - 'tools/test_perf_baseline_source_policy.py'
       - 'tools/check_perf_claims.py'
       - 'tools/test_perf_claims.py'
+      - 'tools/check_report_claim_classification.py'
+      - 'tools/test_report_claim_classification.py'
       - 'docs/performance/claim-registry-v1.json'
+      - 'docs/performance/report-claim-classification-v1.json'
+      - 'docs/performance/REPORT.md'
       - 'docs/performance/perf-regression-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
@@ -112,7 +116,11 @@ on:
       - 'tools/test_perf_baseline_source_policy.py'
       - 'tools/check_perf_claims.py'
       - 'tools/test_perf_claims.py'
+      - 'tools/check_report_claim_classification.py'
+      - 'tools/test_report_claim_classification.py'
       - 'docs/performance/claim-registry-v1.json'
+      - 'docs/performance/report-claim-classification-v1.json'
+      - 'docs/performance/REPORT.md'
       - 'docs/performance/perf-regression-policy-v1.json'
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
@@ -258,6 +266,13 @@ jobs:
             --evidence-root . \
             --mode strict
           python3 -m unittest tools.test_perf_claims
+
+      - name: Check historical REPORT claim classification
+        run: |
+          python3 tools/check_report_claim_classification.py \
+            --registry docs/performance/report-claim-classification-v1.json \
+            --repo-root .
+          python3 -m unittest tools.test_report_claim_classification
 
       - name: Run deterministic smoke baseline
         run: |
@@ -1231,6 +1246,30 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/perf-baseline -> tools/perf-baseline/target
+
+      - name: Check historical REPORT claim classification
+        run: |
+          python3 tools/check_report_claim_classification.py \
+            --registry docs/performance/report-claim-classification-v1.json \
+            --repo-root .
+          python3 -m unittest tools.test_report_claim_classification
+
+      - name: Ensure zstd is available for strict claim checking
+        run: |
+          if ! command -v zstd >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zstd
+          fi
+          zstd --version
+
+      - name: Check performance claim registry
+        run: |
+          python3 tools/check_perf_claims.py \
+            --registry docs/performance/claim-registry-v1.json \
+            --repo-root . \
+            --evidence-root . \
+            --mode strict
+          python3 -m unittest tools.test_perf_claims
 
       - name: Build release harness
         run: cargo build --release --locked --manifest-path "$PERF_MANIFEST"
