@@ -178,11 +178,24 @@ impl fmt::Display for DecodeError {
 impl std::error::Error for DecodeError {}
 
 /// Generated-free scalar projection of one canonical `TSP.Reference`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ReferenceSnapshot {
     identifier: u64,
     deprecated_type: Option<i32>,
     deprecated_is_external: Option<bool>,
+}
+
+impl fmt::Debug for ReferenceSnapshot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Native object identifiers are routing details, not semantic data;
+        // keep them out of diagnostics just like the enclosing records.
+        formatter
+            .debug_struct("ReferenceSnapshot")
+            .field("identifier", &"<redacted>")
+            .field("deprecated_type", &self.deprecated_type)
+            .field("deprecated_is_external", &self.deprecated_is_external)
+            .finish()
+    }
 }
 
 impl ReferenceSnapshot {
@@ -5726,6 +5739,20 @@ mod tests {
         let range_bytes = prost.key_range.encode_to_vec();
         assert_eq!(visited.key_range(), range_bytes.as_slice());
         assert!(visitor.borrowed_payloads.len() >= 6);
+    }
+
+    #[test]
+    fn list_reference_snapshot_debug_redacts_native_identifier() {
+        let mut source = entry_minimal();
+        b(&mut source, 4, &reference(0xfeed_face));
+        let entry = decode_table_data_list_entry(&source, options(&source)).unwrap();
+        let reference = entry.reference().unwrap();
+
+        assert_eq!(reference.identifier(), 0xfeed_face);
+        assert_eq!(
+            format!("{reference:?}"),
+            "ReferenceSnapshot { identifier: \"<redacted>\", deprecated_type: None, deprecated_is_external: None }"
+        );
     }
 
     #[test]
