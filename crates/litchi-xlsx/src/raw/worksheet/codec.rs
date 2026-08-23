@@ -85,7 +85,7 @@ pub(super) fn parse_processed_defaults(
                     defaults = Some(parse_defaults_element(
                         &element,
                         decoder,
-                        &resolver,
+                        resolver,
                         descent.take(),
                     )?);
                     stack.push(Context::SheetFormat);
@@ -109,7 +109,7 @@ pub(super) fn parse_processed_defaults(
                     defaults = Some(parse_defaults_element(
                         &element,
                         decoder,
-                        &resolver,
+                        resolver,
                         descent.take(),
                     )?);
                 }
@@ -242,12 +242,12 @@ impl Parser {
                         )));
                     }
                     let parent = current(&stack)?;
-                    let child = parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
                     stack.push(child);
                 },
                 Event::Empty(element) => {
                     let parent = current(&stack)?;
-                    let child = parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
                     parser.finish(child)?;
                 },
                 Event::Text(value) => {

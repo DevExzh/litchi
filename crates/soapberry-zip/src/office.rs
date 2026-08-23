@@ -3080,15 +3080,15 @@ impl<W: Write> StreamingArchiveWriter<W> {
                 data.len()
                     .min(usize::try_from(self.limits.max_compressed_size).unwrap_or(usize::MAX)),
             )
-            .map_err(|source| Error::from(ErrorKind::Allocation {
-                resource: "deflated member scratch buffer",
-                source,
-            }))?;
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "deflated member scratch buffer",
+                    source,
+                })
+            })?;
         let compression = (|| {
-            let mut scratch = CompressedScratch::new(
-                &mut compressed,
-                self.limits.max_compressed_size,
-            );
+            let mut scratch =
+                CompressedScratch::new(&mut compressed, self.limits.max_compressed_size);
             let mut encoder = DeflateEncoder::new(&mut scratch, Compression::default());
             encoder.write_all(data)?;
             encoder.finish().map(|_scratch| ())
