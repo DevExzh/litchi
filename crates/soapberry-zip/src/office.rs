@@ -3065,12 +3065,56 @@ impl<W: Write> StreamingArchiveWriter<W> {
 
     /// Write a file with Deflate compression.
     ///
+    /// The member is written through the streaming entry API, so the local
+    /// header carries a data descriptor. Callers that already hold the full
+    /// payload and need a canonical local header with upfront CRC-32 and
+    /// sizes can use [`Self::write_deflated_sized`] instead.
+    pub fn write_deflated(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
+        let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
+        let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+        self.reserve_streaming_entry()?;
+        let started = self
+            .archive
+            .new_file(&normalized_name)
+            .compression_method(CompressionMethod::Deflate)
+            .start();
+        let result = match started {
+            Ok((mut entry, config)) => (|| {
+                let descriptor = {
+                    let mut limited_entry =
+                        LimitedEntryWriter::new(&mut entry, self.limits.max_compressed_size);
+                    let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
+                    let mut writer = config.wrap(encoder);
+                    writer.write_all(data)?;
+                    let (encoder, desc) = writer.finish()?;
+                    encoder.finish()?;
+                    limited_entry.ensure_within_limit()?;
+                    desc
+                };
+                entry.finish(descriptor)?;
+                Ok(())
+            })(),
+            Err(error) => Err(error),
+        };
+        if let Err(error) = result {
+            return Err(self.poison(error));
+        }
+        self.total_uncompressed_bytes = self.total_uncompressed_bytes.saturating_add(data_bytes);
+        self.record_streaming_entry(normalized_name, name_bytes);
+        self.refresh_output_bytes();
+        Ok(())
+    }
+
+    /// Write an in-memory payload with Deflate compression and upfront sizes.
+    ///
     /// The payload is compressed into a bounded scratch buffer before any
     /// archive byte is emitted, so the local header declares the final CRC-32
     /// and both sizes and no data descriptor is needed. A compressed-size
     /// limit breach is therefore reported before the archive changes, leaving
-    /// the writer usable instead of poisoned mid-entry.
-    pub fn write_deflated(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
+    /// the writer usable instead of poisoned mid-entry. Prefer this over
+    /// [`Self::write_deflated`] when the produced archive should be probeable
+    /// from its central directory alone.
+    pub fn write_deflated_sized(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
         let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
         self.reserve_streaming_entry()?;
@@ -4947,6 +4991,58 @@ mod tests {
     }
 
     #[test]
+    fn sized_deflated_members_declare_upfront_sizes_without_a_data_descriptor() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("mimetype", b"application/test")
+            .unwrap();
+        writer
+            .write_deflated_sized("content.xml", b"<content>Hello</content>")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        assert!(!local_member_has_data_descriptor(&bytes, b"content.xml"));
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.len(), 2);
+        assert_eq!(reader.read("mimetype").unwrap(), b"application/test");
+        assert_eq!(
+            reader.read("content.xml").unwrap(),
+            b"<content>Hello</content>"
+        );
+    }
+
+    #[test]
+    fn sized_deflated_limit_breach_leaves_the_writer_usable() {
+        let limits = StreamingArchiveLimits::default().with_compressed_size_limit(1024);
+        let mut writer = StreamingArchiveWriter::with_limits(limits);
+        writer
+            .write_stored("mimetype", b"application/test")
+            .unwrap();
+        // xorshift64* output is effectively incompressible, so the 4 KiB
+        // payload must exceed the 1 KiB compressed-size budget.
+        let mut state = 0x1234_5678_9abc_def0u64;
+        let payload: Vec<u8> = (0..4096)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                (state >> 32) as u8
+            })
+            .collect();
+        let error = writer
+            .write_deflated_sized("content.xml", &payload)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::LimitExceeded { .. }));
+        assert!(!writer.is_poisoned());
+        // The archive never observed the rejected member, so a follow-up
+        // in-budget write still succeeds.
+        writer.write_deflated_sized("ok.xml", b"<ok/>").unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(reader.read("ok.xml").unwrap(), b"<ok/>");
+    }
+
+    #[test]
     fn indexed_archive_reads_stored_and_deflated_members_by_stable_id() {
         let mut writer = StreamingArchiveWriter::new();
         writer
@@ -4956,9 +5052,7 @@ mod tests {
             .write_deflated("content.xml", b"<content>Hello</content>")
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        // The sized deflated path declares the final CRC-32 and sizes in the
-        // local header, so no data descriptor is emitted.
-        assert!(!local_member_has_data_descriptor(&bytes, b"content.xml"));
+        assert!(local_member_has_data_descriptor(&bytes, b"content.xml"));
 
         let archive = indexed_archive(bytes);
         assert_eq!(archive.len(), 2);

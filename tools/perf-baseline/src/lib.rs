@@ -49062,10 +49062,10 @@ mod tests {
         assert_eq!(first.archive, second.archive);
         assert_eq!(first.manifest.entry_count, 272);
         assert_eq!(first.manifest.archive_member_count, 77);
-        assert_eq!(first.manifest.archive_bytes, 17_061_898);
+        assert_eq!(first.manifest.archive_bytes, 17_060_208);
         assert_eq!(
             first.manifest.archive_sha256,
-            "7b0ddd1c00ef91d24e60f30bf4a0ca0045807d537329e213f2f03020dfb0750b"
+            "1f7a0b4a3029c60fc8538e9aca55b2a675d7eaee2ef0c402aac73f67fbf1dae7"
         );
         assert_eq!(first.manifest.shape, "media-rich-64-image-owners");
         assert_eq!(
@@ -49077,7 +49077,7 @@ mod tests {
         let batch = run_case(Case::OdtEmbeddedResourceBatchReplaceSave, &first, 0, 1).unwrap();
         assert_eq!(
             scalar.output_sha256.as_deref(),
-            Some("2da19ec3aff1f8cf76a2690a498bb9582b604c0aab25cd40c3b688efa5888a1d")
+            Some("919b75555215beca0c992bd8ad8646ef43e10969a4f4ec67777c43ae9c431524")
         );
         assert_eq!(
             batch.output_sha256.as_deref(),
@@ -49903,10 +49903,10 @@ mod tests {
         assert_eq!(first.manifest.entry_count, 28);
         assert_eq!(first.manifest.archive_member_count, 13);
         assert_eq!(first.manifest.uncompressed_payload_bytes, 16_778_604);
-        assert_eq!(first.manifest.archive_bytes, 16_786_244);
+        assert_eq!(first.manifest.archive_bytes, 16_786_027);
         assert_eq!(
             first.manifest.archive_sha256,
-            "dcbb1f88da9366f2eab8eb6029dcc73930ea2fc03552b78dd4922689f8a9655d"
+            "14ee72736a6ad24ea4eac4c7d73875dc051132f50d4d1811becffd6a9887e4a5"
         );
         assert_eq!(first.manifest.shape, "media-rich-cross-slide");
         assert_eq!(
@@ -49918,7 +49918,7 @@ mod tests {
         let batch = run_case(Case::OdpMediaTextBoxBatchReplaceSave, &first, 0, 1).unwrap();
         assert_eq!(
             scalar.output_sha256.as_deref(),
-            Some("ee31f8c046af7b99819b183ca4fc56e00b97d2f97b36fa776c7d4c96dee3614b")
+            Some("203e8c893bbe9d22e16b7edb66d06b2f103f24c3a6bf017f29606f1aaa22cdf8")
         );
         assert_eq!(
             batch.output_sha256.as_deref(),

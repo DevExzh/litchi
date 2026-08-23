@@ -1347,7 +1347,7 @@ impl<W: Write> PackageWriter<W> {
                 .map_err(|e| Error::ZipError(e.to_string()))?;
         } else {
             self.zip_writer
-                .write_deflated(path, content)
+                .write_deflated_sized(path, content)
                 .map_err(|e| Error::ZipError(e.to_string()))?;
         };
         self.record_manifest_entry(entry, entry_bytes);
@@ -1808,7 +1808,7 @@ impl<W: Write> PackageWriter<W> {
         }
         if let Err(error) = self
             .zip_writer
-            .write_deflated("META-INF/manifest.xml", manifest_content.as_bytes())
+            .write_deflated_sized("META-INF/manifest.xml", manifest_content.as_bytes())
         {
             return Err(self.map_archive_error(error));
         }
