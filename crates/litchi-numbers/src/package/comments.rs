@@ -2697,13 +2697,15 @@ fn append_list_facts(
         return Err(Error::InvalidSource { path });
     }
     for entry in &probe.entries {
-        if list_type == tst::table_data_list::ListType::CommentStorage && entry.key == 0 {
+        if list_type == tst::table_data_list::ListType::CommentStorage as i32 && entry.key == 0 {
             return Err(Error::InvalidSource { path });
         }
-        if list_type == tst::table_data_list::ListType::CommentStorage && entry.refcount == 0 {
+        if list_type == tst::table_data_list::ListType::CommentStorage as i32 && entry.refcount == 0
+        {
             return Err(Error::InvalidSource { path });
         }
-        if list_type == tst::table_data_list::ListType::CommentStorage && entry.storage_id.is_none()
+        if list_type == tst::table_data_list::ListType::CommentStorage as i32
+            && entry.storage_id.is_none()
         {
             return Err(Error::InvalidSource { path });
         }
@@ -2916,7 +2918,7 @@ fn census_models_and_cells(
                             },
                         }
                     },
-                    Err(error) if message.type_ == 6_000 => continue,
+                    Err(_error) if message.type_ == 6_000 => continue,
                     Err(error) => return Err(map_table_codec_error(error, path)),
                 };
                 let data_options = table_cell_decode_options(
