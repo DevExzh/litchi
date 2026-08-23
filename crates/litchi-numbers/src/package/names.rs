@@ -935,6 +935,27 @@ fn validate_changed_work_budget(source: &Package, operations: &[Operation]) -> R
         .iter()
         .find(|entry| entry.name() == PACKAGE_METADATA_ENTRY)
         .map_or(0, |entry| entry.data().len());
+    // The metadata selector visitor is caller-owned: for every current
+    // ComponentInfo it compares the effective locator with every selected
+    // native component before the codec can advance any token.  Its input is
+    // the decompressed type-11006 payload, so the compressed Snappy member
+    // size above is not a safe bound for repetitive or hostile locators.
+    // Sum the parsed source payloads before any changed-only allocation; the
+    // changed semantic operation count is the safe upper bound for selected
+    // components because native resolution has not run yet.  Saturating
+    // arithmetic keeps malformed/hostile sizes fail-closed.
+    let metadata_payload_bytes = source
+        .state
+        .components
+        .catalog()
+        .iter()
+        .flat_map(|component| component.archive().objects.iter())
+        .flat_map(|object| object.messages.iter())
+        .filter(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+        .fold(0usize, |total, message| {
+            total.saturating_add(message.data.len())
+        });
+    let metadata_selector_work = metadata_payload_bytes.saturating_mul(changed);
     // Name publication also scans/compresses the metadata sidecar, compares
     // selected locators against current metadata components, reassembles the
     // physical ZIP, reopens the complete candidate, and performs locality.
@@ -943,6 +964,7 @@ fn validate_changed_work_budget(source: &Package, operations: &[Operation]) -> R
         .saturating_mul(2)
         .saturating_add(entry_count.saturating_mul(2))
         .saturating_add(metadata_bytes.saturating_mul(2))
+        .saturating_add(metadata_selector_work)
         .saturating_add(locator_bytes.saturating_mul(changed));
     let observed = observed.saturating_add(publication_work);
     let maximum = source.state.options.semantic().max_formula_render_work();
