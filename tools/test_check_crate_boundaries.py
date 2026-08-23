@@ -1452,6 +1452,49 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_iwa_keynote_source_topology(root), [])
 
+    def test_iwa_keynote_slide_info_native_text_ids_require_deprecation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            host.parent.mkdir(parents=True)
+            host.write_text(
+                "pub struct KeynoteSlideInfo {\n"
+                "    pub title_storage_id: Option<TextStorageId>,\n"
+                "    #[allow(dead_code)]\n"
+                "    pub body_storage_id: Option<TextStorageId>,\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub notes_storage_id: Option<TextStorageId>,\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_info_source_topology(root),
+                [
+                    "litchi-iwa Keynote slide info native field must remain deprecated "
+                    "body_storage_id: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:4",
+                    "litchi-iwa Keynote slide info native field must remain deprecated "
+                    "title_storage_id: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:2",
+                ],
+            )
+
+            host.write_text(
+                "pub struct KeynoteSlideInfo {\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub title_storage_id: Option<TextStorageId>,\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub body_storage_id: Option<TextStorageId>,\n"
+                "    #[deprecated(note = \"compatibility\")]\n"
+                "    pub notes_storage_id: Option<TextStorageId>,\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_info_source_topology(root), []
+            )
+
     def test_retired_iwa_keynote_document_reader_inventory_is_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE,

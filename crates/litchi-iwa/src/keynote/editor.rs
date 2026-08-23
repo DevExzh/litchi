@@ -121,10 +121,25 @@ pub struct KeynoteSlideInfo {
     /// placeholders retain their storage, so [`Self::body`] remains readable.
     pub is_body_visible: Option<bool>,
     pub transition: Option<TransitionSettings>,
+    /// Native title-storage identity retained for migration-host graph work.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy native Keynote text-storage ID; use litchi_keynote::Package slide selectors for semantic title reads and edits; retained for migration-host compatibility"
+    )]
     pub title_storage_id: Option<TextStorageId>,
     pub title: Option<String>,
+    /// Native body-storage identity retained for migration-host graph work.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy native Keynote text-storage ID; use litchi_keynote::Package slide selectors for semantic body reads and edits; retained for migration-host compatibility"
+    )]
     pub body_storage_id: Option<TextStorageId>,
     pub body: Option<String>,
+    /// Native speaker-notes storage identity retained for migration-host graph work.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy native Keynote text-storage ID; use litchi_keynote::Package slide selectors for semantic speaker-notes reads and edits; retained for migration-host compatibility"
+    )]
     pub notes_storage_id: Option<TextStorageId>,
     pub notes: Option<String>,
 }
