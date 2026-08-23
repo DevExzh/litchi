@@ -119,6 +119,8 @@ IWORK_EXAMPLE_NATIVE_ID_CALL = re.compile(
 IWA_KEYNOTE_SOURCE_ROOT = Path("crates/litchi-iwa/src/keynote")
 IWA_KEYNOTE_EDITOR_SOURCE = IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
 IWA_KEYNOTE_SLIDE_INFO_RAW_FIELDS = (
+    "node_id",
+    "slide_id",
     "title_storage_id",
     "body_storage_id",
     "notes_storage_id",
@@ -5342,12 +5344,13 @@ def audit_iwa_legacy_method_deprecation_source_topology(
 
 
 def audit_iwa_keynote_slide_info_source_topology(root: Path = ROOT) -> list[str]:
-    """Keep migrated Keynote text-storage IDs advisory-deprecated.
+    """Keep migrated Keynote slide and text-storage IDs advisory-deprecated.
 
     ``KeynoteSlideInfo`` remains a migration-host compatibility value, but its
-    title/body/speaker-notes storage identities are native handles.  The
-    focused package owns those semantic text paths now, so a future edit must
-    not silently make the handles look like supported API again.
+    slide-node, slide, title/body, and speaker-notes identities are native
+    handles. The focused package owns semantic slide and title/body text
+    paths now, so a future edit must not silently make the handles look like
+    supported API again.
     """
 
     path = root / IWA_KEYNOTE_EDITOR_SOURCE
