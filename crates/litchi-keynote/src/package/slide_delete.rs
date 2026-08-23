@@ -100,6 +100,8 @@ pub enum Error {
     UnsupportedTopology,
     #[error("the Keynote slide selector is ambiguous")]
     AmbiguousSelector,
+    #[error("the Keynote slide selector name cannot be empty")]
+    EmptySlideName,
     #[error("the Keynote show has no slide matching the requested name")]
     SlideNameNotFound,
     #[error("the Keynote show has no slide at position {position:?}")]
@@ -1619,8 +1621,11 @@ fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     }
 }
 
-fn map_selector_error(_error: SlideSelectorError) -> Error {
-    Error::AmbiguousSelector
+fn map_selector_error(error: SlideSelectorError) -> Error {
+    match error {
+        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+    }
 }
 
 fn map_read_error(error: ReadError) -> Error {

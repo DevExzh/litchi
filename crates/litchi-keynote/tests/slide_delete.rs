@@ -1026,6 +1026,11 @@ fn selectors_final_slide_and_transaction_state_fail_closed() -> TestResult<()> {
         missing_name.remove_slide("Missing"),
         Err(delete::Error::SlideNameNotFound)
     ));
+    let mut empty_name = package.edit_slide_deletion();
+    assert!(matches!(
+        empty_name.remove_slide(""),
+        Err(delete::Error::EmptySlideName)
+    ));
 
     let ambiguous_bytes = package_bytes(&["Same", "Same", "Other"], MetadataMode::Exact)?;
     let ambiguous = Package::from_bytes(&ambiguous_bytes)?;
