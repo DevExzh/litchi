@@ -710,6 +710,66 @@ fn duplicate_rooted_node_package(source: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+fn aliased_node_slide_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let slide_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Slide-4.iwa")
+        .ok_or_else(|| io::Error::other("synthetic slide component is missing"))?;
+    let stream = SnappyStream::decompress(slide_entry.data())?;
+    let slide_archive = Archive::parse(stream.as_bytes())?;
+    let slide = slide_archive
+        .object(FIRST_SLIDE)
+        .ok_or_else(|| io::Error::other("synthetic slide is missing"))?;
+    let slide_message = slide
+        .messages
+        .iter()
+        .find(|message| message.type_ == SLIDE_MESSAGE_TYPE)
+        .cloned()
+        .ok_or_else(|| io::Error::other("synthetic slide payload is missing"))?;
+    let slide_info = slide
+        .archive_info
+        .message_infos
+        .iter()
+        .find(|info| info.type_ == SLIDE_MESSAGE_TYPE)
+        .cloned()
+        .ok_or_else(|| io::Error::other("synthetic slide metadata is missing"))?;
+
+    mutate_component(source, DOCUMENT_MEMBER, move |archive| {
+        let node = archive
+            .object_mut(FIRST_NODE)
+            .ok_or_else(|| io::Error::other("synthetic node is missing"))?;
+        let node_payload = {
+            let message = node
+                .messages
+                .iter_mut()
+                .find(|message| message.type_ == 4)
+                .ok_or_else(|| io::Error::other("synthetic node payload is missing"))?;
+            #[allow(
+                deprecated,
+                reason = "the native node reference is deliberately made adversarial"
+            )]
+            {
+                let mut decoded = kn::SlideNodeArchive::decode(message.data.as_slice())?;
+                decoded.slide = Some(reference(FIRST_NODE));
+                message.data = decoded.encode_to_vec();
+            }
+            message.data.clone()
+        };
+        let node_info = node
+            .archive_info
+            .message_infos
+            .iter_mut()
+            .find(|info| info.type_ == 4)
+            .ok_or_else(|| io::Error::other("synthetic node metadata is missing"))?;
+        node_info.length = u32::try_from(node_payload.len())?;
+        node_info.object_references = vec![FIRST_NODE];
+        node.messages.push(slide_message);
+        node.archive_info.message_infos.push(slide_info);
+        Ok(())
+    })
+}
+
 fn shared_slide_package(source: &[u8]) -> TestResult<Vec<u8>> {
     mutate_component(source, DOCUMENT_MEMBER, |archive| {
         let node = archive
@@ -1270,6 +1330,28 @@ fn duplicate_unselected_root_node_is_rejected_before_staging() -> TestResult<()>
         Malformation::None,
     )?;
     let malformed = duplicate_rooted_node_package(&source)?;
+    let package = Package::from_bytes(&malformed)?;
+    assert!(matches!(
+        package.slide_transition(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert!(matches!(
+        package.edit_slide_transition(0usize),
+        Err(Error::InvalidSource)
+    ));
+    Ok(())
+}
+
+#[test]
+fn aliased_node_slide_owner_is_rejected_before_staging() -> TestResult<()> {
+    let source = package_bytes(
+        Some(&full_settings()?),
+        Some(&Settings::new()),
+        ["Alpha", "Beta"],
+        [true, false],
+        Malformation::None,
+    )?;
+    let malformed = aliased_node_slide_package(&source)?;
     let package = Package::from_bytes(&malformed)?;
     assert!(matches!(
         package.slide_transition(0usize),
