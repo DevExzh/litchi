@@ -28,6 +28,12 @@ use crate::model::{Reference, Slide};
 const ODF_PRESENTATION: &str = "application/vnd.oasis.opendocument.presentation";
 const BODY_MARKER: &str = "<office:presentation";
 const FAMILY_NAME: &str = "ODP";
+const SLIDES_CACHE_QUERY_THRESHOLD: usize = 2;
+// The source-backed owner already retains bounded content.xml bytes.  Keep a
+// much smaller ceiling for the optional semantic projection so a repeated
+// query cannot turn an otherwise lazy source view into a large second model.
+const SLIDES_CACHE_MAX_SOURCE_BYTES: usize = 4 * 1024 * 1024;
+const SLIDES_CACHE_MAX_COUNT: usize = 256;
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
 const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
 
@@ -57,6 +63,8 @@ pub struct SourceBackedPresentation {
     content_xml: String,
     styles_xml: Option<String>,
     metadata: Option<litchi_core::Metadata>,
+    slides_queries: AtomicUsize,
+    slides_cache: OnceLock<Option<Arc<[Slide]>>>,
     text_queries: AtomicUsize,
     text_cache: OnceLock<Option<String>>,
 }
@@ -232,6 +240,8 @@ impl SourceBackedPresentation {
             content_xml,
             styles_xml,
             metadata,
+            slides_queries: AtomicUsize::new(0),
+            slides_cache: OnceLock::new(),
             text_queries: AtomicUsize::new(0),
             text_cache: OnceLock::new(),
         })
@@ -277,6 +287,31 @@ impl SourceBackedPresentation {
 
     /// Parse all slides with the same semantic parser used by [`super::Presentation`].
     pub fn slides(&self) -> Result<Vec<Slide>> {
+        if let Some(cache) = self.slides_cache.get() {
+            self.check_source()?;
+            return self.slides_from_cache(cache);
+        }
+
+        let previous = self
+            .slides_queries
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_add(1))
+            })
+            .unwrap_or(usize::MAX);
+        if previous.saturating_add(1) < SLIDES_CACHE_QUERY_THRESHOLD {
+            return self.slides_uncached();
+        }
+
+        let slides = self.slides_uncached()?;
+        self.check_source()?;
+        if self.slides_cache.get().is_none() {
+            self.publish_slides_cache(&slides);
+        }
+        self.check_source()?;
+        Ok(slides)
+    }
+
+    fn slides_uncached(&self) -> Result<Vec<Slide>> {
         self.check_source()?;
         let result =
             Parser::parse_slides_with_styles(&self.content_xml, self.styles_xml.as_deref());
@@ -288,6 +323,35 @@ impl SourceBackedPresentation {
     /// Parse one slide while retaining the parser's complete-document
     /// validation semantics.
     pub fn slide(&self, index: usize) -> Result<Option<Slide>> {
+        if let Some(cache) = self.slides_cache.get() {
+            self.check_source()?;
+            return self.slide_from_cache(cache, index);
+        }
+
+        let previous = self
+            .slides_queries
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                Some(count.saturating_add(1))
+            })
+            .unwrap_or(usize::MAX);
+        if previous.saturating_add(1) < SLIDES_CACHE_QUERY_THRESHOLD {
+            return self.slide_uncached(index);
+        }
+
+        // Build the shared projection only after the finite threshold.  This
+        // keeps a one-off indexed query on the specialized parser while
+        // allowing repeated list/index queries to share one validated result.
+        let slides = self.slides_uncached()?;
+        let selected = slides.get(index).cloned();
+        self.check_source()?;
+        if self.slides_cache.get().is_none() {
+            self.publish_slides_cache(&slides);
+        }
+        self.check_source()?;
+        Ok(selected)
+    }
+
+    fn slide_uncached(&self, index: usize) -> Result<Option<Slide>> {
         self.check_source()?;
         let result = Parser::parse_slide_with_styles_at(
             &self.content_xml,
@@ -297,6 +361,48 @@ impl SourceBackedPresentation {
         let observed = self.source.version()?;
         ensure_current(self.source_version, observed)?;
         result
+    }
+
+    fn slides_from_cache(&self, cache: &Option<Arc<[Slide]>>) -> Result<Vec<Slide>> {
+        let Some(slides) = cache else {
+            return self.slides_uncached();
+        };
+        let result = slides.to_vec();
+        self.check_source()?;
+        Ok(result)
+    }
+
+    fn slide_from_cache(
+        &self,
+        cache: &Option<Arc<[Slide]>>,
+        index: usize,
+    ) -> Result<Option<Slide>> {
+        let Some(slides) = cache else {
+            return self.slide_uncached(index);
+        };
+        let result = slides.get(index).cloned();
+        self.check_source()?;
+        Ok(result)
+    }
+
+    fn publish_slides_cache(&self, slides: &[Slide]) {
+        if self.content_xml.len() > SLIDES_CACHE_MAX_SOURCE_BYTES
+            || slides.len() > SLIDES_CACHE_MAX_COUNT
+        {
+            let _ = self.slides_cache.set(None);
+            return;
+        }
+
+        // The projection is optional.  Retaining it must not turn a valid
+        // source query into an allocation failure, and the source-size/count
+        // gates keep its aggregate footprint finite before cloning strings.
+        let mut retained = Vec::new();
+        if retained.try_reserve_exact(slides.len()).is_err() {
+            let _ = self.slides_cache.set(None);
+            return;
+        }
+        retained.extend(slides.iter().cloned());
+        let _ = self.slides_cache.set(Some(retained.into()));
     }
 
     /// Extract all visible presentation text with the ordinary facade's
@@ -337,7 +443,9 @@ impl SourceBackedPresentation {
     }
 
     fn text_uncached(&self) -> Result<String> {
-        let slides = self.slides()?;
+        // Keep the text selector's established threshold and freshness shape
+        // independent of the broader slide projection cache.
+        let slides = self.slides_uncached()?;
         let mut all_text = Vec::new();
         for slide in slides {
             let text = slide.all_text();
