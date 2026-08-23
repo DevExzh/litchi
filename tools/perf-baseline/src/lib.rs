@@ -746,6 +746,7 @@ enum Case {
     PptFreshWriteTo,
     DocSemanticOpen,
     DocSemanticListParagraphs,
+    DocSemanticParagraphCount,
     DocSemanticOneParagraph,
     DocSemanticFullText,
     DocSemanticNoopEditSave,
@@ -1215,6 +1216,7 @@ impl Case {
             Self::PptFreshWriteTo => "ppt_fresh_write_to",
             Self::DocSemanticOpen => "doc_semantic_open",
             Self::DocSemanticListParagraphs => "doc_semantic_list_paragraphs",
+            Self::DocSemanticParagraphCount => "doc_semantic_paragraph_count",
             Self::DocSemanticOneParagraph => "doc_semantic_one_paragraph",
             Self::DocSemanticFullText => "doc_semantic_full_text",
             Self::DocSemanticNoopEditSave => "doc_semantic_noop_edit_save",
@@ -1509,6 +1511,7 @@ impl Case {
             self,
             Self::DocSemanticOpen
                 | Self::DocSemanticListParagraphs
+                | Self::DocSemanticParagraphCount
                 | Self::DocSemanticOneParagraph
                 | Self::DocSemanticFullText
                 | Self::DocSemanticNoopEditSave
@@ -8660,6 +8663,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_fresh_write_to" => Some(Case::PptFreshWriteTo),
         "doc_semantic_open" => Some(Case::DocSemanticOpen),
         "doc_semantic_list_paragraphs" => Some(Case::DocSemanticListParagraphs),
+        "doc_semantic_paragraph_count" => Some(Case::DocSemanticParagraphCount),
         "doc_semantic_one_paragraph" => Some(Case::DocSemanticOneParagraph),
         "doc_semantic_full_text" => Some(Case::DocSemanticFullText),
         "doc_semantic_noop_edit_save" => Some(Case::DocSemanticNoopEditSave),
@@ -9070,6 +9074,7 @@ fn print_usage() {
                                        cfb_open_stream_simulated_mini_4095_shared_repeat8,\n\
                                        doc_fresh_write_to,xls_fresh_write_to,ppt_fresh_write_to,\n\
                                        doc_semantic_open,doc_semantic_list_paragraphs,\n\
+                                       doc_semantic_paragraph_count,\n\
                                        doc_semantic_one_paragraph,doc_semantic_full_text,\n\
                                        doc_semantic_noop_edit_save,doc_semantic_one_edit_save,\n\
                                        doc_body_snapshot_list_paragraphs,\n\
@@ -15463,6 +15468,7 @@ fn run_case_with_config(
         },
         Case::DocSemanticOpen
         | Case::DocSemanticListParagraphs
+        | Case::DocSemanticParagraphCount
         | Case::DocSemanticOneParagraph
         | Case::DocSemanticFullText
         | Case::DocSemanticNoopEditSave
@@ -17691,6 +17697,21 @@ fn run_semantic_doc(
         return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
     }
     let selected = shape.doc_paragraph_count() / 2;
+    let expected_paragraph_count = if case == Case::DocSemanticParagraphCount {
+        let mut oracle_package =
+            litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+        let oracle_document = oracle_package.document()?;
+        let oracle_paragraphs = oracle_document.paragraphs()?;
+        let expected = oracle_paragraphs.len();
+        if expected != corpus.manifest.entry_count || expected != shape.doc_paragraph_count() {
+            return Err(
+                "semantic DOC paragraph-count oracle differs from writer specification".into(),
+            );
+        }
+        expected
+    } else {
+        shape.doc_paragraph_count()
+    };
     let expected_changed = if case == Case::DocSemanticOneEditSave {
         let source = Snapshot::from_bytes(corpus.archive.clone())?;
         let mut edit = source.edit()?;
@@ -17729,6 +17750,23 @@ fn run_semantic_doc(
                 }
                 verify_semantic_doc(&corpus.archive, shape, None)?;
                 std::hint::black_box(paragraphs);
+                record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+            },
+            Case::DocSemanticParagraphCount => {
+                let mut package =
+                    litchi_doc::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                let document = package.document()?;
+                let started = Instant::now();
+                let count = document.paragraph_count()?;
+                let duration = started.elapsed();
+                if count != expected_paragraph_count {
+                    return Err(
+                        "semantic DOC paragraph count differs from independent paragraph oracle"
+                            .into(),
+                    );
+                }
+                verify_semantic_doc(&corpus.archive, shape, None)?;
+                std::hint::black_box(count);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::DocSemanticOneParagraph => {
@@ -41417,7 +41455,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 344);
+        assert_eq!(selectable_count, 345);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
