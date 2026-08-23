@@ -467,6 +467,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::from_bytes`].
+    #[deprecated(
+        since = "0.0.1",
+        note = "use Package::from_bytes; the archive-qualified alias is redundant"
+    )]
     pub fn from_archive_bytes(bytes: &[u8]) -> PackageResult<Self> {
         Self::from_bytes(bytes)
     }
