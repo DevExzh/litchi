@@ -2150,15 +2150,81 @@ NUMBERS_EXTRACTOR_NO_EAGER_TABLE_DATA_LIST_SOURCE_PATTERNS = (
     (
         "TableDataList::decode",
         re.compile(
-            r"(?<![A-Za-z0-9_#])TableDataList[ \t\r\n]*::"
+            r"(?<![A-Za-z0-9_#])(?:r#)?TableDataList[ \t\r\n]*::"
             r"[ \t\r\n]*decode\b"
         ),
     ),
     (
         "TableDataListSegment::decode",
         re.compile(
-            r"(?<![A-Za-z0-9_#])TableDataListSegment[ \t\r\n]*::"
+            r"(?<![A-Za-z0-9_#])(?:r#)?TableDataListSegment[ \t\r\n]*::"
             r"[ \t\r\n]*decode\b"
+        ),
+    ),
+)
+IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor/storage.rs"
+)
+NUMBERS_TABLE_CELL_STORAGE_READ_FUNCTIONS = (
+    "resolve_table_string_values",
+    "table_data_list_has_entries",
+    "rich_text_payload_entry_count",
+)
+NUMBERS_TABLE_CELL_STORAGE_ROOT_READ_FUNCTIONS = (
+    "resolve_table_string_values",
+    "table_data_list_has_entries",
+)
+NUMBERS_TABLE_CELL_STORAGE_BARE_CALL = re.compile(
+    r"(?<![A-Za-z0-9_:#.])(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*\("
+)
+NUMBERS_TABLE_CELL_STORAGE_QUALIFIED_CALL = re.compile(
+    r"(?<![A-Za-z0-9_:.])(?:crate|self|super|storage|Self)"
+    r"(?:[ \t\r\n]*::[ \t\r\n]*(?:r#)?[A-Za-z_][A-Za-z0-9_]*)*"
+    r"[ \t\r\n]*::[ \t\r\n]*(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*\("
+)
+NUMBERS_TABLE_CELL_STORAGE_MESSAGE_INDEX_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])table_data_list_message_index"
+    r"[ \t\r\n]*\("
+)
+NUMBERS_TABLE_CELL_STORAGE_CODEC_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])table_cell_storage_codec[ \t\r\n]*::[ \t\r\n]*"
+    r"decode_table_data_list(?:_segment)?(?:_[A-Za-z0-9_]+)*\b"
+)
+NUMBERS_TABLE_CELL_STORAGE_CODEC_PATH_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"numbers_table_cell_storage_codec[ \t\r\n]*::[ \t\r\n]*"
+    r"decode_table_data_list(?:_segment)?(?:_[A-Za-z0-9_]+)*\b"
+)
+NUMBERS_TABLE_CELL_STORAGE_CODEC_ALIAS_IMPORT = re.compile(
+    r"^[ \t]*(?:pub[ \t\r\n]+)?use[ \t\r\n]+"
+    r"(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+    r"numbers_table_cell_storage_codec[ \t\r\n]+as[ \t\r\n]+"
+    r"(?:r#)?(?P<alias>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*;",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_CELL_STORAGE_NO_EAGER_DECODE_PATTERNS = (
+    *NUMBERS_EXTRACTOR_NO_EAGER_TABLE_DATA_LIST_SOURCE_PATTERNS,
+    (
+        "prost Message::decode",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?Message[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "UFCS Prost decode",
+        re.compile(
+            r"<[\s\S]*?[ \t\r\n]+as[ \t\r\n]+"
+            r"(?:(?:::)?(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+            r"(?:r#)?Message[ \t\r\n]*>[ \t\r\n]*::[ \t\r\n]*decode\b"
+        ),
+    ),
+    (
+        "generated decode_message helper",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])decode_message"
+            r"(?:[ \t\r\n]*::)?[ \t\r\n]*(?:<|\()"
         ),
     ),
 )
@@ -4496,6 +4562,93 @@ def _rust_function_declarations(source: str) -> list[tuple[str, int]]:
         declarations.append((match.group(1), line_number))
         previous_offset = name_offset
     return declarations
+
+
+def _rust_mask_nested_function_items(source: str) -> str:
+    """Mask nested Rust function items while preserving offsets and newlines."""
+
+    code = _mask_rust_non_code(source)
+    masked = list(code)
+
+    def blank(start: int, end: int) -> None:
+        for offset in range(start, end):
+            if masked[offset] != "\n":
+                masked[offset] = " "
+
+    for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+        opening = code.find("{", declaration.end())
+        if opening < 0:
+            continue
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth == 0:
+            blank(declaration.start(), cursor)
+
+    return "".join(masked)
+
+
+def _rust_top_level_function_bodies(source: str) -> dict[str, tuple[str, int]]:
+    """Return module-level Rust function bodies and their source offsets."""
+
+    code = _mask_rust_non_code(source)
+    functions: dict[str, tuple[str, int]] = {}
+    for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+        if code.count("{", 0, declaration.start()) != code.count("}", 0, declaration.start()):
+            continue
+        opening = code.find("{", declaration.end())
+        if opening < 0:
+            continue
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth:
+            continue
+        name = declaration.group(1)
+        functions.setdefault(
+            name,
+            (
+                _rust_mask_nested_function_items(code[opening + 1 : cursor - 1]),
+                opening + 1,
+            ),
+        )
+    return functions
+
+
+def _rust_named_function_body(source: str, name: str) -> tuple[str, int] | None:
+    """Return one top-level Rust function body and its source offset."""
+
+    return _rust_top_level_function_bodies(source).get(name)
+
+
+def _numbers_table_cell_storage_codec_call_patterns(
+    source: str,
+) -> tuple[re.Pattern[str], ...]:
+    """Return codec-call patterns, including an explicitly imported module alias."""
+
+    patterns = [
+        NUMBERS_TABLE_CELL_STORAGE_CODEC_CALL,
+        NUMBERS_TABLE_CELL_STORAGE_CODEC_PATH_CALL,
+    ]
+    for match in NUMBERS_TABLE_CELL_STORAGE_CODEC_ALIAS_IMPORT.finditer(source):
+        alias = re.escape(match.group("alias"))
+        patterns.append(
+            re.compile(
+                rf"(?<![A-Za-z0-9_#]){alias}[ \t\r\n]*::[ \t\r\n]*"
+                r"decode_table_data_list(?:_segment)?(?:_[A-Za-z0-9_]+)*\b"
+            )
+        )
+    return tuple(patterns)
 
 
 def _rust_public_declarations(source: str) -> list[tuple[str, int]]:
@@ -10367,6 +10520,114 @@ def audit_numbers_extractor_no_eager_table_data_list_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_table_cell_storage_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep selected Numbers storage reads on the bounded codec seam.
+
+    The host still has intentionally generated mutation paths and a full
+    ``resolve_table_data_list`` helper.  This ratchet therefore inspects only
+    the three read-only functions that have migrated to the borrowed
+    ``numbers_table_cell_storage_codec`` projection.  Test-gated imports and
+    helpers are masked item-by-item so a cfg(test) oracle cannot hide a later
+    production regression.
+    """
+
+    violations: list[str] = []
+    source_path = root / IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE
+    if not source_path.is_file():
+        return violations
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    production_source = _mask_rust_cfg_test_items(raw_source)
+    top_level_functions = _rust_top_level_function_bodies(production_source)
+    codec_call_patterns = _numbers_table_cell_storage_codec_call_patterns(
+        production_source
+    )
+    for function_name in NUMBERS_TABLE_CELL_STORAGE_READ_FUNCTIONS:
+        result = top_level_functions.get(function_name)
+        if result is None:
+            violations.append(
+                "focused litchi-iwa Numbers table-cell storage read function is "
+                f"missing {function_name}: {IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE}"
+            )
+            continue
+
+        reachable: list[tuple[str, str, int]] = []
+        pending = [function_name]
+        visited: set[str] = set()
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            current_result = top_level_functions.get(current)
+            if current_result is None:
+                continue
+            visited.add(current)
+            current_body, current_offset = current_result
+            reachable.append((current, current_body, current_offset))
+            for call_pattern in (
+                NUMBERS_TABLE_CELL_STORAGE_BARE_CALL,
+                NUMBERS_TABLE_CELL_STORAGE_QUALIFIED_CALL,
+            ):
+                for call in call_pattern.finditer(current_body):
+                    helper_name = call.group("name")
+                    if (
+                        helper_name in top_level_functions
+                        and helper_name not in visited
+                    ):
+                        pending.append(helper_name)
+
+        if not any(
+            any(pattern.search(body) for pattern in codec_call_patterns)
+            for _name, body, _offset in reachable
+        ):
+            _name, _body, body_offset = reachable[0]
+            line_number = production_source.count("\n", 0, body_offset) + 1
+            violations.append(
+                "focused litchi-iwa Numbers table-cell storage read function "
+                f"{function_name} does not route through "
+                "numbers_table_cell_storage_codec: "
+                f"{IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE}:{line_number}"
+            )
+
+        for current_name, body, body_offset in reachable:
+            if function_name in NUMBERS_TABLE_CELL_STORAGE_ROOT_READ_FUNCTIONS:
+                index_match = NUMBERS_TABLE_CELL_STORAGE_MESSAGE_INDEX_CALL.search(body)
+                if index_match is not None:
+                    line_number = (
+                        production_source.count(
+                            "\n", 0, body_offset + index_match.start()
+                        )
+                        + 1
+                    )
+                    violations.append(
+                        "focused litchi-iwa Numbers table-cell storage root read "
+                        f"function {function_name} calls table_data_list_message_index "
+                        f"(via {current_name}): "
+                        f"{IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE}:{line_number}"
+                    )
+
+            for label, pattern in NUMBERS_TABLE_CELL_STORAGE_NO_EAGER_DECODE_PATTERNS:
+                for match in pattern.finditer(body):
+                    line_number = (
+                        production_source.count("\n", 0, body_offset + match.start())
+                        + 1
+                    )
+                    helper_suffix = (
+                        ""
+                        if current_name == function_name
+                        else f" via helper {current_name}"
+                    )
+                    violations.append(
+                        "focused litchi-iwa Numbers table-cell storage read function "
+                        f"{function_name}{helper_suffix} uses {label}: "
+                        f"{IWA_NUMBERS_TABLE_CELL_STORAGE_SOURCE}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_extractor_no_eager_comment_storage_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -11903,6 +12164,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_rich_text_source_topology()
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
+        + audit_iwa_numbers_table_cell_storage_source_topology()
         + audit_numbers_extractor_no_eager_comment_storage_source_topology()
         + audit_numbers_extractor_no_eager_formula_source_topology()
         + audit_numbers_names_package_no_eager_prost_source_topology()
