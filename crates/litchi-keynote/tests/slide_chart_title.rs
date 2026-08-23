@@ -359,6 +359,50 @@ fn chart_title_empty_visible_clear_inverse_restores_presence_and_bytes() -> Test
 }
 
 #[test]
+fn chart_title_explicit_empty_text_clear_inverse_restores_exact_presence() -> TestResult<()> {
+    let bytes =
+        synthetic_package_with_states([(Some(true), Some("")), (Some(true), Some("Costs"))])?;
+    let package = Package::from_bytes(&bytes)?;
+    let source = exact_bytes(&package)?;
+    assert_eq!(
+        package.slide_chart_title(0usize, 0usize)?,
+        Some(String::new())
+    );
+
+    let cleared = package
+        .edit_slide_chart_title(0usize, 0usize)?
+        .clear()?
+        .commit()?;
+    assert_eq!(cleared.package().slide_chart_title(0usize, 0usize)?, None);
+    assert_eq!(
+        message_payload(
+            &exact_bytes(cleared.package())?,
+            NON_STYLES[0],
+            CHART_NON_STYLE_MESSAGE_TYPE,
+        )?,
+        non_style_payload_state(Some(false), None)?,
+    );
+
+    let restored = cleared
+        .package()
+        .apply_slide_chart_title(&cleared.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    assert_eq!(
+        restored.package().slide_chart_title(0usize, 0usize)?,
+        Some(String::new())
+    );
+    assert_eq!(
+        message_payload(
+            &exact_bytes(restored.package())?,
+            NON_STYLES[0],
+            CHART_NON_STYLE_MESSAGE_TYPE,
+        )?,
+        non_style_payload_state(Some(true), Some(""))?,
+    );
+    Ok(())
+}
+
+#[test]
 fn chart_title_clear_hidden_or_absent_stale_text_is_exact_noop() -> TestResult<()> {
     for state in [(Some(false), Some("stale")), (None, Some("stale"))] {
         let bytes = synthetic_package_with_states([state, (Some(true), Some("Costs"))])?;
