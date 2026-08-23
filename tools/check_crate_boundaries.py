@@ -2198,6 +2198,17 @@ NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT = (
 )
 IWA_PAGES_SOURCE_ROOT = Path("crates/litchi-iwa/src/pages")
 IWA_PAGES_EDITOR_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
+IWA_PAGES_LEGACY_METHOD_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "section_content.rs"
+)
+IWA_PAGES_LEGACY_METHODS = frozenset(
+    {
+        "section_text",
+        "replace_section_text",
+        "set_section_text",
+        "clear_section_text",
+    }
+)
 RETIRED_IWA_PAGES_DOCUMENT_SOURCE = IWA_PAGES_SOURCE_ROOT / "document.rs"
 RETIRED_IWA_PAGES_DOCUMENT_TYPES = (
     "PagesDocument",
@@ -2225,6 +2236,12 @@ WORKSPACE_CRATES_ROOT = Path("crates")
 IWA_HOST_SOURCE_ROOT = Path("crates/litchi-iwa/src")
 IWA_PAGES_FOCUSED_READER_TYPES = frozenset({"Document", "Package"})
 IWA_NUMBERS_SOURCE_ROOT = Path("crates/litchi-iwa/src/numbers")
+IWA_NUMBERS_LEGACY_METHOD_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
+)
+IWA_NUMBERS_LEGACY_METHODS = frozenset(
+    {"cell_comment", "set_cell_comment", "clear_cell_comment"}
+)
 RETIRED_IWA_NUMBERS_DOCUMENT_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "document.rs"
 RETIRED_IWA_NUMBERS_DOCUMENT_TYPES = (
     "NumbersDocument",
@@ -5244,6 +5261,69 @@ def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
                 "retired litchi-iwa Keynote slide-name README call "
                 f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
             )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_legacy_method_deprecation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retained Numbers/Pages raw-ID compatibility methods deprecated.
+
+    These methods remain available because the migration host still handles
+    sources that the focused package owners cannot edit.  Their signatures
+    nevertheless accept native object identities, so dropping the marker
+    would make a compatibility path look like a supported semantic API again.
+    Keep this source-only check exact to the two migrated method families; it
+    does not classify unrelated host capabilities that have no focused owner.
+    """
+
+    methods = (
+        (
+            IWA_NUMBERS_LEGACY_METHOD_SOURCE,
+            "Numbers",
+            IWA_NUMBERS_LEGACY_METHODS,
+        ),
+        (
+            IWA_PAGES_LEGACY_METHOD_SOURCE,
+            "Pages",
+            IWA_PAGES_LEGACY_METHODS,
+        ),
+    )
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])pub[ \t\r\n]+fn[ \t\r\n]+"
+        r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    violations: list[str] = []
+
+    for relative, product, names in methods:
+        path = root / relative
+        if not path.is_file():
+            continue
+        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        for match in declaration.finditer(source):
+            name = match.group(1)
+            if name not in names:
+                continue
+
+            prefix = source[: match.start()]
+            attributes = list(
+                re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE)
+            )
+            nearest = attributes[-1] if attributes else None
+            deprecated = False
+            if nearest is not None:
+                attribute = prefix[nearest.start() :]
+                if re.match(r"[ \t]*#[ \t]*\[[ \t]*deprecated\b", attribute):
+                    closing = attribute.rfind("]")
+                    deprecated = closing >= 0 and not attribute[closing + 1 :].strip()
+
+            if not deprecated:
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    f"litchi-iwa {product} legacy method must remain deprecated "
+                    f"{name}: {relative}:{line_number}"
+                )
 
     return sorted(set(violations))
 
@@ -11144,6 +11224,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_litchi_semantic_facade_source_topology()
         + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_legacy_method_deprecation_source_topology()
         + audit_iwa_keynote_slide_info_source_topology()
         + audit_iwa_keynote_document_source_topology()
         + audit_iwa_keynote_show_settings_source_topology()
