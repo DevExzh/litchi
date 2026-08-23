@@ -103,9 +103,11 @@ fn all_profiles_round_trip_and_emit_exact_filepass_families() {
             u32::from(key_bits)
         );
         let next = offset + 4 + pass.len();
+        // MS-XLS WORKBOOKCONTENT places FILEPASS before the INTERFACE
+        // production; CODEPAGE follows the complete interface preamble.
         assert_eq!(
             u16::from_le_bytes(stream[next..next + 2].try_into().unwrap()),
-            0x0042
+            0x00e1
         );
     }
 }
