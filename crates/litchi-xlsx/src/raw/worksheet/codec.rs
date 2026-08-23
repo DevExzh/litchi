@@ -41,9 +41,10 @@ pub(super) fn parse_processed_defaults(
     let mut defaults = None;
 
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
+        let event = reader
+            .read_event()
             .map_err(|error| invalid(error.to_string()))?;
+        let (namespace, event) = reader.resolver().resolve_event(event);
         let decoder = reader.decoder();
         let resolver = reader.resolver();
         match event {
@@ -207,9 +208,10 @@ impl Parser {
         let mut closed_root = false;
 
         loop {
-            let (namespace, event) = reader
-                .read_resolved_event()
+            let event = reader
+                .read_event()
                 .map_err(|error| invalid(error.to_string()))?;
+            let (namespace, event) = reader.resolver().resolve_event(event);
             let decoder = reader.decoder();
             let resolver = reader.resolver();
             match event {

@@ -14177,7 +14177,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     // On native targets, the umbrella byte facade retains this same source-backed
     // catalog. Check its lightweight projection so the index stays compatible
     // with that newly landed ingress path without adding another timed selector.
-    let facade = litchi::Workbook::from_bytes(bytes)?;
+    let facade = litchi::Workbook::from_bytes(bytes).map_err(|error| error.to_string())?;
     let expected = [
         "Résumé".to_owned(),
         "Στοιχεία".to_owned(),
@@ -14237,7 +14237,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     let mut duplicate_seed_edit = duplicate_seed.edit()?;
     duplicate_seed_edit.add("Data")?;
     let duplicate_seed = duplicate_seed_edit.commit()?.workbook().clone();
-    let mut duplicate_package = OpcPackage::from_bytes(duplicate_seed.to_bytes()?)?;
+    let mut duplicate_package = OpcPackage::from_bytes(&duplicate_seed.to_bytes()?)?;
     let workbook_uri = PackURI::new("/xl/workbook.xml")?;
     let workbook_xml =
         String::from_utf8(duplicate_package.get_part(&workbook_uri)?.blob().to_vec())?;

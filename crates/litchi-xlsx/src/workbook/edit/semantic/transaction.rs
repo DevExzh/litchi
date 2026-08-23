@@ -1515,7 +1515,8 @@ impl Edit {
             let part = base.inner.package.get_part(&data.part_uri)?;
             let before = part.blob_arc();
             let MergePlan { add, remove } = merge_projection.plan;
-            let mut after = if remove.is_empty() {
+            let has_merge_removes = !remove.is_empty();
+            let mut after = if !has_merge_removes {
                 None
             } else {
                 Some(raw::worksheet::edit::rewrite_merges(
@@ -1539,7 +1540,7 @@ impl Edit {
             // snapshot instead of parsing it again after the rewrite. Grid
             // and merge edits retain the full post-write store verification.
             let requires_store_verification =
-                !ordinary.is_empty() || !add.is_empty() || !remove.is_empty();
+                !ordinary.is_empty() || !add.is_empty() || has_merge_removes;
             if !ordinary.is_empty() {
                 let input = after.as_deref().unwrap_or(&before);
                 after = Some(raw::worksheet::edit::rewrite(input, &data.name, ordinary)?);
