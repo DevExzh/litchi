@@ -11291,3 +11291,21 @@ surface without assigning a replacement owner or adding an API.
 This amendment is limited to the four named detached diffs and the corrective
 `b72e7e50f` follow-up. It makes no Cargo/build, native, host-edge, ordered-debt,
 or monolith-exit claim.
+
+## 2026-08-23 amendment: detached Keynote chart-title owner-scan hardening
+
+Detached commit `612bc0f26` changes only the focused Keynote chart-title
+package path in `crates/litchi-keynote/src/package/slide_chart_title.rs`.
+When mutation guards are requested, `chart_graphs` now lazily builds one
+package-wide `HashMap` of non-style owner counts and reuses it for every chart
+in that graph build. The scan charges component, object, message, payload, and
+parsed-field work through one `ChartGraphScanBudget` against the package's
+aggregate `WireWork` limit. A selected non-style object must still have exactly
+one chart owner, and invalid or zero chart identities fail closed.
+
+This removes repeated package scans while preserving the existing chart-title
+guard semantics. The `WireWork` charge is scoped to this owner scan and its
+nested chart-reference parsing; it is not a whole-chart CPU or latency bound,
+and no such bound is claimed. This is package-level work hardening only. No
+Cargo/build/test or native result is added, and this amendment makes no
+dependency-edge, ordered-debt, host-exit, or monolith-exit claim.
