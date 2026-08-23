@@ -418,6 +418,33 @@ mod tests {
             }
         }
 
+        fn rename_entry(bytes: &mut [u8], old_name: &[u8], new_name: &[u8]) {
+            assert_eq!(old_name.len(), new_name.len());
+            let central = central_record(bytes, old_name);
+            let central_name_len = usize::from(u16::from_le_bytes(
+                bytes[central + 28..central + 30].try_into().unwrap(),
+            ));
+            assert_eq!(central_name_len, old_name.len());
+
+            let local = usize::try_from(u32::from_le_bytes(
+                bytes[central + 42..central + 46].try_into().unwrap(),
+            ))
+            .unwrap();
+            assert_eq!(&bytes[local..local + 4], b"PK\x03\x04");
+            let local_name_len = usize::from(u16::from_le_bytes(
+                bytes[local + 26..local + 28].try_into().unwrap(),
+            ));
+            assert_eq!(local_name_len, old_name.len());
+            assert_eq!(&bytes[local + 30..local + 30 + local_name_len], old_name);
+            assert_eq!(
+                &bytes[central + 46..central + 46 + central_name_len],
+                old_name
+            );
+
+            bytes[local + 30..local + 30 + local_name_len].copy_from_slice(new_name);
+            bytes[central + 46..central + 46 + central_name_len].copy_from_slice(new_name);
+        }
+
         fn assert_probe(bytes: &[u8], expected: usize) {
             super::super::reset_opc_probe_count();
             let _ = detect_file_format_from_bytes(bytes);
@@ -450,14 +477,18 @@ mod tests {
         );
         assert_probe(&alias, 1);
 
-        let duplicate = zip_entries(&[
+        // zip 8.6 rejects duplicate names at authoring time. Emit two legal,
+        // equal-length names, then rewrite one entry's local and central
+        // headers so the detector still receives a genuine duplicate ZIP.
+        let mut duplicate = zip_entries(&[
             (
                 "mimetype",
                 litchi_odf_common::constants::ODF_TEXT.as_bytes(),
             ),
-            ("content.xml", b"one"),
+            ("content.xm2", b"one"),
             ("content.xml", b"two"),
         ]);
+        rename_entry(&mut duplicate, b"content.xm2", b"content.xml");
         assert_eq!(
             litchi_odf_common::detect::packaged_has_ooxml_catalog(&duplicate),
             None
