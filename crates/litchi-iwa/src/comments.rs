@@ -544,6 +544,7 @@ fn set_drawable_comment_in_package(
         if old.text == text {
             return Ok(());
         }
+        validate_direct_reply_graph(package, &locations, storage_id, &old)?;
         let storage_entry = locations.get(&storage_id).cloned().ok_or_else(|| {
             Error::InvalidFormat(format!("comment storage object {storage_id} is missing"))
         })?;
@@ -551,7 +552,12 @@ fn set_drawable_comment_in_package(
             .values()
             .filter(|candidate| candidate.comment_storage_object_id == Some(storage_id))
             .count();
-        if direct_users == 1 {
+        let globally_owned = if direct_users == 1 {
+            prove_global_comment_ownership(package, application, &location, storage_id)?
+        } else {
+            false
+        };
+        if globally_owned {
             update_comment_storage_text(package, &locations, storage_id, text)?;
             return advance_save_tokens_for_entries(package, &[storage_entry]);
         }
@@ -2558,6 +2564,42 @@ fn comment_object_is_referenced(
         let archive = package.archive(name)?;
         for object in &archive.objects {
             for message in &object.messages {
+                if message.type_ == crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE {
+                    let metadata = tsp::PackageMetadata::decode(message.data.as_slice())?;
+                    let metadata_edge = metadata
+                        .data_metadata_map
+                        .as_ref()
+                        .is_some_and(|reference| reference.identifier == identifier);
+                    let component_edge = metadata
+                        .components
+                        .iter()
+                        .chain(&metadata.versioned_components)
+                        .any(|component| {
+                            component
+                                .external_references
+                                .iter()
+                                .chain(&component.versioned_external_references)
+                                .any(|reference| reference.object_identifier == Some(identifier))
+                                || component.data_references.iter().any(|data| {
+                                    data.object_reference_list
+                                        .iter()
+                                        .any(|reference| reference.object_identifier == identifier)
+                                })
+                                // Registrations are not dereferenceable edges,
+                                // but removing an object while its identity is
+                                // registered would leave stale package state.
+                                // Treat both registries as ownership for this
+                                // narrow fail-closed census.
+                                || component
+                                    .object_uuid_map_entries
+                                    .iter()
+                                    .any(|entry| entry.identifier == identifier)
+                                || component.ambiguous_object_identifiers.contains(&identifier)
+                        });
+                    if metadata_edge || component_edge {
+                        return Ok(true);
+                    }
+                }
                 if message.type_ == COMMENT_STORAGE_MESSAGE_TYPE {
                     let object_id = object.archive_info.identifier.ok_or_else(|| {
                         Error::Archive(format!("object in {name} has no archive identifier"))
@@ -2581,6 +2623,68 @@ fn comment_object_is_referenced(
         }
     }
     Ok(false)
+}
+
+/// Prove that a direct drawable edge is the only known owner of a comment
+/// storage object before allowing an in-place text rewrite.
+///
+/// The selected edge is removed only from a private package clone, then the
+/// existing package-wide reference census checks drawable payloads, comment
+/// reply edges, archive metadata, and component external references.  A
+/// negative result deliberately falls back to the caller's copy-on-write
+/// path, preserving the legacy raw APIs while preventing a hidden owner from
+/// observing the in-place text mutation.
+fn prove_global_comment_ownership(
+    package: &IWorkPackage,
+    application: Application,
+    location: &DrawableLocation,
+    storage_id: u64,
+) -> Result<bool> {
+    let archive = package.archive(&location.archive_name)?;
+    let object = archive.object(location.object_id).ok_or_else(|| {
+        Error::InvalidFormat(format!("drawable object {} is missing", location.object_id))
+    })?;
+    let message_info = object
+        .archive_info
+        .message_infos
+        .get(location.message_index)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "drawable object {} lost payload metadata {}",
+                location.object_id, location.message_index
+            ))
+        })?;
+    let metadata_occurrences = message_info
+        .object_references
+        .iter()
+        .filter(|reference| **reference == storage_id)
+        .count()
+        + message_info
+            .field_infos
+            .iter()
+            .flat_map(|field| &field.object_references)
+            .filter(|reference| **reference == storage_id)
+            .count();
+    if metadata_occurrences > 1 {
+        return Err(Error::InvalidFormat(format!(
+            "drawable object {} duplicates comment storage reference {storage_id}",
+            location.object_id
+        )));
+    }
+
+    let mut detached = package.clone();
+    replace_drawable_comment_reference(
+        &mut detached,
+        application,
+        location,
+        Some(storage_id),
+        None,
+    )?;
+    Ok(!comment_object_is_referenced(
+        &detached,
+        application,
+        storage_id,
+    )?)
 }
 
 /// Borrowed routing facts for the direct drawable comment edge.
