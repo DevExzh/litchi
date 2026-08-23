@@ -1,4 +1,7 @@
 target
-corpus
+corpus/*
+!corpus/
+!corpus/detect_format/
+!corpus/detect_format/*
 artifacts
 coverage
