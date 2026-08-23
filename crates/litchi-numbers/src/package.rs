@@ -2324,6 +2324,7 @@ const fn input_too_large(observed: u64, limits: Limits) -> Error {
 #[allow(deprecated)]
 mod tests {
     use super::*;
+    use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into};
     use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
     use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsk, tst};
     use prost::Message;
@@ -2858,6 +2859,350 @@ mod tests {
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
             entries.push((name, iwa));
         }
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().map(|(name, data)| (*name, data.as_slice())),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn exact_cross_component_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Aliased".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        package_bytes_from_archives([
+            (
+                "Index/Document.iwa",
+                Archive {
+                    objects: vec![root],
+                },
+            ),
+            (
+                "Index/Sheet.iwa",
+                Archive {
+                    objects: vec![sheet.clone()],
+                },
+            ),
+            (
+                "Index/Alias.iwa",
+                Archive {
+                    objects: vec![sheet],
+                },
+            ),
+        ])
+    }
+
+    fn exact_alias_with_unaliased_sheet_package_bytes() -> Result<Vec<u8>> {
+        let mut root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2), reference(3)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        root.archive_info.message_infos[0].object_references = vec![2, 3];
+        let aliased_sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Aliased".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let unaliased_sheet = object(
+            3,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Unaliased".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        package_bytes_from_archives([
+            (
+                "Index/Document.iwa",
+                Archive {
+                    objects: vec![root],
+                },
+            ),
+            (
+                "Index/Sheet.iwa",
+                Archive {
+                    objects: vec![aliased_sheet.clone()],
+                },
+            ),
+            (
+                "Index/Alias.iwa",
+                Archive {
+                    objects: vec![aliased_sheet],
+                },
+            ),
+            (
+                "Index/Other.iwa",
+                Archive {
+                    objects: vec![unaliased_sheet],
+                },
+            ),
+        ])
+    }
+
+    fn divergent_cross_component_alias_package_bytes(reverse: bool) -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let first = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "First".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let second = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Second".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let mut archives = vec![(
+            "Index/Document.iwa",
+            Archive {
+                objects: vec![root],
+            },
+        )];
+        if reverse {
+            archives.extend([
+                (
+                    "Index/Second.iwa",
+                    Archive {
+                        objects: vec![second],
+                    },
+                ),
+                (
+                    "Index/First.iwa",
+                    Archive {
+                        objects: vec![first],
+                    },
+                ),
+            ]);
+        } else {
+            archives.extend([
+                (
+                    "Index/First.iwa",
+                    Archive {
+                        objects: vec![first],
+                    },
+                ),
+                (
+                    "Index/Second.iwa",
+                    Archive {
+                        objects: vec![second],
+                    },
+                ),
+            ]);
+        }
+        package_bytes_from_archives(archives)
+    }
+
+    fn same_component_duplicate_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Duplicated".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let mut decompressed = Archive {
+            objects: vec![root, sheet.clone()],
+        }
+        .to_bytes()
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let duplicate = Archive {
+            objects: vec![sheet],
+        }
+        .to_bytes()
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        decompressed.extend_from_slice(&duplicate);
+        let iwa = SnappyStream::compress(&decompressed)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        litchi_iwa_archive::package::to_bytes(
+            [("Index/Document.iwa", iwa.as_slice())]
+                .iter()
+                .map(|(name, data)| (*name, *data)),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn mixed_cross_and_same_component_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Duplicated".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let mut duplicate_component = Archive {
+            objects: vec![sheet.clone()],
+        }
+        .to_bytes()
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        duplicate_component.extend_from_slice(
+            &Archive {
+                objects: vec![sheet.clone()],
+            }
+            .to_bytes()
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+        );
+        let entries = [
+            (
+                "Index/Alias.iwa",
+                SnappyStream::compress(
+                    &Archive {
+                        objects: vec![sheet],
+                    }
+                    .to_bytes()
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            ),
+            (
+                "Index/Document.iwa",
+                SnappyStream::compress(
+                    &Archive {
+                        objects: vec![root],
+                    }
+                    .to_bytes()
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            ),
+            (
+                "Index/Sheet.iwa",
+                SnappyStream::compress(&duplicate_component)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            ),
+        ];
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().map(|(name, data)| (*name, data.as_slice())),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn raw_header_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = Archive {
+            objects: vec![object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                tn::DocumentArchive::default().encode_to_vec(),
+            )?],
+        }
+        .to_bytes()
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Raw alias".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let canonical = Archive {
+            objects: vec![sheet],
+        }
+        .to_bytes()
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let (header_length, prefix_length) = decode_varint_from_bytes(&canonical)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let header_length = usize::try_from(header_length)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let header_end = prefix_length
+            .checked_add(header_length)
+            .ok_or_else(|| Error::InvalidFormat("archive header range overflow".to_owned()))?;
+        let header = canonical
+            .get(prefix_length..header_end)
+            .ok_or_else(|| Error::InvalidFormat("archive header is truncated".to_owned()))?;
+        let payload = canonical
+            .get(header_end..)
+            .ok_or_else(|| Error::InvalidFormat("archive payload is truncated".to_owned()))?;
+
+        let mut raw_alias = Vec::new();
+        let mut raw_header = header.to_vec();
+        // ArchiveInfo field 100 is intentionally unknown to the generated
+        // owner. Its retained raw framing makes this alias divergent from
+        // the canonical object even though decoded fields are identical.
+        raw_header.extend_from_slice(&[0xa0, 0x06, 0x01]);
+        encode_varint_into(
+            &mut raw_alias,
+            u64::try_from(raw_header.len())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+        );
+        raw_alias.extend_from_slice(&raw_header);
+        raw_alias.extend_from_slice(payload);
+
+        let compressed_root = SnappyStream::compress(&root)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let compressed_canonical = SnappyStream::compress(&canonical)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let compressed_alias = SnappyStream::compress(&raw_alias)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let entries = [
+            ("Index/Document.iwa", compressed_root),
+            ("Index/Canonical.iwa", compressed_canonical),
+            ("Index/RawAlias.iwa", compressed_alias),
+        ];
         litchi_iwa_archive::package::to_bytes(
             entries.iter().map(|(name, data)| (*name, data.as_slice())),
             Limits::default(),
@@ -3777,6 +4122,138 @@ mod tests {
             Package::from_bytes(&bytes),
             Err(Error::InvalidFormat(_))
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn exact_cross_component_aliases_are_coalesced_for_projection_and_lookup() -> Result<()> {
+        let bytes = exact_cross_component_alias_package_bytes()?;
+        let package = Package::from_bytes(&bytes)?;
+
+        assert_eq!(package.object_count(), 3);
+        assert_eq!(package.sheets().len(), 1);
+        assert_eq!(package.sheets()[0].name(), "Aliased");
+        let entries = package
+            .state
+            .index
+            .iter_entries_by_type(SHEET_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].id(), 2);
+        let resolved = package
+            .state
+            .index
+            .resolve_ref_id(&package.state.components, 2)?
+            .expect("rooted sheet alias must resolve");
+        assert_eq!(resolved.messages.len(), 1);
+        assert_eq!(resolved.messages[0].type_, SHEET_MESSAGE_TYPE);
+        Ok(())
+    }
+
+    #[test]
+    fn divergent_cross_component_aliases_are_rejected_regardless_of_component_order() {
+        for reverse in [false, true] {
+            let bytes = divergent_cross_component_alias_package_bytes(reverse)
+                .expect("synthetic divergent alias package");
+            assert!(
+                Package::from_bytes(&bytes).is_err(),
+                "divergent aliases must fail closed (reverse={reverse})"
+            );
+        }
+    }
+
+    #[test]
+    fn identical_same_component_aliases_are_rejected() -> Result<()> {
+        let bytes = same_component_duplicate_alias_package_bytes()?;
+        assert!(Package::from_bytes(&bytes).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn same_component_duplicates_are_rejected_inside_cross_component_alias_groups() -> Result<()> {
+        let bytes = mixed_cross_and_same_component_alias_package_bytes()?;
+        assert!(Package::from_bytes(&bytes).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn physical_object_limit_counts_cross_component_aliases() -> Result<()> {
+        let bytes = exact_cross_component_alias_package_bytes()?;
+        let semantic = SemanticLimits::new(2, crate::MAX_SHEETS, crate::MAX_TABLES, MAX_REFERENCES)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        assert!(matches!(
+            Package::from_bytes_with_options(&bytes, ReadOptions::new(Limits::default(), semantic),),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Objects,
+                observed: 3,
+                maximum: 2,
+                path: SemanticPath::Package,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn primary_type_iteration_emits_a_cross_component_alias_once() -> Result<()> {
+        let bytes = exact_cross_component_alias_package_bytes()?;
+        let package = Package::from_bytes(&bytes)?;
+        let ids = package
+            .state
+            .index
+            .iter_entries_by_type(SHEET_MESSAGE_TYPE)
+            .map(|entry| entry.id())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, [2]);
+        Ok(())
+    }
+
+    #[test]
+    fn unaliased_name_edit_preserves_exact_aliases_and_aliased_edit_fails_atomically()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let bytes = exact_alias_with_unaliased_sheet_package_bytes()?;
+        let package = Package::from_bytes(&bytes)?;
+        let before_alias = package
+            .state
+            .components
+            .catalog()
+            .get("Index/Alias.iwa")
+            .and_then(|component| component.archive().object(2))
+            .ok_or_else(|| Error::InvalidFormat("alias fixture is missing".to_owned()))?
+            .messages
+            .clone();
+
+        let edited = package
+            .edit_names()
+            .rename_sheet("Unaliased", "Edited")?
+            .commit()?;
+        assert_eq!(edited.package().sheets()[0].name(), "Aliased");
+        assert_eq!(edited.package().sheets()[1].name(), "Edited");
+        let after_alias = edited
+            .package()
+            .state
+            .components
+            .catalog()
+            .get("Index/Alias.iwa")
+            .and_then(|component| component.archive().object(2))
+            .ok_or_else(|| Error::InvalidFormat("rewritten alias is missing".to_owned()))?
+            .messages
+            .clone();
+        assert_eq!(after_alias, before_alias);
+
+        let aliased_edit = package
+            .edit_names()
+            .rename_sheet("Aliased", "Changed")?
+            .commit();
+        assert!(aliased_edit.is_err());
+        assert_eq!(package.sheets()[0].name(), "Aliased");
+        assert_eq!(package.sheets()[1].name(), "Unaliased");
+        Ok(())
+    }
+
+    #[test]
+    fn cross_component_alias_with_divergent_raw_archive_header_is_rejected() -> Result<()> {
+        let bytes = raw_header_alias_package_bytes()?;
+        assert!(Package::from_bytes(&bytes).is_err());
         Ok(())
     }
 
