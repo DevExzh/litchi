@@ -5364,10 +5364,10 @@ mod named_paragraph_styles;
 mod placeholder_ownership;
 mod slide_audio;
 mod slide_background;
+#[cfg(test)]
 mod slide_background_color;
+#[cfg(test)]
 mod slide_background_gradient_wire;
-mod slide_background_reset;
-mod slide_background_wire;
 mod slide_charts;
 mod slide_create;
 mod slide_graph;
@@ -5377,9 +5377,6 @@ mod slide_layout_update;
 mod slide_movies;
 mod slide_preview;
 mod slide_shapes;
-mod slide_style_graph;
-mod slide_style_metadata;
-mod slide_style_registry;
 mod slide_tables;
 mod soundtrack_items;
 mod soundtrack_wire;

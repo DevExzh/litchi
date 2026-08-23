@@ -1,169 +1,105 @@
-//! Semantic Keynote slide-background access.
+//! Compatibility facade for focused Keynote slide-background transactions.
+//!
+//! The semantic background graph belongs to `litchi-keynote`. This adapter
+//! keeps the historical `KeynoteEditor` methods available while routing every
+//! operation through the selector-first package transaction. The old native
+//! protobuf conversion oracle is retained only for the host crate's legacy
+//! differential tests; it is not part of production ownership.
 
-use litchi_keynote::background::{Background, Opaque};
+use litchi_keynote::background::Background;
 
-use super::slide_background_color::color_from_native;
-use super::slide_background_gradient_wire::gradient_from_fill;
 use super::*;
 
-const SLIDE_MESSAGE_TYPE: u32 = 5;
-const SLIDE_STYLE_MESSAGE_TYPE: u32 = 9;
-
-pub(super) struct ResolvedSlideBackground {
-    pub(super) background: Background,
-    pub(super) fill_payload: Vec<u8>,
-}
-
 impl KeynoteEditor {
-    /// Read the effective background, following the native slide-style parent chain.
+    /// Read the effective background through the focused Keynote package API.
     pub fn slide_background(&self, slide_index: usize) -> Result<Background> {
-        Ok(resolve_slide_background(self, slide_index)?.background)
+        focused_slide_background_package(self)?
+            .slide_background(litchi_core::Position::new(slide_index))
+            .map_err(map_focused_slide_background_error)
     }
 
-    /// Read the background stored directly on the slide's variation style.
-    ///
-    /// `None` means the slide inherits its effective background from its
-    /// layout style. This is distinct from [`Background::None`],
-    /// which is an explicit native “No Fill” override.
+    /// Read the direct variation-style background override, if one exists.
     pub fn slide_background_override(&self, slide_index: usize) -> Result<Option<Background>> {
-        direct_slide_background_override(self, slide_index)
+        focused_slide_background_package(self)?
+            .slide_background_override(litchi_core::Position::new(slide_index))
+            .map_err(map_focused_slide_background_error)
     }
 
-    /// Set a slide background through a native, cullable slide-style variation.
+    /// Set a slide background through the focused package transaction.
     pub fn set_slide_background(
         &mut self,
         slide_index: usize,
         background: Background,
     ) -> Result<()> {
-        let resolved = resolve_slide_background(self, slide_index)?;
-        if resolved.background == background {
+        let package = focused_slide_background_package(self)?;
+        let commit = package
+            .edit_slide_background(litchi_core::Position::new(slide_index))
+            .map_err(map_focused_slide_background_error)?
+            .set(background)
+            .map_err(map_focused_slide_background_error)?
+            .commit()
+            .map_err(map_focused_slide_background_error)?;
+        if commit.patch().is_noop() {
             return Ok(());
         }
-        super::slide_background_wire::set_slide_background(
-            self,
-            slide_index,
-            background,
-            &resolved.fill_payload,
-        )
+        replace_from_focused_slide_background_commit(self, commit.package())
     }
 
-    /// Delete a direct slide-background override and restore layout inheritance.
-    ///
-    /// Returns `true` when an override was removed and `false` when the slide
-    /// already inherited its background.
+    /// Remove a direct background override and restore style inheritance.
     pub fn reset_slide_background(&mut self, slide_index: usize) -> Result<bool> {
-        if direct_slide_background_override(self, slide_index)?.is_none() {
+        let package = focused_slide_background_package(self)?;
+        let commit = package
+            .edit_slide_background(litchi_core::Position::new(slide_index))
+            .map_err(map_focused_slide_background_error)?
+            .clear()
+            .map_err(map_focused_slide_background_error)?
+            .commit()
+            .map_err(map_focused_slide_background_error)?;
+        if commit.patch().is_noop() {
             return Ok(false);
         }
-        super::slide_background_reset::reset_slide_background(self, slide_index)?;
+        replace_from_focused_slide_background_commit(self, commit.package())?;
         Ok(true)
     }
 }
 
-fn direct_slide_background_override(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-) -> Result<Option<Background>> {
-    let slides = editor.slides()?;
-    let slide = slides.get(slide_index).ok_or_else(|| {
-        Error::ParseError(format!(
-            "Keynote slide index {slide_index} is out of range for {} slides",
-            slides.len()
+fn focused_slide_background_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
+    let bytes = editor.to_bytes()?;
+    litchi_keynote::Package::from_bytes(&bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Keynote slide background source failed: {error}"
         ))
-    })?;
-    let graph = ObjectGraph::read(editor.package())?;
-    let native: kn::SlideArchive =
-        graph.decode_type(slide.slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
-    let style_id = native.style.identifier;
-    let style: kn::SlideStyleArchive =
-        graph.decode_type(style_id, SLIDE_STYLE_MESSAGE_TYPE, "KN.SlideStyleArchive")?;
-    if style.super_.is_variation != Some(true) {
-        return Ok(None);
-    }
-    let raw =
-        graph.message_data_type(style_id, SLIDE_STYLE_MESSAGE_TYPE, "KN.SlideStyleArchive")?;
-    let properties_payload = optional_length_delimited_payload(raw, 11)?;
-    if properties_payload.is_some() != style.slide_properties.is_some() {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote slide style {style_id} has inconsistent slide-properties wire data"
-        )));
-    }
-    let Some(properties_payload) = properties_payload else {
-        return Ok(None);
-    };
-    let fill_payload = optional_length_delimited_payload(properties_payload, 1)?;
-    if fill_payload.is_some()
-        != style
-            .slide_properties
-            .as_ref()
-            .is_some_and(|properties| properties.fill.is_some())
-    {
-        return Err(Error::InvalidFormat(format!(
-            "Keynote slide style {style_id} has inconsistent fill wire data"
-        )));
-    }
-    fill_payload.map(background_from_fill).transpose()
+    })
 }
 
-pub(super) fn resolve_slide_background(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-) -> Result<ResolvedSlideBackground> {
-    let slides = editor.slides()?;
-    let slide = slides.get(slide_index).ok_or_else(|| {
-        Error::ParseError(format!(
-            "Keynote slide index {slide_index} is out of range for {} slides",
-            slides.len()
+fn replace_from_focused_slide_background_commit(
+    editor: &mut KeynoteEditor,
+    package: &litchi_keynote::Package,
+) -> Result<()> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Keynote slide background write failed: {error}"
         ))
     })?;
-    let graph = ObjectGraph::read(editor.package())?;
-    let native: kn::SlideArchive =
-        graph.decode_type(slide.slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
-    let mut style_id = native.style.identifier;
-    let mut visited = HashSet::new();
-    loop {
-        if !visited.insert(style_id) {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote slide {slide_index} has a cyclic slide-style parent chain at {style_id}"
-            )));
-        }
-        let style: kn::SlideStyleArchive =
-            graph.decode_type(style_id, SLIDE_STYLE_MESSAGE_TYPE, "KN.SlideStyleArchive")?;
-        let raw =
-            graph.message_data_type(style_id, SLIDE_STYLE_MESSAGE_TYPE, "KN.SlideStyleArchive")?;
-        let properties_payload = optional_length_delimited_payload(raw, 11)?;
-        if properties_payload.is_some() != style.slide_properties.is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "Keynote slide style {style_id} has inconsistent slide-properties wire data"
-            )));
-        }
-        if let (Some(properties), Some(properties_payload)) =
-            (style.slide_properties.as_ref(), properties_payload)
-        {
-            let fill_payload = optional_length_delimited_payload(properties_payload, 1)?;
-            if fill_payload.is_some() != properties.fill.is_some() {
-                return Err(Error::InvalidFormat(format!(
-                    "Keynote slide style {style_id} has inconsistent fill wire data"
-                )));
-            }
-            if let Some(fill_payload) = fill_payload {
-                return Ok(ResolvedSlideBackground {
-                    background: background_from_fill(fill_payload)?,
-                    fill_payload: fill_payload.to_vec(),
-                });
-            }
-        }
-        let Some(parent) = style.super_.parent else {
-            return Ok(ResolvedSlideBackground {
-                background: Background::None,
-                fill_payload: Vec::new(),
-            });
-        };
-        style_id = parent.identifier;
-    }
+    *editor = KeynoteEditor::from_bytes(&bytes)?;
+    Ok(())
 }
 
+fn map_focused_slide_background_error<E: std::fmt::Display>(error: E) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Keynote slide background operation failed: {error}"
+    ))
+}
+
+// This parser remains a test-only generated-Prost differential oracle for the
+// old host fixtures. Production reads and writes are owned by the focused
+// lazy codec behind `litchi-keynote::Package`.
+#[cfg(test)]
 pub(super) fn background_from_fill(fill_payload: &[u8]) -> Result<Background> {
+    use litchi_keynote::background::Opaque;
+    use prost::Message as _;
+
     let fill = tsd::FillArchive::decode(fill_payload)?;
     if fill_payload.is_empty()
         && fill.color.is_none()
@@ -173,10 +109,12 @@ pub(super) fn background_from_fill(fill_payload: &[u8]) -> Result<Background> {
         return Ok(Background::None);
     }
     if fill.color.is_none() && fill.gradient.is_some() && fill.image.is_none() {
-        return Ok(match gradient_from_fill(fill_payload)? {
-            Some(gradient) => Background::Gradient(gradient),
-            None => opaque_background(fill_payload)?,
-        });
+        return Ok(
+            match super::slide_background_gradient_wire::gradient_from_fill(fill_payload)? {
+                Some(gradient) => Background::Gradient(gradient),
+                None => opaque_background(fill_payload)?,
+            },
+        );
     }
     let Some(color) = fill.color.as_ref() else {
         return opaque_background(fill_payload);
@@ -184,13 +122,18 @@ pub(super) fn background_from_fill(fill_payload: &[u8]) -> Result<Background> {
     if fill.gradient.is_some() || fill.image.is_some() {
         return opaque_background(fill_payload);
     }
-    Ok(match color_from_native(color) {
-        Some(color) => Background::Solid(color),
-        None => return opaque_background(fill_payload),
-    })
+    Ok(
+        match super::slide_background_color::color_from_native(color) {
+            Some(color) => Background::Solid(color),
+            None => return opaque_background(fill_payload),
+        },
+    )
 }
 
+#[cfg(test)]
 fn opaque_background(fill_payload: &[u8]) -> Result<Background> {
+    use litchi_keynote::background::Opaque;
+
     Opaque::from_slice(fill_payload)
         .map(Background::Opaque)
         .map_err(|error| Error::ParseError(error.to_string()))
