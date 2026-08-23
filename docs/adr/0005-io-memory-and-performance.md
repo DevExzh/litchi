@@ -513,3 +513,22 @@ instead of resetting for each table. The change does not alter Cargo metadata
 or the boundary-checker topology, and it does not turn the historical
 `4e84abdf` 20-finding audit above into a current-wave gate. No policy edge,
 debt item, ownership assignment, or verification result changes here.
+
+## 2026-08-23 amendment: typed Pages footnote limit preservation
+
+The committed `33656a7f0` change keeps the Pages footnote rewrite seam's
+resource failures typed. `rewrite_custom_mark_wire` now checks the
+selected/after field arithmetic instead of saturating; overflow is reported
+as `WireFields`. Candidate verification runs `native_footnotes` before
+semantic readback so aggregate text and entry ceilings can surface as
+`TextBytes` and `Entries`; `map_package_error_with_kind` maps `TextTooLarge`
+and `TooManyBodyStorages` into those categories. The focused source test
+`semantic_package_limits_keep_typed_footnote_error_categories` covers
+`TextTooLarge { observed: 9, limit: 8 }` to `TextBytes` and
+`TooManyBodyStorages { actual: 5, limit: 4 }` to `Entries`; no test execution
+result is claimed here.
+
+This is bounded error classification and checked-arithmetic evidence only.
+It does not claim package-wide accounting, allocation or performance
+measurements, native round-trip behavior, migration-debt retirement, host
+exit, or `litchi-iwa` monolith deletion.
