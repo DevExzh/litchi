@@ -165,12 +165,12 @@ pub(crate) fn page_breaks(sheet: &Worksheet) -> Result<crate::page_breaks::PageB
     // consulting the cache. A descendant snapshot can retain the same bytes
     // while changing a workbook relationship to an unsupported sheet kind;
     // cache hits must preserve the historical `NotWorksheet` error.
-    let content = xml(sheet)?;
+    let source = part(sheet)?.blob_arc();
     let value = sheet
         .data
         .page_breaks
-        .get_or_try_init(|| crate::page_breaks::parse(content))?;
-    Ok(value.clone())
+        .get_or_try_init(source, |content| crate::page_breaks::parse(content))?;
+    Ok(value.as_ref().clone())
 }
 
 /// Parse worksheet page setup.
