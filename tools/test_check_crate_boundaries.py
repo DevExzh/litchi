@@ -14598,6 +14598,531 @@ class BoundaryPolicyTests(unittest.TestCase):
             "+ audit_iwa_numbers_table_cell_storage_source_topology()", main_source
         )
 
+    def test_package_metadata_read_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.IWA_PACKAGE_METADATA_SOURCE,
+            Path("crates/litchi-iwa/src/package_metadata.rs"),
+        )
+        self.assertEqual(
+            boundaries.PACKAGE_METADATA_READ_FUNCTIONS,
+            (
+                "component_identifier_for_entry",
+                "component_identifier_for_object_uuid",
+                "component_uuid_identifiers",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PACKAGE_METADATA_CODEC_VISITOR_FUNCTIONS,
+            ("inspect_package_metadata_with_visitor",),
+        )
+
+    def test_package_metadata_read_boundary_allows_visitor_aliases_and_masks_tests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use prost::Message;\n"
+                "use litchi_iwa_protos::package_metadata_codec::{\n"
+                "    inspect_package_metadata_with_visitor,\n"
+                "};\n"
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "fn visitor_helper() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_identifier_for_entry() {\n"
+                "    crate::package_metadata::visitor_helper();\n"
+                "}\n"
+                "fn component_identifier_for_object_uuid() {\n"
+                "    self::visitor_helper();\n"
+                "}\n"
+                "fn component_uuid_identifiers() {\n"
+                "    inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn mutation_helper() {\n"
+                "    let _ = PackageMetadata::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn generated_oracle() {\n"
+                "    let _ = ComponentInfo::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_package_metadata_read_source_topology(root),
+                [],
+            )
+
+    def test_package_metadata_read_boundary_allows_pub_crate_glob_and_absolute_visitor_imports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "pub(crate) use litchi_iwa_protos::package_metadata_codec::{\n"
+                "    inspect_package_metadata_with_visitor as inspect,\n"
+                "};\n"
+                "pub(crate) use litchi_iwa_protos::package_metadata_codec::*;\n"
+                "fn visitor_helper() {\n"
+                "    inspect(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_identifier_for_entry() { visitor_helper(); }\n"
+                "fn component_identifier_for_object_uuid() {\n"
+                "    ::litchi_iwa_protos::package_metadata_codec::inspect_package_metadata_with_visitor(\n"
+                "        bytes, options, visitor\n"
+                "    );\n"
+                "}\n"
+                "fn component_uuid_identifiers() {\n"
+                "    inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_package_metadata_read_source_topology(root),
+                [],
+            )
+
+    def test_package_metadata_read_boundary_rejects_missing_visitor_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn helper() {}\n"
+                "fn component_identifier_for_entry() { helper(); }\n"
+                "fn component_identifier_for_object_uuid() { helper(); }\n"
+                "fn component_uuid_identifiers() { helper(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_package_metadata_read_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 3)
+            for function_name in boundaries.PACKAGE_METADATA_READ_FUNCTIONS:
+                self.assertTrue(
+                    any(
+                        function_name in violation
+                        and "does not route through package_metadata_codec visitor"
+                        in violation
+                        for violation in violations
+                    )
+                )
+
+    def test_package_metadata_read_boundary_rejects_generated_decodes(self) -> None:
+        markers = {
+            "PackageMetadata::decode": "let _ = PackageMetadata::decode(bytes);\n",
+            "ComponentInfo::decode": "let _ = ComponentInfo::decode(bytes);\n",
+            "ObjectUuidMapEntry::decode": (
+                "let _ = ObjectUuidMapEntry::decode(bytes);\n"
+            ),
+            "UFCS generated PackageMetadata decode": (
+                "let _ = <tsp::PackageMetadata as prost::Message>::decode(bytes);\n"
+            ),
+            "UFCS generated ComponentInfo decode": (
+                "let _ = <tsp::ComponentInfo as prost::Message>::decode(bytes);\n"
+            ),
+            "UFCS generated ObjectUuidMapEntry decode": (
+                "let _ = <tsp::ObjectUuidMapEntry as prost::Message>::decode(bytes);\n"
+            ),
+            "generated Prost Message::decode": "let _ = Message::decode(bytes);\n",
+        }
+        for label, marker in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                        "fn visitor_helper() {\n"
+                        "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                        "}\n"
+                        "fn component_identifier_for_entry() {\n"
+                        "    visitor_helper();\n"
+                        f"    {marker}"
+                        "}\n"
+                        "fn component_identifier_for_object_uuid() {\n"
+                        "    visitor_helper();\n"
+                        "}\n"
+                        "fn component_uuid_identifiers() {\n"
+                        "    visitor_helper();\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_iwa_package_metadata_read_source_topology(root)
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(label, violations[0])
+                    self.assertIn("component_identifier_for_entry", violations[0])
+
+    def test_package_metadata_read_boundary_rejects_generated_collection_materialization(
+        self,
+    ) -> None:
+        markers = {
+            "PackageMetadata collection": (
+                "let _ = record.components.iter().collect::<Vec<_>>();\n"
+            ),
+            "ComponentInfo collection": (
+                "let _ = holder.object_uuid_map_entries.iter().collect::<Vec<_>>();\n"
+            ),
+            "generated metadata collection type": (
+                "let _: ::std::vec::Vec<ComponentInfo> = Vec::new();\n"
+            ),
+        }
+        for label, marker in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                        "fn visitor_helper() {\n"
+                        "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                        f"    {marker}"
+                        "}\n"
+                        "fn component_identifier_for_entry() { visitor_helper(); }\n"
+                        "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                        "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_iwa_package_metadata_read_source_topology(root)
+                    )
+                    self.assertEqual(len(violations), 3)
+                    self.assertTrue(all(label in violation for violation in violations))
+
+    def test_package_metadata_read_boundary_rejects_qualified_prost_and_trait_aliases(
+        self,
+    ) -> None:
+        markers = {
+            "qualified Prost Message::decode": (
+                "let _ = ::prost::Message::decode(bytes);\n",
+                "",
+            ),
+            "imported Prost Message trait alias decode": (
+                "let _ = M::decode(bytes);\n",
+                "pub(crate) use ::prost::Message as M;\n",
+            ),
+        }
+        for label, (marker, imports) in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        imports
+                        + "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                        + "fn visitor_helper() {\n"
+                        + "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                        + f"    {marker}"
+                        + "}\n"
+                        + "fn component_identifier_for_entry() { visitor_helper(); }\n"
+                        + "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                        + "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_iwa_package_metadata_read_source_topology(root)
+                    )
+                    self.assertEqual(len(violations), 3)
+                    self.assertTrue(all(label in violation for violation in violations))
+
+    def test_package_metadata_read_boundary_rejects_pub_crate_generated_alias_collections(
+        self,
+    ) -> None:
+        markers = {
+            "generated ComponentInfo type alias collection": (
+                "let _: ::std::vec::Vec<Component> = ::std::vec::Vec::new();\n",
+                "ComponentInfo",
+                "Component",
+            ),
+            "generated PackageMetadata type alias collection": (
+                "let _: std::collections::HashSet<Metadata> = std::collections::HashSet::new();\n",
+                "PackageMetadata",
+                "Metadata",
+            ),
+        }
+        for label, (marker, generated, alias) in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        f"pub(crate) use crate::protobuf::tsp::{generated} as {alias};\n"
+                        "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                        "fn visitor_helper() {\n"
+                        "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                        f"    {marker}"
+                        "}\n"
+                        "fn component_identifier_for_entry() { visitor_helper(); }\n"
+                        "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                        "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_iwa_package_metadata_read_source_topology(root)
+                    )
+                    self.assertEqual(len(violations), 3)
+                    self.assertTrue(all(label in violation for violation in violations))
+
+    def test_package_metadata_read_boundary_rejects_generated_type_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "pub(crate) use crate::protobuf::tsp::PackageMetadata as Metadata;\n"
+                "type Component = crate::protobuf::tsp::ComponentInfo;\n"
+                "fn visitor_helper() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "    let _ = Metadata::decode(bytes);\n"
+                "    let _: Vec<Component> = Vec::new();\n"
+                "}\n"
+                "fn component_identifier_for_entry() { visitor_helper(); }\n"
+                "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_package_metadata_read_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 6)
+            self.assertTrue(
+                any("generated PackageMetadata alias decode" in item for item in violations)
+            )
+            self.assertTrue(
+                any(
+                    "generated ComponentInfo type alias collection" in item
+                    for item in violations
+                )
+            )
+
+    def test_package_metadata_read_boundary_rejects_qualified_btree_set_collection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "fn visitor_helper() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "    let _: ::std::collections::BTreeSet<ObjectUuidMapEntry> =\n"
+                "        ::std::collections::BTreeSet::new();\n"
+                "}\n"
+                "fn component_identifier_for_entry() { visitor_helper(); }\n"
+                "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_package_metadata_read_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 3)
+            self.assertTrue(
+                all("generated metadata collection type" in item for item in violations)
+            )
+
+    def test_package_metadata_read_boundary_tracks_qualified_helper_decodes(self) -> None:
+        prefixes = (
+            "crate::package_metadata",
+            "self",
+            "super",
+            "package_metadata",
+        )
+        for prefix in prefixes:
+            with self.subTest(prefix=prefix):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                        "fn eager_helper() {\n"
+                        "    let _ = r#ComponentInfo::decode(bytes);\n"
+                        "}\n"
+                        "fn visitor_helper() {\n"
+                        "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                        "}\n"
+                        "fn component_identifier_for_entry() {\n"
+                        "    visitor_helper();\n"
+                        f"    {prefix}::eager_helper();\n"
+                        "}\n"
+                        "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                        "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_iwa_package_metadata_read_source_topology(root)
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "component_identifier_for_entry via helper eager_helper uses "
+                        "ComponentInfo::decode",
+                        violations[0],
+                    )
+
+    def test_package_metadata_read_boundary_tracks_simple_local_function_pointer_alias(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "fn eager_helper() {\n"
+                "    let _ = ComponentInfo::decode(bytes);\n"
+                "}\n"
+                "fn visitor_helper() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_identifier_for_entry() {\n"
+                "    let callback: fn() = crate::package_metadata::eager_helper;\n"
+                "    callback();\n"
+                "    visitor_helper();\n"
+                "}\n"
+                "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_package_metadata_read_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "component_identifier_for_entry via helper eager_helper uses "
+                "ComponentInfo::decode",
+                violations[0],
+            )
+
+    def test_package_metadata_read_boundary_does_not_traverse_external_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "fn eager_helper() {\n"
+                "    let _ = ComponentInfo::decode(bytes);\n"
+                "}\n"
+                "fn visitor_helper() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_identifier_for_entry() {\n"
+                "    let callback = external::eager_helper;\n"
+                "    callback();\n"
+                "    external::eager_helper();\n"
+                "    visitor_helper();\n"
+                "}\n"
+                "fn component_identifier_for_object_uuid() { visitor_helper(); }\n"
+                "fn component_uuid_identifiers() { visitor_helper(); }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_package_metadata_read_source_topology(root),
+                [],
+            )
+
+    def test_package_metadata_read_boundary_cfg_test_cannot_hide_production_decode(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use prost::Message;\n"
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "fn helper() {\n"
+                "    let _ = PackageMetadata::decode(bytes);\n"
+                "}\n"
+                "fn component_identifier_for_entry() {\n"
+                "    helper();\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_identifier_for_object_uuid() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_uuid_identifiers() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn generated_oracle() {\n"
+                "    let _ = ObjectUuidMapEntry::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_package_metadata_read_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("PackageMetadata::decode", violations[0])
+            self.assertIn("via helper helper", violations[0])
+
+    def test_package_metadata_read_boundary_preserves_unreachable_mutation_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PACKAGE_METADATA_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "fn mutation_helper() {\n"
+                "    let _ = PackageMetadata::decode(bytes);\n"
+                "    let _: Vec<ComponentInfo> = Vec::new();\n"
+                "}\n"
+                "fn component_identifier_for_entry() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_identifier_for_object_uuid() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n"
+                "fn component_uuid_identifiers() {\n"
+                "    codec::inspect_package_metadata_with_visitor(bytes, options, visitor);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_package_metadata_read_source_topology(root),
+                [],
+            )
+
+    def test_package_metadata_read_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_package_metadata_read_source_topology()", main_source
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
