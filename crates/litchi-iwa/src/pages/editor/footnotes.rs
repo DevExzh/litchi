@@ -837,7 +837,7 @@ fn validate_footnote_table_entries(
 fn remove_unreferenced_footnote_graph(
     package: &mut IWorkPackage,
     graph: &BodyFootnoteGraph,
-) -> Result<Vec<u64>> {
+) -> Result<[u64; 3]> {
     let reference_id = graph.reference_id;
     remove_unreferenced_footnote_object(
         package,
