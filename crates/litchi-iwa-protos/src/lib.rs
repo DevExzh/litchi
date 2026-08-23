@@ -1160,8 +1160,9 @@ pub mod package_metadata_codec;
 #[doc(hidden)]
 pub mod numbers_formula_codec;
 
-/// Internal Keynote slide-transition projection implemented by a private
-/// Buffa lazy-view sidecar. Generated types remain inaccessible downstream.
+/// Internal Keynote slide-transition projection and opaque color/path
+/// validator implemented around a private Buffa lazy-view sidecar. Generated
+/// types remain inaccessible downstream.
 #[doc(hidden)]
 pub mod keynote_slide_transition_codec;
 

@@ -21,7 +21,7 @@ pub(crate) mod soundtrack_order;
 pub(crate) mod soundtrack_settings;
 
 use std::fmt;
-use std::fs::File;
+use std::fs::{Metadata, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str;
@@ -401,6 +401,73 @@ struct SlideRecord {
     is_skipped: bool,
 }
 
+/// The descriptor metadata captured around one exact package read.
+///
+/// A path is not a stable source identity: a caller can replace it while a
+/// package is being read, and a file can be modified in place without
+/// changing its pathname.  The descriptor remains pinned after open, while
+/// this value rejects an observable mutation of that descriptor before the
+/// captured bytes become package state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileSnapshot {
+    length: u64,
+    modified: Option<std::time::SystemTime>,
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    #[cfg(unix)]
+    mode: u32,
+    #[cfg(unix)]
+    modified_seconds: i64,
+    #[cfg(unix)]
+    modified_nanoseconds: i64,
+    #[cfg(unix)]
+    changed_seconds: i64,
+    #[cfg(unix)]
+    changed_nanoseconds: i64,
+    #[cfg(windows)]
+    file_attributes: u32,
+    #[cfg(windows)]
+    creation_time: u64,
+    #[cfg(windows)]
+    last_write_time: u64,
+}
+
+impl FileSnapshot {
+    fn from_metadata(metadata: &Metadata) -> Self {
+        #[cfg(unix)]
+        use std::os::unix::fs::MetadataExt;
+        #[cfg(windows)]
+        use std::os::windows::fs::MetadataExt;
+
+        Self {
+            length: metadata.len(),
+            modified: metadata.modified().ok(),
+            #[cfg(unix)]
+            device: metadata.dev(),
+            #[cfg(unix)]
+            inode: metadata.ino(),
+            #[cfg(unix)]
+            mode: metadata.mode(),
+            #[cfg(unix)]
+            modified_seconds: metadata.mtime(),
+            #[cfg(unix)]
+            modified_nanoseconds: metadata.mtime_nsec(),
+            #[cfg(unix)]
+            changed_seconds: metadata.ctime(),
+            #[cfg(unix)]
+            changed_nanoseconds: metadata.ctime_nsec(),
+            #[cfg(windows)]
+            file_attributes: metadata.file_attributes(),
+            #[cfg(windows)]
+            creation_time: metadata.creation_time(),
+            #[cfg(windows)]
+            last_write_time: metadata.last_write_time(),
+        }
+    }
+}
+
 /// Deterministic measurements for one Keynote package snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Stats {
@@ -417,6 +484,14 @@ impl Package {
     ///
     /// Returns an error when the file cannot be read, is not a bounded valid
     /// iWork package, or does not contain a Keynote document root.
+    ///
+    /// Path ingress accepts regular files only. It opens the final filesystem
+    /// object without following Unix symbolic links or Windows reparse points,
+    /// rejects Win32 device namespaces and non-disk handles, grows the source
+    /// buffer under the configured input ceiling, and checks descriptor
+    /// identity and mutation metadata before publishing package state.
+    /// Platforms without this descriptor-safe profile fail closed; portable
+    /// callers can use [`Self::from_bytes`] instead.
     pub fn open(path: impl AsRef<Path>) -> ReadResult<Self> {
         Self::open_with_options(path, ReadOptions::default())
     }
@@ -3563,10 +3638,229 @@ fn strict_slide_node_skipped(data: &[u8], limits: WireLimits) -> litchi_iwa_comm
     Ok(skipped)
 }
 
+const INITIAL_SOURCE_CAPACITY: usize = 64 * 1024;
+
 fn read_source(path: &Path, limits: Limits) -> ReadResult<Arc<[u8]>> {
-    let mut file = File::open(path)?;
-    let length = file.metadata()?.len();
-    read_source_with_reported_length(&mut file, length, limits)
+    #[cfg(windows)]
+    if windows_path_uses_device_namespace(path) {
+        return Err(ReadError::InvalidFormat(
+            "Keynote package source must be a regular file".to_owned(),
+        ));
+    }
+
+    let mut options = OpenOptions::new();
+    options.read(true);
+    if !configure_source_open_options(&mut options) {
+        return Err(ReadError::InvalidFormat(
+            "descriptor-safe Keynote package opening is unsupported on this platform".to_owned(),
+        ));
+    }
+    let mut file = options.open(path).map_err(|error| {
+        #[cfg(unix)]
+        if matches!(
+            error.raw_os_error(),
+            Some(code) if code == libc::ELOOP || code == libc::EMLINK
+        ) {
+            return ReadError::InvalidFormat(
+                "Keynote package source must not be a symbolic link".to_owned(),
+            );
+        }
+        ReadError::Io(error)
+    })?;
+    #[cfg(windows)]
+    ensure_windows_disk_handle(&file)?;
+    let metadata = file.metadata()?;
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+
+        const FILE_ATTRIBUTE_DEVICE: u32 = 0x0000_0040;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+        if metadata.file_attributes() & (FILE_ATTRIBUTE_DEVICE | FILE_ATTRIBUTE_REPARSE_POINT) != 0
+        {
+            return Err(ReadError::InvalidFormat(
+                "Keynote package source must be a regular file".to_owned(),
+            ));
+        }
+    }
+    if !metadata.is_file() {
+        if metadata.is_dir() {
+            return Err(ReadError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Keynote package source must be a regular file",
+            )));
+        }
+        return Err(ReadError::InvalidFormat(
+            "Keynote package source must be a regular file".to_owned(),
+        ));
+    }
+
+    let before = FileSnapshot::from_metadata(&metadata);
+    let source = read_source_with_reported_length(&mut file, before.length, limits)?;
+    let after = FileSnapshot::from_metadata(&file.metadata()?);
+    let observed_length = u64::try_from(source.len()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote package input length does not fit u64".to_owned())
+    })?;
+    ensure_source_unchanged(before, after, observed_length)?;
+    Ok(source)
+}
+
+#[cfg(unix)]
+fn configure_source_open_options(options: &mut OpenOptions) -> bool {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    // Nonblocking prevents a FIFO from stalling before descriptor metadata
+    // rejects it; no-follow pins the final path component. Use libc's target
+    // definitions so the flags remain correct across supported Unix ABIs.
+    options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    true
+}
+
+#[cfg(windows)]
+fn ensure_windows_disk_handle(file: &std::fs::File) -> ReadResult<()> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_TYPE_DISK, GetFileType};
+
+    // SAFETY: `file` owns a live handle for the duration of this call.
+    let file_type = unsafe { GetFileType(file.as_raw_handle()) };
+    if file_type != FILE_TYPE_DISK {
+        return Err(ReadError::InvalidFormat(
+            "Keynote package source must be a regular file".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn windows_path_uses_device_namespace(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::{Component, Prefix};
+
+    let mut units = path.as_os_str().encode_wide();
+    let first = units.next();
+    let second = units.next();
+    let third = units.next();
+    let fourth = units.next();
+    let extended_marker = windows_path_separator(first)
+        && windows_path_separator(second)
+        && third == Some(u16::from(b'?'))
+        && windows_path_separator(fourth);
+    if windows_path_separator(first)
+        && ((windows_path_separator(second)
+            && third == Some(u16::from(b'.'))
+            && windows_path_separator(fourth))
+            || (second == Some(u16::from(b'?'))
+                && third == Some(u16::from(b'?'))
+                && windows_path_separator(fourth)))
+    {
+        return true;
+    }
+
+    let unsafe_prefix = match path.components().next() {
+        Some(Component::Prefix(prefix)) => match prefix.kind() {
+            Prefix::DeviceNS(_) | Prefix::Verbatim(_) => true,
+            Prefix::UNC(_server, share) | Prefix::VerbatimUNC(_server, share) => {
+                windows_os_str_eq_ascii(share, b"pipe")
+            },
+            Prefix::Disk(_) | Prefix::VerbatimDisk(_) => false,
+        },
+        _ => extended_marker,
+    };
+    unsafe_prefix || windows_file_name_is_dos_device(path)
+}
+
+#[cfg(windows)]
+fn windows_path_separator(unit: Option<u16>) -> bool {
+    matches!(unit, Some(0x2f | 0x5c))
+}
+
+#[cfg(windows)]
+fn windows_os_str_eq_ascii(value: &std::ffi::OsStr, expected: &[u8]) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+
+    let mut units = value.encode_wide();
+    expected.iter().all(|expected| {
+        units.next().is_some_and(|unit| {
+            u8::try_from(unit).is_ok_and(|actual| actual.eq_ignore_ascii_case(expected))
+        })
+    }) && units.next().is_none()
+}
+
+#[cfg(windows)]
+fn windows_file_name_is_dos_device(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+
+    let Some(file_name) = path.file_name() else {
+        return false;
+    };
+    let mut name = [0_u16; 8];
+    let mut length = 0usize;
+    for mut unit in file_name.encode_wide() {
+        if matches!(unit, 0x2e | 0x3a) {
+            break;
+        }
+        if length == name.len() {
+            return false;
+        }
+        if matches!(unit, 0x61..=0x7a) {
+            unit -= 0x20;
+        }
+        name[length] = unit;
+        length += 1;
+    }
+    while length != 0 && name[length - 1] == u16::from(b' ') {
+        length -= 1;
+    }
+    let name = &name[..length];
+    matches!(
+        name,
+        [0x43, 0x4f, 0x4e]
+            | [0x50, 0x52, 0x4e]
+            | [0x41, 0x55, 0x58]
+            | [0x4e, 0x55, 0x4c]
+            | [0x43, 0x4f, 0x4e, 0x49, 0x4e, 0x24]
+            | [0x43, 0x4f, 0x4e, 0x4f, 0x55, 0x54, 0x24]
+            | [0x43, 0x4c, 0x4f, 0x43, 0x4b, 0x24]
+    ) || (matches!(
+        &name[..name.len().min(3)],
+        [0x43, 0x4f, 0x4d] | [0x4c, 0x50, 0x54]
+    ) && matches!(name, [_, _, _, 0x31..=0x39 | 0x00b2 | 0x00b3 | 0x00b9]))
+}
+
+#[cfg(windows)]
+fn configure_source_open_options(options: &mut OpenOptions) -> bool {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    // Open the final reparse point itself.  Metadata below rejects the
+    // descriptor before any package bytes are read.
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    // Permit independent readers while excluding concurrent writers, renames,
+    // and deletions during the exact-artifact capture. Descriptor metadata
+    // still verifies stable file identity before publication.
+    options
+        .share_mode(FILE_SHARE_READ)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS);
+    true
+}
+
+#[cfg(not(any(unix, windows)))]
+fn configure_source_open_options(_options: &mut OpenOptions) -> bool {
+    false
+}
+
+fn ensure_source_unchanged(
+    before: FileSnapshot,
+    after: FileSnapshot,
+    observed_length: u64,
+) -> ReadResult<()> {
+    if before != after || observed_length != before.length {
+        return Err(ReadError::InvalidFormat(
+            "Keynote package source changed while it was being read".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn read_source_with_reported_length(
@@ -3579,9 +3873,7 @@ fn read_source_with_reported_length(
     let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
         ReadError::InvalidFormat("Keynote input limit does not fit usize".to_owned())
     })?;
-    let capacity = usize::try_from(reported_length).map_err(|_error| {
-        ReadError::InvalidFormat("Keynote input length does not fit usize".to_owned())
-    })?;
+    let capacity = initial_source_capacity(reported_length)?;
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(capacity).map_err(|_error| {
         ReadError::Archive(litchi_iwa_archive::Error::Allocation {
@@ -3597,7 +3889,7 @@ fn read_source_with_reported_length(
         })?;
         if remaining == 0 {
             let mut extra = [0u8; 1];
-            if reader.read(&mut extra)? != 0 {
+            if read_retrying_interrupted(reader, &mut extra)? != 0 {
                 return Err(input_limit_error(
                     limits.max_input_bytes().saturating_add(1),
                     limits,
@@ -3607,7 +3899,7 @@ fn read_source_with_reported_length(
         }
 
         let read_limit = remaining.min(buffer.len());
-        let read = reader.read(&mut buffer[..read_limit])?;
+        let read = read_retrying_interrupted(reader, &mut buffer[..read_limit])?;
         if read == 0 {
             break;
         }
@@ -3619,6 +3911,22 @@ fn read_source_with_reported_length(
     }
 
     Ok(bytes.into())
+}
+
+fn initial_source_capacity(reported_length: u64) -> ReadResult<usize> {
+    let reported_capacity = usize::try_from(reported_length).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote input length does not fit usize".to_owned())
+    })?;
+    Ok(reported_capacity.min(INITIAL_SOURCE_CAPACITY))
+}
+
+fn read_retrying_interrupted(reader: &mut impl Read, buffer: &mut [u8]) -> std::io::Result<usize> {
+    loop {
+        match reader.read(buffer) {
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {},
+            result => return result,
+        }
+    }
 }
 
 fn reserve_source_growth(bytes: &mut Vec<u8>, required: usize, maximum: usize) -> ReadResult<()> {
@@ -4209,6 +4517,238 @@ mod tests {
         };
 
         assert_input_limit(&error, 2, 1);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_source_options_allow_concurrent_readers() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("concurrent-readers.key");
+        std::fs::copy(native_fixture_path(), &path)?;
+
+        let mut first_options = OpenOptions::new();
+        first_options.read(true);
+        assert!(configure_source_open_options(&mut first_options));
+        let first = first_options.open(&path)?;
+
+        let mut second_options = OpenOptions::new();
+        second_options.read(true);
+        assert!(configure_source_open_options(&mut second_options));
+        let second = second_options.open(&path)?;
+        assert!(first.metadata()?.is_file());
+        assert!(second.metadata()?.is_file());
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_path_reader_rejects_device_namespaces_and_non_disk_handles()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert!(windows_path_uses_device_namespace(Path::new(
+            r"\\.\PhysicalDrive0"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            "//./pipe/private-keynote"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            r"\??\PhysicalDrive0"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            r"\\?\GLOBALROOT\Device\Harddisk0"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            "//?/GLOBALROOT/Device/Harddisk0"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            r"\\server\pipe\private-keynote"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            r"\\?\UNC\server\pipe\private-keynote"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            r"C:\private\NUL.key"
+        )));
+        assert!(windows_path_uses_device_namespace(Path::new(
+            r"C:\private\com1"
+        )));
+        assert!(!windows_path_uses_device_namespace(Path::new(
+            r"\\?\C:\fixture.key"
+        )));
+        assert!(!windows_path_uses_device_namespace(Path::new(
+            r"\\?\UNC\server\share\fixture.key"
+        )));
+        assert!(!windows_path_uses_device_namespace(Path::new(
+            r"\\server\share\fixture.key"
+        )));
+
+        let null_device = OpenOptions::new().read(true).open("NUL")?;
+        assert!(matches!(
+            ensure_windows_disk_handle(&null_device),
+            Err(ReadError::InvalidFormat(message))
+                if message == "Keynote package source must be a regular file"
+        ));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_path_reader_rejects_symlinks_and_fifos_without_disclosure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::symlink;
+        use std::process::Command;
+
+        let directory = tempfile::tempdir()?;
+        let target = directory.path().join("target.key");
+        std::fs::copy(native_fixture_path(), &target)?;
+
+        let symlink_path = directory.path().join("private-keynote-symlink-do-not-leak");
+        symlink(&target, &symlink_path)?;
+        let symlink_error = Package::open(&symlink_path)
+            .err()
+            .ok_or_else(|| io::Error::other("a symbolic link must not be followed"))?;
+        assert!(matches!(
+            &symlink_error,
+            ReadError::InvalidFormat(message) if message.contains("symbolic link")
+        ));
+        assert!(
+            !symlink_error
+                .to_string()
+                .contains(symlink_path.to_string_lossy().as_ref())
+        );
+        assert!(
+            !symlink_error
+                .to_string()
+                .contains("private-keynote-symlink-do-not-leak")
+        );
+
+        let fifo_path = directory.path().join("private-keynote-fifo-do-not-leak");
+        let status = match Command::new("mkfifo").arg(&fifo_path).status() {
+            Ok(status) => status,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        };
+        if !status.success() {
+            return Err(io::Error::other("test could not create a Keynote FIFO").into());
+        }
+        let fifo_error = Package::open(&fifo_path)
+            .err()
+            .ok_or_else(|| io::Error::other("a FIFO must not be accepted as a Keynote package"))?;
+        assert!(
+            matches!(&fifo_error, ReadError::InvalidFormat(message) if message.contains("regular file"))
+        );
+        assert!(
+            !fifo_error
+                .to_string()
+                .contains("private-keynote-fifo-do-not-leak")
+        );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn descriptor_metadata_change_refuses_source_publication()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = NamedTempFile::new()?;
+        file.write_all(&[0_u8])?;
+        let before = FileSnapshot::from_metadata(&file.as_file().metadata()?);
+
+        let mut permissions = file.as_file().metadata()?.permissions();
+        use std::os::unix::fs::PermissionsExt;
+        let mode = permissions.mode();
+        permissions.set_mode(mode ^ 0o100);
+        file.as_file().set_permissions(permissions)?;
+        let after = FileSnapshot::from_metadata(&file.as_file().metadata()?);
+
+        assert_ne!(before, after);
+        assert!(matches!(
+            ensure_source_unchanged(before, after, before.length),
+            Err(ReadError::InvalidFormat(message))
+                if message == "Keynote package source changed while it was being read"
+        ));
+        Ok(())
+    }
+
+    struct InterruptedReader {
+        interrupted: bool,
+        bytes: &'static [u8],
+    }
+
+    impl Read for InterruptedReader {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            if !self.interrupted {
+                self.interrupted = true;
+                return Err(io::Error::from(io::ErrorKind::Interrupted));
+            }
+            let amount = buffer.len().min(self.bytes.len());
+            buffer[..amount].copy_from_slice(&self.bytes[..amount]);
+            self.bytes = &self.bytes[amount..];
+            Ok(amount)
+        }
+    }
+
+    #[test]
+    fn source_reader_retries_interrupted_reads_with_bounded_growth()
+    -> Result<(), Box<dyn std::error::Error>> {
+        static SOURCE: [u8; INITIAL_SOURCE_CAPACITY + 1] = [b'K'; INITIAL_SOURCE_CAPACITY + 1];
+        assert_eq!(
+            initial_source_capacity(Limits::MAX_INPUT_BYTES)?,
+            INITIAL_SOURCE_CAPACITY
+        );
+        let mut reader = InterruptedReader {
+            interrupted: false,
+            bytes: &SOURCE,
+        };
+        let source = read_source_with_reported_length(
+            &mut reader,
+            u64::try_from(SOURCE.len())?,
+            Limits::default(),
+        )?;
+        assert_eq!(source.as_ref(), SOURCE);
+        Ok(())
+    }
+
+    struct LimitProbeInterruptedReader {
+        bytes: &'static [u8],
+        interrupted_probe: bool,
+    }
+
+    impl Read for LimitProbeInterruptedReader {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            if !self.bytes.is_empty() {
+                let amount = buffer.len().min(self.bytes.len());
+                buffer[..amount].copy_from_slice(&self.bytes[..amount]);
+                self.bytes = &self.bytes[amount..];
+                return Ok(amount);
+            }
+            if !self.interrupted_probe {
+                self.interrupted_probe = true;
+                return Err(io::Error::from(io::ErrorKind::Interrupted));
+            }
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn source_reader_retries_an_interrupted_exact_limit_probe()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let defaults = Limits::default();
+        let limits = Limits::new(
+            4,
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )?;
+        let mut reader = LimitProbeInterruptedReader {
+            bytes: b"key!",
+            interrupted_probe: false,
+        };
+        assert_eq!(
+            read_source_with_reported_length(&mut reader, 4, limits)?.as_ref(),
+            b"key!"
+        );
+        assert!(reader.interrupted_probe);
         Ok(())
     }
 
