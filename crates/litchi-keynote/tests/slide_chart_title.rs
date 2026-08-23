@@ -316,6 +316,24 @@ fn chart_title_noop_and_clear_preserve_exact_source() -> TestResult<()> {
 }
 
 #[test]
+fn chart_title_set_accepts_owned_text_without_changing_transaction_wire_behavior() -> TestResult<()>
+{
+    let package = Package::from_bytes(&synthetic_package()?)?;
+    let title = String::from("Revenue by region");
+    let committed = package
+        .edit_slide_chart_title(0usize, 0usize)?
+        .set(title)?
+        .commit()?;
+
+    assert_eq!(
+        committed.package().slide_chart_title(0usize, 0usize)?,
+        Some("Revenue by region".to_owned())
+    );
+    assert!(!committed.patch().is_noop());
+    Ok(())
+}
+
+#[test]
 fn chart_title_empty_visible_clear_inverse_restores_presence_and_bytes() -> TestResult<()> {
     let bytes = synthetic_package_with_states([(Some(true), None), (Some(true), Some("Costs"))])?;
     let package = Package::from_bytes(&bytes)?;

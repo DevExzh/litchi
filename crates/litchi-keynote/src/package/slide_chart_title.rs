@@ -243,8 +243,12 @@ impl<'a> ChartTitleEdit<'a> {
     }
 
     /// Stage a visible chart title.
-    pub fn set(mut self, title: &str) -> Result<Self, ChartTitleError> {
-        self.after = Some(copy_title(title)?);
+    ///
+    /// The input is copied into bounded edit-owned storage immediately, so a
+    /// caller may pass either a borrowed string slice or an owned `String`
+    /// without changing the transaction's source ownership or wire behavior.
+    pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, ChartTitleError> {
+        self.after = Some(copy_title(title.as_ref())?);
         Ok(self)
     }
 
