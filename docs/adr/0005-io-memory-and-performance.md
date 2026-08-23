@@ -499,6 +499,8 @@ At committed HEAD `4e84abdf`, the Cargo metadata snapshot contains 64 workspace
 packages, 239 internal dependency declarations, and 13 ordered policy debts.
 Those figures are inventory evidence only: the complete
 `tools/check_crate_boundaries.py` run is not green and reports 20 focused
-Pages table-lock flat-alias findings for the compatibility aliases introduced
-by `093b82f40` (including the shared `TableSelector` export). This disposition
-changes no policy edge, debt item, ownership assignment, or verification gate.
+Pages table-lock flat-alias findings: 18 findings for the six compatibility
+aliases introduced by `093b82f40` (three public sites each), plus two
+pre-existing findings for `TableLockState` and the shared `TableSelector`
+export. This disposition changes no policy edge, debt item, ownership
+assignment, or verification gate.
