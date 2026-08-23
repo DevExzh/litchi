@@ -4315,3 +4315,56 @@ The inventory is unchanged at 64 packages, 239 internal declarations, one
 migration host, and 13 debts. This is boundary and ingress hardening, not
 generated-schema or Prost retirement, dependency-edge removal, native
 application evidence, host exit, or monolith deletion.
+
+## 2026-08-23 amendment: Wave52 Numbers formula projection (not a monolith-exit gate)
+
+The preceding monolith/deletion evidence remains historical. The current
+Numbers formula slice changes only the production formula reader boundary: the
+bounded owned `FormulaArchiveBytes` source copy remains the preservation
+authority, strict schema preflight charges the admitted source before a private
+Buffa lazy per-node/event stream, and that stream replaces the per-cell
+generated `FormulaArchive` graph. No generated repeated/LazyRepeatedView is
+materialized and no `to_owned_message` conversion is used in the production
+formula path. Within the `litchi-numbers` formula path, generated Prost
+messages remain a test-only oracle for fixture construction and differential
+checks.
+
+This does not establish workspace-wide Prost freedom. Commit `2c538d496`
+moves the direct `litchi-numbers` `prost` declaration from normal dependencies
+to dev-dependencies; its generated `FormulaArchive` builders, decoder, and
+reference renderer are `cfg(test)`-gated oracles. That removes the focused
+normal dependency edge without removing Prost from other workspace owners. It
+does not move the migration host owner, remove the `litchi-iwa` dependency
+edge, retire an ordered debt, or satisfy a host/monolith deletion gate. It also
+makes no mutation, publication, or durable-output change.
+
+The exact isolated verification used a detached snapshot plus a temporary,
+uncommitted bypass of the unrelated Pages provenance guard:
+
+- `cargo test -p litchi-iwa-protos numbers_formula_codec --lib`: 36 passed;
+- `cargo test -p litchi-numbers --lib package::extractor::tests::compatibility_`:
+  7 passed;
+- the corresponding `raw_formula_archive_` and `scalar_formula_` filters:
+  9 passed each;
+- `cargo check -p litchi-iwa-protos -p litchi-numbers --all-targets`: passed;
+- `cargo clippy -p litchi-iwa-protos --lib -- -D warnings`: passed. Strict
+  Numbers Clippy reached only two untouched deprecated `object_count` uses
+  and one untouched `manual_contains` finding;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 319 passed, and the
+  tracked audit retained 20 Pages findings and zero Numbers findings.
+
+Broader formula tests were also attempted, but existing table-storage and
+table-transaction verification failures outside the migrated reader prevent a
+full-suite green claim. On macOS, Numbers 14.4 opened the read-only native
+fixture `/private/tmp/litchi-wave52-formula-native.2dgQQv/source.numbers`
+without repair. Its visible 1,200 by 8 table exposed 2,398 formulas, result `5`
+at E2, and the intentional division-by-zero at F2. Formula-editor inspection
+was cancelled. The Rust `read_numbers` example reported one rooted sheet, one
+1,200 by 8 table with 9,600 materialized cells, and one compatibility table.
+SHA-256 remained
+`e0fb395b0e819583f14d72f1d4916ce482ff35dce9de895d3dfd26869888bbc9`
+through both read-only checks.
+
+No exact RSS/performance, native save/reopen mutation, Rust/native formula
+parity, workspace-wide Prost removal, host exit, debt retirement, or monolith
+deletion follows from this bounded source migration.

@@ -709,3 +709,47 @@ ASan runs with 11/20 seeds. They do not establish native type-6011 support or
 a current campaign. No performance/allocation result, Prost removal,
 host-edge or ordered-debt retirement, migration-host exit, or monolith
 deletion follows from this amendment.
+
+## 2026-08-23 amendment: Wave52 Numbers formula projection (bounded resource record)
+
+The preceding dated evidence and scope notes remain historical. The current
+Numbers formula slice moves the production fallback away from the per-cell
+generated `FormulaArchive` graph. A bounded owned copy of the admitted formula
+source (`FormulaArchiveBytes`) remains the exact-byte preservation authority;
+the production path does not re-encode that source. Strict schema-directed
+preflight charges the bounded bytes, fields, nesting, work, and
+repeated-entry/node counts before a private Buffa lazy per-node/event stream
+is admitted. The stream is forced for every selected node or event used by
+rendering. It does not materialize generated repeated fields or a generated
+`LazyRepeatedView`, and it does not call `to_owned_message`.
+
+Within the `litchi-numbers` formula path, the canonical Prost-generated
+builders and decoder remain a `cfg(test)`-gated oracle for differential
+fixture construction and parity checks. Commit `2c538d496` moves the direct
+`litchi-numbers` `prost` dependency from normal dependencies to
+dev-dependencies; it does not remove Prost from the workspace or from other
+owners.
+
+The exact isolated resource record used a detached snapshot plus a temporary,
+uncommitted bypass of the unrelated Pages provenance guard. The formula codec
+suite passed 36/36, the direct compatibility-renderer suite 7/7, the raw
+formula-envelope suite 9/9, and the scalar/fallback suite 9/9.
+`cargo check -p litchi-iwa-protos -p litchi-numbers --all-targets` passed.
+Strict `litchi-iwa-protos` library Clippy passed; strict `litchi-numbers`
+library Clippy stopped only at two untouched deprecated `object_count` calls
+and one untouched `manual_contains` finding. The boundary-policy suite passed
+319/319, with the tracked audit retaining 20 Pages findings and zero Numbers
+findings.
+
+Numbers 14.4 opened the read-only native fixture
+`/private/tmp/litchi-wave52-formula-native.2dgQQv/source.numbers` without a
+repair warning. The 1,200 by 8 table exposed 2,398 formulas, result `5` at E2,
+and the intentional division-by-zero at F2; inspecting and cancelling the
+formula editor left SHA-256
+`e0fb395b0e819583f14d72f1d4916ce482ff35dce9de895d3dfd26869888bbc9`
+unchanged. The Rust `read_numbers` example also reported one rooted sheet, one
+1,200 by 8 table with 9,600 materialized cells, and one compatibility table,
+with the same post-read hash. This is bounded reader and application-acceptance
+evidence only: no exact RSS, allocation, latency, performance, Rust/native
+formula parity, native save/reopen mutation, publication change, host exit,
+debt retirement, or monolith deletion is claimed.
