@@ -124,6 +124,9 @@ pub enum ChartTitleError {
     /// An exact-name slide or chart selector was ambiguous.
     #[error("the Keynote chart-title selector is ambiguous")]
     AmbiguousSelector,
+    /// An exact-name slide selector was empty.
+    #[error("the Keynote slide selector name cannot be empty")]
+    EmptySlideName,
     /// An exact-name slide selector did not match.
     #[error("the Keynote show has no slide matching the requested name")]
     SlideNameNotFound,
@@ -1437,9 +1440,8 @@ fn map_chart_selector_error(error: ChartSelectorError) -> ChartTitleError {
 
 fn map_slide_selector_error(error: SlideSelectorError) -> ChartTitleError {
     match error {
-        SlideSelectorError::EmptySlideName | SlideSelectorError::DuplicateSlideName { .. } => {
-            ChartTitleError::AmbiguousSelector
-        },
+        SlideSelectorError::EmptySlideName => ChartTitleError::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => ChartTitleError::AmbiguousSelector,
     }
 }
 

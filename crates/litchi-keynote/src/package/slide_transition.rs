@@ -39,7 +39,7 @@ use thiserror::Error;
 
 use super::{Package, PhysicalSource, ReadError, SLIDE_MESSAGE_TYPE, SLIDE_NODE_MESSAGE_TYPE};
 use crate::{
-    SlideSelector,
+    SlideSelector, SlideSelectorError,
     transition::{
         Acceleration, AnimationParameters, CustomParameters, Direction, Effect, Settings,
         TextDelivery, TimingCurveSlot,
@@ -149,6 +149,9 @@ pub enum Error {
     /// An exact-name selector was ambiguous.
     #[error("the Keynote slide selector is ambiguous")]
     AmbiguousSelector,
+    /// An exact-name selector was empty.
+    #[error("the Keynote slide selector name cannot be empty")]
+    EmptySlideName,
     /// An exact-name selector did not match.
     #[error("the Keynote show has no slide matching the requested name")]
     SlideNameNotFound,
@@ -1249,10 +1252,17 @@ impl Package {
                 .show()
                 .map_err(map_read_error)?
                 .select_slide(selector)
-                .map_err(|_| Error::AmbiguousSelector)?
+                .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
                 .ok_or(Error::SlideNameNotFound),
         }
+    }
+}
+
+fn map_slide_selector_error(error: SlideSelectorError) -> Error {
+    match error {
+        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
     }
 }
 

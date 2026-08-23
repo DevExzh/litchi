@@ -378,6 +378,9 @@ impl Show {
     ) -> SlideSelectorResult<Option<&Slide>> {
         match selector.into() {
             SlideSelector::Name(name) => {
+                if name.is_empty() {
+                    return Err(SlideSelectorError::EmptySlideName);
+                }
                 let mut matches = self
                     .slides
                     .iter()
