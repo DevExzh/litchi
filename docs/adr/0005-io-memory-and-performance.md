@@ -672,3 +672,40 @@ bounded source hardening and staged budget work:
 These changes establish no native or type-6011 result, full-workspace
 verification, Buffa/Prost exit, generated-schema retirement, dependency/debt
 change, host exit, monolith deletion, or performance measurement.
+
+## 2026-08-24 amendment: accepted bounded follow-up at `2bbf3c64`
+
+The historical tails above are retained. The accepted chain from `7468fdfc4`
+through `2bbf3c64` remains narrowly scoped:
+
+- `7468fdfc4` makes an exact-byte `EntryStore::replace_data` replacement a
+  copy-on-write no-op and its focused case asserts shared state and payload
+  `Arc` identity (`Arc::ptr_eq`); it adds no wire or package-wide memory
+  measurement.
+- `322032c10` deprecates the three legacy raw-ID Keynote chart-title methods
+  and adds boundary source ratchets requiring the typed selector methods;
+  the compatibility methods remain available.
+- `031678a31` covers the strict alternate type-`6201` TableDataList route,
+  rejects a non-canonical duplicate scalar before public projection, and
+  explicitly uses only synthetic type-`6011` segment fixtures; it is not
+  native Segment evidence.
+- `2bbf3c64` shares one `FootnoteSemanticBudget` across source and candidate
+  projections, with the exact-cap case rejecting observed `19` at limit `14`;
+  fallible reservations remain local and this is not package-wide accounting.
+
+The current lightweight checks are `git diff --check` and the boundary-policy
+Python suite (`python3 -m unittest tools.test_check_crate_boundaries`, 314
+tests). No full-workspace Cargo gate is claimed: the surrounding checkout has
+a dirty/staged snapshot and `Cargo.lock` is not tracked by this parent. The
+clean archived Buffa/protos reports remain historical only (33 focused
+protocol tests and a full `litchi-iwa-protos` run at 267 passed/0 failed; a
+later strict Numbers/Buffa report recorded 237 passing protos tests). None of
+these four commits changes generated schema ownership or removes Prost.
+
+Prior reports supply only historical native no-repair and fuzz-smoke evidence:
+the Numbers comment/formula/rich-text reopen recorded 24 type-6005 and zero
+type-6011 entries, and the TableDataList/CommentStorage smokes recorded 100
+ASan runs with 11/20 seeds. They do not establish native type-6011 support or
+a current campaign. No performance/allocation result, Prost removal,
+host-edge or ordered-debt retirement, migration-host exit, or monolith
+deletion follows from this amendment.

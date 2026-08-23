@@ -11972,3 +11972,42 @@ bounded and scoped:
 No native or type-6011 result, full-workspace verification gate, Buffa/Prost
 exit, generated-schema retirement, dependency/debt retirement, migration-host
 exit, or monolith deletion is admitted by this amendment.
+
+## 2026-08-24 amendment: accepted bounded follow-up at `2bbf3c64`
+
+The historical verification tails above are retained. The accepted commits
+are source- and focused-coverage changes only:
+
+- `7468fdfc4` makes exact-byte `EntryStore::replace_data` replacement a
+  copy-on-write no-op; its focused case asserts shared state and payload
+  identity with `Arc::ptr_eq`.
+- `322032c10` deprecates the three raw-ID Keynote chart-title methods and
+  ratchets the typed selector facade in the boundary checker; compatibility
+  callers remain supported.
+- `031678a31` exercises strict alternate type-`6201` TableDataList ingress,
+  rejects a non-canonical duplicate scalar, and labels its type-`6011`
+  segment data synthetic only. No native Segment proof is supplied.
+- `2bbf3c64` carries one `FootnoteSemanticBudget` across source and candidate
+  projections; its exact-cap case rejects observed `19` at limit `14`, with
+  fallible local reservations rather than a package-wide memory claim.
+
+The current lightweight checks are `git diff --check` and
+`python3 -m unittest tools.test_check_crate_boundaries` (314 tests). No
+full-workspace Cargo gate is admitted: the surrounding checkout is a
+dirty/staged snapshot and `Cargo.lock` is not tracked by this parent. The
+clean archived Buffa/protos evidence is historical only: the prior focused
+protocol check recorded 33 passes and the full `litchi-iwa-protos` baseline
+recorded 267 passed/0 failed; a later strict Numbers/Buffa report recorded
+237 passing protos tests. These commits change neither generated schema
+ownership nor Prost removal status.
+
+Prior reports supply bounded native/fuzz context only: a Numbers
+comment/formula/rich-text reopen found 24 type-6005 and zero type-6011
+entries, while the TableDataList and CommentStorage smokes recorded 100 ASan
+runs with 11/20 seeds. The reports do not prove native type-6011 support, a
+current fuzz campaign, or Rust/native parity. No verification gate beyond
+those historical records is admitted here.
+
+The host edge and all ordered debt remain. There is no Prost removal,
+generated-schema retirement, dependency-edge/debt retirement, migration-host
+exit, or `litchi-iwa` monolith deletion in this amendment.
