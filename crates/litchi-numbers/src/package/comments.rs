@@ -1748,7 +1748,12 @@ fn cell_ranges(
     {
         return Err(Error::InvalidSource { path });
     }
-    charge_scan_work(scan_work, column_count, path)?;
+    let slot_count = offsets.len() / 2;
+    // Native producers may pad the offset table beyond the semantic table
+    // width, but those slots must remain missing-column sentinels. Inspect
+    // the complete table so a comment scan cannot silently accept a cell
+    // outside the selected table's declared bounds.
+    charge_scan_work(scan_work, slot_count, path)?;
     let width = if wide { 4 } else { 1 };
     let mut populated = 0usize;
     let mut ranges = Vec::new();
@@ -1759,8 +1764,14 @@ fn cell_ranges(
             path,
         })?;
     let mut previous = None;
-    for (index, bytes) in offsets.chunks_exact(2).take(column_count).enumerate() {
+    for (index, bytes) in offsets.chunks_exact(2).enumerate() {
         let raw = u16::from_le_bytes([bytes[0], bytes[1]]);
+        if index >= column_count {
+            if raw != u16::MAX {
+                return Err(Error::InvalidSource { path });
+            }
+            continue;
+        }
         if raw == u16::MAX {
             ranges.push(None);
             continue;
@@ -3056,6 +3067,47 @@ mod tests {
                 path: Path::Package
             }
         ));
+    }
+
+    #[test]
+    fn cell_ranges_reject_non_sentinel_padding() {
+        let mut scan_work = 0;
+        let error = cell_ranges(
+            &[0, 0, u8::MAX, u8::MAX, 1, 0],
+            4,
+            1,
+            false,
+            2,
+            Path::Package,
+            &mut scan_work,
+        )
+        .expect_err("padded slots must remain missing-column sentinels");
+
+        assert!(matches!(
+            error,
+            Error::InvalidSource {
+                path: Path::Package
+            }
+        ));
+        assert_eq!(scan_work, 3);
+    }
+
+    #[test]
+    fn cell_ranges_accept_sentinel_padding() {
+        let mut scan_work = 0;
+        let ranges = cell_ranges(
+            &[0, 0, 3, 0, u8::MAX, u8::MAX, u8::MAX, u8::MAX],
+            8,
+            2,
+            false,
+            2,
+            Path::Package,
+            &mut scan_work,
+        )
+        .expect("sentinel padding should be accepted");
+
+        assert_eq!(ranges, vec![Some(0..3), Some(3..8)]);
+        assert_eq!(scan_work, 4);
     }
 
     #[test]
