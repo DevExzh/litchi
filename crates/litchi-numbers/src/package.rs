@@ -804,6 +804,14 @@ impl Package {
     }
 
     /// Return the count of indexed IWA objects retained by this package.
+    ///
+    /// This is a native-package diagnostic, not a semantic Numbers document
+    /// measure. It remains available for migration-host compatibility while
+    /// the package adapter is retired behind the semantic facade.
+    #[deprecated(
+        since = "0.0.1",
+        note = "native IWA object-count diagnostic; native object counts are not part of the supported semantic Numbers API; use Package::document and selector-based semantic APIs"
+    )]
     #[must_use]
     pub fn object_count(&self) -> usize {
         self.state.index.object_count()
@@ -2308,6 +2316,7 @@ const fn input_too_large(observed: u64, limits: Limits) -> Error {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
