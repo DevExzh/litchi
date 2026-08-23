@@ -8,7 +8,9 @@ use std::{
     env,
     error::Error,
     fs::{self, File, OpenOptions},
+    fmt::Debug,
     io::{self, Write},
+    num::{NonZeroU64, NonZeroUsize},
     ops::Range,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -20,8 +22,14 @@ use std::{
 };
 
 use litchi_cfb::{OleFile, OverlayLimits, SameLengthStreamOverlay, SharedOleFile};
-use litchi_core::{FileSource, ReadAt, SourceVersion};
-use litchi_opc::{OpcPackage, PackURI, PackageWriter, SourceBackedPackage};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource, Limits, ReadAt,
+    SourceVersion,
+};
+use litchi_opc::{
+    OpcPackage, PackURI, PackageWriter, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
+    SourceCacheLimits,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use soapberry_zip::ZipArchive;
@@ -61,8 +69,26 @@ const XLSX_FILE_SOURCE_UNCOMPRESSED_PAYLOAD_BYTES: usize = 4_231_168;
 const XLSX_FILE_SOURCE_SHEET_COUNT: usize = 4;
 const XLSX_FILE_SOURCE_ROWS_PER_SHEET: usize = 48;
 const XLSX_FILE_SOURCE_COLUMNS_PER_SHEET: usize = 48;
+const XLSX_REPEAT_STORE_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-source-repeated-store-corpus-v1";
+const XLSX_REPEAT_STORE_OVERSIZED_SOURCE_SHA256: &str =
+    "3cf797e44ef51189a4b62d040cf39ff2af670ebd909c6e806f387b51e72ecfec";
+const XLSX_REPEAT_STORE_OVERSIZED_MIN_BYTES: usize = 8 * 1024 * 1024 + 1;
+const XLSX_REPEAT_STORE_QUERY_ITERATIONS: usize = 8;
+const XLSX_REPEAT_STORE_SELECTED_MEMBER: &str = "xl/worksheets/sheet1.xml";
+const XLSX_REPEAT_STORE_TIMING_SCOPE: &str =
+    "semantic_query_only; explicit PartData reacquisition excluded";
+const XLSX_REPEAT_STORE_STRUCTURAL_CLAIM_SCOPE: &str =
+    "structural cache/read control only; elapsed/query_ns must not be compared with candidate";
+const XLSX_REPEAT_STORE_CANDIDATE_CLAIM_SCOPE: &str =
+    "primary repeated-query selector; compare only the same selector across A/B revisions";
+const XLSX_REPEAT_STORE_EVICTION_CACHE_BYTES: usize = 8 * 1024 * 1024;
+const XLSX_REPEAT_STORE_EVICTION_CACHE_ENTRIES: usize = 2;
+const XLSX_REPEAT_STORE_OVERSIZED_CACHE_BYTES: usize = 8 * 1024 * 1024;
+const XLSX_REPEAT_STORE_CACHE_ENTRIES: usize = 128;
 static NEXT_PPTX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 static NEXT_DOCX_REPLAY_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_XLSX_REPEAT_STORE_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Logical order observed by a positional source wrapper.
 ///
@@ -312,6 +338,8 @@ struct ChildResult {
     xlsx_source_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_semantic_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_repeat_store: Option<XlsxRepeatStoreEvidence>,
 }
 
 impl ChildResult {
@@ -344,8 +372,55 @@ impl ChildResult {
             docx_source_replay: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
+            xlsx_repeat_store: None,
         }
     }
+}
+
+/// Untimed correctness and cache attribution for the opt-in repeated-store
+/// XLSX probes. The query timings are retained separately so the child timer
+/// can cover only repeated semantic calls while all hashes and diagnostics
+/// remain outside the measured operation. Reacquisition controls are
+/// structural-only: their explicit `PartData` setup is excluded from timing,
+/// and their elapsed/query vectors must not be compared with the candidate.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct XlsxRepeatStoreEvidence {
+    implementation: String,
+    scenario: String,
+    selected_member: String,
+    selected_member_uncompressed_bytes: u64,
+    cache_max_bytes: usize,
+    cache_max_entries: usize,
+    query_iterations: usize,
+    query_names: [String; 4],
+    query_elapsed_ns: [u64; 4],
+    timed_elapsed_total_ns: u64,
+    control_reacquire_count: u64,
+    timing_scope: String,
+    claim_scope: String,
+    budget_managed: bool,
+    budget_memory_limit: Option<u64>,
+    budget_input_bytes_limit: Option<u64>,
+    budget_work_limit: Option<u64>,
+    semantic_projection_sha256: String,
+    diagnostics_before: XlsxRepeatStoreCounters,
+    diagnostics_after: XlsxRepeatStoreCounters,
+    diagnostics_delta: XlsxRepeatStoreCounters,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+struct XlsxRepeatStoreCounters {
+    cache_cold_loads: u64,
+    cache_successful_loads: u64,
+    cache_bypasses: u64,
+    cache_oversized_bypasses: u64,
+    cache_evictions: u64,
+    source_read_calls: u64,
+    source_read_bytes: u64,
+    selected_member_read_calls: u64,
+    selected_member_read_bytes: u64,
+    budget_input_bytes_used: u64,
+    budget_work_used: u64,
 }
 
 /// Untimed source-backed replay evidence for the ordinary-root PPTX cases.
@@ -520,6 +595,8 @@ pub(crate) struct SampleEvidence {
     pub xlsx_source_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xlsx_semantic_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xlsx_repeat_store: Option<XlsxRepeatStoreEvidence>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
@@ -603,6 +680,34 @@ struct OperationDetails {
     cfb_published_bytes: Option<u64>,
     cfb_phases: Option<CfbPhaseEvidence>,
     cfb_owned: Option<CfbOwnedEvidence>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum XlsxRepeatStoreScenario {
+    Medium,
+    Oversized,
+}
+
+impl XlsxRepeatStoreScenario {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Medium => "medium",
+            Self::Oversized => "oversized",
+        }
+    }
+
+    const fn cache_limits(self) -> (usize, usize) {
+        match self {
+            Self::Medium => (
+                XLSX_REPEAT_STORE_EVICTION_CACHE_BYTES,
+                XLSX_REPEAT_STORE_EVICTION_CACHE_ENTRIES,
+            ),
+            Self::Oversized => (
+                XLSX_REPEAT_STORE_OVERSIZED_CACHE_BYTES,
+                XLSX_REPEAT_STORE_CACHE_ENTRIES,
+            ),
+        }
+    }
 }
 
 /// Operation-local attribution for the three sequential stages of the CFB
@@ -693,6 +798,10 @@ enum Operation {
     DocxSourceOpenFullTextLifecycle,
     XlsxFileOpen,
     XlsxFileOpenLifecycle,
+    XlsxSourceRepeatedStoreMedium,
+    XlsxSourceRepeatedStoreMediumReacquisitionControl,
+    XlsxSourceRepeatedStoreOversized,
+    XlsxSourceRepeatedStoreOversizedReacquisitionControl,
 }
 
 impl Operation {
@@ -746,6 +855,16 @@ impl Operation {
             },
             "xlsx_file_open" => Some(Self::XlsxFileOpen),
             "xlsx_file_open_lifecycle" => Some(Self::XlsxFileOpenLifecycle),
+            "xlsx_source_repeated_store_medium" => Some(Self::XlsxSourceRepeatedStoreMedium),
+            "xlsx_source_repeated_store_medium_reacquisition_control" => {
+                Some(Self::XlsxSourceRepeatedStoreMediumReacquisitionControl)
+            },
+            "xlsx_source_repeated_store_oversized" => {
+                Some(Self::XlsxSourceRepeatedStoreOversized)
+            },
+            "xlsx_source_repeated_store_oversized_reacquisition_control" => {
+                Some(Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl)
+            },
             _ => None,
         }
     }
@@ -798,6 +917,16 @@ impl Operation {
             },
             Self::XlsxFileOpen => super::Case::XlsxFileOpen,
             Self::XlsxFileOpenLifecycle => super::Case::XlsxFileOpenLifecycle,
+            Self::XlsxSourceRepeatedStoreMedium => super::Case::XlsxSourceRepeatedStoreMedium,
+            Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => {
+                super::Case::XlsxSourceRepeatedStoreMediumReacquisitionControl
+            },
+            Self::XlsxSourceRepeatedStoreOversized => {
+                super::Case::XlsxSourceRepeatedStoreOversized
+            },
+            Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
+                super::Case::XlsxSourceRepeatedStoreOversizedReacquisitionControl
+            },
         }
     }
 
@@ -856,7 +985,45 @@ impl Operation {
     }
 
     const fn is_xlsx(self) -> bool {
-        matches!(self, Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle)
+        matches!(
+            self,
+            Self::XlsxFileOpen
+                | Self::XlsxFileOpenLifecycle
+                | Self::XlsxSourceRepeatedStoreMedium
+                | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
+                | Self::XlsxSourceRepeatedStoreOversized
+                | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
+        )
+    }
+
+    const fn is_xlsx_repeated_store(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceRepeatedStoreMedium
+                | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
+                | Self::XlsxSourceRepeatedStoreOversized
+                | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
+        )
+    }
+
+    const fn xlsx_repeated_store_scenario(self) -> Option<XlsxRepeatStoreScenario> {
+        match self {
+            Self::XlsxSourceRepeatedStoreMedium
+            | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => Some(XlsxRepeatStoreScenario::Medium),
+            Self::XlsxSourceRepeatedStoreOversized
+            | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
+                Some(XlsxRepeatStoreScenario::Oversized)
+            },
+            _ => None,
+        }
+    }
+
+    const fn is_xlsx_repeated_store_reacquisition_control(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
+                | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
+        )
     }
 
     const fn is_docx_lifecycle(self) -> bool {
@@ -940,7 +1107,7 @@ impl Operation {
     /// before the timed interval, so a page-cache proof would not describe the
     /// operation being measured.  Open and lifecycle controls remain eligible.
     const fn supports_cold_verified(self) -> bool {
-        !self.is_pptx_query() && !self.is_docx_query()
+        !self.is_pptx_query() && !self.is_docx_query() && !self.is_xlsx_repeated_store()
     }
 
     const fn pptx_query_name(self) -> Option<&'static str> {
@@ -1001,8 +1168,23 @@ pub(crate) fn run_selected(
             .transpose()?;
         let xlsx = selected
             .iter()
-            .any(|(_, operation)| operation.is_xlsx())
+            .any(|(_, operation)| operation.is_xlsx() && !operation.is_xlsx_repeated_store())
             .then(|| super::build_xlsx_cell_crud_corpus(super::XlsxCellCrudShape::Medium))
+            .transpose()?;
+        let xlsx_repeat_medium = selected
+            .iter()
+            .any(|(_, operation)| {
+                operation.xlsx_repeated_store_scenario() == Some(XlsxRepeatStoreScenario::Medium)
+            })
+            .then(build_xlsx_repeat_store_medium_corpus)
+            .transpose()?;
+        let xlsx_repeat_oversized = selected
+            .iter()
+            .any(|(_, operation)| {
+                operation.xlsx_repeated_store_scenario()
+                    == Some(XlsxRepeatStoreScenario::Oversized)
+            })
+            .then(build_xlsx_repeat_store_oversized_corpus)
             .transpose()?;
         assert_pinned_corpora(&opc, &cfb)?;
         if let Some(docx) = docx.as_ref() {
@@ -1010,6 +1192,18 @@ pub(crate) fn run_selected(
         }
         if let Some(xlsx) = xlsx.as_ref() {
             assert_pinned_xlsx_corpus(xlsx)?;
+        }
+        if let Some(xlsx_repeat_medium) = xlsx_repeat_medium.as_ref() {
+            assert_pinned_xlsx_repeat_store_corpus(
+                xlsx_repeat_medium,
+                XlsxRepeatStoreScenario::Medium,
+            )?;
+        }
+        if let Some(xlsx_repeat_oversized) = xlsx_repeat_oversized.as_ref() {
+            assert_pinned_xlsx_repeat_store_corpus(
+                xlsx_repeat_oversized,
+                XlsxRepeatStoreScenario::Oversized,
+            )?;
         }
         let mut runs = Vec::with_capacity(selected.len());
         let mut opc_save_hashes: Option<Vec<(String, String)>> = None;
@@ -1023,8 +1217,19 @@ pub(crate) fn run_selected(
                 docx.as_ref()
                     .ok_or("DOCX filesystem corpus was not prepared")?
             } else if operation.is_xlsx() {
-                xlsx.as_ref()
-                    .ok_or("XLSX filesystem corpus was not prepared")?
+                if let Some(scenario) = operation.xlsx_repeated_store_scenario() {
+                    match scenario {
+                        XlsxRepeatStoreScenario::Medium => xlsx_repeat_medium
+                            .as_ref()
+                            .ok_or("XLSX repeated-store medium corpus was not prepared")?,
+                        XlsxRepeatStoreScenario::Oversized => xlsx_repeat_oversized
+                            .as_ref()
+                            .ok_or("XLSX repeated-store oversized corpus was not prepared")?,
+                    }
+                } else {
+                    xlsx.as_ref()
+                        .ok_or("XLSX filesystem corpus was not prepared")?
+                }
             } else {
                 &opc
             };
@@ -1087,6 +1292,122 @@ fn assert_pinned_docx_corpus(corpus: &super::Corpus) -> Result<(), Box<dyn Error
             corpus.manifest.archive_sha256
         )
         .into());
+    }
+    Ok(())
+}
+
+fn build_xlsx_repeat_store_medium_corpus() -> Result<super::Corpus, Box<dyn Error>> {
+    let mut corpus = super::build_xlsx_cell_crud_corpus(super::XlsxCellCrudShape::Medium)?;
+    corpus.manifest.name = "xlsx-source-repeated-store-medium".to_owned();
+    corpus.manifest.generator = XLSX_REPEAT_STORE_CORPUS_GENERATOR;
+    corpus.manifest.shape = "medium";
+    corpus.manifest.payload_kind = "fixed-medium-grid-for-repeated-selected-store";
+    Ok(corpus)
+}
+
+fn build_xlsx_repeat_store_oversized_corpus() -> Result<super::Corpus, Box<dyn Error>> {
+    let mut corpus = build_xlsx_repeat_store_medium_corpus()?;
+    let worksheet_uri = PackURI::new(format!("/{XLSX_REPEAT_STORE_SELECTED_MEMBER}"))?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let original = package.get_part(&worksheet_uri)?.blob().to_vec();
+    let closing = b"</worksheet>";
+    let closing_position = original
+        .windows(closing.len())
+        .rposition(|window| window == closing)
+        .ok_or("XLSX repeated-store oversized corpus has no worksheet closing tag")?;
+    let padding = XLSX_REPEAT_STORE_OVERSIZED_MIN_BYTES
+        .saturating_sub(original.len())
+        .saturating_add(64);
+    let mut enlarged = Vec::with_capacity(
+        original
+            .len()
+            .checked_add(padding)
+            .and_then(|value| value.checked_add(64))
+            .ok_or("XLSX repeated-store oversized worksheet length overflows usize")?,
+    );
+    enlarged.extend_from_slice(&original[..closing_position]);
+    let mut remaining = padding;
+    while remaining != 0 {
+        let chunk = remaining.min(1024 * 1024);
+        enlarged.extend_from_slice(b"<!-- litchi-xlsx-repeated-store-oversized:");
+        enlarged.extend(std::iter::repeat_n(b'x', chunk));
+        enlarged.extend_from_slice(b" -->");
+        remaining -= chunk;
+    }
+    enlarged.extend_from_slice(&original[closing_position..]);
+    package.get_part_mut(&worksheet_uri)?.set_blob(enlarged);
+    corpus.archive = PackageWriter::to_bytes(&package)?;
+    corpus.manifest.name = "xlsx-source-repeated-store-oversized".to_owned();
+    corpus.manifest.generator = XLSX_REPEAT_STORE_CORPUS_GENERATOR;
+    corpus.manifest.shape = "oversized";
+    corpus.manifest.payload_kind = "fixed-medium-grid-with-oversized-selected-worksheet";
+    corpus.manifest.archive_bytes = corpus.archive.len();
+    corpus.manifest.archive_sha256 = super::sha256_hex(&corpus.archive);
+    corpus.manifest.uncompressed_payload_bytes = package
+        .iter_parts()
+        .try_fold(0usize, |total, part| {
+            total.checked_add(part.blob().len()).ok_or_else(|| {
+                io::Error::other("XLSX repeated-store logical payload bytes overflow")
+            })
+        })?;
+    Ok(corpus)
+}
+
+fn assert_pinned_xlsx_repeat_store_corpus(
+    corpus: &super::Corpus,
+    scenario: XlsxRepeatStoreScenario,
+) -> Result<(), Box<dyn Error>> {
+    let manifest = &corpus.manifest;
+    if manifest.generator != XLSX_REPEAT_STORE_CORPUS_GENERATOR {
+        return Err(format!(
+            "XLSX repeated-store corpus has generator '{}', expected '{XLSX_REPEAT_STORE_CORPUS_GENERATOR}'",
+            manifest.generator
+        )
+        .into());
+    }
+    let expected_shape = scenario.name();
+    if manifest.shape != expected_shape {
+        return Err(format!(
+            "XLSX repeated-store corpus has shape '{}', expected '{expected_shape}'",
+            manifest.shape
+        )
+        .into());
+    }
+    if corpus.manifest.xlsx.as_ref().is_none_or(|xlsx| {
+        xlsx.sheet_count != XLSX_FILE_SOURCE_SHEET_COUNT
+            || xlsx.rows_per_sheet != XLSX_FILE_SOURCE_ROWS_PER_SHEET
+            || xlsx.columns_per_sheet != XLSX_FILE_SOURCE_COLUMNS_PER_SHEET
+    }) {
+        return Err("XLSX repeated-store corpus typed shape drifted".into());
+    }
+    if scenario == XlsxRepeatStoreScenario::Medium {
+        if manifest.archive_bytes != XLSX_FILE_SOURCE_ARCHIVE_BYTES
+            || corpus.archive.len() != XLSX_FILE_SOURCE_ARCHIVE_BYTES
+            || manifest.archive_sha256 != XLSX_FILE_SOURCE_SHA256
+            || super::sha256_hex(&corpus.archive) != XLSX_FILE_SOURCE_SHA256
+            || manifest.entry_count != XLSX_FILE_SOURCE_ENTRY_COUNT
+            || manifest.archive_member_count != XLSX_FILE_SOURCE_ARCHIVE_MEMBER_COUNT
+            || manifest.uncompressed_payload_bytes != XLSX_FILE_SOURCE_UNCOMPRESSED_PAYLOAD_BYTES
+        {
+            return Err("XLSX repeated-store medium corpus archive pin drifted".into());
+        }
+    } else {
+        if manifest.archive_sha256 != XLSX_REPEAT_STORE_OVERSIZED_SOURCE_SHA256 {
+            return Err(format!(
+                "XLSX repeated-store oversized source hash drifted: expected {XLSX_REPEAT_STORE_OVERSIZED_SOURCE_SHA256}, got {}",
+                manifest.archive_sha256
+            )
+            .into());
+        }
+        let package = OpcPackage::from_bytes(&corpus.archive)?;
+        let worksheet_uri = PackURI::new(format!("/{XLSX_REPEAT_STORE_SELECTED_MEMBER}"))?;
+        let worksheet_bytes = package.get_part(&worksheet_uri)?.blob().len();
+        if worksheet_bytes < XLSX_REPEAT_STORE_OVERSIZED_MIN_BYTES {
+            return Err(format!(
+                "XLSX repeated-store selected worksheet is {worksheet_bytes} bytes, expected at least {XLSX_REPEAT_STORE_OVERSIZED_MIN_BYTES}"
+            )
+            .into());
+        }
     }
     Ok(())
 }
@@ -1167,7 +1488,7 @@ fn assert_pinned_xlsx_corpus(corpus: &super::Corpus) -> Result<(), Box<dyn Error
 }
 
 fn source_sha256_for_operation<'a>(operation: Operation, corpus: &'a super::Corpus) -> &'a str {
-    if operation.is_xlsx() {
+    if operation.is_xlsx() && !operation.is_xlsx_repeated_store() {
         XLSX_FILE_SOURCE_SHA256
     } else {
         &corpus.manifest.archive_sha256
@@ -1304,7 +1625,7 @@ fn run_one(
     )?;
     let expected_xlsx_semantic_sha256 = operation
         .is_xlsx()
-        .then(|| xlsx_semantic_sha256(corpus))
+        .then(|| xlsx_semantic_sha256_for_operation(operation, corpus))
         .transpose()?;
 
     // Untimed warmups are independent children. Each measured sample then
@@ -1652,6 +1973,7 @@ fn record_sample(
         docx_source_replay: invocation.child.docx_source_replay,
         xlsx_source_sha256: invocation.child.xlsx_source_sha256,
         xlsx_semantic_sha256: invocation.child.xlsx_semantic_sha256,
+        xlsx_repeat_store: invocation.child.xlsx_repeat_store,
     });
     Ok(())
 }
@@ -1839,7 +2161,12 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         | Operation::DocxSourceOpenFullTextLifecycle => {
             Err("open operation has no output digest".into())
         },
-        Operation::XlsxFileOpen | Operation::XlsxFileOpenLifecycle => {
+        Operation::XlsxFileOpen
+        | Operation::XlsxFileOpenLifecycle
+        | Operation::XlsxSourceRepeatedStoreMedium
+        | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
+        | Operation::XlsxSourceRepeatedStoreOversized
+        | Operation::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
             Err("open operation has no output digest".into())
         },
     }
@@ -2067,6 +2394,11 @@ where
     } else {
         None
     };
+    let mut deferred_xlsx_repeat_store_operation = if operation.is_xlsx_repeated_store() {
+        Some(prepare_xlsx_repeat_store_operation(operation, &source)?)
+    } else {
+        None
+    };
     let before = verified_before.or_else(|| process_metrics::Snapshot::read().ok());
     let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
@@ -2135,9 +2467,26 @@ where
                 run_xlsx_operation(operation, &source, &mut deferred_xlsx_operation)?;
                 None
             },
+            Operation::XlsxSourceRepeatedStoreMedium
+            | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
+            | Operation::XlsxSourceRepeatedStoreOversized
+            | Operation::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
+                let deferred = deferred_xlsx_repeat_store_operation
+                    .as_mut()
+                    .ok_or("XLSX repeated-store child operation was not prepared")?;
+                run_xlsx_repeat_store_queries(deferred)?;
+                None
+            },
         })
     })();
-    let elapsed_ns = u64::try_from(started.elapsed().as_nanos())?;
+    let elapsed_ns = if operation.is_xlsx_repeated_store() {
+        deferred_xlsx_repeat_store_operation
+            .as_ref()
+            .ok_or("XLSX repeated-store child operation was not retained")?
+            .timed_elapsed_total_ns
+    } else {
+        u64::try_from(started.elapsed().as_nanos())?
+    };
     let allocation_metrics = allocation_region.finish();
     let counter = counter_result?;
     let after = process_metrics::Snapshot::read().ok();
@@ -2188,11 +2537,28 @@ where
     // Correctness and hashing are intentionally after the timed operation and
     // after the operation-only counters have been sampled.
     let corpus = filesystem_corpus(operation)?;
-    let xlsx_evidence = if operation.is_xlsx() {
+    if let Some(deferred) = deferred_xlsx_repeat_store_operation.as_mut() {
+        finalize_xlsx_repeat_store_evidence(deferred)?;
+    }
+    let xlsx_evidence = if operation.is_xlsx() && !operation.is_xlsx_repeated_store() {
         let deferred = deferred_xlsx_operation
             .as_ref()
             .ok_or("XLSX child operation did not retain its timed workbook")?;
         Some(verify_xlsx_operation(
+            operation,
+            &source,
+            &corpus,
+            matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
+            deferred,
+        )?)
+    } else {
+        None
+    };
+    let xlsx_repeat_store = if operation.is_xlsx_repeated_store() {
+        let deferred = deferred_xlsx_repeat_store_operation
+            .as_ref()
+            .ok_or("XLSX repeated-store child operation did not retain its timed workbook")?;
+        Some(verify_xlsx_repeat_store_operation(
             operation,
             &source,
             &corpus,
@@ -2214,6 +2580,11 @@ where
         // their correctness validation and every operation-only snapshot.
         std::hint::black_box(deferred.timed_projection);
         std::hint::black_box(deferred.workbook);
+    }
+    if let Some(deferred) = deferred_xlsx_repeat_store_operation.take() {
+        std::hint::black_box(deferred.workbook);
+        std::hint::black_box(deferred.worksheet);
+        std::hint::black_box(deferred.control_package);
     }
     let output = operation
         .is_save()
@@ -2250,8 +2621,14 @@ where
         cfb_owned: details.cfb_owned,
         pptx_source_replay,
         docx_source_replay,
-        xlsx_source_sha256: xlsx_evidence.as_ref().map(|value| value.0.clone()),
-        xlsx_semantic_sha256: xlsx_evidence.map(|value| value.1),
+        xlsx_source_sha256: xlsx_evidence
+            .as_ref()
+            .map(|value| value.0.clone())
+            .or_else(|| xlsx_repeat_store.as_ref().map(|value| value.0.clone())),
+        xlsx_semantic_sha256: xlsx_evidence
+            .map(|value| value.1)
+            .or_else(|| xlsx_repeat_store.as_ref().map(|value| value.1.clone())),
+        xlsx_repeat_store: xlsx_repeat_store.map(|value| value.2),
     };
     serde_json::to_writer(io::stdout().lock(), &result)?;
     Ok(true)
@@ -2268,6 +2645,12 @@ fn filesystem_corpus(operation: Operation) -> Result<super::Corpus, Box<dyn Erro
         return super::build_docx_source_edit_corpus();
     }
     if operation.is_xlsx() {
+        if let Some(scenario) = operation.xlsx_repeated_store_scenario() {
+            return match scenario {
+                XlsxRepeatStoreScenario::Medium => build_xlsx_repeat_store_medium_corpus(),
+                XlsxRepeatStoreScenario::Oversized => build_xlsx_repeat_store_oversized_corpus(),
+            };
+        }
         return super::build_xlsx_cell_crud_corpus(super::XlsxCellCrudShape::Medium);
     }
     let opc = super::build_opc_corpus(OPC_FILE_SHAPE, OPC_FILE_PAYLOAD)?;
@@ -2276,6 +2659,681 @@ fn filesystem_corpus(operation: Operation) -> Result<super::Corpus, Box<dyn Erro
     } else {
         Ok(opc)
     }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct XlsxRepeatStoreSourceCounters {
+    read_calls: u64,
+    read_bytes: u64,
+    selected_member_read_calls: u64,
+    selected_member_read_bytes: u64,
+}
+
+#[derive(Debug)]
+struct XlsxRepeatStoreSource {
+    bytes: Arc<Vec<u8>>,
+    version: SourceVersion,
+    selected_member_range: Range<u64>,
+    counters: Mutex<XlsxRepeatStoreSourceCounters>,
+}
+
+impl XlsxRepeatStoreSource {
+    fn from_bytes(bytes: Arc<Vec<u8>>) -> Result<(Arc<Self>, u64), Box<dyn Error>> {
+        let archive = ZipArchive::from_slice(bytes.as_slice())?;
+        for header in archive.entries() {
+            let header = header?;
+            let name = header.file_path().try_normalize()?.as_ref().to_owned();
+            if name != XLSX_REPEAT_STORE_SELECTED_MEMBER {
+                continue;
+            }
+            let entry = archive.get_entry(header.wayfinder())?;
+            let (start, end) = entry.compressed_data_range();
+            let selected_member_uncompressed_bytes = entry.claim_verifier().size();
+            let source = Arc::new(Self {
+                bytes: Arc::clone(&bytes),
+                version: SourceVersion::new(
+                    NEXT_XLSX_REPEAT_STORE_SOURCE_ID.fetch_add(1, Ordering::Relaxed),
+                    0,
+                ),
+                selected_member_range: start..end,
+                counters: Mutex::new(XlsxRepeatStoreSourceCounters::default()),
+            });
+            return Ok((source, selected_member_uncompressed_bytes));
+        }
+        Err(format!(
+            "XLSX repeated-store source is missing {XLSX_REPEAT_STORE_SELECTED_MEMBER}"
+        )
+        .into())
+    }
+
+    fn snapshot(&self) -> io::Result<XlsxRepeatStoreSourceCounters> {
+        self.counters
+            .lock()
+            .map(|counters| *counters)
+            .map_err(|_| io::Error::other("XLSX repeated-store source counters are poisoned"))
+    }
+
+    fn record(&self, offset: u64, count: usize) -> io::Result<()> {
+        let count = u64::try_from(count)
+            .map_err(|_| io::Error::other("XLSX repeated-store read length does not fit u64"))?;
+        let end = offset
+            .checked_add(count)
+            .ok_or_else(|| io::Error::other("XLSX repeated-store read range overflows u64"))?;
+        let request = offset..end;
+        let selected_bytes = overlap_len(&request, &self.selected_member_range);
+        let mut counters = self
+            .counters
+            .lock()
+            .map_err(|_| io::Error::other("XLSX repeated-store source counters are poisoned"))?;
+        checked_counter_add(&mut counters.read_calls, 1, "XLSX repeated-store read calls")?;
+        checked_counter_add(
+            &mut counters.read_bytes,
+            count,
+            "XLSX repeated-store read bytes",
+        )?;
+        if selected_bytes != 0 {
+            checked_counter_add(
+                &mut counters.selected_member_read_calls,
+                1,
+                "XLSX repeated-store selected-member read calls",
+            )?;
+            checked_counter_add(
+                &mut counters.selected_member_read_bytes,
+                selected_bytes,
+                "XLSX repeated-store selected-member read bytes",
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl ReadAt for XlsxRepeatStoreSource {
+    fn len(&self) -> io::Result<u64> {
+        u64::try_from(self.bytes.len())
+            .map_err(|_| io::Error::other("XLSX repeated-store source length does not fit u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let start = match usize::try_from(offset) {
+            Ok(start) => start,
+            Err(_) => {
+                self.record(offset, 0)?;
+                return Ok(0);
+            },
+        };
+        let count = self
+            .bytes
+            .get(start..)
+            .map_or(0, |remaining| remaining.len().min(output.len()));
+        if count != 0 {
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+        }
+        self.record(offset, count)?;
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(self.version)
+    }
+}
+
+fn xlsx_repeat_store_context(source_len: u64) -> Result<ExecutionContext, Box<dyn Error>> {
+    let memory = xlsx_repeat_store_memory_limit(source_len)?;
+    let budget = Budget::root(
+        "litchi-perf-xlsx-repeated-store",
+        Limits::new(memory, u64::MAX, u64::MAX, 10_000_000, 256, u64::MAX),
+    );
+    let (_cancellation, token) = CancellationSource::pair();
+    let workers = NonZeroUsize::new(1).ok_or("XLSX repeated-store worker limit is zero")?;
+    let in_flight_bytes = NonZeroU64::new(memory).ok_or("XLSX repeated-store memory is zero")?;
+    let execution_limits = ExecutionLimits::new(workers, workers, in_flight_bytes, 0)?;
+    Ok(ExecutionContext::new(budget, token, execution_limits))
+}
+
+fn xlsx_repeat_store_memory_limit(source_len: u64) -> Result<u64, Box<dyn Error>> {
+    source_len
+        .checked_mul(4)
+        .and_then(|value| value.checked_add(64 * 1024 * 1024))
+        .ok_or_else(|| "XLSX repeated-store managed memory limit overflows u64".into())
+}
+
+fn xlsx_repeat_store_counters(
+    diagnostics: SourceCacheDiagnostics,
+    source: XlsxRepeatStoreSourceCounters,
+) -> XlsxRepeatStoreCounters {
+    XlsxRepeatStoreCounters {
+        cache_cold_loads: diagnostics.cold_loads,
+        cache_successful_loads: diagnostics.successful_loads,
+        cache_bypasses: diagnostics.bypasses,
+        cache_oversized_bypasses: diagnostics.oversized_bypasses,
+        cache_evictions: diagnostics.evictions,
+        source_read_calls: source.read_calls,
+        source_read_bytes: source.read_bytes,
+        selected_member_read_calls: source.selected_member_read_calls,
+        selected_member_read_bytes: source.selected_member_read_bytes,
+        budget_input_bytes_used: diagnostics.budget_input_bytes_used,
+        budget_work_used: diagnostics.budget_work_used,
+    }
+}
+
+fn xlsx_repeat_store_counter_delta(
+    before: XlsxRepeatStoreCounters,
+    after: XlsxRepeatStoreCounters,
+) -> Result<XlsxRepeatStoreCounters, Box<dyn Error>> {
+    let delta = |name: &str, before: u64, after: u64| {
+        after.checked_sub(before).ok_or_else(|| {
+            io::Error::other(format!("XLSX repeated-store {name} counter moved backwards"))
+        })
+    };
+    Ok(XlsxRepeatStoreCounters {
+        cache_cold_loads: delta("cache cold loads", before.cache_cold_loads, after.cache_cold_loads)?,
+        cache_successful_loads: delta(
+            "cache successful loads",
+            before.cache_successful_loads,
+            after.cache_successful_loads,
+        )?,
+        cache_bypasses: delta("cache bypasses", before.cache_bypasses, after.cache_bypasses)?,
+        cache_oversized_bypasses: delta(
+            "cache oversized bypasses",
+            before.cache_oversized_bypasses,
+            after.cache_oversized_bypasses,
+        )?,
+        cache_evictions: delta("cache evictions", before.cache_evictions, after.cache_evictions)?,
+        source_read_calls: delta("source read calls", before.source_read_calls, after.source_read_calls)?,
+        source_read_bytes: delta("source read bytes", before.source_read_bytes, after.source_read_bytes)?,
+        selected_member_read_calls: delta(
+            "selected-member read calls",
+            before.selected_member_read_calls,
+            after.selected_member_read_calls,
+        )?,
+        selected_member_read_bytes: delta(
+            "selected-member read bytes",
+            before.selected_member_read_bytes,
+            after.selected_member_read_bytes,
+        )?,
+        budget_input_bytes_used: delta(
+            "managed input bytes",
+            before.budget_input_bytes_used,
+            after.budget_input_bytes_used,
+        )?,
+        budget_work_used: delta("managed work", before.budget_work_used, after.budget_work_used)?,
+    })
+}
+
+fn add_xlsx_repeat_store_counters(
+    left: &mut XlsxRepeatStoreCounters,
+    right: XlsxRepeatStoreCounters,
+) -> Result<(), Box<dyn Error>> {
+    let add = |name: &str, left: &mut u64, right: u64| {
+        *left = (*left)
+            .checked_add(right)
+            .ok_or_else(|| io::Error::other(format!("XLSX repeated-store {name} counter overflows")))?;
+        Ok::<(), io::Error>(())
+    };
+    add("cache cold loads", &mut left.cache_cold_loads, right.cache_cold_loads)?;
+    add(
+        "cache successful loads",
+        &mut left.cache_successful_loads,
+        right.cache_successful_loads,
+    )?;
+    add("cache bypasses", &mut left.cache_bypasses, right.cache_bypasses)?;
+    add(
+        "cache oversized bypasses",
+        &mut left.cache_oversized_bypasses,
+        right.cache_oversized_bypasses,
+    )?;
+    add("cache evictions", &mut left.cache_evictions, right.cache_evictions)?;
+    add("source read calls", &mut left.source_read_calls, right.source_read_calls)?;
+    add("source read bytes", &mut left.source_read_bytes, right.source_read_bytes)?;
+    add(
+        "selected-member read calls",
+        &mut left.selected_member_read_calls,
+        right.selected_member_read_calls,
+    )?;
+    add(
+        "selected-member read bytes",
+        &mut left.selected_member_read_bytes,
+        right.selected_member_read_bytes,
+    )?;
+    add(
+        "managed input bytes",
+        &mut left.budget_input_bytes_used,
+        right.budget_input_bytes_used,
+    )?;
+    add("managed work", &mut left.budget_work_used, right.budget_work_used)?;
+    Ok(())
+}
+
+struct DeferredXlsxRepeatStoreOperation {
+    scenario: XlsxRepeatStoreScenario,
+    reacquisition_control: bool,
+    workbook: litchi_xlsx::SourceBackedWorkbook,
+    worksheet: litchi_xlsx::SourceWorksheet,
+    control_package: Option<SourceBackedPackage>,
+    selected_member: PackURI,
+    source: Arc<XlsxRepeatStoreSource>,
+    control_source: Option<Arc<XlsxRepeatStoreSource>>,
+    selected_member_uncompressed_bytes: u64,
+    cache_max_bytes: usize,
+    cache_max_entries: usize,
+    diagnostics_before: Option<XlsxRepeatStoreCounters>,
+    diagnostics_after: Option<XlsxRepeatStoreCounters>,
+    diagnostics_delta: Option<XlsxRepeatStoreCounters>,
+    query_elapsed_ns: [u64; 4],
+    timed_elapsed_total_ns: u64,
+    control_reacquire_count: u64,
+    semantic_projection_sha256: Option<String>,
+    evidence: Option<XlsxRepeatStoreEvidence>,
+}
+
+fn prepare_xlsx_repeat_store_operation(
+    operation: Operation,
+    source_path: &Path,
+) -> Result<DeferredXlsxRepeatStoreOperation, Box<dyn Error>> {
+    let scenario = operation
+        .xlsx_repeated_store_scenario()
+        .ok_or("non-repeated-store operation passed to XLSX repeated-store preparation")?;
+    let bytes = Arc::new(fs::read(source_path)?);
+    let (source, selected_member_uncompressed_bytes) =
+        XlsxRepeatStoreSource::from_bytes(Arc::clone(&bytes))?;
+    let (cache_max_bytes, cache_max_entries) = scenario.cache_limits();
+    let cache_limits = SourceCacheLimits::new(cache_max_bytes, cache_max_entries)?;
+    let selected_member = PackURI::new(format!("/{XLSX_REPEAT_STORE_SELECTED_MEMBER}"))?;
+    let source_for_workbook: Arc<dyn ReadAt> = source.clone();
+    let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        source_for_workbook,
+        ReadLimits::default(),
+        cache_limits,
+        xlsx_repeat_store_context(u64::try_from(bytes.len())?)?,
+    )?;
+    let worksheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX repeated-store corpus is missing Sheet1")?;
+    let reacquisition_control = operation.is_xlsx_repeated_store_reacquisition_control();
+    let (control_source, control_package) = if reacquisition_control {
+        // Keep the matched control's explicit PartData reads on a distinct
+        // source wrapper and cache.  The semantic workbook and the control
+        // package therefore have independent counters and source versions;
+        // their aggregate interval is reported explicitly below.
+        let (control_source, _) = XlsxRepeatStoreSource::from_bytes(Arc::clone(&bytes))?;
+        let source_for_package: Arc<dyn ReadAt> = control_source.clone();
+        let package = SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source_for_package,
+            ReadLimits::default(),
+            cache_limits,
+            xlsx_repeat_store_context(u64::try_from(bytes.len())?)?,
+        )?;
+        reacquire_xlsx_repeat_store_part(&package, &selected_member)?;
+        if scenario == XlsxRepeatStoreScenario::Medium {
+            let sheet_two = PackURI::new("/xl/worksheets/sheet2.xml")?;
+            reacquire_xlsx_repeat_store_part(&package, &sheet_two)?;
+            let styles = PackURI::new("/xl/styles.xml")?;
+            reacquire_xlsx_repeat_store_part(&package, &styles)?;
+        }
+        (Some(control_source), Some(package))
+    } else {
+        (None, None)
+    };
+    // Prepare the exact semantic workbook used by both candidate and control
+    // intervals.  The control's explicit PartData package above is separate
+    // instrumentation, while this workbook owns the repeated query Store.
+    worksheet.cell("A1")?;
+    if scenario == XlsxRepeatStoreScenario::Medium {
+        // The managed workbook pins its catalog payload, so two cache entries
+        // are required: one pinned catalog plus one evictable worksheet. Each
+        // following worksheet then evicts Sheet1's PartData while its parsed
+        // Store remains retained by the SourceWorksheet handle.
+        for sheet in workbook.sheets().skip(1) {
+            sheet.cell("A1")?;
+        }
+    }
+    Ok(DeferredXlsxRepeatStoreOperation {
+        scenario,
+        reacquisition_control,
+        workbook,
+        worksheet,
+        control_package,
+        selected_member,
+        source,
+        control_source,
+        selected_member_uncompressed_bytes,
+        cache_max_bytes,
+        cache_max_entries,
+        diagnostics_before: None,
+        diagnostics_after: None,
+        diagnostics_delta: None,
+        query_elapsed_ns: [0; 4],
+        timed_elapsed_total_ns: 0,
+        control_reacquire_count: 0,
+        semantic_projection_sha256: None,
+        evidence: None,
+    })
+}
+
+fn reacquire_xlsx_repeat_store_part(
+    package: &SourceBackedPackage,
+    uri: &PackURI,
+) -> Result<(), Box<dyn Error>> {
+    let data = package.part(uri)?.data()?;
+    std::hint::black_box(data.as_bytes().len());
+    Ok(())
+}
+
+fn prepare_xlsx_repeat_store_control_query(
+    state: &mut DeferredXlsxRepeatStoreOperation,
+) -> Result<(), Box<dyn Error>> {
+    let package = state
+        .control_package
+        .as_ref()
+        .ok_or("XLSX repeated-store control omitted its control package")?;
+    reacquire_xlsx_repeat_store_part(package, &state.selected_member)?;
+    if state.scenario == XlsxRepeatStoreScenario::Medium {
+        let sheet_two = PackURI::new("/xl/worksheets/sheet2.xml")?;
+        reacquire_xlsx_repeat_store_part(package, &sheet_two)?;
+        let styles = PackURI::new("/xl/styles.xml")?;
+        reacquire_xlsx_repeat_store_part(package, &styles)?;
+    }
+    state.control_reacquire_count = state
+        .control_reacquire_count
+        .checked_add(1)
+        .ok_or("XLSX repeated-store control reacquisition count overflow")?;
+    Ok(())
+}
+
+fn xlsx_repeat_store_snapshot(
+    state: &DeferredXlsxRepeatStoreOperation,
+) -> Result<XlsxRepeatStoreCounters, Box<dyn Error>> {
+    if state.reacquisition_control {
+        let package_diagnostics = state
+            .control_package
+            .as_ref()
+            .ok_or("XLSX repeated-store control omitted diagnostics package")?
+            .cache_diagnostics();
+        let control_source = state
+            .control_source
+            .as_ref()
+            .ok_or("XLSX repeated-store control omitted its source counters")?
+            .snapshot()?;
+        // Structural controls have a separate package/source pair so their
+        // exact reacquisition contract is not contaminated by the semantic
+        // worksheet's revision-dependent PartData work. The semantic queries
+        // still run and are validated, but their diagnostics are deliberately
+        // outside this structural evidence interval.
+        return Ok(xlsx_repeat_store_counters(package_diagnostics, control_source));
+    }
+    Ok(xlsx_repeat_store_counters(
+        state.workbook.cache_diagnostics(),
+        state.source.snapshot()?,
+    ))
+}
+
+fn hash_xlsx_repeat_store_debug(hasher: &mut Sha256, tag: &str, value: impl Debug) {
+    hasher.update(tag.as_bytes());
+    hasher.update([0]);
+    hasher.update(format!("{value:?}").as_bytes());
+    hasher.update([0xff]);
+}
+
+fn hash_xlsx_repeat_store_source_view(
+    hasher: &mut Sha256,
+    view: &litchi_xlsx::SourceCellView,
+) {
+    match view {
+        litchi_xlsx::SourceCellView::Missing => hash_xlsx_repeat_store_debug(hasher, "missing", ()),
+        litchi_xlsx::SourceCellView::Covered(range) => {
+            hash_xlsx_repeat_store_debug(hasher, "covered", range)
+        },
+        litchi_xlsx::SourceCellView::Stored(cell) => {
+            hash_xlsx_repeat_store_debug(hasher, "stored", cell)
+        },
+        _ => hash_xlsx_repeat_store_debug(hasher, "unknown", ()),
+    }
+}
+
+fn hash_xlsx_repeat_store_typed_view(
+    hasher: &mut Sha256,
+    view: litchi_xlsx::cell::View<'_>,
+) {
+    match view {
+        litchi_xlsx::cell::View::Missing => hash_xlsx_repeat_store_debug(hasher, "missing", ()),
+        litchi_xlsx::cell::View::Covered(range) => {
+            hash_xlsx_repeat_store_debug(hasher, "covered", range)
+        },
+        litchi_xlsx::cell::View::Stored(cell) => {
+            hash_xlsx_repeat_store_debug(hasher, "stored", cell)
+        },
+        _ => hash_xlsx_repeat_store_debug(hasher, "unknown", ()),
+    }
+}
+
+fn hash_xlsx_repeat_store_sparse(
+    hasher: &mut Sha256,
+    values: impl IntoIterator<Item = (litchi_xlsx::Address, litchi_xlsx::Cell)>,
+) {
+    let values = values.into_iter().collect::<Vec<_>>();
+    hash_xlsx_repeat_store_debug(hasher, "sparse_len", values.len());
+    for (address, cell) in values {
+        hash_xlsx_repeat_store_debug(hasher, "sparse_address", address);
+        hash_xlsx_repeat_store_debug(hasher, "sparse_cell", cell);
+    }
+}
+
+fn run_xlsx_repeat_store_queries(
+    state: &mut DeferredXlsxRepeatStoreOperation,
+) -> Result<(), Box<dyn Error>> {
+    let before = xlsx_repeat_store_snapshot(state)?;
+    state.diagnostics_before = Some(before);
+    let mut elapsed = [0_u64; 4];
+    for (query_index, query_elapsed) in elapsed.iter_mut().enumerate() {
+        let mut query_total = 0_u64;
+        for _ in 0..XLSX_REPEAT_STORE_QUERY_ITERATIONS {
+            if state.reacquisition_control {
+                prepare_xlsx_repeat_store_control_query(state)?;
+            }
+            let started = Instant::now();
+            match query_index {
+                0 => {
+                    let value = state.worksheet.cell("A1")?;
+                    std::hint::black_box(value);
+                },
+                1 => {
+                    let values = state.worksheet.cells("A1:H8")?;
+                    std::hint::black_box(values);
+                },
+                2 => {
+                    let visited = state
+                        .worksheet
+                        .visit_cells("A1:H8", |_address, _cell| Ok(()))?;
+                    std::hint::black_box(visited);
+                },
+                3 => {
+                    let extent = state.worksheet.stored_extent()?;
+                    std::hint::black_box(extent);
+                },
+                _ => return Err("XLSX repeated-store query index is out of range".into()),
+            }
+            query_total = query_total
+                .checked_add(u64::try_from(started.elapsed().as_nanos())?)
+                .ok_or("XLSX repeated-store query timing overflows u64")?;
+        }
+        *query_elapsed = query_total;
+    }
+    let after = xlsx_repeat_store_snapshot(state)?;
+    let delta = xlsx_repeat_store_counter_delta(before, after)?;
+    let timed_elapsed_total_ns = elapsed.iter().try_fold(0_u64, |total, elapsed| {
+        total
+            .checked_add(*elapsed)
+            .ok_or_else(|| io::Error::other("XLSX repeated-store total timing overflows u64"))
+    })?;
+    state.diagnostics_after = Some(after);
+    state.diagnostics_delta = Some(delta);
+    state.query_elapsed_ns = elapsed;
+    state.timed_elapsed_total_ns = timed_elapsed_total_ns;
+    state.semantic_projection_sha256 = None;
+    Ok(())
+}
+
+fn finalize_xlsx_repeat_store_evidence(
+    state: &mut DeferredXlsxRepeatStoreOperation,
+) -> Result<(), Box<dyn Error>> {
+    let semantic_projection_sha256 = xlsx_repeat_store_semantic_projection(&state.worksheet)?;
+    state.semantic_projection_sha256 = Some(semantic_projection_sha256.clone());
+    let before = state
+        .diagnostics_before
+        .ok_or("XLSX repeated-store evidence omitted before diagnostics")?;
+    let after = state
+        .diagnostics_after
+        .ok_or("XLSX repeated-store evidence omitted after diagnostics")?;
+    let delta = state
+        .diagnostics_delta
+        .ok_or("XLSX repeated-store evidence omitted diagnostics delta")?;
+    let workbook_diagnostics = state.workbook.cache_diagnostics();
+    if state.reacquisition_control {
+        let package_diagnostics = state
+            .control_package
+            .as_ref()
+            .ok_or("XLSX repeated-store control omitted diagnostics package")?
+            .cache_diagnostics();
+        if workbook_diagnostics.budget_managed != package_diagnostics.budget_managed
+            || workbook_diagnostics.budget_memory_limit
+                != package_diagnostics.budget_memory_limit
+            || workbook_diagnostics.budget_input_bytes_limit
+                != package_diagnostics.budget_input_bytes_limit
+            || workbook_diagnostics.budget_work_limit != package_diagnostics.budget_work_limit
+        {
+            return Err("XLSX repeated-store control budget limits are asymmetric".into());
+        }
+    }
+    state.evidence = Some(XlsxRepeatStoreEvidence {
+        implementation: if state.reacquisition_control {
+            "explicit_part_data_reacquisition_structural_control".to_owned()
+        } else {
+            "source_backed_cached_store".to_owned()
+        },
+        scenario: state.scenario.name().to_owned(),
+        selected_member: XLSX_REPEAT_STORE_SELECTED_MEMBER.to_owned(),
+        selected_member_uncompressed_bytes: state.selected_member_uncompressed_bytes,
+        cache_max_bytes: state.cache_max_bytes,
+        cache_max_entries: state.cache_max_entries,
+        query_iterations: XLSX_REPEAT_STORE_QUERY_ITERATIONS,
+        query_names: [
+            "cell".to_owned(),
+            "cells".to_owned(),
+            "visit".to_owned(),
+            "stored_extent".to_owned(),
+        ],
+        query_elapsed_ns: state.query_elapsed_ns,
+        timed_elapsed_total_ns: state.timed_elapsed_total_ns,
+        control_reacquire_count: state.control_reacquire_count,
+        timing_scope: XLSX_REPEAT_STORE_TIMING_SCOPE.to_owned(),
+        claim_scope: if state.reacquisition_control {
+            XLSX_REPEAT_STORE_STRUCTURAL_CLAIM_SCOPE.to_owned()
+        } else {
+            XLSX_REPEAT_STORE_CANDIDATE_CLAIM_SCOPE.to_owned()
+        },
+        budget_managed: workbook_diagnostics.budget_managed,
+        budget_memory_limit: workbook_diagnostics.budget_memory_limit,
+        budget_input_bytes_limit: workbook_diagnostics.budget_input_bytes_limit,
+        budget_work_limit: workbook_diagnostics.budget_work_limit,
+        semantic_projection_sha256,
+        diagnostics_before: before,
+        diagnostics_after: after,
+        diagnostics_delta: delta,
+    });
+    Ok(())
+}
+
+fn xlsx_repeat_store_semantic_projection(
+    worksheet: &litchi_xlsx::SourceWorksheet,
+) -> Result<String, Box<dyn Error>> {
+    let mut projection = Sha256::new();
+    for query_index in 0..4 {
+        for _ in 0..XLSX_REPEAT_STORE_QUERY_ITERATIONS {
+            match query_index {
+                0 => {
+                    projection.update(b"cell\0");
+                    let value = worksheet.cell("A1")?;
+                    hash_xlsx_repeat_store_source_view(&mut projection, &value);
+                },
+                1 => {
+                    projection.update(b"cells\0");
+                    let values = worksheet.cells("A1:H8")?;
+                    hash_xlsx_repeat_store_sparse(
+                        &mut projection,
+                        values.into_iter().map(|value| (value.address, value.cell)),
+                    );
+                },
+                2 => {
+                    projection.update(b"visit\0");
+                    let visited = worksheet.visit_cells("A1:H8", |address, cell| {
+                        hash_xlsx_repeat_store_debug(&mut projection, "visit_address", address);
+                        hash_xlsx_repeat_store_debug(&mut projection, "visit_cell", cell);
+                        Ok(())
+                    })?;
+                    hash_xlsx_repeat_store_debug(&mut projection, "visit_count", visited);
+                },
+                3 => {
+                    projection.update(b"stored_extent\0");
+                    hash_xlsx_repeat_store_debug(
+                        &mut projection,
+                        "stored_extent",
+                        worksheet.stored_extent()?,
+                    );
+                },
+                _ => return Err("XLSX repeated-store query index is out of range".into()),
+            }
+        }
+    }
+    Ok(super::sha256_hex(&projection.finalize()))
+}
+
+fn typed_xlsx_repeat_store_projection(
+    corpus: &super::Corpus,
+) -> Result<String, Box<dyn Error>> {
+    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
+    let sheet = typed
+        .sheet("Sheet1")?
+        .ok_or("typed XLSX repeated-store oracle is missing Sheet1")?;
+    let mut projection = Sha256::new();
+    for query_index in 0..4 {
+        for _ in 0..XLSX_REPEAT_STORE_QUERY_ITERATIONS {
+            match query_index {
+                0 => {
+                    projection.update(b"cell\0");
+                    hash_xlsx_repeat_store_typed_view(&mut projection, sheet.cell("A1")?);
+                },
+                1 => {
+                    projection.update(b"cells\0");
+                    hash_xlsx_repeat_store_sparse(
+                        &mut projection,
+                        sheet
+                            .cells("A1:H8")?
+                            .map(|(address, cell)| (address, cell.clone())),
+                    );
+                },
+                2 => {
+                    projection.update(b"visit\0");
+                    let mut visited = 0usize;
+                    for (address, cell) in sheet.cells("A1:H8")? {
+                        hash_xlsx_repeat_store_debug(&mut projection, "visit_address", address);
+                        hash_xlsx_repeat_store_debug(&mut projection, "visit_cell", cell);
+                        visited = visited.saturating_add(1);
+                    }
+                    hash_xlsx_repeat_store_debug(&mut projection, "visit_count", visited);
+                },
+                3 => {
+                    projection.update(b"stored_extent\0");
+                    hash_xlsx_repeat_store_debug(
+                        &mut projection,
+                        "stored_extent",
+                        sheet.stored_extent()?,
+                    );
+                },
+                _ => return Err("typed XLSX repeated-store query index is out of range".into()),
+            }
+        }
+    }
+    Ok(super::sha256_hex(&projection.finalize()))
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -3681,7 +4739,16 @@ struct XlsxRootSemanticProjection {
 fn xlsx_typed_semantic_oracle(
     corpus: &super::Corpus,
 ) -> Result<XlsxRootSemanticProjection, Box<dyn Error>> {
-    assert_pinned_xlsx_corpus(corpus)?;
+    if corpus.manifest.generator == XLSX_REPEAT_STORE_CORPUS_GENERATOR {
+        let scenario = match corpus.manifest.shape {
+            "medium" => XlsxRepeatStoreScenario::Medium,
+            "oversized" => XlsxRepeatStoreScenario::Oversized,
+            shape => return Err(format!("unknown XLSX repeated-store shape '{shape}'").into()),
+        };
+        assert_pinned_xlsx_repeat_store_corpus(corpus, scenario)?;
+    } else {
+        assert_pinned_xlsx_corpus(corpus)?;
+    }
     let spec = corpus
         .xlsx
         .as_ref()
@@ -3717,6 +4784,13 @@ fn xlsx_typed_semantic_oracle(
 fn xlsx_semantic_sha256(corpus: &super::Corpus) -> Result<String, Box<dyn Error>> {
     let oracle = xlsx_typed_semantic_oracle(corpus)?;
     xlsx_semantic_projection_sha256(&oracle)
+}
+
+fn xlsx_semantic_sha256_for_operation(
+    _operation: Operation,
+    corpus: &super::Corpus,
+) -> Result<String, Box<dyn Error>> {
+    xlsx_semantic_sha256(corpus)
 }
 
 fn xlsx_semantic_projection_sha256(
@@ -4065,7 +5139,12 @@ fn verify_child_output(
         | Operation::DocxSourceOpenFullTextLifecycle => {
             verify_docx_operation(source, corpus, allow_page_aligned_source)
         },
-        Operation::XlsxFileOpen | Operation::XlsxFileOpenLifecycle => {
+        Operation::XlsxFileOpen
+        | Operation::XlsxFileOpenLifecycle
+        | Operation::XlsxSourceRepeatedStoreMedium
+        | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
+        | Operation::XlsxSourceRepeatedStoreOversized
+        | Operation::XlsxSourceRepeatedStoreOversizedReacquisitionControl => {
             // XLSX correctness is validated once against the exact timed
             // workbook before this output-only dispatch reaches this arm.
             Ok(())
@@ -4180,6 +5259,315 @@ fn verify_xlsx_operation(
         }
     }
     Ok((source_sha256, semantic_sha256))
+}
+
+fn validate_xlsx_repeat_store_counter_consistency(
+    label: &str,
+    counters: XlsxRepeatStoreCounters,
+) -> Result<(), Box<dyn Error>> {
+    if counters.cache_cold_loads > counters.cache_successful_loads {
+        return Err(format!(
+            "XLSX repeated-store {label} cold loads exceed successful loads"
+        )
+        .into());
+    }
+    if counters.cache_bypasses > counters.cache_successful_loads {
+        return Err(format!(
+            "XLSX repeated-store {label} bypasses exceed successful loads"
+        )
+        .into());
+    }
+    if counters.cache_oversized_bypasses > counters.cache_bypasses {
+        return Err(format!(
+            "XLSX repeated-store {label} oversized bypasses exceed bypasses"
+        )
+        .into());
+    }
+    if counters.selected_member_read_calls > counters.source_read_calls
+        || counters.selected_member_read_bytes > counters.source_read_bytes
+    {
+        return Err(format!(
+            "XLSX repeated-store {label} selected-member reads exceed source reads"
+        )
+        .into());
+    }
+    if counters.budget_input_bytes_used > counters.source_read_bytes {
+        return Err(format!(
+            "XLSX repeated-store {label} managed input exceeds source reads"
+        )
+        .into());
+    }
+    if counters.cache_cold_loads != 0 && counters.budget_work_used == 0 {
+        return Err(format!(
+            "XLSX repeated-store {label} cold loads omitted managed work"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn validate_xlsx_repeat_store_evidence(
+    operation: Operation,
+    source_len: u64,
+    deferred: &DeferredXlsxRepeatStoreOperation,
+    evidence: &XlsxRepeatStoreEvidence,
+) -> Result<(), Box<dyn Error>> {
+    let scenario = operation
+        .xlsx_repeated_store_scenario()
+        .ok_or("non-repeated-store operation passed to XLSX repeated-store evidence validation")?;
+    let control = operation.is_xlsx_repeated_store_reacquisition_control();
+    let expected_implementation = if control {
+        "explicit_part_data_reacquisition_structural_control"
+    } else {
+        "source_backed_cached_store"
+    };
+    if evidence.implementation != expected_implementation {
+        return Err(format!(
+            "XLSX repeated-store evidence implementation '{}' does not match '{expected_implementation}'",
+            evidence.implementation
+        )
+        .into());
+    }
+    if evidence.scenario != scenario.name() {
+        return Err(format!(
+            "XLSX repeated-store evidence scenario '{}' does not match '{}'",
+            evidence.scenario,
+            scenario.name()
+        )
+        .into());
+    }
+    if evidence.selected_member != XLSX_REPEAT_STORE_SELECTED_MEMBER {
+        return Err(format!(
+            "XLSX repeated-store evidence selected member '{}' does not match '{XLSX_REPEAT_STORE_SELECTED_MEMBER}'",
+            evidence.selected_member
+        )
+        .into());
+    }
+    let (cache_max_bytes, cache_max_entries) = scenario.cache_limits();
+    if evidence.cache_max_bytes != cache_max_bytes
+        || evidence.cache_max_entries != cache_max_entries
+    {
+        return Err("XLSX repeated-store evidence cache limits drifted".into());
+    }
+    if evidence.query_iterations != XLSX_REPEAT_STORE_QUERY_ITERATIONS {
+        return Err("XLSX repeated-store evidence query iteration count drifted".into());
+    }
+    let expected_names = [
+        "cell".to_owned(),
+        "cells".to_owned(),
+        "visit".to_owned(),
+        "stored_extent".to_owned(),
+    ];
+    if evidence.query_names != expected_names {
+        return Err("XLSX repeated-store evidence query order drifted".into());
+    }
+    if evidence.query_elapsed_ns.len() != expected_names.len()
+        || evidence.query_elapsed_ns.iter().any(|elapsed| *elapsed == 0)
+    {
+        return Err("XLSX repeated-store evidence query timings are incomplete".into());
+    }
+    let timed_total = evidence
+        .query_elapsed_ns
+        .iter()
+        .try_fold(0_u64, |total, elapsed| total.checked_add(*elapsed))
+        .ok_or("XLSX repeated-store evidence timing overflows u64")?;
+    if evidence.timed_elapsed_total_ns != timed_total {
+        return Err(
+            "XLSX repeated-store evidence total timing does not equal query timings".into(),
+        );
+    }
+    let expected_claim_scope = if control {
+        XLSX_REPEAT_STORE_STRUCTURAL_CLAIM_SCOPE
+    } else {
+        XLSX_REPEAT_STORE_CANDIDATE_CLAIM_SCOPE
+    };
+    if evidence.timing_scope != XLSX_REPEAT_STORE_TIMING_SCOPE
+        || evidence.claim_scope != expected_claim_scope
+    {
+        return Err("XLSX repeated-store timing or claim scope drifted".into());
+    }
+    if deferred.query_elapsed_ns != evidence.query_elapsed_ns
+        || deferred.timed_elapsed_total_ns != evidence.timed_elapsed_total_ns
+        || deferred.control_reacquire_count != evidence.control_reacquire_count
+    {
+        return Err("XLSX repeated-store deferred timing disagrees with evidence".into());
+    }
+    let expected_reacquire_count = if control {
+        u64::try_from(XLSX_REPEAT_STORE_QUERY_ITERATIONS * expected_names.len())?
+    } else {
+        0
+    };
+    if evidence.control_reacquire_count != expected_reacquire_count {
+        return Err("XLSX repeated-store control interval count drifted".into());
+    }
+    if !evidence.budget_managed
+        || evidence.budget_memory_limit != Some(xlsx_repeat_store_memory_limit(source_len)?)
+        || evidence.budget_input_bytes_limit != Some(u64::MAX)
+        || evidence.budget_work_limit != Some(u64::MAX)
+    {
+        return Err("XLSX repeated-store source budget diagnostics are inconsistent".into());
+    }
+    if evidence.selected_member_uncompressed_bytes == 0
+        || (scenario == XlsxRepeatStoreScenario::Oversized
+            && evidence.selected_member_uncompressed_bytes
+                < u64::try_from(XLSX_REPEAT_STORE_OVERSIZED_MIN_BYTES)?)
+    {
+        return Err("XLSX repeated-store selected-member size contract failed".into());
+    }
+
+    validate_xlsx_repeat_store_counter_consistency(
+        "before",
+        evidence.diagnostics_before,
+    )?;
+    validate_xlsx_repeat_store_counter_consistency("after", evidence.diagnostics_after)?;
+    validate_xlsx_repeat_store_counter_consistency("delta", evidence.diagnostics_delta)?;
+    let mut reconstructed_after = evidence.diagnostics_before;
+    add_xlsx_repeat_store_counters(&mut reconstructed_after, evidence.diagnostics_delta)?;
+    if reconstructed_after != evidence.diagnostics_after {
+        return Err("XLSX repeated-store diagnostics delta is inconsistent".into());
+    }
+    if deferred.diagnostics_before != Some(evidence.diagnostics_before)
+        || deferred.diagnostics_after != Some(evidence.diagnostics_after)
+        || deferred.diagnostics_delta != Some(evidence.diagnostics_delta)
+    {
+        return Err("XLSX repeated-store deferred diagnostics disagree with evidence".into());
+    }
+
+    let delta = evidence.diagnostics_delta;
+    if control {
+        let parts_per_query = match scenario {
+            XlsxRepeatStoreScenario::Medium => 3_u64,
+            XlsxRepeatStoreScenario::Oversized => 1_u64,
+        };
+        let expected_query_count = u64::try_from(
+            XLSX_REPEAT_STORE_QUERY_ITERATIONS
+                .checked_mul(expected_names.len())
+                .ok_or("XLSX repeated-store expected query count overflows usize")?,
+        )?;
+        let expected_cold_loads = expected_query_count
+            .checked_mul(parts_per_query)
+            .ok_or("XLSX repeated-store expected cache count overflows u64")?;
+        if delta.cache_cold_loads != expected_cold_loads
+            || delta.cache_successful_loads != expected_cold_loads
+            || delta.selected_member_read_calls != expected_query_count
+            || delta.selected_member_read_bytes == 0
+            || delta.source_read_calls < delta.selected_member_read_calls
+            || delta.source_read_bytes < delta.selected_member_read_bytes
+            || delta.budget_input_bytes_used == 0
+            || delta.budget_work_used == 0
+        {
+            return Err("XLSX repeated-store control cache/read interval is not exact".into());
+        }
+        match scenario {
+            XlsxRepeatStoreScenario::Medium => {
+                if delta.cache_bypasses != 0
+                    || delta.cache_oversized_bypasses != 0
+                    || delta.cache_evictions != expected_cold_loads
+                    || evidence.diagnostics_before.cache_evictions == 0
+                {
+                    return Err(
+                        "XLSX repeated-store medium control did not prove real eviction".into(),
+                    );
+                }
+            },
+            XlsxRepeatStoreScenario::Oversized => {
+                if delta.cache_bypasses != expected_query_count
+                    || delta.cache_oversized_bypasses != expected_query_count
+                    || delta.cache_evictions != 0
+                    || evidence.diagnostics_before.cache_oversized_bypasses == 0
+                {
+                    return Err(
+                        "XLSX repeated-store oversized control did not prove bypass contract"
+                            .into(),
+                    );
+                }
+            },
+        }
+    } else if scenario == XlsxRepeatStoreScenario::Medium {
+        // Primary selectors are intentionally revision-neutral. The old and
+        // optimized binaries may report different positive deltas here; the
+        // raw diagnostics remain complete for the external ABBA adjudicator.
+        if evidence.diagnostics_before.cache_evictions == 0
+            || evidence.diagnostics_before.cache_bypasses != 0
+            || evidence.diagnostics_before.cache_oversized_bypasses != 0
+        {
+            return Err("XLSX repeated-store medium candidate did not prove real eviction".into());
+        }
+    } else if evidence.diagnostics_before.cache_oversized_bypasses == 0 {
+        return Err("XLSX repeated-store oversized candidate did not prove bypass contract".into());
+    }
+    Ok(())
+}
+
+fn verify_xlsx_repeat_store_operation(
+    operation: Operation,
+    source: &Path,
+    corpus: &super::Corpus,
+    allow_page_aligned_source: bool,
+    deferred: &DeferredXlsxRepeatStoreOperation,
+) -> Result<(String, String, XlsxRepeatStoreEvidence), Box<dyn Error>> {
+    let scenario = operation
+        .xlsx_repeated_store_scenario()
+        .ok_or("non-repeated-store operation passed to XLSX repeated-store verification")?;
+    assert_pinned_xlsx_repeat_store_corpus(corpus, scenario)?;
+    let initial_bytes = fs::read(source)?;
+    if !allow_page_aligned_source && super::sha256_hex(&initial_bytes) != corpus.manifest.archive_sha256
+    {
+        return Err("XLSX repeated-store source hash differs from corpus manifest".into());
+    }
+    let evidence = deferred
+        .evidence
+        .clone()
+        .ok_or("XLSX repeated-store operation omitted timed evidence")?;
+    validate_xlsx_repeat_store_evidence(
+        operation,
+        u64::try_from(initial_bytes.len())?,
+        deferred,
+        &evidence,
+    )?;
+    let expected_projection = typed_xlsx_repeat_store_projection(corpus)?;
+    if evidence.semantic_projection_sha256 != expected_projection {
+        return Err(
+            "XLSX repeated-store query projection differs from typed semantic oracle".into(),
+        );
+    }
+    if evidence.selected_member_uncompressed_bytes
+        < u64::try_from(XLSX_REPEAT_STORE_OVERSIZED_MIN_BYTES)?
+            && scenario == XlsxRepeatStoreScenario::Oversized
+    {
+        return Err("XLSX repeated-store oversized member is below the required threshold".into());
+    }
+    let delta = evidence.diagnostics_delta;
+    if operation.is_xlsx_repeated_store_reacquisition_control() {
+        if delta.selected_member_read_bytes == 0
+            || delta.selected_member_read_calls == 0
+            || delta.cache_cold_loads == 0
+            || delta.cache_successful_loads == 0
+            || delta.budget_input_bytes_used == 0
+            || delta.budget_work_used == 0
+        {
+            return Err(
+                "XLSX repeated-store control did not reacquire selected worksheet payload".into(),
+            );
+        }
+        if scenario == XlsxRepeatStoreScenario::Oversized
+            && (delta.cache_bypasses == 0 || delta.cache_oversized_bypasses == 0)
+        {
+            return Err(
+                "XLSX repeated-store oversized control did not prove cache bypasses".into(),
+            );
+        }
+    }
+    let final_bytes = fs::read(source)?;
+    let source_sha256 = super::sha256_hex(&final_bytes);
+    if !allow_page_aligned_source
+        && (source_sha256 != corpus.manifest.archive_sha256
+            || final_bytes.len() != corpus.manifest.archive_bytes)
+    {
+        return Err("XLSX repeated-store source changed after semantic verification".into());
+    }
+    let semantic_sha256 = xlsx_semantic_sha256(corpus)?;
+    Ok((source_sha256, semantic_sha256, evidence))
 }
 
 fn docx_document_signature(document: &litchi::Document) -> Result<String, Box<dyn Error>> {
@@ -4483,8 +5871,8 @@ mod tests {
 
     use super::{
         CacheSelection, ChildMode, ColdAdvice, CountingReadAt, Operation, ReadPattern,
-        ReadPatternState, ReadSizeBuckets, checked_atomic_add, checked_atomic_sub,
-        xlsx_semantic_sha256,
+        ReadPatternState, ReadSizeBuckets, XlsxRepeatStoreScenario, checked_atomic_add,
+        checked_atomic_sub, xlsx_semantic_sha256,
     };
 
     struct OverReturningSource;
@@ -4936,6 +6324,10 @@ mod tests {
         assert!(Operation::OpcSourceOpen.supports_cold_verified());
         assert!(Operation::XlsxFileOpen.supports_cold_verified());
         assert!(Operation::XlsxFileOpenLifecycle.supports_cold_verified());
+        assert!(!Operation::XlsxSourceRepeatedStoreMedium.supports_cold_verified());
+        assert!(!Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl.supports_cold_verified());
+        assert!(!Operation::XlsxSourceRepeatedStoreOversized.supports_cold_verified());
+        assert!(!Operation::XlsxSourceRepeatedStoreOversizedReacquisitionControl.supports_cold_verified());
     }
 
     #[test]
@@ -4951,6 +6343,42 @@ mod tests {
         assert_eq!(Operation::parse(lifecycle.case().name()), Some(lifecycle));
         assert!(!open.is_save());
         assert!(!lifecycle.is_save());
+    }
+
+    #[test]
+    fn xlsx_repeated_store_selectors_roundtrip_structural_control_scope() {
+        for (name, control, scenario) in [
+            (
+                "xlsx_source_repeated_store_medium",
+                false,
+                XlsxRepeatStoreScenario::Medium,
+            ),
+            (
+                "xlsx_source_repeated_store_medium_reacquisition_control",
+                true,
+                XlsxRepeatStoreScenario::Medium,
+            ),
+            (
+                "xlsx_source_repeated_store_oversized",
+                false,
+                XlsxRepeatStoreScenario::Oversized,
+            ),
+            (
+                "xlsx_source_repeated_store_oversized_reacquisition_control",
+                true,
+                XlsxRepeatStoreScenario::Oversized,
+            ),
+        ] {
+            let operation = Operation::parse(name).expect("repeated-store selector parses");
+            assert_eq!(operation.case().name(), name);
+            assert_eq!(operation.xlsx_repeated_store_scenario(), Some(scenario));
+            assert_eq!(
+                operation.is_xlsx_repeated_store_reacquisition_control(),
+                control
+            );
+            assert!(!operation.supports_cold_verified());
+            assert_eq!(Operation::parse(operation.case().name()), Some(operation));
+        }
     }
 
     #[test]
@@ -5154,6 +6582,7 @@ mod tests {
             docx_source_replay: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
+            xlsx_repeat_store: None,
         };
         let sample = crate::allocation_metrics::Sample {
             status: crate::allocation_metrics::Status::Measured,
