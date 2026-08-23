@@ -58,11 +58,11 @@ state, 20 warmups, and 500 retained samples for each selector over tiny,
 medium, and large plain generated RTF. Configuration, corpus/source identity,
 binary identity, clean-worktree identity, and recomputation checks pass.
 
-The first capture recorded the host-default `rustc 1.97.1` in runtime metadata
-even though the stable binaries had been compiled by the repository-pinned
-Rust 1.95.0 toolchain. It accepted 0 of 24 statistic cells. The capture is
-retained because its executable hashes and workload identities are exact, but
-its toolchain label is not the compiler provenance.
+The first capture recorded the host-default `rustc 1.97.1` in runtime metadata.
+It accepted 0 of 24 statistic cells. The capture is retained because its
+executable hashes and workload identities are exact, but its runtime toolchain
+label does not establish compiler provenance; build logs are not part of the
+compact package.
 
 The immediate rerun resolved runtime metadata from the pinned workspace and
 records `rustc 1.95.0 (59807616e 2026-04-14)` in all four legs. Its strict
@@ -78,7 +78,7 @@ summary accepts five in-run cells:
 
 The other 19 pinned-run cells are rejected, including 14 adverse-both cells.
 More importantly, none of these five cells was accepted in the immediately
-preceding equivalent capture. The executable bytes, revisions, corpus/source
+preceding matched capture. The executable bytes, revisions, corpus/source
 identities, selectors, CPU affinity, worker count, warmups, and retained sample
 counts match between captures. Because the accepted set does not reproduce,
 all latency results are withheld and no claim-registry entry is added.

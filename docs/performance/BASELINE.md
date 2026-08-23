@@ -21,19 +21,36 @@ The schema-1 corpus objects and the comparator's case/corpus identity digest are
 unchanged; V2 fields that are not represented by the historical report remain
 explicitly unknown rather than being inferred.
 
+## Latest retained OPC structural ownership result (change 0259)
+
+Private OPC structural parsing now reuses the lazy ZIP reader's validated
+shared decompression allocation for deflated content-types and relationship
+manifests. Stored members retain their direct source borrow, while
+`IndexedArchive` and other positional sources keep the existing owned fallback.
+Focused `Arc::ptr_eq` and enum-variant tests bind all three paths; CRC, size and
+resource limits, cache/single-flight behavior, cancellation, and error
+propagation remain on their existing implementations.
+
+This deterministically removes one complete post-decompression `Vec` clone per
+eligible structural member, but it is not a measured allocation, memory, RSS,
+latency, I/O, or end-to-end result. See
+[change 0259](changes/0259-opc-shared-structural-members.md); a fixed
+relationship-heavy corpus and controlled resource/ABBA evidence remain open.
+
 ## Latest retained unified RTF byte-ingress evidence (change 0258)
 
 `litchi::Document::from_bytes` now hands owned RTF bytes directly to the native
 RTF parser. The facade therefore accepts literal CP-1252 plus native LZFu and
-stored MELA transports without a lossy UTF-8 gate, while byte/reader/smart
-detection preserves ZIP and OLE2 precedence. Exact native-source round trip,
+stored MELA transports without an intermediate UTF-8 requirement, while the
+byte, reader, and smart detectors preserve ZIP and OLE2 precedence. Exact
+native-source round trip,
 semantic parity, malformed-frame refusal, and cursor restoration are focused
 correctness gates.
 
 Two clean CPU-2 release A1/B1/B2/A2 captures reuse identical binaries over the
 two new opt-in facade selectors, tiny/medium/large plain generated RTF, 20
 warmups, and 500 samples per leg. The pinned-metadata capture accepts five
-in-run cells, while the immediately preceding equivalent capture accepts none.
+in-run cells, while the immediately preceding matched capture accepts none.
 The accepted set is not reproducible, so no latency statistic or speedup claim
 is retained. Both compact packages and the complete claim boundary are in
 [change 0258](changes/0258-rtf-byte-native-facade.md).
@@ -861,9 +878,10 @@ documented below; newer selectable cases do not inherit those measurements.
 Change 0258 adds the opt-in `rtf_file_open` and
 `rtf_file_open_lifecycle` selectors over plain, CP-1252, LZFu, and MELA
 variants. The non-plain variants are correctness-only because the historical
-facade control cannot open them. Back-to-back plain 20-warmup/500-sample ABBA
-captures fail cross-run reproducibility, so the retained evidence supports no
-latency claim and does not change the historical default tranche.
+facade control cannot open them. Back-to-back matched plain
+20-warmup/500-sample ABBA captures fail cross-run reproducibility, so the
+retained evidence supports no latency claim and does not change the historical
+default tranche.
 
 Four opt-in XLSB lifecycle selectors cover fresh open, worksheet listing, one
 cell, and a prepared full `worksheet.cells()` scan over deterministic tiny,
