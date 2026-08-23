@@ -17,6 +17,7 @@ on:
       - 'crates/litchi-drawingml/**'
       - 'crates/litchi-fonts/**'
       - 'crates/litchi-formula/**'
+      - 'crates/litchi/**'
       - 'crates/litchi-odf-common/**'
       - 'crates/litchi-odp/**'
       - 'crates/litchi-odraw/**'
@@ -34,6 +35,7 @@ on:
       - 'crates/litchi-spreadsheet-drawing/**'
       - 'crates/litchi-vba/**'
       - 'crates/litchi-xls/**'
+      - 'crates/litchi-xlsb/**'
       - 'crates/litchi-xlsx/**'
       - 'crates/soapberry-zip/**'
       - 'crates/xml-minifier-macros/**'
@@ -55,6 +57,8 @@ on:
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
+      - 'docs/performance/results/**'
+      - 'docs/performance/changes/**'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   pull_request:
@@ -73,6 +77,7 @@ on:
       - 'crates/litchi-drawingml/**'
       - 'crates/litchi-fonts/**'
       - 'crates/litchi-formula/**'
+      - 'crates/litchi/**'
       - 'crates/litchi-odf-common/**'
       - 'crates/litchi-odp/**'
       - 'crates/litchi-odraw/**'
@@ -90,6 +95,7 @@ on:
       - 'crates/litchi-spreadsheet-drawing/**'
       - 'crates/litchi-vba/**'
       - 'crates/litchi-xls/**'
+      - 'crates/litchi-xlsb/**'
       - 'crates/litchi-xlsx/**'
       - 'crates/soapberry-zip/**'
       - 'crates/xml-minifier-macros/**'
@@ -111,6 +117,8 @@ on:
       - 'docs/performance/results/perf-regression-default-manifest-v1.json'
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
+      - 'docs/performance/results/**'
+      - 'docs/performance/changes/**'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
       - '.github/workflows/perf-baseline.yml'
   workflow_dispatch:
@@ -121,6 +129,10 @@ on:
         type: string
   schedule:
     - cron: '17 3 * * 0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -212,6 +224,14 @@ jobs:
           assert comparison["summary"]["latency_excluded_results"] == 2
           assert comparison["summary"]["compared_metrics"] == 20
           PY
+
+      - name: Ensure zstd is available for strict claim checking
+        run: |
+          if ! command -v zstd >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zstd
+          fi
+          zstd --version
 
       - name: Test fail-closed performance Python tooling
         run: |
@@ -2185,7 +2205,7 @@ jobs:
             target/perf/odf-semantic-baseline.json
             target/perf/rtf-semantic-baseline.json
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
   reference-regression:
     name: reference-gated hosted comparison
@@ -2227,4 +2247,4 @@ jobs:
           name: performance-regression-comparison-${{ github.run_id }}
           path: target/perf/comparison/
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 30
