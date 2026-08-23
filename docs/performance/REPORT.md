@@ -75,6 +75,33 @@ partial-sink, and zero-sink refusal gates are also required. This is
 correctness and phase evidence only; no latency, allocation, RSS,
 physical-I/O, or broad DOCX claim is registered.
 
+## Strict claim canonical recomputation (change 0261)
+
+[Change 0261](changes/0261-strict-claim-canonical-recomputation.md) hardens the
+strict performance-evidence verifier. It independently recomputes elapsed
+statistics, accepted/adverse cells, and the complete canonical summary from
+all four raw ABBA reports, rejecting tampered summary labels or result cells.
+It detects and preserves the exact legacy/current report profiles and rejects
+mixed profiles. Resource metrics now derive A1/B1/B2/A2 values and paired
+ratios/deltas from parsed `heaptrack` and `/usr/bin/time` leg sources rather
+than trusting declared values. `time`/`heaptrack` run, status, artifact, and
+parser identities fail closed; resource legs bind exact variant, revision,
+binary, harness tool, and profile metadata, while raw projection-marker fields
+are ignored. Public projection helpers are not exposed; the public verifier path
+creates the module-private `_ValidatedProjection` trust carrier only after raw
+validation, while plain mappings and mutations are rejected before
+summarization.
+
+For each leg, `_project_report` sequentially validates raw samples, recomputes
+bounded elapsed statistics and identity projections without retaining elapsed
+sample values, and discards the raw report/sample payload before the next leg.
+The verifier fails closed at 512 MiB per member, 2 GiB total decompressed input,
+and 64 MiB summary limits. The strict result is four validated performance
+claims; the focused verifier tests report 141 relevant Python passes. An
+external `/usr/bin/time -v` run recorded 1,114,076 KiB maximum RSS for the
+evidence package. This is claim-integrity and bounded-verifier evidence only;
+it adds no speedup claim and changes no library performance result.
+
 ## Fresh-child XLSX filesystem roots (change 0260)
 
 [Change 0260](changes/0260-xlsx-fresh-child-filesystem-roots.md) moves the

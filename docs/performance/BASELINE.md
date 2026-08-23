@@ -84,6 +84,32 @@ partial/zero-sink refusals are required. This is correctness and phase
 evidence only; no speedup, allocation, RSS, physical-I/O, or broad DOCX claim
 is retained. See [change 0263](changes/0263-docx-story-hyperlink-publication.md).
 
+## Latest strict claim-evidence integrity gate (change 0261)
+
+The strict checker now validates all four compressed ABBA reports and
+recomputes the elapsed p50/mean/p95/p99 cells, accepted/adverse sets, resource
+A1/B1/B2/A2 values, paired ratios/deltas, and complete canonical summary from
+raw sources. Summary labels and declared resource deltas are no longer trusted.
+Legacy-v1 and current-v1 report profiles reproduce their direct summaries
+exactly; mixed profiles refuse. `time`/`heaptrack` run, status, artifact, and
+parser identities fail closed, and every resource leg binds exact variant,
+revision, binary, harness tool, and profile metadata. Raw projection-marker
+fields are ignored. Public projection helpers are not exposed; the public verifier
+path creates the module-private `_ValidatedProjection` trust carrier only after
+raw validation, while plain mappings and mutations are rejected before
+summarization.
+
+For each leg, `_project_report` sequentially validates raw samples, recomputes
+bounded elapsed statistics and identity projections without retaining elapsed
+sample values, and discards the raw report/sample payload before the next leg.
+The fail-closed ceilings are 512 MiB per member, 2 GiB total decompressed input,
+and 64 MiB for the summary. The strict run validates four performance claims,
+and the relevant Python verifier suite records 141 passing tests.
+`/usr/bin/time -v` records 1,114,076 KiB maximum RSS for that evidence-package
+run. These figures describe the verifier and its input boundary, not the Rust
+library or a performance improvement. See
+[change 0261](changes/0261-strict-claim-canonical-recomputation.md).
+
 ## Latest retained XLSX filesystem input-mode coverage (change 0260)
 
 The opt-in `xlsx_file_open` and `xlsx_file_open_lifecycle` selectors now run
