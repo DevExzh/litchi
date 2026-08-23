@@ -5523,7 +5523,12 @@ fn preflight_formula_cell_value(
     charge_formula_preflight_work(work, 1, maximum_work)?;
     let input_bytes = source
         .len()
-        .saturating_mul(2)
+        .checked_mul(2)
+        .ok_or(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::Fields,
+            observed: usize::MAX,
+            limit: maximum_work,
+        })?
         .clamp(1, WireLimits::MAX_INPUT_BYTES);
     let limits = WireLimits::default()
         .with_input_bytes(input_bytes)?
@@ -5580,18 +5585,25 @@ fn preflight_formula_category_payload(
     let remaining_work = budget.maximum_work.saturating_sub(budget.work_items);
     if remaining_work == 0 {
         budget.retain_attempted_work(1);
+        let observed = budget.work_items.checked_add(1).ok_or_else(|| {
+            formula_semantic_limit(SemanticLimitKind::FormulaWork, usize::MAX, MAX_FORMULA_WORK)
+        })?;
         return Err(formula_semantic_limit(
             SemanticLimitKind::FormulaWork,
-            budget.work_items.saturating_add(1),
+            observed,
             MAX_FORMULA_WORK,
         ));
     }
-    let input_bytes = checked_formula_work_product(
-        source.len(),
-        MAX_FORMULA_CATEGORY_DEPTH.saturating_add(1),
-        budget.maximum_work,
-    )?
-    .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let category_passes = MAX_FORMULA_CATEGORY_DEPTH.checked_add(1).ok_or_else(|| {
+        formula_semantic_limit(
+            SemanticLimitKind::FormulaWork,
+            usize::MAX,
+            budget.maximum_work,
+        )
+    })?;
+    let input_bytes =
+        checked_formula_work_product(source.len(), category_passes, budget.maximum_work)?
+            .clamp(1, WireLimits::MAX_INPUT_BYTES);
     let fields = remaining_work.clamp(1, WireLimits::MAX_FIELDS);
     let limits = WireLimits::default()
         .with_input_bytes(input_bytes)?
@@ -5616,7 +5628,13 @@ fn preflight_formula_category_payload(
             },
             3 => {
                 formula_projection_wire_type(field, 2)?;
-                let observed_depth = visit.path().len().saturating_add(1);
+                let observed_depth = visit.path().len().checked_add(1).ok_or(
+                    litchi_iwa_common::Error::LimitExceeded {
+                        kind: LimitKind::Nesting,
+                        observed: usize::MAX,
+                        limit: MAX_FORMULA_CATEGORY_DEPTH,
+                    },
+                )?;
                 if observed_depth > MAX_FORMULA_CATEGORY_DEPTH {
                     return Err(litchi_iwa_common::Error::LimitExceeded {
                         kind: LimitKind::Nesting,
@@ -5681,9 +5699,18 @@ fn preflight_formula_category_payload(
             // in the candidate budget even though no category map is
             // published.
             budget.retain_attempted_work(projection_work);
+            let observed = work_before_projection
+                .checked_add(observed)
+                .ok_or_else(|| {
+                    formula_semantic_limit(
+                        SemanticLimitKind::FormulaWork,
+                        usize::MAX,
+                        MAX_FORMULA_WORK,
+                    )
+                })?;
             Err(formula_semantic_limit(
                 SemanticLimitKind::FormulaWork,
-                work_before_projection.saturating_add(observed),
+                observed,
                 MAX_FORMULA_WORK,
             ))
         },
