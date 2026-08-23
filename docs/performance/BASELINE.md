@@ -21,6 +21,26 @@ The schema-1 corpus objects and the comparator's case/corpus identity digest are
 unchanged; V2 fields that are not represented by the historical report remain
 explicitly unknown rather than being inferred.
 
+## Latest DOCX story-hyperlink publication coverage (change 0263)
+
+The opt-in `docx_story_hyperlink_noop_save` and
+`docx_story_hyperlink_redaction_save` selectors use a pinned seven-story DOCX
+corpus: main, header, footer, footnotes, endnotes, comments, and glossary;
+15 OPC Parts; 24 ZIP members; 9,900 archive bytes; and source SHA-256
+`457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac`.
+The selectable matrix is 383 names and the default remains 36 cases / 198
+records.
+
+Source and sink preparation plus the independent story-XML and `.rels`
+namespace/membership/target/type/mode oracles are outside the timed interval.
+The timer covers open, strict target planning, commit, and sequential
+publication. Exact no-op bytes, exact redaction member locality, raw local and
+offset-normalized central ZIP identity for untouched members, deterministic
+output, source immutability, and stale/foreign/signed/unknown-owner/
+partial/zero-sink refusals are required. This is correctness and phase
+evidence only; no speedup, allocation, RSS, physical-I/O, or broad DOCX claim
+is retained. See [change 0263](changes/0263-docx-story-hyperlink-publication.md).
+
 ## Latest retained XLSX filesystem input-mode coverage (change 0260)
 
 The opt-in `xlsx_file_open` and `xlsx_file_open_lifecycle` selectors now run
@@ -889,7 +909,7 @@ machine-noisy latency thresholds.
 ## Current stable tranche update
 
 The stage-1 records above are retained unchanged. The current harness has
-**381 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
+**383 selectable cases**; 200 was the count before the opt-in ODF `mimetype`
 repair-plan selector and later opt-in selectors were added. The
 historical 36-default-case/198-default-record tranche remains measured as
 documented below; newer selectable cases do not inherit those measurements.
