@@ -178,12 +178,17 @@ impl From<litchi_iwa_common::comment::Error> for Error {
 /// drawable payload and stores comment bodies in `TSD.CommentStorageArchive`
 /// objects. Table-cell comments use a separate table-list indirection and are
 /// available through each application's semantic editor.
+#[deprecated(
+    since = "0.0.1",
+    note = "legacy migration-host drawable-comment editor; use focused format-semantic comment owners where available; direct-drawable comment migration remains pending"
+)]
 #[derive(Debug, Clone)]
 pub struct IWorkDrawableCommentEditor {
     package: IWorkPackage,
     application: Application,
 }
 
+#[allow(deprecated)]
 impl IWorkDrawableCommentEditor {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Self::from_package(IWorkPackage::open(path)?)
@@ -2945,4 +2950,5 @@ impl DrawablePayload {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests;

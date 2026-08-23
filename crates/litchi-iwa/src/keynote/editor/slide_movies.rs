@@ -666,6 +666,7 @@ impl KeynoteEditor {
         self.remove_slide_media(slide_index, drawable_object_id, MovieKind::File)
     }
 
+    #[allow(deprecated)]
     pub(in crate::keynote::editor) fn remove_slide_media(
         &mut self,
         slide_index: usize,

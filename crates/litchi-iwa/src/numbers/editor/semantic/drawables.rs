@@ -4,6 +4,7 @@
 
 use super::*;
 
+#[allow(deprecated)]
 impl NumbersEditor {
     /// List supported direct-comment drawables owned by one reachable sheet.
     pub fn sheet_drawables(&self, sheet_id: u64) -> Result<Vec<DrawableInfo>> {
@@ -18,6 +19,10 @@ impl NumbersEditor {
     }
 
     /// Read a comment attached directly to a drawable owned by one sheet.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn sheet_drawable_comment(
         &self,
         sheet_id: u64,
@@ -29,6 +34,10 @@ impl NumbersEditor {
     }
 
     /// Create or replace a direct comment on a drawable owned by one sheet.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn set_sheet_drawable_comment(
         &mut self,
         sheet_id: u64,
@@ -43,6 +52,10 @@ impl NumbersEditor {
     }
 
     /// Delete a direct comment from a drawable owned by one sheet.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn clear_sheet_drawable_comment(
         &mut self,
         sheet_id: u64,
@@ -56,6 +69,10 @@ impl NumbersEditor {
     }
 
     /// Read direct replies in a comment thread on one sheet drawable.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn sheet_drawable_comment_replies(
         &self,
         sheet_id: u64,
@@ -67,6 +84,10 @@ impl NumbersEditor {
     }
 
     /// Add a reply to a direct comment on one sheet drawable.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn add_sheet_drawable_comment_reply(
         &mut self,
         sheet_id: u64,
@@ -81,6 +102,10 @@ impl NumbersEditor {
     }
 
     /// Update a direct reply, returning its current storage identifier.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn set_sheet_drawable_comment_reply(
         &mut self,
         sheet_id: u64,
@@ -100,6 +125,10 @@ impl NumbersEditor {
     }
 
     /// Remove a direct reply from a comment on one sheet drawable.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn remove_sheet_drawable_comment_reply(
         &mut self,
         sheet_id: u64,

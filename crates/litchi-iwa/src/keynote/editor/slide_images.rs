@@ -534,6 +534,7 @@ impl KeynoteEditor {
     }
 
     /// Remove an ordinary image, its private object graph, and unshared assets.
+    #[allow(deprecated)]
     pub fn remove_slide_image(
         &mut self,
         slide_index: usize,

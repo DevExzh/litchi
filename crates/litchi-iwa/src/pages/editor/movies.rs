@@ -526,6 +526,7 @@ impl PagesEditor {
     }
 
     /// Remove a body movie, its attachment/private graph, and unshared assets.
+    #[allow(deprecated)]
     pub fn remove_body_movie(&mut self, drawable_object_id: u64) -> Result<RemovedPagesMovie> {
         let source = body_movie_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;

@@ -541,6 +541,7 @@ impl PagesEditor {
     }
 
     /// Remove a body-anchored image, its private graph, and unshared assets.
+    #[allow(deprecated)]
     pub fn remove_body_image(
         &mut self,
         drawable_object_id: DrawableId,

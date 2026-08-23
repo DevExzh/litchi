@@ -460,6 +460,7 @@ impl NumbersEditor {
     }
 
     /// Remove one audio clip, its private graph, and its unshared asset.
+    #[allow(deprecated)]
     pub fn remove_sheet_audio(
         &mut self,
         sheet_id: u64,
@@ -580,6 +581,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn scratch_spreadsheet_supports_audio_crud_without_a_source_package() {
         let mut editor = NumbersDocumentBuilder::new()
             .sheet_name("Audio")

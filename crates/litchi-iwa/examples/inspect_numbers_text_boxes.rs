@@ -1,5 +1,7 @@
 //! List ordinary text boxes owned by each Numbers sheet.
 
+#![allow(deprecated)]
+
 use std::env;
 
 use litchi_iwa::numbers::NumbersEditor;

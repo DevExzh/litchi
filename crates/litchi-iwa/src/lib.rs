@@ -199,6 +199,7 @@ pub mod raw {
 
 // Internal modules use a short alias while the public API keeps this native
 // primitive behind the explicit `raw` namespace above.
+#[allow(deprecated)]
 pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;

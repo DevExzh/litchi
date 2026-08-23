@@ -860,6 +860,7 @@ impl PagesEditor {
     }
 
     /// Remove an ordinary body shape and its private text-bearing graph.
+    #[allow(deprecated)]
     pub fn remove_body_shape(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyShape> {
         let graph = body_shape_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;

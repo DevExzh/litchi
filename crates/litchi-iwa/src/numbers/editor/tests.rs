@@ -97,6 +97,7 @@ fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
     let mut editor = NumbersEditor::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();
@@ -159,6 +160,7 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn duplicate_and_cross_sheet_drawable_ownership_fail_transactionally() {
     let mut duplicate_owner = test_package_with_text_box();
     duplicate_owner

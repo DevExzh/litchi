@@ -11701,3 +11701,27 @@ duplicate names, and the absence of a production generated decode call.
 This is bounded neutral-projection hardening only: no Cargo/build/test or
 native result is admitted, and no format-owner edge, ordered debt, host-exit,
 or monolith result follows.
+
+## 2026-08-23 amendment: drawable-comment compatibility deprecation boundary
+
+The legacy `litchi-iwa` drawable-comment surface now carries an explicit,
+source-visible deprecation boundary. `IWorkDrawableCommentEditor` is retained
+as the cross-application migration-host editor, while raw-ID Pages, Numbers,
+and Keynote host methods for direct drawable comments (including raw-ID reply
+methods) are marked deprecated as compatibility APIs. The attributes are
+advisory only: every signature, identifier type, validation path, publication
+step, and output byte behavior remains unchanged.
+
+This is deliberately narrower than a generated-schema cleanup. Focused text
+comment/reply APIs and other semantic owners are not deprecated, and no broad
+protobuf, raw archive, or generated module receives a deprecation marker.
+There is not yet a drop-in focused owner for direct-drawable comment CRUD, so
+the notes point new work toward focused format-semantic owners where available
+and retain the compatibility path for existing callers until ownership moves.
+
+The migration-host declarations and compatibility examples use focused
+`allow(deprecated)` scopes so internal callers and README doctests continue to
+compile while external callers receive rustdoc/compiler guidance. This is a
+source/rustdoc ratchet only; no Cargo/build/test or native result is admitted,
+no dependency edge or ordered debt is retired, and no host-exit or monolith-
+deletion claim follows.
