@@ -351,7 +351,9 @@ fn slide_background_reset_preserves_combined_and_unknown_style_properties() {
         .archive("Index/DocumentStylesheet.iwa")
         .unwrap();
     let info = &archive.object(style_id).unwrap().archive_info.message_infos[0];
-    assert_eq!(info.object_references, [40, 89]);
+    // The focused writer records the native stylesheet edge in addition to
+    // the parent and the unrelated retained property edge.
+    assert_eq!(info.object_references, [40, 41, 89]);
     assert_eq!(info.data_references, [99]);
     assert_eq!(
         info.field_infos

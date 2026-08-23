@@ -8,6 +8,7 @@ mod edit;
 mod limits;
 mod rendering_invalidation;
 pub(crate) mod show_settings;
+mod slide_background;
 mod slide_chart_title;
 pub(crate) mod slide_delete;
 mod slide_notes;
@@ -64,6 +65,10 @@ pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
 pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
+};
+pub use slide_background::{
+    SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
+    SlideBackgroundLimitKind, SlideBackgroundPatch,
 };
 pub use slide_chart_title::{
     ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,

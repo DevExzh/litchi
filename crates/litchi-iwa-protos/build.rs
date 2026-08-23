@@ -34,6 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_soundtrack_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_media_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_slide_transition_codec.rs");
+    println!("cargo:rerun-if-changed=src/keynote_slide_background_codec.rs");
     println!("cargo:rerun-if-changed=src/hyperlink_codec.rs");
     println!("cargo:rerun-if-changed=src/comment_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_names_codec.rs");
@@ -128,6 +129,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_keynote_slide_transition_projection_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_keynote_slide_background_projection_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -600,6 +605,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         &buffa_keynote_slide_transition_out_directory,
     )?;
 
+    // Keynote slide backgrounds retain the complete FillArchive source.  The
+    // private projection only forces the singular RGB color branch; gradient
+    // and image payloads remain borrowed opaque bytes and are checked by the
+    // handwritten schema validator.
+    let buffa_keynote_slide_background_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-keynote-slide-background");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("KNSlideBackgroundArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_keynote_slide_background_out_directory)
+        .include_file("iwa_keynote_slide_background_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_keynote_slide_background_projection_budget(
+        &buffa_keynote_slide_background_out_directory,
+    )?;
+
     // Pages section pagination is three optional scalar values. Keep all
     // template, name, and fill data outside generated code and decode the
     // selected values through a borrowed lazy view.
@@ -778,6 +806,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "KNSlideTransitionArchive.proto",
             2347,
             "7a74d790563b72453833a73fa7352b0a796ba11a8b87f9c7665897b9ce3a28e0",
+        ),
+        (
+            "KNSlideBackgroundArchive.proto",
+            967,
+            "6ff880181cbc9860a1d86e343c28d35d843dd3489f0c419d1d31dae93da1c7e0",
         ),
         (
             "KNSoundtrackSettingsArchive.proto",
@@ -1032,6 +1065,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/keynote_slide_transition_codec.rs",
             "crate::buffa_keynote_slide_transition_generated::",
             "mod buffa_keynote_slide_transition_generated {",
+        ),
+        (
+            "src/keynote_slide_background_codec.rs",
+            "crate::buffa_keynote_slide_background_generated::",
+            "mod buffa_keynote_slide_background_generated {",
         ),
         (
             "src/keynote_show_codec.rs",
@@ -3996,7 +4034,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         ),
         (
             "../litchi-pages/src/package/section_settings.rs",
-            "transaction::resolve_target(source, position, &mut budget)?",
+            "transaction::resolve_target(package, position, budget)?",
             1,
         ),
         (
@@ -4838,6 +4876,133 @@ fn enforce_keynote_slide_transition_projection_provenance(
             "derived Keynote slide-transition projection/router drifted from canonical KN fields, exceeded its 4 KiB source budget, introduced generated repeated storage, or added production encoding"
                 .into(),
         );
+    }
+    Ok(())
+}
+
+fn enforce_keynote_slide_background_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const FILL_FIELDS: [&str; 3] = [
+        "optional .TSP.Color color = 1;",
+        "optional .TSD.GradientArchive gradient = 2;",
+        "optional .TSD.ImageFillArchive image = 3;",
+    ];
+    const COLOR_FIELDS: [&str; 11] = [
+        "required .TSP.Color.ColorModel model = 1;",
+        "optional float r = 3;",
+        "optional float g = 4;",
+        "optional float b = 5;",
+        "optional float a = 6 [default = 1];",
+        "optional float c = 7;",
+        "optional float m = 8;",
+        "optional float y = 9;",
+        "optional float k = 10;",
+        "optional float w = 11;",
+        "optional .TSP.Color.RGBColorSpace rgbspace = 12;",
+    ];
+    const GRADIENT_FIELDS: [&str; 6] = [
+        "optional .TSD.GradientArchive.GradientType type = 1;",
+        "repeated .TSD.GradientArchive.GradientStop stops = 2;",
+        "optional float opacity = 3;",
+        "optional bool advancedGradient = 4;",
+        "optional .TSD.AngleGradientArchive anglegradient = 5;",
+        "optional .TSD.TransformGradientArchive transformgradient = 6;",
+    ];
+    const IMAGE_FIELDS: [&str; 9] = [
+        "optional .TSP.DataReference imagedata = 6;",
+        "optional .TSD.ImageFillArchive.ImageFillTechnique technique = 2 [default = NaturalSize];",
+        "optional .TSP.Color tint = 3;",
+        "optional .TSP.Size fillsize = 4;",
+        "optional .TSP.DataReference originalimagedata = 7 [deprecated = true];",
+        "optional bool interpretsUntaggedImageDataAsGeneric = 8;",
+        "optional .TSP.Color referencecolor = 9;",
+        "optional .TSP.Reference database_imagedata = 1;",
+        "optional .TSP.Reference database_originalimagedata = 5;",
+    ];
+    const ROUTER_DECLARATIONS: [&str; 10] = [
+        "const FILL_COLOR_FIELD: u32 = 1;",
+        "const FILL_GRADIENT_FIELD: u32 = 2;",
+        "const FILL_IMAGE_FIELD: u32 = 3;",
+        "const COLOR_MODEL_FIELD: u32 = 1;",
+        "const COLOR_RED_FIELD: u32 = 3;",
+        "const COLOR_GREEN_FIELD: u32 = 4;",
+        "const COLOR_BLUE_FIELD: u32 = 5;",
+        "const COLOR_ALPHA_FIELD: u32 = 6;",
+        "const COLOR_SPACE_FIELD: u32 = 12;",
+        "const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;",
+    ];
+    const PROJECTION_FIELDS: [&str; 14] = [
+        "optional KeynoteColorArchive color = 1;",
+        "optional bytes gradient = 2;",
+        "optional bytes image = 3;",
+        "required int32 model = 1;",
+        "optional float r = 3;",
+        "optional float g = 4;",
+        "optional float b = 5;",
+        "optional float a = 6;",
+        "optional float c = 7;",
+        "optional float m = 8;",
+        "optional float y = 9;",
+        "optional float k = 10;",
+        "optional float w = 11;",
+        "optional int32 rgbspace = 12;",
+    ];
+
+    let drawing = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let common = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("KNSlideBackgroundArchive.proto"))?;
+    let codec = fs::read_to_string("src/keynote_slide_background_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let fill_block = proto_message_block(&drawing, "FillArchive").unwrap_or("");
+    let gradient_block = proto_message_block(&drawing, "GradientArchive").unwrap_or("");
+    let image_block = proto_message_block(&drawing, "ImageFillArchive").unwrap_or("");
+    let color_block = proto_message_block(&common, "Color").unwrap_or("");
+    let fill_ok = FILL_FIELDS
+        .iter()
+        .all(|field| fill_block.matches(field).count() == 1);
+    let color_ok = COLOR_FIELDS
+        .iter()
+        .all(|field| color_block.matches(field).count() == 1);
+    let gradient_ok = GRADIENT_FIELDS
+        .iter()
+        .all(|field| gradient_block.matches(field).count() == 1);
+    let image_ok = IMAGE_FIELDS
+        .iter()
+        .all(|field| image_block.matches(field).count() == 1);
+    let router_ok = ROUTER_DECLARATIONS
+        .iter()
+        .all(|marker| production_codec.matches(marker).count() == 1);
+    let projection_ok = PROJECTION_FIELDS
+        .iter()
+        .all(|field| projection.matches(field).count() == 1);
+    let forbidden_ok = projection.len() <= 2 * 1024
+        && !projection.contains("repeated ")
+        && !production_codec.contains("prost::")
+        && !production_codec.contains("to_owned_message")
+        && !production_codec.contains("encode_to_vec")
+        && !production_codec.contains("try_encode")
+        && !production_codec.contains(".encode(");
+    if !(fill_ok
+        && color_ok
+        && gradient_ok
+        && image_ok
+        && router_ok
+        && projection_ok
+        && forbidden_ok)
+    {
+        return Err(format!(
+            "derived Keynote slide-background projection/router drift: fill={fill_ok} color={color_ok} gradient={gradient_ok} image={image_ok} router={router_ok} projection={projection_ok} forbidden={forbidden_ok} prost={} owned={} encode_vec={} try_encode={} dot_encode={} repeated={} (fill block {} bytes, color {} bytes, gradient {} bytes, image {} bytes, projection {} bytes)",
+            production_codec.contains("prost::"),
+            production_codec.contains("to_owned_message"),
+            production_codec.contains("encode_to_vec"),
+            production_codec.contains("try_encode"),
+            production_codec.contains(".encode("),
+            projection.contains("repeated "),
+            fill_block.len(), color_block.len(), gradient_block.len(), image_block.len(), projection.len()
+        ).into());
     }
     Ok(())
 }
@@ -5746,6 +5911,64 @@ fn enforce_keynote_slide_transition_projection_budget(
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || generated_repeated_views != 0 {
         return Err(format!(
             "Keynote slide-transition projection generated {files} files/{bytes} bytes/{generated_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_keynote_slide_background_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: [&str; 5] = [
+        "KNSlideBackgroundArchive.__lazy_view.rs",
+        "KNSlideBackgroundArchive.__view.rs",
+        "KNSlideBackgroundArchive.rs",
+        "LitchiIwaKeynoteBackgroundProjection.mod.rs",
+        "iwa_keynote_slide_background_buffa_protos.rs",
+    ];
+    const MAX_GENERATED_BYTES: u64 = 160 * 1024;
+
+    let mut entries = fs::read_dir(directory)?
+        .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut names = Vec::new();
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut digest = Sha256::new();
+    for (file_name, path, file_type_result) in entries {
+        if !file_type_result?.is_file() {
+            continue;
+        }
+        let name = file_name.into_string().map_err(
+            |_name| "Keynote slide-background projection generated a non-UTF-8 filename",
+        )?;
+        let generated = fs::read(&path)?;
+        let text = std::str::from_utf8(&generated)?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("Keynote slide-background generated-byte count overflow")?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("Keynote slide-background repeated-view count overflow")?;
+        digest.update(generated);
+        names.push(name);
+    }
+    let aggregate_digest = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    const EXPECTED_DIGEST: &str =
+        "74c65ba143ca7bba098268575790c214858447cf215634b1279e1eb30d5b45e6";
+    if names.as_slice() != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || aggregate_digest != EXPECTED_DIGEST
+    {
+        return Err(format!(
+            "Keynote slide-background projection generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/digest {aggregate_digest}; expected {EXPECTED_FILES:?}, at most {MAX_GENERATED_BYTES} bytes, zero repeated views, and digest {EXPECTED_DIGEST}"
         )
         .into());
     }

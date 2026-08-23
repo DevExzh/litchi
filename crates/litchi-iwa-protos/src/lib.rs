@@ -1003,6 +1003,46 @@ mod buffa_keynote_slide_transition_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for Keynote slide backgrounds.
+///
+/// Only the singular color branch is generated; gradient and image payloads
+/// stay borrowed bytes so a future fill extension cannot create an owned
+/// generated graph at the format boundary.
+#[doc(hidden)]
+mod buffa_keynote_slide_background_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-slide-background/iwa_keynote_slide_background_buffa_protos.rs"
+    ));
+}
+
 /// Internal archive-header codec implemented by the private Buffa sidecar.
 ///
 /// This module intentionally exchanges only the existing Prost compatibility
@@ -1165,6 +1205,11 @@ pub mod numbers_formula_codec;
 /// types remain inaccessible downstream.
 #[doc(hidden)]
 pub mod keynote_slide_transition_codec;
+
+/// Internal strict raw-preserving Keynote slide-background codec. Generated
+/// types remain private and all unrecognized fill payloads stay borrowed.
+#[doc(hidden)]
+pub mod keynote_slide_background_codec;
 
 pub use generated::{
     kn, knsos, tn, tnsos, tp, tpsos, tsa, tsasos, tsce, tsch, tschsos, tsck, tscksos, tsd, tsdsos,

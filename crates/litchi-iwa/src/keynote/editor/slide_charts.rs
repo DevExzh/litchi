@@ -87,7 +87,7 @@ use crate::shapes::{
     remove_orphaned_image_asset,
 };
 use litchi_keynote::{ChartCatalog, ChartSelector, ChartSelectorError};
-use title::{focused_chart_catalog, slide_chart_title};
+use title::focused_chart_catalog;
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 

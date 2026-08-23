@@ -1770,6 +1770,37 @@ mod tests {
     }
 
     #[test]
+    fn external_only_removal_preserves_other_component_owners_of_the_same_object() {
+        let selected = ComponentSelector::new(1, "a.iwa");
+        let target = ComponentSelector::new(2, "styles.iwa");
+        let a = component(1, "a.iwa", None, &[], &[(6, 2, Some(5), Some(0))]);
+        let styles = component(2, "styles.iwa", None, &[(5, UuidBits::new(10, 20))], &[]);
+        let other = component(3, "other.iwa", None, &[], &[(6, 2, Some(5), Some(0))]);
+        let source = metadata(10, &[a, styles, other.clone()], &[]);
+        let externals = [ExternalReferenceRemoval::new(
+            selected,
+            target,
+            5,
+            Some(false),
+        )];
+
+        let output = remove_package_metadata(
+            &source,
+            RemovalBatch::new(10, &[], &externals, &[]),
+            options(&source),
+        )
+        .unwrap();
+
+        assert_eq!(output.report().removals(), 1);
+        assert!(
+            output
+                .bytes()
+                .windows(other.len())
+                .any(|window| window == other)
+        );
+    }
+
+    #[test]
     fn removal_rejects_versioned_ambiguous_and_cross_kind_occurrences() {
         let selector = ComponentSelector::new(1, "a.iwa");
         let uuid = UuidBits::new(10, 20);
@@ -2544,17 +2575,18 @@ fn scan_removal_component(
                     if reference.object != Some(removal.object_identifier) {
                         continue;
                     }
-                    let full = current
+                    let selected = current
                         && field.number == 6
                         && identifier == removal.source.identifier
                         && locator == removal.source.locator
                         && reference.target == removal.target.identifier;
-                    if !full {
-                        return Err(RewriteError::invalid(if !current || field.number == 18 {
-                            InvalidReason::VersionedRemoval
-                        } else {
-                            InvalidReason::CrossComponentRemoval
-                        }));
+                    if !selected {
+                        // External-only ownership changes may leave another
+                        // component pointing at the same retained object. If
+                        // the object UUID is also removed, the global
+                        // `deleted_object` check below still fails closed on
+                        // every unauthorized occurrence.
+                        continue;
                     }
                     if reference.is_weak != removal.expected_is_weak {
                         return Err(RewriteError::invalid(InvalidReason::RemovalMismatch));
