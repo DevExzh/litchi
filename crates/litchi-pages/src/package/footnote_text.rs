@@ -21,7 +21,7 @@ use thiserror::Error;
 
 use super::{
     FOOTNOTE_REFERENCE_MESSAGE_TYPE, MAX_BODY_FOOTNOTES, Package, PackageError,
-    STORAGE_TEXT_PREFIX, TEXTUAL_ATTACHMENT_MESSAGE_TYPE, decode_body_storage,
+    STORAGE_TEXT_PREFIX, TEXTUAL_ATTACHMENT_MESSAGE_TYPE, decode_body_storage_with_wire_error,
     effective_text_limit, find_object, footnote_decode_options, footnote_marker_decode_options,
     footnote_marker_identifier, is_body_text_message_type, root_references_with_limits,
     storage_rewrite_limits, unique_message_payload, unique_text_payload,
@@ -620,14 +620,14 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
         find_object(components, body_identifier.get()).ok_or(FootnoteTextError::InvalidSource)?;
     let body_payload =
         unique_text_payload(&body.messages, body_identifier).map_err(map_package_error)?;
-    let (body_storage, _) = decode_body_storage(
+    let (body_storage, _) = decode_body_storage_with_wire_error(
         &body.messages,
         body_identifier,
         super::MAX_SECTIONS,
         effective_text_limit(package.state.source.limits()),
         package.state.source.limits(),
     )
-    .map_err(map_package_error)?;
+    .map_err(map_body_storage_decode_error)?;
     checked_utf16_units(body_storage.text())?;
     let entries =
         super::footnote_table_entries(body_payload, body_identifier, package.state.source.limits())
@@ -705,14 +705,14 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             .ok_or(FootnoteTextError::InvalidSource)?;
         let storage_payload = unique_text_payload(&storage.messages, storage_identifier)
             .map_err(map_package_error)?;
-        let (storage_value, _) = decode_body_storage(
+        let (storage_value, _) = decode_body_storage_with_wire_error(
             &storage.messages,
             storage_identifier,
             super::MAX_SECTIONS,
             effective_text_limit(package.state.source.limits()),
             package.state.source.limits(),
         )
-        .map_err(map_package_error)?;
+        .map_err(map_body_storage_decode_error)?;
         let text = storage_value
             .text()
             .strip_prefix(STORAGE_TEXT_PREFIX)
@@ -1587,6 +1587,13 @@ fn map_package_error(error: PackageError) -> FootnoteTextError {
     map_package_error_with_kind(error, FootnoteTextLimitKind::WireBytes)
 }
 
+fn map_body_storage_decode_error(error: super::BodyStorageDecodeError) -> FootnoteTextError {
+    match error {
+        super::BodyStorageDecodeError::Package(error) => map_package_error(error),
+        super::BodyStorageDecodeError::Wire(error) => map_text_rewrite_error(error),
+    }
+}
+
 fn map_package_error_with_kind(
     error: PackageError,
     payload_limit_kind: FootnoteTextLimitKind,
@@ -1768,11 +1775,12 @@ mod tests {
 
     use super::{
         FootnoteObjectLocations, FootnoteTextError, FootnoteTextLimitKind, FootnoteTextPatch,
-        StorageWireLimitsError, checked_utf16_units, is_canonical_component_name,
+        checked_utf16_units, is_canonical_component_name, map_body_storage_decode_error,
         map_package_error_with_kind, map_storage_wire_limits_error, position_from_anchor,
         rewrite_custom_mark_wire,
     };
     use crate::footnote::body::{Footnote, Position};
+    use crate::package::{BodyStorageDecodeError, StorageWireLimitsError};
     use crate::{Error as SemanticError, PackageError};
     use litchi_iwa_common::WireLimits;
     use litchi_iwa_core::ArchiveObject;
@@ -1853,6 +1861,65 @@ mod tests {
             entries_error,
             FootnoteTextError::LimitExceeded {
                 kind: FootnoteTextLimitKind::Entries,
+                observed: 5,
+                maximum: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn native_body_storage_limits_keep_wire_categories() {
+        let cases = [
+            (
+                RewriteError::LimitExceeded {
+                    resource: "message bytes",
+                    observed: 17,
+                    limit: 16,
+                },
+                FootnoteTextLimitKind::WireBytes,
+                17,
+                16,
+            ),
+            (
+                RewriteError::LimitExceeded {
+                    resource: "text fragments",
+                    observed: 9,
+                    limit: 8,
+                },
+                FootnoteTextLimitKind::Entries,
+                9,
+                8,
+            ),
+            (
+                RewriteError::LimitExceeded {
+                    resource: "rewrite work",
+                    observed: 33,
+                    limit: 32,
+                },
+                FootnoteTextLimitKind::WireWork,
+                33,
+                32,
+            ),
+        ];
+        for (error, kind, observed, maximum) in cases {
+            assert_eq!(
+                map_body_storage_decode_error(BodyStorageDecodeError::Wire(error)),
+                FootnoteTextError::LimitExceeded {
+                    kind,
+                    observed,
+                    maximum,
+                }
+            );
+        }
+        assert_eq!(
+            map_body_storage_decode_error(BodyStorageDecodeError::Package(
+                PackageError::PayloadLimit {
+                    observed: 5,
+                    limit: 4,
+                },
+            )),
+            FootnoteTextError::LimitExceeded {
+                kind: FootnoteTextLimitKind::WireBytes,
                 observed: 5,
                 maximum: 4,
             }
