@@ -12388,3 +12388,65 @@ does not select one unproven root cause. It establishes open/render, emitted-
 artifact reopen, strict Rust reread, and exact inverse evidence only—not
 durable native save parity, Rust/native byte parity, performance, or a
 publication gate.
+
+## 2026-08-24 amendment: Wave57 Numbers name-publication verification record
+
+Commit `35c2ae281d40bc16c659c30dd3690a702a750ea0` was verified with the
+following focused gates. Follow-up accounting hardening is commit
+`ba57356166e82ff37ee1cd5223b68acd484aac42`: detached, unmetered candidate-size
+`Budget` work was removed, candidate sizing and selector comparisons now share
+the reported `Budget`, and a test-only aggregate proves every successful
+`Budget` charge equals `RewriteReport.work_bytes`; max-minus-one fails before
+candidate allocation.
+
+- `cargo test -p litchi-iwa-protos package_metadata_codec --lib`: 19/19;
+- `cargo test -p litchi-numbers --test names`: 19/19;
+- `cargo test -p litchi-numbers package::tests:: --lib`: 37/37;
+- `cargo test -p litchi-iwa --lib comments::tests::creates_reuses_and_cleans_native_author_graph`: 1/1, with 299 existing deprecation warnings;
+- `cargo check -p litchi-iwa-protos -p litchi-numbers --all-targets`: passed, with two existing `object_count` deprecation warnings;
+- `cargo clippy -p litchi-iwa-protos --lib -- -D warnings`: passed. Numbers all-target Clippy passed with explicit allowances for the unrelated existing `deprecated`, `manual_contains`, and test-only `clone_on_copy` findings;
+- `python3 -m unittest tools.test_check_crate_boundaries`: 369/369. `py_compile`, targeted Rust formatting, and `git diff --check` passed before the implementation commit.
+
+The live `python3 tools/check_crate_boundaries.py --explain` command still
+exits 1 only for the known Pages table-lock baseline: 23 findings comprising
+20 tracked aliases and three untracked retired-host findings. It reports no
+Numbers/save-token finding. The full Numbers library run is not green: 400
+tests passed, four were ignored, and the unrelated
+`focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022`
+test failed its existing storage canonical-framing assertion. These results
+do not constitute a full-workspace green claim. Before native rewrite and
+allocation, the Names caller precharges decompressed type-11006 payload bytes
+times the changed semantic-operation upper bound for visitor locator matching;
+compressed Snappy bytes are charged separately as publication accounting.
+
+The bounded native record used the normalized duplicate source
+`/private/tmp/litchi-wave55-metadata-native.4D1yTa/duplicated.numbers`
+(139,219 bytes, SHA-256
+`790aa7386ad6f5bb641dda0aaef3a47236cbe727b9712a5a9cf581ffce6d6754`). The
+final Rust output was
+`/private/tmp/litchi-wave57-final-native.x3zj8I/rust-renamed.numbers`
+(82,283 bytes, SHA-256
+`770a4d593ceede1b14fdee7803d6de780c33d435f270ef572341e6cf4ec37830`), and
+its inverse was 139,219 bytes with the exact source hash above. The final
+diagnostics reported `changed = true`, two operations, two touched semantic
+components, and three preview deletions. A probe observed root token 538 and
+unchanged `last_object_identifier` 905357; selected Document identifier 1 and
+CalculationEngine identifier 904977 had token 538, while unrelated and
+versioned records remained unchanged.
+
+Numbers 14.4 opened and rendered both sheets and tables from the Rust output
+without repair, including the renamed names, marker text, and `42`. Save As
+reported the known `TSPersistence` code 2 autosave alert but emitted
+`/private/tmp/litchi-wave57-token-native.TihN4K/numbers-saved.numbers`
+(86,023 bytes, SHA-256
+`545d0a506e74e95e08b40fbae2f25e16434ef5b720b49937f083be29fbe5bed0`). Numbers
+reopened and rendered that emitted artifact without repair, and the Rust
+reader read it back with root token 539 after Numbers normalization. The
+normalized source itself has the same Save As failure, while a pristine
+no-alias control saves successfully; this record does not attribute the
+failure to the Wave57 token route.
+
+The native evidence is therefore bounded to open/render and emitted-artifact
+reopen/readback. It is not native save acceptance, durable publication,
+Rust/native parity, or native token-set acceptance, and it makes no
+performance or RSS claim.

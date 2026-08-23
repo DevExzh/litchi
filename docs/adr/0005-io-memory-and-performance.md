@@ -863,3 +863,39 @@ finite operation-local accounting contract, not a measurement or claim for
 package-wide peak RSS, allocation count, latency, or throughput. The slice
 changes no manifest edge and retires no Prost-generated schema or workspace
 dependency.
+
+## 2026-08-24 amendment: Wave57 Numbers name-publication resource record
+
+Commit `35c2ae281d40bc16c659c30dd3690a702a750ea0` extends the bounded Numbers
+name-publication operation through the PackageMetadata save-token sidecar.
+Follow-up accounting hardening is commit
+`ba57356166e82ff37ee1cd5223b68acd484aac42`. It removes detached, unmetered
+candidate-size `Budget` work: candidate sizing and selector comparisons now
+share the reported `Budget`, a test-only aggregate proves every successful
+`Budget` charge equals `RewriteReport.work_bytes`, and max-minus-one fails
+before candidate allocation.
+Source scanning charges physical package entries, the metadata member,
+identifier/effective-locator matching, fields, nesting depth, work, selected
+component count, and output bytes. The operation charges native rewrite and
+metadata rewrite work together and performs exact output sizing, fallible
+reservation, and candidate verification before publication. A candidate
+allocation is made only after the relevant preflight checks succeed.
+
+The save-token selector count is bounded by `RewriteOptions.max_components`;
+the report keeps `additions = 0` because token updates are not registry-object
+additions. Root token advancement and selected current-component updates are
+therefore accounted as operation-local rewrite work without overloading the
+registry-addition counter. Unknown root/component fields are copied from the
+source, while selected known fields are replaced or canonically appended only
+after the full source and selector checks pass. This is a finite resource
+contract for this operation, not a package-wide memory, allocation, RSS,
+latency, throughput, or performance claim. Before native rewrite/allocation,
+the Names caller also precharges decompressed type-11006 payload bytes times
+the changed semantic-operation upper bound for visitor locator matching;
+compressed Snappy bytes are separate publication accounting.
+
+No manifest edge changed. This amendment does not retire generated schemas or
+Prost ownership: the hidden codec uses the existing Buffa projection as a
+parity boundary, while unrelated generated mutation/writer paths and normal
+workspace Prost owners remain. It makes no workspace-wide dependency-removal
+claim.
