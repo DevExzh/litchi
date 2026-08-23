@@ -22,6 +22,7 @@ const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 #[cfg(test)]
 std::thread_local! {
     static OUTPUT_ALLOCATIONS: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
+    static WORK_CHARGES: core::cell::Cell<usize> = const { core::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -32,6 +33,16 @@ fn record_output_allocation() {
 #[cfg(test)]
 fn output_allocations() -> usize {
     OUTPUT_ALLOCATIONS.get()
+}
+
+#[cfg(test)]
+fn reset_work_charges() {
+    WORK_CHARGES.set(0);
+}
+
+#[cfg(test)]
+fn work_charges() -> usize {
+    WORK_CHARGES.get()
 }
 
 /// Finite aggregate policy for one decode, rewrite, and verification cycle.
@@ -2549,6 +2560,64 @@ mod tests {
             assert_eq!(output_allocations(), allocations);
         }
     }
+
+    #[test]
+    fn save_tokens_exact_work_includes_candidate_selector_matching() {
+        let locators = [
+            "a.iwa", "b.iwa", "c.iwa", "d.iwa", "e.iwa", "f.iwa", "g.iwa", "h.iwa",
+        ];
+        let components: Vec<Vec<u8>> = locators
+            .iter()
+            .enumerate()
+            .map(|(index, locator)| {
+                token_component((index + 1) as u64, locator, Some(536), false, false)
+            })
+            .collect();
+        let selectors: Vec<ComponentSelector<'_>> = locators
+            .iter()
+            .enumerate()
+            .map(|(index, locator)| ComponentSelector::new((index + 1) as u64, locator))
+            .collect();
+        let source = token_metadata(77, Some(536), &components, &[]);
+        let batch = SaveTokenBatch::new(&selectors);
+        reset_work_charges();
+        let baseline =
+            rewrite_package_metadata_save_tokens(&source, batch, options(&source)).unwrap();
+        let report = baseline.report();
+        assert_eq!(work_charges(), report.work_bytes());
+        let exact = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes(),
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            0,
+        );
+        reset_work_charges();
+        let replay = rewrite_package_metadata_save_tokens(&source, batch, exact).unwrap();
+        assert_eq!(replay.bytes(), baseline.bytes());
+        assert_eq!(work_charges(), replay.report().work_bytes());
+
+        let limited = RewriteOptions::new(
+            source.len(),
+            report.output_bytes(),
+            report.fields(),
+            report.work_bytes() - 1,
+            report.max_depth(),
+            report.components_scanned(),
+            report.references_scanned(),
+            0,
+        );
+        let allocations = output_allocations();
+        let error = rewrite_package_metadata_save_tokens(&source, batch, limited).unwrap_err();
+        assert!(matches!(
+            error.resource_limit(),
+            Some(RewriteLimit::Work { .. })
+        ));
+        assert_eq!(output_allocations(), allocations);
+    }
 }
 
 /// Strictly inspect PackageMetadata without materializing generated messages.
@@ -3058,42 +3127,20 @@ fn save_token_component_output_pass(
     Ok(())
 }
 
-fn save_token_component_size_unmetered(
-    source: &[u8],
-    current: bool,
-    batch: SaveTokenBatch<'_>,
-    new_root: u64,
-) -> Result<(usize, bool), RewriteError> {
-    let hard = usize::try_from(buffa::MAX_MESSAGE_BYTES)
-        .map_err(|_error| RewriteError::invalid(InvalidReason::MalformedWire))?;
-    let options = RewriteOptions::new(
-        source.len(),
-        hard,
-        usize::MAX,
-        usize::MAX,
-        MAX_RECURSION,
-        usize::MAX,
-        usize::MAX,
-        usize::MAX,
-    );
-    let mut local_budget = Budget::new_inspection(source, options)?;
-    save_token_component_size(source, current, batch, new_root, &mut local_budget, 2)
-}
-
 fn precharge_save_token_candidate_component(
     source: &[u8],
     current: bool,
     batch: SaveTokenBatch<'_>,
-    candidate_len: usize,
+    new_root: u64,
     budget: &mut Budget,
     depth: u32,
-) -> Result<(), RewriteError> {
+) -> Result<(usize, bool), RewriteError> {
     budget.component()?;
-    budget.message_len(candidate_len, depth)?;
+    let mut output = 0usize;
     let mut identifier = None;
     let mut preferred_locator = None;
     let mut locator = None;
-    let mut token = None;
+    let mut token_raw = None;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
         match field.number {
@@ -3102,15 +3149,17 @@ fn precharge_save_token_candidate_component(
             3 => set_once(&mut locator, strict_utf8(field.bytes()?)?)?,
             12 => {
                 let value = field.varint()?;
-                if token.replace(value).is_some() {
+                if token_raw.replace((value, field.raw)).is_some() {
                     return Err(RewriteError::invalid(InvalidReason::DuplicateSaveToken));
                 }
             },
             _ => {},
         }
+        output = checked_add(output, field.raw.len())?;
     }
     if !current {
-        return Ok(());
+        budget.message_len(output, depth)?;
+        return Ok((output, false));
     }
     let identifier = identifier
         .filter(|value| *value != 0)
@@ -3129,10 +3178,19 @@ fn precharge_save_token_candidate_component(
         )?;
         selected |= identifier == selector.identifier && effective_locator == selector.locator;
     }
-    if selected && token.is_none() {
+    if selected && token_raw.is_none() {
         budget.field()?;
     }
-    Ok(())
+    if selected {
+        if let Some((_token, raw)) = token_raw {
+            output = output
+                .checked_sub(raw.len())
+                .ok_or_else(|| RewriteError::invalid(InvalidReason::Verification))?;
+        }
+        output = checked_add(output, varint_field_len(12, new_root))?;
+    }
+    budget.message_len(output, depth)?;
+    Ok((output, selected))
 }
 
 fn precharge_save_token_rewrite_and_verification(
@@ -3168,13 +3226,11 @@ fn precharge_save_token_rewrite_and_verification(
             continue;
         }
         let payload = field.bytes()?;
-        let (candidate_len, _selected) =
-            save_token_component_size_unmetered(payload, field.number == 3, batch, new_root)?;
-        precharge_save_token_candidate_component(
+        let (_candidate_len, _selected) = precharge_save_token_candidate_component(
             payload,
             field.number == 3,
             batch,
-            candidate_len,
+            new_root,
             budget,
             2,
         )?;
@@ -5500,6 +5556,8 @@ impl Budget {
             }));
         }
         self.work_bytes = observed;
+        #[cfg(test)]
+        WORK_CHARGES.set(WORK_CHARGES.get().saturating_add(amount));
         Ok(())
     }
     fn depth(&mut self, depth: u32) -> Result<(), RewriteError> {

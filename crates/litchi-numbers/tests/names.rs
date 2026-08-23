@@ -1116,8 +1116,15 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
 
 #[test]
 fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
-    let source = package_bytes(false, false, 0)?;
-    let semantic = PackageSemanticLimits::default().with_formula_render_limits(1, 1)?;
+    // Keep both native component groups selected so the metadata selector
+    // visitor must compare every current ComponentInfo against multiple
+    // locators before publication. The semantic work ceiling must reject
+    // this sidecar-heavy transaction without changing the exact source.
+    let source = split_components(&package_bytes(false, false, 0)?)?;
+    // 2,597 is the pre-selector-charge total for this fixed fixture; the
+    // two selected component groups each add one decompressed metadata
+    // payload bound to the caller-owned work total.
+    let semantic = PackageSemanticLimits::default().with_formula_render_limits(2_597, 1)?;
     let package = Package::from_bytes_with_options(
         &source,
         PackageReadOptions::new(Limits::default(), semantic),
@@ -1125,6 +1132,7 @@ fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
     let before = bytes(&package)?;
     let error = package
         .edit_names()
+        .rename_sheet("Alpha", "Renamed")?
         .rename_table("Alpha", "One", "Denied")?
         .commit()
         .expect_err("the conservative changed-work guard must run before native rewrite");
