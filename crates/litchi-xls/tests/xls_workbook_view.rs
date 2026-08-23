@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
+use litchi_core::sheet::WorkbookTrait;
 use litchi_xls::Workbook;
 use litchi_xls::writer::{WorkbookWindowOptions, Writer};
 
@@ -76,6 +77,28 @@ fn workbook_window_and_sheet_ids_round_trip() {
             .unwrap()
             .is_selected()
     );
+}
+
+#[test]
+fn workbook_trait_follows_active_window_worksheet() {
+    let mut writer = Writer::new();
+    writer.add_worksheet("One").unwrap();
+    writer.add_worksheet("Two").unwrap();
+    writer.add_worksheet("Three").unwrap();
+    writer
+        .set_workbook_window(WorkbookWindowOptions {
+            active_sheet_index: 2,
+            selected_sheet_count: 1,
+            ..WorkbookWindowOptions::default()
+        })
+        .unwrap();
+
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook_trait: &dyn WorkbookTrait = &workbook;
+    assert_eq!(workbook_trait.active_sheet_index(), 2);
+    assert_eq!(workbook_trait.active_worksheet().unwrap().name(), "Three");
 }
 
 #[test]

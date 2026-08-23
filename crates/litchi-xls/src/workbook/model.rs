@@ -517,6 +517,21 @@ impl<R: Read + Seek> Workbook<R> {
                 && defined_name.kind == DefinedNameKind::BuiltIn(built_in)
         })
     }
+
+    /// Return the parsed worksheet index selected by the primary BIFF8
+    /// `Window1` record.
+    ///
+    /// `Window1.active_sheet_index` addresses the complete `BoundSheet8`
+    /// directory, which may also contain chart, macro, or module tabs. The
+    /// generic workbook trait indexes only parsed worksheets, so resolve the
+    /// tab through `SheetMetadata` before exposing it there.
+    fn active_worksheet_position(&self) -> Option<usize> {
+        let tab_index = usize::from(self.workbook_view.primary_window()?.active_sheet_index());
+        let worksheet_index = self.sheets.get(tab_index)?.parsed_worksheet_index()?;
+        self.worksheets
+            .get(worksheet_index)
+            .map(|_| worksheet_index)
+    }
 }
 
 impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::WorkbookTrait
@@ -529,7 +544,8 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
             )));
         }
         // Return reference instead of clone - zero-copy!
-        Ok(Box::new(&self.worksheets[0]))
+        let index = self.active_worksheet_position().unwrap_or(0);
+        Ok(Box::new(&self.worksheets[index]))
     }
 
     fn worksheet_names(&self) -> &[String] {
@@ -569,7 +585,7 @@ impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::Workboo
     }
 
     fn active_sheet_index(&self) -> usize {
-        0 // Default to first sheet
+        self.active_worksheet_position().unwrap_or(0)
     }
 
     fn is_1904_date_system(&self) -> bool {
