@@ -554,6 +554,7 @@ impl RtfSemanticVariant {
                     | Case::RtfLogicalTailPlanNoopSave
             ) || matches!(self, Self::Plain))
             && (!matches!(case, Case::RtfSemanticTextToSink) || !matches!(self, Self::Watermark))
+            && (!case.is_rtf_root_file() || !matches!(self, Self::Watermark))
     }
 
     const fn supports_validation(self) -> bool {
@@ -3644,11 +3645,13 @@ struct RtfTailPublicationSummary {
 }
 
 /// Evidence for the opt-in unified `litchi::Document` owned-byte RTF ingress.
-/// The facade's semantic projection is compared with an independently opened
+/// The facade's semantic projection is compared with a separately opened
 /// native `litchi_rtf::Document` before the timed loop and again after every
-/// timed construction.  The byte clone and all oracle setup stay outside the
-/// measured interval.  This is scoped to the named synthetic RTF corpus and
-/// makes no generic latency, allocation, I/O, or producer claim.
+/// timed construction. Both seams deliberately use the same native RTF
+/// parser/model; this verifies facade adapter parity, not parser independence.
+/// The byte clone and all oracle setup stay outside the measured interval.
+/// This is scoped to the named synthetic RTF corpus and makes no generic
+/// latency, allocation, I/O, or producer claim.
 #[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
 struct RtfRootSummary {
     implementation: &'static str,
@@ -3662,7 +3665,7 @@ struct RtfRootSummary {
     paragraph_text_sha256: String,
     paragraph_count: usize,
     native_semantic_parity_verified: bool,
-    exact_source_hash_verified: bool,
+    native_exact_source_roundtrip_verified: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -9842,6 +9845,7 @@ fn print_usage() {
                                        xlsx_range_source_first_cell,\n\
                                        xlsx_range_source_narrow_column_range_scan,\n\
                                        opc_open_session_scaling,cfb_bulk_read_scaling,\n\
+                                       rtf_file_open,rtf_file_open_lifecycle,\n\
                                        rtf_semantic_open,rtf_semantic_paragraph_count,\n\
                                        rtf_semantic_list_paragraphs,rtf_semantic_collect_paragraphs,\n\
                                        rtf_semantic_one_paragraph,rtf_semantic_full_text,\n\
@@ -18314,9 +18318,10 @@ fn run_rtf_root_access(
     let variant = semantic_rtf_variant(corpus)?;
     let lifecycle = rtf_root_case_parameters(case)?;
 
-    // Build the native typed oracle before timing. It deliberately does not
-    // use the unified facade, so a facade ingress regression cannot certify
-    // itself through its own projection.
+    // Build the native typed seam oracle before timing. It deliberately does
+    // not use the unified facade, so a facade adapter regression cannot
+    // certify itself through its own projection. Both seams still share the
+    // native RTF parser/model; this is not an independent parser oracle.
     let native = litchi_rtf::Document::from_bytes(&corpus.archive)?;
     verify_semantic_rtf(&native, shape, variant, &[])?;
     let expected_projection = RtfRootSemanticProjection {
@@ -18337,7 +18342,7 @@ fn run_rtf_root_access(
         return Err("RTF root source hash differs from deterministic manifest".into());
     }
 
-    // This preflight is also the independent semantic-parity gate for every
+    // This preflight is also the native semantic-parity gate for every
     // selected transport. For the historical facade implementation, the
     // default plain ASCII corpus succeeds; CP-1252/LZFu selectors become
     // runnable as soon as the native byte ingress lands.
@@ -18400,7 +18405,7 @@ fn run_rtf_root_access(
         paragraph_text_sha256: rtf_root_values_digest(&expected_projection.paragraphs),
         paragraph_count,
         native_semantic_parity_verified: true,
-        exact_source_hash_verified: true,
+        native_exact_source_roundtrip_verified: true,
     };
     Ok(result_with_source(
         case,
@@ -47925,7 +47930,7 @@ mod tests {
             assert_eq!(evidence.source_bytes, plain.archive.len() as u64);
             assert_eq!(evidence.source_sha256, plain.manifest.archive_sha256);
             assert!(evidence.native_semantic_parity_verified);
-            assert!(evidence.exact_source_hash_verified);
+            assert!(evidence.native_exact_source_roundtrip_verified);
             assert!(evidence.performance_claim.starts_with("none:"));
             assert_eq!(
                 evidence.paragraph_count,
@@ -47944,6 +47949,12 @@ mod tests {
             super::verify_semantic_rtf(&native, SemanticShape::Tiny, variant, &[]).unwrap();
             assert_eq!(native.to_bytes().unwrap(), corpus.archive);
             assert_eq!(sha256_hex(&corpus.archive), corpus.manifest.archive_sha256);
+        }
+        for case in cases {
+            assert!(RtfSemanticVariant::Plain.supports_case(case));
+            assert!(RtfSemanticVariant::Byte1252.supports_case(case));
+            assert!(RtfSemanticVariant::Lzfu.supports_case(case));
+            assert!(!RtfSemanticVariant::Watermark.supports_case(case));
         }
         assert_eq!(Case::DEFAULT.len(), 36);
     }

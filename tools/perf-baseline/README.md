@@ -156,8 +156,10 @@ selectors, `rtf_file_open` and `rtf_file_open_lifecycle`. They reuse the
 deterministic semantic RTF corpus and time exactly
 `litchi::Document::from_bytes(Vec<u8>)`, or that construction plus
 `Document::text()` for the lifecycle case. The caller-owned `Vec<u8>` clone,
-the independent native `litchi_rtf::Document` semantic oracle, exact source
-SHA-256 check, and facade/native parity checks are outside the timer. The
+the separately opened native `litchi_rtf::Document` seam oracle, native exact
+source round trip, source SHA-256 check, and facade/native parity checks are
+outside the timer. Both seams use the same native RTF parser/model, so this is
+an adapter-parity oracle rather than an independent parser implementation. The
 default `plain` variant is ASCII-only and remains runnable on a pre-ingress
 control build:
 
@@ -171,8 +173,10 @@ cargo run --manifest-path tools/perf-baseline/Cargo.toml --release -- \
 `--rtf-variant byte1252,lzfu` enables the literal CP-1252 and compressed LZFu
 corpora. Their exact-byte native round trips and semantic projections are
 correctness oracles; facade parity is required when the native byte ingress is
-available. The report records `source.rtf_root` with the transport variant,
-source hash, text/paragraph digests, and explicit `performance_claim: "none"`;
+available. Producer-watermark RTF is intentionally unsupported by these two
+facade selectors. The report records `source.rtf_root` with the transport
+variant, source hash, text/paragraph digests, native exact-source round-trip
+proof, and explicit `performance_claim: "none"`;
 these selectors make no generic latency, allocation, physical-I/O, producer,
 or ABBA claim. They are opt-in and leave the default 36 cases / 198 records
 unchanged. The exhaustive `Case` registry/count tests now cover 380 selectable
