@@ -531,6 +531,7 @@ mod tests {
             payload_kinds: Vec::new(),
             writer_shapes: Vec::new(),
             xlsx_shapes: Vec::new(),
+            xlsb_shapes: Vec::new(),
             xlsx_cell_crud_shapes: Vec::new(),
             xlsx_row_visibility_shapes: Vec::new(),
             semantic_shapes: Vec::new(),
