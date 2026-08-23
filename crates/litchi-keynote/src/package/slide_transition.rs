@@ -1826,9 +1826,7 @@ fn validate_requested_opaque_settings(
 /// them. Keep this forwarding entry point alongside the validator so every
 /// adapter uses the same duplicate-field, wire-type, finite-scalar, and
 /// nested-required-field checks.
-pub fn validate_opaque_transition_settings(
-    settings: &Settings,
-) -> Result<(), Error> {
+pub fn validate_opaque_transition_settings(settings: &Settings) -> Result<(), Error> {
     validate_requested_opaque_settings(settings, WireLimits::default())
 }
 
