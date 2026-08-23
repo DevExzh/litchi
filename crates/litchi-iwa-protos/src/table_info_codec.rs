@@ -457,7 +457,10 @@ impl Budget {
     }
 
     fn charge_field(&mut self) -> Result<(), DecodeError> {
-        let observed = self.fields.saturating_add(1);
+        let observed = self
+            .fields
+            .checked_add(1)
+            .ok_or_else(|| DecodeError::field_limit(usize::MAX, self.max_fields))?;
         if observed > self.max_fields {
             return Err(DecodeError::field_limit(observed, self.max_fields));
         }
@@ -466,8 +469,13 @@ impl Budget {
     }
 
     fn charge_message(&mut self, bytes: usize) -> Result<(), DecodeError> {
-        let strict_and_projection = bytes.saturating_mul(2);
-        let observed = self.work_bytes.saturating_add(strict_and_projection);
+        let strict_and_projection = bytes
+            .checked_mul(2)
+            .ok_or_else(|| DecodeError::work_limit(usize::MAX, self.max_work_bytes))?;
+        let observed = self
+            .work_bytes
+            .checked_add(strict_and_projection)
+            .ok_or_else(|| DecodeError::work_limit(usize::MAX, self.max_work_bytes))?;
         if observed > self.max_work_bytes {
             return Err(DecodeError::work_limit(observed, self.max_work_bytes));
         }
@@ -789,7 +797,7 @@ mod tests {
     use prost::Message as _;
 
     use super::{
-        DecodeOptions, TableInfoSnapshot, TableModelReference, WireResourceLimit,
+        Budget, DecodeOptions, TableInfoSnapshot, TableModelReference, WireResourceLimit,
         decode_table_info, decode_table_model_reference,
     };
     use crate::{tsd, tsp, tst};
@@ -1069,6 +1077,38 @@ mod tests {
             })
         );
         Ok(())
+    }
+
+    #[test]
+    fn budget_charge_overflow_is_a_typed_limit() {
+        let mut budget = Budget::new(DecodeOptions::new(1, usize::MAX, 1, 2));
+        budget.fields = usize::MAX;
+        let error = budget
+            .charge_field()
+            .expect_err("field addition must not saturate");
+        assert_eq!(
+            error.field_limit_values(),
+            Some((usize::MAX, usize::MAX))
+        );
+
+        let mut budget = Budget::new(DecodeOptions::new(1, 1, usize::MAX, 2));
+        budget.work_bytes = usize::MAX - 1;
+        let error = budget
+            .charge_message(1)
+            .expect_err("work addition must not saturate");
+        assert_eq!(
+            error.work_limit_values(),
+            Some((usize::MAX, usize::MAX))
+        );
+
+        let mut budget = Budget::new(DecodeOptions::new(1, 1, usize::MAX, 2));
+        let error = budget
+            .charge_message(usize::MAX)
+            .expect_err("work multiplication must not saturate");
+        assert_eq!(
+            error.work_limit_values(),
+            Some((usize::MAX, usize::MAX))
+        );
     }
 
     #[test]
