@@ -91,6 +91,8 @@ const XLSX_DEFINED_NAMES_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-defined-names-source-edit-media-v1";
 const XLSX_PAGE_BREAK_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-break-source-edit-media-v1";
+const XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR: &str =
+    "litchi-xlsx-page-break-projection-media-v1";
 const XLSX_PAGE_MARGIN_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-page-margin-source-edit-media-v1";
 const XLSX_PAGE_SETUP_SOURCE_EDIT_CORPUS_GENERATOR: &str =
@@ -179,6 +181,7 @@ const ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_C
     [2, 2, 2, 2];
 const ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_CALLS] =
     [2, 4, 2, 2];
+const XLSX_REPEATED_PAGE_BREAK_CALLS: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT: usize = 8;
@@ -694,6 +697,8 @@ enum Case {
     XlsxSourceBackedDefinedNamesEditSave,
     XlsxEagerPageBreakEditSave,
     XlsxSourceBackedPageBreakEditSave,
+    XlsxWorksheetRepeatedPageBreaks,
+    XlsxPackageRepeatedPageBreaks,
     XlsxEagerPageMarginEditSave,
     XlsxSourceBackedPageMarginEditSave,
     XlsxEagerPageSetupEditSave,
@@ -1113,6 +1118,8 @@ impl Case {
             },
             Self::XlsxEagerPageBreakEditSave => "xlsx_eager_page_break_edit_save",
             Self::XlsxSourceBackedPageBreakEditSave => "xlsx_source_backed_page_break_edit_save",
+            Self::XlsxWorksheetRepeatedPageBreaks => "xlsx_worksheet_repeated_page_breaks",
+            Self::XlsxPackageRepeatedPageBreaks => "xlsx_package_repeated_page_breaks",
             Self::XlsxEagerPageMarginEditSave => "xlsx_eager_page_margin_edit_save",
             Self::XlsxSourceBackedPageMarginEditSave => "xlsx_source_backed_page_margin_edit_save",
             Self::XlsxEagerPageSetupEditSave => "xlsx_eager_page_setup_edit_save",
@@ -2288,6 +2295,13 @@ impl Case {
         matches!(
             self,
             Self::XlsxEagerPageBreakEditSave | Self::XlsxSourceBackedPageBreakEditSave
+        )
+    }
+
+    const fn is_xlsx_page_break_projection(self) -> bool {
+        matches!(
+            self,
+            Self::XlsxWorksheetRepeatedPageBreaks | Self::XlsxPackageRepeatedPageBreaks
         )
     }
 
@@ -6747,6 +6761,27 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_xlsx_page_break_projection())
+    {
+        let corpus = build_xlsx_page_break_projection_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_xlsx_page_break_projection())
+        {
+            results.push(run_xlsx_page_break_projection(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.is_opc_source_cache_evidence())
     {
         let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible)?;
@@ -6846,6 +6881,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_xlsx_calculation_metadata_edit_save()
                     && !case.is_xlsx_defined_names_edit_save()
                     && !case.is_xlsx_page_break_edit_save()
+                    && !case.is_xlsx_page_break_projection()
                     && !case.is_xlsx_page_margin_edit_save()
                     && !case.is_xlsx_page_setup_edit_save()
                     && !case.is_xlsx_print_options_edit_save()
@@ -8673,6 +8709,8 @@ fn parse_case(value: &str) -> Option<Case> {
         },
         "xlsx_eager_page_break_edit_save" => Some(Case::XlsxEagerPageBreakEditSave),
         "xlsx_source_backed_page_break_edit_save" => Some(Case::XlsxSourceBackedPageBreakEditSave),
+        "xlsx_worksheet_repeated_page_breaks" => Some(Case::XlsxWorksheetRepeatedPageBreaks),
+        "xlsx_package_repeated_page_breaks" => Some(Case::XlsxPackageRepeatedPageBreaks),
         "xlsx_eager_page_margin_edit_save" => Some(Case::XlsxEagerPageMarginEditSave),
         "xlsx_source_backed_page_margin_edit_save" => {
             Some(Case::XlsxSourceBackedPageMarginEditSave)
@@ -9126,6 +9164,8 @@ fn print_usage() {
                                        xlsx_source_backed_defined_names_edit_save,\n\
                                        xlsx_eager_page_break_edit_save,\n\
                                        xlsx_source_backed_page_break_edit_save,\n\
+                                       xlsx_worksheet_repeated_page_breaks,\n\
+                                       xlsx_package_repeated_page_breaks,\n\
                                        xlsx_eager_page_margin_edit_save,\n\
                                        xlsx_source_backed_page_margin_edit_save,\n\
                                        xlsx_eager_page_setup_edit_save,\n\
@@ -12586,6 +12626,35 @@ fn build_xlsx_page_break_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     Ok(corpus)
 }
 
+fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
+    let mut corpus = build_xlsx_page_break_edit_corpus()?;
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let replaced = xlsx_page_break_oracle_rewrite(opc.get_part(&target_uri)?.blob())?;
+    opc.get_part_mut(&target_uri)?.set_blob(replaced);
+    let archive = PackageWriter::to_bytes(&opc)?;
+    let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
+    let uncompressed_payload_bytes = opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("XLSX page-break projection logical byte count overflows usize")
+    })?;
+    corpus.manifest.name = "xlsx-page-break-projection-media".to_owned();
+    corpus.manifest.generator = XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR;
+    corpus.manifest.entry_count = opc.part_count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    corpus.manifest.uncompressed_payload_bytes = uncompressed_payload_bytes;
+    corpus.manifest.archive_bytes = archive.len();
+    corpus.manifest.archive_sha256 = sha256_hex(&archive);
+    corpus.manifest.target_entry = "worksheet:Sheet1:rowBreaks".to_owned();
+    corpus.manifest.target_payload_bytes = target_payload.len();
+    corpus.manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    corpus.archive = archive;
+    corpus.target_name = "xl/worksheets/sheet1.xml".to_owned();
+    corpus.target_payload = target_payload;
+    Ok(corpus)
+}
+
 fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -15646,6 +15715,9 @@ fn run_case_with_config(
         },
         Case::XlsxEagerPageBreakEditSave | Case::XlsxSourceBackedPageBreakEditSave => {
             run_xlsx_page_break_edit_save(case, corpus, warmup_iterations, samples)
+        },
+        Case::XlsxWorksheetRepeatedPageBreaks | Case::XlsxPackageRepeatedPageBreaks => {
+            Err("XLSX page-break projection cases use their dedicated corpus runner".into())
         },
         Case::XlsxEagerPageMarginEditSave | Case::XlsxSourceBackedPageMarginEditSave => {
             run_xlsx_page_margin_edit_save(case, corpus, warmup_iterations, samples)
@@ -36464,10 +36536,996 @@ fn run_xlsx_calculation_metadata_edit_save(
     })
 }
 
+// This benchmark oracle intentionally has no dependency on the XLSX page-break
+// codec. It scans only bounded worksheet XML and keeps its own semantic model.
+const XLSX_PAGE_BREAK_ORACLE_MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const XLSX_PAGE_BREAK_ORACLE_MAX_EVENTS: usize = 1_000_000;
+const XLSX_PAGE_BREAK_ORACLE_MAX_DEPTH: usize = 256;
+const XLSX_PAGE_BREAK_ORACLE_MAX_HORIZONTAL_BREAKS: usize = 1_022;
+const XLSX_PAGE_BREAK_ORACLE_MAX_VERTICAL_BREAKS: usize = 1_023;
+const XLSX_PAGE_BREAK_ORACLE_CORE_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const XLSX_PAGE_BREAK_ORACLE_STRICT_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const XLSX_PAGE_BREAK_ORACLE_FRAGMENT: &[u8] =
+    br#"<rowBreaks count="1" manualBreakCount="1"><brk id="100" max="16383" man="1"/></rowBreaks>"#;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct XlsxPageBreakOracle {
+    horizontal: Option<XlsxPageBreakOracleCollection>,
+    vertical: Option<XlsxPageBreakOracleCollection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct XlsxPageBreakOracleCollection {
+    breaks: Vec<XlsxPageBreakOracleBreak>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct XlsxPageBreakOracleBreak {
+    id: u32,
+    minimum: u32,
+    maximum: u32,
+    manual: bool,
+    pivot: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct XlsxPageBreakOracleTag<'a> {
+    name: &'a [u8],
+    attributes: &'a [u8],
+    start: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum XlsxPageBreakOracleToken<'a> {
+    Start(XlsxPageBreakOracleTag<'a>),
+    Empty(XlsxPageBreakOracleTag<'a>),
+    End { name: &'a [u8], start: usize },
+    Text(&'a [u8]),
+    Comment,
+    CData,
+    Declaration,
+    Processing,
+}
+
+#[derive(Debug)]
+struct XlsxPageBreakOracleOpenCollection {
+    horizontal: bool,
+    count: Option<usize>,
+    manual_count: Option<usize>,
+    breaks: Vec<XlsxPageBreakOracleBreak>,
+}
+
+#[derive(Debug)]
+struct XlsxPageBreakOracleOpenBreak {
+    value: XlsxPageBreakOracleBreak,
+}
+
 fn xlsx_page_break_target() -> Result<litchi_xlsx::page_breaks::Collection, Box<dyn Error>> {
     Ok(litchi_xlsx::page_breaks::Collection::horizontal([
         litchi_xlsx::page_breaks::Break::new(100, 0, 16_383)?.with_manual(true),
     ])?)
+}
+
+fn xlsx_page_break_oracle_target() -> XlsxPageBreakOracle {
+    XlsxPageBreakOracle {
+        horizontal: Some(XlsxPageBreakOracleCollection {
+            breaks: vec![XlsxPageBreakOracleBreak {
+                id: 100,
+                minimum: 0,
+                maximum: 16_383,
+                manual: true,
+                pivot: false,
+            }],
+        }),
+        vertical: None,
+    }
+}
+
+fn xlsx_page_break_oracle_error(message: impl Into<String>) -> Box<dyn Error> {
+    message.into().into()
+}
+
+fn xlsx_page_break_oracle_parse(xml: &[u8]) -> Result<XlsxPageBreakOracle, Box<dyn Error>> {
+    if xml.len() > XLSX_PAGE_BREAK_ORACLE_MAX_XML_BYTES {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle XML exceeds its bounded input size",
+        ));
+    }
+
+    let mut cursor = 0usize;
+    let mut events = 0usize;
+    let mut stack: Vec<&[u8]> = Vec::new();
+    let mut result = XlsxPageBreakOracle {
+        horizontal: None,
+        vertical: None,
+    };
+    let mut open_collection: Option<XlsxPageBreakOracleOpenCollection> = None;
+    let mut open_break: Option<XlsxPageBreakOracleOpenBreak> = None;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
+
+    loop {
+        let Some(token) = xlsx_page_break_oracle_next_token(xml, &mut cursor)? else {
+            break;
+        };
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| xlsx_page_break_oracle_error("XLSX page-break oracle event overflow"))?;
+        if events > XLSX_PAGE_BREAK_ORACLE_MAX_EVENTS {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle exceeds its event bound",
+            ));
+        }
+
+        match token {
+            XlsxPageBreakOracleToken::Start(tag) => {
+                if root_closed {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found content after the worksheet root",
+                    ));
+                }
+                if stack.is_empty() {
+                    if root_seen || !xlsx_page_break_oracle_unqualified(tag.name, b"worksheet") {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle requires one worksheet root",
+                        ));
+                    }
+                    xlsx_page_break_oracle_validate_root(tag.attributes)?;
+                    root_seen = true;
+                    stack.push(tag.name);
+                    continue;
+                }
+                if let Some(collection) = open_collection.as_mut() {
+                    if stack.len() == 2 && xlsx_page_break_oracle_unqualified(tag.name, b"brk") {
+                        if open_break.is_some() {
+                            return Err(xlsx_page_break_oracle_error(
+                                "XLSX page-break oracle found a nested break",
+                            ));
+                        }
+                        open_break = Some(XlsxPageBreakOracleOpenBreak {
+                            value: xlsx_page_break_oracle_parse_break(
+                                tag.attributes,
+                                collection.horizontal,
+                            )?,
+                        });
+                    } else {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found an unexpected collection child",
+                        ));
+                    }
+                } else if stack.len() == 1
+                    && (xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks")
+                        || xlsx_page_break_oracle_unqualified(tag.name, b"colBreaks"))
+                {
+                    let horizontal = xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks");
+                    if (horizontal && result.horizontal.is_some())
+                        || (!horizontal && result.vertical.is_some())
+                    {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found a duplicate collection",
+                        ));
+                    }
+                    open_collection = Some(xlsx_page_break_oracle_open_collection(
+                        tag.attributes,
+                        horizontal,
+                    )?);
+                }
+                if stack.len() >= XLSX_PAGE_BREAK_ORACLE_MAX_DEPTH {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle nesting exceeds its depth bound",
+                    ));
+                }
+                stack.push(tag.name);
+            },
+            XlsxPageBreakOracleToken::Empty(tag) => {
+                if stack.is_empty() || root_closed {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found an element outside the worksheet root",
+                    ));
+                }
+                if let Some(collection) = open_collection.as_mut() {
+                    if stack.len() == 2 && xlsx_page_break_oracle_unqualified(tag.name, b"brk") {
+                        let value = xlsx_page_break_oracle_parse_break(
+                            tag.attributes,
+                            collection.horizontal,
+                        )?;
+                        xlsx_page_break_oracle_push_break(collection, value)?;
+                    } else {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found an unexpected empty collection child",
+                        ));
+                    }
+                } else if stack.len() == 1
+                    && (xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks")
+                        || xlsx_page_break_oracle_unqualified(tag.name, b"colBreaks"))
+                {
+                    let horizontal = xlsx_page_break_oracle_unqualified(tag.name, b"rowBreaks");
+                    if (horizontal && result.horizontal.is_some())
+                        || (!horizontal && result.vertical.is_some())
+                    {
+                        return Err(xlsx_page_break_oracle_error(
+                            "XLSX page-break oracle found a duplicate collection",
+                        ));
+                    }
+                    let collection =
+                        xlsx_page_break_oracle_open_collection(tag.attributes, horizontal)?;
+                    let collection = xlsx_page_break_oracle_finish_collection(collection)?;
+                    if horizontal {
+                        result.horizontal = Some(collection);
+                    } else {
+                        result.vertical = Some(collection);
+                    }
+                }
+            },
+            XlsxPageBreakOracleToken::End { name, .. } => {
+                let Some(open_name) = stack.last() else {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found an unexpected closing element",
+                    ));
+                };
+                if *open_name != name {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found mismatched XML elements",
+                    ));
+                }
+                if open_collection.is_some() {
+                    match stack.len() {
+                        3 => {
+                            let open = open_break.take().ok_or_else(|| {
+                                xlsx_page_break_oracle_error(
+                                    "XLSX page-break oracle lost an open break",
+                                )
+                            })?;
+                            xlsx_page_break_oracle_push_break(
+                                open_collection.as_mut().ok_or_else(|| {
+                                    xlsx_page_break_oracle_error(
+                                        "XLSX page-break oracle lost its collection",
+                                    )
+                                })?,
+                                open.value,
+                            )?;
+                        },
+                        2 => {
+                            if open_break.is_some() {
+                                return Err(xlsx_page_break_oracle_error(
+                                    "XLSX page-break oracle closed a collection with an open break",
+                                ));
+                            }
+                            let collection = open_collection.take().ok_or_else(|| {
+                                xlsx_page_break_oracle_error(
+                                    "XLSX page-break oracle lost its open collection",
+                                )
+                            })?;
+                            let horizontal = collection.horizontal;
+                            let collection = xlsx_page_break_oracle_finish_collection(collection)?;
+                            if horizontal {
+                                result.horizontal = Some(collection);
+                            } else {
+                                result.vertical = Some(collection);
+                            }
+                        },
+                        _ => {
+                            return Err(xlsx_page_break_oracle_error(
+                                "XLSX page-break oracle has invalid collection state",
+                            ));
+                        },
+                    }
+                }
+                stack.pop();
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            XlsxPageBreakOracleToken::Text(value) => {
+                let non_whitespace = value.iter().any(|byte| !byte.is_ascii_whitespace());
+                if non_whitespace
+                    && (stack.is_empty()
+                        || root_closed
+                        || stack.len() == 1
+                        || open_collection.is_some())
+                {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found unexpected XML text",
+                    ));
+                }
+            },
+            XlsxPageBreakOracleToken::CData => {
+                if stack.len() <= 1 || open_collection.is_some() {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle rejects CDATA in worksheet control XML",
+                    ));
+                }
+            },
+            XlsxPageBreakOracleToken::Comment => {},
+            XlsxPageBreakOracleToken::Declaration => {
+                if declaration_seen || root_seen || !stack.is_empty() {
+                    return Err(xlsx_page_break_oracle_error(
+                        "XLSX page-break oracle found an invalid XML declaration",
+                    ));
+                }
+                declaration_seen = true;
+            },
+            XlsxPageBreakOracleToken::Processing => {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle rejects processing instructions",
+                ));
+            },
+        }
+    }
+
+    if !root_seen
+        || !root_closed
+        || !stack.is_empty()
+        || open_collection.is_some()
+        || open_break.is_some()
+    {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an unterminated worksheet",
+        ));
+    }
+    Ok(result)
+}
+
+fn xlsx_page_break_oracle_next_token<'a>(
+    xml: &'a [u8],
+    cursor: &mut usize,
+) -> Result<Option<XlsxPageBreakOracleToken<'a>>, Box<dyn Error>> {
+    if *cursor >= xml.len() {
+        return Ok(None);
+    }
+    let start = *cursor;
+    if xml[start] != b'<' {
+        let end = xml[start..]
+            .iter()
+            .position(|byte| *byte == b'<')
+            .map_or(xml.len(), |offset| start + offset);
+        *cursor = end;
+        return Ok(Some(XlsxPageBreakOracleToken::Text(&xml[start..end])));
+    }
+    if xml[start..].starts_with(b"<!--") {
+        let body_start = start + 4;
+        let end = xlsx_page_break_oracle_find(xml, body_start, b"-->").ok_or_else(|| {
+            xlsx_page_break_oracle_error("XLSX page-break oracle found an unterminated comment")
+        })?;
+        *cursor = end + 3;
+        return Ok(Some(XlsxPageBreakOracleToken::Comment));
+    }
+    if xml[start..].starts_with(b"<![CDATA[") {
+        let body_start = start + 9;
+        let end = xlsx_page_break_oracle_find(xml, body_start, b"]]>").ok_or_else(|| {
+            xlsx_page_break_oracle_error("XLSX page-break oracle found unterminated CDATA")
+        })?;
+        *cursor = end + 3;
+        return Ok(Some(XlsxPageBreakOracleToken::CData));
+    }
+    if xml[start..].starts_with(b"<?") {
+        let end = xlsx_page_break_oracle_find(xml, start + 2, b"?>").ok_or_else(|| {
+            xlsx_page_break_oracle_error("XLSX page-break oracle found an unterminated instruction")
+        })?;
+        let declaration = xml[start..].get(5).is_some_and(|byte| {
+            *byte == b' ' || *byte == b'\t' || *byte == b'\r' || *byte == b'\n'
+        }) && xml[start..].starts_with(b"<?xml");
+        *cursor = end + 2;
+        return Ok(Some(if declaration {
+            XlsxPageBreakOracleToken::Declaration
+        } else {
+            XlsxPageBreakOracleToken::Processing
+        }));
+    }
+    if xml[start..].starts_with(b"<!") {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle rejects DTD and unknown declarations",
+        ));
+    }
+    if xml[start..].starts_with(b"</") {
+        let end = xlsx_page_break_oracle_tag_end(xml, start + 2)?;
+        let body = xlsx_page_break_oracle_trim(&xml[start + 2..end]);
+        if body.is_empty() || body.iter().any(|byte| byte.is_ascii_whitespace()) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an invalid closing tag",
+            ));
+        }
+        if !xlsx_page_break_oracle_valid_name(body) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an invalid XML name",
+            ));
+        }
+        *cursor = end + 1;
+        return Ok(Some(XlsxPageBreakOracleToken::End { name: body, start }));
+    }
+
+    let end = xlsx_page_break_oracle_tag_end(xml, start + 1)?;
+    let mut body = xlsx_page_break_oracle_trim(&xml[start + 1..end]);
+    let empty = body.last() == Some(&b'/');
+    if empty {
+        body = xlsx_page_break_oracle_trim(&body[..body.len() - 1]);
+    }
+    let name_end = body
+        .iter()
+        .position(|byte| byte.is_ascii_whitespace())
+        .unwrap_or(body.len());
+    let name = &body[..name_end];
+    if name.is_empty() || !xlsx_page_break_oracle_valid_name(name) {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an invalid opening tag",
+        ));
+    }
+    let attributes = xlsx_page_break_oracle_trim_start(&body[name_end..]);
+    *cursor = end + 1;
+    let tag = XlsxPageBreakOracleTag {
+        name,
+        attributes,
+        start,
+    };
+    Ok(Some(if empty {
+        XlsxPageBreakOracleToken::Empty(tag)
+    } else {
+        XlsxPageBreakOracleToken::Start(tag)
+    }))
+}
+
+fn xlsx_page_break_oracle_tag_end(xml: &[u8], mut cursor: usize) -> Result<usize, Box<dyn Error>> {
+    let mut quote = None;
+    while cursor < xml.len() {
+        match (quote, xml[cursor]) {
+            (Some(delimiter), byte) if byte == delimiter => quote = None,
+            (None, b'\'' | b'"') => quote = Some(xml[cursor]),
+            (None, b'>') => return Ok(cursor),
+            _ => {},
+        }
+        cursor += 1;
+    }
+    Err(xlsx_page_break_oracle_error(
+        "XLSX page-break oracle found an unterminated tag",
+    ))
+}
+
+fn xlsx_page_break_oracle_find(haystack: &[u8], start: usize, needle: &[u8]) -> Option<usize> {
+    haystack
+        .get(start..)?
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|offset| start + offset)
+}
+
+fn xlsx_page_break_oracle_trim(value: &[u8]) -> &[u8] {
+    xlsx_page_break_oracle_trim_start(value)
+        .iter()
+        .rposition(|byte| !byte.is_ascii_whitespace())
+        .map_or(&[], |end| {
+            &xlsx_page_break_oracle_trim_start(value)[..end + 1]
+        })
+}
+
+fn xlsx_page_break_oracle_trim_start(value: &[u8]) -> &[u8] {
+    value
+        .iter()
+        .position(|byte| !byte.is_ascii_whitespace())
+        .map_or(&[], |start| &value[start..])
+}
+
+fn xlsx_page_break_oracle_valid_name(name: &[u8]) -> bool {
+    name.first()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_' || *byte == b':')
+        && name
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b':' | b'-' | b'.'))
+}
+
+fn xlsx_page_break_oracle_unqualified(name: &[u8], expected: &[u8]) -> bool {
+    name == expected
+}
+
+fn xlsx_page_break_oracle_each_attribute<F>(
+    attributes: &[u8],
+    mut visitor: F,
+) -> Result<(), Box<dyn Error>>
+where
+    F: FnMut(&[u8], &[u8]) -> Result<(), Box<dyn Error>>,
+{
+    let mut cursor = 0usize;
+    while cursor < attributes.len() {
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if cursor == attributes.len() {
+            break;
+        }
+        let name_start = cursor;
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'=')
+        {
+            cursor += 1;
+        }
+        let name = &attributes[name_start..cursor];
+        if !xlsx_page_break_oracle_valid_name(name) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an invalid attribute name",
+            ));
+        }
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if attributes.get(cursor) != Some(&b'=') {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle requires quoted XML attributes",
+            ));
+        }
+        cursor += 1;
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        let Some(&delimiter) = attributes.get(cursor) else {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found a missing attribute value",
+            ));
+        };
+        if delimiter != b'\'' && delimiter != b'"' {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle requires quoted XML attributes",
+            ));
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while attributes
+            .get(cursor)
+            .is_some_and(|byte| *byte != delimiter)
+        {
+            if attributes[cursor] == b'<' {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found '<' in an attribute value",
+                ));
+            }
+            cursor += 1;
+        }
+        let Some(_) = attributes.get(cursor) else {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found an unterminated attribute value",
+            ));
+        };
+        visitor(name, &attributes[value_start..cursor])?;
+        cursor += 1;
+    }
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_validate_root(attributes: &[u8]) -> Result<(), Box<dyn Error>> {
+    let mut namespace = None::<Vec<u8>>;
+    xlsx_page_break_oracle_each_attribute(attributes, |name, value| {
+        if name == b"xmlns" {
+            if namespace.is_some() {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found duplicate worksheet namespaces",
+                ));
+            }
+            namespace = Some(value.to_vec());
+        }
+        Ok(())
+    })?;
+    if !namespace.as_deref().is_some_and(|value| {
+        value == XLSX_PAGE_BREAK_ORACLE_CORE_NAMESPACE
+            || value == XLSX_PAGE_BREAK_ORACLE_STRICT_NAMESPACE
+    }) {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found a non-SpreadsheetML worksheet namespace",
+        ));
+    }
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_open_collection(
+    attributes: &[u8],
+    horizontal: bool,
+) -> Result<XlsxPageBreakOracleOpenCollection, Box<dyn Error>> {
+    let mut count = None;
+    let mut manual_count = None;
+    xlsx_page_break_oracle_each_attribute(attributes, |name, value| {
+        if name == b"xmlns" || name.contains(&b':') {
+            return Ok(());
+        }
+        let target = match name {
+            b"count" => &mut count,
+            b"manualBreakCount" => &mut manual_count,
+            _ => {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found an unknown collection attribute",
+                ));
+            },
+        };
+        if target.is_some() {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX page-break oracle found a duplicate collection attribute",
+            ));
+        }
+        *target = Some(xlsx_page_break_oracle_usize(value, "collection count")?);
+        Ok(())
+    })?;
+    Ok(XlsxPageBreakOracleOpenCollection {
+        horizontal,
+        count,
+        manual_count,
+        breaks: Vec::new(),
+    })
+}
+
+fn xlsx_page_break_oracle_parse_break(
+    attributes: &[u8],
+    horizontal: bool,
+) -> Result<XlsxPageBreakOracleBreak, Box<dyn Error>> {
+    let mut id = None;
+    let mut minimum = None;
+    let mut maximum = None;
+    let mut manual = None;
+    let mut pivot = None;
+    xlsx_page_break_oracle_each_attribute(attributes, |name, value| {
+        if name == b"xmlns" || name.contains(&b':') {
+            return Ok(());
+        }
+        match name {
+            b"id" => xlsx_page_break_oracle_set_once(
+                &mut id,
+                xlsx_page_break_oracle_u32(value, "break coordinate")?,
+            )?,
+            b"min" => xlsx_page_break_oracle_set_once(
+                &mut minimum,
+                xlsx_page_break_oracle_u32(value, "break coordinate")?,
+            )?,
+            b"max" => xlsx_page_break_oracle_set_once(
+                &mut maximum,
+                xlsx_page_break_oracle_u32(value, "break coordinate")?,
+            )?,
+            b"man" => {
+                xlsx_page_break_oracle_set_once(&mut manual, xlsx_page_break_oracle_bool(value)?)?
+            },
+            b"pt" => {
+                xlsx_page_break_oracle_set_once(&mut pivot, xlsx_page_break_oracle_bool(value)?)?
+            },
+            _ => {
+                return Err(xlsx_page_break_oracle_error(
+                    "XLSX page-break oracle found an unknown break attribute",
+                ));
+            },
+        }
+        Ok(())
+    })?;
+    let value = XlsxPageBreakOracleBreak {
+        id: id.unwrap_or(0),
+        minimum: minimum.unwrap_or(0),
+        maximum: maximum.unwrap_or(0),
+        manual: manual.unwrap_or(false),
+        pivot: pivot.unwrap_or(false),
+    };
+    let (maximum_id, maximum_span) = if horizontal {
+        (1_048_575, 16_383)
+    } else {
+        (16_383, 1_048_575)
+    };
+    if value.minimum > value.maximum || value.id > maximum_id || value.maximum > maximum_span {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an out-of-grid break",
+        ));
+    }
+    Ok(value)
+}
+
+fn xlsx_page_break_oracle_set_once<T>(
+    target: &mut Option<T>,
+    value: T,
+) -> Result<(), Box<dyn Error>> {
+    if target.is_some() {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found a duplicate break attribute",
+        ));
+    }
+    *target = Some(value);
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_push_break(
+    collection: &mut XlsxPageBreakOracleOpenCollection,
+    value: XlsxPageBreakOracleBreak,
+) -> Result<(), Box<dyn Error>> {
+    let maximum = if collection.horizontal {
+        XLSX_PAGE_BREAK_ORACLE_MAX_HORIZONTAL_BREAKS
+    } else {
+        XLSX_PAGE_BREAK_ORACLE_MAX_VERTICAL_BREAKS
+    };
+    if collection.breaks.len() >= maximum {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle collection exceeds its Office bound",
+        ));
+    }
+    collection.breaks.push(value);
+    Ok(())
+}
+
+fn xlsx_page_break_oracle_finish_collection(
+    collection: XlsxPageBreakOracleOpenCollection,
+) -> Result<XlsxPageBreakOracleCollection, Box<dyn Error>> {
+    if collection.count.unwrap_or(0) != collection.breaks.len()
+        || collection.manual_count.unwrap_or(0)
+            != collection
+                .breaks
+                .iter()
+                .filter(|value| value.manual)
+                .count()
+    {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle collection counts do not match its children",
+        ));
+    }
+    Ok(XlsxPageBreakOracleCollection {
+        breaks: collection.breaks,
+    })
+}
+
+fn xlsx_page_break_oracle_u32(value: &[u8], what: &str) -> Result<u32, Box<dyn Error>> {
+    if value.is_empty() {
+        return Err(xlsx_page_break_oracle_error(format!(
+            "XLSX page-break oracle found an empty {what}"
+        )));
+    }
+    let mut result = 0u32;
+    for byte in value {
+        if !byte.is_ascii_digit() {
+            return Err(xlsx_page_break_oracle_error(format!(
+                "XLSX page-break oracle found an invalid {what}"
+            )));
+        }
+        result = result
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(u32::from(*byte - b'0')))
+            .ok_or_else(|| {
+                xlsx_page_break_oracle_error(format!("XLSX page-break oracle {what} overflows u32"))
+            })?;
+    }
+    Ok(result)
+}
+
+fn xlsx_page_break_oracle_usize(value: &[u8], what: &str) -> Result<usize, Box<dyn Error>> {
+    usize::try_from(xlsx_page_break_oracle_u32(value, what)?).map_err(|error| {
+        xlsx_page_break_oracle_error(format!(
+            "XLSX page-break oracle {what} does not fit usize: {error}"
+        ))
+    })
+}
+
+fn xlsx_page_break_oracle_bool(value: &[u8]) -> Result<bool, Box<dyn Error>> {
+    match value {
+        b"0" | b"false" => Ok(false),
+        b"1" | b"true" => Ok(true),
+        _ => Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle found an invalid boolean",
+        )),
+    }
+}
+
+fn xlsx_page_break_oracle_drawing_start(xml: &[u8]) -> Result<Option<usize>, Box<dyn Error>> {
+    let mut cursor = 0usize;
+    let mut depth = 0usize;
+    let mut root_close = None;
+    while let Some(token) = xlsx_page_break_oracle_next_token(xml, &mut cursor)? {
+        match token {
+            XlsxPageBreakOracleToken::Start(tag) => {
+                if depth == 1 && xlsx_page_break_oracle_unqualified(tag.name, b"drawing") {
+                    return Ok(Some(tag.start));
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    xlsx_page_break_oracle_error("XLSX page-break oracle depth overflow")
+                })?;
+            },
+            XlsxPageBreakOracleToken::Empty(tag) => {
+                if depth == 1 && xlsx_page_break_oracle_unqualified(tag.name, b"drawing") {
+                    return Ok(Some(tag.start));
+                }
+            },
+            XlsxPageBreakOracleToken::End { start, .. } => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    xlsx_page_break_oracle_error("XLSX page-break oracle depth underflow")
+                })?;
+                if depth == 0 {
+                    root_close = Some(start);
+                }
+            },
+            XlsxPageBreakOracleToken::Text(_)
+            | XlsxPageBreakOracleToken::Comment
+            | XlsxPageBreakOracleToken::CData
+            | XlsxPageBreakOracleToken::Declaration
+            | XlsxPageBreakOracleToken::Processing => {},
+        }
+    }
+    Ok(root_close)
+}
+
+fn xlsx_page_break_oracle_rewrite(xml: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+    if xlsx_page_break_oracle_parse(xml)?
+        != (XlsxPageBreakOracle {
+            horizontal: None,
+            vertical: None,
+        })
+    {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle fixture already contains authored breaks",
+        ));
+    }
+    let insertion = xlsx_page_break_oracle_drawing_start(xml)?.ok_or_else(|| {
+        xlsx_page_break_oracle_error(
+            "XLSX page-break oracle fixture has no bounded drawing insertion point",
+        )
+    })?;
+    let capacity = xml
+        .len()
+        .checked_add(XLSX_PAGE_BREAK_ORACLE_FRAGMENT.len())
+        .ok_or_else(|| xlsx_page_break_oracle_error("XLSX page-break oracle output overflows"))?;
+    if capacity > XLSX_PAGE_BREAK_ORACLE_MAX_XML_BYTES {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle output exceeds its bounded size",
+        ));
+    }
+    let mut output = Vec::with_capacity(capacity);
+    output.extend_from_slice(&xml[..insertion]);
+    output.extend_from_slice(XLSX_PAGE_BREAK_ORACLE_FRAGMENT);
+    output.extend_from_slice(&xml[insertion..]);
+    if xlsx_page_break_oracle_parse(&output)? != xlsx_page_break_oracle_target() {
+        return Err(xlsx_page_break_oracle_error(
+            "XLSX page-break oracle rewrite did not produce its target",
+        ));
+    }
+    Ok(output)
+}
+
+fn xlsx_page_break_expected_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
+    // Construct the expected package from independently rewritten worksheet
+    // bytes; do not call either page-break publication implementation here.
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let rewritten = xlsx_page_break_oracle_rewrite(package.get_part(&target_uri)?.blob())?;
+    package.get_part_mut(&target_uri)?.set_blob(rewritten);
+    PackageWriter::to_bytes(&package).map_err(Into::into)
+}
+
+fn xlsx_page_break_oracle_matches_public(
+    actual: &litchi_xlsx::page_breaks::PageBreaks,
+    expected: &XlsxPageBreakOracle,
+) -> bool {
+    fn matches_collection(
+        actual: Option<&litchi_xlsx::page_breaks::Collection>,
+        expected: Option<&XlsxPageBreakOracleCollection>,
+    ) -> bool {
+        match (actual, expected) {
+            (None, None) => true,
+            (Some(actual), Some(expected)) => {
+                actual.len() == expected.breaks.len()
+                    && actual
+                        .breaks()
+                        .iter()
+                        .zip(&expected.breaks)
+                        .all(|(actual, expected)| {
+                            actual.id() == expected.id
+                                && actual.minimum() == expected.minimum
+                                && actual.maximum() == expected.maximum
+                                && actual.is_manual() == expected.manual
+                                && actual.is_pivot() == expected.pivot
+                        })
+            },
+            _ => false,
+        }
+    }
+
+    matches_collection(actual.horizontal(), expected.horizontal.as_ref())
+        && matches_collection(actual.vertical(), expected.vertical.as_ref())
+}
+
+fn xlsx_page_break_oracle_append(encoded: &mut Vec<u8>, value: &XlsxPageBreakOracle) {
+    fn append_collection(
+        encoded: &mut Vec<u8>,
+        name: &[u8],
+        collection: Option<&XlsxPageBreakOracleCollection>,
+    ) {
+        encoded.extend_from_slice(name);
+        match collection {
+            None => encoded.push(b'-'),
+            Some(collection) => {
+                encoded.push(b'[');
+                for value in &collection.breaks {
+                    encoded.extend_from_slice(&value.id.to_le_bytes());
+                    encoded.extend_from_slice(&value.minimum.to_le_bytes());
+                    encoded.extend_from_slice(&value.maximum.to_le_bytes());
+                    encoded.push(u8::from(value.manual));
+                    encoded.push(u8::from(value.pivot));
+                }
+                encoded.push(b']');
+            },
+        }
+        encoded.push(b';');
+    }
+
+    append_collection(encoded, b"row", value.horizontal.as_ref());
+    append_collection(encoded, b"col", value.vertical.as_ref());
+}
+
+fn xlsx_page_break_oracle_append_public(
+    encoded: &mut Vec<u8>,
+    value: &litchi_xlsx::page_breaks::PageBreaks,
+) {
+    let mut oracle = XlsxPageBreakOracle {
+        horizontal: None,
+        vertical: None,
+    };
+    if let Some(collection) = value.horizontal() {
+        oracle.horizontal = Some(XlsxPageBreakOracleCollection {
+            breaks: collection
+                .breaks()
+                .iter()
+                .map(|value| XlsxPageBreakOracleBreak {
+                    id: value.id(),
+                    minimum: value.minimum(),
+                    maximum: value.maximum(),
+                    manual: value.is_manual(),
+                    pivot: value.is_pivot(),
+                })
+                .collect(),
+        });
+    }
+    if let Some(collection) = value.vertical() {
+        oracle.vertical = Some(XlsxPageBreakOracleCollection {
+            breaks: collection
+                .breaks()
+                .iter()
+                .map(|value| XlsxPageBreakOracleBreak {
+                    id: value.id(),
+                    minimum: value.minimum(),
+                    maximum: value.maximum(),
+                    manual: value.is_manual(),
+                    pivot: value.is_pivot(),
+                })
+                .collect(),
+        });
+    }
+    xlsx_page_break_oracle_append(encoded, &oracle);
+}
+
+fn xlsx_repeated_page_break_digest(value: &XlsxPageBreakOracle) -> Result<String, Box<dyn Error>> {
+    let mut encoded = Vec::new();
+    xlsx_page_break_oracle_append(&mut encoded, value);
+    let capacity = encoded
+        .len()
+        .checked_mul(XLSX_REPEATED_PAGE_BREAK_CALLS)
+        .ok_or("XLSX repeated page-break digest size overflows usize")?;
+    let mut repeated = Vec::with_capacity(capacity);
+    for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+        repeated.extend_from_slice(&encoded);
+    }
+    Ok(sha256_hex(&repeated))
+}
+
+fn xlsx_page_break_outputs_digest(
+    values: &[litchi_xlsx::page_breaks::PageBreaks],
+    expected: &XlsxPageBreakOracle,
+) -> Result<String, Box<dyn Error>> {
+    let mut encoded = Vec::new();
+    for value in values {
+        if !xlsx_page_break_oracle_matches_public(value, expected) {
+            return Err(xlsx_page_break_oracle_error(
+                "XLSX repeated page-break projection differs from the bounded XML oracle",
+            ));
+        }
+        xlsx_page_break_oracle_append_public(&mut encoded, value);
+    }
+    Ok(sha256_hex(&encoded))
 }
 
 fn verify_xlsx_page_break_edit_output(
@@ -36475,12 +37533,6 @@ fn verify_xlsx_page_break_edit_output(
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
     let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let page_breaks = reopened.page_breaks("Sheet1")?;
-    if page_breaks.page_breaks().horizontal() != Some(&xlsx_page_break_target()?)
-        || page_breaks.page_breaks().vertical().is_some()
-    {
-        return Err("XLSX page-break output has unexpected authored breaks".into());
-    }
     if reopened
         .calculation_metadata()?
         .properties()
@@ -36509,8 +37561,17 @@ fn verify_xlsx_page_break_edit_output(
             return Err("XLSX page-break Part metadata differs from source".into());
         }
         if source_part.partname() == &target_uri {
-            if source_part.blob() == candidate_part.blob() {
-                return Err("XLSX page-break worksheet XML did not change".into());
+            let expected = xlsx_page_break_oracle_rewrite(source_part.blob())?;
+            if candidate_part.blob() != expected {
+                return Err(
+                    "XLSX page-break worksheet XML differs from the independent expected bytes"
+                        .into(),
+                );
+            }
+            if xlsx_page_break_oracle_parse(candidate_part.blob())?
+                != xlsx_page_break_oracle_target()
+            {
+                return Err("XLSX page-break output has unexpected authored breaks".into());
             }
         } else if source_part.blob() != candidate_part.blob() {
             return Err("XLSX page-break edit changed an unselected Part payload".into());
@@ -36579,10 +37640,12 @@ fn run_xlsx_page_break_edit_save(
         return Err("XLSX page-break case requires its fixed media-rich corpus".into());
     }
     let source_backed = case == Case::XlsxSourceBackedPageBreakEditSave;
-    let expected_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let mut expected = Vec::new();
-    let expected_materializations =
-        publish_xlsx_page_break_edit(expected_source, &mut expected, source_backed)?;
+    let expected = xlsx_page_break_expected_output(corpus)?;
+    let expected_materializations = if source_backed {
+        2
+    } else {
+        corpus.manifest.entry_count
+    };
     let required_materializations = if source_backed {
         2
     } else {
@@ -36657,6 +37720,94 @@ fn run_xlsx_page_break_edit_save(
         output_sha256: Some(expected_digest),
         operation_metrics: None,
     })
+}
+
+/// Measure repeated page-break reads on the concrete immutable `Worksheet`
+/// handle, alongside the public `Package::page_breaks` control. Package and
+/// workbook setup, the exact raw-XML oracle, and the first projection/warm-up
+/// call all stay outside the timed repeated-query interval.
+fn run_xlsx_page_break_projection(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if corpus.manifest.generator != XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR
+        || !case.is_xlsx_page_break_projection()
+    {
+        return Err("XLSX page-break projection case requires its fixed projection corpus".into());
+    }
+    let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
+    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let expected = xlsx_page_break_oracle_parse(opc.get_part(&target_uri)?.blob())?;
+    let expected_digest = xlsx_repeated_page_break_digest(&expected)?;
+
+    // Verify both public entry points against the independent raw-XML oracle
+    // before any timed work. This makes the Package path an explicit control
+    // and ensures the direct Worksheet selector cannot hide a semantic drift.
+    let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+    let package_projection = package.page_breaks("Sheet1")?;
+    if !xlsx_page_break_oracle_matches_public(package_projection.page_breaks(), &expected) {
+        return Err("XLSX Package page-break projection differs from raw oracle".into());
+    }
+    let workbook = package.workbook()?;
+    let worksheet = workbook
+        .sheet("Sheet1")?
+        .ok_or("XLSX worksheet page-break oracle has no Sheet1")?;
+    let worksheet_projection = worksheet.page_breaks()?;
+    if !xlsx_page_break_oracle_matches_public(&worksheet_projection, &expected) {
+        return Err("XLSX Worksheet page-break projection differs from raw oracle".into());
+    }
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+        let mut outputs = Vec::with_capacity(XLSX_REPEATED_PAGE_BREAK_CALLS);
+        let started = match case {
+            Case::XlsxWorksheetRepeatedPageBreaks => {
+                let workbook = package.workbook()?;
+                let worksheet = workbook
+                    .sheet("Sheet1")?
+                    .ok_or("XLSX Worksheet repeated-query setup has no Sheet1")?;
+                let warmed = worksheet.page_breaks()?;
+                if !xlsx_page_break_oracle_matches_public(&warmed, &expected) {
+                    return Err("XLSX Worksheet warm projection differs from raw oracle".into());
+                }
+                let started = Instant::now();
+                for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+                    outputs.push(worksheet.page_breaks()?);
+                }
+                started
+            },
+            Case::XlsxPackageRepeatedPageBreaks => {
+                let warmed = package.page_breaks("Sheet1")?;
+                if !xlsx_page_break_oracle_matches_public(warmed.page_breaks(), &expected) {
+                    return Err("XLSX Package warm projection differs from raw oracle".into());
+                }
+                let started = Instant::now();
+                for _ in 0..XLSX_REPEATED_PAGE_BREAK_CALLS {
+                    outputs.push(package.page_breaks("Sheet1")?.page_breaks().clone());
+                }
+                started
+            },
+            _ => unreachable!("filtered XLSX page-break projection case"),
+        };
+        let duration = started.elapsed();
+        if outputs.len() != XLSX_REPEATED_PAGE_BREAK_CALLS
+            || outputs
+                .iter()
+                .any(|value| !xlsx_page_break_oracle_matches_public(value, &expected))
+            || xlsx_page_break_outputs_digest(&outputs, &expected)? != expected_digest
+        {
+            return Err("XLSX repeated page-break projections differ from raw oracle".into());
+        }
+        std::hint::black_box(outputs);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let mut result = result(case, corpus, elapsed, None);
+    result.output_sha256 = Some(expected_digest);
+    Ok(result)
 }
 
 fn xlsx_page_margin_target() -> Result<litchi_xlsx::page_margins::Margins, Box<dyn Error>> {
@@ -41351,6 +42502,7 @@ mod tests {
         SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
         SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
         XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
@@ -41366,15 +42518,16 @@ mod tests {
         build_xlsx_cell_crud_corpus, build_xlsx_conditional_formatting_edit_corpus,
         build_xlsx_corpus, build_xlsx_data_validation_edit_corpus,
         build_xlsx_defined_names_edit_corpus, build_xlsx_merge_edit_corpus,
-        build_xlsx_page_break_edit_corpus, build_xlsx_page_margin_edit_corpus,
-        build_xlsx_page_setup_edit_corpus, build_xlsx_print_options_edit_corpus,
-        build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
-        cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
-        expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, resolve_execution_workers, run_case, run_case_with_config,
-        run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
-        run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        build_xlsx_page_break_edit_corpus, build_xlsx_page_break_projection_corpus,
+        build_xlsx_page_margin_edit_corpus, build_xlsx_page_setup_edit_corpus,
+        build_xlsx_print_options_edit_corpus, build_xlsx_row_visibility_corpus,
+        build_xlsx_sheet_protection_edit_corpus, cfb_open_stream_expected_payload,
+        cfb_target_aware_repeat_formula, doc_body_text_fnv1a, expected_opc_overlay_output,
+        ole_common_changed_output, opc_overlay_replacement_payload, parse_case, payload_bytes,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
+        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
+        run_docx_source_backed_one_edit_save, run_odf_content_cow,
+        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -41382,10 +42535,11 @@ mod tests {
         run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
         run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
-        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_margin_edit_save,
-        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
-        run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
-        updated_writer_text, verify_xlsx_cells, writer_shape, xlsx_cell_count, xlsx_spec,
+        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_break_projection,
+        run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
+        run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
+        simulated_request_delay, statistics, updated_writer_text, verify_xlsx_cells, writer_shape,
+        xlsx_cell_count, xlsx_spec,
     };
 
     #[test]
@@ -42640,6 +43794,8 @@ mod tests {
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedDefinedNamesEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageBreakEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageBreakEditSave));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxWorksheetRepeatedPageBreaks));
+        assert!(!Case::DEFAULT.contains(&Case::XlsxPackageRepeatedPageBreaks));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageMarginEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxSourceBackedPageMarginEditSave));
         assert!(!Case::DEFAULT.contains(&Case::XlsxEagerPageSetupEditSave));
@@ -43476,6 +44632,45 @@ mod tests {
                 .ordinary_payload_materializations,
             Some(vec![2])
         );
+    }
+
+    #[test]
+    fn xlsx_repeated_page_break_selectors_match_the_exact_oracle() {
+        for (name, case) in [
+            (
+                "xlsx_worksheet_repeated_page_breaks",
+                Case::XlsxWorksheetRepeatedPageBreaks,
+            ),
+            (
+                "xlsx_package_repeated_page_breaks",
+                Case::XlsxPackageRepeatedPageBreaks,
+            ),
+        ] {
+            assert_eq!(parse_case(name), Some(case));
+            assert_eq!(case.name(), name);
+            assert!(!case.uses_xlsx());
+            assert!(!Case::DEFAULT.contains(&case));
+        }
+        let corpus = build_xlsx_page_break_projection_corpus().unwrap();
+        let again = build_xlsx_page_break_projection_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(
+            corpus.manifest.generator,
+            XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR
+        );
+        assert_eq!(corpus.manifest.archive_sha256, sha256_hex(&corpus.archive));
+
+        let worksheet =
+            run_xlsx_page_break_projection(Case::XlsxWorksheetRepeatedPageBreaks, &corpus, 0, 1)
+                .unwrap();
+        let package =
+            run_xlsx_page_break_projection(Case::XlsxPackageRepeatedPageBreaks, &corpus, 0, 1)
+                .unwrap();
+        assert_eq!(worksheet.case, "xlsx_worksheet_repeated_page_breaks");
+        assert_eq!(package.case, "xlsx_package_repeated_page_breaks");
+        assert_eq!(worksheet.output_sha256, package.output_sha256);
+        assert_eq!(worksheet.elapsed_ns.samples.len(), 1);
+        assert_eq!(package.elapsed_ns.samples.len(), 1);
     }
 
     #[test]
