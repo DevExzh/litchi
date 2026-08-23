@@ -1,8 +1,8 @@
 # Performance CRUD coverage
 
-Date: 2026-08-23
+Date: 2026-08-24
 
-This is a coverage map, not a completion claim. It compares the 383 selectable
+This is a coverage map, not a completion claim. It compares the 385 selectable
 benchmark cases and the explicitly labeled correctness-only APIs with
 `docs/CRUD_Scenario_Checklist.md`. Generic ZIP/OPC/CFB substrate measurements
 do not certify format-semantic CRUD behavior, and API-only coverage is not a
@@ -26,6 +26,22 @@ zero-output budget/release behavior. These are bounded correctness gates only;
 successful signed/protected/encrypted/macro mutation, link resolution, and
 latency/resource speedup are not claimed, and the current selector/default
 counts are unchanged.
+
+Change 0265 adds two opt-in PPTX whole-slide boundary publication selectors.
+The deterministic four-dependency-free-slide corpus is 45 ZIP members and
+32,396 bytes with source SHA-256
+`685a1805ad291e8f9852d3ccd584320f20847bd0ac8fdf29857f96efe1109477`. Removal
+covers first, middle, and last positions plus a typed final-only refusal; move
+covers both boundary directions and an exact `from == to` no-op. The
+production opened-presentation `Snapshot`/`Transaction` paths report plan,
+commit, sequential publication, and semantic-reopen phases. Twice-built
+determinism, source immutability, raw local plus normalized-central identity
+for untouched members, strict `[Content_Types].xml` identity on moves,
+serialized durable forward/inverse patches, and dependency/unknown/MCE/signed/
+limits/stale/foreign/partial/zero-sink gates are covered. The selectors bring
+the current matrix to 385 names while the default remains 36 cases / 198
+records; this is correctness and phase evidence only, with no latency,
+allocation, RSS, or physical-I/O claim.
 
 | Required scenario | Current status | Coverage evidence |
 |---|---|---|

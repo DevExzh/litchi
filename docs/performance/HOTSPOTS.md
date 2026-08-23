@@ -11,6 +11,20 @@ inventory, one-under input, zero-output publication, and RAII release checks
 pass. This is bounded correctness-only evidence with no selector/default
 count, latency, allocation/RSS, physical-I/O, or resource-performance claim.)
 
+[change 0265 — PPTX slide-boundary publication selectors](changes/0265-pptx-slide-boundary-publication.md)
+(the opt-in remove and move selectors use a deterministic four-slide,
+dependency-free PPTX corpus with 45 ZIP members, 32,396 source bytes, and
+SHA-256 `685a1805ad291e8f9852d3ccd584320f20847bd0ac8fdf29857f96efe1109477`.
+Removal covers first/middle/last positions and a final-only refusal; move
+covers both boundaries and the `from == to` no-op. Production
+`Snapshot`/`Transaction`, semantic reopen, phase vectors, serialized
+forward/inverse patches, source immutability, deterministic rebuilds, strict
+untouched raw local/offset-normalized central records, and dependency,
+unknown-member, MCE, signed, limits, stale/foreign, partial, and zero-sink
+gates are covered. Move requires strict `[Content_Types].xml` identity. This
+is correctness and phase evidence only; no latency, allocation/RSS,
+physical-I/O, or broad PPTX claim is made.)
+
 [change 0263 — DOCX story-hyperlink publication selectors](changes/0263-docx-story-hyperlink-publication.md)
 (the opt-in no-op and shared-target redaction selectors cover seven Word story
 kinds, 15 Parts, 24 ZIP members, and a pinned 9,900-byte source. Their timer
@@ -1275,6 +1289,19 @@ checked. Source/sink preparation and all independent oracles are outside the
 open + plan + commit + sequential-publication timer. This is correctness and
 phase evidence only, not a speedup, allocation, RSS, physical-I/O, or broad
 DOCX claim.
+
+Change 0265 adds two opt-in whole-slide boundary publication selectors over a
+45-member, 32,396-byte, four-dependency-free-slide PPTX corpus. Removal proves
+first/middle/last positions plus final-only refusal; move proves both boundary
+directions and the exact `from == to` no-op. Production opened-presentation
+`Snapshot`/`Transaction` plans and commits are timed as separate plan, commit,
+sequential-publication, and reopen phases. Semantic reopen, twice-built
+determinism, source immutability, durable serialized forward/inverse patches,
+stale/foreign, dependency, unknown-member, MCE, signed, limits, partial, and
+zero-sink gates remain untimed. Untouched raw local and normalized-central
+records must match; move requires strict `[Content_Types].xml` identity. This
+is correctness and phase evidence only, not a latency, allocation/RSS,
+physical-I/O, or broad PPTX claim.
 
 PPTX ordinary reads defer slide payload parsing, but repeatedly parse the
 presentation slide-reference list. Exact-name slide lookup resolves and parses

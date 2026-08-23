@@ -243,6 +243,39 @@ cargo run --manifest-path tools/perf-baseline/Cargo.toml --release --bin litchi-
   --json target/perf/opc-relationship-open.json
 ```
 
+## PPTX slide-boundary publication selectors (change 0265)
+
+Run the opt-in whole-slide boundary selectors over the deterministic
+four-dependency-free-slide PPTX corpus:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml --release -- \
+  --case pptx_slide_remove_boundary_save,pptx_slide_move_boundary_save \
+  --warmup 3 --samples 30 \
+  --json target/perf/pptx-slide-boundaries.json
+```
+
+The corpus has 45 ZIP members, 32,396 source archive bytes, and source
+SHA-256
+`685a1805ad291e8f9852d3ccd584320f20847bd0ac8fdf29857f96efe1109477`.
+Removal covers first, middle, and last positions and a final-only refusal;
+move covers `0 -> 3` and `3 -> 0`, while `from == to` is an exact no-op. The
+production opened-presentation `Snapshot`/`Transaction` paths are used. Each
+sample reports plan, commit, sequential OPC publication, and semantic-reopen
+phase vectors; corpus/sink preparation and independent semantic, ZIP, patch,
+and refusal oracles are outside the phase clocks.
+
+The corpus is built twice and must be byte-identical. Gates cover source
+immutability, semantic reopen, raw local and local-offset-normalized central
+identity for untouched members, strict `[Content_Types].xml` identity on
+moves, serialized durable forward/inverse patches, dependency,
+unknown-member, markup-compatibility, signed-package, limits, stale/foreign,
+partial-sink, and zero-sink refusals. The two opt-in `Case` entries bring the
+selectable matrix to 385 names while the default remains 36 cases / 198
+records. This is correctness and phase evidence only: no latency,
+allocation, RSS, decompression, throughput, physical-I/O, or broad PPTX claim
+is made. See [change 0265](../../docs/performance/changes/0265-pptx-slide-boundary-publication.md).
+
 ## XLSX vendor-extension preservation shape (change 0262)
 
 The existing XLSX cell-value selectors also accept the explicit
