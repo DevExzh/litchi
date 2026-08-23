@@ -33,7 +33,7 @@
     {
       "id": "abba-0248",
       "kind": "abba_package",
-      "relative_path": "0248-cfb-streaming-20260821",
+      "relative_path": "docs/performance/results/0248-cfb-streaming-20260821",
       "manifest": {
         "path": "0248-cfb-streaming-abba-manifest.json",
         "sha256": "7ffd58b3252879713697244972284a44a40244f47090d8a5aa0ac07a709314ee",
@@ -49,7 +49,7 @@
     {
       "id": "abba-0249",
       "kind": "abba_package",
-      "relative_path": "0249-ods-known-change-20260821",
+      "relative_path": "docs/performance/results/0249-ods-known-change-20260821",
       "manifest": {
         "path": "0249-ods-known-change-abba-manifest.json",
         "sha256": "acff26a2a42a168ea173e408b8847a374e915dc2e73482432af116ff8512d6c4",
@@ -65,7 +65,7 @@
     {
       "id": "abba-0250",
       "kind": "abba_package",
-      "relative_path": "0250-zip-ordering-20260821",
+      "relative_path": "docs/performance/results/0250-zip-ordering-20260821",
       "manifest": {
         "path": "0250-zip-ordering-abba-manifest.json",
         "sha256": "84b67141fa08a1ea1af7f398501fcf1ee58874bc121b6e34826858f153b23bde",
@@ -81,7 +81,7 @@
     {
       "id": "abba-0251",
       "kind": "abba_package",
-      "relative_path": "0251-xlsx-xml-borrowed-20260821",
+      "relative_path": "docs/performance/results/0251-xlsx-xml-borrowed-20260821",
       "manifest": {
         "path": "0251-xlsx-xml-borrowed-abba-manifest.json",
         "sha256": "06fbd58b2d9ae8fe460c656bc7316b1493ed78f47ec5d5c91e91d4c088e8c00b",
@@ -93,6 +93,14 @@
         "canonical_sha256": "c6045e6bd17d9181346692aa0463eda4b13c3b78f42f8e65b13990d17b3a04f9",
         "schema_version": 1
       }
+    },
+    {
+      "id": "resource-0251",
+      "kind": "resource_abba_report",
+      "relative_path": "docs/performance/results/0251-xlsx-xml-borrowed-resource-20260821.json",
+      "sha256": "bad9031a246b80d1090ad16cb9837b4581d8f451bbd43e7d03c839e878ae99d3",
+      "schema_version": 1,
+      "abba_schema_version": 1
     }
   ],
   "claims": [
@@ -338,10 +346,10 @@
       "id": "claim-0251-xlsx-xml-borrowed",
       "change_id": "0251-xlsx-xml-borrowed-abba",
       "claim_class": "optimization",
-      "status": "held",
-      "code_state": "not_landed",
+      "status": "landed",
+      "code_state": "landed",
       "reason_codes": [
-        "resource_guardrail_pending"
+        "accepted_latency_and_resource_guardrail"
       ],
       "scope": {
         "format": "xlsx",
@@ -462,6 +470,7 @@
         "metrics": [
           "heaptrack.allocation_calls",
           "heaptrack.allocated_bytes",
+          "heaptrack.temporary_allocations",
           "heaptrack.peak_heap_bytes",
           "heaptrack.peak_rss_bytes",
           "time.max_rss_kib"
