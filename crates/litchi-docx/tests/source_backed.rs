@@ -4,14 +4,18 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{Position, ReadAt, SourceVersion};
+use litchi_docx::alt::{Data, MAX_DATA_BYTES};
 use litchi_docx::document::{Snapshot, TransactionError};
 use litchi_docx::{Error, Package, ReadLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
+use litchi_opc::rel::TargetMode;
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part};
 
 const MAIN_DOCUMENT: &str = "word/document.xml";
 const UNUSED_PART: &str = "word/000-unused.bin";
 const TRAILING_PART: &str = "word/zzz-trailing.bin";
+const ALT_TARGET: &str = "word/altChunk.html";
+const ALT_VENDOR_PART: &str = "word/vendor-alt.bin";
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
 struct ObservedSource {
@@ -181,6 +185,123 @@ fn fixture() -> (Vec<u8>, std::ops::Range<usize>, std::ops::Range<usize>) {
         rt::OFFICE_DOCUMENT,
         false,
     )
+}
+
+fn alt_chunk_fixture(signed: bool, shared_target: bool) -> Vec<u8> {
+    alt_chunk_fixture_with_layout(signed, shared_target, false)
+}
+
+fn alt_chunk_fixture_with_layout(
+    signed: bool,
+    shared_target: bool,
+    nested_anchor: bool,
+) -> Vec<u8> {
+    let second = if shared_target {
+        r#"<w:altChunk r:id="rIdAltChunk2"/>"#
+    } else {
+        ""
+    };
+    let anchors = if nested_anchor {
+        format!(r#"<w:p><w:altChunk r:id="rIdAltChunk1"/>{second}</w:p>"#)
+    } else {
+        format!(r#"<w:altChunk r:id="rIdAltChunk1"/>{second}"#)
+    };
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:t>before</w:t></w:r></w:p>{anchors}<w:p><w:r><w:t>after</w:t></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+
+    let mut package = OpcPackage::new();
+    let mut main = BlobPart::new(
+        PackURI::new(format!("/{MAIN_DOCUMENT}")).unwrap(),
+        ct::WML_DOCUMENT_MAIN.to_owned(),
+        document,
+    );
+    main.rels_mut()
+        .try_add_relationship(
+            rt::ALTERNATIVE_FORMAT_IMPORT.to_owned(),
+            "altChunk.html".to_owned(),
+            "rIdAltChunk1".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    if shared_target {
+        main.rels_mut()
+            .try_add_relationship(
+                rt::ALTERNATIVE_FORMAT_IMPORT.to_owned(),
+                "altChunk.html".to_owned(),
+                "rIdAltChunk2".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+    }
+    package.try_add_part(Box::new(main)).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(format!("/{ALT_TARGET}")).unwrap(),
+            "text/html".to_owned(),
+            b"<html><body>original</body></html>".to_vec(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(format!("/{ALT_VENDOR_PART}")).unwrap(),
+            "application/octet-stream".to_owned(),
+            (0_u8..=u8::MAX).cycle().take(8192).collect(),
+        )))
+        .unwrap();
+    package.relate_to(MAIN_DOCUMENT, rt::OFFICE_DOCUMENT);
+    if signed {
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+                b"<origin/>".to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+/// Return one raw local ZIP member span without using the package reader.
+///
+/// This intentionally compares local framing and compressed bytes, while the
+/// central-directory relative offset (which may move after one replacement)
+/// remains outside the member identity check.
+fn raw_local_member(zip: &[u8], name: &str) -> Vec<u8> {
+    let name = name.as_bytes();
+    for (offset, signature) in zip.windows(4).enumerate() {
+        if signature != b"PK\x01\x02" || offset + 46 > zip.len() {
+            continue;
+        }
+        let compressed_size =
+            u32::from_le_bytes(zip[offset + 20..offset + 24].try_into().unwrap()) as usize;
+        let name_length =
+            u16::from_le_bytes(zip[offset + 28..offset + 30].try_into().unwrap()) as usize;
+        let extra_length =
+            u16::from_le_bytes(zip[offset + 30..offset + 32].try_into().unwrap()) as usize;
+        if offset + 46 + name_length + extra_length > zip.len()
+            || &zip[offset + 46..offset + 46 + name_length] != name
+        {
+            continue;
+        }
+        let local_offset =
+            u32::from_le_bytes(zip[offset + 42..offset + 46].try_into().unwrap()) as usize;
+        let local_name_length = u16::from_le_bytes(
+            zip[local_offset + 26..local_offset + 28]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let local_extra_length = u16::from_le_bytes(
+            zip[local_offset + 28..local_offset + 30]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let end = local_offset + 30 + local_name_length + local_extra_length + compressed_size;
+        return zip[local_offset..end].to_vec();
+    }
+    panic!("ZIP member {name:?} was not found")
 }
 
 struct FailingSink {
@@ -508,4 +629,153 @@ fn strict_main_document_relationship_uses_the_same_overlay_contract() {
             .unwrap(),
         "strict edited"
     );
+}
+
+#[test]
+fn alt_chunk_payload_overlay_is_one_edit_and_preserves_raw_unselected_members() {
+    let source_bytes = alt_chunk_fixture(false, false);
+    let source = Arc::new(ObservedSource::new(source_bytes.clone(), 0..0, 0..0));
+    let package = source_backed::Package::from_read_at(source).unwrap();
+    let replacement = b"<html><body>replacement &amp; inert</body></html>".to_vec();
+    let mut output = Vec::new();
+
+    package
+        .publish_alt_chunk_to_stream(
+            &mut output,
+            source_backed::AltChunkSelector::index(0),
+            Data::Html(replacement.clone()),
+        )
+        .unwrap();
+
+    assert_ne!(output, source_bytes);
+    assert_eq!(
+        raw_local_member(&output, MAIN_DOCUMENT),
+        raw_local_member(&source_bytes, MAIN_DOCUMENT)
+    );
+    assert_eq!(
+        raw_local_member(&output, ALT_VENDOR_PART),
+        raw_local_member(&source_bytes, ALT_VENDOR_PART)
+    );
+    let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
+    let target = reopened
+        .get_part(&PackURI::new(format!("/{ALT_TARGET}")).unwrap())
+        .unwrap();
+    assert_eq!(target.blob(), replacement.as_slice());
+}
+
+#[test]
+fn alt_chunk_real_libreoffice_fixture_preserves_untouched_zip_members() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx"
+    );
+    let source_bytes = std::fs::read(path).unwrap();
+    let source = Arc::new(ObservedSource::new(source_bytes.clone(), 0..0, 0..0));
+    let package = source_backed::Package::from_read_at(source).unwrap();
+    let replacement = b"<html><body>changed from a real producer</body></html>".to_vec();
+    let mut output = Vec::new();
+
+    package
+        .publish_alt_chunk_to_stream(
+            &mut output,
+            source_backed::AltChunkSelector::index(0),
+            Data::Html(replacement.clone()),
+        )
+        .unwrap();
+
+    for member in [
+        "[Content_Types].xml",
+        "word/document.xml",
+        "word/_rels/document.xml.rels",
+    ] {
+        assert_eq!(
+            raw_local_member(&output, member),
+            raw_local_member(&source_bytes, member),
+            "untouched member {member} changed"
+        );
+    }
+    let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
+    assert_eq!(
+        reopened
+            .get_part(&PackURI::new("/word/altChunk.html").unwrap())
+            .unwrap()
+            .blob(),
+        replacement.as_slice()
+    );
+}
+
+#[test]
+fn alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_noops_exact() {
+    let shared_bytes = alt_chunk_fixture(false, true);
+    let shared_source = Arc::new(ObservedSource::new(shared_bytes, 0..0, 0..0));
+    let shared_package = source_backed::Package::from_read_at(shared_source).unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        shared_package.publish_alt_chunk_to_stream(
+            &mut output,
+            source_backed::AltChunkSelector::index(0),
+            Data::Html(b"<html><body>ambiguous</body></html>".to_vec()),
+        ),
+        Err(Error::UnsafeEdit { .. })
+    ));
+    assert!(output.is_empty());
+
+    let signed_bytes = alt_chunk_fixture(true, false);
+    let signed_source = Arc::new(ObservedSource::new(signed_bytes.clone(), 0..0, 0..0));
+    let signed_package = source_backed::Package::from_read_at(signed_source).unwrap();
+    signed_package
+        .publish_alt_chunk_to_stream(
+            &mut output,
+            source_backed::AltChunkSelector::index(0),
+            Data::Html(b"<html><body>original</body></html>".to_vec()),
+        )
+        .unwrap();
+    assert_eq!(output, signed_bytes);
+
+    let signed_source = Arc::new(ObservedSource::new(signed_bytes, 0..0, 0..0));
+    let signed_package = source_backed::Package::from_read_at(signed_source).unwrap();
+    output.clear();
+    assert!(matches!(
+        signed_package.publish_alt_chunk_to_stream(
+            &mut output,
+            source_backed::AltChunkSelector::index(0),
+            Data::Html(b"<html><body>signed change</body></html>".to_vec()),
+        ),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn alt_chunk_overlay_refuses_non_body_anchor_layouts() {
+    let source_bytes = alt_chunk_fixture_with_layout(false, false, true);
+    let source = Arc::new(ObservedSource::new(source_bytes, 0..0, 0..0));
+    let package = source_backed::Package::from_read_at(source).unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        package.publish_alt_chunk_to_stream(
+            &mut output,
+            source_backed::AltChunkSelector::index(0),
+            Data::Html(b"<html><body>nested</body></html>".to_vec()),
+        ),
+        Err(Error::OutOfBounds { .. })
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn alt_chunk_overlay_rejects_oversized_payload_before_reading_source() {
+    let source_bytes = alt_chunk_fixture(false, false);
+    let source = Arc::new(ObservedSource::new(source_bytes, 0..0, 0..0));
+    let package = source_backed::Package::from_read_at(source).unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        package.publish_alt_chunk_to_stream(
+            &mut output,
+            source_backed::AltChunkSelector::index(0),
+            Data::Html(vec![b'x'; MAX_DATA_BYTES + 1]),
+        ),
+        Err(Error::Invalid(_))
+    ));
+    assert!(output.is_empty());
 }

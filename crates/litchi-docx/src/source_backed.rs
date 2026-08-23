@@ -11,14 +11,16 @@
 pub mod paragraph_copy;
 pub mod paragraph_remove;
 
+use crate::alt::Data;
 use crate::document::{Commit, Edit, Snapshot, TransactionResult};
 use crate::error::{Error, Result};
 use crate::namespace::scan_word_element_ranges;
 use crate::package::validate_document_main_content_type;
 use crate::paragraph::Paragraph;
 use crate::parts::document_part::{
-    document_blocks, document_elements, document_paragraph, document_paragraph_count,
-    document_paragraphs, document_tables, is_xml_outer_whitespace, visible_document_xml,
+    body_block_ranges, document_blocks, document_elements, document_paragraph,
+    document_paragraph_count, document_paragraphs, document_tables, is_xml_outer_whitespace,
+    visible_document_xml,
 };
 use crate::redact;
 use crate::sanitize::{self, RelationshipState};
@@ -46,6 +48,31 @@ use std::sync::Arc;
 pub struct Package {
     package: SourceBackedPackage,
     execution: Option<ExecutionContext>,
+}
+
+/// A checked selector for one active `w:altChunk` anchor in the main story.
+///
+/// The selector is deliberately positional: an altChunk has no semantic name
+/// of its own, and relationship IDs are package vocabulary rather than an
+/// ordinary document selector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AltChunkSelector {
+    /// Zero-based active main-story altChunk position.
+    Index(usize),
+}
+
+impl AltChunkSelector {
+    /// Construct a checked-by-use positional selector.
+    #[must_use]
+    pub const fn index(index: usize) -> Self {
+        Self::Index(index)
+    }
+}
+
+impl From<usize> for AltChunkSelector {
+    fn from(index: usize) -> Self {
+        Self::Index(index)
+    }
 }
 
 struct DocumentVariablesSource {
@@ -803,6 +830,48 @@ impl Package {
         Ok(target)
     }
 
+    /// Replace the opaque payload behind one existing main-story altChunk.
+    ///
+    /// This is an opt-in one-edit save path for foreign HTML, RTF, text, XML,
+    /// or nested-Office payloads. The selected relationship, Part URI, media
+    /// type, and relationship closure are immutable; only the existing target
+    /// payload is replaced. Every other ZIP member is copied through the
+    /// source-backed OPC preservation plan, including unsupported members and
+    /// the source's local ZIP framing.
+    ///
+    /// A positional selector resolves only active main-story anchors. An
+    /// external relationship, an ambiguous/shared target, a target with its
+    /// own relationships, a non-`/word/` direct-child target, a media-type or
+    /// extension mismatch, and other unsafe layouts are refused before output.
+    /// Exact payload no-ops preserve the complete source artifact, including
+    /// signatures. A real change to signed input is refused until the caller
+    /// chooses an explicit signature-stripping or resigning workflow.
+    ///
+    /// The payload is inert: it is never imported, parsed as a nested Office
+    /// document, rendered, fetched, or executed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, selector, relationship, target-layout,
+    /// signature, XML-publication, or sink error. A sink failure after output
+    /// begins is reported by the underlying incomplete-output error.
+    pub fn publish_alt_chunk_to_stream<W: Write>(
+        self,
+        writer: W,
+        selector: impl Into<AltChunkSelector>,
+        replacement: Data,
+    ) -> Result<()> {
+        replacement.validate()?;
+        let target = self.alt_chunk_target(
+            selector.into(),
+            replacement.media_type(),
+            replacement.extension(),
+        )?;
+        self.package
+            .write_part_overlay_to_stream(writer, &target, replacement.into_bytes())
+            .map_err(Error::from)
+    }
+
     /// Publish an explicit external-hyperlink sanitization commit to a
     /// sequential stream.
     ///
@@ -939,6 +1008,141 @@ impl Package {
         self.package
             .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;
         Ok(report)
+    }
+
+    fn alt_chunk_target(
+        &self,
+        selector: AltChunkSelector,
+        media_type: &str,
+        extension: &str,
+    ) -> Result<litchi_opc::PackURI> {
+        self.package.check_execution()?;
+        let main = self.package.main_document_part()?;
+        let main_name = main.partname().clone();
+        let data = main.data()?;
+        let chunks = crate::alt::scan(data.as_bytes())?;
+        // `body_block_ranges` uses this stable private kind ordering for the
+        // third variant, the direct-body altChunk block.
+        const ALT_CHUNK_BLOCK_KIND: usize = 2;
+        let body_ranges = body_block_ranges(data.as_bytes())?;
+        let body_len = body_ranges
+            .iter()
+            .filter(|(kind, start, _)| *kind == ALT_CHUNK_BLOCK_KIND && chunks.contains_key(start))
+            .count();
+        let AltChunkSelector::Index(index) = selector;
+        let chunk = body_ranges
+            .into_iter()
+            .filter_map(|(kind, start, _)| {
+                (kind == ALT_CHUNK_BLOCK_KIND)
+                    .then_some(chunks.get(&start))
+                    .flatten()
+            })
+            .nth(index)
+            .ok_or(Error::OutOfBounds {
+                object: "altChunk",
+                index,
+                len: body_len,
+            })?;
+        let relationship = main
+            .rels()
+            .get(chunk.relationship().as_str())
+            .ok_or_else(|| {
+                Error::InvalidRelationship(format!(
+                    "altChunk relationship '{}' is missing",
+                    chunk.relationship().as_str()
+                ))
+            })?;
+        if !crate::alt::is_relationship(relationship.reltype()) {
+            return Err(Error::InvalidRelationship(format!(
+                "relationship '{}' is not an altChunk relationship",
+                chunk.relationship().as_str()
+            )));
+        }
+        if relationship.is_external() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "external altChunk targets cannot be replaced by a source-backed payload overlay",
+            });
+        }
+        let target = relationship.target_partname()?;
+        let target_part = self.package.part(&target)?;
+        if target == main_name {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "an altChunk target cannot be the main document Part",
+            });
+        }
+        let target_kind = crate::alt::Kind::from_media_type(target_part.content_type());
+        let replacement_kind = crate::alt::Kind::from_media_type(media_type);
+        if target_kind != replacement_kind || matches!(target_kind, crate::alt::Kind::Unknown) {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "replacement media type family must match the existing altChunk target Part",
+            });
+        }
+        if !target_part.rels().is_empty() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "altChunk targets with dependent relationships are outside the safe payload-only closure",
+            });
+        }
+        let relative = target
+            .as_str()
+            .strip_prefix("/word/")
+            .ok_or(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "altChunk target must be a direct child of the Word package directory",
+            })?;
+        let Some((stem, target_extension)) = relative.rsplit_once('.') else {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "altChunk target must have a bounded foreign-payload extension",
+            });
+        };
+        if stem.is_empty()
+            || relative.contains('/')
+            || target_extension.is_empty()
+            || !target_extension.eq_ignore_ascii_case(extension)
+        {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "altChunk target path or extension is outside the safe payload-only layout",
+            });
+        }
+
+        let mut inbound = 0usize;
+        for candidate in self.package.rels().iter() {
+            if !candidate.is_external() && candidate.target_partname()? == target {
+                inbound = inbound.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("altChunk inbound count overflow".into())
+                })?;
+            }
+        }
+        for part in self.package.iter_parts() {
+            for candidate in part.rels().iter() {
+                if !candidate.is_external() && candidate.target_partname()? == target {
+                    inbound = inbound.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("altChunk inbound count overflow".into())
+                    })?;
+                }
+            }
+        }
+        if inbound != 1 {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "publish_alt_chunk_to_stream",
+                reason: "the selected altChunk target is shared by an ambiguous relationship closure",
+            });
+        }
+        self.package.source_version()?;
+        Ok(target)
     }
 
     fn main_document_snapshot(

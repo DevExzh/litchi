@@ -603,6 +603,8 @@ impl<'data> ArchiveReader<'data> {
         let mut total_metadata_bytes = 0u64;
         let mut total_uncompressed_size = 0u64;
         let mut ordered_names = Vec::new();
+        let mut local_offsets_strictly_increasing = true;
+        let mut previous_local_header_offset = None;
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
@@ -710,11 +712,16 @@ impl<'data> ArchiveReader<'data> {
                 continue;
             }
 
+            let local_header_offset = entry.local_header_offset();
+            if previous_local_header_offset.is_some_and(|previous| local_header_offset <= previous)
+            {
+                local_offsets_strictly_increasing = false;
+            }
+            previous_local_header_offset = Some(local_header_offset);
             if directories.contains_key(&name) {
                 return Err(file_directory_collision_error(&name, lossy_name));
             }
 
-            let local_header_offset = entry.local_header_offset();
             if index.contains_key(&name) {
                 return Err(duplicate_member_error(
                     &name,
@@ -733,7 +740,9 @@ impl<'data> ArchiveReader<'data> {
             ordered_names.push((local_header_offset, name));
         }
 
-        ordered_names.sort_by_key(|(offset, _)| *offset);
+        if !local_offsets_strictly_increasing {
+            ordered_names.sort_by_key(|(offset, _)| *offset);
+        }
         let order = ordered_names.into_iter().map(|(_, name)| name).collect();
 
         Ok(Self {
@@ -864,6 +873,41 @@ impl<'data> ArchiveReader<'data> {
                 other.as_id().as_u16(),
             ))),
         }
+    }
+
+    /// Borrow and verify a stored member without materializing a second copy.
+    ///
+    /// `Some` is returned only for ZIP Store members. Deflated and otherwise
+    /// unsupported members return `None`, allowing a caller to fall back to
+    /// [`Self::read`]. Before the borrowed slice is published, the local
+    /// header, data descriptor (when present), declared size, and CRC are
+    /// validated. The returned bytes borrow the source archive for the
+    /// lifetime of this reader and are never inserted into a decompression
+    /// cache.
+    ///
+    /// Archive limits are admission limits: the member's declared metadata
+    /// and size were checked by [`Self::new_with_limits`] before this method
+    /// can be called. Since this method does not allocate payload storage, it
+    /// does not create a separate materialization budget charge.
+    pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        let lookup = lookup_member_name(name);
+
+        let info = self
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+        if info.compression_method != CompressionMethod::Store {
+            return Ok(None);
+        }
+
+        let entry = self.archive.get_entry_borrowed(info.wayfinder)?;
+        let data = entry.data();
+        entry.claim_verifier().valid(ZipVerification {
+            crc: crate::crc32(data),
+            uncompressed_size: data.len() as u64,
+        })?;
+        Ok(Some(data))
     }
 
     /// Decompress and verify one member directly into a caller-owned sink.
@@ -1008,7 +1052,21 @@ where
         &'archive self,
         scratch: &mut [u8],
     ) -> Result<PreservationIndex<'archive, R>, Error> {
-        PreservationIndex::new(&self.archive, scratch)
+        self.preservation_index_with_limits(scratch, ArchiveLimits::default())
+    }
+
+    /// Build a raw-member preservation index under explicit archive limits.
+    ///
+    /// Metadata and member-name limits are applied to every retained source
+    /// central record, including directory records, because preservation must
+    /// own their exact raw metadata even though ordinary file indexes exclude
+    /// directories. The file-count limit retains its non-directory meaning.
+    pub fn preservation_index_with_limits<'archive>(
+        &'archive self,
+        scratch: &mut [u8],
+        limits: ArchiveLimits,
+    ) -> Result<PreservationIndex<'archive, R>, Error> {
+        PreservationIndex::new_with_limits(&self.archive, scratch, limits)
     }
 
     /// Locate and index a positional ZIP source with default resource limits.
@@ -1092,6 +1150,8 @@ where
         let mut strict_mimetype = None;
         let mut has_encrypted_entries = false;
         let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
+        let mut local_offsets_strictly_increasing = true;
+        let mut previous_local_header_offset = None;
 
         {
             let mut central_entries =
@@ -1214,6 +1274,13 @@ where
                 }
 
                 let entry_id = EntryId(entries.len());
+                let local_header_offset = entry.local_header_offset();
+                if previous_local_header_offset
+                    .is_some_and(|previous| local_header_offset <= previous)
+                {
+                    local_offsets_strictly_increasing = false;
+                }
+                previous_local_header_offset = Some(local_header_offset);
                 if index.contains_key(&name) {
                     return Err(duplicate_member_error(
                         &name,
@@ -1222,7 +1289,7 @@ where
                     ));
                 }
                 index.insert(name.clone(), entry_id);
-                ordered_entries.push((entry.local_header_offset(), entry_id));
+                ordered_entries.push((local_header_offset, entry_id));
                 entries.push(IndexedEntry {
                     name,
                     info: EntryInfo {
@@ -1238,7 +1305,9 @@ where
             validate_strict_mimetype(&archive, strict_mimetype)?;
         }
 
-        ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
+        if !local_offsets_strictly_increasing {
+            ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
+        }
         let order = ordered_entries.into_iter().map(|(_, id)| id).collect();
 
         Ok(Self {
@@ -3562,6 +3631,17 @@ impl<'data> LazyArchiveReader<'data> {
     /// use `read_shared()` which returns an Arc.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
         self.read_shared(name).map(|arc| (*arc).clone())
+    }
+
+    /// Borrow and verify a stored member without populating the lazy cache.
+    ///
+    /// This is the zero-copy structural-ingress fast path for callers that
+    /// consume a stored XML member immediately. Deflated members return
+    /// `None` and should use [`Self::read`] instead. The returned slice remains
+    /// tied to the source bytes borrowed by this reader.
+    #[inline]
+    pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
+        self.inner.read_stored_borrowed(name)
     }
 
     /// Read and decompress a file, returning a shared reference.
@@ -6140,6 +6220,12 @@ mod tests {
             FixtureEntry::stored(b"folder/", b""),
             FixtureEntry::stored(b"second.bin", b"second"),
         ]);
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
+
         let archive = ZipArchive::from_slice(&bytes).unwrap();
         let central = archive.directory_offset() as usize;
         let eocd = archive.eocd_offset() as usize;
@@ -6150,6 +6236,11 @@ mod tests {
         let third = bytes[central + first_len + second_len..eocd].to_vec();
         bytes[central..eocd].copy_from_slice(&[third, second, first].concat());
 
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
         let indexed = indexed_archive(bytes);
         assert_eq!(
             indexed.file_names().collect::<Vec<_>>(),
@@ -6170,6 +6261,30 @@ mod tests {
                 b"folder/".to_vec(),
                 b"first.bin".to_vec(),
             ]
+        );
+    }
+
+    #[test]
+    fn equal_local_header_offsets_keep_existing_reader_ordering() {
+        let mut bytes = fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"second.bin", b"second"),
+        ]);
+        let archive = ZipArchive::from_slice(&bytes).unwrap();
+        let central = archive.directory_offset() as usize;
+        let first_len = central_record_len(&bytes, central);
+        let second = central + first_len;
+        bytes[second + 42..second + 46].copy_from_slice(&0u32.to_le_bytes());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
+        );
+        let indexed = indexed_archive(bytes);
+        assert_eq!(
+            indexed.file_names().collect::<Vec<_>>(),
+            vec!["first.bin", "second.bin"]
         );
     }
 
