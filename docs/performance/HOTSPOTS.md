@@ -12,6 +12,16 @@ source-immutability, and refusal oracles stay outside. This is correctness and
 phase evidence only; no latency, allocation/RSS, physical-I/O, or broad DOCX
 claim is made.)
 
+[change 0262 — XLSX vendor-extension preservation corpus](changes/0262-xlsx-vendor-extension-preservation.md)
+(the explicit CLI-only `vendor-extension` shape extends the deterministic
+four-sheet, 48-by-48, eight-media XLSX cell corpus with orphan XML/BIN Parts
+and one XML-local relationship. It is excluded from `XlsxCellCrudShape::ALL`,
+adds no Case, and at landing left 381 selectable names plus the default 36
+cases / 198 records unchanged. Exact no-op/edit/lifecycle, topology/content-type/
+relationship, managed-Budget, typed sink-refusal, and raw untouched-member
+identity gates pass; no latency, allocation/RSS, decompression,
+physical-I/O, or producer claim is made.)
+
 [change 0260 — fresh-child XLSX filesystem roots](changes/0260-xlsx-fresh-child-filesystem-roots.md)
 (the existing path-open and open-plus-names/count/full-text selectors now run
 each sample in a fresh child over one pinned medium XLSX. Warm and explicit

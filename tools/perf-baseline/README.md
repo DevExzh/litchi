@@ -243,6 +243,34 @@ cargo run --manifest-path tools/perf-baseline/Cargo.toml --release --bin litchi-
   --json target/perf/opc-relationship-open.json
 ```
 
+## XLSX vendor-extension preservation shape (change 0262)
+
+The existing XLSX cell-value selectors also accept the explicit
+`--xlsx-cell-crud-shape vendor-extension` shape. It extends the deterministic
+four-sheet, 48-by-48, eight-media corpus with two orphan vendor Parts and one
+XML-local internal relationship to a binary Part. The package has exactly 20
+ZIP members, 4,227,295 archive bytes, and source SHA-256
+`b031d236b0f48b45ab357126ff238a40e2a2e147c1471cf82e429ab6f6d250fb`.
+
+The shape is intentionally excluded from `XlsxCellCrudShape::ALL` and adds no
+`Case`, so the selectable count remains 381 and the default matrix remains 36
+cases / 198 records. Focused source-backed and managed-cell controls verify
+exact no-op/edit/lifecycle behavior, typed stale/foreign and partial-output
+refusals, managed Budget boundaries, package/content-type/relationship
+topology, and raw local plus central-directory identity for untouched members.
+Signed, protected, formula, markup-compatibility, macro, and other
+unsupported-owner refusals remain the existing production contract. This shape
+is correctness-only and makes no latency, allocation, RSS, decompression, or
+physical-I/O claim:
+
+```sh
+cargo run --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline -- \
+  --case xlsx_source_backed_cell_values_one_edit_save \
+  --xlsx-cell-crud-shape vendor-extension --warmup 0 --samples 1 \
+  --json target/perf/xlsx-vendor-extension.json
+```
+
 ## Run
 
 Run the opt-in DOCX story-hyperlink planning case over its deterministic
