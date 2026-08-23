@@ -20,11 +20,12 @@ import hashlib
 import json
 import math
 import re
+import statistics
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 
 SCHEMA_VERSION = 1
@@ -36,6 +37,35 @@ ABBA_ROLES = ("a1", "b1", "b2", "a2")
 ABBA_ORDER = ("a1_control", "b1_candidate", "b2_candidate", "a2_control")
 RESOURCE_LEGS = ("A1", "B1", "B2", "A2")
 RESOURCE_PAIRS = ("A1_control_to_B1_candidate", "A2_control_to_B2_candidate")
+RESOURCE_VARIANTS = {
+    "A1": "control",
+    "A2": "control",
+    "B1": "candidate",
+    "B2": "candidate",
+}
+# These are the retained fields emitted by perf_resource_profile for the
+# strict XLSX process-total sources.  Keeping the list here makes the claim
+# verifier independent of the publication-side aggregate values.
+_TIME_RESOURCE_FIELDS = (
+    "max_rss_kib",
+    "user_seconds",
+    "system_seconds",
+    "voluntary_context_switches",
+    "involuntary_context_switches",
+    "major_page_faults",
+    "minor_page_faults",
+    "elapsed_wall_seconds",
+)
+_HEAPTRACK_RESOURCE_FIELDS = (
+    "allocation_calls",
+    "allocated_bytes",
+    "temporary_allocations",
+    "peak_heap_bytes",
+    "peak_rss_bytes",
+)
+_MAX_ABBA_DECOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
+_MAX_ABBA_MEMBER_BYTES = 512 * 1024 * 1024
+_MAX_ABBA_SUMMARY_BYTES = 64 * 1024 * 1024
 
 _MISSING = object()
 
@@ -98,6 +128,77 @@ def canonical_bytes(value: Any) -> bytes:
         ).encode("utf-8")
     except (TypeError, ValueError, OverflowError) as error:
         raise ClaimInputError(f"cannot canonicalize JSON: {error}") from error
+
+
+def canonical_sha256(value: Any) -> str:
+    """Hash canonical JSON incrementally to avoid a second large byte buffer."""
+
+    _validate_json_tree(value, "JSON")
+    digest = hashlib.sha256()
+
+    def emit(item: Any) -> None:
+        if isinstance(item, dict):
+            digest.update(b"{")
+            for index, key in enumerate(sorted(item)):
+                if index:
+                    digest.update(b",")
+                try:
+                    encoded_key = json.dumps(
+                        key, separators=(",", ":"), allow_nan=False
+                    ).encode("utf-8")
+                except (TypeError, ValueError, OverflowError) as error:
+                    raise ClaimInputError(f"cannot canonicalize JSON key: {error}") from error
+                digest.update(encoded_key)
+                digest.update(b":")
+                emit(item[key])
+            digest.update(b"}")
+            return
+        if isinstance(item, list):
+            digest.update(b"[")
+            for index, child in enumerate(item):
+                if index:
+                    digest.update(b",")
+                emit(child)
+            digest.update(b"]")
+            return
+        try:
+            encoded = json.dumps(
+                item, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ).encode("utf-8")
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ClaimInputError(f"cannot canonicalize JSON value: {error}") from error
+        digest.update(encoded)
+
+    emit(value)
+    return digest.hexdigest()
+
+
+def canonical_size(value: Any) -> int:
+    """Return canonical JSON size without materializing canonical bytes."""
+
+    _validate_json_tree(value, "JSON")
+
+    def size(item: Any) -> int:
+        if isinstance(item, dict):
+            total = 2
+            for index, key in enumerate(sorted(item)):
+                if index:
+                    total += 1
+                total += len(
+                    json.dumps(key, separators=(",", ":"), allow_nan=False).encode(
+                        "utf-8"
+                    )
+                ) + 1 + size(item[key])
+            return total
+        if isinstance(item, list):
+            return 2 + sum(size(child) for child in item) + max(0, len(item) - 1)
+        return len(
+            json.dumps(item, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
+                "utf-8"
+            )
+        )
+
+    return size(value)
 
 
 def load_json(path: Path, *, location: str | None = None) -> Any:
@@ -464,8 +565,21 @@ def validate_registry(registry: Any, *, repo_root: Path) -> tuple[dict[str, Any]
     return value, evidence_by_id, claims_by_id
 
 
-def _decompress_json(path: Path, *, location: str) -> tuple[Any, str, int]:
-    """Decompress one report without retaining its raw bytes in Python."""
+def _decompress_json(
+    path: Path,
+    *,
+    location: str,
+    extract: Callable[[Any, str, str], Any] | None = None,
+    max_bytes: int | None = None,
+) -> tuple[Any, str, int]:
+    """Decompress one report without retaining its raw bytes in Python.
+
+    ``extract`` is deliberately called while the temporary JSON tree is still
+    local to this function.  Strict verification uses it to retain only the
+    source rows and elapsed samples needed for independent recomputation,
+    rather than keeping each complete harness report alive alongside the
+    summary.
+    """
 
     try:
         process = subprocess.Popen(
@@ -485,6 +599,15 @@ def _decompress_json(path: Path, *, location: str) -> tuple[Any, str, int]:
                 break
             digest.update(chunk)
             size += len(chunk)
+            if max_bytes is not None and size > max_bytes:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                process.wait()
+                raise ClaimInputError(
+                    f"{location} exceeds the decompressed-byte ceiling ({max_bytes})"
+                )
             temporary.write(chunk)
         stderr = process.stderr.read() if process.stderr is not None else b""
         return_code = process.wait()
@@ -493,7 +616,47 @@ def _decompress_json(path: Path, *, location: str) -> tuple[Any, str, int]:
             raise ClaimInputError(f"zstd failed for {location}: {message}")
         temporary.flush()
         report = load_json(Path(temporary.name), location=location)
-    return report, digest.hexdigest(), size
+    if extract is None:
+        extracted = report
+    else:
+        # The manifest binds the canonical identity of the complete report.
+        # Compute it while the decoded tree is local, then discard that tree
+        # after the callback returns its bounded projection.
+        report_canonical_sha256 = canonical_sha256(report)
+        extracted = extract(report, location, report_canonical_sha256)
+        if isinstance(extracted, dict):
+            extracted["_canonical_sha256"] = report_canonical_sha256
+    return extracted, digest.hexdigest(), size
+
+
+def _canonical_summary_cells(summary: dict[str, Any], *, location: str) -> tuple[set[tuple[str, str, str]], set[tuple[str, str, str]]]:
+    """Extract claim cells from a canonical summary."""
+
+    accepted: set[tuple[str, str, str]] = set()
+    adverse: set[tuple[str, str, str]] = set()
+    for index, result in enumerate(_require_list(summary.get("results"), f"{location}.results")):
+        result_location = f"{location}.results[{index}]"
+        result_object = _require_object(result, result_location)
+        case = _require_string(result_object.get("case"), f"{result_location}.case")
+        corpus = _require_object(result_object.get("corpus"), f"{result_location}.corpus")
+        corpus_name = _require_string(corpus.get("name"), f"{result_location}.corpus.name")
+        elapsed = _require_object(result_object.get("elapsed_ns"), f"{result_location}.elapsed_ns")
+        for statistic in _check_string_list(
+            elapsed.get("accepted_statistics"),
+            f"{result_location}.elapsed_ns.accepted_statistics",
+            allow_empty=True,
+        ):
+            accepted.add((case, corpus_name, statistic))
+        for statistic in _check_string_list(
+            elapsed.get("adverse_both_statistics"),
+            f"{result_location}.elapsed_ns.adverse_both_statistics",
+            allow_empty=True,
+        ):
+            adverse.add((case, corpus_name, statistic))
+    return accepted, adverse
+
+
+
 
 
 def _validate_report_identity(report: Any, *, role: str, expected_revision: str, minimum_samples: int, location: str) -> None:
@@ -617,13 +780,25 @@ def _verify_scope_and_cells(
     *,
     package_change_id: str,
     policy: dict[str, Any],
+    recomputed_cells: tuple[set[tuple[str, str, str]], set[tuple[str, str, str]]] | None = None,
 ) -> None:
     if package_change_id != claim["change_id"]:
         raise ClaimPolicyError(f"claim {claim['id']!r} change_id does not match its package")
     scope = claim["scope"]
     rows, combined = _summary_cells(summary)
-    accepted = {cell for cell in combined if not cell[2].startswith("!adverse:")}
-    adverse = {(case, corpus, stat[9:]) for case, corpus, stat in combined if stat.startswith("!adverse:")}
+    summary_accepted = {cell for cell in combined if not cell[2].startswith("!adverse:")}
+    summary_adverse = {
+        (case, corpus, stat[9:])
+        for case, corpus, stat in combined
+        if stat.startswith("!adverse:")
+    }
+    if recomputed_cells is None:
+        accepted = summary_accepted
+        adverse = summary_adverse
+    else:
+        accepted, adverse = recomputed_cells
+        if summary_accepted != accepted or summary_adverse != adverse:
+            raise ClaimInputError("summary accepted/adverse cells differ from raw samples")
     expected_pairs: dict[str, dict[str, Any]] = {item["name"]: item for item in scope["corpora"]}
     scope_pairs: set[tuple[str, str]] = set()
     for key, row in rows.items():
@@ -691,11 +866,22 @@ def verify_abba_package(
         raise ClaimPolicyError(f"ABBA manifest {evidence['id']} change id does not match claim")
     if manifest.get("self_excluded") is not True:
         raise ClaimInputError(f"ABBA manifest {evidence['id']} is not self-excluding")
+    compression = _require_object(manifest.get("compression"), f"{evidence['id']}.manifest.compression")
+    if compression.get("format") != "zstd":
+        raise ClaimInputError(f"ABBA manifest {evidence['id']} compression format is not zstd")
+    if compression.get("checksum") != "XXH64" or compression.get("content_size") is not True:
+        raise ClaimInputError(f"ABBA manifest {evidence['id']} compression metadata is incomplete")
+    _require_int(compression.get("level"), f"{evidence['id']}.manifest.compression.level", minimum=1)
+    _require_int(compression.get("threads"), f"{evidence['id']}.manifest.compression.threads", minimum=1)
     summary_meta = evidence["summary"]
     summary_path = safe_path(package_dir, summary_meta["path"], location=f"evidence.{evidence['id']}.summary.path", require_exists=True)
     summary_raw_sha, summary_bytes = sha256_file(summary_path)
     if summary_raw_sha != summary_meta["sha256"]:
         raise ClaimInputError(f"summary hash mismatch for {evidence['id']}")
+    if summary_bytes > _MAX_ABBA_SUMMARY_BYTES:
+        raise ClaimInputError(
+            f"ABBA summary {evidence['id']} exceeds the byte ceiling ({_MAX_ABBA_SUMMARY_BYTES})"
+        )
     summary = load_json(summary_path, location=str(summary_path))
     summary_object = _require_object(summary, f"{evidence['id']}.summary")
     _require_keys(
@@ -704,7 +890,7 @@ def verify_abba_package(
         {"environment", "harness_identity", "implementation_identity", "protocol", "report_identity", "results", "schema_version", "tool", "verification"},
         f"{evidence['id']}.summary",
     )
-    canonical_sha = hashlib.sha256(canonical_bytes(summary)).hexdigest()
+    canonical_sha = canonical_sha256(summary)
     if canonical_sha != summary_meta["canonical_sha256"]:
         raise ClaimInputError(f"summary canonical hash mismatch for {evidence['id']}")
     manifest_summary = _require_object(manifest.get("summary"), f"{evidence['id']}.manifest.summary")
@@ -719,7 +905,7 @@ def verify_abba_package(
             raise ClaimInputError(f"ABBA manifest {evidence['id']} summary.{key} mismatch")
     if manifest_summary.get("bytes") != summary_bytes:
         raise ClaimInputError(f"ABBA manifest {evidence['id']} summary byte count mismatch")
-    if manifest_summary.get("canonical_bytes") != len(canonical_bytes(summary)):
+    if manifest_summary.get("canonical_bytes") != canonical_size(summary):
         raise ClaimInputError(f"ABBA manifest {evidence['id']} canonical byte count mismatch")
     if manifest.get("summary_identity") != manifest_summary:
         raise ClaimInputError(f"ABBA manifest {evidence['id']} summary identity mismatch")
@@ -749,8 +935,33 @@ def verify_abba_package(
     artifacts = _require_list(manifest.get("artifacts"), f"{evidence['id']}.manifest.artifacts")
     if [item.get("role") for item in artifacts if isinstance(item, dict)] != list(ABBA_ROLES) or len(artifacts) != 4:
         raise ClaimInputError(f"ABBA manifest {evidence['id']} must contain exactly a1,b1,b2,a2")
+    declared_total = 0
+    for index, raw in enumerate(artifacts):
+        item = _require_object(raw, f"{evidence['id']}.manifest.artifacts[{index}]")
+        declared_bytes = _require_int(
+            item.get("uncompressed_bytes"),
+            f"artifact {item.get('role', index)}.uncompressed_bytes",
+            minimum=0,
+        )
+        if declared_bytes > _MAX_ABBA_MEMBER_BYTES:
+            raise ClaimInputError(
+                f"ABBA artifact {evidence['id']}/{item.get('role', index)} exceeds the "
+                f"per-member decompressed-byte ceiling ({_MAX_ABBA_MEMBER_BYTES})"
+            )
+        declared_total += declared_bytes
+    if declared_total > _MAX_ABBA_DECOMPRESSED_BYTES:
+        raise ClaimInputError(
+            f"ABBA evidence {evidence['id']} exceeds the strict decompressed-byte ceiling "
+            f"({_MAX_ABBA_DECOMPRESSED_BYTES})"
+        )
+    try:
+        from tools import perf_abba_summary
+    except ImportError:  # pragma: no cover - direct script execution fallback
+        import perf_abba_summary  # type: ignore[no-redef]
     artifact_by_role: dict[str, dict[str, Any]] = {}
     reports_by_role: dict[str, dict[str, Any]] = {}
+    report_profiles: dict[str, str] = {}
+    total_uncompressed_bytes = 0
     for index, raw in enumerate(artifacts):
         item = _require_object(raw, f"{evidence['id']}.manifest.artifacts[{index}]")
         _require_keys(
@@ -762,29 +973,70 @@ def verify_abba_package(
         role = item.get("role")
         if role not in ABBA_ROLES or role in artifact_by_role:
             raise ClaimInputError(f"ABBA manifest {evidence['id']} has invalid/duplicate artifact role")
+        if item.get("compression") != "zstd":
+            raise ClaimInputError(f"ABBA artifact {evidence['id']}/{role} compression is not zstd")
+        declared_uncompressed_bytes = _require_int(
+            item.get("uncompressed_bytes"),
+            f"artifact {role}.uncompressed_bytes",
+            minimum=0,
+        )
         artifact_by_role[role] = item
         artifact_path = safe_path(package_dir, _require_string(item.get("path"), f"artifact {role}.path"), location=f"artifact {role}.path", require_exists=True)
         compressed_sha, compressed_bytes = sha256_file(artifact_path)
         if compressed_sha != item.get("sha256") or compressed_bytes != item.get("bytes"):
             raise ClaimInputError(f"ABBA artifact {evidence['id']}/{role} compressed identity mismatch")
         expected_revision = control_revision if role in {"a1", "a2"} else candidate_revision
-        report, uncompressed_sha, uncompressed_bytes = _decompress_json(artifact_path, location=f"{evidence['id']}/{role}")
+
+        def extract_validated_report(
+            value: Any, report_location: str, raw_canonical_sha256: str
+        ) -> dict[str, Any]:
+            _validate_report_identity(
+                value,
+                role=role,
+                expected_revision=expected_revision,
+                minimum_samples=policy["minimum_samples"],
+                location=report_location,
+            )
+            report_profile = perf_abba_summary.detect_report_profile(value, report_location)
+            report_profiles[role] = report_profile
+            return perf_abba_summary._project_report(
+                value,
+                report_location,
+                profile=report_profile,
+                expected_revision=expected_revision,
+                minimum_samples=policy["minimum_samples"],
+                raw_canonical_sha256=raw_canonical_sha256,
+            )
+
+        report, uncompressed_sha, uncompressed_bytes = _decompress_json(
+            artifact_path,
+            location=f"{evidence['id']}/{role}",
+            extract=extract_validated_report,
+            max_bytes=_MAX_ABBA_MEMBER_BYTES,
+        )
         if uncompressed_sha != item.get("uncompressed_sha256") or uncompressed_bytes != item.get("uncompressed_bytes"):
             raise ClaimInputError(f"ABBA artifact {evidence['id']}/{role} uncompressed identity mismatch")
-        report_canonical = hashlib.sha256(canonical_bytes(report)).hexdigest()
+        total_uncompressed_bytes += uncompressed_bytes
+        if total_uncompressed_bytes > _MAX_ABBA_DECOMPRESSED_BYTES:
+            raise ClaimInputError(
+                f"ABBA evidence {evidence['id']} exceeds the strict decompressed-byte ceiling "
+                f"({_MAX_ABBA_DECOMPRESSED_BYTES})"
+            )
+        report_canonical = report.pop("_canonical_sha256", None)
+        if not isinstance(report_canonical, str):
+            raise ClaimInputError(f"ABBA artifact {evidence['id']}/{role} lacks canonical identity")
         if report_canonical != item.get("canonical_sha256"):
             raise ClaimInputError(f"ABBA artifact {evidence['id']}/{role} canonical identity mismatch")
+        if report.get("report_sha256") != report_canonical:
+            raise ClaimInputError(f"ABBA artifact {evidence['id']}/{role} projection identity mismatch")
         summary_report_identity = _require_object(report_identity[role], f"summary.report_identity.{role}")
         if summary_report_identity.get("canonical_sha256") != report_canonical:
             raise ClaimInputError(f"ABBA summary report identity mismatch for {evidence['id']}/{role}")
-        _validate_report_identity(report, role=role, expected_revision=expected_revision, minimum_samples=policy["minimum_samples"], location=f"{evidence['id']}/{role}")
-        # Retain only the small identity projection.  The decompressed report
-        # can be hundreds of MiB (the 0248 package); retaining all four full
-        # JSON trees would needlessly multiply strict-mode memory use.
-        reports_by_role[role] = {
-            "environment": report.get("environment"),
-            "configuration": report.get("configuration"),
-        }
+        reports_by_role[role] = report
+    if set(report_profiles) != set(ABBA_ROLES) or len(set(report_profiles.values())) != 1:
+        raise ClaimInputError(f"ABBA evidence {evidence['id']} mixes legacy-v1/current-v1 report profiles")
+    report_profile = next(iter(report_profiles.values()))
+
     environment = _require_object(summary.get("environment"), f"{evidence['id']}.summary.environment")
     environment_legs = _require_object(environment.get("legs"), f"{evidence['id']}.summary.environment.legs")
     if set(environment_legs) != set(ABBA_ROLES):
@@ -805,7 +1057,31 @@ def verify_abba_package(
             raise ClaimInputError(f"ABBA summary {evidence['id']} harness configuration identity mismatch")
     if verification.get("result_count") != len(result_list):
         raise ClaimInputError(f"ABBA summary {evidence['id']} result count mismatch")
-    _verify_scope_and_cells(summary, claim, package_change_id=manifest["change_id"], policy=policy)
+    try:
+        canonical_summary = perf_abba_summary._summarize_projected_reports(
+            reports_by_role,
+            drift_ceilings=protocol["drift_ceiling_percent"],
+            profile=report_profile,
+        )
+    except Exception as error:
+        raise ClaimInputError(
+            f"{evidence['id']} projected reports fail canonical recomputation: {error}"
+        ) from error
+    if canonical_sha256(canonical_summary) != canonical_sha256(summary):
+        raise ClaimInputError(
+            f"{evidence['id']} summary differs from canonical raw-report recomputation"
+        )
+    recomputed_cells = _canonical_summary_cells(
+        canonical_summary,
+        location=f"{evidence['id']}.canonical",
+    )
+    _verify_scope_and_cells(
+        summary,
+        claim,
+        package_change_id=manifest["change_id"],
+        policy=policy,
+        recomputed_cells=recomputed_cells,
+    )
     return {
         "summary": summary,
         "control_revision": control_revision,
@@ -832,23 +1108,400 @@ def _finite_number(value: Any, location: str) -> float:
     return number
 
 
-def _find_report_value(value: Any, path: str) -> Any:
-    pieces = path.split(".")
-    if len(pieces) != 2:
-        return _MISSING
-    root, key = pieces
-    if root == "time":
-        source = value.get("time") if isinstance(value, dict) else None
-        parsed = source.get("parsed") if isinstance(source, dict) else None
-    elif root == "heaptrack":
-        source = value.get("heaptrack") if isinstance(value, dict) else None
-        parsed = source.get("parsed") if isinstance(source, dict) else None
-        if parsed is None and isinstance(source, dict):
-            printed = source.get("print")
-            parsed = printed.get("parsed") if isinstance(printed, dict) else None
+def _require_resource_artifact(value: Any, location: str) -> dict[str, Any]:
+    """Validate a retained artifact descriptor without opening its path.
+
+    Resource reports are evidence packages: the verifier cannot re-read the
+    external artifact paths, but it can require the producer's retained
+    identity envelope to be complete.  In particular, ``present`` and
+    ``retained`` must not be silently replaced by a stale parser value.
+    """
+
+    artifact = _require_object(value, location)
+    if artifact.get("present") is not True or artifact.get("retained") is not True:
+        raise ClaimInputError(f"{location} must be present and retained")
+    _require_int(artifact.get("bytes"), f"{location}.bytes")
+    _require_sha(artifact.get("sha256"), f"{location}.sha256")
+    return artifact
+
+
+def _require_resource_run(value: Any, location: str) -> dict[str, Any]:
+    """Require a completed command and retained stdout/stderr identities."""
+
+    run = _require_object(value, location)
+    returncode = run.get("returncode")
+    if isinstance(returncode, bool) or not isinstance(returncode, int) or returncode != 0:
+        raise ClaimInputError(f"{location} did not complete successfully")
+    if run.get("timed_out") is not False:
+        raise ClaimInputError(f"{location}.timed_out must be false")
+    _require_resource_artifact(run.get("stdout"), f"{location}.stdout")
+    _require_resource_artifact(run.get("stderr"), f"{location}.stderr")
+    return run
+
+
+def _validate_time_resource_source(
+    source: Any,
+    location: str,
+    *,
+    required_field: str | None = None,
+) -> dict[str, Any]:
+    """Validate the complete retained /usr/bin/time parser envelope."""
+
+    timed = _require_object(source, location)
+    if timed.get("status") != "ok":
+        raise ClaimInputError(f"{location}.status must be 'ok'")
+    _require_resource_run(timed.get("run"), f"{location}.run")
+    parsed = _require_object(timed.get("parsed"), f"{location}.parsed")
+    if parsed.get("status") != "ok":
+        raise ClaimInputError(f"{location}.parsed.status must be 'ok'")
+    _require_resource_artifact(parsed.get("artifact"), f"{location}.parsed.artifact")
+    fields = _TIME_RESOURCE_FIELDS
+    expected_fields = parsed.get("expected_fields")
+    if expected_fields != list(fields):
+        raise ClaimInputError(f"{location}.parsed.expected_fields does not match the time schema")
+    if required_field is not None and required_field not in fields:
+        raise ClaimInputError(f"{location} does not support parsed field {required_field!r}")
+    for field in fields:
+        _finite_nonnegative(parsed.get(field), f"{location}.parsed.{field}")
+    return parsed
+
+
+def _validate_heaptrack_resource_source(
+    source: Any,
+    location: str,
+    *,
+    required_field: str | None = None,
+) -> dict[str, Any]:
+    """Validate the complete retained heaptrack capture/print envelope."""
+
+    heaptrack = _require_object(source, location)
+    if heaptrack.get("status") != "ok":
+        raise ClaimInputError(f"{location}.status must be 'ok'")
+    _require_resource_artifact(heaptrack.get("harness"), f"{location}.harness")
+    _require_resource_run(heaptrack.get("run"), f"{location}.run")
+    capture = _require_resource_artifact(heaptrack.get("capture"), f"{location}.capture")
+    captures = _require_list(heaptrack.get("captures"), f"{location}.captures")
+    if len(captures) != 1:
+        raise ClaimInputError(f"{location}.captures must contain exactly one capture")
+    listed_capture = _require_resource_artifact(captures[0], f"{location}.captures[0]")
+    if listed_capture != capture:
+        raise ClaimInputError(f"{location}.captures[0] does not match {location}.capture")
+
+    printed = _require_object(heaptrack.get("print"), f"{location}.print")
+    if printed.get("status") != "ok":
+        raise ClaimInputError(f"{location}.print.status must be 'ok'")
+    print_artifact = _require_resource_artifact(
+        printed.get("artifact"), f"{location}.print.artifact"
+    )
+    print_run = _require_resource_run(printed.get("run"), f"{location}.print.run")
+    if print_run.get("stdout") != print_artifact:
+        raise ClaimInputError(
+            f"{location}.print.run.stdout does not match {location}.print.artifact"
+        )
+    parsed = _require_object(printed.get("parsed"), f"{location}.print.parsed")
+    if parsed.get("status") != "ok":
+        raise ClaimInputError(f"{location}.print.parsed.status must be 'ok'")
+    parsed_artifact = _require_resource_artifact(
+        parsed.get("artifact"), f"{location}.print.parsed.artifact"
+    )
+    if parsed_artifact != print_artifact:
+        raise ClaimInputError(
+            f"{location}.print.parsed.artifact does not match {location}.print.artifact"
+        )
+    _require_resource_artifact(
+        parsed.get("histogram_artifact"),
+        f"{location}.print.parsed.histogram_artifact",
+    )
+    fields = _HEAPTRACK_RESOURCE_FIELDS
+    if required_field is not None and required_field not in fields:
+        raise ClaimInputError(f"{location} does not support parsed field {required_field!r}")
+    for field in fields:
+        _finite_nonnegative(parsed.get(field), f"{location}.print.parsed.{field}")
+    identity = _require_object(
+        heaptrack.get("harness_identity"), f"{location}.harness_identity"
+    )
+    if identity.get("status") != "validated":
+        raise ClaimInputError(f"{location}.harness_identity.status must be 'validated'")
+    _require_sha(identity.get("sha256"), f"{location}.harness_identity.sha256")
+    return parsed
+
+
+def _parsed_resource_value(leg: dict[str, Any], metric: str) -> Any:
+    """Read a resource value only from a successful retained parser source.
+
+    A failed command with a stale ``parsed`` object is an input error, not a
+    missing observation.  This distinction is important because callers also
+    receive the publication ``values_by_leg`` map, which must be bound to the
+    parser result rather than used as an independent fallback.
+    """
+
+    if metric.startswith("time."):
+        source = leg.get("time")
+        if source is None:
+            return _MISSING
+        field = metric.split(".", 1)[1]
+        parsed = _validate_time_resource_source(source, "resource-leg.time", required_field=field)
+    elif metric.startswith("heaptrack."):
+        source = leg.get("heaptrack")
+        if source is None:
+            return _MISSING
+        field = metric.split(".", 1)[1]
+        parsed = _validate_heaptrack_resource_source(
+            source, "resource-leg.heaptrack", required_field=field
+        )
     else:
         return _MISSING
-    return parsed.get(key, _MISSING) if isinstance(parsed, dict) else _MISSING
+    return parsed.get(field, _MISSING)
+
+
+def _compare_resource_number(actual: Any, expected: Any, location: str) -> None:
+    actual_value = _finite_number(actual, location)
+    expected_value = _finite_number(expected, location)
+    tolerance = max(1e-12, abs(expected_value) * 1e-12)
+    if abs(actual_value - expected_value) > tolerance:
+        raise ClaimInputError(
+            f"{location}={actual_value} disagrees with per-leg resource evidence ({expected_value})"
+        )
+
+
+def _resource_value_summary(values: list[float | int], location: str) -> dict[str, Any]:
+    observed = [float(value) for value in values]
+    try:
+        mean = statistics.fmean(observed)
+    except (OverflowError, ValueError) as error:
+        raise ClaimInputError(f"{location} mean cannot be represented") from error
+    try:
+        median = statistics.median(observed)
+    except (OverflowError, ValueError) as error:
+        raise ClaimInputError(f"{location} median cannot be represented") from error
+    if not math.isfinite(mean) or not math.isfinite(median):
+        raise ClaimInputError(f"{location} aggregate is not finite")
+    return {
+        "status": "observed",
+        "count": len(observed),
+        "mean": mean,
+        "median": median,
+        "minimum": min(observed),
+        "maximum": max(observed),
+        "overflow_fields": [],
+    }
+
+
+def _resource_pair_summary(
+    control: float | int,
+    candidate: float | int,
+    *,
+    execution_order: str,
+    location: str,
+) -> dict[str, Any]:
+    control_value = float(control)
+    candidate_value = float(candidate)
+    if control_value == 0:
+        status = "observed_equal_zero" if candidate_value == 0 else "undefined_zero_control"
+        return {
+            "execution_order": execution_order,
+            "control": control,
+            "candidate": candidate,
+            "relative_delta_percent": None,
+            "ratio_candidate_to_control": None,
+            "status": status,
+        }
+    relative_delta = (candidate_value - control_value) / control_value * 100.0
+    ratio = candidate_value / control_value
+    if not math.isfinite(relative_delta) or not math.isfinite(ratio):
+        raise ClaimInputError(f"{location} pair result is not finite")
+    return {
+        "execution_order": execution_order,
+        "control": control,
+        "candidate": candidate,
+        "relative_delta_percent": relative_delta,
+        "ratio_candidate_to_control": ratio,
+        "status": "observed",
+    }
+
+
+def _verify_resource_metric(
+    metric_name: str,
+    metric: dict[str, Any],
+    legs: list[dict[str, Any]],
+    *,
+    max_regression: float,
+    evidence_id: str,
+) -> None:
+    location = f"{evidence_id}.statistics.metrics.{metric_name}"
+    parsed_values: dict[str, float | int] = {}
+    for index, leg in enumerate(legs):
+        label = RESOURCE_LEGS[index]
+        value = _parsed_resource_value(leg, metric_name)
+        if value is not _MISSING:
+            parsed_values[label] = _finite_nonnegative(
+                value, f"{location}.parsed.{label}"
+            )
+
+    values_by_leg = metric.get("values_by_leg", _MISSING)
+    declared_values: dict[str, float | int] = {}
+    if values_by_leg is not _MISSING:
+        declared = _require_object(values_by_leg, f"{location}.values_by_leg")
+        if set(declared) != set(RESOURCE_LEGS):
+            raise ClaimInputError(f"{location}.values_by_leg must contain exactly A1/B1/B2/A2")
+        for label in RESOURCE_LEGS:
+            declared_values[label] = _finite_nonnegative(
+                declared[label], f"{location}.values_by_leg.{label}"
+            )
+
+    if set(parsed_values) != set(RESOURCE_LEGS):
+        raise ClaimInputError(
+            f"{location} requires complete supported parsed source for A1/B1/B2/A2"
+        )
+    if set(declared_values) != set(RESOURCE_LEGS):
+        raise ClaimInputError(
+            f"{location}.values_by_leg must contain parsed values for A1/B1/B2/A2"
+        )
+    for label in RESOURCE_LEGS:
+        _compare_resource_number(
+            declared_values[label],
+            parsed_values[label],
+            f"{location}.values_by_leg.{label}",
+        )
+    values = parsed_values
+    controls = [values["A1"], values["A2"]]
+    candidates = [values["B1"], values["B2"]]
+    expected_control = _resource_value_summary(controls, f"{location}.control")
+    expected_candidate = _resource_value_summary(candidates, f"{location}.candidate")
+    for group_name, expected in (("control", expected_control), ("candidate", expected_candidate)):
+        actual = _require_object(metric.get(group_name), f"{location}.{group_name}")
+        for field in ("status", "count", "overflow_fields"):
+            if actual.get(field) != expected[field]:
+                raise ClaimInputError(f"{location}.{group_name}.{field} disagrees with per-leg evidence")
+        for field in ("mean", "median", "minimum", "maximum"):
+            _compare_resource_number(actual.get(field), expected[field], f"{location}.{group_name}.{field}")
+
+    paired = _require_object(metric.get("paired"), f"{location}.paired")
+    expected_pairs = {
+        "A1_control_to_B1_candidate": _resource_pair_summary(
+            values["A1"], values["B1"], execution_order="A1, B1", location=f"{location}.paired.A1_control_to_B1_candidate"
+        ),
+        "A2_control_to_B2_candidate": _resource_pair_summary(
+            values["A2"], values["B2"], execution_order="B2, A2", location=f"{location}.paired.A2_control_to_B2_candidate"
+        ),
+    }
+    if set(paired) != set(expected_pairs):
+        raise ClaimInputError(f"{location}.paired keys do not match A1/B1/B2/A2")
+    for pair_name, expected in expected_pairs.items():
+        actual = _require_object(paired.get(pair_name), f"{location}.paired.{pair_name}")
+        if actual.get("execution_order") != expected["execution_order"]:
+            raise ClaimInputError(f"{location}.paired.{pair_name}.execution_order disagrees")
+        for field in ("control", "candidate"):
+            _compare_resource_number(actual.get(field), expected[field], f"{location}.paired.{pair_name}.{field}")
+        if actual.get("status") != expected["status"]:
+            if actual.get("status") != "observed":
+                raise ClaimPolicyError(f"resource metric {metric_name} {pair_name} is withheld")
+            raise ClaimInputError(f"{location}.paired.{pair_name}.status disagrees with per-leg evidence")
+        for field in ("relative_delta_percent", "ratio_candidate_to_control"):
+            actual_value = actual.get(field)
+            expected_value = expected[field]
+            if expected_value is None:
+                if actual_value is not None:
+                    raise ClaimInputError(f"{location}.paired.{pair_name}.{field} must be null")
+            else:
+                _compare_resource_number(actual_value, expected_value, f"{location}.paired.{pair_name}.{field}")
+        if expected["status"] != "observed":
+            raise ClaimPolicyError(f"resource metric {metric_name} {pair_name} is withheld")
+        relative = float(expected["relative_delta_percent"])
+        if relative > max_regression:
+            raise ClaimPolicyError(f"resource metric {metric_name} {pair_name} exceeds +{max_regression:g}%")
+
+
+def _resource_leg_identity(
+    item: dict[str, Any],
+    *,
+    label: str,
+    expected_revision: str,
+    expected_variant: str,
+    location: str,
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    """Validate the identity that binds one published resource leg.
+
+    The resource producer retains the full harness identity beside each leg,
+    while a few older reports retained the equivalent ``harness_report``
+    environment envelope.  Both forms are accepted, but neither may be
+    absent: a leg with only aggregate values is not evidence of a run.
+
+    The returned tuple contains the binary descriptor, the harness tool
+    profile, and the retained heaptrack harness-identity digest.  The caller
+    compares those values across the ABBA positions below.
+    """
+
+    binary = _require_object(item.get("binary_identity"), f"{location}.binary_identity")
+    _require_sha(binary.get("binary_sha256"), f"{location}.binary_identity.binary_sha256")
+    if binary.get("label") != expected_variant:
+        raise ClaimInputError(
+            f"{location}.binary_identity.label must be {expected_variant!r}"
+        )
+    if item.get("variant") != expected_variant:
+        raise ClaimInputError(f"{location}.variant must be {expected_variant!r}")
+    if item.get("leg") != label:
+        raise ClaimInputError(f"{location}.leg must be {label!r}")
+
+    identity = item.get("harness_identity")
+    if identity is None:
+        # Compatibility for the pre-publication shape.  The environment is
+        # still required to carry the revision and clean-worktree assertion.
+        identity = item.get("harness_report") or item.get("report")
+    identity = _require_object(identity, f"{location}.harness_identity")
+    environment = identity.get("environment")
+    environment_object = _require_object(environment, f"{location}.harness_identity.environment")
+    revision = identity.get("git_revision")
+    if revision is None:
+        revision = environment_object.get("git_revision")
+    revision = _require_revision(revision, f"{location}.harness_identity.git_revision")
+    if revision != expected_revision:
+        raise ClaimInputError(
+            f"{location}.harness_identity.git_revision does not match {expected_variant} revision"
+        )
+    if "git_revision" in environment_object:
+        environment_revision = _require_revision(
+            environment_object.get("git_revision"),
+            f"{location}.harness_identity.environment.git_revision",
+        )
+        if environment_revision != revision:
+            raise ClaimInputError(
+                f"{location}.harness_identity environment and harness revisions differ"
+            )
+    dirty = identity.get("git_worktree_dirty")
+    if dirty is None:
+        dirty = environment_object.get("git_worktree_dirty")
+    if dirty is not False:
+        raise ClaimInputError(f"{location}.harness_identity.git_worktree_dirty must be false")
+    if "git_worktree_dirty" in environment_object and environment_object.get("git_worktree_dirty") is not False:
+        raise ClaimInputError(
+            f"{location}.harness_identity.environment.git_worktree_dirty must be false"
+        )
+    if "leg" in identity and identity.get("leg") != label:
+        raise ClaimInputError(f"{location}.harness_identity.leg does not match {label}")
+    if "variant" in identity and identity.get("variant") != expected_variant:
+        raise ClaimInputError(
+            f"{location}.harness_identity.variant does not match {expected_variant}"
+        )
+
+    tool = _require_object(identity.get("tool"), f"{location}.harness_identity.tool")
+    for field in ("name", "version", "profile"):
+        _require_string(tool.get(field), f"{location}.harness_identity.tool.{field}")
+
+    heaptrack = _require_object(item.get("heaptrack"), f"{location}.heaptrack")
+    heap_identity = _require_object(
+        heaptrack.get("harness_identity"),
+        f"{location}.heaptrack.harness_identity",
+    )
+    if heap_identity.get("status") != "validated":
+        raise ClaimInputError(
+            f"{location}.heaptrack.harness_identity.status must be 'validated'"
+        )
+    harness_digest = _require_sha(
+        heap_identity.get("sha256"),
+        f"{location}.heaptrack.harness_identity.sha256",
+    )
+    return binary, tool, harness_digest
 
 
 def verify_resource_report(
@@ -878,18 +1531,83 @@ def verify_resource_report(
     candidate_revision = _require_revision(validation.get("candidate_revision"), f"{evidence['id']}.validation.candidate_revision")
     if control_revision == candidate_revision:
         raise ClaimInputError(f"resource report {evidence['id']} revisions are identical")
+    binaries: list[dict[str, Any]] = []
+    harness_tools: list[dict[str, Any]] = []
+    harness_digests: list[str] = []
     for index, leg in enumerate(legs):
         item = _require_object(leg, f"{evidence['id']}.legs[{index}]")
-        harness = item.get("harness_report") or item.get("report")
-        if isinstance(harness, dict):
-            environment = harness.get("environment")
-            if isinstance(environment, dict) and environment.get("git_worktree_dirty") is not False:
-                raise ClaimInputError(f"resource report {evidence['id']} leg {labels[index]} is dirty")
-        binary = _require_object(item.get("binary_identity"), f"{evidence['id']}.legs[{index}].binary_identity")
-        _require_sha(binary.get("binary_sha256"), f"{evidence['id']}.legs[{index}].binary_identity.binary_sha256")
-    binaries = [item["binary_identity"]["binary_sha256"] for item in legs]
+        label = RESOURCE_LEGS[index]
+        variant = RESOURCE_VARIANTS[label]
+        binary, tool, harness_digest = _resource_leg_identity(
+            item,
+            label=label,
+            expected_revision=(control_revision if variant == "control" else candidate_revision),
+            expected_variant=variant,
+            location=f"{evidence['id']}.legs[{index}]",
+        )
+        binaries.append(binary)
+        harness_tools.append(tool)
+        harness_digests.append(harness_digest)
+    declared_order = validation.get("leg_order")
+    if declared_order is not None and declared_order != list(RESOURCE_LEGS):
+        raise ClaimInputError(f"resource report {evidence['id']} validation leg order mismatch")
+    for field, index in (("control_binary_sha256", 0), ("candidate_binary_sha256", 1)):
+        declared_binary = validation.get(field)
+        if declared_binary is not None:
+            declared_binary = _require_sha(
+                declared_binary, f"{evidence['id']}.validation.{field}"
+            )
+            if declared_binary != binaries[index]["binary_sha256"]:
+                raise ClaimInputError(
+                    f"resource report {evidence['id']} validation {field} does not match its leg"
+                )
+    declared_harnesses = validation.get("harness_identities")
+    if declared_harnesses is not None:
+        declared_harnesses = _require_list(
+            declared_harnesses, f"{evidence['id']}.validation.harness_identities"
+        )
+        if len(declared_harnesses) != len(RESOURCE_LEGS):
+            raise ClaimInputError(
+                f"resource report {evidence['id']} validation harness identity count mismatch"
+            )
+        for index, raw_identity in enumerate(declared_harnesses):
+            declared_identity = _require_object(
+                raw_identity,
+                f"{evidence['id']}.validation.harness_identities[{index}]",
+            )
+            label = RESOURCE_LEGS[index]
+            variant = RESOURCE_VARIANTS[label]
+            if declared_identity.get("leg") != label or declared_identity.get("variant") != variant:
+                raise ClaimInputError(
+                    f"resource report {evidence['id']} validation harness identity {label} is rebound"
+                )
+            declared_revision = _require_revision(
+                declared_identity.get("git_revision"),
+                f"{evidence['id']}.validation.harness_identities[{index}].git_revision",
+            )
+            expected_revision = control_revision if variant == "control" else candidate_revision
+            if declared_revision != expected_revision:
+                raise ClaimInputError(
+                    f"resource report {evidence['id']} validation harness identity {label} revision mismatch"
+                )
+            declared_tool = _require_object(
+                declared_identity.get("tool"),
+                f"{evidence['id']}.validation.harness_identities[{index}].tool",
+            )
+            if declared_tool != harness_tools[index]:
+                raise ClaimInputError(
+                    f"resource report {evidence['id']} validation harness tool identity {label} differs"
+                )
     if binaries[0] != binaries[3] or binaries[1] != binaries[2] or binaries[0] == binaries[1]:
         raise ClaimInputError(f"resource report {evidence['id']} binary identities are inconsistent")
+    if harness_digests[0] != harness_digests[3] or harness_digests[1] != harness_digests[2]:
+        raise ClaimInputError(f"resource report {evidence['id']} harness identities drift within a variant")
+    if harness_digests[0] == harness_digests[1]:
+        raise ClaimInputError(f"resource report {evidence['id']} control and candidate harness identities are identical")
+    if harness_tools[0] != harness_tools[3] or harness_tools[1] != harness_tools[2]:
+        raise ClaimInputError(f"resource report {evidence['id']} harness tool profiles drift within a variant")
+    if any(tool != harness_tools[0] for tool in harness_tools[1:]):
+        raise ClaimInputError(f"resource report {evidence['id']} harness tool profiles differ across ABBA legs")
     statistics = _require_object(root.get("statistics"), f"{evidence['id']}.statistics")
     if statistics.get("status") != "observed":
         raise ClaimInputError(f"resource report {evidence['id']} statistics are not observed")
@@ -901,20 +1619,13 @@ def verify_resource_report(
         item = metrics.get(metric)
         if not isinstance(item, dict):
             raise ClaimInputError(f"resource report {evidence['id']} is missing metric {metric!r}")
-        paired = _require_object(item.get("paired"), f"{evidence['id']}.statistics.metrics.{metric}.paired")
-        for pairing in RESOURCE_PAIRS:
-            pair = _require_object(paired.get(pairing), f"{evidence['id']}.statistics.metrics.{metric}.paired.{pairing}")
-            if pair.get("status") != "observed":
-                raise ClaimPolicyError(f"resource metric {metric} {pairing} is withheld")
-            control = _finite_nonnegative(pair.get("control"), f"{metric}.{pairing}.control")
-            candidate = _finite_nonnegative(pair.get("candidate"), f"{metric}.{pairing}.candidate")
-            if control == 0:
-                raise ClaimPolicyError(f"resource metric {metric} {pairing} has zero control")
-            relative = _finite_number(pair.get("relative_delta_percent"), f"{metric}.{pairing}.relative_delta_percent")
-            if relative > max_regression:
-                raise ClaimPolicyError(f"resource metric {metric} {pairing} exceeds +{max_regression:g}%")
-            if candidate < 0 or control < 0:
-                raise ClaimInputError(f"resource metric {metric} has negative value")
+        _verify_resource_metric(
+            metric,
+            item,
+            legs,
+            max_regression=max_regression,
+            evidence_id=evidence["id"],
+        )
     if latency_result is not None:
         if validation.get("control_revision") != latency_result["control_revision"] or validation.get("candidate_revision") != latency_result["candidate_revision"]:
             raise ClaimPolicyError(f"resource report {evidence['id']} revisions do not match latency evidence")

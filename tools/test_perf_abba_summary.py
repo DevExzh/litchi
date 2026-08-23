@@ -1067,6 +1067,10 @@ class PerfAbbaSummaryTests(unittest.TestCase):
                 summary["report_identity"][label]["canonical_sha256"],
                 hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
             )
+            self.assertEqual(
+                summary["report_identity"][label]["canonical_sha256"],
+                perf_abba_summary._canonical_sha256(leg, f"{label}.report"),
+            )
 
         malformed = four_legs()
         malformed[0]["unserializable"] = float("nan")
@@ -1274,6 +1278,104 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             json.dumps(from_file, sort_keys=True, separators=(",", ":")),
             json.dumps(direct, sort_keys=True, separators=(",", ":")),
         )
+
+
+class ProjectedReportSummaryTests(unittest.TestCase):
+    def legacy_legs(self):
+        legs = four_legs()
+        for leg in legs:
+            leg["tool"].pop("binary")
+            leg["tool"].pop("instrumentation")
+            leg.pop("binary_identity")
+        return legs
+
+    def projected(self, legs):
+        return {
+            label: perf_abba_summary._project_report(
+                leg,
+                label,
+                profile=perf_abba_summary.detect_report_profile(leg, label),
+            )
+            for label, leg in zip(perf_abba_summary.LEG_ORDER, legs)
+        }
+
+    def test_legacy_profile_projection_matches_direct_summary(self):
+        legs = self.legacy_legs()
+        self.assertEqual(
+            perf_abba_summary.detect_reports_profile(legs),
+            perf_abba_summary.REPORT_PROFILE_LEGACY,
+        )
+        direct = perf_abba_summary.summarize_reports(legs)
+        projected = perf_abba_summary._summarize_projected_reports(self.projected(legs))
+        self.assertEqual(projected, direct)
+        self.assertNotIn("binary_identity_verified", direct["verification"])
+
+    def test_current_profile_projection_matches_direct_summary(self):
+        legs = four_legs()
+        self.assertEqual(
+            perf_abba_summary.detect_reports_profile(legs),
+            perf_abba_summary.REPORT_PROFILE_CURRENT,
+        )
+        direct = perf_abba_summary.summarize_reports(legs)
+        projected = perf_abba_summary._summarize_projected_reports(self.projected(legs))
+        self.assertEqual(projected, direct)
+        self.assertTrue(projected["verification"]["binary_identity_verified"])
+
+    def test_mixed_profile_is_rejected_from_all_raw_legs(self):
+        legs = self.legacy_legs()
+        legs[0]["tool"].update(binary=perf_abba_summary.HARNESS_TOOL_NAME, instrumentation="none")
+        legs[0]["binary_identity"] = copy.deepcopy(four_legs()[0]["binary_identity"])
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "mixed"
+        ):
+            perf_abba_summary.detect_reports_profile(legs)
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "mixed"
+        ):
+            perf_abba_summary.summarize_reports(legs)
+
+    def test_projection_rejects_raw_identity_mismatch(self):
+        legs = four_legs()
+        legs[1]["results"][0]["sink"]["accepted_bytes"] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "sink identity"
+        ):
+            perf_abba_summary._summarize_projected_reports(self.projected(legs))
+
+    def test_raw_summary_never_trusts_projection_only_markers(self):
+        legs = four_legs()
+        row = legs[0]["results"][0]
+        row["elapsed_ns"]["samples"][-1] += 1
+        # These keys are intentionally accepted only on the internal
+        # validated projection path.  A raw caller cannot use them to bypass
+        # sample/statistic validation.
+        row["_elapsed_statistics"] = {"sample_count": 5, "p50": 999}
+        row["_operation_metrics_identity"] = "forged"
+        with self.assertRaises(perf_abba_summary.AbbaSummaryInputError):
+            perf_abba_summary.summarize_reports(legs)
+
+    def test_projection_helpers_are_private_and_mutation_is_rejected(self):
+        self.assertFalse(hasattr(perf_abba_summary, "project_report"))
+        self.assertFalse(hasattr(perf_abba_summary, "summarize_projected_reports"))
+        projections = self.projected(four_legs())
+        for projection in projections.values():
+            row = next(iter(projection["results"].values()))
+            row["_elapsed_statistics"]["p50"] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "mutated"
+        ):
+            perf_abba_summary._summarize_projected_reports(projections)
+
+        forged = {
+            label: dict(projection)
+            for label, projection in self.projected(four_legs()).items()
+        }
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "private validation provenance"
+        ):
+            perf_abba_summary._summarize_projected_reports(forged)
+        with self.assertRaises(TypeError):
+            perf_abba_summary.summarize_reports(_validated=("current-v1", {}))
 
 
 if __name__ == "__main__":
