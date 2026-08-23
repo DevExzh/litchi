@@ -780,3 +780,29 @@ codec cases, and 9/9 migration-host background cases. Strict Keynote and
 protos Clippy passed; the three-crate all-target check passed with the
 checkout's existing warnings. These results establish bounded correctness and
 limit behavior for this seam, not a general performance result.
+
+## 2026-08-24 amendment: Wave54 Numbers table-cell storage reader resource record
+
+Commit `b7f720872` moves the three read-only Numbers table-cell storage
+helpers `resolve_table_string_values`, `table_data_list_has_entries`, and
+`rich_text_payload_entry_count` off owned generated `TableDataList` and
+`TableDataListSegment` graphs. The doc-hidden
+`litchi_iwa_protos::numbers_table_cell_storage_codec` now supplies borrowed
+root/segment snapshots and strict streaming visitors. Its private Buffa lazy
+views are forced only as parity checks; generated repeated storage does not
+escape. Generated messages remain in the unchanged mutation/writer paths and
+test oracles.
+
+Each admitted payload has explicit source-byte, field, work, nesting,
+reference, and selected-text limits. The host merges successful reports into
+one operation-local field/work/reference/text budget across root candidates,
+ordered segments, and rich-text package scans. Failed resource checks stop the
+operation; ordinary malformed candidates conservatively charge their complete
+source length before compatibility selection continues. Visitor output is
+staged with fallible reservations, and no partial strings, counts, or package
+mutation are published after a later segment failure.
+
+This is a finite reader-resource contract, not a measurement of peak memory,
+allocation count, latency, throughput, or package-wide performance. No
+manifest edge changes, generated-schema retirement, or workspace-wide Prost
+claim follow from this reader cutover.
