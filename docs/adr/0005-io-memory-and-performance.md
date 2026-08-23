@@ -753,3 +753,30 @@ with the same post-read hash. This is bounded reader and application-acceptance
 evidence only: no exact RSS, allocation, latency, performance, Rust/native
 formula parity, native save/reopen mutation, publication change, host exit,
 debt retirement, or monolith deletion is claimed.
+
+## 2026-08-24 amendment: Wave53 Keynote slide-background resource record
+
+Commit `0b12df5e1` applies the resource contract to the focused Keynote
+slide-background seam. The borrowed codec charges aggregate source scanning,
+selected fields, nesting, projection/iterator work, typed rewrite work,
+readback, and exact output size before the corresponding allocation. Fallible
+reservations cover handwritten output buffers and metadata/style rewrites;
+failed limit checks publish no partial package. Unknown source bytes are
+retained only when the selected typed rewrite can prove that its framing and
+nested fields remain safe. This is bounded operation-local accounting, not a
+package-wide peak-memory, allocation, latency, or throughput measurement.
+
+The focused manifest topology is unchanged. `litchi-keynote` keeps its direct
+`prost` edge in `dev-dependencies` for test-only compatibility oracles;
+`litchi-iwa-protos` retains normal `prost` because other generated owners still
+use it; and the earlier `litchi-numbers` formula migration retains its direct
+`prost` edge only in `dev-dependencies`. Wave53 introduces no normal
+dependency edge and does not claim workspace-wide Prost freedom or generated
+schema retirement.
+
+The frozen focused resource evidence is recorded in ADR 0008: 25/25 focused
+Keynote package cases, 19/19 background-codec cases, 13/13 package-metadata
+codec cases, and 9/9 migration-host background cases. Strict Keynote and
+protos Clippy passed; the three-crate all-target check passed with the
+checkout's existing warnings. These results establish bounded correctness and
+limit behavior for this seam, not a general performance result.
