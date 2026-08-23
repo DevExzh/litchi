@@ -3939,9 +3939,8 @@ fn parse_render_node_fields<'source>(
             22 | 23 | 24 | 37 | 46 => {
                 let _ = canonical_render_u32(field.varint()?)?;
             },
-            42 | 43 => {
-                let _ = field.varint()?;
-            },
+            42 => fields.decimal_low = Some(field.varint()?),
+            43 => fields.decimal_high = Some(field.varint()?),
             47 => {
                 let _ = canonical_render_int32(field.varint()?)?;
             },
@@ -6866,6 +6865,30 @@ mod tests {
         assert_eq!(calls.arrays, [(2, 1)]);
         assert_eq!(calls.colon_tracts, 1);
         assert_eq!(calls.categories, 1);
+    }
+
+    #[test]
+    fn render_number_retains_decimal128_sidecars() {
+        let value = 0.75f64;
+        let (decimal_low, decimal_high) = formula_decimal128_parts(value).unwrap();
+        let source = formula(&[node(17, |node| {
+            fixed64(node, 4, value.to_bits());
+            varint(node, 42, decimal_low);
+            varint(node, 43, decimal_high);
+        })]);
+
+        let mut calls = RenderCalls::default();
+        let report = decode_formula_archive_for_render(
+            &source,
+            context(),
+            render_options(&source),
+            &mut calls,
+        )
+        .expect("render compatibility should retain decimal sidecars");
+
+        assert_eq!(report.node_count(), 1);
+        assert_eq!(calls.events, ["begin-array", "number", "end-array"]);
+        assert_eq!(calls.numbers, [value.to_bits()]);
     }
 
     #[test]
