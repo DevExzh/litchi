@@ -987,35 +987,48 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
         Some(original.clone()),
     );
 
-    // The same fixture also has a uniquely owned, segment-backed comment at
-    // key 12. Text replacement is supported for this shape, while changed
-    // clear remains refused until graph cleanup is implemented.
+    // The same fixture also has a segment-backed comment at key 12. Segment
+    // entries remain readable, but text replacement is outside the exact
+    // root-only publication seam until the owning segment graph can be
+    // rewired atomically.
     let segmented_bytes = synthetic_table_data_list_package(Corruption::None, 12)?;
     let segmented_original_bytes = segmented_bytes.clone();
     let segmented_package = Package::from_bytes(&segmented_bytes)?;
     let segmented_original = segmented_package
         .table_cell_comment(sheet, table, position)?
         .ok_or_else(|| std::io::Error::other("segmented synthetic comment is missing"))?;
-    let segmented_changed = segmented_package.set_table_cell_comment(
-        sheet,
-        table,
-        position,
-        "Segment-backed comment changed through Package",
-    )?;
-    assert_eq!(
-        segmented_changed
-            .package()
-            .table_cell_comment(sheet, table, position)?
-            .as_ref()
-            .map(|comment| comment.text()),
-        Some("Segment-backed comment changed through Package")
-    );
-    assert!(segmented_changed.diagnostics().changed());
     let segmented_error = segmented_package
+        .set_table_cell_comment(
+            sheet,
+            table,
+            position,
+            "Segment-backed comment changed through Package",
+        )
+        .expect_err("segment-backed text replacement must be refused");
+    assert!(matches!(
+        segmented_error,
+        TableCellCommentError::UnsupportedDependency {
+            path: TableCellCommentPath::Cell {
+                sheet: 0,
+                table: 0,
+                row: 4,
+                column: 0,
+            },
+        }
+    ));
+    assert_eq!(
+        segmented_bytes, segmented_original_bytes,
+        "segmented replacement refusal mutated source bytes"
+    );
+    assert_eq!(
+        segmented_package.table_cell_comment(sheet, table, position)?,
+        Some(segmented_original.clone()),
+    );
+    let segmented_clear_error = segmented_package
         .clear_table_cell_comment(sheet, table, position)
         .expect_err("segmented changed clear must be refused");
     assert!(matches!(
-        segmented_error,
+        segmented_clear_error,
         TableCellCommentError::UnsupportedDependency {
             path: TableCellCommentPath::Cell {
                 sheet: 0,
