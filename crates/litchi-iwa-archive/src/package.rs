@@ -1469,7 +1469,8 @@ impl Catalog {
     /// buffer is allocated. The complete output is bounded by
     /// [`Limits::max_input_bytes`], then returned as one committed artifact.
     /// An empty edit list uses the existing exact source path, including for
-    /// legacy catalogs.
+    /// legacy catalogs. A nonempty edit list whose decoded payloads all match
+    /// the current entries uses that exact source path as well.
     ///
     /// # Errors
     ///
@@ -1556,7 +1557,9 @@ impl Catalog {
     /// existing non-directory member, names may not be repeated, and one
     /// member cannot be both edited and deleted. Deleting an opaque member is
     /// supported because its payload is never decoded; editing one remains an
-    /// error.
+    /// error. A nonempty edit list whose decoded payloads all match the
+    /// current entries is also an exact source no-op when no deletion is
+    /// requested.
     ///
     /// Retained members keep their source order, raw local and central names,
     /// header metadata, comments, and compressed bytes. Only edited payload
@@ -1600,6 +1603,17 @@ impl Catalog {
         let shape = validate_reassembly_shape(&archive)?;
         let (prepared, deleted) =
             prepare_mutations(&archive, edits, deleted_names, checked_limits)?;
+        if deleted.is_empty()
+            && !edits.is_empty()
+            && edits.iter().all(|edit| {
+                self.entries.iter().any(|entry| {
+                    !entry.is_opaque() && entry.name() == edit.name() && entry.data() == edit.data()
+                })
+            })
+        {
+            checked_limits.check_output_size(source_size)?;
+            return self.to_bytes();
+        }
         let output_size = reassembled_output_size(&archive, &prepared, &deleted)?;
         checked_limits.check_output_size(output_size)?;
         let output_len = usize::try_from(output_size).map_err(|_error| {
@@ -5118,6 +5132,25 @@ mod tests {
             })
         ));
         assert_eq!(limited_sink, [0xde, 0xad, 0xbe, 0xef]);
+        Ok(())
+    }
+
+    #[test]
+    fn identical_nonempty_edits_use_the_exact_source_for_store_and_deflate() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("Stored/data", b"stored payload")?;
+        writer.write_deflated("Deflated/data", b"deflated payload repeated")?;
+        let bytes = writer.finish_to_bytes()?;
+        let catalog = Catalog::from_bytes(&bytes)?;
+        let edits = catalog
+            .iter()
+            .map(|entry| EntryEdit::new(entry.name(), entry.data()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            catalog.reassemble_to_bytes(&edits, Limits::default())?,
+            bytes
+        );
         Ok(())
     }
 
