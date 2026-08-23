@@ -1495,6 +1495,101 @@ class BoundaryPolicyTests(unittest.TestCase):
                 boundaries.audit_iwa_keynote_slide_info_source_topology(root), []
             )
 
+    def test_iwa_numbers_pages_legacy_methods_require_deprecation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            numbers = root / boundaries.IWA_NUMBERS_LEGACY_METHOD_SOURCE
+            numbers.parent.mkdir(parents=True)
+            numbers.write_text(
+                "pub fn cell_comment() {}\n"
+                "pub fn set_cell_comment() {}\n"
+                "pub fn clear_cell_comment() {}\n",
+                encoding="utf-8",
+            )
+            pages = root / boundaries.IWA_PAGES_LEGACY_METHOD_SOURCE
+            pages.parent.mkdir(parents=True)
+            pages.write_text(
+                "pub fn section_text() {}\n"
+                "pub fn replace_section_text() {}\n"
+                "pub fn set_section_text() {}\n"
+                "pub fn clear_section_text() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_legacy_method_deprecation_source_topology(root),
+                [
+                    "litchi-iwa Numbers legacy method must remain deprecated "
+                    "cell_comment: "
+                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:1",
+                    "litchi-iwa Numbers legacy method must remain deprecated "
+                    "clear_cell_comment: "
+                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:3",
+                    "litchi-iwa Numbers legacy method must remain deprecated "
+                    "set_cell_comment: "
+                    "crates/litchi-iwa/src/numbers/editor/semantic/table.rs:2",
+                    "litchi-iwa Pages legacy method must remain deprecated "
+                    "clear_section_text: "
+                    "crates/litchi-iwa/src/pages/editor/section_content.rs:4",
+                    "litchi-iwa Pages legacy method must remain deprecated "
+                    "replace_section_text: "
+                    "crates/litchi-iwa/src/pages/editor/section_content.rs:2",
+                    "litchi-iwa Pages legacy method must remain deprecated "
+                    "section_text: "
+                    "crates/litchi-iwa/src/pages/editor/section_content.rs:1",
+                    "litchi-iwa Pages legacy method must remain deprecated "
+                    "set_section_text: "
+                    "crates/litchi-iwa/src/pages/editor/section_content.rs:3",
+                ],
+            )
+
+            deprecated = '#[deprecated(note = "compatibility")]\n'
+            numbers.write_text(
+                "".join(
+                    f"{deprecated}pub fn {name}() {{}}\n"
+                    for name in ("cell_comment", "set_cell_comment", "clear_cell_comment")
+                ),
+                encoding="utf-8",
+            )
+            pages.write_text(
+                "".join(
+                    f"{deprecated}pub fn {name}() {{}}\n"
+                    for name in (
+                        "section_text",
+                        "replace_section_text",
+                        "set_section_text",
+                        "clear_section_text",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_legacy_method_deprecation_source_topology(root),
+                [],
+            )
+
+            pages.write_text(
+                "".join(
+                    f"{deprecated if name != 'set_section_text' else '#[allow(deprecated)]'}"
+                    f"pub fn {name}() {{}}\n"
+                    for name in (
+                        "section_text",
+                        "replace_section_text",
+                        "set_section_text",
+                        "clear_section_text",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_legacy_method_deprecation_source_topology(root),
+                [
+                    "litchi-iwa Pages legacy method must remain deprecated "
+                    "set_section_text: "
+                    "crates/litchi-iwa/src/pages/editor/section_content.rs:5",
+                ],
+            )
+
     def test_retired_iwa_keynote_document_reader_inventory_is_exact(self) -> None:
         self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_DOCUMENT_SOURCE,
