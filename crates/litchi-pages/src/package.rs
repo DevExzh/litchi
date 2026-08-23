@@ -326,6 +326,17 @@ enum StorageWireLimitsError {
     Wire(litchi_iwa_text_wire::RewriteError),
 }
 
+enum BodyStorageDecodeError {
+    Package(PackageError),
+    Wire(litchi_iwa_text_wire::RewriteError),
+}
+
+impl From<PackageError> for BodyStorageDecodeError {
+    fn from(error: PackageError) -> Self {
+        Self::Package(error)
+    }
+}
+
 impl FileSnapshot {
     fn from_metadata(metadata: &FileMetadata) -> Self {
         #[cfg(unix)]
@@ -1219,6 +1230,17 @@ fn decode_body_storage(
     max_text_bytes: usize,
     limits: Limits,
 ) -> PackageResult<(Storage, Vec<NativeSectionReference>)> {
+    decode_body_storage_with_wire_error(messages, identifier, max_sections, max_text_bytes, limits)
+        .map_err(map_body_storage_decode_error)
+}
+
+fn decode_body_storage_with_wire_error(
+    messages: &[litchi_iwa_core::RawMessage],
+    identifier: NonZeroU64,
+    max_sections: usize,
+    max_text_bytes: usize,
+    limits: Limits,
+) -> Result<(Storage, Vec<NativeSectionReference>), BodyStorageDecodeError> {
     let payload = unique_text_payload(messages, identifier)?;
     let wire_limits = storage_rewrite_limits(limits).map_err(|limit_error| match limit_error {
         StorageWireLimitsError::Physical(physical_error) => PackageError::Archive(physical_error),
@@ -1228,7 +1250,7 @@ fn decode_body_storage(
     })?;
     let preflight = preflight_body_wire(payload, identifier, max_sections, max_text_bytes, limits)?;
     let decoded = litchi_iwa_text_wire::decode_storage_with_limits(payload, wire_limits)
-        .map_err(map_rooted_storage_decode_error)?;
+        .map_err(BodyStorageDecodeError::Wire)?;
     let validation = decoded.validation();
     let storage = decoded.into_storage();
     let materialized_utf16 = storage.text().encode_utf16().count();
@@ -1238,11 +1260,20 @@ fn decode_body_storage(
         || storage.len() != preflight.text_bytes
         || materialized_utf16 != validation.utf16_len()
     {
-        return Err(PackageError::InvalidFormat(format!(
-            "Pages body object {identifier} lazy text projection disagreed with strict preflight"
-        )));
+        return Err(BodyStorageDecodeError::Package(
+            PackageError::InvalidFormat(format!(
+                "Pages body object {identifier} lazy text projection disagreed with strict preflight"
+            )),
+        ));
     }
     Ok((storage, preflight.section_references))
+}
+
+fn map_body_storage_decode_error(error: BodyStorageDecodeError) -> PackageError {
+    match error {
+        BodyStorageDecodeError::Package(error) => error,
+        BodyStorageDecodeError::Wire(error) => map_rooted_storage_decode_error(error),
+    }
 }
 
 fn project_body_footnotes(
