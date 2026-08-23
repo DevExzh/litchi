@@ -1314,8 +1314,8 @@ fn rust_code_marker_count(source: &str, marker: &str) -> usize {
         }
 
         if let Some(end) = rust_route_literal_end(bytes, cursor) {
-            for position in cursor..end {
-                code[position] = true;
+            for is_code in &mut code[cursor..end] {
+                *is_code = true;
             }
             cursor = end;
             continue;
