@@ -551,6 +551,8 @@ fn resolve_footnote(
 }
 
 fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTextError> {
+    let mut semantic_budget =
+        super::FootnoteSemanticBudget::new(effective_text_limit(package.state.source.limits()));
     let root = root_references_with_limits(
         package.state.source.components(),
         package.state.source.limits(),
@@ -653,13 +655,25 @@ fn native_footnotes(package: &Package) -> Result<Vec<NativeFootnote>, FootnoteTe
             package.state.source.limits(),
         )
         .map_err(map_package_error)?;
-        if storage_value
+        let text = storage_value
             .text()
             .strip_prefix(STORAGE_TEXT_PREFIX)
-            .is_none()
+            .ok_or(FootnoteTextError::InvalidSource)?;
+        if text.len() > crate::footnote::body::MAX_TEXT_BYTES {
+            return Err(FootnoteTextError::InvalidSource);
+        }
+        let custom_mark = decoded.custom_mark_string();
+        if custom_mark
+            .is_some_and(|value| value.len() > crate::footnote::body::MAX_CUSTOM_MARK_BYTES)
         {
             return Err(FootnoteTextError::InvalidSource);
         }
+        super::FootnoteSemanticBudget::charge(
+            &mut semantic_budget,
+            text.len(),
+            custom_mark.map_or(0, str::len),
+        )
+        .map_err(|error| map_package_error_with_kind(error, FootnoteTextLimitKind::TextBytes))?;
         let marker_identifier = footnote_marker_identifier(
             storage_payload,
             storage_identifier,
