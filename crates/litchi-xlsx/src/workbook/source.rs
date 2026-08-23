@@ -86,6 +86,12 @@ struct SourceInner {
     date_system: DateSystem,
     active_sheet: Option<usize>,
     sheets: Box<[Arc<SourceSheetData>]>,
+    /// Sheet positions sorted by their canonical, case-insensitive names.
+    ///
+    /// The mandatory workbook catalog rejects duplicate canonical names, so a
+    /// sorted position index is equivalent to the previous linear search while
+    /// avoiding a second allocation of every key string.
+    sheet_name_order: Box<[usize]>,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -440,6 +446,15 @@ impl SourceBackedWorkbook {
             }));
         }
         let sheets = sheets.into_boxed_slice();
+        let mut sheet_name_order = (0..sheets.len()).collect::<Vec<_>>();
+        sheet_name_order.sort_unstable_by(|left, right| {
+            sheets[*left]
+                .name_key
+                .as_ref()
+                .cmp(sheets[*right].name_key.as_ref())
+                .then_with(|| left.cmp(right))
+        });
+        let sheet_name_order = sheet_name_order.into_boxed_slice();
         // The source can change after the mandatory root and relationship
         // reads, including while the semantic sheet metadata above is being
         // allocated. Do not publish a facade whose catalog was assembled from
@@ -464,6 +479,7 @@ impl SourceBackedWorkbook {
                 },
                 active_sheet,
                 sheets,
+                sheet_name_order,
             }),
         })
     }
@@ -526,9 +542,15 @@ impl SourceBackedWorkbook {
             CoreSelector::Name(name) => {
                 let key = crate::sheet::key(&name);
                 self.inner
-                    .sheets
-                    .iter()
-                    .find(|sheet| sheet.name_key == key)
+                    .sheet_name_order
+                    .binary_search_by(|&position| {
+                        self.inner.sheets[position]
+                            .name_key
+                            .as_ref()
+                            .cmp(key.as_ref())
+                    })
+                    .ok()
+                    .and_then(|order| self.inner.sheets.get(self.inner.sheet_name_order[order]))
                     .cloned()
             },
             CoreSelector::Id(never) => match never {},
@@ -632,6 +654,37 @@ impl SourceWorksheet {
         self.owner.package.source_version()?;
         self.owner.execution_check()?;
         Ok(values)
+    }
+
+    /// Visit every stored cell selected by a checked range without cloning it.
+    ///
+    /// The callback receives the immutable semantic cell state owned by this
+    /// worksheet's parsed source snapshot. A callback may copy a cell if it
+    /// needs to retain it, but the ordinary full-scan path does not allocate a
+    /// result vector or clone formulas, shared-string text, or unknown-cell
+    /// diagnostics. Formula caches, shared strings, styles, and MCE-selected
+    /// worksheet markup have already been validated by [`Self::store`].
+    ///
+    /// Cancellation is checked between callbacks. The source version is
+    /// checked after the complete visit, so a source mutation during the
+    /// callback cannot publish a semantically stale scan as successful.
+    pub fn visit_cells<'a, F>(&self, area: impl Into<Area<'a>>, mut visit: F) -> Result<usize>
+    where
+        F: FnMut(Address, &Cell) -> Result<()>,
+    {
+        let range = area.into().resolve()?;
+        let store = self.store()?;
+        let mut visited = 0usize;
+        for (address, cell) in store.cells(range) {
+            self.owner.execution_check()?;
+            visit(address, cell)?;
+            visited = visited
+                .checked_add(1)
+                .ok_or_else(|| invalid("source-backed cell visit count overflow"))?;
+        }
+        self.owner.package.source_version()?;
+        self.owner.execution_check()?;
+        Ok(visited)
     }
 
     /// Bounding rectangle of stored cell records.

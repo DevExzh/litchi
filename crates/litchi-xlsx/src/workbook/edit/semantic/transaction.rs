@@ -1515,7 +1515,8 @@ impl Edit {
             let part = base.inner.package.get_part(&data.part_uri)?;
             let before = part.blob_arc();
             let MergePlan { add, remove } = merge_projection.plan;
-            let mut after = if remove.is_empty() {
+            let has_merge_removes = !remove.is_empty();
+            let mut after = if !has_merge_removes {
                 None
             } else {
                 Some(raw::worksheet::edit::rewrite_merges(
@@ -1533,6 +1534,13 @@ impl Edit {
                 rows: effective_rows,
                 columns: effective_columns,
             };
+            // Metadata-only worksheet edits already validate the source store
+            // above and each metadata codec validates its own complete XML
+            // surface. Keep the unchanged grid cold in the newly published
+            // snapshot instead of parsing it again after the rewrite. Grid
+            // and merge edits retain the full post-write store verification.
+            let requires_store_verification =
+                !ordinary.is_empty() || !add.is_empty() || has_merge_removes;
             if !ordinary.is_empty() {
                 let input = after.as_deref().unwrap_or(&before);
                 after = Some(raw::worksheet::edit::rewrite(input, &data.name, ordinary)?);
@@ -1594,9 +1602,15 @@ impl Edit {
             let after =
                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
             let after = raw::compact::changed(&after, "compact changed worksheet output")?;
-            let parsed = raw::worksheet::parse(&after, || base.inner.shared_strings())?;
+            let parsed = requires_store_verification
+                .then(|| raw::worksheet::parse(&after, || base.inner.shared_strings()))
+                .transpose()?;
+            // Keep the existing whole-worksheet web-binding validation even
+            // when the grid store is intentionally not reparsed.
             let parsed_web = raw::web::read(&after)?;
-            base.inner.validate_styles(&parsed)?;
+            if let Some(parsed) = parsed.as_ref() {
+                base.inner.validate_styles(parsed)?;
+            }
             for change in &changes[change_start..] {
                 match change {
                     Change::Create { .. }
@@ -1622,6 +1636,9 @@ impl Edit {
                         change,
                         ..
                     } => {
+                        let parsed = parsed.as_ref().ok_or_else(|| {
+                            invalid("worksheet merge verification lost the parsed store")
+                        })?;
                         if parsed.merge_ranges().contains(range) != change.after() {
                             return Err(invalid(format!(
                                 "worksheet merged-range verification failed at {sheet}!{range}"
@@ -1629,6 +1646,9 @@ impl Edit {
                         }
                     },
                     Change::Defaults { sheet, after, .. } => {
+                        let parsed = parsed.as_ref().ok_or_else(|| {
+                            invalid("worksheet defaults verification lost the parsed store")
+                        })?;
                         if parsed.defaults() != after.as_ref() {
                             return Err(invalid(format!(
                                 "worksheet defaults edit verification failed at {sheet}"
@@ -1641,6 +1661,9 @@ impl Edit {
                         after,
                         ..
                     } => {
+                        let parsed = parsed.as_ref().ok_or_else(|| {
+                            invalid("worksheet cell verification lost the parsed store")
+                        })?;
                         let actual = State::read(parsed.entry(*address), &base);
                         if actual != *after {
                             return Err(invalid(format!(
@@ -1651,6 +1674,9 @@ impl Edit {
                     Change::Row {
                         sheet, row, after, ..
                     } => {
+                        let parsed = parsed.as_ref().ok_or_else(|| {
+                            invalid("worksheet row verification lost the parsed store")
+                        })?;
                         let actual = RowState::read(parsed.row_entry(*row), &base);
                         if actual != *after {
                             return Err(invalid(format!(
@@ -1665,6 +1691,9 @@ impl Edit {
                         after,
                         ..
                     } => {
+                        let parsed = parsed.as_ref().ok_or_else(|| {
+                            invalid("worksheet column verification lost the parsed store")
+                        })?;
                         let actual = ColumnState::read(parsed.column_entry(*column), &base);
                         if actual != *after {
                             return Err(invalid(format!(
@@ -1724,14 +1753,16 @@ impl Edit {
                 }
             }
             let after = Arc::new(after);
-            if parsed.stored_cell_count() <= MAX_VALIDATED_STORE_HANDOFF_CELLS
-                && after.len() <= MAX_VALIDATED_STORE_HANDOFF_BYTES
-            {
-                validated_worksheet_stores.push(ValidatedWorksheetStore {
-                    uri: data.part_uri.clone(),
-                    content: Arc::clone(&after),
-                    store: parsed,
-                });
+            if let Some(parsed) = parsed {
+                if parsed.stored_cell_count() <= MAX_VALIDATED_STORE_HANDOFF_CELLS
+                    && after.len() <= MAX_VALIDATED_STORE_HANDOFF_BYTES
+                {
+                    validated_worksheet_stores.push(ValidatedWorksheetStore {
+                        uri: data.part_uri.clone(),
+                        content: Arc::clone(&after),
+                        store: parsed,
+                    });
+                }
             }
             parts.push(PartChange {
                 uri: data.part_uri.clone(),
