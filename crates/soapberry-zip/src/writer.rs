@@ -613,6 +613,104 @@ where
         Ok(())
     }
 
+    /// Writes one member whose compressed bytes, CRC-32, and sizes are already
+    /// known, declaring the final values in the local header.
+    ///
+    /// This is the sized counterpart of the streaming entry API: because the
+    /// local header carries the real CRC-32 and both sizes, no data descriptor
+    /// is emitted and the resulting archive can be probed from its central
+    /// directory alone. `crc32` and `uncompressed_size` must describe the
+    /// plaintext that `compressed` inflates to under `compression_method`;
+    /// only `Store` and `Deflate` are accepted.
+    pub fn write_precompressed_file(
+        &mut self,
+        name: &str,
+        compression_method: CompressionMethod,
+        crc32: u32,
+        uncompressed_size: u64,
+        compressed: &[u8],
+    ) -> Result<(), Error> {
+        if !matches!(
+            compression_method,
+            CompressionMethod::Store | CompressionMethod::Deflate
+        ) {
+            return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                compression_method.as_id().as_u16(),
+            )));
+        }
+        let file_path = ZipFilePath::from_str(name.trim_end_matches('/'));
+
+        if file_path.len() > u16::MAX as usize {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "file name too long".to_string(),
+            }));
+        }
+
+        let compressed_size = compressed.len() as u64;
+        if uncompressed_size >= ZIP64_THRESHOLD_FILE_SIZE
+            || compressed_size >= ZIP64_THRESHOLD_FILE_SIZE
+        {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "file too large".to_string(),
+            }));
+        }
+
+        let local_header_offset = self.writer.count();
+        let mut flags = 0u16;
+        if file_path.needs_utf8_encoding() {
+            flags |= FLAG_UTF8_ENCODING;
+        }
+
+        let name_bytes = file_path.as_ref().as_bytes();
+        let name_len = name_bytes.len() as u16;
+        self.file_names
+            .try_reserve(name_bytes.len())
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP member-name storage: {error}"),
+            })?;
+        self.files
+            .try_reserve(1)
+            .map_err(|error| ErrorKind::InvalidInput {
+                msg: format!("could not reserve ZIP file-header storage: {error}"),
+            })?;
+        self.file_names.extend_from_slice(name_bytes);
+
+        let header = ZipLocalFileHeaderFixed {
+            signature: ZipLocalFileHeaderFixed::SIGNATURE,
+            version_needed: 20,
+            flags,
+            compression_method: compression_method.as_id(),
+            last_mod_time: 0,
+            last_mod_date: 0,
+            crc32,
+            compressed_size: compressed_size as u32,
+            uncompressed_size: uncompressed_size as u32,
+            file_name_len: file_path.len() as u16,
+            extra_field_len: 0,
+        };
+
+        header.write(&mut self.writer)?;
+        self.writer.write_all(file_path.as_ref().as_bytes())?;
+        self.writer.write_all(compressed)?;
+
+        let mut file_header = FileHeader {
+            name_len,
+            compression_method,
+            local_header_offset,
+            compressed_size,
+            uncompressed_size,
+            crc: crc32,
+            flags,
+            modification_time: None,
+            unix_permissions: None,
+            extra_fields: ExtraFieldsContainer::new(),
+        };
+        file_header.finalize_extra_fields()?;
+        self.files.push(file_header);
+
+        Ok(())
+    }
+
     /// Writes a local file header with filtered extra fields.
     fn write_local_header(
         &mut self,

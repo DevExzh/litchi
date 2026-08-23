@@ -2224,6 +2224,42 @@ impl<W: Write> Write for LimitedEntryWriter<'_, '_, W> {
     }
 }
 
+/// Bounded in-memory scratch for one deflated member.
+///
+/// The scratch enforces the same compressed-size budget as
+/// [`LimitedEntryWriter`], but before any archive byte is emitted so a limit
+/// breach cannot poison the archive mid-entry.
+struct CompressedScratch<'a> {
+    inner: &'a mut Vec<u8>,
+    maximum: u64,
+}
+
+impl<'a> CompressedScratch<'a> {
+    fn new(inner: &'a mut Vec<u8>, maximum: u64) -> Self {
+        Self { inner, maximum }
+    }
+}
+
+impl Write for CompressedScratch<'_> {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        let written = u64::try_from(self.inner.len()).unwrap_or(u64::MAX);
+        let requested = u64::try_from(buffer.len()).unwrap_or(u64::MAX);
+        let remaining = self.maximum.saturating_sub(written);
+        if requested > remaining {
+            return Err(streaming_limit_io_error(
+                StreamingLimitResource::CompressedBytes,
+                written.saturating_add(requested),
+                self.maximum,
+            ));
+        }
+        self.inner.write(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 /// Bounded ZIP transport writer for sequential Office package members.
 ///
 /// This substrate does not construct semantic XLSX, DOCX, PPTX, or ODF
@@ -3028,40 +3064,63 @@ impl<W: Write> StreamingArchiveWriter<W> {
     }
 
     /// Write a file with Deflate compression.
+    ///
+    /// The payload is compressed into a bounded scratch buffer before any
+    /// archive byte is emitted, so the local header declares the final CRC-32
+    /// and both sizes and no data descriptor is needed. A compressed-size
+    /// limit breach is therefore reported before the archive changes, leaving
+    /// the writer usable instead of poisoned mid-entry.
     pub fn write_deflated(&mut self, name: &str, data: &[u8]) -> Result<(), Error> {
         let data_bytes = u64::try_from(data.len()).unwrap_or(u64::MAX);
         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
         self.reserve_streaming_entry()?;
-        let started = self
-            .archive
-            .new_file(&normalized_name)
-            .compression_method(CompressionMethod::Deflate)
-            .start();
-        let result = match started {
-            Ok((mut entry, config)) => (|| {
-                let descriptor = {
-                    let mut limited_entry =
-                        LimitedEntryWriter::new(&mut entry, self.limits.max_compressed_size);
-                    let encoder = DeflateEncoder::new(&mut limited_entry, Compression::default());
-                    let mut writer = config.wrap(encoder);
-                    writer.write_all(data)?;
-                    let (encoder, desc) = writer.finish()?;
-                    encoder.finish()?;
-                    limited_entry.ensure_within_limit()?;
-                    desc
-                };
-                entry.finish(descriptor)?;
-                Ok(())
-            })(),
-            Err(error) => Err(error),
-        };
-        if let Err(error) = result {
-            return Err(self.poison(error));
+        let mut compressed = Vec::new();
+        compressed
+            .try_reserve(
+                data.len()
+                    .min(usize::try_from(self.limits.max_compressed_size).unwrap_or(usize::MAX)),
+            )
+            .map_err(|source| Error::from(ErrorKind::Allocation {
+                resource: "deflated member scratch buffer",
+                source,
+            }))?;
+        let compression = (|| {
+            let mut scratch = CompressedScratch::new(
+                &mut compressed,
+                self.limits.max_compressed_size,
+            );
+            let mut encoder = DeflateEncoder::new(&mut scratch, Compression::default());
+            encoder.write_all(data)?;
+            encoder.finish().map(|_scratch| ())
+        })();
+        if let Err(error) = compression {
+            let error = Error::from(error);
+            return Err(match streaming_limit_from_error(&error) {
+                Some(StreamingLimitExceeded {
+                    resource: StreamingLimitResource::CompressedBytes,
+                    actual,
+                    maximum,
+                }) => limit_error(LimitResource::CompressedSize, actual, maximum),
+                _ => error,
+            });
         }
-        self.total_uncompressed_bytes = self.total_uncompressed_bytes.saturating_add(data_bytes);
-        self.record_streaming_entry(normalized_name, name_bytes);
-        self.refresh_output_bytes();
-        Ok(())
+        let crc32 = crate::crc32(data);
+        match self.archive.write_precompressed_file(
+            &normalized_name,
+            CompressionMethod::Deflate,
+            crc32,
+            data_bytes,
+            &compressed,
+        ) {
+            Ok(()) => {
+                self.total_uncompressed_bytes =
+                    self.total_uncompressed_bytes.saturating_add(data_bytes);
+                self.record_streaming_entry(normalized_name, name_bytes);
+                self.refresh_output_bytes();
+                Ok(())
+            },
+            Err(error) => Err(self.poison(error)),
+        }
     }
 
     /// Consume a reader value into a stored ZIP member.
@@ -4897,7 +4956,9 @@ mod tests {
             .write_deflated("content.xml", b"<content>Hello</content>")
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        assert!(local_member_has_data_descriptor(&bytes, b"content.xml"));
+        // The sized deflated path declares the final CRC-32 and sizes in the
+        // local header, so no data descriptor is emitted.
+        assert!(!local_member_has_data_descriptor(&bytes, b"content.xml"));
 
         let archive = indexed_archive(bytes);
         assert_eq!(archive.len(), 2);
