@@ -33,6 +33,41 @@ pub(crate) trait ArchiveAccess {
         name: &str,
     ) -> std::result::Result<soapberry_zip::office::Metadata, soapberry_zip::Error>;
     fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error>;
+    fn read_stored_borrowed<'a>(
+        &'a self,
+        name: &str,
+    ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error>;
+}
+
+/// A structural ZIP member can be consumed directly from a validated stored
+/// source, while a deflated member must first be materialized. Keeping this
+/// distinction private prevents archive storage details from entering the
+/// ordinary OPC model.
+enum StructuralMember<'a> {
+    Borrowed(&'a [u8]),
+    Owned(Vec<u8>),
+}
+
+impl StructuralMember<'_> {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Borrowed(bytes) => bytes,
+            Self::Owned(bytes) => bytes,
+        }
+    }
+}
+
+fn read_structural_member<'a, A: ArchiveAccess + ?Sized>(
+    archive: &'a A,
+    name: &str,
+) -> Result<StructuralMember<'a>> {
+    match archive.read_stored_borrowed(name)? {
+        Some(bytes) => Ok(StructuralMember::Borrowed(bytes)),
+        None => archive
+            .read(name)
+            .map(StructuralMember::Owned)
+            .map_err(Into::into),
+    }
 }
 
 impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
@@ -54,6 +89,13 @@ impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
     fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error> {
         Self::read(self, name)
     }
+
+    fn read_stored_borrowed<'a>(
+        &'a self,
+        name: &str,
+    ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error> {
+        Self::read_stored_borrowed(self, name)
+    }
 }
 
 impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::IndexedArchive<R> {
@@ -74,6 +116,16 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::Indexe
 
     fn read(&self, name: &str) -> std::result::Result<Vec<u8>, soapberry_zip::Error> {
         Self::read(self, name)
+    }
+
+    fn read_stored_borrowed<'a>(
+        &'a self,
+        _name: &str,
+    ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error> {
+        // Positional sources may be remote, mutable, or backed by a file. A
+        // borrowed payload would not have a sound lifetime, so they always
+        // use the owned read path.
+        Ok(None)
     }
 }
 
@@ -370,8 +422,8 @@ impl PackageReader {
             content_types_metadata.uncompressed_size(),
             limits.max_content_types_bytes() as u64,
         )?;
-        let content_types_xml = archive.read(content_types_member)?;
-        let content_types = ContentTypeMap::from_xml(&content_types_xml, limits)?;
+        let content_types_xml = read_structural_member(archive, content_types_member)?;
+        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
 
         // Phase 2: Get package-level relationships (on-demand decompression)
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
@@ -440,8 +492,8 @@ impl PackageReader {
             content_types_metadata.uncompressed_size(),
             limits.max_content_types_bytes() as u64,
         )?;
-        let content_types_xml = archive.read(content_types_member)?;
-        let content_types = ContentTypeMap::from_xml(&content_types_xml, limits)?;
+        let content_types_xml = read_structural_member(archive, content_types_member)?;
+        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
 
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let pkg_srels =
@@ -628,10 +680,10 @@ impl PackageReader {
         match archive.metadata(rels_path) {
             Ok(metadata) => {
                 ledger.preflight_xml_bytes(limits, metadata.uncompressed_size())?;
-                let rels_xml = archive.read(rels_path)?;
-                ledger.retain_xml_bytes(limits, rels_xml.len() as u64)?;
+                let rels_xml = read_structural_member(archive, rels_path)?;
+                ledger.retain_xml_bytes(limits, rels_xml.as_bytes().len() as u64)?;
                 Self::parse_rels_xml_with_source(
-                    &rels_xml,
+                    rels_xml.as_bytes(),
                     source_uri.base_uri(),
                     Some(source_uri.as_str()),
                     limits,
@@ -994,8 +1046,8 @@ impl PackageReader {
             content_types_metadata.uncompressed_size(),
             limits.max_content_types_bytes() as u64,
         )?;
-        let content_types_xml = archive.read(content_types_member)?;
-        let content_types = ContentTypeMap::from_xml(&content_types_xml, limits)?;
+        let content_types_xml = read_structural_member(archive, content_types_member)?;
+        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)?;
         let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let pkg_srels = Self::load_rels_lazy(archive, &package_uri, limits, &mut ledger)?;
         let mut non_part_members = Vec::new();
@@ -1058,11 +1110,9 @@ impl PackageReader {
                 limits.max_content_types_bytes() as u64,
             )
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
-        let content_types_xml = archive
-            .read(content_types_member)
-            .map_err(OpcError::from)
+        let content_types_xml = read_structural_member(archive, content_types_member)
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
-        let content_types = ContentTypeMap::from_xml(&content_types_xml, limits)
+        let content_types = ContentTypeMap::from_xml(content_types_xml.as_bytes(), limits)
             .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
         let package_uri = PackURI::new(PACKAGE_URI)
             .map_err(OpcError::InvalidPackUri)
