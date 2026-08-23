@@ -702,8 +702,8 @@ fn duplicate_rooted_node_package(source: &[u8]) -> TestResult<Vec<u8>> {
             .find(|message| message.type_ == 2)
             .ok_or_else(|| io::Error::other("synthetic show payload is missing"))?;
         let mut decoded = kn::ShowArchive::decode(message.data.as_slice())?;
-        // Keep the selected first node unique: the selector must reject a
-        // duplicate elsewhere in the rooted slide list as well.
+        // Keep the selected first node unique: the rooted ownership audit must
+        // reject a duplicate elsewhere in the slide-node list as well.
         decoded.slide_tree.slides.push(reference(SECOND_NODE));
         message.data = decoded.encode_to_vec();
         Ok(())
@@ -1257,6 +1257,24 @@ fn co_located_slide_and_node_are_rewritten_once() -> TestResult<()> {
         commit.package().exact_bytes(),
         FIRST_NODE
     )?);
+    Ok(())
+}
+
+#[test]
+fn duplicate_unselected_root_node_is_rejected_before_staging() -> TestResult<()> {
+    let source = package_bytes(
+        Some(&full_settings()?),
+        None,
+        ["Alpha", "Beta"],
+        [true, false],
+        Malformation::None,
+    )?;
+    let malformed = duplicate_rooted_node_package(&source)?;
+    let package = Package::from_bytes(&malformed)?;
+    assert!(matches!(
+        package.edit_slide_transition(0usize),
+        Err(Error::InvalidSource)
+    ));
     Ok(())
 }
 
