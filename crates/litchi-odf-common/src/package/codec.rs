@@ -1,8 +1,11 @@
 //! Archive access and neutral `manifest.xml` codecs.
 
-use super::model::{Archive, ArchiveNames, ArchiveReaderKind, Entry, Manifest, PreparedArchive};
+use super::model::{
+    Archive, ArchiveLimits, ArchiveMetadata, ArchiveNames, ArchiveReaderKind, Entry, Manifest,
+    PreparedArchive,
+};
 use super::path::validate_manifest_path;
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -12,7 +15,89 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
+const LOEXT_NAMESPACE: &[u8] =
+    b"urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0";
 const MANIFEST_PATHS: [&str; 2] = ["META-INF/manifest.xml", "manifest.xml"];
+/// Hard parser ceiling shared with the default validation policy.
+///
+/// Configured validation limits may tighten this value, but the typed and
+/// neutral manifest parsers remain bounded by this hard ceiling.
+pub(crate) const MAX_MANIFEST_ENTRIES: usize = 100_000;
+
+#[derive(Clone, Copy)]
+pub(crate) enum ManifestScanElement {
+    FileEntry,
+    EncryptionData,
+    Algorithm,
+    StartKeyGeneration,
+    KeyDerivation,
+    Other,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ManifestScanEvent {
+    Start(ManifestScanElement),
+    Empty(ManifestScanElement),
+    End(ManifestScanElement),
+    Eof,
+    Other,
+}
+
+pub(crate) enum ManifestScanAttributes {
+    Manifest(Result<HashMap<Vec<u8>, String>>),
+    ManifestAndLoext(Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)>),
+}
+
+const DEFAULT_MAX_MANIFEST_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Preserve ZIP resource-limit and allocation failures at the ODF boundary.
+///
+/// The neutral package layer is the owner of borrowed archive access, so all
+/// callers (including the core package owner and the detector) use this one
+/// mapping instead of flattening archive limits into format strings.
+pub(crate) fn map_archive_error(error: soapberry_zip::Error) -> Error {
+    map_archive_error_kind(error.into_kind())
+}
+
+pub(crate) fn map_archive_error_kind(kind: soapberry_zip::ErrorKind) -> Error {
+    match kind {
+        soapberry_zip::ErrorKind::Allocation { resource, source } => {
+            Error::Allocation { resource, source }
+        },
+        soapberry_zip::ErrorKind::LimitExceeded {
+            resource,
+            actual,
+            maximum,
+        } => archive_limit_error(resource, actual, maximum),
+        soapberry_zip::ErrorKind::IO(io_error) | soapberry_zip::ErrorKind::Io(io_error) => {
+            Error::Io(io_error)
+        },
+        kind => Error::InvalidFormat(soapberry_zip::Error::from(kind).to_string()),
+    }
+}
+
+fn archive_limit_error(resource: soapberry_zip::LimitResource, actual: u64, maximum: u64) -> Error {
+    let (dimension, scope) = match resource {
+        soapberry_zip::LimitResource::FileCount => (Resource::Objects, "ODF ZIP file count"),
+        soapberry_zip::LimitResource::MemberNameBytes => {
+            (Resource::InputBytes, "ODF ZIP member name bytes")
+        },
+        soapberry_zip::LimitResource::MetadataBytes => {
+            (Resource::InputBytes, "ODF ZIP metadata bytes")
+        },
+        soapberry_zip::LimitResource::CompressedSize => {
+            (Resource::InputBytes, "ODF ZIP compressed bytes")
+        },
+        soapberry_zip::LimitResource::EntrySize => (Resource::InputBytes, "ODF ZIP entry bytes"),
+        soapberry_zip::LimitResource::TotalSize => (Resource::InputBytes, "ODF ZIP total bytes"),
+    };
+    Error::ResourceLimit(ResourceLimit {
+        resource: dimension,
+        observed: actual,
+        limit: maximum,
+        scope: scope.into(),
+    })
+}
 
 fn try_copy_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     let mut output = Vec::new();
@@ -39,10 +124,15 @@ impl<'data> Archive<'data> {
     ///
     /// Returns an error when `data` is not a readable ZIP archive.
     pub fn new(data: &'data [u8]) -> Result<Self> {
+        Self::new_with_limits(data, ArchiveLimits::default())
+    }
+
+    /// Open an ODF ZIP archive with explicit central-directory limits.
+    pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> {
         #[cfg(test)]
         super::model::note_index_build();
-        let reader = ArchiveReader::new(data)
-            .map_err(|error| Error::InvalidFormat(format!("Invalid ZIP archive: {error}")))?;
+        let reader = ArchiveReader::new_with_limits(data, limits.into_zip_limits())
+            .map_err(map_archive_error)?;
         Ok(Self {
             reader: ArchiveReaderKind::Borrowed(reader),
         })
@@ -66,7 +156,27 @@ impl<'data> Archive<'data> {
             ArchiveReaderKind::Borrowed(reader) => reader.read(path),
             ArchiveReaderKind::Prepared(reader) => reader.read(path),
         };
-        result.map_err(|error| Error::InvalidFormat(error.to_string()))
+        result.map_err(map_archive_error)
+    }
+
+    /// Read one archive member after checking its declared uncompressed size
+    /// against a caller-selected finite limit.
+    pub fn read_with_limit(
+        &self,
+        path: &str,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<Vec<u8>> {
+        let metadata = self.metadata(path)?;
+        if metadata.uncompressed_size() > maximum {
+            return Err(Error::ResourceLimit(ResourceLimit {
+                resource: Resource::InputBytes,
+                observed: metadata.uncompressed_size(),
+                limit: maximum,
+                scope: scope.into(),
+            }));
+        }
+        self.read(path)
     }
 
     /// Read one UTF-8 archive member.
@@ -80,6 +190,34 @@ impl<'data> Archive<'data> {
             .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8 in '{path}': {error}")))
     }
 
+    /// Read one UTF-8 archive member under a declared-size limit.
+    pub fn read_string_with_limit(
+        &self,
+        path: &str,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<String> {
+        let bytes = self.read_with_limit(path, maximum, scope)?;
+        String::from_utf8(bytes)
+            .map_err(|error| Error::InvalidFormat(format!("Invalid UTF-8 in '{path}': {error}")))
+    }
+
+    /// Return declared ZIP metadata for one archive member without reading
+    /// or decompressing its payload.
+    pub fn metadata(&self, path: &str) -> Result<ArchiveMetadata> {
+        let result = match &self.reader {
+            ArchiveReaderKind::Borrowed(reader) => reader.metadata(path),
+            ArchiveReaderKind::Prepared(reader) => reader.metadata(path),
+        };
+        result
+            .map(|metadata| ArchiveMetadata {
+                compressed_size: metadata.compressed_size(),
+                uncompressed_size: metadata.uncompressed_size(),
+                directory: metadata.is_directory(),
+            })
+            .map_err(map_archive_error)
+    }
+
     /// Read the package manifest, accepting both common ODF locations.
     ///
     /// # Errors
@@ -87,11 +225,21 @@ impl<'data> Archive<'data> {
     /// Returns an error when neither conventional manifest location can be
     /// read as UTF-8.
     pub fn read_manifest_xml(&self) -> Result<String> {
+        self.read_manifest_xml_with_limit(DEFAULT_MAX_MANIFEST_BYTES, "ODF manifest bytes")
+    }
+
+    /// Read the package manifest while checking its declared size before
+    /// materialization.
+    pub fn read_manifest_xml_with_limit(
+        &self,
+        maximum: u64,
+        scope: &'static str,
+    ) -> Result<String> {
         if self.contains(MANIFEST_PATHS[0]) {
-            return self.read_string(MANIFEST_PATHS[0]);
+            return self.read_string_with_limit(MANIFEST_PATHS[0], maximum, scope);
         }
         if self.contains(MANIFEST_PATHS[1]) {
-            return self.read_string(MANIFEST_PATHS[1]);
+            return self.read_string_with_limit(MANIFEST_PATHS[1], maximum, scope);
         }
         Err(Error::InvalidFormat(
             "No manifest.xml found in ODF package".to_string(),
@@ -125,7 +273,7 @@ impl<'data> Archive<'data> {
             ArchiveReaderKind::Borrowed(reader) => reader.is_stored(path),
             ArchiveReaderKind::Prepared(reader) => reader.is_stored(path),
         };
-        result.map_err(|error| Error::InvalidFormat(error.to_string()))
+        result.map_err(map_archive_error)
     }
 }
 
@@ -138,30 +286,61 @@ pub fn read_manifest(archive: &Archive<'_>) -> Result<Manifest> {
     parse_manifest(&archive.read_manifest_xml()?)
 }
 
-/// Read the neutral file-entry model from an archive reader.
+/// Observe a manifest while the neutral parser validates and indexes it.
 ///
-/// # Errors
-///
-/// Returns an error when the XML is malformed or contains invalid manifest
-/// entries.
-pub fn parse_manifest(xml: &str) -> Result<Manifest> {
+/// The callback is deliberately crate-private: it is the sharing seam between
+/// the neutral package owner and the typed encryption owner.  Keeping the
+/// event loop here means callers that need both views do not have to parse the
+/// manifest XML twice.  Callback failures are retained until the neutral scan
+/// completes so a neutral validation error keeps its historical precedence.
+pub(crate) trait ManifestScanObserver {
+    fn wants_attributes(&self) -> bool {
+        false
+    }
+
+    fn event(
+        &mut self,
+        event: ManifestScanEvent,
+        attributes: Option<ManifestScanAttributes>,
+        file_entry_path: Option<&str>,
+        file_entry_size: Option<u64>,
+    ) -> Result<()>;
+}
+
+pub(crate) fn parse_manifest_with_observer<O: ManifestScanObserver>(
+    xml: &str,
+    observer: &mut O,
+) -> Result<(Manifest, Option<Error>)> {
     let mut reader = NsReader::from_str(xml);
     let mut buffer = Vec::new();
     let mut entries = HashMap::new();
     let mut current_path: Option<String> = None;
+    let mut observer_error = None;
 
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("Invalid manifest XML: {error}")))?;
-        match event {
-            Event::Start(element) if is_manifest_element(&namespace, &element, b"file-entry") => {
+        let scan_event = classify_manifest_event(&namespace, &event);
+        let mut attributes = if observer_error.is_none() && observer.wants_attributes() {
+            scan_attributes(&reader, &event, scan_event)
+        } else {
+            None
+        };
+        let mut callback_called = false;
+        match &event {
+            Event::Start(element)
+                if matches!(
+                    scan_event,
+                    ManifestScanEvent::Start(ManifestScanElement::FileEntry)
+                ) =>
+            {
                 if current_path.is_some() {
                     return Err(Error::InvalidFormat(
                         "Nested manifest file entries are invalid".to_string(),
                     ));
                 }
-                let (path, entry) = parse_entry(&reader, &element)?.ok_or_else(|| {
+                let (path, entry) = parse_entry(&reader, element)?.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
                 validate_manifest_path(&path)?;
@@ -169,16 +348,37 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
                     return Err(Error::InvalidFormat(format!(
                         "Duplicate manifest file entry '{path}'"
                     )));
+                }
+                if entries.len() >= MAX_MANIFEST_ENTRIES {
+                    return Err(Error::InvalidFormat(
+                        "manifest file entries exceed the configured ODF ceiling".to_string(),
+                    ));
                 }
                 entries.try_reserve(1).map_err(|source| Error::Allocation {
                     resource: "ODF manifest entry index",
                     source,
                 })?;
                 current_path = Some(try_copy_string(&path, "ODF manifest current path")?);
+                if observer_error.is_none()
+                    && let Err(error) = observer.event(
+                        scan_event,
+                        attributes.take(),
+                        Some(path.as_str()),
+                        entry.size,
+                    )
+                {
+                    observer_error = Some(error);
+                }
+                callback_called = true;
                 entries.insert(path, entry);
             },
-            Event::Empty(element) if is_manifest_element(&namespace, &element, b"file-entry") => {
-                let (path, entry) = parse_entry(&reader, &element)?.ok_or_else(|| {
+            Event::Empty(element)
+                if matches!(
+                    scan_event,
+                    ManifestScanEvent::Empty(ManifestScanElement::FileEntry)
+                ) =>
+            {
+                let (path, entry) = parse_entry(&reader, element)?.ok_or_else(|| {
                     Error::InvalidFormat("Manifest file entry has no full path".to_string())
                 })?;
                 validate_manifest_path(&path)?;
@@ -187,29 +387,35 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
                         "Duplicate manifest file entry '{path}'"
                     )));
                 }
+                if entries.len() >= MAX_MANIFEST_ENTRIES {
+                    return Err(Error::InvalidFormat(
+                        "manifest file entries exceed the configured ODF ceiling".to_string(),
+                    ));
+                }
                 entries.try_reserve(1).map_err(|source| Error::Allocation {
                     resource: "ODF manifest entry index",
                     source,
                 })?;
                 entries.insert(path, entry);
             },
-            Event::End(element)
-                if namespace_is_manifest(&namespace)
-                    && element.local_name().as_ref() == b"file-entry" =>
-            {
-                current_path = None;
-            },
-            Event::Eof => break,
-            Event::Start(_)
-            | Event::Empty(_)
-            | Event::End(_)
-            | Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+            _ => {},
+        };
+
+        if observer_error.is_none() && !callback_called {
+            if let Err(error) = observer.event(scan_event, attributes.take(), None, None) {
+                observer_error = Some(error);
+            }
+        }
+
+        if matches!(
+            &event,
+            Event::End(_element)
+                if matches!(scan_event, ManifestScanEvent::End(ManifestScanElement::FileEntry))
+        ) {
+            current_path = None;
+        }
+        if matches!(&event, Event::Eof) {
+            break;
         }
         buffer.clear();
     }
@@ -224,7 +430,179 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
         .map(|entry| try_copy_string(&entry.media_type, "ODF manifest mimetype"))
         .transpose()?
         .unwrap_or_default();
-    Ok(Manifest { mimetype, entries })
+    Ok((Manifest { mimetype, entries }, observer_error))
+}
+
+fn classify_manifest_event(namespace: &ResolveResult<'_>, event: &Event<'_>) -> ManifestScanEvent {
+    let classify = |local: &[u8]| {
+        if !namespace_is_manifest(namespace) {
+            return ManifestScanElement::Other;
+        }
+        match local {
+            b"file-entry" => ManifestScanElement::FileEntry,
+            b"encryption-data" => ManifestScanElement::EncryptionData,
+            b"algorithm" => ManifestScanElement::Algorithm,
+            b"start-key-generation" => ManifestScanElement::StartKeyGeneration,
+            b"key-derivation" => ManifestScanElement::KeyDerivation,
+            _ => ManifestScanElement::Other,
+        }
+    };
+    match event {
+        Event::Start(element) => ManifestScanEvent::Start(classify(element.local_name().as_ref())),
+        Event::Empty(element) => ManifestScanEvent::Empty(classify(element.local_name().as_ref())),
+        Event::End(element) => ManifestScanEvent::End(classify(element.local_name().as_ref())),
+        Event::Eof => ManifestScanEvent::Eof,
+        Event::Text(_)
+        | Event::CData(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::GeneralRef(_) => ManifestScanEvent::Other,
+    }
+}
+
+fn scan_attributes(
+    reader: &NsReader<&[u8]>,
+    event: &Event<'_>,
+    scan_event: ManifestScanEvent,
+) -> Option<ManifestScanAttributes> {
+    let element = match event {
+        Event::Start(element) | Event::Empty(element) => element,
+        Event::End(_)
+        | Event::Text(_)
+        | Event::CData(_)
+        | Event::Comment(_)
+        | Event::Decl(_)
+        | Event::PI(_)
+        | Event::DocType(_)
+        | Event::GeneralRef(_)
+        | Event::Eof => return None,
+    };
+    match scan_event {
+        ManifestScanEvent::Start(ManifestScanElement::KeyDerivation)
+        | ManifestScanEvent::Empty(ManifestScanElement::KeyDerivation) => {
+            Some(ManifestScanAttributes::ManifestAndLoext(
+                scan_manifest_and_loext_attributes(reader, element),
+            ))
+        },
+        ManifestScanEvent::Start(ManifestScanElement::EncryptionData)
+        | ManifestScanEvent::Empty(ManifestScanElement::EncryptionData)
+        | ManifestScanEvent::Start(ManifestScanElement::Algorithm)
+        | ManifestScanEvent::Empty(ManifestScanElement::Algorithm)
+        | ManifestScanEvent::Start(ManifestScanElement::StartKeyGeneration)
+        | ManifestScanEvent::Empty(ManifestScanElement::StartKeyGeneration) => Some(
+            ManifestScanAttributes::Manifest(scan_manifest_attributes(reader, element)),
+        ),
+        ManifestScanEvent::Start(ManifestScanElement::FileEntry)
+        | ManifestScanEvent::Empty(ManifestScanElement::FileEntry)
+        | ManifestScanEvent::Start(ManifestScanElement::Other)
+        | ManifestScanEvent::Empty(ManifestScanElement::Other)
+        | ManifestScanEvent::End(_)
+        | ManifestScanEvent::Eof
+        | ManifestScanEvent::Other => None,
+    }
+}
+
+fn scan_manifest_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<HashMap<Vec<u8>, String>> {
+    let mut values = HashMap::new();
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
+            Error::InvalidFormat(format!("Invalid manifest attribute: {error}"))
+        })?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        if !matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE) {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
+            })?;
+        if values.contains_key(local.as_ref()) {
+            return Err(Error::InvalidFormat(
+                "Duplicate manifest attribute".to_string(),
+            ));
+        }
+        values.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODF typed manifest attributes",
+            source,
+        })?;
+        let key = try_copy_bytes(local.as_ref(), "ODF typed manifest attribute name")?;
+        let value = match value {
+            Cow::Owned(value) => value,
+            Cow::Borrowed(value) => try_copy_string(value, "ODF typed manifest attribute value")?,
+        };
+        values.insert(key, value);
+    }
+    Ok(values)
+}
+
+fn scan_manifest_and_loext_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)> {
+    let mut manifest = HashMap::new();
+    let mut loext = HashMap::new();
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
+            Error::InvalidFormat(format!("Invalid manifest attribute: {error}"))
+        })?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let target = match namespace {
+            ResolveResult::Bound(Namespace(uri)) if uri == MANIFEST_NAMESPACE => &mut manifest,
+            ResolveResult::Bound(Namespace(uri)) if uri == LOEXT_NAMESPACE => &mut loext,
+            _ => continue,
+        };
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("Invalid manifest attribute value: {error}"))
+            })?;
+        if target.contains_key(local.as_ref()) {
+            return Err(Error::InvalidFormat(
+                "Duplicate manifest key-derivation attribute".to_string(),
+            ));
+        }
+        target.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODF key-derivation attributes",
+            source,
+        })?;
+        let key = try_copy_bytes(local.as_ref(), "ODF key-derivation attribute name")?;
+        let value = match value {
+            Cow::Owned(value) => value,
+            Cow::Borrowed(value) => try_copy_string(value, "ODF key-derivation attribute value")?,
+        };
+        target.insert(key, value);
+    }
+    Ok((manifest, loext))
+}
+
+/// Read the neutral file-entry model from an archive reader.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed or contains invalid manifest
+/// entries.
+pub fn parse_manifest(xml: &str) -> Result<Manifest> {
+    struct NoopObserver;
+    impl ManifestScanObserver for NoopObserver {
+        fn event(
+            &mut self,
+            _event: ManifestScanEvent,
+            _attributes: Option<ManifestScanAttributes>,
+            _file_entry_path: Option<&str>,
+            _file_entry_size: Option<u64>,
+        ) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    let (manifest, _) = parse_manifest_with_observer(xml, &mut NoopObserver)?;
+    Ok(manifest)
 }
 
 /// Return whether a package path is a likely embedded media resource.
@@ -238,14 +616,6 @@ pub fn is_media_path(path: &str) -> bool {
         || has_ascii_extension(path, b".jpeg")
         || has_ascii_extension(path, b".gif")
         || has_ascii_extension(path, b".svg")
-}
-
-fn is_manifest_element(
-    namespace: &ResolveResult<'_>,
-    element: &BytesStart<'_>,
-    local: &[u8],
-) -> bool {
-    namespace_is_manifest(namespace) && element.local_name().as_ref() == local
 }
 
 fn namespace_is_manifest(namespace: &ResolveResult<'_>) -> bool {

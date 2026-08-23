@@ -1,0 +1,475 @@
+{
+  "schema_version": 1,
+  "registry_kind": "litchi-performance-claim-registry",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "policies": {
+    "latency-abba-v1": {
+      "minimum_samples": 500,
+      "order": [
+        "a1",
+        "b1",
+        "b2",
+        "a2"
+      ],
+      "drift_ceiling_percent": {
+        "p50": 5,
+        "mean": 5,
+        "p95": 10,
+        "p99": 15
+      }
+    },
+    "resource-guardrail-v1": {
+      "max_regression_percent": 5,
+      "required_pairings": [
+        "A1_control_to_B1_candidate",
+        "A2_control_to_B2_candidate"
+      ]
+    }
+  },
+  "evidence": [
+    {
+      "id": "abba-0248",
+      "kind": "abba_package",
+      "relative_path": "0248-cfb-streaming-20260821",
+      "manifest": {
+        "path": "0248-cfb-streaming-abba-manifest.json",
+        "sha256": "7ffd58b3252879713697244972284a44a40244f47090d8a5aa0ac07a709314ee",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "e652f3923d923579c86eab764958fb708ab60c1a9a732d66168cfbcf81e32f72",
+        "canonical_sha256": "ef2ce9ab577b959bd4bcc650e20d011a4f6e9a877cf2feefe71782d5196dfd9c",
+        "schema_version": 1
+      }
+    },
+    {
+      "id": "abba-0249",
+      "kind": "abba_package",
+      "relative_path": "0249-ods-known-change-20260821",
+      "manifest": {
+        "path": "0249-ods-known-change-abba-manifest.json",
+        "sha256": "acff26a2a42a168ea173e408b8847a374e915dc2e73482432af116ff8512d6c4",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "1680eb8638c7da65902e4a3d57e04035a6807ff59061df815774a4bf018ea3e0",
+        "canonical_sha256": "74f4041cc1a6d210e57688cd49cb7c3c4276a451c4c2b007e819af774d35b90a",
+        "schema_version": 1
+      }
+    },
+    {
+      "id": "abba-0250",
+      "kind": "abba_package",
+      "relative_path": "0250-zip-ordering-20260821",
+      "manifest": {
+        "path": "0250-zip-ordering-abba-manifest.json",
+        "sha256": "84b67141fa08a1ea1af7f398501fcf1ee58874bc121b6e34826858f153b23bde",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "aa511946b050e92461645c9d8e57ed2ca6cca8c827b2d5776006efbc6f25cf1c",
+        "canonical_sha256": "7772f973341f4f8b941a7e7381bbce8e73df8438b5f0f44174f981573ee42732",
+        "schema_version": 1
+      }
+    },
+    {
+      "id": "abba-0251",
+      "kind": "abba_package",
+      "relative_path": "0251-xlsx-xml-borrowed-20260821",
+      "manifest": {
+        "path": "0251-xlsx-xml-borrowed-abba-manifest.json",
+        "sha256": "06fbd58b2d9ae8fe460c656bc7316b1493ed78f47ec5d5c91e91d4c088e8c00b",
+        "schema_version": 1
+      },
+      "summary": {
+        "path": "summary.json",
+        "sha256": "43cb20b1c68273cf42492b78f4c66a780b54e898bba9949ce082fc7d33291283",
+        "canonical_sha256": "c6045e6bd17d9181346692aa0463eda4b13c3b78f42f8e65b13990d17b3a04f9",
+        "schema_version": 1
+      }
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim-0248-cfb-streaming",
+      "change_id": "0248-cfb-streaming-abba",
+      "claim_class": "optimization",
+      "status": "rejected",
+      "code_state": "not_landed",
+      "reason_codes": [
+        "adverse_both_latency_cells"
+      ],
+      "scope": {
+        "format": "cfb",
+        "selectors": [
+          "cfb_open_stream_mini_4095_shared_bulk",
+          "cfb_open_stream_mini_4095_shared_concurrent",
+          "cfb_open_stream_mini_4095_shared_different_sid",
+          "cfb_open_stream_mini_4095_shared_one_shot",
+          "cfb_open_stream_mini_4095_shared_repeat",
+          "cfb_open_stream_mini_4095_shared_repeat8",
+          "cfb_open_stream_mini_shared_bulk",
+          "cfb_open_stream_mini_shared_concurrent",
+          "cfb_open_stream_mini_shared_different_sid",
+          "cfb_open_stream_mini_shared_one_shot",
+          "cfb_open_stream_mini_shared_repeat",
+          "cfb_open_stream_mini_shared_repeat8"
+        ],
+        "corpora": [
+          {
+            "name": "cfb-selective-minifat-4095-byte-wide-root",
+            "archive_sha256": "5d02a3b1486d676f2db3b4c43fc8698957a24fcd2b347ec4beba8e64d021efcb",
+            "generator": "litchi-cfb-selective-read-v1",
+            "shape": "wide-root",
+            "package_format": "CFB/OLE2"
+          },
+          {
+            "name": "cfb-selective-minifat-4095-byte-many-small",
+            "archive_sha256": "e5c90470074e936cff06ad73be993acea1017bce11042208c472ab770fb8af48",
+            "generator": "litchi-cfb-selective-read-v1",
+            "shape": "many-small",
+            "package_format": "CFB/OLE2"
+          },
+          {
+            "name": "cfb-selective-minifat-36-byte-wide-root",
+            "archive_sha256": "3bc17d57a6504792a3b04d47db237891ddd6615daaa512c6aa05d833427a56f3",
+            "generator": "litchi-cfb-selective-read-v1",
+            "shape": "wide-root",
+            "package_format": "CFB/OLE2"
+          },
+          {
+            "name": "cfb-selective-minifat-36-byte-many-small",
+            "archive_sha256": "988be74585fe447a2695a8a584ce459181ab7a20b5bc4dd79d24ebf9e1d49557",
+            "generator": "litchi-cfb-selective-read-v1",
+            "shape": "many-small",
+            "package_format": "CFB/OLE2"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0248",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 7,
+        "adverse_both_cells": 35,
+        "accepted_statistics": [
+          {
+            "case": "cfb_open_stream_mini_shared_different_sid",
+            "corpus": "cfb-selective-minifat-36-byte-wide-root",
+            "statistic": "p50"
+          },
+          {
+            "case": "cfb_open_stream_mini_shared_different_sid",
+            "corpus": "cfb-selective-minifat-36-byte-wide-root",
+            "statistic": "mean"
+          },
+          {
+            "case": "cfb_open_stream_mini_shared_different_sid",
+            "corpus": "cfb-selective-minifat-36-byte-wide-root",
+            "statistic": "p95"
+          },
+          {
+            "case": "cfb_open_stream_mini_shared_one_shot",
+            "corpus": "cfb-selective-minifat-36-byte-wide-root",
+            "statistic": "p99"
+          },
+          {
+            "case": "cfb_open_stream_mini_shared_repeat",
+            "corpus": "cfb-selective-minifat-36-byte-wide-root",
+            "statistic": "p95"
+          },
+          {
+            "case": "cfb_open_stream_mini_shared_repeat",
+            "corpus": "cfb-selective-minifat-36-byte-many-small",
+            "statistic": "mean"
+          },
+          {
+            "case": "cfb_open_stream_mini_shared_repeat8",
+            "corpus": "cfb-selective-minifat-36-byte-many-small",
+            "statistic": "p99"
+          }
+        ]
+      },
+      "documentation": [
+        "docs/performance/changes/0248-cfb-streaming-abba.md"
+      ]
+    },
+    {
+      "id": "claim-0249-ods-known-change",
+      "change_id": "0249-ods-known-change-abba",
+      "claim_class": "optimization",
+      "status": "rejected",
+      "code_state": "not_landed",
+      "reason_codes": [
+        "no_accepted_latency_cells"
+      ],
+      "scope": {
+        "format": "ods",
+        "selectors": [
+          "ods_source_backed_one_edit_save",
+          "ods_source_backed_one_percent_edit_save"
+        ],
+        "corpora": [
+          {
+            "name": "ods-media-publication",
+            "archive_sha256": "46b7f61cb74639115f6d120dc6498b97d6b310d51c78c4fb85ac60d6fc758b14",
+            "generator": "litchi-ods-media-publication-v1",
+            "shape": "media-rich",
+            "package_format": "ODS/ODF/ZIP"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0249",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 0,
+        "adverse_both_cells": 2,
+        "accepted_statistics": []
+      },
+      "documentation": [
+        "docs/performance/changes/0249-ods-known-change-source-publication-abba.md"
+      ]
+    },
+    {
+      "id": "claim-0250-zip-ordering",
+      "change_id": "0250-zip-ordering-abba",
+      "claim_class": "optimization",
+      "status": "rejected",
+      "code_state": "not_landed",
+      "reason_codes": [
+        "no_accepted_latency_cells"
+      ],
+      "scope": {
+        "format": "zip",
+        "selectors": [
+          "zip_index"
+        ],
+        "corpora": [
+          {
+            "name": "tiny-compressible",
+            "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "tiny",
+            "package_format": "OPC/ZIP"
+          },
+          {
+            "name": "tiny-incompressible",
+            "archive_sha256": "08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "tiny",
+            "package_format": "OPC/ZIP"
+          },
+          {
+            "name": "many-small-compressible",
+            "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "many-small",
+            "package_format": "OPC/ZIP"
+          },
+          {
+            "name": "many-small-incompressible",
+            "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "many-small",
+            "package_format": "OPC/ZIP"
+          },
+          {
+            "name": "few-large-compressible",
+            "archive_sha256": "c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "few-large",
+            "package_format": "OPC/ZIP"
+          },
+          {
+            "name": "few-large-incompressible",
+            "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "few-large",
+            "package_format": "OPC/ZIP"
+          },
+          {
+            "name": "wide-root-compressible",
+            "archive_sha256": "c89c13841d987233e00cbf0fd9f40f35a56c463c5eb3aadd551fce1e008a9d35",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "wide-root",
+            "package_format": "OPC/ZIP"
+          },
+          {
+            "name": "wide-root-incompressible",
+            "archive_sha256": "b8ed826dc5627314aa1f2442b6313158ef48bab7622dce0994b94afe8cc2cfd7",
+            "generator": "litchi-opc-synthetic-v2",
+            "shape": "wide-root",
+            "package_format": "OPC/ZIP"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0250",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 0,
+        "adverse_both_cells": 14,
+        "accepted_statistics": []
+      },
+      "documentation": [
+        "docs/performance/changes/0250-zip-ordering-abba.md"
+      ]
+    },
+    {
+      "id": "claim-0251-xlsx-xml-borrowed",
+      "change_id": "0251-xlsx-xml-borrowed-abba",
+      "claim_class": "optimization",
+      "status": "held",
+      "code_state": "not_landed",
+      "reason_codes": [
+        "resource_guardrail_pending"
+      ],
+      "scope": {
+        "format": "xlsx",
+        "selectors": [
+          "xlsx_eager_cell_values_one_edit_save",
+          "xlsx_source_backed_cell_values_one_edit_save",
+          "xlsx_first_cell",
+          "xlsx_source_first_cell"
+        ],
+        "corpora": [
+          {
+            "name": "xlsx-cell-values-medium",
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "shape": "medium",
+            "package_format": "XLSX/OPC/ZIP"
+          },
+          {
+            "name": "xlsx-tiny",
+            "archive_sha256": "69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+            "generator": "litchi-xlsx-synthetic-v1",
+            "shape": "tiny",
+            "package_format": "XLSX/OPC/ZIP"
+          }
+        ]
+      },
+      "latency_evidence": {
+        "evidence_id": "abba-0251",
+        "allowed_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "accepted_cells": 15,
+        "adverse_both_cells": 0,
+        "accepted_statistics": [
+          {
+            "case": "xlsx_eager_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_eager_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_eager_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p95"
+          },
+          {
+            "case": "xlsx_eager_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p99"
+          },
+          {
+            "case": "xlsx_first_cell",
+            "corpus": "xlsx-tiny",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_first_cell",
+            "corpus": "xlsx-tiny",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_first_cell",
+            "corpus": "xlsx-tiny",
+            "statistic": "p99"
+          },
+          {
+            "case": "xlsx_source_backed_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_source_backed_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_source_backed_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p95"
+          },
+          {
+            "case": "xlsx_source_backed_cell_values_one_edit_save",
+            "corpus": "xlsx-cell-values-medium",
+            "statistic": "p99"
+          },
+          {
+            "case": "xlsx_source_first_cell",
+            "corpus": "xlsx-tiny",
+            "statistic": "p50"
+          },
+          {
+            "case": "xlsx_source_first_cell",
+            "corpus": "xlsx-tiny",
+            "statistic": "mean"
+          },
+          {
+            "case": "xlsx_source_first_cell",
+            "corpus": "xlsx-tiny",
+            "statistic": "p95"
+          },
+          {
+            "case": "xlsx_source_first_cell",
+            "corpus": "xlsx-tiny",
+            "statistic": "p99"
+          }
+        ]
+      },
+      "resource_guardrail": {
+        "required": true,
+        "evidence_id": "resource-0251",
+        "metrics": [
+          "heaptrack.allocation_calls",
+          "heaptrack.allocated_bytes",
+          "heaptrack.peak_heap_bytes",
+          "heaptrack.peak_rss_bytes",
+          "time.max_rss_kib"
+        ]
+      },
+      "documentation": [
+        "docs/performance/changes/0251-xlsx-xml-borrowed-abba.md"
+      ]
+    }
+  ]
+}

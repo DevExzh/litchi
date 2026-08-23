@@ -32,7 +32,6 @@ use quick_xml::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Write as _,
-    fs,
     ops::Range,
     path::Path,
     sync::Arc,
@@ -422,7 +421,10 @@ impl Snapshot {
     ///
     /// Returns the same errors as [`Self::from_bytes_with_password`] plus filesystem errors.
     pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_bytes_with_password(fs::read(path)?, password)
+        Self::from_package(
+            Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODG")?,
+            MIMETYPE,
+        )
     }
 
     /// Opens an `OpenDocument` drawing template from owned bytes.

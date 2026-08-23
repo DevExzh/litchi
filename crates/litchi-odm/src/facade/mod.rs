@@ -80,6 +80,16 @@ impl Master {
         crate::package::Snapshot::open(path).map(|package| Self { package })
     }
 
+    /// Opens a password-encrypted master-document package from a file path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for filesystem, password, encryption, or package
+    /// validation failures.
+    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+        crate::package::Snapshot::open_with_password(path, password).map(|package| Self { package })
+    }
+
     /// Opens a master-document package from in-memory bytes.
     ///
     /// # Errors

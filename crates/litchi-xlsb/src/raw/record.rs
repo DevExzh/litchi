@@ -8,10 +8,13 @@
 use std::fmt;
 use std::io::{self, Read};
 
-use super::{Error, Result, Stage};
+use super::{Error, LimitResource, Result, Stage};
 
 /// Largest value representable by the four-byte BIFF12 record-size field.
-pub(super) const MAX_WIRE_PAYLOAD: usize = 0x0fff_ffff;
+pub const MAX_WIRE_PAYLOAD: usize = 0x0fff_ffff;
+
+/// Largest value representable by the four-byte `XLWideString` unit count.
+pub const MAX_WIRE_STRING_UNITS: usize = u32::MAX as usize;
 
 /// Finite resource limits for one raw operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +37,30 @@ impl Limits {
             payload,
             string_units,
         }
+    }
+
+    /// Construct and validate explicit raw ceilings.
+    pub const fn try_new(payload: usize, string_units: usize) -> Result<Self> {
+        Self::new(payload, string_units).validate()
+    }
+
+    /// Validate the physical bounds of this raw limit profile.
+    pub const fn validate(self) -> Result<Self> {
+        if self.payload > MAX_WIRE_PAYLOAD {
+            return Err(Error::InvalidLimit {
+                resource: LimitResource::Payload,
+                value: self.payload,
+                maximum: MAX_WIRE_PAYLOAD,
+            });
+        }
+        if self.string_units > MAX_WIRE_STRING_UNITS {
+            return Err(Error::InvalidLimit {
+                resource: LimitResource::StringUnits,
+                value: self.string_units,
+                maximum: MAX_WIRE_STRING_UNITS,
+            });
+        }
+        Ok(self)
     }
 
     /// Maximum accepted bytes in one record payload.
@@ -139,6 +166,7 @@ impl Header {
     /// `Ok(None)` means the stream was already at a clean record boundary.
     /// Once any header byte is consumed, premature EOF is a typed truncation.
     pub fn read<R: Read>(reader: &mut R, limits: Limits) -> Result<Option<Self>> {
+        limits.validate()?;
         let Some(first) = read_first(reader)? else {
             return Ok(None);
         };
@@ -149,6 +177,7 @@ impl Header {
 
     /// Decode one header from the start of a byte slice.
     pub fn parse(input: &[u8], limits: Limits) -> Result<(Self, usize)> {
+        limits.validate()?;
         let first = input.first().copied().ok_or(Error::Truncated {
             stage: Stage::Kind,
             offset: 0,
@@ -239,6 +268,14 @@ impl<'a> Records<'a> {
         }
     }
 
+    /// Construct an iterator after validating its raw limit profile.
+    pub fn try_with_limits(input: &'a [u8], limits: Limits) -> Result<Self> {
+        match limits.validate() {
+            Ok(limits) => Ok(Self::with_limits(input, limits)),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Current byte offset at the next record boundary.
     #[must_use]
     pub const fn offset(&self) -> usize {
@@ -255,7 +292,13 @@ impl<'a> Iterator for Records<'a> {
     type Item = Result<Record<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.failed || self.offset == self.input.len() {
+        if self.failed {
+            return None;
+        }
+        if let Err(error) = self.limits.validate() {
+            return self.fail(error);
+        }
+        if self.offset == self.input.len() {
             return None;
         }
         let tail = match self.input.get(self.offset..) {

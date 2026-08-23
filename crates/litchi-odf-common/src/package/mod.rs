@@ -12,6 +12,10 @@ mod path;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::{
+    MAX_MANIFEST_ENTRIES, ManifestScanAttributes, ManifestScanElement, ManifestScanEvent,
+    ManifestScanObserver, parse_manifest_with_observer,
+};
 pub use codec::{is_media_path, parse_manifest, read_manifest};
 #[allow(
     clippy::module_name_repetitions,
@@ -23,7 +27,7 @@ pub use edit::{
     replace_content_xml_with_payload_verification, splice, xml_splice_publication,
 };
 pub(crate) use model::PreparedArchive;
-pub use model::{Archive, ArchiveNames, Entry, Manifest};
+pub use model::{Archive, ArchiveLimits, ArchiveMetadata, ArchiveNames, Entry, Manifest};
 #[cfg(test)]
 pub(crate) use model::{index_build_count, note_index_build, reset_index_build_count};
 pub(crate) use path::validate_manifest_path;

@@ -25,6 +25,176 @@ use zeroize::Zeroizing;
 
 const MAX_MANIFEST_TEXT_BYTES: usize = 1024;
 const MANIFEST_PATH: &str = "META-INF/manifest.xml";
+const LOEXT_NAMESPACE: &[u8] =
+    b"urn:org:documentfoundation:names:experimental:office:xmlns:manifest:1.0";
+
+fn ensure_source_manifest_rewritable(source: &OwnedPackage) -> Result<()> {
+    if source.has_zip_encrypted_entries() {
+        return Err(Error::Unsupported(
+            "ZIP-encrypted ODF entries cannot be copied by the package writer".to_string(),
+        ));
+    }
+    let package = source.package()?;
+    let manifest_bytes = source
+        .get_file(MANIFEST_PATH)
+        .or_else(|_| source.get_file("manifest.xml"))?;
+    ensure_supported_manifest_metadata(&manifest_bytes)?;
+    let manifest = package.manifest();
+    if manifest
+        .entries
+        .values()
+        .any(|entry| entry.size.is_some() && entry.encryption.is_none())
+    {
+        return Err(Error::Unsupported(
+            "ODF unencrypted manifest:size metadata cannot be preserved by the package writer"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
+    let mut reader = NsReader::from_reader(bytes);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid source manifest XML: {error}"))
+            })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let ResolveResult::Bound(Namespace(uri)) = namespace else {
+                    return Err(Error::Unsupported(
+                        "ODF manifest contains unsupported non-manifest metadata".to_string(),
+                    ));
+                };
+                if uri != MANIFEST_NAMESPACE {
+                    return Err(Error::Unsupported(
+                        "ODF manifest contains unsupported non-manifest metadata".to_string(),
+                    ));
+                }
+                let element_name = element.local_name();
+                if !matches!(
+                    element_name.as_ref(),
+                    b"manifest"
+                        | b"file-entry"
+                        | b"encryption-data"
+                        | b"algorithm"
+                        | b"start-key-generation"
+                        | b"key-derivation"
+                ) {
+                    return Err(Error::Unsupported(
+                        "ODF manifest contains unsupported element metadata".to_string(),
+                    ));
+                }
+                let mut full_path = None;
+                let mut has_version = false;
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|error| {
+                        Error::InvalidFormat(format!("invalid source manifest attribute: {error}"))
+                    })?;
+                    if attribute.key.as_ref() == b"xmlns"
+                        || attribute.key.as_ref().starts_with(b"xmlns:")
+                    {
+                        continue;
+                    }
+                    let (attribute_namespace, local) =
+                        reader.resolver().resolve_attribute(attribute.key);
+                    let local = local.as_ref();
+                    let allowed = match attribute_namespace {
+                        ResolveResult::Bound(Namespace(attribute_uri))
+                            if attribute_uri == MANIFEST_NAMESPACE =>
+                        {
+                            let allowed = match element_name.as_ref() {
+                                b"manifest" => local == b"version",
+                                b"file-entry" => {
+                                    matches!(
+                                        local,
+                                        b"full-path" | b"media-type" | b"size" | b"version"
+                                    )
+                                },
+                                b"encryption-data" => {
+                                    matches!(local, b"checksum-type" | b"checksum")
+                                },
+                                b"algorithm" => {
+                                    matches!(local, b"algorithm-name" | b"initialisation-vector")
+                                },
+                                b"start-key-generation" => {
+                                    matches!(local, b"start-key-generation-name" | b"key-size")
+                                },
+                                b"key-derivation" => matches!(
+                                    local,
+                                    b"key-derivation-name"
+                                        | b"salt"
+                                        | b"iteration-count"
+                                        | b"key-size"
+                                        | b"argon2-iterations"
+                                        | b"argon2-memory"
+                                        | b"argon2-lanes"
+                                ),
+                                _ => false,
+                            };
+                            if local == b"full-path" {
+                                full_path = Some(
+                                    attribute
+                                        .decoded_and_normalized_value(
+                                            XmlVersion::Implicit1_0,
+                                            reader.decoder(),
+                                        )
+                                        .map_err(|error| {
+                                            Error::InvalidFormat(format!(
+                                                "invalid source manifest path: {error}"
+                                            ))
+                                        })?
+                                        .into_owned(),
+                                );
+                            }
+                            if local == b"version" {
+                                has_version = true;
+                            }
+                            allowed
+                        },
+                        ResolveResult::Bound(Namespace(attribute_uri))
+                            if attribute_uri == LOEXT_NAMESPACE
+                                && element_name.as_ref() == b"key-derivation" =>
+                        {
+                            matches!(
+                                local,
+                                b"argon2-iterations" | b"argon2-memory" | b"argon2-lanes"
+                            )
+                        },
+                        _ => false,
+                    };
+                    if !allowed {
+                        return Err(Error::Unsupported(
+                            "ODF manifest contains unsupported metadata".to_string(),
+                        ));
+                    }
+                }
+                if element_name.as_ref() == b"file-entry"
+                    && has_version
+                    && full_path.as_deref() != Some("/")
+                {
+                    return Err(Error::Unsupported(
+                        "ODF manifest version metadata is only supported on the root entry"
+                            .to_string(),
+                    ));
+                }
+            },
+            Event::DocType(_) | Event::GeneralRef(_) => {
+                return Err(Error::Unsupported(
+                    "ODF manifest contains unsupported DTD or entity metadata".to_string(),
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok(())
+}
 
 /// Finite limits applied to sequential ODF package publication.
 ///
@@ -253,7 +423,7 @@ use super::manifest::{
     ManifestChecksumAlgorithm, ManifestEncryption, ManifestEncryptionAlgorithm,
     ManifestKeyDerivation, ManifestStartKeyGeneration,
 };
-use super::package::OwnedPackage;
+use super::package::{OwnedPackage, is_signature_owner_path};
 use super::xml_splice::XmlSplicePublication;
 use crate::package::validate_manifest_path;
 
@@ -805,15 +975,11 @@ impl<W: Write> PackageWriter<W> {
         matches!(
             path,
             "mimetype" | "manifest.xml" | "META-INF" | "META-INF/" | MANIFEST_PATH
-        ) || (path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
-    }
-
-    fn is_document_signature_path(path: &str) -> bool {
-        path.starts_with("META-INF/") && path.ends_with("signatures.xml")
+        ) || is_signature_owner_path(path)
     }
 
     fn is_reserved_write_path(path: &str) -> bool {
-        Self::is_reserved_admin_path(path) && !Self::is_document_signature_path(path)
+        Self::is_reserved_admin_path(path) && !is_signature_owner_path(path)
     }
 
     fn validate_reader_path(&self, path: &str) -> PackageWriterResult<()> {
@@ -1181,7 +1347,7 @@ impl<W: Write> PackageWriter<W> {
                 .map_err(|e| Error::ZipError(e.to_string()))?;
         } else {
             self.zip_writer
-                .write_deflated(path, content)
+                .write_deflated_sized(path, content)
                 .map_err(|e| Error::ZipError(e.to_string()))?;
         };
         self.record_manifest_entry(entry, entry_bytes);
@@ -1231,6 +1397,7 @@ impl<W: Write> PackageWriter<W> {
         excluded_paths: &HashSet<String>,
     ) -> Result<()> {
         self.inherit_manifest_version(source)?;
+        ensure_source_manifest_rewritable(source)?;
         let package = source.package()?;
         if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
             return Err(Error::InvalidFormat(
@@ -1248,7 +1415,7 @@ impl<W: Write> PackageWriter<W> {
         for path in package.files()? {
             if path.ends_with('/')
                 || matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml")
-                || (path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
+                || is_signature_owner_path(&path)
                 || excluded_paths.contains(&path)
             {
                 continue;
@@ -1325,6 +1492,7 @@ impl<W: Write> PackageWriter<W> {
     /// unsupported encrypted entries, or an entry cannot be copied.
     pub fn copy_auxiliary_files_from(&mut self, source: &OwnedPackage) -> Result<()> {
         self.inherit_manifest_version(source)?;
+        ensure_source_manifest_rewritable(source)?;
         let package = source.package()?;
         if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
             return Err(Error::InvalidFormat(
@@ -1381,6 +1549,7 @@ impl<W: Write> PackageWriter<W> {
         excluded_prefixes: &[String],
     ) -> Result<()> {
         self.inherit_manifest_version(source)?;
+        ensure_source_manifest_rewritable(source)?;
         let package = source.package()?;
         if package.manifest().has_encrypted_entries() && self.encryption.is_none() {
             return Err(Error::InvalidFormat(
@@ -1639,7 +1808,7 @@ impl<W: Write> PackageWriter<W> {
         }
         if let Err(error) = self
             .zip_writer
-            .write_deflated("META-INF/manifest.xml", manifest_content.as_bytes())
+            .write_deflated_sized("META-INF/manifest.xml", manifest_content.as_bytes())
         {
             return Err(self.map_archive_error(error));
         }
@@ -1863,7 +2032,7 @@ impl<W: Write> PackageWriter<W> {
                 | "manifest.xml"
                 | "META-INF/"
                 | "META-INF/manifest.xml"
-        ) || (path.starts_with("META-INF/") && path.ends_with("signatures.xml"))
+        ) || is_signature_owner_path(path)
     }
 }
 
@@ -2224,6 +2393,30 @@ mod tests {
             .unwrap();
         let error = writer.copy_auxiliary_files_from(&source).unwrap_err();
         assert!(error.to_string().contains("encrypted entries"));
+    }
+
+    #[test]
+    fn copying_auxiliary_files_rejects_unencrypted_manifest_sizes() {
+        let mut bytes = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(Cursor::new(&mut bytes));
+            let options = zip::write::SimpleFileOptions::default();
+            zip.start_file("mimetype", options).unwrap();
+            zip.write_all(b"application/vnd.oasis.opendocument.text")
+                .unwrap();
+            zip.start_file("content.xml", options).unwrap();
+            zip.write_all(b"<content/>").unwrap();
+            zip.start_file("META-INF/manifest.xml", options).unwrap();
+            zip.write_all(br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml" manifest:size="10"/></manifest:manifest>"#).unwrap();
+            zip.finish().unwrap();
+        }
+        let source = OwnedPackage::from_bytes(bytes).unwrap();
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        let error = writer.copy_auxiliary_files_from(&source).unwrap_err();
+        assert!(error.to_string().contains("manifest:size"));
     }
 
     #[test]

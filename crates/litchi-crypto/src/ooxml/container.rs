@@ -364,6 +364,12 @@ fn map_writer_error(error: OleError) -> Error {
         OleError::SourceChanged { expected, observed } => Error::Container(format!(
             "CFB positional source changed (expected {expected:?}, observed {observed:?})"
         )),
+        OleError::LimitExceeded { resource, .. } => {
+            Error::Container(format!("CFB ingress limit exceeded: {resource}"))
+        },
+        OleError::InvalidLimit { resource, .. } => {
+            Error::Container(format!("Invalid CFB ingress limit: {resource}"))
+        },
     }
 }
 
@@ -382,6 +388,12 @@ fn map_reader_error(error: OleError) -> Error {
         OleError::SourceChanged { expected, observed } => Error::Container(format!(
             "CFB positional source changed (expected {expected:?}, observed {observed:?})"
         )),
+        OleError::LimitExceeded { resource, .. } => {
+            Error::Container(format!("CFB ingress limit exceeded: {resource}"))
+        },
+        OleError::InvalidLimit { resource, .. } => {
+            Error::Container(format!("Invalid CFB ingress limit: {resource}"))
+        },
     }
 }
 

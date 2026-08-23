@@ -10,13 +10,14 @@ use crate::model::legacy_animation::validate_legacy_animation_root;
 use crate::model::media::{EmbeddedMedia, embed_media, validate_package_media_path};
 use crate::{Presentation, Reference, Shape, Slide};
 use litchi_core::{Result, xml::escape_xml};
+use litchi_odf_common::package::{is_linked_href, resolve_package_path};
 use quick_xml::{
     Decoder, Reader, XmlVersion,
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 const MAX_DEPENDENCY_FREE_COPY_PAGE_BYTES: usize = 64 * 1024;
 const MAX_DEPENDENCY_FREE_COPY_NAME_BYTES: usize = 4 * 1024;
@@ -35,6 +36,28 @@ const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
 const XMLNS_DEFAULT: &[u8] = b"xmlns";
 const XMLNS_PREFIX: &[u8] = b"xmlns:";
 const MAX_NAMESPACE_BINDINGS: usize = 512;
+const MAX_MEDIA_CHANGE_PAYLOAD_BYTES: usize = 32 * 1024 * 1024;
+const MAX_MEDIA_REFERENCE_XML_BYTES: usize = 16 * 1024 * 1024;
+const MAX_MEDIA_REFERENCE_TOTAL_XML_BYTES: usize = 256 * 1024 * 1024;
+const MAX_MEDIA_REFERENCE_XML_DEPTH: usize = 128;
+const MAX_MEDIA_REFERENCE_XML_EVENTS: usize = 1_000_000;
+const MAX_MEDIA_REFERENCE_TOTAL_XML_EVENTS: usize = 4_000_000;
+const MAX_MEDIA_REFERENCE_XML_PARTS: usize = 65_536;
+const MAX_MEDIA_REFERENCE_VALUE_BYTES: usize = 1_048_576;
+const MAX_MEDIA_REFERENCE_PATHS: usize = 131_072;
+const MAX_MEDIA_REFERENCE_PATH_BYTES: usize = 16 * 1024 * 1024;
+
+pub(super) struct MediaChangePlan {
+    pub(super) media_files: BTreeMap<String, EmbeddedMedia>,
+    pub(super) removed_media_paths: BTreeSet<String>,
+    pub(super) changed: usize,
+    pub(super) staged_media_bytes: usize,
+}
+
+#[derive(Default)]
+struct MediaReferenceIndex {
+    referenced_paths: HashSet<String>,
+}
 
 pub(super) struct DependencyFreeBlankSlideCopy {
     slide: Slide,
@@ -104,6 +127,10 @@ pub(super) struct MutablePresentation {
     source_package: Option<OwnedPackage>,
     /// Newly embedded package media, keyed by package path.
     media_files: BTreeMap<String, EmbeddedMedia>,
+    /// Existing source media members explicitly removed by the transaction.
+    removed_media_paths: BTreeSet<String>,
+    /// Bounded source XML reference index, built once when a media removal is staged.
+    media_reference_index: Option<MediaReferenceIndex>,
     /// Inert slide-show settings and custom shows.
     settings: Option<crate::Settings>,
     /// Inert header/footer/date-time declarations and page bindings.
@@ -208,6 +235,8 @@ impl MutablePresentation {
             styles_xml,
             source_package,
             media_files: BTreeMap::new(),
+            removed_media_paths: BTreeSet::new(),
+            media_reference_index: None,
             settings,
             source_declarations: declarations.clone(),
             declarations,
@@ -754,14 +783,208 @@ impl MutablePresentation {
         media_type: String,
     ) -> Result<Reference> {
         validate_package_media_path(&path)?;
-        if let Some(package) = &self.source_package
-            && package.has_file(&path)?
-        {
-            return Err(litchi_core::Error::InvalidFormat(format!(
-                "cannot replace existing ODP package media path '{path}' implicitly"
-            )));
+        if let Some(package) = &self.source_package {
+            let archive = package.package()?;
+            ensure_media_manifest_rewritable(&archive)?;
+            if package.has_file(&path)? {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "cannot replace existing ODP package media path '{path}' implicitly"
+                )));
+            }
         }
         embed_media(&mut self.media_files, path, bytes, media_type)
+    }
+
+    /// Preflight a package-media batch without changing the staged state.
+    pub(super) fn prepare_media_changes(
+        &mut self,
+        changes: &[super::edit::MediaChange],
+    ) -> Result<MediaChangePlan> {
+        for change in changes {
+            validate_media_change(change)?;
+        }
+        let source_package = self.source_package.clone().ok_or_else(|| {
+            litchi_core::Error::Unsupported(
+                "ODP media changes require a retained source package".to_string(),
+            )
+        })?;
+        let archive = source_package.package()?;
+        let mut files = self.media_files.clone();
+        let mut removed = self.removed_media_paths.clone();
+        let mut touched = BTreeSet::new();
+        let mut changed = 0usize;
+
+        for change in changes {
+            let path = change.path();
+            if !touched.insert(path.to_string()) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "ODP media change batch selects '{path}' more than once"
+                )));
+            }
+            match change {
+                super::edit::MediaChange::Add {
+                    payload,
+                    media_type,
+                    ..
+                } => {
+                    if archive.has_file(path) || files.contains_key(path) {
+                        return Err(litchi_core::Error::InvalidFormat(format!(
+                            "ODP media add path '{path}' already exists"
+                        )));
+                    }
+                    files.insert(
+                        path.to_string(),
+                        EmbeddedMedia {
+                            bytes: payload.clone(),
+                            media_type: media_type.clone(),
+                        },
+                    );
+                    changed = changed.checked_add(1).ok_or_else(|| {
+                        litchi_core::Error::InvalidFormat(
+                            "ODP media change count overflow".to_string(),
+                        )
+                    })?;
+                },
+                super::edit::MediaChange::Replace {
+                    payload,
+                    media_type,
+                    ..
+                } => {
+                    let source_exists = archive.has_file(path);
+                    let existing_type = archive.manifest().get_media_type(path);
+                    let previous = files.get(path);
+                    if source_exists && previous.is_none() && existing_type.is_none() {
+                        return Err(litchi_core::Error::Unsupported(format!(
+                            "ODP media replacement refuses member '{path}' without manifest metadata"
+                        )));
+                    }
+                    if let Some(existing_type) = existing_type
+                        && existing_type != media_type.as_str()
+                    {
+                        return Err(litchi_core::Error::Unsupported(format!(
+                            "ODP media replacement cannot change manifest type for '{path}'"
+                        )));
+                    }
+                    if let Some(previous) = previous {
+                        if previous.bytes.as_slice() == payload.as_slice()
+                            && previous.media_type == media_type.as_str()
+                        {
+                            continue;
+                        }
+                    } else if !source_exists {
+                        return Err(litchi_core::Error::InvalidFormat(format!(
+                            "ODP media replacement path '{path}' does not exist"
+                        )));
+                    }
+
+                    let source_is_exact = if source_exists && previous.is_none() {
+                        archive.get_file(path)?.as_slice() == payload.as_slice()
+                            && existing_type == Some(media_type.as_str())
+                    } else {
+                        false
+                    };
+                    if source_is_exact && !removed.contains(path) {
+                        continue;
+                    }
+                    if source_is_exact {
+                        removed.remove(path);
+                        changed = changed.checked_add(1).ok_or_else(|| {
+                            litchi_core::Error::InvalidFormat(
+                                "ODP media change count overflow".to_string(),
+                            )
+                        })?;
+                        continue;
+                    }
+                    files.insert(
+                        path.to_string(),
+                        EmbeddedMedia {
+                            bytes: payload.clone(),
+                            media_type: media_type.clone(),
+                        },
+                    );
+                    removed.remove(path);
+                    changed = changed.checked_add(1).ok_or_else(|| {
+                        litchi_core::Error::InvalidFormat(
+                            "ODP media change count overflow".to_string(),
+                        )
+                    })?;
+                },
+                super::edit::MediaChange::Remove { .. } => {
+                    let source_exists = archive.has_file(path);
+                    if source_exists && self.source_media_is_referenced(path)? {
+                        return Err(litchi_core::Error::Unsupported(format!(
+                            "ODP media removal refuses referenced member '{path}'"
+                        )));
+                    }
+                    if files.remove(path).is_some() {
+                        if source_exists {
+                            removed.insert(path.to_string());
+                        } else {
+                            removed.remove(path);
+                        }
+                        changed = changed.checked_add(1).ok_or_else(|| {
+                            litchi_core::Error::InvalidFormat(
+                                "ODP media change count overflow".to_string(),
+                            )
+                        })?;
+                    } else if source_exists {
+                        if !removed.insert(path.to_string()) {
+                            return Err(litchi_core::Error::InvalidFormat(format!(
+                                "ODP media member '{path}' is already removed"
+                            )));
+                        }
+                        changed = changed.checked_add(1).ok_or_else(|| {
+                            litchi_core::Error::InvalidFormat(
+                                "ODP media change count overflow".to_string(),
+                            )
+                        })?;
+                    } else {
+                        return Err(litchi_core::Error::InvalidFormat(format!(
+                            "ODP media removal path '{path}' does not exist"
+                        )));
+                    }
+                },
+            }
+        }
+
+        if changed > 0 {
+            ensure_media_manifest_rewritable(&archive)?;
+        }
+        let staged_media_bytes = staged_media_bytes_for(&files)?;
+        Ok(MediaChangePlan {
+            media_files: files,
+            removed_media_paths: removed,
+            changed,
+            staged_media_bytes,
+        })
+    }
+
+    pub(super) fn apply_media_plan(&mut self, plan: MediaChangePlan) {
+        self.media_files = plan.media_files;
+        self.removed_media_paths = plan.removed_media_paths;
+    }
+
+    pub(super) fn has_staged_media_changes(&self) -> bool {
+        !self.media_files.is_empty() || !self.removed_media_paths.is_empty()
+    }
+
+    pub(super) fn staged_media_bytes(&self) -> Result<usize> {
+        staged_media_bytes_for(&self.media_files)
+    }
+
+    fn source_media_is_referenced(&mut self, path: &str) -> Result<bool> {
+        if self.media_reference_index.is_none() {
+            let source_package = self.source_package.clone().ok_or_else(|| {
+                litchi_core::Error::Unsupported(
+                    "ODP media references require a retained source package".to_string(),
+                )
+            })?;
+            self.media_reference_index = Some(MediaReferenceIndex::build(&source_package)?);
+        }
+        Ok(self
+            .media_reference_index
+            .as_ref()
+            .is_some_and(|index| index.referenced_paths.contains(path)))
     }
 
     /// Verify that every media part staged by this transaction survived package publication.
@@ -790,6 +1013,26 @@ impl MutablePresentation {
             if entry.media_type != expected.media_type {
                 return Err(litchi_core::Error::InvalidFormat(format!(
                     "published ODP media type differs for '{path}'"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn verify_removed_media(&self, reopened: &OwnedPackage) -> Result<()> {
+        if self.removed_media_paths.is_empty() {
+            return Ok(());
+        }
+        let references = MediaReferenceIndex::build(reopened)?;
+        for path in &self.removed_media_paths {
+            if reopened.has_file(path)? {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "published ODP package retained removed media path '{path}'"
+                )));
+            }
+            if references.referenced_paths.contains(path) {
+                return Err(litchi_core::Error::InvalidFormat(format!(
+                    "published ODP package retained a reference to removed media path '{path}'"
                 )));
             }
         }
@@ -1423,7 +1666,9 @@ impl MutablePresentation {
         }
 
         if let Some(package) = &self.source_package {
-            writer.copy_auxiliary_files_from(package)?;
+            let mut excluded = self.media_files.keys().cloned().collect::<Vec<_>>();
+            excluded.extend(self.removed_media_paths.iter().cloned());
+            writer.copy_auxiliary_files_from_except(package, &excluded, &[])?;
         }
 
         writer.finish_to_bounded_bytes()
@@ -1441,7 +1686,10 @@ pub(super) fn ensure_foreign_transfer_package_safety(
             "ODP foreign blank-slide transfer refuses {side} package macro owners"
         )));
     }
-    if files.iter().any(|path| is_signature_owner_path(path)) {
+    if files
+        .iter()
+        .any(|path| crate::core::is_signature_owner_path(path))
+    {
         return Err(litchi_core::Error::Unsupported(format!(
             "ODP foreign blank-slide transfer refuses {side} signature owners"
         )));
@@ -1642,11 +1890,6 @@ fn is_macro_owner_path(path: &str) -> bool {
     })
 }
 
-fn is_signature_owner_path(path: &str) -> bool {
-    let normalized = path.trim_start_matches('/').to_ascii_lowercase();
-    normalized == "meta-inf/documentsignatures.xml" || normalized == "meta-inf/macrosignatures.xml"
-}
-
 pub(super) fn ensure_no_macro_xml_owners(content: &str, side: &str) -> Result<()> {
     let mut reader = Reader::from_str(content);
     reader.config_mut().check_end_names = true;
@@ -1824,7 +2067,9 @@ fn is_macro_owner_name(local_name: &[u8]) -> bool {
 
 fn is_xml_owner_part(path: &str, media_type: Option<&str>) -> bool {
     let xml_extension = path.rsplit_once('.').is_some_and(|(_, extension)| {
-        extension.eq_ignore_ascii_case("xml") || extension.eq_ignore_ascii_case("rdf")
+        extension.eq_ignore_ascii_case("xml")
+            || extension.eq_ignore_ascii_case("rdf")
+            || extension.eq_ignore_ascii_case("rels")
     });
     let xml_media_type = media_type.is_some_and(|value| {
         let value = value
@@ -1841,6 +2086,392 @@ fn is_xml_owner_part(path: &str, media_type: Option<&str>) -> bool {
         || path.eq_ignore_ascii_case("styles.xml")
         || xml_extension
         || xml_media_type
+}
+
+fn validate_media_change(change: &super::edit::MediaChange) -> Result<()> {
+    match change {
+        super::edit::MediaChange::Add {
+            path,
+            payload,
+            media_type,
+        }
+        | super::edit::MediaChange::Replace {
+            path,
+            payload,
+            media_type,
+        } => {
+            validate_package_media_path(path)?;
+            validate_media_payload(payload, media_type)?;
+        },
+        super::edit::MediaChange::Remove { path } => {
+            validate_package_media_path(path)?;
+        },
+    }
+    Ok(())
+}
+
+fn validate_media_payload(payload: &[u8], media_type: &str) -> Result<()> {
+    crate::model::media::validate_media_type(media_type)?;
+    if payload.len() > MAX_MEDIA_CHANGE_PAYLOAD_BYTES {
+        return Err(litchi_core::Error::InvalidFormat(format!(
+            "ODP media change payload exceeds {MAX_MEDIA_CHANGE_PAYLOAD_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+fn ensure_media_manifest_rewritable(
+    archive: &litchi_odf_common::core::package::Package<'_>,
+) -> Result<()> {
+    if archive
+        .manifest()
+        .entries
+        .values()
+        .any(|entry| entry.size.is_some() || entry.encryption.is_some())
+    {
+        return Err(litchi_core::Error::Unsupported(
+            "ODP media changes refuse manifest metadata the writer cannot preserve".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn staged_media_bytes_for(files: &BTreeMap<String, EmbeddedMedia>) -> Result<usize> {
+    files.iter().try_fold(0usize, |total, (path, media)| {
+        let size = path
+            .len()
+            .checked_add(media.media_type.len())
+            .and_then(|value| value.checked_add(media.bytes.len()))
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat("ODP staged media size overflow".to_string())
+            })?;
+        total.checked_add(size).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("ODP staged media total overflow".to_string())
+        })
+    })
+}
+
+impl MediaReferenceIndex {
+    fn build(package: &OwnedPackage) -> Result<Self> {
+        let archive = package.package()?;
+        let files = archive.files()?;
+        if files.len() > MAX_MEDIA_REFERENCE_XML_PARTS {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Objects,
+                    observed: files.len() as u64,
+                    limit: MAX_MEDIA_REFERENCE_XML_PARTS as u64,
+                    scope: std::sync::Arc::from("ODP media reference XML parts"),
+                },
+            ));
+        }
+        let mut index = Self::default();
+        let mut path_bytes = 0usize;
+        let mut xml_bytes = 0usize;
+        let mut events = 0usize;
+        for path in files {
+            if path.ends_with('/')
+                || path.eq_ignore_ascii_case("META-INF/manifest.xml")
+                || path.eq_ignore_ascii_case("manifest.xml")
+                || crate::core::is_signature_owner_path(&path)
+                || !is_xml_owner_part(&path, archive.manifest().get_media_type(&path))
+            {
+                continue;
+            }
+            let bytes = archive.get_file(&path)?;
+            if bytes.len() > MAX_MEDIA_REFERENCE_XML_BYTES {
+                return Err(litchi_core::Error::ResourceLimit(
+                    litchi_core::ResourceLimit {
+                        resource: litchi_core::Resource::InputBytes,
+                        observed: bytes.len() as u64,
+                        limit: MAX_MEDIA_REFERENCE_XML_BYTES as u64,
+                        scope: std::sync::Arc::from("ODP media reference XML part"),
+                    },
+                ));
+            }
+            xml_bytes = xml_bytes.checked_add(bytes.len()).ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "ODP media reference XML byte count overflow".to_string(),
+                )
+            })?;
+            if xml_bytes > MAX_MEDIA_REFERENCE_TOTAL_XML_BYTES {
+                return Err(litchi_core::Error::ResourceLimit(
+                    litchi_core::ResourceLimit {
+                        resource: litchi_core::Resource::InputBytes,
+                        observed: xml_bytes as u64,
+                        limit: MAX_MEDIA_REFERENCE_TOTAL_XML_BYTES as u64,
+                        scope: std::sync::Arc::from("ODP media reference XML parts"),
+                    },
+                ));
+            }
+            scan_media_reference_xml(
+                &path,
+                &bytes,
+                &mut index.referenced_paths,
+                &mut path_bytes,
+                &mut events,
+            )?;
+        }
+        Ok(index)
+    }
+}
+
+fn scan_media_reference_xml(
+    owner_path: &str,
+    bytes: &[u8],
+    referenced_paths: &mut HashSet<String>,
+    referenced_path_bytes: &mut usize,
+    events: &mut usize,
+) -> Result<()> {
+    let mut reader = NsReader::from_reader(bytes);
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let relationship_part = owner_path
+        .rsplit_once('.')
+        .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("rels"));
+    let mut part_events = 0usize;
+    loop {
+        part_events = part_events.checked_add(1).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "ODP media reference XML event count overflow".to_string(),
+            )
+        })?;
+        *events = events.checked_add(1).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat(
+                "ODP media reference XML event count overflow".to_string(),
+            )
+        })?;
+        if part_events > MAX_MEDIA_REFERENCE_XML_EVENTS {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Work,
+                    observed: part_events as u64,
+                    limit: MAX_MEDIA_REFERENCE_XML_EVENTS as u64,
+                    scope: std::sync::Arc::from("ODP media reference XML"),
+                },
+            ));
+        }
+        if *events > MAX_MEDIA_REFERENCE_TOTAL_XML_EVENTS {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Work,
+                    observed: *events as u64,
+                    limit: MAX_MEDIA_REFERENCE_XML_EVENTS as u64,
+                    scope: std::sync::Arc::from("ODP media reference XML"),
+                },
+            ));
+        }
+        let (_namespace, event) =
+            reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| {
+                    litchi_core::Error::InvalidFormat(format!(
+                        "invalid ODP media reference XML part '{owner_path}': {error}"
+                    ))
+                })?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    litchi_core::Error::InvalidFormat(
+                        "ODP media reference XML depth overflow".to_string(),
+                    )
+                })?;
+                if depth > MAX_MEDIA_REFERENCE_XML_DEPTH {
+                    return Err(litchi_core::Error::ResourceLimit(
+                        litchi_core::ResourceLimit {
+                            resource: litchi_core::Resource::Depth,
+                            observed: depth as u64,
+                            limit: MAX_MEDIA_REFERENCE_XML_DEPTH as u64,
+                            scope: std::sync::Arc::from("ODP media reference XML"),
+                        },
+                    ));
+                }
+                scan_media_reference_attributes(
+                    &reader,
+                    &element,
+                    owner_path,
+                    relationship_part,
+                    referenced_paths,
+                    referenced_path_bytes,
+                )?;
+            },
+            Event::Empty(element) => {
+                scan_media_reference_attributes(
+                    &reader,
+                    &element,
+                    owner_path,
+                    relationship_part,
+                    referenced_paths,
+                    referenced_path_bytes,
+                )?;
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    litchi_core::Error::InvalidFormat(format!(
+                        "ODP media reference XML part '{owner_path}' has an unmatched end"
+                    ))
+                })?;
+            },
+            Event::DocType(_) | Event::GeneralRef(_) => {
+                return Err(litchi_core::Error::Unsupported(format!(
+                    "ODP media reference XML part '{owner_path}' contains a DTD or entity reference"
+                )));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+        buffer.clear();
+    }
+    Ok(())
+}
+
+fn scan_media_reference_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    owner_path: &str,
+    relationship_part: bool,
+    referenced_paths: &mut HashSet<String>,
+    referenced_path_bytes: &mut usize,
+) -> Result<()> {
+    let mut candidates = Vec::new();
+    let mut external_target = false;
+    for raw_attribute in element.attributes() {
+        let attribute = raw_attribute.map_err(|error| {
+            litchi_core::Error::InvalidFormat(format!(
+                "invalid ODP media reference attribute in '{owner_path}': {error}"
+            ))
+        })?;
+        let (_, local) = reader.resolver().resolve_attribute(attribute.key);
+        let local = local.as_ref();
+        let target_mode = relationship_part && local == b"TargetMode";
+        let candidate =
+            local == b"href" || local == b"resource" || (relationship_part && local == b"Target");
+        if !target_mode && !candidate {
+            continue;
+        }
+        if attribute.value.len() > MAX_MEDIA_REFERENCE_VALUE_BYTES {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::InputBytes,
+                    observed: attribute.value.len() as u64,
+                    limit: MAX_MEDIA_REFERENCE_VALUE_BYTES as u64,
+                    scope: std::sync::Arc::from("ODP media reference XML attribute"),
+                },
+            ));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                litchi_core::Error::InvalidFormat(format!(
+                    "invalid ODP media reference attribute in '{owner_path}': {error}"
+                ))
+            })?
+            .into_owned();
+        if target_mode {
+            external_target = value.eq_ignore_ascii_case("external");
+        } else {
+            candidates.push(value);
+        }
+    }
+    if external_target {
+        return Ok(());
+    }
+    for candidate in candidates {
+        let Some(path) = resolve_owner_relative_reference(owner_path, &candidate)? else {
+            continue;
+        };
+        if referenced_paths.contains(&path) {
+            continue;
+        }
+        if referenced_paths.len() >= MAX_MEDIA_REFERENCE_PATHS {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Objects,
+                    observed: referenced_paths.len() as u64 + 1,
+                    limit: MAX_MEDIA_REFERENCE_PATHS as u64,
+                    scope: std::sync::Arc::from("ODP media reference index"),
+                },
+            ));
+        }
+        let path_bytes = referenced_path_bytes
+            .checked_add(path.len())
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "ODP media reference path size overflow".to_string(),
+                )
+            })?;
+        if path_bytes > MAX_MEDIA_REFERENCE_PATH_BYTES {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::InputBytes,
+                    observed: path_bytes as u64,
+                    limit: MAX_MEDIA_REFERENCE_PATH_BYTES as u64,
+                    scope: std::sync::Arc::from("ODP media reference paths"),
+                },
+            ));
+        }
+        referenced_paths
+            .try_reserve(1)
+            .map_err(|source| litchi_core::Error::Allocation {
+                resource: "ODP media reference index",
+                source,
+            })?;
+        *referenced_path_bytes = path_bytes;
+        referenced_paths.insert(path);
+    }
+    Ok(())
+}
+
+fn resolve_owner_relative_reference(owner_path: &str, value: &str) -> Result<Option<String>> {
+    let value = value.trim();
+    let target_end = value.find(['?', '#']).unwrap_or(value.len());
+    let target = &value[..target_end];
+    if target.is_empty() || is_linked_href(target) {
+        return Ok(None);
+    }
+    let base = owner_relative_base(owner_path);
+    let joined = if base.is_empty() {
+        target.to_string()
+    } else {
+        format!("{base}/{target}")
+    };
+    let resolved = resolve_package_path(&joined).map_err(|error| {
+        litchi_core::Error::Unsupported(format!(
+            "ODP media reference '{value}' in '{owner_path}' is not a safe package path: {error}"
+        ))
+    })?;
+    if is_linked_href(&resolved) {
+        return Ok(None);
+    }
+    Ok(Some(resolved))
+}
+
+fn owner_relative_base(owner_path: &str) -> String {
+    let source_path = if let Some((prefix, rels_name)) = owner_path.rsplit_once("/_rels/") {
+        match strip_ascii_suffix(rels_name, ".rels") {
+            Some(source_name) if prefix.is_empty() => source_name.to_string(),
+            Some(source_name) => format!("{prefix}/{source_name}"),
+            None => owner_path.to_string(),
+        }
+    } else if let Some(rels_name) = owner_path.strip_prefix("_rels/") {
+        strip_ascii_suffix(rels_name, ".rels")
+            .unwrap_or(rels_name)
+            .to_string()
+    } else {
+        owner_path.to_string()
+    };
+    source_path
+        .rsplit_once('/')
+        .map_or_else(String::new, |(directory, _)| directory.to_string())
+}
+
+fn strip_ascii_suffix<'a>(value: &'a str, suffix: &str) -> Option<&'a str> {
+    value
+        .len()
+        .checked_sub(suffix.len())
+        .filter(|&start| value[start..].eq_ignore_ascii_case(suffix))
+        .map(|start| &value[..start])
 }
 
 fn dependency_free_copy_name(old_name: &str, names: &[String]) -> Result<String> {
