@@ -713,9 +713,11 @@ impl SourceWorksheet {
         if let Some(store) = self.data.cells.get() {
             // A cached semantic Store must still honor the managed package's
             // cancellation and source-version checks. `PartView::data()` is
-            // a cache hit when the bounded payload is retained and does not
-            // detach its managed `PartData` reservation.
-            let _payload = part.data()?;
+            // deliberately not requested here: the semantic Store is already
+            // the validated worksheet snapshot, and its retained value must
+            // remain usable even when the bounded payload cache evicted or
+            // bypassed the original worksheet bytes.
+            self.owner.package.check_execution()?;
             self.owner.execution_check()?;
             self.owner.package.source_version()?;
             return Ok(store);
@@ -980,7 +982,7 @@ mod tests {
         ReadAt, Resource, SourceVersion,
     };
     use litchi_opc::constants::content_type as ct;
-    use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits};
+    use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::{ReadLimits, SourceBackedWorkbook, SourceCellView};
@@ -1247,6 +1249,50 @@ mod tests {
     }
 
     #[test]
+    fn cached_worksheet_queries_do_not_reload_an_evicted_payload() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
+        let workbook = SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits(
+            source.clone(),
+            ReadLimits::default(),
+            cache_limits,
+        )
+        .unwrap();
+
+        let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(matches!(
+            first.cell("A1").unwrap(),
+            SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                if value.as_str() == "7"
+        ));
+        let first_reads_after_preload = source.first_body_marker_reads.load(Ordering::SeqCst);
+        assert!(first_reads_after_preload > 0);
+
+        // Loading the second worksheet evicts the first worksheet's bounded
+        // PartData payload, while the parsed semantic Store remains retained
+        // by the worksheet handle.
+        let second = workbook.sheet("Second").unwrap().unwrap();
+        assert!(matches!(
+            second.cell("A1").unwrap(),
+            SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                if value.as_str() == "9"
+        ));
+        assert!(workbook.cache_diagnostics().evictions > 0);
+
+        let first_reads_before_cached_query = source.first_body_marker_reads.load(Ordering::SeqCst);
+        assert!(matches!(
+            first.cell("A1").unwrap(),
+            SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                if value.as_str() == "7"
+        ));
+        assert_eq!(
+            source.first_body_marker_reads.load(Ordering::SeqCst),
+            first_reads_before_cached_query,
+            "a retained semantic worksheet must not reload evicted PartData"
+        );
+    }
+
+    #[test]
     fn source_changes_are_returned_as_typed_opc_errors() {
         let source = Arc::new(CountingSource::new(source_backed_xlsx()));
         let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
@@ -1434,6 +1480,40 @@ mod tests {
         assert_eq!(
             source.first_body_marker_reads.load(Ordering::SeqCst),
             reads_before_cancel
+        );
+        drop(first);
+        drop(workbook);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn managed_package_facade_checks_package_cancellation_on_cached_reads() {
+        let archive = source_backed_xlsx();
+        let source = Arc::new(CountingSource::new(archive));
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 4).unwrap();
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source.clone(),
+                ReadLimits::default(),
+                cache_limits,
+                context,
+            )
+            .unwrap();
+        let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+        let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(first.cell("A1").is_ok());
+        let reads_before_cancel = source.first_body_marker_reads.load(Ordering::SeqCst);
+
+        cancellation_source.cancel();
+        assert!(matches!(
+            first.cell("A1"),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert_eq!(
+            source.first_body_marker_reads.load(Ordering::SeqCst),
+            reads_before_cancel,
+            "a cancelled cached read must not reload worksheet payload"
         );
         drop(first);
         drop(workbook);
