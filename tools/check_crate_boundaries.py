@@ -726,6 +726,198 @@ KEYNOTE_SLIDE_TRANSITION_SEMANTIC_OPAQUE_PAYLOAD_MEMBERS = frozenset(
         "timing_curve_payloads",
     }
 )
+
+# Keynote slide-background ownership moved into the focused package in Wave53.
+# The compatibility host keeps one deliberately thin adapter so callers that
+# still use ``KeynoteEditor`` can be migrated incrementally. The two small
+# color/gradient files are retained only as cfg(test) differential oracles;
+# every style-graph, metadata, registry, and wire owner is retired.
+IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background.rs"
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES = frozenset(
+    {
+        IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_color.rs",
+        IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_gradient_wire.rs",
+    }
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_wire.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_reset.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_style_graph.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_style_metadata.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_style_registry.rs",
+)
+# Compatibility alias for callers that describe the retained files by their
+# test-only role rather than their ownership role.
+IWA_KEYNOTE_SLIDE_BACKGROUND_TEST_ORACLE_SOURCES = (
+    IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_LEGACY_SOURCES = (
+    *IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES,
+    *RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES,
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/set_keynote_slide_background.rs"
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(?P<module>slide_background_color|"
+    r"slide_background_gradient_wire|slide_background_wire|slide_background_reset|"
+    r"slide_style_graph|slide_style_metadata|slide_style_registry)\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_MODULE = re.compile(
+    r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]"
+    r"[ \t\r\n]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(?P<module>slide_background_color|"
+    r"slide_background_gradient_wire)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE_NAMES = frozenset(
+    {
+        "slide_background_color",
+        "slide_background_gradient_wire",
+        "slide_background_wire",
+        "slide_background_reset",
+        "slide_style_graph",
+        "slide_style_metadata",
+        "slide_style_registry",
+    }
+)
+
+# These are ownership markers, not a ban on using the focused package. Keep
+# the list explicit so the adapter can continue to call semantic package
+# methods while any accidental return of the old generated/wire/style graph
+# implementation is reported at the exact source line.
+IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_GENERATED_MARKERS = frozenset(
+    {
+        "kn",
+        "tsd",
+        "tsp",
+        "tss",
+        "tswp",
+        "prost",
+        "prost_types",
+        "litchi_iwa_protos",
+        "Message",
+        "ArchiveObject",
+        "RawMessage",
+        "IWorkPackage",
+        "IWorkTextEditor",
+        "SlideArchive",
+        "SlideStyleArchive",
+        "SlideStylePropertiesArchive",
+        "StyleArchive",
+        "StylesheetArchive",
+        "FillArchive",
+        "GradientArchive",
+        "Color",
+        "Reference",
+        "ObjectGraph",
+        "decode_type",
+        "decode_message",
+        "message_data_type",
+        "archive_name",
+    }
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_WIRE_MARKERS = frozenset(
+    {
+        "WireView",
+        "WireLimits",
+        "WireFieldView",
+        "parse_wire_field",
+        "parse_wire_fields",
+        "optional_length_delimited_payload",
+        "required_length_delimited_payload",
+        "repeated_length_delimited_payloads",
+        "patch_length_delimited_field",
+        "patch_fixed32_field",
+        "patch_fixed64_field",
+        "patch_varint_field",
+        "patch_nested_length_delimited_field",
+        "patch_nested_fixed32_field",
+        "patch_nested_fixed64_field",
+        "patch_nested_varint_field",
+        "remove_repeated_length_delimited_field_where",
+        "rewrite_repeated_length_delimited_fields",
+        "transform_length_delimited_field",
+        "transform_length_delimited_fields_at_path",
+    }
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_STYLE_MARKERS = frozenset(
+    {
+        "style_id",
+        "stylesheet_id",
+        "SLIDE_STYLE_MESSAGE_TYPE",
+        "STYLESHEET_MESSAGE_TYPE",
+        "is_collapsible_background_variation",
+        "style_is_exclusive",
+        "patch_slide_style_reference",
+        "patch_stylesheet",
+        "rewrite_stylesheet_data",
+        "update_package_metadata",
+        "ensure_slide_style_external_reference",
+        "component_identifier_for_entry",
+        "next_object_identifier",
+        "set_package_last_object_identifier",
+        "clone_style_object",
+        "replace_style_data",
+        "release_package_identifier_suffix",
+        "remove_background_field_metadata",
+        "new_style_object",
+        "encode_background_fill",
+        "gradient_to_fill",
+        "native_color_space",
+        "color_to_native",
+        "color_from_native",
+        "gradient_from_fill",
+        "opaque_background",
+        "has_exact_fields",
+        "update_archive",
+    }
+)
+IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_MARKER_GROUPS = (
+    (
+        "generated protobuf ownership marker",
+        IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_GENERATED_MARKERS,
+    ),
+    ("wire ownership marker", IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_WIRE_MARKERS),
+    (
+        "style-registry ownership marker",
+        IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_STYLE_MARKERS,
+    ),
+)
+
+KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_background.rs"
+)
+KEYNOTE_SLIDE_BACKGROUND_IMPLEMENTATION_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "background.rs",
+    KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE,
+)
+KEYNOTE_SLIDE_BACKGROUND_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+)
+KEYNOTE_SLIDE_BACKGROUND_PACKAGE_METHODS = (
+    "slide_background",
+    "slide_background_override",
+    "edit_slide_background",
+    "apply_slide_background",
+)
+KEYNOTE_SLIDE_BACKGROUND_EDIT_METHODS = ("set", "clear")
+KEYNOTE_PACKAGE_SLIDE_BACKGROUND_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?slide_background\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_KEYNOTE_PACKAGE_SLIDE_BACKGROUND_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?slide_background\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
 RETIRED_IWA_KEYNOTE_SLIDE_DELETE_METHODS = ("remove_slide",)
 RETIRED_IWA_KEYNOTE_SLIDE_DELETE_METHOD_SET = frozenset(
     RETIRED_IWA_KEYNOTE_SLIDE_DELETE_METHODS
@@ -6373,6 +6565,233 @@ def audit_keynote_slide_transition_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_slide_background_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep slide-background wire/style ownership out of the compatibility host.
+
+    ``slide_background_color.rs`` and ``slide_background_gradient_wire.rs`` are
+    intentionally retained as cfg(test) differential oracles for old host
+    fixtures.  They are not allowed to become production modules or callers;
+    all other files from the former background implementation are retired.
+    """
+
+    violations: list[str] = []
+    oracle_sources = IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES
+
+    for retired in IWA_KEYNOTE_SLIDE_BACKGROUND_LEGACY_SOURCES:
+        path = root / retired
+        if not path.exists():
+            continue
+        if retired in oracle_sources:
+            continue
+        violations.append(
+            "retired litchi-iwa Keynote slide-background source returned: "
+            + str(retired)
+        )
+
+    example = root / RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_EXAMPLE
+    if example.exists():
+        violations.append(
+            "retired litchi-iwa Keynote slide-background example returned: "
+            + str(RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_EXAMPLE)
+        )
+
+    editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
+    module_names: dict[str, list[tuple[int, int]]] = {}
+    if editor_path.is_file():
+        source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
+
+        def is_cfg_test_module(module_start: int) -> bool:
+            line_start = source.rfind("\n", 0, module_start) + 1
+            prefix = source[:line_start].rstrip()
+            while prefix:
+                previous_line_start = prefix.rfind("\n") + 1
+                previous_line = prefix[previous_line_start:].strip()
+                if not previous_line:
+                    prefix = prefix[:previous_line_start].rstrip()
+                    continue
+                if RUST_CFG_TEST_ATTRIBUTE.fullmatch(previous_line):
+                    return True
+                if previous_line.startswith("#["):
+                    prefix = prefix[:previous_line_start].rstrip()
+                    continue
+                return False
+            return False
+
+        for match in IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE.finditer(source):
+            module = match.group("module")
+            line_number = source.count("\n", 0, match.start()) + 1
+            module_names.setdefault(module, []).append((match.start(), line_number))
+            if module in {
+                "slide_background_color",
+                "slide_background_gradient_wire",
+            }:
+                if is_cfg_test_module(match.start()):
+                    continue
+                violations.append(
+                    "retained litchi-iwa Keynote slide-background oracle module "
+                    f"must be cfg(test) {module}: "
+                    f"{IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+                )
+            else:
+                violations.append(
+                    "retired litchi-iwa Keynote slide-background module "
+                    f"{module}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+                )
+
+    for oracle in oracle_sources:
+        if not (root / oracle).is_file():
+            continue
+        module = oracle.stem
+        if module_names.get(module):
+            continue
+        violations.append(
+            "retained litchi-iwa Keynote slide-background oracle source must be "
+            f"cfg(test)-owned: {oracle}"
+        )
+
+    # A cfg(test) item scanner is required here: the adapter may contain a
+    # generated-Prost differential helper after its production functions.
+    # Truncating at the first cfg(test) attribute would hide production code
+    # placed above a test-only import or helper.
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path == root / IWA_KEYNOTE_EDITOR_TEST_SOURCE:
+                continue
+            if path in {root / oracle for oracle in oracle_sources}:
+                continue
+            raw_source = path.read_text(encoding="utf-8")
+            production_code = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(raw_source)
+            )
+            for match in re.finditer(
+                r"(?<![A-Za-z0-9_])(?:"
+                + "|".join(
+                    re.escape(name)
+                    for name in sorted(IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE_NAMES)
+                )
+                + r")(?![A-Za-z0-9_])",
+                production_code,
+            ):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote slide-background production "
+                    f"reference {match.group(0)}: {path.relative_to(root)}:{line_number}"
+                )
+
+    adapter_path = root / IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE
+    if adapter_path.is_file():
+        raw_source = adapter_path.read_text(encoding="utf-8")
+        production_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(raw_source)
+        )
+        for label, markers in IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_MARKER_GROUPS:
+            for match in RUST_IDENTIFIER.finditer(production_code):
+                marker = match.group(1)
+                if marker not in markers:
+                    continue
+                line_number = production_code.count("\n", 0, match.start(1)) + 1
+                violations.append(
+                    "litchi-iwa Keynote slide-background compatibility adapter "
+                    f"retains {label} {marker}: "
+                    f"{IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_keynote_slide_background_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce selector-first focused Keynote slide-background ownership."""
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    package_path = root / KEYNOTE_SLIDE_BACKGROUND_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    if not package_path.is_file():
+        violations.append(
+            "focused litchi-keynote slide-background public API is missing "
+            f"package owner module: {KEYNOTE_SLIDE_BACKGROUND_EXPORT_SOURCES[1]}"
+        )
+    elif KEYNOTE_PACKAGE_SLIDE_BACKGROUND_MODULE.search(package_source) is None:
+        violations.append(
+            "focused litchi-keynote slide-background public API is missing "
+            f"private package owner module: {KEYNOTE_SLIDE_BACKGROUND_EXPORT_SOURCES[1]}"
+        )
+    for match in PUBLIC_KEYNOTE_PACKAGE_SLIDE_BACKGROUND_MODULE.finditer(
+        package_source
+    ):
+        line_number = package_source.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-keynote slide-background public API exposes duplicate "
+            "package::slide_background module: "
+            f"{KEYNOTE_SLIDE_BACKGROUND_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    owner_path = root / KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-keynote slide-background public API is missing private "
+            f"package owner source: {KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE}"
+        )
+        owner_source = ""
+    else:
+        owner_source = owner_path.read_text(encoding="utf-8")
+
+    owner_public_methods = {
+        name
+        for declaration, _line_number in _rust_public_declarations(owner_source)
+        for name, _nested_line in _rust_function_declarations(declaration)
+    }
+    for method in KEYNOTE_SLIDE_BACKGROUND_PACKAGE_METHODS:
+        if method in owner_public_methods:
+            continue
+        violations.append(
+            "focused litchi-keynote slide-background public API is missing Package "
+            f"method {method}: {KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE}"
+        )
+
+    for method in KEYNOTE_SLIDE_BACKGROUND_EDIT_METHODS:
+        if method in owner_public_methods:
+            continue
+        violations.append(
+            "focused litchi-keynote slide-background public API is missing "
+            f"Edit method {method}: {KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE}"
+        )
+
+    # Keep the owner and semantic value source free of generated Prost reads;
+    # cfg(test) differential helpers remain legal through item masking.
+    for path in (
+        root / KEYNOTE_SLIDE_BACKGROUND_IMPLEMENTATION_SOURCES[0],
+        owner_path,
+    ):
+        if not path.is_file():
+            continue
+        raw_source = path.read_text(encoding="utf-8")
+        production_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(raw_source)
+        )
+        for label, pattern in KEYNOTE_NO_EAGER_PROST_SOURCE_PATTERNS:
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "focused litchi-keynote slide-background production source uses "
+                    f"{label}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_keynote_slide_delete_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -11469,6 +11888,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_soundtrack_settings_facade_source_topology()
         + audit_iwa_keynote_slide_transition_source_topology()
         + audit_keynote_slide_transition_facade_source_topology()
+        + audit_iwa_keynote_slide_background_source_topology()
+        + audit_keynote_slide_background_facade_source_topology()
         + audit_iwa_keynote_slide_delete_source_topology()
         + audit_keynote_slide_delete_facade_source_topology()
         + audit_iwa_keynote_placeholder_visibility_source_topology()

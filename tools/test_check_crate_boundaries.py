@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import tempfile
 import unittest
@@ -4271,6 +4272,238 @@ class BoundaryPolicyTests(unittest.TestCase):
                             "crates/litchi-keynote/src/package.rs:1"
                         ],
                     )
+
+    def test_keynote_slide_background_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE,
+            Path("crates/litchi-iwa/src/keynote/editor/slide_background.rs"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES,
+            (
+                Path("crates/litchi-iwa/src/keynote/editor/slide_background_wire.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_background_reset.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_style_graph.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_style_metadata.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_style_registry.rs"),
+            ),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES,
+            frozenset(
+                {
+                    Path("crates/litchi-iwa/src/keynote/editor/slide_background_color.rs"),
+                    Path(
+                        "crates/litchi-iwa/src/keynote/editor/slide_background_gradient_wire.rs"
+                    ),
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_TEST_ORACLE_SOURCES,
+            boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES,
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_EXAMPLE,
+            Path("crates/litchi-iwa/examples/set_keynote_slide_background.rs"),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_BACKGROUND_PACKAGE_METHODS,
+            (
+                "slide_background",
+                "slide_background_override",
+                "edit_slide_background",
+                "apply_slide_background",
+            ),
+        )
+        self.assertEqual(
+            boundaries.KEYNOTE_SLIDE_BACKGROUND_EDIT_METHODS,
+            ("set", "clear"),
+        )
+
+    def test_retired_iwa_keynote_slide_background_surface_and_adapter_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "#[cfg(test)]\n"
+                "mod slide_background_color;\n"
+                "#[cfg(test)]\n"
+                "pub(crate) mod r#slide_background_gradient_wire;\n"
+                "mod slide_background_wire;\n",
+                encoding="utf-8",
+            )
+            for retired in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES:
+                path = root / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// returned source\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+            adapter = root / boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE
+            adapter.parent.mkdir(parents=True, exist_ok=True)
+            adapter.write_text(
+                "fn production() { let _ = tsd::FillArchive::default(); }\n"
+                "#[cfg(test)]\n"
+                "fn differential() {\n"
+                "    let _ = prost::Message::decode(&[]);\n"
+                "    let _ = WireView::parse(&[]);\n"
+                "    patch_stylesheet();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_keynote_slide_background_source_topology(
+                root
+            )
+            self.assertIn(
+                "retired litchi-iwa Keynote slide-background example returned: "
+                "crates/litchi-iwa/examples/set_keynote_slide_background.rs",
+                violations,
+            )
+            self.assertIn(
+                "retired litchi-iwa Keynote slide-background module "
+                "slide_background_wire: "
+                "crates/litchi-iwa/src/keynote/editor.rs:5",
+                violations,
+            )
+            for filename in (
+                "slide_background_wire.rs",
+                "slide_background_reset.rs",
+                "slide_style_graph.rs",
+                "slide_style_metadata.rs",
+                "slide_style_registry.rs",
+            ):
+                self.assertIn(
+                    "retired litchi-iwa Keynote slide-background source returned: "
+                    f"crates/litchi-iwa/src/keynote/editor/{filename}",
+                    violations,
+                )
+            self.assertIn(
+                "litchi-iwa Keynote slide-background compatibility adapter retains "
+                "generated protobuf ownership marker tsd: "
+                "crates/litchi-iwa/src/keynote/editor/slide_background.rs:1",
+                violations,
+            )
+            self.assertFalse(
+                any("prost::Message" in violation for violation in violations)
+            )
+            self.assertFalse(any("WireView" in violation for violation in violations))
+            self.assertFalse(any("patch_stylesheet" in violation for violation in violations))
+
+    def test_iwa_keynote_slide_background_oracles_require_cfg_test_and_no_prod_refs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "mod slide_background_color;\n"
+                "#[cfg(test)]\n"
+                "mod slide_background_gradient_wire;\n",
+                encoding="utf-8",
+            )
+            for oracle in boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_TEST_ORACLE_SOURCES:
+                path = root / oracle
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("fn oracle() {}\n", encoding="utf-8")
+            legacy = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy.rs"
+            legacy.write_text(
+                "#[cfg(test)]\n"
+                "fn differential() { slide_background_color::color_from_native(); }\n"
+                "fn production() { slide_background_gradient_wire::gradient_to_fill(); }\n",
+                encoding="utf-8",
+            )
+            adapter = root / boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE
+            adapter.parent.mkdir(parents=True, exist_ok=True)
+            adapter.write_text(
+                "#[cfg(test)]\n"
+                "fn differential() { slide_background_color::color_from_native(); }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_background_source_topology(root),
+                [
+                    "retained litchi-iwa Keynote slide-background oracle module "
+                    "must be cfg(test) slide_background_color: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:1",
+                    "retired litchi-iwa Keynote slide-background production reference "
+                    "slide_background_color: "
+                    "crates/litchi-iwa/src/keynote/editor.rs:1",
+                    "retired litchi-iwa Keynote slide-background production reference "
+                    "slide_background_gradient_wire: "
+                    "crates/litchi-iwa/src/keynote/legacy.rs:3",
+                ],
+            )
+
+    def test_focused_keynote_slide_background_requires_package_owner_and_is_prost_free(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_root = root / boundaries.KEYNOTE_SOURCE_ROOT
+            source_root.mkdir(parents=True)
+            package = root / boundaries.KEYNOTE_SLIDE_BACKGROUND_EXPORT_SOURCES[1]
+            package.write_text("mod slide_background;\n", encoding="utf-8")
+            owner = root / boundaries.KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn slide_background(&self) {}\n"
+                "    pub fn slide_background_override(&self) {}\n"
+                "    pub fn edit_slide_background(&self) {}\n"
+                "    pub fn apply_slide_background(&self) {}\n"
+                "}\n"
+                "impl SlideBackgroundEdit<'_> {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn oracle() { let _ = prost::Message::decode(&[]); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_background_facade_source_topology(root),
+                [],
+            )
+
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn slide_background(&self) {}\n"
+                "    pub fn slide_background_override(&self) {}\n"
+                "    pub fn edit_slide_background(&self) {}\n"
+                "    pub fn apply_slide_background(&self) {}\n"
+                "}\n"
+                "impl SlideBackgroundEdit<'_> {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "}\n"
+                "fn production() { let _ = prost::Message::decode(&[]); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_background_facade_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("prost::Message", violations[0])
+            self.assertIn(
+                "crates/litchi-keynote/src/package/slide_background.rs:11",
+                violations[0],
+            )
+
+    def test_keynote_slide_background_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_slide_background_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_keynote_slide_background_facade_source_topology()", main_source
+        )
 
     def test_keynote_slide_delete_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(
