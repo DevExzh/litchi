@@ -24,6 +24,7 @@ use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
+#[allow(deprecated)]
 use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::{MediaAssetId, reachable_embedded_assets};
 use crate::package_metadata::{
@@ -161,6 +162,7 @@ impl PagesEditor {
     }
 
     /// List supported direct-comment drawables reachable from the Pages root.
+    #[allow(deprecated)]
     pub fn drawables(&self) -> Result<Vec<DrawableInfo>> {
         let reachable = self.reachable_drawable_ids()?;
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
@@ -2228,6 +2230,7 @@ impl PagesEditor {
     }
 
     /// Remove a body-anchored Pages text box and its private object graph.
+    #[allow(deprecated)]
     pub fn remove_text_box(&mut self, drawable_object_id: u64) -> Result<RemovedPagesTextBox> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let text = self
@@ -2287,6 +2290,11 @@ impl PagesEditor {
     }
 
     /// Read a comment attached directly to a reachable Pages drawable.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn drawable_comment(&self, drawable_object_id: u64) -> Result<Option<DrawableComment>> {
         self.require_drawable(drawable_object_id)?;
         IWorkDrawableCommentEditor::from_package(self.package().clone())?
@@ -2294,6 +2302,11 @@ impl PagesEditor {
     }
 
     /// Create or replace a direct comment on a reachable Pages drawable.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn set_drawable_comment(
         &mut self,
         drawable_object_id: u64,
@@ -2307,6 +2320,11 @@ impl PagesEditor {
     }
 
     /// Delete a direct comment from a reachable Pages drawable.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn clear_drawable_comment(&mut self, drawable_object_id: u64) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
@@ -2316,6 +2334,7 @@ impl PagesEditor {
     }
 
     /// Read the direct replies in a reachable Pages drawable comment thread.
+    #[allow(deprecated)]
     pub fn drawable_comment_replies(
         &self,
         drawable_object_id: DrawableId,
@@ -2326,6 +2345,7 @@ impl PagesEditor {
     }
 
     /// Add a reply to a reachable Pages drawable comment.
+    #[allow(deprecated)]
     pub fn add_drawable_comment_reply(
         &mut self,
         drawable_object_id: DrawableId,
@@ -2339,6 +2359,7 @@ impl PagesEditor {
     }
 
     /// Update a direct reply, returning its current storage identifier.
+    #[allow(deprecated)]
     pub fn set_drawable_comment_reply(
         &mut self,
         drawable_object_id: DrawableId,
@@ -2353,6 +2374,7 @@ impl PagesEditor {
     }
 
     /// Remove a direct reply from a reachable Pages drawable comment.
+    #[allow(deprecated)]
     pub fn remove_drawable_comment_reply(
         &mut self,
         drawable_object_id: DrawableId,

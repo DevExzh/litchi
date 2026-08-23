@@ -611,6 +611,7 @@ impl NumbersEditor {
     }
 
     /// Remove an ordinary image, its private graph, and unshared assets.
+    #[allow(deprecated)]
     pub fn remove_sheet_image(
         &mut self,
         sheet_id: u64,
@@ -853,6 +854,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn scratch_spreadsheet_supports_image_crud_without_a_source_package() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");

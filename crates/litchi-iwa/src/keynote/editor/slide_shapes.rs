@@ -938,6 +938,7 @@ impl KeynoteEditor {
     }
 
     /// Remove an ordinary shape and its private text-bearing object graph.
+    #[allow(deprecated)]
     pub fn remove_slide_shape(
         &mut self,
         slide_index: usize,

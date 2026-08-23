@@ -567,6 +567,7 @@ impl NumbersEditor {
     }
 
     /// Remove an ordinary movie, its private graph, and unshared assets.
+    #[allow(deprecated)]
     pub fn remove_sheet_movie(
         &mut self,
         sheet_id: u64,
@@ -697,6 +698,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn scratch_spreadsheet_supports_movie_crud_without_a_source_package() {
         let mut editor = NumbersDocumentBuilder::new()
             .sheet_name("Movies")

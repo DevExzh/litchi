@@ -1,5 +1,7 @@
 //! Create, replace, or clear a sheet-owned Numbers drawable comment.
 
+#![allow(deprecated)]
+
 use std::env;
 
 use litchi_iwa::numbers::NumbersEditor;

@@ -18,6 +18,7 @@ use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
+#[allow(deprecated)]
 use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::MediaAssetId;
 use crate::media::reachable_embedded_assets;
@@ -3960,6 +3961,7 @@ impl KeynoteEditor {
     }
 
     /// Remove an ordinary slide-owned text box and its private object graph.
+    #[allow(deprecated)]
     pub fn remove_slide_text_box(
         &mut self,
         slide_index: usize,
@@ -4014,6 +4016,7 @@ impl KeynoteEditor {
     }
 
     /// List supported direct-comment drawables owned by one slide.
+    #[allow(deprecated)]
     pub fn slide_drawables(&self, slide_index: usize) -> Result<Vec<DrawableInfo>> {
         let owned = self.slide_owned_drawable_ids(slide_index)?;
         let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
@@ -4026,6 +4029,11 @@ impl KeynoteEditor {
     }
 
     /// Read a comment attached directly to a drawable owned by one slide.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn slide_drawable_comment(
         &self,
         slide_index: usize,
@@ -4037,6 +4045,11 @@ impl KeynoteEditor {
     }
 
     /// Create or replace a direct drawable comment on one slide.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn set_slide_drawable_comment(
         &mut self,
         slide_index: usize,
@@ -4053,6 +4066,11 @@ impl KeynoteEditor {
     }
 
     /// Delete a direct drawable comment on one slide.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn clear_slide_drawable_comment(
         &mut self,
         slide_index: usize,
@@ -4068,6 +4086,11 @@ impl KeynoteEditor {
     }
 
     /// Read direct replies in a comment thread on one slide drawable.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn slide_drawable_comment_replies(
         &self,
         slide_index: usize,
@@ -4079,6 +4102,11 @@ impl KeynoteEditor {
     }
 
     /// Add a reply to a direct comment on one slide drawable.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn add_slide_drawable_comment_reply(
         &mut self,
         slide_index: usize,
@@ -4095,6 +4123,11 @@ impl KeynoteEditor {
     }
 
     /// Update a direct reply, returning its current storage identifier.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn set_slide_drawable_comment_reply(
         &mut self,
         slide_index: usize,
@@ -4116,6 +4149,11 @@ impl KeynoteEditor {
     }
 
     /// Remove a direct reply from a comment on one slide drawable.
+    #[allow(deprecated)]
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Keynote drawable-comment reply API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
+    )]
     pub fn remove_slide_drawable_comment_reply(
         &mut self,
         slide_index: usize,

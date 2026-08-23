@@ -575,6 +575,7 @@ impl PagesEditor {
     }
 
     /// Remove a body chart, its attachment, and any crate-owned private styles.
+    #[allow(deprecated)]
     pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyChart> {
         let source = body_chart_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;

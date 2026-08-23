@@ -428,6 +428,7 @@ impl PagesEditor {
     }
 
     /// Remove body audio, its attachment/private graph, and unshared asset.
+    #[allow(deprecated)]
     pub fn remove_body_audio(&mut self, drawable_object_id: u64) -> Result<RemovedPagesAudio> {
         let source = body_audio_graph(self, drawable_object_id)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;

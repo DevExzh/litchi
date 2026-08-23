@@ -4585,6 +4585,7 @@ fn cloned_slide_rejects_duplicate_reference_identifiers_transactionally() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn slide_owned_drawable_comment_crud_is_reachability_guarded() {
     let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
     assert_eq!(

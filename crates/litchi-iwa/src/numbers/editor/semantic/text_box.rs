@@ -2074,6 +2074,7 @@ impl NumbersEditor {
     }
 
     /// Remove an ordinary sheet-owned text box and its private object graph.
+    #[allow(deprecated)]
     pub fn remove_sheet_text_box(
         &mut self,
         sheet_id: u64,

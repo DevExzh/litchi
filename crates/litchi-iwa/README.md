@@ -1073,6 +1073,8 @@ Cell comments and replies remain separate migration-host APIs in the
 compatibility example below.
 
 ```rust
+#![allow(deprecated)]
+
 use litchi_iwa::numbers::{
     FormulaAxisReference, FormulaCellReference, FormulaExpression, NumbersEditor,
 };
@@ -2256,7 +2258,14 @@ sheet's unique `drawable_infos` ownership; `KeynoteEditor` restricts them to a
 slide's `owned_drawables` list. The `inspect_drawable_comments`,
 `edit_drawable_comment`, `edit_drawable_comment_reply`, and
 `edit_numbers_drawable_comment` examples expose the application-independent
-and sheet-scoped APIs.
+and sheet-scoped APIs. The root editor and raw-ID host-specific direct-drawable
+comment methods (including raw-ID reply methods) are explicitly deprecated
+compatibility surfaces. Their signatures and behavior are unchanged, and
+migration-host examples retain `#![allow(deprecated)]` so existing workflows
+continue to compile. Use focused format-semantic comment owners where they
+exist; direct-drawable comment ownership has no drop-in focused replacement
+yet. Focused text comment/reply APIs and generated/raw modules are not part of
+this deprecation slice.
 Nested comment references and comment-storage text/UUID fields are patched at
 the protobuf wire level, retaining unknown Apple fields byte-for-byte; the
 the `litchi-iwa-archive` `compare_iwa_packages` example compares decompressed

@@ -980,6 +980,7 @@ impl NumbersEditor {
     }
 
     /// Remove an ordinary shape and its private text-bearing graph.
+    #[allow(deprecated)]
     pub fn remove_sheet_shape(
         &mut self,
         sheet_id: u64,

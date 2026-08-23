@@ -535,6 +535,7 @@ impl NumbersEditor {
     }
 
     /// Remove a standalone chart and its private caption, title, and mediator objects.
+    #[allow(deprecated)]
     pub fn remove_sheet_chart(
         &mut self,
         sheet_id: u64,

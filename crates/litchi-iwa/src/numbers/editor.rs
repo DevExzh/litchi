@@ -33,6 +33,7 @@ use super::formula::{
     FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey, compile_formula,
 };
 use crate::archive::{Archive, ArchiveObject, RawMessage};
+#[allow(deprecated)]
 use crate::comments::{
     IWorkDrawableCommentEditor, advance_save_tokens_for_entries, clone_comment_storage_exact,
     current_apple_reference_date, fresh_comment_storage_uuid, insert_comment_storage,

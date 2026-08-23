@@ -569,6 +569,7 @@ impl KeynoteEditor {
 
     /// Remove a standalone slide chart and its private title, caption, and styles.
     /// `selector` uses checked chart order or an exact visible chart title.
+    #[allow(deprecated)]
     pub fn remove_slide_chart(
         &mut self,
         slide_index: usize,

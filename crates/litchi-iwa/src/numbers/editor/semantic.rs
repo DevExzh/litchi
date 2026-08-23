@@ -22,6 +22,7 @@ use prost::Message;
 
 use super::super::formula::{FormulaCachedValue, FormulaExpression, FormulaPivotCategoryReference};
 use crate::archive::RawMessage;
+#[allow(deprecated)]
 use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
