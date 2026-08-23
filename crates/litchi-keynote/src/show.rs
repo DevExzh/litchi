@@ -656,6 +656,44 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_name_resolution_is_exact_and_position_selectors_remain_independent() {
+        let mut first = Slide::builder(0);
+        first.set_name(Some("Agenda".to_owned()));
+        let mut second = Slide::builder(1);
+        second.set_name(Some("Agenda".to_owned()));
+        let mut third = Slide::builder(2);
+        third.set_name(Some("Appendix".to_owned()));
+        let mut builder = Show::builder();
+        builder.push_slide(first.build());
+        builder.push_slide(second.build());
+        builder.push_slide(third.build());
+        let show = builder.build();
+
+        assert_eq!(show.select_slide("agenda"), Ok(None));
+        assert_eq!(
+            show.select_slide("Appendix")
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(2))
+        );
+        assert_eq!(
+            show.select_slide(SlideSelector::index(0))
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(0))
+        );
+        assert_eq!(
+            show.select_slide(SlideSelector::index(1))
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(1))
+        );
+        assert_eq!(
+            show.select_slide("Agenda"),
+            Err(SlideSelectorError::DuplicateSlideName {
+                name: "Agenda".into()
+            })
+        );
+    }
+
+    #[test]
     fn slides_prefer_names_and_retain_unambiguous_position_selectors() {
         let unnamed = Slide::builder(7).build();
         let mut named_builder = Slide::builder(8);

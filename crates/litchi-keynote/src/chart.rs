@@ -518,4 +518,20 @@ mod tests {
         assert_eq!(empty.select_position(0usize), Ok(Some(0)));
         assert_eq!(empty.charts()[0].selector(), ChartSelector::index(0));
     }
+
+    #[test]
+    fn duplicate_name_resolution_does_not_poison_positions_or_other_names() {
+        let catalog = ChartCatalog::from_titles([Some("Revenue"), Some("Revenue"), Some("Costs")]);
+
+        assert_eq!(
+            catalog.select_position("Revenue"),
+            Err(ChartSelectorError::DuplicateChartTitle {
+                name: "Revenue".into()
+            })
+        );
+        assert_eq!(catalog.select_position("Costs"), Ok(Some(2)));
+        assert_eq!(catalog.select_position(0usize), Ok(Some(0)));
+        assert_eq!(catalog.select_position(1usize), Ok(Some(1)));
+        assert_eq!(catalog.select_position(99usize), Ok(None));
+    }
 }

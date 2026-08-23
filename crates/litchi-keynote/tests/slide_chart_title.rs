@@ -511,6 +511,10 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
         Err(ChartTitleError::ChartNameNotFound)
     ));
     assert!(matches!(
+        package.slide_chart_title("charts", 0usize),
+        Err(ChartTitleError::SlideNameNotFound)
+    ));
+    assert!(matches!(
         package.edit_slide_chart_title("Missing", 0usize),
         Err(ChartTitleError::SlideNameNotFound)
     ));
@@ -528,10 +532,24 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
         (Some(true), Some("Revenue")),
         (Some(true), Some("Revenue")),
     ])?)?;
+    assert_eq!(
+        duplicate.slide_chart_title(0usize, ChartSelector::index(0))?,
+        Some("Revenue".to_owned())
+    );
+    assert_eq!(
+        duplicate.slide_chart_title(0usize, ChartSelector::index(1))?,
+        Some("Revenue".to_owned())
+    );
     assert!(matches!(
         duplicate.slide_chart_title(0usize, ChartSelector::name("Revenue")),
         Err(ChartTitleError::AmbiguousSelector)
     ));
+    let duplicate_source = exact_bytes(&duplicate)?;
+    assert!(matches!(
+        duplicate.edit_slide_chart_title(0usize, ChartSelector::name("Revenue")),
+        Err(ChartTitleError::AmbiguousSelector)
+    ));
+    assert_eq!(exact_bytes(&duplicate)?, duplicate_source);
 
     let malformed = {
         let mut stream = document_stream(&bytes)?;
