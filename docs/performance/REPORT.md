@@ -11,6 +11,18 @@ complete. The reproducible environment, original substrate baseline, corpus
 definitions, commands, and profiler limitations are in
 [`BASELINE.md`](BASELINE.md); raw reports are under [`results/`](results/).
 
+## Shared lazy OPC structural members (change 0259)
+
+[Change 0259](changes/0259-opc-shared-structural-members.md) carries the lazy
+ZIP reader's existing `Arc<Vec<u8>>` materialization into private OPC parsing
+for deflated `[Content_Types].xml` and relationship manifests. It removes the
+former second complete `Vec` clone, while stored members remain borrowed and
+positional/indexed sources retain the owned fallback. Focused pointer-identity
+tests plus full OPC/ZIP, strict lint, rustdoc, and independent review gates
+pass. This is deterministic ownership-shape evidence only; a
+relationship-heavy controlled benchmark and resource profile remain required
+before any latency, allocation, memory, I/O, or broad OOXML claim.
+
 ## Byte-native unified RTF ingress (change 0258)
 
 [Change 0258](changes/0258-rtf-byte-native-facade.md) removes the facade's
@@ -23,7 +35,7 @@ precedence. Two opt-in facade selectors raise the selectable harness count to
 Two CPU-2 release A1/B1/B2/A2 captures used identical control/candidate
 binaries, plain tiny/medium/large corpora, 20 warmups, and 500 samples per leg.
 The pinned-metadata capture accepts five in-run cells, but the immediately
-preceding equivalent capture accepts 0/24. Because the accepted set does not
+preceding matched capture accepts 0/24. Because the accepted set does not
 reproduce, all latency results are withheld and no claim-registry entry is
 added. Both compact packages are retained as non-reproducibility evidence;
 the landing is supported by correctness and source-preservation gates only.
