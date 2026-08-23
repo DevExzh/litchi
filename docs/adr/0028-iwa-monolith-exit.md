@@ -4254,3 +4254,36 @@ monolith deletion gate:
 No native or type-6011 result, Rust/native parity, full-workspace verification,
 Buffa/Prost exit, generated-schema retirement, dependency/debt retirement,
 migration-host exit, or monolith deletion is admitted by this amendment.
+
+## 2026-08-24 amendment: accepted bounded follow-up at `2bbf3c64`
+
+The historical monolith/deletion tails above are retained. The accepted chain
+does not move an owner out of `litchi-iwa` or satisfy a deletion-gate item:
+
+- `7468fdfc4` preserves copy-on-write identity for an exact-byte
+  `EntryStore::replace_data` no-op, with a focused `Arc::ptr_eq` case.
+- `322032c10` deprecates three raw-ID Keynote chart-title methods and adds
+  typed-selector boundary ratchets; the migration-host compatibility methods
+  remain.
+- `031678a31` adds strict alternate type-`6201` TableDataList coverage and
+  rejects a non-canonical duplicate scalar. Its type-`6011` data is synthetic
+  test input, not native Segment evidence.
+- `2bbf3c64` shares the Pages footnote source/candidate semantic budget and
+  rejects observed `19` at exact limit `14`; this is local projection
+  hardening, not a workspace memory or performance result.
+
+The current lightweight checks are `git diff --check` and
+`python3 -m unittest tools.test_check_crate_boundaries` (314 tests). No
+full-workspace Cargo gate is claimed because the surrounding checkout has a
+dirty/staged snapshot and `Cargo.lock` is not tracked by this parent. Clean
+archived Buffa/protos results remain historical only: 33 focused protocol
+tests and a full `litchi-iwa-protos` baseline at 267 passed/0 failed, with a
+later strict Numbers/Buffa report at 237 passing protos tests. No accepted
+commit removes Prost or changes generated-schema ownership.
+
+Prior reports supply only historical native/fuzz context: a Numbers
+comment/formula/rich-text reopen recorded 24 type-6005 and zero type-6011
+entries, and TableDataList/CommentStorage smokes recorded 100 ASan runs with
+11/20 seeds. No native type-6011 proof or current fuzz campaign follows.
+The host edge, all ordered debt, and the monolith remain; no dependency-edge
+or debt retirement, migration-host exit, or deletion claim is made.
