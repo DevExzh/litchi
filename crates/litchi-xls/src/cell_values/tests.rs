@@ -5,8 +5,9 @@
 )]
 
 use super::*;
-use litchi_cfb::{OleFile, OleWriter, OverlaySourceMode, SharedOleFile};
+use litchi_cfb::{OleFile, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile};
 use std::io::Write;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 fn package() -> Vec<u8> {
     let mut writer = crate::Writer::new();
@@ -287,10 +288,10 @@ fn directory_signature(
     bytes: &[u8],
 ) -> Vec<(u32, String, u8, String, u32, u32, u32, u32, u64, bool)> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec()).unwrap();
-    let shared = SharedOleFile::open(Arc::new(SnapshotSource::new(
+    let shared = SharedOleFile::open_owned(
         Arc::clone(&snapshot.inner.bytes),
         snapshot.inner.source_version,
-    )))
+    )
     .unwrap();
     shared
         .directory_entries()
@@ -485,7 +486,7 @@ fn source_backed_numeric_plan_validates_without_retaining_target_snapshot() {
 }
 
 #[test]
-fn source_backed_numeric_diagnostics_report_generic_and_owned_shapes() {
+fn source_backed_numeric_diagnostics_report_owned_shapes_after_candidate() {
     let reference = Reference::new(3, 2).unwrap();
 
     let source = Snapshot::from_bytes(package()).unwrap();
@@ -494,20 +495,23 @@ fn source_backed_numeric_diagnostics_report_generic_and_owned_shapes() {
         .set_number("Sheet1".into(), reference, 9.25)
         .unwrap();
     let ordinary = ordinary_edit.commit_source_backed().unwrap();
-    let generic = ordinary.diagnostics().operation_shape();
-    assert_eq!(generic.source_mode, OverlaySourceMode::GenericReadAt);
-    assert_eq!(generic.source_bytes, source.bytes().len() as u64);
-    assert_eq!(generic.planning_fingerprint_scans, 2);
-    assert_eq!(generic.composed_source_preflight_scans, 1);
-    assert_eq!(generic.target_materialization_write_pre_scans, 1);
-    assert_eq!(generic.target_materialization_emission_scans, 1);
-    assert_eq!(generic.target_materialization_write_post_scans, 1);
-    assert_eq!(generic.direct_write_pre_scans, 1);
-    assert_eq!(generic.direct_emission_scans, 1);
-    assert_eq!(generic.direct_write_post_scans, 1);
-    assert_eq!(generic.atomic_save_pre_temp_scans, 1);
-    assert_eq!(generic.atomic_save_emission_scans, 1);
-    assert_eq!(generic.atomic_save_pre_rename_scans, 1);
+    let ordinary_shape = ordinary.diagnostics().operation_shape();
+    assert_eq!(
+        ordinary_shape.source_mode,
+        OverlaySourceMode::OwnedImmutableArc
+    );
+    assert_eq!(ordinary_shape.source_bytes, source.bytes().len() as u64);
+    assert_eq!(ordinary_shape.planning_fingerprint_scans, 1);
+    assert_eq!(ordinary_shape.composed_source_preflight_scans, 1);
+    assert_eq!(ordinary_shape.target_materialization_write_pre_scans, 0);
+    assert_eq!(ordinary_shape.target_materialization_emission_scans, 1);
+    assert_eq!(ordinary_shape.target_materialization_write_post_scans, 0);
+    assert_eq!(ordinary_shape.direct_write_pre_scans, 0);
+    assert_eq!(ordinary_shape.direct_emission_scans, 1);
+    assert_eq!(ordinary_shape.direct_write_post_scans, 0);
+    assert_eq!(ordinary_shape.atomic_save_pre_temp_scans, 0);
+    assert_eq!(ordinary_shape.atomic_save_emission_scans, 1);
+    assert_eq!(ordinary_shape.atomic_save_pre_rename_scans, 0);
 
     let source = Snapshot::from_bytes(package()).unwrap();
     let mut plan_edit = source.edit();
@@ -515,20 +519,20 @@ fn source_backed_numeric_diagnostics_report_generic_and_owned_shapes() {
         .set_number("Sheet1".into(), reference, 9.25)
         .unwrap();
     let plan = plan_edit.commit_source_backed_plan().unwrap();
-    let owned = plan.diagnostics().operation_shape();
-    assert_eq!(owned.source_mode, OverlaySourceMode::OwnedImmutableArc);
-    assert_eq!(owned.source_bytes, source.bytes().len() as u64);
-    assert_eq!(owned.planning_fingerprint_scans, 1);
-    assert_eq!(owned.composed_source_preflight_scans, 1);
-    assert_eq!(owned.target_materialization_write_pre_scans, 0);
-    assert_eq!(owned.target_materialization_emission_scans, 1);
-    assert_eq!(owned.target_materialization_write_post_scans, 0);
-    assert_eq!(owned.direct_write_pre_scans, 0);
-    assert_eq!(owned.direct_emission_scans, 1);
-    assert_eq!(owned.direct_write_post_scans, 0);
-    assert_eq!(owned.atomic_save_pre_temp_scans, 0);
-    assert_eq!(owned.atomic_save_emission_scans, 1);
-    assert_eq!(owned.atomic_save_pre_rename_scans, 0);
+    let plan_shape = plan.diagnostics().operation_shape();
+    assert_eq!(plan_shape.source_mode, OverlaySourceMode::OwnedImmutableArc);
+    assert_eq!(plan_shape.source_bytes, source.bytes().len() as u64);
+    assert_eq!(plan_shape.planning_fingerprint_scans, 1);
+    assert_eq!(plan_shape.composed_source_preflight_scans, 1);
+    assert_eq!(plan_shape.target_materialization_write_pre_scans, 0);
+    assert_eq!(plan_shape.target_materialization_emission_scans, 1);
+    assert_eq!(plan_shape.target_materialization_write_post_scans, 0);
+    assert_eq!(plan_shape.direct_write_pre_scans, 0);
+    assert_eq!(plan_shape.direct_emission_scans, 1);
+    assert_eq!(plan_shape.direct_write_post_scans, 0);
+    assert_eq!(plan_shape.atomic_save_pre_temp_scans, 0);
+    assert_eq!(plan_shape.atomic_save_emission_scans, 1);
+    assert_eq!(plan_shape.atomic_save_pre_rename_scans, 0);
 }
 
 #[test]
@@ -1091,9 +1095,91 @@ fn source_backed_numeric_sink_reports_partial_output() {
     assert_eq!(sink.accepted.len(), sink.limit);
 }
 
+#[test]
+fn source_backed_numeric_owned_plan_preserves_direct_atomic_and_sink_contracts() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    let expected = commit.snapshot().bytes().to_vec();
+
+    let mut direct = Vec::new();
+    let report = commit.write_to(&mut direct).unwrap();
+    assert_eq!(direct, expected);
+    assert_eq!(report.bytes(), u64::try_from(expected.len()).unwrap());
+    assert_eq!(
+        report.source_fingerprint(),
+        commit.diagnostics().source_fingerprint()
+    );
+    assert_eq!(
+        report.target_fingerprint(),
+        commit.diagnostics().target_fingerprint()
+    );
+
+    let mut zero = ZeroProgressSink;
+    assert!(matches!(
+        commit.write_to(&mut zero),
+        Err(OverlayError::Io(_))
+    ));
+
+    let mut flush = FlushFailingSink { bytes: Vec::new() };
+    assert!(matches!(
+        commit.write_to(&mut flush),
+        Err(OverlayError::IncompleteOutput {
+            progress: OutputProgress::CompleteUnflushed { .. },
+            ..
+        })
+    ));
+    assert_eq!(flush.bytes, expected);
+
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let directory = std::env::temp_dir().join(format!(
+        "litchi-xls-owned-numeric-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let destination = directory.join("workbook.xls");
+    std::fs::write(&destination, b"old destination").unwrap();
+    let saved = commit.save(&destination).unwrap();
+    assert_eq!(saved.bytes(), u64::try_from(expected.len()).unwrap());
+    assert_eq!(std::fs::read(&destination).unwrap(), expected);
+    assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
+    std::fs::remove_file(destination).unwrap();
+    std::fs::remove_dir(directory).unwrap();
+}
+
 struct PrefixFailingSink {
     accepted: Vec<u8>,
     limit: usize,
+}
+
+struct ZeroProgressSink;
+
+impl Write for ZeroProgressSink {
+    fn write(&mut self, _bytes: &[u8]) -> std::io::Result<usize> {
+        Ok(0)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+struct FlushFailingSink {
+    bytes: Vec<u8>,
+}
+
+impl Write for FlushFailingSink {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(std::io::Error::other("test flush refusal"))
+    }
 }
 
 impl Write for PrefixFailingSink {
