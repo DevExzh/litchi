@@ -74,12 +74,6 @@ test = false
 doc = false
 bench = false
 
-[[bin]]
-name = "numbers_table_cell_api"
-path = "fuzz_targets/numbers_table_cell_api.rs"
-test = false
-doc = false
-bench = false
 
 [[bin]]
 name = "pages_page_layout"

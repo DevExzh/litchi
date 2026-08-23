@@ -73,15 +73,6 @@ name, local row/column references, bounded deep formula trees near the
 aggregate work ceiling, exact-source patch application and conflicts,
 inversion, and content-redacted failures.
 
-`numbers_table_cell_api` is the focused presence-preserving table-cell target.
-It offers arbitrary bytes to bounded Numbers ingress and reuses the native
-`basic.numbers` seed for checked and A1 reads, dense row-major ranges,
-`Storage::Missing` versus stored-empty observations, finite scalar set/clear
-shortcuts, exact no-op and inverse replay, and typed coordinate, selector, and
-resource failures. The harness imports only the public `litchi::numbers`
-facade; its shared fuzz manifest still enables the package's `iwork` feature,
-so Cargo builds the same complete root iWork dependency graph as the other
-focused targets.
 
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
@@ -157,10 +148,6 @@ at most a 5,461-node bounded formula tree; keep `-max_len` at 1 KiB so
 arbitrary ingress remains bounded while native transaction commands receive
 every input.
 
-`numbers_table_cell_api` uses the same finite Numbers physical and semantic
-profile. Table-cell commands consume only a small fixed prefix and replacement
-text is capped at 128 bytes; keep `-max_len` at 512 bytes so malformed ingress
-and native read/edit commands both receive every input.
 
 `pages_page_layout` accepts at most 256 KiB of source bytes, 128 package
 entries, 1 MiB per expanded entry and decoded IWA item, and 4 MiB aggregate
@@ -279,13 +266,6 @@ cargo +nightly fuzz run numbers_formula_cells -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
-Run the focused Numbers table-cell API target without a checked-in duplicate
-corpus:
-
-```sh
-cargo +nightly fuzz run numbers_table_cell_api -- \
-  -max_len=512 -timeout=10 -rss_limit_mb=2048
-```
 
 Run the focused Pages target without a checked-in duplicate corpus:
 

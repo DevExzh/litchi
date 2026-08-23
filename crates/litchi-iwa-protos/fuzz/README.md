@@ -164,6 +164,18 @@ The target accepts at most 64 KiB and configures finite limits of 8,192 fields,
 * `malformed_varint.hex`, `malformed_truncated.hex`,
   `malformed_range.hex`, and `malformed_reference.hex`.
 
+The additional root-focused recipes are
+`root_duplicate_next_list_id.hex`, `root_duplicate_optional_bool.hex`,
+`root_entry_missing_refcount.hex`, `root_invalid_optional_bool.hex`,
+`root_missing_next_list_id.hex`, `root_overflow_next_list_id.hex`,
+`root_truncated_segment_reference.hex`, and `root_unclosed_group.hex`.
+The segment-focused recipes are `segment_duplicate_range.hex`,
+`segment_duplicate_type.hex`, `segment_entry_missing_refcount.hex`,
+`segment_missing_list_type.hex`, `segment_missing_range.hex`,
+`segment_range_duplicate_location.hex`, `segment_range_overflow_location.hex`,
+`segment_unclosed_group.hex`, `segment_wrong_list_type_wire.hex`, and
+`segment_wrong_range_wire.hex`.
+
 List and type-check this target from this directory:
 
 ```sh
@@ -199,54 +211,29 @@ The checked-in files are `hex:` recipes rather than generated corpus output,
 so they remain reviewable and the target feeds the exact decoded bytes to both
 strict entry points. Invalid or oversized recipes are skipped.
 
-## Numbers table-model and data-store codec
 
-`numbers_table_model` exercises the next table-model migration seam with one
-bounded, caller-owned source. It compares strict and historical compatibility
-model/data-store report paths with their visitor counterparts, checks every
-borrowed model/store payload remains inside the unchanged source, and probes
-the dense-native recovery route. Failed wire parses are observed independently
-so a partial visitor prefix is never published as a model or store result.
+## Pages body and section-boundary codec
 
-The target accepts at most 64 KiB and uses the finite profile of 8,192 fields,
-256 KiB of work, 1,024 references, 64 KiB of text, and depth 64. The checked-in
-recipes under `corpus/numbers_table_model/` include canonical model/store
-envelopes, a sparse compatibility model, duplicate and wrong-wire model
-fields, and malformed-group storage. They are hand-authored `hex:` recipes,
-not copied native package bytes.
+`pages_body_footnote_codec` sends one bounded, caller-owned source through both
+the document-body and section-boundary projections. Successful snapshots are
+compared with generated Prost values, every borrowed reference is checked to
+remain inside the unchanged source, and malformed or resource-limited inputs
+are observed independently for both shapes. The target also checks source
+atomicity across mutations and invalid limit configurations.
+
+The target accepts at most 64 KiB and uses 8,192 fields, 256 KiB of aggregate
+work, and recursion depth 64. Corpus entries under
+`corpus/pages_body_footnote_codec/` are hand-authored `hex:` recipes covering
+canonical document and boundary envelopes, optional fields, duplicate and
+missing required fields, invalid references, non-canonical wire, truncation,
+and unknown groups.
 
 List and type-check this target from this directory:
 
 ```sh
 cargo +nightly fuzz list
-cargo +nightly fuzz check numbers_table_model
+cargo +nightly fuzz check pages_body_footnote_codec
 ```
-
-Run a bounded AddressSanitizer/libFuzzer smoke with all mutable corpus,
-artifact, and build locations outside the checkout:
-
-```sh
-fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-table-model-fuzz.XXXXXX")"
-fuzz_corpus="$fuzz_root/corpus"
-mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
-cleanup_fuzz_corpus() {
-  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
-    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
-  else
-    rm -rf "$fuzz_root"
-  fi
-}
-trap cleanup_fuzz_corpus EXIT
-cp corpus/numbers_table_model/*.hex "$fuzz_corpus/"
-CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
-  numbers_table_model "$fuzz_corpus" -- \
-  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
-  -timeout=10 -rss_limit_mb=2048
-```
-
-`cargo +nightly fuzz run` is the sanitizer invocation. Corpus additions,
-artifacts, and build output stay in the temporary root; set
-`KEEP_FUZZ_CORPUS=1` to retain it for review.
 
 ## Pages footnote reference and marker codecs
 
