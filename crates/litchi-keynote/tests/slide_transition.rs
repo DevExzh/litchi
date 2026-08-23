@@ -702,7 +702,9 @@ fn duplicate_rooted_node_package(source: &[u8]) -> TestResult<Vec<u8>> {
             .find(|message| message.type_ == 2)
             .ok_or_else(|| io::Error::other("synthetic show payload is missing"))?;
         let mut decoded = kn::ShowArchive::decode(message.data.as_slice())?;
-        decoded.slide_tree.slides.push(reference(FIRST_NODE));
+        // Keep the selected first node unique: the selector must reject a
+        // duplicate elsewhere in the rooted slide list as well.
+        decoded.slide_tree.slides.push(reference(SECOND_NODE));
         message.data = decoded.encode_to_vec();
         Ok(())
     })
