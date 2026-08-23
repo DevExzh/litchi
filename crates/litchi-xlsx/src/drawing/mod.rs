@@ -1,6 +1,6 @@
 //! Layered `SpreadsheetDrawing` ownership.
 //!
-//! [`model`] owns the contextual object inventory and [`codec`] owns the
+//! `model` owns the contextual object inventory and `codec` owns the
 //! namespace-aware, bounded XML reader. Shape authoring and full `DrawingML`
 //! text parsing remain in their existing `shapes` owner; the text facade here
 //! reuses [`litchi_drawingml`] without copying its vocabulary.

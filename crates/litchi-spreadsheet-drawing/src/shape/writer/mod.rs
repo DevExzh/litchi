@@ -18,7 +18,7 @@
 //! coordinate transform, and [`ConnectionShapeSpec`] authors `xdr:cxnSp`
 //! connectors whose `a:stCxn`/`a:endCxn` sites reference other shapes by
 //! name. All three deliberately reuse the typed read model from
-//! [`super::shapes`] (`Anchor`,
+//! the shared shape model (`Anchor`,
 //! `Properties`, `GroupTransform`, paragraphs and runs) so
 //! anything authored here round-trips through the shape inventory with
 //! identical semantics.

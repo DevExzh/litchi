@@ -663,7 +663,7 @@ impl SourceWorksheet {
     /// needs to retain it, but the ordinary full-scan path does not allocate a
     /// result vector or clone formulas, shared-string text, or unknown-cell
     /// diagnostics. Formula caches, shared strings, styles, and MCE-selected
-    /// worksheet markup have already been validated by [`Self::store`].
+    /// worksheet markup have already been validated by `Self::store`.
     ///
     /// Cancellation is checked between callbacks. The source version is
     /// checked after the complete visit, so a source mutation during the

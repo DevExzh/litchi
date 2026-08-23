@@ -572,7 +572,7 @@ impl Frame {
 
     /// Return the focused low-level frame relationship ID, if present.
     ///
-    /// Prefer package-level [`load`] and [`put`], which validate this identifier
+    /// Prefer package-level [`crate::web::load`] and [`crate::web::put`], which validate this identifier
     /// against the part relationship graph.
     #[must_use]
     pub fn rel(&self) -> Option<&str> {

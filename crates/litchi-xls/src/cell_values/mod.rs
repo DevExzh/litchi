@@ -2485,7 +2485,7 @@ impl Transaction {
     ///
     /// Only existing `Number`, `RK`, and `MulRk` value fields are eligible.
     /// The transaction submits the exact source-relative ranges recorded by
-    /// the private [`Entry`] inventory to
+    /// the private `Entry` inventory to
     /// [`SourceBackedOverlayPublisher`]; it never renders a replacement
     /// Workbook stream or falls back to [`Self::commit`]. Unsupported,
     /// structural, resource, protected, signed, encrypted, macro-bearing,

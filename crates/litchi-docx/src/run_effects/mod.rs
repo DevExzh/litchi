@@ -1,7 +1,7 @@
 //! Layered Word 2010 run-property effects.
 //!
-//! The semantic values are kept in [`model`], bounded invariants in
-//! [`validation`], and `WordprocessingML` wire handling in [`codec`].  This
+//! The semantic values are kept in `model`, bounded invariants in
+//! `validation`, and `WordprocessingML` wire handling in `codec`.  This
 //! owner intentionally stops at `[MS-DOCX]` §2.2.1: unsupported OpenType and
 //! future namespace children remain ordered, bounded [`OpaqueExtension`]
 //! values rather than being guessed into the visual model.

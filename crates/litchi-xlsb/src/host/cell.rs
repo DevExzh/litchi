@@ -205,7 +205,8 @@ impl Cell {
         self.is_formula.then_some(self.formula_flags)
     }
 
-    /// Zero-based index into [`StylesTable::cell_xfs`](crate::package::StylesTable::cell_xfs).
+    /// Zero-based index into
+    /// [`StylesTable::cell_xfs`](crate::package::styles_table::StylesTable::cell_xfs).
     pub fn style_id(&self) -> u32 {
         self.style_id
     }

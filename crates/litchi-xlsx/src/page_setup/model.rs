@@ -797,7 +797,7 @@ impl Display for RelId {
 ///
 /// Every core setting is optional so XML attribute absence survives read,
 /// update, and publication. The printer-settings relationship is deliberately
-/// owned by [`crate::xlsx::printer_settings`], which prevents ordinary page
+/// owned by [`crate::package::printer_settings`], which prevents ordinary page
 /// authoring from emitting a dangling raw relationship ID. Public fields keep
 /// struct-update syntax concise while private representations prevent invalid
 /// fixed-domain values.

@@ -467,7 +467,7 @@ impl ObjectTable {
 
     /// Create an object at the first free non-stock handle.
     ///
-    /// EMF creation records normally use [`insert`] because they carry an
+    /// EMF creation records normally use [`Self::insert`] because they carry an
     /// explicit handle. This helper remains useful to callers constructing an
     /// in-memory table.
     pub fn create_object(&mut self, object: GdiObject) -> u32 {

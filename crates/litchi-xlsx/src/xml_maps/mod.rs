@@ -1,8 +1,8 @@
 //! Layered `SpreadsheetML` Custom XML Maps ownership.
 //!
-//! Typed contextual values live in [`model`], bounded XML conversion lives in
-//! [`codec`], workbook relationship traversal lives in [`package`], and focused
-//! regression coverage lives in [`tests`]. Schema and binding payloads remain
+//! Typed contextual values live in `model`, bounded XML conversion lives in
+//! `codec`, workbook relationship traversal lives in `package`, and focused
+//! regression coverage lives in `tests`. Schema and binding payloads remain
 //! inert, bounded XML rather than being resolved or executed.
 
 mod codec;

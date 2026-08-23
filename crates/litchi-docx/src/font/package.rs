@@ -130,7 +130,7 @@ pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
 /// and OPC graph.
 ///
 /// Font bytes are stored exactly as supplied. Callers that have unobfuscated
-/// bytes must explicitly call [`obfuscate`] first. The API
+/// bytes must explicitly call [`crate::font::obfuscate`] first. The API
 /// operates on an already decrypted in-memory `OpcPackage` and invalidates any
 /// package signatures immediately before the mutation phase. Moving a default,
 /// empty [`Table`] removes the optional font-table graph and any font resources
