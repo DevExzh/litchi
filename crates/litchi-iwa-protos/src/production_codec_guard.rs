@@ -9,6 +9,7 @@ use std::borrow::Cow;
 pub(crate) const FORBIDDEN_PROST_CODEC_MARKERS: &[&str] = &[
     "prost::",
     "prost ::",
+    "prost as",
     "Message::decode",
     "Message :: decode",
     "Message::merge",
@@ -554,6 +555,20 @@ pub fn decode_projection(source: &[u8]) {
 
 #[cfg(test)]
 mod tests {}
+"#;
+
+        assert!(has_forbidden_codec_marker(source));
+    }
+
+    #[test]
+    fn production_ratchet_rejects_aliased_prost_import() {
+        let source = r#"
+use prost as p;
+use p::Message as _;
+
+pub fn decode_projection(source: &[u8]) {
+    let _ = fixture::Archive::decode(source);
+}
 "#;
 
         assert!(has_forbidden_codec_marker(source));
