@@ -821,8 +821,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "TSCEFormulaArchive.proto",
-            2343,
-            "3c477f4610fedd8fc563ffd83122984d3042cfa8b9d756e3e1c60a719e8d5ba8",
+            2651,
+            "ea5986ce3394c6300f4e6a9e3508b0aeaff27ca0172bf94445ce605d2e955dc7",
         ),
         (
             "TSCETableCellDependenciesArchive.proto",
@@ -3108,6 +3108,23 @@ fn enforce_formula_projection_provenance(
         "optional uint32 AST_function_node_index = 2;",
         "optional uint32 AST_function_node_numArgs = 3;",
         "optional double AST_number_node_number = 4;",
+        "optional double AST_date_node_dateNum = 7;",
+        "optional double AST_duration_node_unitNum = 8;",
+        "optional uint32 AST_array_node_numCol = 11;",
+        "optional uint32 AST_array_node_numRow = 12;",
+        "optional uint32 AST_list_node_numArgs = 13;",
+        "optional string AST_unknown_function_node_string = 17;",
+        "optional uint32 AST_unknown_function_node_numArgs = 18;",
+        "optional .TSCE.ASTNodeArrayArchive.ASTCategoryReferenceArchive AST_category_ref = 39;",
+        "message CategoryReferenceArchive {",
+        "required .TSP.UUID group_by_uid = 1;",
+        "required .TSP.UUID column_uid = 2;",
+        "optional .TSCE.PreserveColumnRowFlagsArchive preserve_flags = 7;",
+        "optional .TSP.UUID relative_group_uid = 9;",
+        "optional .TSP.UUID absolute_group_uid = 10;",
+        "message PreserveColumnRowFlagsArchive {",
+        "required bool begin_row_is_absolute = 1;",
+        "required bool begin_column_is_absolute = 2;",
         "optional uint64 AST_number_node_decimal_low = 42;",
         "optional uint64 AST_number_node_decimal_high = 43;",
         "optional bool AST_boolean_node_boolean = 5;",
@@ -3156,6 +3173,9 @@ fn enforce_formula_projection_provenance(
         "pub fn inspect_formula_archive",
         "pub fn inspect_formula_dependencies_with_visitor",
         "pub fn decode_formula_archive_with_visitor",
+        "pub enum FormulaRenderEvent",
+        "pub trait FormulaRenderVisitor",
+        "pub fn decode_formula_archive_for_render",
         "pub enum FormulaWriteNode",
         "pub struct FormulaWritePlan",
         "pub struct FormulaWriteRequirements",
@@ -3191,10 +3211,17 @@ optional uint32 function_num_args = 3;
 optional double number = 4;
 optional bool boolean = 5;
 optional string string = 6;
+optional double date = 7;
+optional double duration = 8;
 optional bool token_boolean = 10;
+optional uint32 array_num_col = 11;
+optional uint32 array_num_row = 12;
+optional uint32 list_num_args = 13;
 optional bytes thunk_array = 14;
 optional bytes local_cell_reference = 15;
 optional bytes cross_table_cell_reference = 16;
+optional string unknown_function_string = 17;
+optional uint32 unknown_function_num_args = 18;
 optional string whitespace = 25;
 optional bytes column = 26;
 optional bytes row = 27;
@@ -3202,6 +3229,7 @@ optional bytes cross_table_extra = 28;
 optional bytes uid_coordinate = 30;
 optional bytes sticky_bits = 33;
 optional bytes tract_list = 38;
+optional bytes category_ref = 39;
 optional bytes colon_tract = 40;
 optional uint64 decimal_low = 42;
 optional uint64 decimal_high = 43;
@@ -5434,8 +5462,8 @@ fn enforce_formula_projection_budget(directory: &Path) -> Result<(), Box<dyn Err
         directory,
         "FormulaArchive",
         EXPECTED_FILES,
-        360_069,
-        "e94549480102d09d181f89cdf82197c6d873959ac07446d7a67ec7bba9c06091",
+        381_650,
+        "ad289602872a90f970b98c5573ec793c2515c84de46cb814a8c3bc8c83277a43",
     )
 }
 

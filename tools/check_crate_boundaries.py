@@ -1894,6 +1894,7 @@ IWA_NUMBERS_TABLE_INFO_SOURCE = (
 )
 NUMBERS_SOURCE_ROOT = Path("crates/litchi-numbers/src")
 NUMBERS_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package.rs"
+NUMBERS_PACKAGE_MANIFEST = Path("crates/litchi-numbers/Cargo.toml")
 NUMBERS_EXTRACTOR_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "extractor.rs"
 NUMBERS_NAMES_PACKAGE_SOURCE = NUMBERS_SOURCE_ROOT / "package" / "names.rs"
 NUMBERS_PACKAGE_TEST_MODULE = re.compile(
@@ -1986,21 +1987,14 @@ NUMBERS_EXTRACTOR_NO_EAGER_FORMULA_SOURCE_PATTERNS = (
             r"[ \t\r\n]*decode\b"
         ),
     ),
-)
-# The lossless formula renderer still needs the generated archive for AST
-# shapes outside the compact visitor.  This one call is a compatibility
-# fallback, not eager ingress: `FormulaArchiveBytes::from_wire` has already
-# preflighted and copied the bounded source bytes before the referenced cell
-# reaches this method.  Keep the exception exact (source-backed `self.bytes`)
-# so a new generated decode with an arbitrary payload remains a ratchet
-# violation.
-NUMBERS_EXTRACTOR_FORMULA_COMPATIBILITY_FALLBACK = re.compile(
-    r"(?<![A-Za-z0-9_#])(?:tsce[ \t\r\n]*::|"
-    r"litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*tsce[ \t\r\n]*::)"
-    r"FormulaArchive[ \t\r\n]*::"
-    r"[ \t\r\n]*decode[ \t\r\n]*\([ \t\r\n]*"
-    r"self[ \t\r\n]*\.[ \t\r\n]*bytes[ \t\r\n]*\.[ \t\r\n]*"
-    r"as_ref[ \t\r\n]*\([ \t\r\n]*\)[ \t\r\n]*\)"
+    (
+        "generated FormulaArchive type",
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
+            r"tsce[ \t\r\n]*::[ \t\r\n]*FormulaArchive\b"
+            r"(?![ \t\r\n]*::[ \t\r\n]*decode\b)"
+        ),
+    ),
 )
 NUMBERS_NAMES_GENERATED_PROTO_MODULES = ("tn", "tsce", "tst", "tswp")
 NUMBERS_NAMES_NO_EAGER_PROST_SOURCE_PATTERNS = (
@@ -4162,6 +4156,116 @@ def _mask_rust_non_code(source: str) -> str:
                 cursor = end
                 continue
         cursor += 1
+
+    return "".join(masked)
+
+
+RUST_CFG_TEST_ATTRIBUTE = re.compile(
+    r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
+    re.MULTILINE,
+)
+RUST_CFG_TEST_ITEM = re.compile(
+    r"(?:pub(?:[ \t\r\n]*\([^()]*\))?[ \t\r\n]+)?"
+    r"(?:(?:unsafe|async|const)[ \t\r\n]+)*"
+    r"(?P<kind>use|fn|mod|impl|struct|enum|trait|type|const|static)\b"
+)
+
+
+def _mask_rust_cfg_test_items(source: str) -> str:
+    """Mask individual ``cfg(test)`` Rust items without hiding later production.
+
+    Some large modules interleave test-only imports and reference helpers with
+    production items. Truncating at the first ``cfg(test)`` attribute therefore
+    creates a ratchet bypass. This small item scanner preserves offsets and
+    newlines while blanking each gated item, including its body when present.
+    """
+
+    code = _mask_rust_non_code(source)
+    masked = list(source)
+
+    def blank(start: int, end: int) -> None:
+        for offset in range(start, end):
+            if masked[offset] != "\n":
+                masked[offset] = " "
+
+    def skip_whitespace(cursor: int) -> int:
+        while cursor < len(code) and code[cursor].isspace():
+            cursor += 1
+        return cursor
+
+    def skip_attribute(cursor: int) -> int | None:
+        if cursor >= len(code) or code[cursor] != "#":
+            return None
+        cursor += 1
+        cursor = skip_whitespace(cursor)
+        if cursor >= len(code) or code[cursor] != "[":
+            return None
+        depth = 1
+        cursor += 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "[":
+                depth += 1
+            elif code[cursor] == "]":
+                depth -= 1
+            cursor += 1
+        return cursor if depth == 0 else len(code)
+
+    def item_end(cursor: int, kind: str) -> int:
+        parentheses = 0
+        brackets = 0
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif parentheses == 0 and brackets == 0:
+                if character == ";":
+                    return cursor + 1
+                if character == "{":
+                    depth = 1
+                    cursor += 1
+                    while cursor < len(code) and depth:
+                        if code[cursor] == "{":
+                            depth += 1
+                        elif code[cursor] == "}":
+                            depth -= 1
+                        cursor += 1
+                    after = skip_whitespace(cursor)
+                    if (
+                        kind in {"const", "static"}
+                        and after < len(code)
+                        and code[after] == ";"
+                    ):
+                        return after + 1
+                    return cursor
+            cursor += 1
+        return len(code)
+
+    for attribute in RUST_CFG_TEST_ATTRIBUTE.finditer(code):
+        if all(
+            character in {" ", "\n"}
+            for character in masked[attribute.start() : attribute.end()]
+        ):
+            continue
+        cursor = skip_whitespace(attribute.end())
+        while True:
+            next_cursor = skip_attribute(cursor)
+            if next_cursor is None:
+                break
+            cursor = skip_whitespace(next_cursor)
+        item = RUST_CFG_TEST_ITEM.match(code, cursor)
+        if item is None:
+            # Leave an unrecognized item visible so a future production marker
+            # cannot be hidden by an item shape this small scanner does not yet
+            # understand.
+            blank(attribute.start(), attribute.end())
+            continue
+        blank(attribute.start(), item_end(item.end(), item.group("kind")))
 
     return "".join(masked)
 
@@ -9680,33 +9784,54 @@ def audit_keynote_document_public_api(root: Path = ROOT) -> list[str]:
 def audit_numbers_package_no_eager_prost_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep the Numbers package ingress free of retired generated reads.
+    """Keep the Numbers package ingress and manifest free of normal Prost.
 
-    This is intentionally scoped to ``package.rs``.  The remaining Numbers
-    package helpers still have independent Prost-backed migrations, so a
-    crate-wide dependency or source ban would be premature.  The first
-    ``cfg(test)`` module is excluded so canonical Prost fixtures remain
+    This is intentionally scoped to ``package.rs`` and the focused
+    ``litchi-numbers`` manifest.  Generated Prost fixtures remain available in
+    test-only modules, but a normal dependency would make it possible to
+    reintroduce generated reads into production without a boundary review.
+    The first ``cfg(test)`` module is excluded so canonical fixtures remain
     available to differential tests without weakening the production gate.
     """
 
     violations: list[str] = []
     source_path = root / NUMBERS_PACKAGE_SOURCE
-    if not source_path.is_file():
-        return violations
+    if source_path.is_file():
+        raw_source = source_path.read_text(encoding="utf-8")
+        masked_source = _mask_rust_non_code(raw_source)
+        test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
+        production_source = (
+            raw_source[: test_module.start()] if test_module is not None else raw_source
+        )
+        production_code = _mask_rust_non_code(production_source)
+        for label, pattern in NUMBERS_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS:
+            for match in pattern.finditer(production_code):
+                line_number = production_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "focused litchi-numbers package production source uses "
+                    f"{label}: {NUMBERS_PACKAGE_SOURCE}:{line_number}"
+                )
 
-    raw_source = source_path.read_text(encoding="utf-8")
-    masked_source = _mask_rust_non_code(raw_source)
-    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-    production_source = (
-        raw_source[: test_module.start()] if test_module is not None else raw_source
-    )
-    production_code = _mask_rust_non_code(production_source)
-    for label, pattern in NUMBERS_PACKAGE_NO_EAGER_PROST_SOURCE_PATTERNS:
-        for match in pattern.finditer(production_code):
-            line_number = production_code.count("\n", 0, match.start()) + 1
+    manifest_path = root / NUMBERS_PACKAGE_MANIFEST
+    if manifest_path.is_file():
+        section: str | None = None
+        for line_number, line in enumerate(
+            manifest_path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            header = CARGO_SECTION_HEADER.match(line)
+            if header is not None:
+                section = header.group(1).strip()
+                continue
+            normal_dependencies = section == "dependencies" or (
+                section is not None
+                and section.endswith(".dependencies")
+                and not section.endswith(".dev-dependencies")
+            )
+            if not normal_dependencies or CARGO_PROST_DEPENDENCY.match(line) is None:
+                continue
             violations.append(
-                "focused litchi-numbers package production source uses "
-                f"{label}: {NUMBERS_PACKAGE_SOURCE}:{line_number}"
+                "focused litchi-numbers Cargo manifest retains normal prost "
+                f"dependency: {NUMBERS_PACKAGE_MANIFEST}:{line_number}"
             )
 
     return sorted(set(violations))
@@ -9867,12 +9992,12 @@ def audit_numbers_extractor_no_eager_formula_source_topology(
     """Keep the Numbers formula sidecar free of generated archive reads.
 
     Formula entries are strictly preflighted and retained as bounded source
-    bytes before the compatibility renderer lazily reconstructs a generated
-    ``FormulaArchive`` for a referenced cell.  Reintroducing
-    ``FormulaArchive::decode`` in the extractor's production prefix would make
-    every formula entry eagerly materialize its repeated AST representation.
-    Test-only generated builders and decodes remain available below the first
-    ``cfg(test)`` module as differential fixture material.
+    bytes before the private lazy projection/event stream renders a referenced
+    cell.  Reintroducing ``FormulaArchive::decode`` in the extractor's
+    production source would materialize the generated repeated AST graph and
+    bypass the production ownership boundary.  Test-only generated builders
+    and decodes remain available as individually ``cfg(test)``-gated
+    differential fixture material.
     """
 
     violations: list[str] = []
@@ -9881,22 +10006,9 @@ def audit_numbers_extractor_no_eager_formula_source_topology(
         return violations
 
     raw_source = source_path.read_text(encoding="utf-8")
-    masked_source = _mask_rust_non_code(raw_source)
-    test_module = NUMBERS_PACKAGE_TEST_MODULE.search(masked_source)
-    production_source = (
-        raw_source[: test_module.start()] if test_module is not None else raw_source
-    )
-    production_code = _mask_rust_non_code(production_source)
-    compatibility_fallback = NUMBERS_EXTRACTOR_FORMULA_COMPATIBILITY_FALLBACK.search(
-        production_code
-    )
+    production_code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
     for label, pattern in NUMBERS_EXTRACTOR_NO_EAGER_FORMULA_SOURCE_PATTERNS:
         for match in pattern.finditer(production_code):
-            if (
-                compatibility_fallback is not None
-                and compatibility_fallback.start() <= match.start() < compatibility_fallback.end()
-            ):
-                continue
             line_number = production_code.count("\n", 0, match.start()) + 1
             violations.append(
                 "focused litchi-numbers extractor production source uses "
