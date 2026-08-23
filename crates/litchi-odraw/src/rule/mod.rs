@@ -5,9 +5,9 @@
 //! semantic fields, while unrecognized `OfficeArt` record types remain borrowed
 //! and byte-for-byte writable through [`Opaque`].
 //!
-//! The implementation is split by responsibility: [`model`] owns the typed
-//! rule values, [`codec`] performs record decoding and writing, and
-//! [`validation`] checks the record header and fixed body lengths.
+//! The implementation is split by responsibility: `model` owns the typed
+//! rule values, `codec` performs record decoding and writing, and
+//! `validation` checks the record header and fixed body lengths.
 
 mod codec;
 mod model;
