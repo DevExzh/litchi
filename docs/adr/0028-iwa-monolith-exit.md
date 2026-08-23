@@ -4558,3 +4558,23 @@ This amendment retires no `litchi-iwa` host edge, ordered debt, compatibility
 responsibility, generated schema, or monolith owner. The migration host and
 its existing host/edge/debt obligations remain, and this slice satisfies no
 host-exit or monolith-deletion gate.
+
+## 2026-08-24 amendment: Wave58 focused Numbers comment replacement (not a monolith-exit gate)
+
+Implementation commit `e96a3a301` moves the supported existing-root
+cell-comment replacement publication through the selector-first
+`litchi-numbers` package owner. Native table identifiers remain confined to
+the deprecated migration-host boundary and are converted to scoped sheet and
+table selectors before the focused call. The focused crate receives no raw
+object identifier and adds no public raw-ID method or typed native-ID
+parameter.
+
+This is an intentionally bounded delegation, not a host deletion. Comment
+creation, replies, shared ownership, segmented storage, clear/graph cleanup,
+and sources whose broader table projection is not yet accepted remain in the
+compatibility host. The migration host still owns its public deprecated API,
+native selector adapter, fallback writer, and exact post-publication reopen.
+No manifest edge, generated schema, Buffa/Prost owner, ordered debt, or other
+`litchi-iwa` responsibility is retired. Wave58 therefore satisfies no
+monolith-exit, host-removal, dependency-removal, or publication-completeness
+gate.
