@@ -136,7 +136,7 @@ mod archive;
 mod bundle;
 /// Typed native drawable stacking-order controls.
 pub mod drawable_order;
-pub mod identity;
+mod identity;
 mod image_adjustments;
 mod image_caption;
 pub mod media;
@@ -202,7 +202,6 @@ pub mod raw {
 pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
-pub use identity::IWorkDocumentIdentity;
 pub use media::{
     EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaAssetId, MediaManager, MediaStats,
 };
