@@ -9,7 +9,10 @@
 
 use std::io::{Cursor as IoCursor, Read};
 
-use litchi_xlsb::raw::{Cursor, Error, Header, Kind, Limits, Records, Stage, Writer, kind};
+use litchi_xlsb::raw::{
+    Cursor, Error, Header, Kind, LimitResource, Limits, MAX_WIRE_PAYLOAD, MAX_WIRE_STRING_UNITS,
+    Records, Stage, Writer, kind,
+};
 
 #[test]
 fn round_trips_kind_boundaries_with_borrowed_payloads() {
@@ -142,22 +145,107 @@ fn enforces_payload_budgets_before_reading_or_writing_payloads() {
 }
 
 #[test]
-fn explicit_limits_are_not_silently_clamped_to_wire_limits() {
-    let requested = 0x0fff_ffff_usize + 1;
-    assert_eq!(Limits::new(requested, 7).payload(), requested);
+fn validates_zero_exact_and_over_maximum_limit_profiles() {
+    assert_eq!(Limits::try_new(0, 0).unwrap(), Limits::new(0, 0));
+    let exact = Limits::try_new(MAX_WIRE_PAYLOAD, MAX_WIRE_STRING_UNITS).unwrap();
+    assert_eq!(exact.payload(), MAX_WIRE_PAYLOAD);
+    assert_eq!(exact.string_units(), MAX_WIRE_STRING_UNITS);
+
+    let payload = MAX_WIRE_PAYLOAD + 1;
+    assert!(matches!(
+        Limits::try_new(payload, 0),
+        Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            value,
+            maximum: MAX_WIRE_PAYLOAD,
+        }) if value == payload
+    ));
+
+    if let Some(string_units) = MAX_WIRE_STRING_UNITS.checked_add(1) {
+        assert!(matches!(
+            Limits::try_new(0, string_units),
+            Err(Error::InvalidLimit {
+                resource: LimitResource::StringUnits,
+                value,
+                maximum: MAX_WIRE_STRING_UNITS,
+            }) if value == string_units
+        ));
+    }
 }
 
 #[test]
-fn oversized_wire_headers_are_rejected_before_output() {
-    let too_large = 0x0fff_ffff_usize + 1;
-    let mut output = Vec::new();
-    let mut writer = Writer::with_limits(&mut output, Limits::new(too_large, 1));
+fn legacy_limit_constructor_is_validated_before_wire_work() {
+    let invalid = Limits::new(MAX_WIRE_PAYLOAD + 1, 0);
+
     assert!(matches!(
-        writer.write_header(kind::CELL_BLANK, too_large),
-        Err(Error::LengthOverflow {
-            what: "record payload",
-            length,
-        }) if length == too_large
+        Header::parse(&[], invalid),
+        Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            value,
+            maximum: MAX_WIRE_PAYLOAD,
+        }) if value == MAX_WIRE_PAYLOAD + 1
+    ));
+
+    let mut records = Records::with_limits(&[], invalid);
+    assert!(matches!(
+        records.next(),
+        Some(Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            value,
+            maximum: MAX_WIRE_PAYLOAD,
+        })) if value == MAX_WIRE_PAYLOAD + 1
+    ));
+
+    let mut output = Vec::new();
+    let mut writer = Writer::with_limits(&mut output, invalid);
+    assert!(matches!(
+        writer.write_u8(0),
+        Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            value,
+            maximum: MAX_WIRE_PAYLOAD,
+        }) if value == MAX_WIRE_PAYLOAD + 1
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn checked_limit_constructors_reject_invalid_profiles() {
+    let invalid = Limits::new(MAX_WIRE_PAYLOAD + 1, 0);
+    assert!(matches!(
+        Cursor::try_with_limits(&[], "test", invalid),
+        Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Records::try_with_limits(&[], invalid),
+        Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Writer::try_with_limits(Vec::new(), invalid),
+        Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn oversized_wire_limits_are_rejected_before_writer_creation() {
+    let too_large = MAX_WIRE_PAYLOAD + 1;
+    let mut output = Vec::new();
+    assert!(matches!(
+        Writer::try_with_limits(&mut output, Limits::new(too_large, 1)),
+        Err(Error::InvalidLimit {
+            resource: LimitResource::Payload,
+            value,
+            maximum: MAX_WIRE_PAYLOAD,
+        }) if value == too_large
     ));
     assert!(output.is_empty());
 }
@@ -189,6 +277,21 @@ fn strictly_decodes_utf16_and_enforces_string_budgets() {
         cursor.read_wide_string(),
         Err(Error::InvalidUtf16 { .. })
     ));
+}
+
+#[test]
+fn hostile_wide_string_count_is_rejected_before_materialization() {
+    let bytes = u32::MAX.to_le_bytes();
+    let mut cursor = Cursor::new(&bytes, "hostile string");
+    assert!(matches!(
+        cursor.read_wide_string(),
+        Err(Error::StringLimit {
+            units,
+            limit: 1_048_576,
+            offset: 0,
+        }) if units == MAX_WIRE_STRING_UNITS
+    ));
+    assert_eq!(cursor.position(), 4);
 }
 
 #[test]

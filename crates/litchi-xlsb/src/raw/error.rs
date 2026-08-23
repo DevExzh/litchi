@@ -17,10 +17,40 @@ pub enum Stage {
     Value,
 }
 
+/// Raw BIFF12 resource ceiling named by a limit-profile validation error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitResource {
+    /// One record payload in bytes.
+    Payload,
+    /// One UTF-16 wide-string length in code units.
+    StringUnits,
+}
+
+impl std::fmt::Display for LimitResource {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Payload => "record payload",
+            Self::StringUnits => "UTF-16 string",
+        })
+    }
+}
+
 /// Failure while validating or writing BIFF12 wire data.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// A caller supplied a ceiling beyond the representable or supported
+    /// BIFF12 wire domain.
+    #[error("invalid {resource} limit {value}; maximum is {maximum}")]
+    InvalidLimit {
+        /// Resource whose ceiling was rejected.
+        resource: LimitResource,
+        /// Requested host-side ceiling.
+        value: usize,
+        /// Largest supported ceiling.
+        maximum: usize,
+    },
+
     /// The input ended after a record had started.
     #[error("truncated {stage:?} at byte {offset}: needed {needed} bytes, found {available}")]
     Truncated {
