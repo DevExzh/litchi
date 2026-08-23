@@ -4068,3 +4068,21 @@ recorded.
 No Cargo/build/test result is admitted beyond the supplied artifact handoff.
 No `litchi-iwa` dependency edge or ordered debt is retired, and the
 migration-host, host-exit, and monolith-deletion gates remain open.
+
+## 2026-08-24 amendment: native Keynote chart-title application gate
+
+The supplied Keynote application gate used fixture
+`/private/tmp/litchi_native_keynote_chart_title_gate_wave35.key`, final
+SHA-256
+`f50a8efb2bef885b3759b4bcd5e78f505da0074492774a8dbdde4e8ea9b07e56`. In
+Keynote, a real 2D Column chart's title was set to `Native Chart Title Gate`;
+after save, close, and reopen, the title persisted without a warning or repair
+prompt. The title was then cleared; after save, close, and reopen, it was
+absent, again without a warning or repair prompt. The source fixture
+`test-data/iwork/keynote/basic.key` was unchanged at SHA-256
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`.
+Keynote was quit after the gate.
+
+This is application-only evidence. It establishes no Rust/native parity, no
+ownership result, no migration-debt retirement, and no `litchi-iwa`
+monolith-exit or deletion claim.
