@@ -224,7 +224,7 @@ impl PagesEditor {
         // incorrect when a following footnote shifts into the deleted anchor.
         let mut staged = self.clone();
         staged.replace_body_text(start..end, "")?;
-        if body_footnote_graphs(&staged, staged.body_storage_id.get())?
+        if body_footnote_graphs(staged.package(), staged.body_storage_id.get())?
             .iter()
             .any(|graph| graph.reference_id == removed.reference_id)
         {
@@ -243,8 +243,15 @@ pub(super) fn body_footnote_graphs(
     body_storage_id: u64,
 ) -> Result<Vec<BodyFootnoteGraph>> {
     let mut wire_budget = FootnoteGraphBudget::default();
-    let (_, body) = storage_at_with_data(package, body_storage_id, "Pages body", &mut wire_budget)?;
-    let entries = footnote_table_entries_from_projection(body_storage_id, &body, &mut wire_budget)?;
+    let entries = with_storage_projection(
+        package,
+        body_storage_id,
+        "Pages body",
+        &mut wire_budget,
+        |body, wire_budget| {
+            footnote_table_entries_from_projection(body_storage_id, body, wire_budget)
+        },
+    )?;
     let mut seen = HashSet::new();
     let limits = wire_budget.limits;
     reserve_footnote_set(
@@ -618,8 +625,11 @@ impl<'source> FootnoteStorageProjection<'source> {
         label: &str,
         wire_budget: &mut FootnoteGraphBudget,
     ) -> Result<Self> {
-        let validation = litchi_iwa_text_wire::preflight_storage_with_source_limits(source)
-            .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
+        let validation = litchi_iwa_text_wire::validate_storage_with_limits(
+            source,
+            litchi_iwa_text_wire::RewriteLimits::default(),
+        )
+        .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
         wire_budget.charge_input(source.len())?;
         wire_budget.charge_fields(validation.fields())?;
         wire_budget.charge_work(validation.validation_work())?;
@@ -842,13 +852,22 @@ fn decode_footnote_graph(
                 "Pages footnote object {reference_id} has no contained storage"
             ))
         })?;
-    let (_, storage) = storage_at_with_data(package, storage_id, "Pages footnote", wire_budget)?;
-    if storage.kind() != Some(tswp::storage_archive::KindType::Footnote as i32) {
-        return Err(Error::InvalidFormat(format!(
-            "Pages footnote storage {storage_id} is not a native footnote storage"
-        )));
-    }
-    let content = storage_text(&storage, wire_budget)?;
+    let (content, marker_id) = with_storage_projection(
+        package,
+        storage_id,
+        "Pages footnote",
+        wire_budget,
+        |storage, wire_budget| {
+            if storage.kind() != Some(tswp::storage_archive::KindType::Footnote as i32) {
+                return Err(Error::InvalidFormat(format!(
+                    "Pages footnote storage {storage_id} is not a native footnote storage"
+                )));
+            }
+            let content = storage_text(storage, wire_budget)?;
+            let marker_id = footnote_marker_id(storage_id, storage, wire_budget)?;
+            Ok((content, marker_id))
+        },
+    )?;
     let text = content
         .strip_prefix(FOOTNOTE_CONTENT_PREFIX)
         .ok_or_else(|| {
@@ -856,7 +875,6 @@ fn decode_footnote_graph(
                 "Pages footnote storage {storage_id} lacks its native marker prefix"
             ))
         })?;
-    let marker_id = footnote_marker_id(storage_id, &storage, wire_budget)?;
     validate_footnote_marker(package, marker_id, wire_budget)?;
     let text = owned_boxed_str(text, "Pages footnote text", wire_budget)?;
 
@@ -1595,12 +1613,19 @@ fn storage_at(
     Ok((archive_name, storage))
 }
 
-fn storage_at_with_data<'source>(
-    package: &'source IWorkPackage,
+fn with_storage_projection<T, F>(
+    package: &IWorkPackage,
     storage_id: u64,
     label: &str,
     wire_budget: &mut FootnoteGraphBudget,
-) -> Result<(String, FootnoteStorageProjection<'source>)> {
+    read: F,
+) -> Result<T>
+where
+    F: for<'source> FnOnce(
+        &FootnoteStorageProjection<'source>,
+        &mut FootnoteGraphBudget,
+    ) -> Result<T>,
+{
     let archive_name = find_object_archive(package, storage_id)?;
     let archive = package.archive(&archive_name)?;
     let object = archive
@@ -1609,7 +1634,9 @@ fn storage_at_with_data<'source>(
     let message_index = unique_storage_message_index(object, storage_id)?;
     let source = object.messages[message_index].data.as_slice();
     let storage = FootnoteStorageProjection::decode(source, storage_id, label, wire_budget)?;
-    Ok((archive_name, storage))
+    // The archive is an owned cache clone, so its borrowed projection cannot
+    // escape this function. Keep all projection consumers inside this scope.
+    read(&storage, wire_budget)
 }
 
 /// Admit a legacy storage payload for the mutation/template compatibility path.
@@ -1623,8 +1650,11 @@ fn decode_storage_for_mutation(
     label: &str,
     wire_budget: &mut FootnoteGraphBudget,
 ) -> Result<tswp::StorageArchive> {
-    let validation = litchi_iwa_text_wire::preflight_storage_with_source_limits(source)
-        .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
+    let validation = litchi_iwa_text_wire::validate_storage_with_limits(
+        source,
+        litchi_iwa_text_wire::RewriteLimits::default(),
+    )
+    .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
 
     // The preflight does not allocate semantic text or generated fields. All
     // aggregate charges therefore happen before Prost can grow its repeated

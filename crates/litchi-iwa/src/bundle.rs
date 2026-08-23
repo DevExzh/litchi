@@ -460,7 +460,11 @@ impl BundleExtractionContext {
                     amount: transaction.output.len(),
                 })
             })?;
-        let BundleExtractionTransaction { budget, mut output } = transaction;
+        let BundleExtractionTransaction {
+            budget,
+            mut output,
+            revision: _,
+        } = transaction;
         self.output.append(&mut output);
         self.budget = budget;
         self.revision = next_revision;
