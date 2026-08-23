@@ -158,7 +158,7 @@ pub enum BodyTableLockError {
 #[derive(Debug)]
 pub struct BodyTableLockEdit<'a> {
     source: &'a Package,
-    table_position: usize,
+    target: BodyTableTarget,
     before: State,
     state: State,
 }
@@ -200,7 +200,7 @@ impl BodyTableLockEdit<'_> {
                     target: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    table_position: self.table_position,
+                    proof: self.target,
                     before: self.before,
                     after: self.state,
                 },
@@ -213,7 +213,7 @@ impl BodyTableLockEdit<'_> {
 
         let package = rewrite_lock_state(
             self.source,
-            self.table_position,
+            &self.target,
             self.before,
             self.state,
             &mut budget,
@@ -227,7 +227,7 @@ impl BodyTableLockEdit<'_> {
                 target,
                 source_fingerprint,
                 target_fingerprint,
-                table_position: self.table_position,
+                proof: self.target,
                 before: self.before,
                 after: self.state,
             },
@@ -243,7 +243,7 @@ pub struct BodyTableLockPatch {
     target: Arc<[u8]>,
     source_fingerprint: u64,
     target_fingerprint: u64,
-    table_position: usize,
+    proof: BodyTableTarget,
     before: State,
     after: State,
 }
@@ -252,7 +252,7 @@ impl fmt::Debug for BodyTableLockPatch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("BodyTableLockPatch")
-            .field("table_position", &self.table_position)
+            .field("table_position", &self.proof.table_position)
             .field("before", &self.before)
             .field("after", &self.after)
             .finish_non_exhaustive()
@@ -286,7 +286,7 @@ impl BodyTableLockPatch {
             target: Arc::clone(&self.source),
             source_fingerprint: self.target_fingerprint,
             target_fingerprint: self.source_fingerprint,
-            table_position: self.table_position,
+            proof: self.proof.clone(),
             before: self.after,
             after: self.before,
         }
@@ -372,7 +372,7 @@ impl BodyTableLockCommit {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct BodyTableTarget {
     table_position: usize,
     table_name: Box<str>,
@@ -433,7 +433,7 @@ impl Package {
         let before = State::from_locked(target.explicit_locked.unwrap_or(false));
         Ok(BodyTableLockEdit {
             source: self,
-            table_position: target.table_position,
+            target,
             before,
             state: before,
         })
@@ -448,7 +448,7 @@ impl Package {
         let mut budget = WireBudget::new(source.limits())?;
         if fingerprint(source.source_bytes(), &mut budget)? != patch.source_fingerprint
             || source.source_bytes() != patch.source.as_ref()
-            || self.body_table_lock_at_with_budget(patch.table_position, &mut budget)?
+            || body_table_lock_at_target_with_budget(self, &patch.proof, &mut budget)?
                 != patch.before
         {
             return Err(BodyTableLockError::PatchConflict);
@@ -471,7 +471,7 @@ impl Package {
             return Err(BodyTableLockError::PatchConflict);
         }
         let candidate = reopen_shared(Arc::clone(&patch.target), source.limits(), &mut budget)?;
-        if candidate.body_table_lock_at_with_budget(patch.table_position, &mut budget)?
+        if body_table_lock_at_target_with_budget(&candidate, &patch.proof, &mut budget)?
             != patch.after
         {
             return Err(BodyTableLockError::Verification);
@@ -481,16 +481,6 @@ impl Package {
             patch: patch.clone(),
             diagnostics: BodyTableLockDiagnostics::published(),
         })
-    }
-
-    fn body_table_lock_at_with_budget(
-        &self,
-        table_position: usize,
-        budget: &mut WireBudget,
-    ) -> Result<State, BodyTableLockError> {
-        let target =
-            self.resolve_body_table_with_budget(BodyTableSelector::index(table_position), budget)?;
-        Ok(State::from_locked(target.explicit_locked.unwrap_or(false)))
     }
 
     fn resolve_body_table(
@@ -509,38 +499,15 @@ impl Package {
     ) -> Result<BodyTableTarget, BodyTableLockError> {
         let source = physical_source(self)?;
         budget.charge_source_catalog(source)?;
-        let mut targets = native_body_table_targets_with_budget(self, budget)?;
+        let targets = native_body_table_targets_with_budget(self, budget)?;
         match selector {
             BodyTableSelector::Position(position) => targets
-                .get_mut(position.get())
-                .map(|target| BodyTableTarget {
-                    table_position: target.table_position,
-                    table_name: target.table_name.clone(),
-                    attachment_identifier: target.attachment_identifier,
-                    attachment_component_index: target.attachment_component_index,
-                    attachment_object_index: target.attachment_object_index,
-                    attachment_message_index: target.attachment_message_index,
-                    drawable_identifier: target.drawable_identifier,
-                    model_identifier: target.model_identifier,
-                    model_component_index: target.model_component_index,
-                    model_object_index: target.model_object_index,
-                    model_message_index: target.model_message_index,
-                    model_message_type: target.model_message_type,
-                    component_index: target.component_index,
-                    object_index: target.object_index,
-                    message_index: target.message_index,
-                    message_type: target.message_type,
-                    body_component_index: target.body_component_index,
-                    body_object_index: target.body_object_index,
-                    body_message_index: target.body_message_index,
-                    body_message_type: target.body_message_type,
-                    body_identifier: target.body_identifier,
-                    explicit_locked: target.explicit_locked,
-                })
+                .into_iter()
+                .nth(position.get())
                 .ok_or(BodyTableLockError::TableNotFound),
             BodyTableSelector::Name(name) => {
                 let mut matching = targets
-                    .iter_mut()
+                    .into_iter()
                     .filter(|target| target.table_name.as_ref() == name);
                 let Some(first) = matching.next() else {
                     return Err(BodyTableLockError::TableNotFound);
@@ -548,30 +515,7 @@ impl Package {
                 if matching.next().is_some() {
                     return Err(BodyTableLockError::AmbiguousTableName);
                 }
-                Ok(BodyTableTarget {
-                    table_position: first.table_position,
-                    table_name: first.table_name.clone(),
-                    attachment_identifier: first.attachment_identifier,
-                    attachment_component_index: first.attachment_component_index,
-                    attachment_object_index: first.attachment_object_index,
-                    attachment_message_index: first.attachment_message_index,
-                    drawable_identifier: first.drawable_identifier,
-                    model_identifier: first.model_identifier,
-                    model_component_index: first.model_component_index,
-                    model_object_index: first.model_object_index,
-                    model_message_index: first.model_message_index,
-                    model_message_type: first.model_message_type,
-                    component_index: first.component_index,
-                    object_index: first.object_index,
-                    message_index: first.message_index,
-                    message_type: first.message_type,
-                    body_component_index: first.body_component_index,
-                    body_object_index: first.body_object_index,
-                    body_message_index: first.body_message_index,
-                    body_message_type: first.body_message_type,
-                    body_identifier: first.body_identifier,
-                    explicit_locked: first.explicit_locked,
-                })
+                Ok(first)
             },
         }
     }
@@ -715,6 +659,19 @@ fn native_body_table_targets_with_budget(
         .any(|pair| pair[0].character_index == pair[1].character_index)
     {
         return Err(BodyTableLockError::InvalidSource);
+    }
+    if let Some(first_entry) = entries.first() {
+        let body_message_info = body_location
+            .object
+            .archive_info
+            .message_infos
+            .get(body_message.0)
+            .ok_or(BodyTableLockError::InvalidSource)?;
+        // The body archive header is shared by every table attachment. Prove
+        // its aggregate reference inventory once, before the per-table graph
+        // walk, so work and reference charges describe the transaction rather
+        // than multiplying with the number of selected tables.
+        validate_body_table_ownership(body_message_info, first_entry.identifier, &entries, budget)?;
     }
 
     let mut targets = Vec::new();
@@ -1156,21 +1113,54 @@ fn index_objects<'a>(
     Ok(index)
 }
 
+/// Read the selected table through a previously resolved physical ownership
+/// proof.  The candidate package is produced by a same-topology splice (or
+/// is the exact target captured by a patch), so re-indexing every native
+/// object would only repeat the locate scan that established this proof.
+fn body_table_lock_at_target_with_budget(
+    package: &Package,
+    target: &BodyTableTarget,
+    budget: &mut WireBudget,
+) -> Result<State, BodyTableLockError> {
+    validate_selected_ownership(package, target, budget)?;
+    let source = physical_source(package)?;
+    let component = source
+        .components()
+        .get_index(target.component_index)
+        .ok_or(BodyTableLockError::InvalidSource)?;
+    let object = component
+        .archive()
+        .objects
+        .get(target.object_index)
+        .ok_or(BodyTableLockError::InvalidSource)?;
+    if object.archive_info.identifier != Some(target.drawable_identifier.get()) {
+        return Err(BodyTableLockError::InvalidSource);
+    }
+    let message = object
+        .messages
+        .get(target.message_index)
+        .filter(|message| message.type_ == target.message_type)
+        .ok_or(BodyTableLockError::InvalidSource)?;
+    Ok(State::from_locked(
+        decode_table_info(&message.data, budget, target.body_identifier)?
+            .locked
+            .unwrap_or(false),
+    ))
+}
+
 fn rewrite_lock_state(
     source: &Package,
-    table_position: usize,
+    target: &BodyTableTarget,
     before: State,
     after: State,
     budget: &mut WireBudget,
 ) -> Result<Package, BodyTableLockError> {
     let source_catalog = physical_source(source)?;
     let physical_limits = source_catalog.limits();
-    let target =
-        source.resolve_body_table_with_budget(BodyTableSelector::index(table_position), budget)?;
     if State::from_locked(target.explicit_locked.unwrap_or(false)) != before {
         return Err(BodyTableLockError::InvalidSource);
     }
-    validate_selected_ownership(source, &target, budget)?;
+    validate_selected_ownership(source, target, budget)?;
     let component = source_catalog
         .components()
         .get_index(target.component_index)
@@ -1342,7 +1332,7 @@ fn rewrite_lock_state(
     drop(compressed);
     let candidate_source: Arc<[u8]> = output.into();
     let candidate = reopen_shared(candidate_source, physical_limits, budget)?;
-    if candidate.body_table_lock_at_with_budget(table_position, budget)? != after {
+    if body_table_lock_at_target_with_budget(&candidate, target, budget)? != after {
         return Err(BodyTableLockError::Verification);
     }
     Ok(candidate)
@@ -1401,6 +1391,12 @@ fn deflate_compressed_bound(input_len: usize) -> Option<usize> {
         .and_then(|value| value.checked_add(DEFLATE_BLOCK_OVERHEAD_BYTES))
 }
 
+/// Validate the selected table's local graph and physical slots.
+///
+/// The rooted body's complete table-attachment inventory is proved once by
+/// [`validate_body_table_ownership`]; keeping that shared proof out of this
+/// per-target helper prevents repeated reference scans while retaining the
+/// attachment/drawable/model locality checks.
 fn validate_selected_ownership(
     package: &Package,
     target: &BodyTableTarget,
@@ -1495,14 +1491,7 @@ fn validate_selected_ownership(
         .message_infos
         .get(target.body_message_index)
         .ok_or(BodyTableLockError::InvalidSource)?;
-    if body_info.type_ != target.body_message_type
-        || !message_declares_reference_prefix(
-            body_info,
-            target.attachment_identifier.get(),
-            &[TABLE_BODY_FIELD],
-            budget,
-        )?
-    {
+    if body_info.type_ != target.body_message_type {
         return Err(BodyTableLockError::InvalidSource);
     }
 
@@ -1607,6 +1596,73 @@ fn message_declares_reference(
     Ok(true)
 }
 
+/// Prove the body-level table attachment inventory once for the complete
+/// table projection.  Each table target still proves its attachment,
+/// drawable, model, and physical slots independently; only the shared body
+/// header scan is coalesced.  This keeps aggregate reference/work charges
+/// linear in the body metadata while retaining the exact field-9 ownership
+/// requirement for every table entry.
+fn validate_body_table_ownership(
+    message: &litchi_iwa_core::MessageInfo,
+    selected_identifier: NonZeroU64,
+    entries: &[BodyTableEntry],
+    budget: &mut WireBudget,
+) -> Result<(), BodyTableLockError> {
+    message_declares_reference_prefix(
+        message,
+        selected_identifier.get(),
+        &[TABLE_BODY_FIELD],
+        budget,
+    )?;
+
+    // Reserve for every possible field-9 declaration, rather than only the
+    // selected entry inventory.  Malformed input may carry extra declaration
+    // edges; charging and reserving the complete checked count keeps those
+    // inserts from growing the map outside the transaction budget.
+    let declaration_capacity = message
+        .field_infos
+        .iter()
+        .try_fold(0usize, |count, field| {
+            if field.path.as_slice() == [TABLE_BODY_FIELD] {
+                count.checked_add(1)
+            } else {
+                Some(count)
+            }
+        })
+        .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })?;
+    budget.charge_payload_work(message.field_infos.len())?;
+    budget.charge_payload_work(declaration_capacity)?;
+    let mut declared = HashMap::new();
+    declared
+        .try_reserve(declaration_capacity)
+        .map_err(|_| BodyTableLockError::Allocation {
+            amount: declaration_capacity,
+        })?;
+    for field in &message.field_infos {
+        if field.path.as_slice() != [TABLE_BODY_FIELD] {
+            continue;
+        }
+        budget.charge_payload_work(1)?;
+        let identifier = *field
+            .object_references
+            .first()
+            .ok_or(BodyTableLockError::InvalidSource)?;
+        if declared.insert(identifier, ()).is_some() {
+            return Err(BodyTableLockError::InvalidSource);
+        }
+    }
+    if declared.len() != entries.len() {
+        return Err(BodyTableLockError::InvalidSource);
+    }
+    for entry in entries {
+        budget.charge_payload_work(1)?;
+        if !declared.contains_key(&entry.identifier.get()) {
+            return Err(BodyTableLockError::InvalidSource);
+        }
+    }
+    Ok(())
+}
+
 fn message_declares_reference_prefix(
     message: &litchi_iwa_core::MessageInfo,
     identifier: u64,
@@ -1616,12 +1672,41 @@ fn message_declares_reference_prefix(
     budget.charge_payload_items(message.field_infos.len())?;
     budget.charge_payload_references(message.object_references.len())?;
     budget.charge_payload_work(message.field_infos.len())?;
-    let aggregate_occurrences = message
+    // Retain one aggregate occurrence/declaration counter for this complete
+    // message. It is shared by every field check below, avoiding a fresh
+    // reference scan for each table attachment.
+    let field_reference_capacity =
+        message
+            .field_infos
+            .iter()
+            .try_fold(0usize, |capacity, field| {
+                capacity
+                    .checked_add(field.object_references.len())
+                    .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })
+            })?;
+    let declaration_capacity = message
         .object_references
-        .iter()
-        .filter(|candidate| **candidate == identifier)
-        .count();
-    if aggregate_occurrences != 1 {
+        .len()
+        .checked_add(field_reference_capacity)
+        .ok_or(BodyTableLockError::Allocation { amount: usize::MAX })?;
+    let mut declarations = HashMap::new();
+    budget.charge_payload_work(declaration_capacity)?;
+    declarations
+        .try_reserve(declaration_capacity)
+        .map_err(|_| BodyTableLockError::Allocation {
+            amount: declaration_capacity,
+        })?;
+    for aggregate_identifier in &message.object_references {
+        budget.charge_payload_work(1)?;
+        let counts = declarations
+            .entry(*aggregate_identifier)
+            .or_insert((0usize, 0usize));
+        counts.1 = counts
+            .1
+            .checked_add(1)
+            .ok_or(BodyTableLockError::InvalidSource)?;
+    }
+    if declarations.get(&identifier).map_or(0, |counts| counts.1) != 1 {
         return Err(BodyTableLockError::InvalidSource);
     }
     if message
@@ -1636,12 +1721,23 @@ fn message_declares_reference_prefix(
         budget.charge_payload_references(field.object_references.len())?;
         budget.charge_payload_work(field.path.path.len())?;
         if field.data_references.iter().any(|candidate| {
-            message
-                .object_references
-                .iter()
-                .any(|aggregate| aggregate == candidate)
+            declarations
+                .get(candidate)
+                .is_some_and(|counts| counts.1 != 0)
         }) {
             return Err(BodyTableLockError::InvalidSource);
+        }
+        if field.data_references.is_empty() {
+            for field_identifier in &field.object_references {
+                budget.charge_payload_work(1)?;
+                let counts = declarations
+                    .entry(*field_identifier)
+                    .or_insert((0usize, 0usize));
+                counts.0 = counts
+                    .0
+                    .checked_add(1)
+                    .ok_or(BodyTableLockError::InvalidSource)?;
+            }
         }
         // The selected body table is owned by the exact table-attachment
         // field.  A descendant path is not interchangeable with that edge;
@@ -1657,13 +1753,11 @@ fn message_declares_reference_prefix(
                 return Err(BodyTableLockError::InvalidSource);
             }
             let field_identifier = field.object_references[0];
-            budget.charge_payload_work(message.object_references.len())?;
-            let aggregate_occurrences = message
-                .object_references
-                .iter()
-                .filter(|candidate| **candidate == field_identifier)
-                .count();
-            if aggregate_occurrences != 1 {
+            if declarations
+                .get(&field_identifier)
+                .map_or(0, |counts| counts.1)
+                != 1
+            {
                 return Err(BodyTableLockError::InvalidSource);
             }
             if field_identifier == identifier {
@@ -1683,14 +1777,15 @@ fn message_declares_reference_prefix(
             // must not be reinterpreted as a field-9 table edge merely because
             // this validator is proving one selected table.
             for (field_index, field_identifier) in field.object_references.iter().enumerate() {
-                let aggregate_occurrences = message
-                    .object_references
-                    .iter()
-                    .filter(|candidate| *candidate == field_identifier)
-                    .count();
-                if aggregate_occurrences != 1
-                    || field.object_references[..field_index].contains(field_identifier)
+                if declarations
+                    .get(field_identifier)
+                    .map_or(0, |counts| counts.1)
+                    != 1
                 {
+                    return Err(BodyTableLockError::InvalidSource);
+                }
+                budget.charge_payload_work(field_index)?;
+                if field.object_references[..field_index].contains(field_identifier) {
                     return Err(BodyTableLockError::InvalidSource);
                 }
                 if *field_identifier == identifier {
@@ -1705,16 +1800,14 @@ fn message_declares_reference_prefix(
     if field_declarations != 1 {
         return Err(BodyTableLockError::InvalidSource);
     }
-    for (index, aggregate_identifier) in message.object_references.iter().enumerate() {
-        budget.charge_payload_work(message.field_infos.len())?;
-        if message.object_references[..index].contains(aggregate_identifier) {
+    // Every aggregate reference must have exactly one field-local declaration.
+    // The counters above make this final check linear in the reference count.
+    for aggregate_identifier in &message.object_references {
+        budget.charge_payload_work(1)?;
+        let Some((field_count, aggregate_count)) = declarations.get(aggregate_identifier) else {
             return Err(BodyTableLockError::InvalidSource);
-        }
-        let declarations = message.field_infos.iter().filter(|field| {
-            field.data_references.is_empty()
-                && field.object_references.contains(aggregate_identifier)
-        });
-        if declarations.count() != 1 {
+        };
+        if *aggregate_count != 1 || *field_count != 1 {
             return Err(BodyTableLockError::InvalidSource);
         }
     }
@@ -2783,14 +2876,8 @@ mod tests {
 
         let mut budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
         assert!(
-            message_declares_reference_prefix(
-                &message,
-                100,
-                &[TABLE_BODY_FIELD],
-                true,
-                &mut budget,
-            )
-            .expect("unrelated aggregate references use their own path")
+            message_declares_reference_prefix(&message, 100, &[TABLE_BODY_FIELD], &mut budget)
+                .expect("unrelated aggregate references use their own path")
         );
 
         message.field_infos[0].path = FieldPath::new(vec![17]);
@@ -2800,7 +2887,6 @@ mod tests {
                 &message,
                 100,
                 &[TABLE_BODY_FIELD],
-                true,
                 &mut strict_budget,
             ),
             Err(BodyTableLockError::InvalidSource)
