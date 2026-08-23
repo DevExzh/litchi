@@ -54,6 +54,16 @@ fn package_snapshot(package: &litchi_opc::OpcPackage) -> Package {
     Package::from_opc(package.clone()).unwrap()
 }
 
+fn authored_package() -> litchi_opc::OpcPackage {
+    let source = Package::create().unwrap().into_opc();
+    let mut package = litchi_opc::OpcPackage::new();
+    for part in source.iter_parts() {
+        package.add_part(part.clone_part());
+    }
+    *package.rels_mut() = source.rels().clone();
+    package
+}
+
 fn apply_slicer(package: &mut litchi_opc::OpcPackage, patch: &litchi_xlsb::slicer::Patch) {
     *package = package_snapshot(package)
         .apply_slicer_patch(patch)
@@ -580,7 +590,7 @@ fn shared_timeline_targets_are_refused_before_package_mutation() {
 
 #[test]
 fn patch_binds_root_relationships_and_inverse_restores_signature_state() {
-    let mut package = Package::create().unwrap().into_opc();
+    let mut package = authored_package();
     add_signature_marker(&mut package);
     let signed = package_bytes(&package);
     let snapshot = package_snapshot(&package).slicer_caches().unwrap();
