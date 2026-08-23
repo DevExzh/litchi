@@ -946,7 +946,18 @@ impl Builder {
                 resource: "table column headers",
                 amount: lower_bound,
             })?;
-        values.extend(header_iter.map(Into::into));
+        for header in header_iter {
+            // `size_hint` is only a lower bound. Reserve before every push so
+            // an iterator that under-reports its length cannot send Vec's
+            // infallible growth path into a panic after the initial reserve.
+            values
+                .try_reserve(1)
+                .map_err(|_allocation| Error::Allocation {
+                    resource: "table column headers",
+                    amount: values.len().saturating_add(1),
+                })?;
+            values.push(header.into());
+        }
         self.column_headers = values;
         Ok(())
     }
@@ -976,7 +987,17 @@ impl Builder {
                 resource: "table row headers",
                 amount: lower_bound,
             })?;
-        values.extend(header_iter.map(Into::into));
+        for header in header_iter {
+            // See `set_column_headers`: an inaccurate iterator lower bound
+            // must not expose an infallible Vec growth operation.
+            values
+                .try_reserve(1)
+                .map_err(|_allocation| Error::Allocation {
+                    resource: "table row headers",
+                    amount: values.len().saturating_add(1),
+                })?;
+            values.push(header.into());
+        }
         self.row_headers = values;
         Ok(())
     }
@@ -1228,6 +1249,22 @@ mod tests {
             table.to_csv(),
             "\"Name, value\",\"Value\"\" \"\n\"first\nrow\",\"A, B\",\n,2\n"
         );
+    }
+
+    #[test]
+    fn headers_use_fallible_growth_for_underreported_iterators() {
+        let mut builder = Builder::new("Test", Dimensions::new(1, 1));
+        let column_headers =
+            std::iter::successors(Some(0usize), |index| (*index < 128).then_some(index + 1))
+                .map(|index| format!("column-{index}"));
+        let row_headers =
+            std::iter::successors(Some(0usize), |index| (*index < 128).then_some(index + 1))
+                .map(|index| format!("row-{index}"));
+
+        assert!(builder.set_column_headers(column_headers).is_ok());
+        assert!(builder.set_row_headers(row_headers).is_ok());
+        assert_eq!(builder.column_headers().count(), 129);
+        assert_eq!(builder.row_headers().count(), 129);
     }
 
     fn csv_projection_via_lookup(table: &Table) -> String {
