@@ -37,6 +37,7 @@ use std::{
 use litchi_cfb::{
     OleError, OleFile, OleWriter, SharedOleBulkError, SharedOleFile, SharedOleFileLimits,
 };
+use litchi_core::detection::FileFormat;
 use litchi_core::{
     Budget, CancellationSource, CancellationToken, CheckStatus, ExecutionContext, ExecutionError,
     ExecutionLimits, Limits, ReadAt, SourceVersion, ValidateReport,
@@ -45,17 +46,27 @@ use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
     Editor as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
 };
+use litchi_ooxml_common::xml::{
+    OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
+};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OpenSession, PackURI, PackageWriter, PartData, ReadLimits,
     Relationships, SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics,
     SourceCacheLimits, TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
+use litchi_pptx::shape::text::{
+    extract as extract_drawingml_text, scan_ranges as scan_drawingml_ranges,
+};
 use litchi_xlsx::{
     Cell as XlsxCell, MergeChoice, MergeLimits, Rect, RowIndex, SourceBackedWorkbook,
     StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
     Value as XlsxValue, Workbook,
 };
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesRef, Event};
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::NsReader;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -115,6 +126,7 @@ const XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-row-visibility-source-edit-media-one-sheet-v1";
 const XLSX_MERGE_EDIT_CORPUS_GENERATOR: &str = "litchi-xlsx-merge-edit-sparse-a1-b2-v1";
 const SEMANTIC_ODT_CORPUS_GENERATOR: &str = "litchi-odt-semantic-v1";
+const DETECTION_ODF_CORPUS_GENERATOR: &str = "litchi-detection-odf-catalog-v1";
 const ODF_REPAIR_CORPUS_GENERATOR: &str = "litchi-odf-mimetype-repair-v1";
 const ODF_REPAIR_LOCAL_EXTRA: &[u8] = &[0x55, 0x54, 0x05, 0x00, 0x01, 0, 0, 0, 0];
 const ODF_REPAIR_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
@@ -134,6 +146,18 @@ const ODP_TEXT_BOX_BATCH_CORPUS_GENERATOR: &str = "litchi-odp-cross-slide-textbo
 const SEMANTIC_RTF_CORPUS_GENERATOR: &str = "litchi-rtf-semantic-v2";
 const RTF_LIFECYCLE_CORPUS_GENERATOR: &str = "litchi-rtf-paragraph-lifecycle-v1";
 const RTF_PICTURE_CRUD_CORPUS_GENERATOR: &str = "litchi-rtf-picture-crud-v1";
+const OOXML_TRACKER_CORPUS_GENERATOR: &str = "litchi-ooxml-namespace-tracker-v1";
+const OOXML_TRACKER_OMML_NAMESPACE: &[u8] = OMML_NAMESPACE_URI.as_bytes();
+const OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/math";
+const OOXML_TRACKER_STRICT_OMML_NAMESPACE: &[u8] =
+    OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI.as_bytes();
+const OOXML_TRACKER_DRAWINGML_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const OOXML_TRACKER_STRICT_DRAWINGML_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/drawingml/main";
+const OOXML_TRACKER_OMML_FORMULA_COUNT: usize = 256;
+const OOXML_TRACKER_DRAWINGML_PARAGRAPH_COUNT: usize = 256;
 const XLSX_STREAMING_CORPUS_GENERATOR: &str = "litchi-xlsx-streaming-create-v1";
 const RTF_STREAMING_CORPUS_GENERATOR: &str = "litchi-rtf-streaming-create-v1";
 const RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES: usize = 16 * 1024;
@@ -377,6 +401,109 @@ enum SemanticShape {
     Tiny,
     Medium,
     Large,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DetectionOdfFamily {
+    Odt,
+    Ods,
+    Odp,
+}
+
+impl DetectionOdfFamily {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Odt => "odt",
+            Self::Ods => "ods",
+            Self::Odp => "odp",
+        }
+    }
+
+    const fn odf_format(self) -> FileFormat {
+        match self {
+            Self::Odt => FileFormat::Odt,
+            Self::Ods => FileFormat::Ods,
+            Self::Odp => FileFormat::Odp,
+        }
+    }
+
+    const fn ooxml_format(self) -> FileFormat {
+        match self {
+            Self::Odt => FileFormat::Docx,
+            Self::Ods => FileFormat::Xlsx,
+            Self::Odp => FileFormat::Pptx,
+        }
+    }
+
+    const fn odf_mimetype(self) -> &'static str {
+        match self {
+            Self::Odt => "application/vnd.oasis.opendocument.text",
+            Self::Ods => "application/vnd.oasis.opendocument.spreadsheet",
+            Self::Odp => "application/vnd.oasis.opendocument.presentation",
+        }
+    }
+
+    const fn ooxml_part(self) -> &'static str {
+        match self {
+            Self::Odt => "word/document.xml",
+            Self::Ods => "xl/workbook.xml",
+            Self::Odp => "ppt/presentation.xml",
+        }
+    }
+
+    const fn ooxml_content_type(self) -> &'static str {
+        match self {
+            Self::Odt => {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+            },
+            Self::Ods => {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+            },
+            Self::Odp => {
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+            },
+        }
+    }
+
+    const fn ooxml_payload(self) -> &'static [u8] {
+        match self {
+            Self::Odt => {
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+            },
+            Self::Ods => {
+                br#"<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#
+            },
+            Self::Odp => {
+                br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DetectionMode {
+    Bytes,
+    Reader,
+    Polyglot,
+    CatalogAlias,
+}
+
+impl DetectionMode {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Bytes => "bytes",
+            Self::Reader => "reader",
+            Self::Polyglot => "polyglot",
+            Self::CatalogAlias => "catalog-alias",
+        }
+    }
+
+    const fn expected_format(self, family: DetectionOdfFamily) -> FileFormat {
+        match self {
+            Self::Bytes | Self::Reader => family.odf_format(),
+            Self::Polyglot | Self::CatalogAlias => family.ooxml_format(),
+        }
+    }
 }
 
 /// Transport and producer variants for the opt-in semantic RTF matrix.
@@ -746,6 +873,10 @@ enum Case {
     DocxSourceBackedOneEditSave,
     DocxStoryHyperlinkPlan,
     PptxSourceBackedOneEditSave,
+    OmmlFormulaRangeScan,
+    OmmlFormulaExtract,
+    PptxDrawingmlExtract,
+    PptxDrawingmlRangeScan,
     PptxEagerBatchEditSave,
     PptxSourceBackedBatchEditSave,
     PptxEagerMultiSlideBatchEditSave,
@@ -996,6 +1127,10 @@ enum Case {
     OdtMixedModelContentBatchEditSave,
     OdfValidationReport,
     OdfMimetypeRepairPlan,
+    DetectOdtBytes,
+    DetectOdtReader,
+    DetectOdtPolyglot,
+    DetectOdtCatalogAlias,
     OdtMediaParagraphEditSave,
     OdtMediaLineBreakEditSave,
     OdtMediaAppendRunEditSave,
@@ -1025,6 +1160,10 @@ enum Case {
     OdsMediaOneEditSave,
     OdsContentCowOwnedRebuild,
     OdsContentCowPositional,
+    DetectOdsBytes,
+    DetectOdsReader,
+    DetectOdsPolyglot,
+    DetectOdsCatalogAlias,
     OdpSemanticOpen,
     OdpSemanticListSlides,
     OdpSemanticOneSlide,
@@ -1041,6 +1180,10 @@ enum Case {
     OdpMediaSourceBackedOpen,
     OdpMediaEagerOneSlide,
     OdpMediaSourceBackedOneSlide,
+    DetectOdpBytes,
+    DetectOdpReader,
+    DetectOdpPolyglot,
+    DetectOdpCatalogAlias,
     OdpFileEagerOpen,
     OdpFileSourceOpen,
     OdpFileEagerSelectedSlide,
@@ -1168,6 +1311,10 @@ impl Case {
             Self::DocxSourceBackedOneEditSave => "docx_source_backed_one_edit_save",
             Self::DocxStoryHyperlinkPlan => "docx_story_hyperlink_plan",
             Self::PptxSourceBackedOneEditSave => "pptx_source_backed_one_edit_save",
+            Self::OmmlFormulaRangeScan => "omml_formula_range_scan",
+            Self::OmmlFormulaExtract => "omml_formula_extract",
+            Self::PptxDrawingmlExtract => "pptx_drawingml_extract",
+            Self::PptxDrawingmlRangeScan => "pptx_drawingml_range_scan",
             Self::PptxEagerBatchEditSave => "pptx_eager_batch_edit_save",
             Self::PptxSourceBackedBatchEditSave => "pptx_source_backed_batch_edit_save",
             Self::PptxEagerMultiSlideBatchEditSave => "pptx_eager_multi_slide_batch_edit_save",
@@ -1496,6 +1643,10 @@ impl Case {
             Self::OdtMixedModelContentBatchEditSave => "odt_mixed_model_content_batch_edit_save",
             Self::OdfValidationReport => "odf_validation_report",
             Self::OdfMimetypeRepairPlan => "odf_mimetype_repair_plan",
+            Self::DetectOdtBytes => "detect_odt_bytes",
+            Self::DetectOdtReader => "detect_odt_reader",
+            Self::DetectOdtPolyglot => "detect_odt_polyglot",
+            Self::DetectOdtCatalogAlias => "detect_odt_catalog_alias",
             Self::OdtMediaParagraphEditSave => "odt_media_paragraph_edit_save",
             Self::OdtMediaLineBreakEditSave => "odt_media_line_break_edit_save",
             Self::OdtMediaAppendRunEditSave => "odt_media_append_run_edit_save",
@@ -1527,6 +1678,10 @@ impl Case {
             Self::OdsMediaOneEditSave => "ods_media_one_edit_save",
             Self::OdsContentCowOwnedRebuild => "ods_content_cow_owned_rebuild",
             Self::OdsContentCowPositional => "ods_content_cow_positional",
+            Self::DetectOdsBytes => "detect_ods_bytes",
+            Self::DetectOdsReader => "detect_ods_reader",
+            Self::DetectOdsPolyglot => "detect_ods_polyglot",
+            Self::DetectOdsCatalogAlias => "detect_ods_catalog_alias",
             Self::OdpSemanticOpen => "odp_semantic_open",
             Self::OdpSemanticListSlides => "odp_semantic_list_slides",
             Self::OdpSemanticOneSlide => "odp_semantic_one_slide",
@@ -1543,6 +1698,10 @@ impl Case {
             Self::OdpMediaSourceBackedOpen => "odp_media_source_backed_open",
             Self::OdpMediaEagerOneSlide => "odp_media_eager_one_slide",
             Self::OdpMediaSourceBackedOneSlide => "odp_media_source_backed_one_slide",
+            Self::DetectOdpBytes => "detect_odp_bytes",
+            Self::DetectOdpReader => "detect_odp_reader",
+            Self::DetectOdpPolyglot => "detect_odp_polyglot",
+            Self::DetectOdpCatalogAlias => "detect_odp_catalog_alias",
             Self::OdpFileEagerOpen => "odp_file_eager_open",
             Self::OdpFileSourceOpen => "odp_file_source_open",
             Self::OdpFileEagerSelectedSlide => "odp_file_eager_selected_slide",
@@ -2057,6 +2216,48 @@ impl Case {
         matches!(self, Self::OdfMimetypeRepairPlan)
     }
 
+    const fn is_detection(self) -> bool {
+        matches!(
+            self,
+            Self::DetectOdtBytes
+                | Self::DetectOdtReader
+                | Self::DetectOdtPolyglot
+                | Self::DetectOdtCatalogAlias
+                | Self::DetectOdsBytes
+                | Self::DetectOdsReader
+                | Self::DetectOdsPolyglot
+                | Self::DetectOdsCatalogAlias
+                | Self::DetectOdpBytes
+                | Self::DetectOdpReader
+                | Self::DetectOdpPolyglot
+                | Self::DetectOdpCatalogAlias
+        )
+    }
+
+    fn detection_spec(self) -> Option<(DetectionOdfFamily, DetectionMode)> {
+        match self {
+            Self::DetectOdtBytes => Some((DetectionOdfFamily::Odt, DetectionMode::Bytes)),
+            Self::DetectOdtReader => Some((DetectionOdfFamily::Odt, DetectionMode::Reader)),
+            Self::DetectOdtPolyglot => Some((DetectionOdfFamily::Odt, DetectionMode::Polyglot)),
+            Self::DetectOdtCatalogAlias => {
+                Some((DetectionOdfFamily::Odt, DetectionMode::CatalogAlias))
+            },
+            Self::DetectOdsBytes => Some((DetectionOdfFamily::Ods, DetectionMode::Bytes)),
+            Self::DetectOdsReader => Some((DetectionOdfFamily::Ods, DetectionMode::Reader)),
+            Self::DetectOdsPolyglot => Some((DetectionOdfFamily::Ods, DetectionMode::Polyglot)),
+            Self::DetectOdsCatalogAlias => {
+                Some((DetectionOdfFamily::Ods, DetectionMode::CatalogAlias))
+            },
+            Self::DetectOdpBytes => Some((DetectionOdfFamily::Odp, DetectionMode::Bytes)),
+            Self::DetectOdpReader => Some((DetectionOdfFamily::Odp, DetectionMode::Reader)),
+            Self::DetectOdpPolyglot => Some((DetectionOdfFamily::Odp, DetectionMode::Polyglot)),
+            Self::DetectOdpCatalogAlias => {
+                Some((DetectionOdfFamily::Odp, DetectionMode::CatalogAlias))
+            },
+            _ => None,
+        }
+    }
+
     const fn uses_ods_media(self) -> bool {
         matches!(self, Self::OdsMediaOneEditSave)
     }
@@ -2355,6 +2556,16 @@ impl Case {
         matches!(self, Self::DocxStoryHyperlinkPlan)
     }
 
+    const fn is_ooxml_tracker_scan(self) -> bool {
+        matches!(
+            self,
+            Self::OmmlFormulaRangeScan
+                | Self::OmmlFormulaExtract
+                | Self::PptxDrawingmlExtract
+                | Self::PptxDrawingmlRangeScan
+        )
+    }
+
     const fn is_pptx_source_edit_save(self) -> bool {
         matches!(
             self,
@@ -2613,6 +2824,21 @@ struct Corpus {
     target_name: String,
     target_payload: Vec<u8>,
     xlsx: Option<XlsxCorpus>,
+}
+
+/// Fixed XML fragments for the hidden OOXML namespace-tracker selectors.
+///
+/// The expected projections are produced by the independent `NsReader` oracle
+/// before any timed iteration.  The timed functions only scan the already
+/// materialized bytes and compare their result after the clock stops.
+struct OoxmlTrackerCorpus {
+    manifest: CorpusManifest,
+    omml: Vec<u8>,
+    drawingml: Vec<u8>,
+    expected_omml_ranges: Vec<(u32, u32)>,
+    expected_omml_formulas: Vec<String>,
+    expected_drawingml_text: String,
+    expected_drawingml_ranges: Vec<(u32, u32)>,
 }
 
 #[derive(Debug)]
@@ -6946,6 +7172,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_xls()
                     && !case.uses_semantic_xlsb()
                     && !case.uses_semantic_ppt()
+                    && !case.uses_semantic_xlsb()
                     && !case.is_ppt_pictures()
                     && !case.uses_xlsx()
                     && !case.uses_xlsx_cell_values()
@@ -6979,6 +7206,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
                     && !case.is_docx_story_hyperlink_plan()
+                    && !case.is_ooxml_tracker_scan()
                     && !case.is_doc_owner_public_phases()
                     && !case.is_pptx_source_edit_save()
                     && !case.is_pptx_cross_copy()
@@ -7005,6 +7233,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_validation_pptx()
                     && !case.uses_validation_odf()
                     && !case.uses_odf_repair()
+                    && !case.is_detection()
                     && !case.is_cfb_selective()
                     && !case.is_cfb_open_stream_evidence()
             }) {
@@ -7383,6 +7612,27 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     if options
         .cases
         .iter()
+        .any(|case| case.is_ooxml_tracker_scan())
+    {
+        let corpus = build_ooxml_tracker_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_ooxml_tracker_scan())
+        {
+            results.push(run_ooxml_tracker_case(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
         .any(|case| case.is_pptx_source_edit_save())
     {
         let corpus = build_pptx_source_edit_corpus()?;
@@ -7587,6 +7837,26 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             for case in options.cases.iter().filter(|case| case.uses_semantic_ppt()) {
                 results.push(run_case_with_config(
                     *case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                    options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.uses_semantic_xlsb()) {
+        for shape in &options.xlsb_shapes {
+            let corpus = build_xlsb_corpus(*shape)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.uses_semantic_xlsb())
+            {
+                results.push(run_case_with_config(
+                    case,
                     &corpus,
                     options.warmup_iterations,
                     options.samples,
@@ -7897,6 +8167,25 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     options.warmup_iterations,
                     options.samples,
                     options.range_simulation,
+                )?);
+            }
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_detection()) {
+        for shape in &options.semantic_shapes {
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.is_detection())
+            {
+                let corpus = build_detection_corpus(case, *shape)?;
+                results.push(run_detection_case(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
                 )?);
             }
         }
@@ -8846,6 +9135,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "docx_source_backed_one_edit_save" => Some(Case::DocxSourceBackedOneEditSave),
         "docx_story_hyperlink_plan" => Some(Case::DocxStoryHyperlinkPlan),
         "pptx_source_backed_one_edit_save" => Some(Case::PptxSourceBackedOneEditSave),
+        "omml_formula_range_scan" => Some(Case::OmmlFormulaRangeScan),
+        "omml_formula_extract" => Some(Case::OmmlFormulaExtract),
+        "pptx_drawingml_extract" => Some(Case::PptxDrawingmlExtract),
+        "pptx_drawingml_range_scan" => Some(Case::PptxDrawingmlRangeScan),
         "pptx_eager_batch_edit_save" => Some(Case::PptxEagerBatchEditSave),
         "pptx_source_backed_batch_edit_save" => Some(Case::PptxSourceBackedBatchEditSave),
         "pptx_eager_multi_slide_batch_edit_save" => Some(Case::PptxEagerMultiSlideBatchEditSave),
@@ -9132,6 +9425,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odt_mixed_model_content_batch_edit_save" => Some(Case::OdtMixedModelContentBatchEditSave),
         "odf_validation_report" => Some(Case::OdfValidationReport),
         "odf_mimetype_repair_plan" => Some(Case::OdfMimetypeRepairPlan),
+        "detect_odt_bytes" => Some(Case::DetectOdtBytes),
+        "detect_odt_reader" => Some(Case::DetectOdtReader),
+        "detect_odt_polyglot" => Some(Case::DetectOdtPolyglot),
+        "detect_odt_catalog_alias" => Some(Case::DetectOdtCatalogAlias),
         "odt_media_paragraph_edit_save" => Some(Case::OdtMediaParagraphEditSave),
         "odt_media_line_break_edit_save" => Some(Case::OdtMediaLineBreakEditSave),
         "odt_media_append_run_edit_save" => Some(Case::OdtMediaAppendRunEditSave),
@@ -9167,6 +9464,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "ods_media_one_edit_save" => Some(Case::OdsMediaOneEditSave),
         "ods_content_cow_owned_rebuild" => Some(Case::OdsContentCowOwnedRebuild),
         "ods_content_cow_positional" => Some(Case::OdsContentCowPositional),
+        "detect_ods_bytes" => Some(Case::DetectOdsBytes),
+        "detect_ods_reader" => Some(Case::DetectOdsReader),
+        "detect_ods_polyglot" => Some(Case::DetectOdsPolyglot),
+        "detect_ods_catalog_alias" => Some(Case::DetectOdsCatalogAlias),
         "odp_semantic_open" => Some(Case::OdpSemanticOpen),
         "odp_semantic_list_slides" => Some(Case::OdpSemanticListSlides),
         "odp_semantic_one_slide" => Some(Case::OdpSemanticOneSlide),
@@ -9183,6 +9484,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "odp_media_source_backed_open" => Some(Case::OdpMediaSourceBackedOpen),
         "odp_media_eager_one_slide" => Some(Case::OdpMediaEagerOneSlide),
         "odp_media_source_backed_one_slide" => Some(Case::OdpMediaSourceBackedOneSlide),
+        "detect_odp_bytes" => Some(Case::DetectOdpBytes),
+        "detect_odp_reader" => Some(Case::DetectOdpReader),
+        "detect_odp_polyglot" => Some(Case::DetectOdpPolyglot),
+        "detect_odp_catalog_alias" => Some(Case::DetectOdpCatalogAlias),
         "odp_file_eager_open" => Some(Case::OdpFileEagerOpen),
         "odp_file_source_open" => Some(Case::OdpFileSourceOpen),
         "odp_file_eager_selected_slide" => Some(Case::OdpFileEagerSelectedSlide),
@@ -9329,6 +9634,9 @@ fn print_usage() {
                                        docx_source_backed_one_edit_save,\n\
                                        docx_story_hyperlink_plan,\n\
                                        pptx_source_backed_one_edit_save,\n\
+                                       omml_formula_range_scan,\n\
+                                       omml_formula_extract,\n\
+                                       pptx_drawingml_extract,pptx_drawingml_range_scan,\n\
                                        pptx_eager_batch_edit_save,\n\
                                        pptx_source_backed_batch_edit_save,\n\
                                        pptx_eager_multi_slide_batch_edit_save,\n\
@@ -9516,6 +9824,8 @@ fn print_usage() {
                                        odt_semantic_one_edit_save,odt_semantic_one_percent_edit_save,\n\
                                        odt_mixed_model_content_scalar_edit_save,\n\
                                        odt_mixed_model_content_batch_edit_save,\n\
+                                       detect_odt_bytes,detect_odt_reader,\n\
+                                       detect_odt_polyglot,detect_odt_catalog_alias,\n\
                                        odt_media_paragraph_edit_save,odt_media_line_break_edit_save,\n\
                                        odt_media_append_run_edit_save,\n\
                                        odt_media_append_hyperlink_edit_save,\n\
@@ -9539,6 +9849,8 @@ fn print_usage() {
                                        ods_source_backed_repeated_edit,\n\
                                        ods_media_one_edit_save,\n\
                                        ods_content_cow_owned_rebuild,ods_content_cow_positional,\n\
+                                       detect_ods_bytes,detect_ods_reader,\n\
+                                       detect_ods_polyglot,detect_ods_catalog_alias,\n\
                                        odp_semantic_open,odp_semantic_list_slides,\n\
                                        odp_semantic_one_slide,odp_semantic_full_text,\n\
                                        odp_semantic_create_small,odp_semantic_noop_edit_save,\n\
@@ -9548,6 +9860,8 @@ fn print_usage() {
                                        odp_content_cow_owned_rebuild,odp_content_cow_positional,\n\
                                        odp_media_eager_open,odp_media_source_backed_open,\n\
                                        odp_media_eager_one_slide,odp_media_source_backed_one_slide,\n\
+                                       detect_odp_bytes,detect_odp_reader,\n\
+                                       detect_odp_polyglot,detect_odp_catalog_alias,\n\
                                        odp_file_eager_open,odp_file_source_open,\n\
                                        odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
                                        odp_source_backed_repeated_text_uncached,\n\
@@ -14056,6 +14370,295 @@ fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
     })
 }
 
+fn detection_format_name(format: FileFormat) -> &'static str {
+    match format {
+        FileFormat::Docx => "docx",
+        FileFormat::Xlsx => "xlsx",
+        FileFormat::Pptx => "pptx",
+        FileFormat::Odt => "odt",
+        FileFormat::Ods => "ods",
+        FileFormat::Odp => "odp",
+        _ => "other",
+    }
+}
+
+fn build_detection_corpus(case: Case, shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
+    let (family, mode) = case
+        .detection_spec()
+        .ok_or("non-detection case passed to detection corpus builder")?;
+    let base = match family {
+        DetectionOdfFamily::Odt => build_semantic_odt_corpus(shape)?,
+        DetectionOdfFamily::Ods => build_semantic_ods_corpus(shape)?,
+        DetectionOdfFamily::Odp => build_semantic_odp_corpus(shape)?,
+    };
+    let archive = match mode {
+        DetectionMode::Bytes | DetectionMode::Reader => base.archive.clone(),
+        DetectionMode::Polyglot => detection_polyglot_archive(family, &base.archive)?,
+        DetectionMode::CatalogAlias => detection_catalog_alias_archive(family, &base.archive)?,
+    };
+    let expected = mode.expected_format(family);
+    let observed = litchi::common::detection::detect_file_format_from_bytes(&archive);
+    if observed != Some(expected) {
+        return Err(format!(
+            "{} detection corpus oracle differs: expected {}, observed {}",
+            case.name(),
+            detection_format_name(expected),
+            observed.map_or("none", detection_format_name),
+        )
+        .into());
+    }
+    let (archive_member_count, logical_bytes) = zip_logical_work(&archive)?;
+    let target_payload = detection_format_name(expected).as_bytes().to_vec();
+    let mut manifest = base.manifest;
+    manifest.name = format!("{}-{}-{}", family.name(), mode.name(), shape.name());
+    manifest.generator = DETECTION_ODF_CORPUS_GENERATOR;
+    manifest.package_format = "ODF/OOXML/ZIP";
+    manifest.shape = shape.name();
+    manifest.payload_kind = mode.payload_kind();
+    manifest.compression = "deflate-and-stored";
+    manifest.entry_count = archive_member_count;
+    manifest.archive_member_count = archive_member_count;
+    manifest.entry_bytes = target_payload.len();
+    manifest.uncompressed_payload_bytes = usize::try_from(logical_bytes)?;
+    manifest.archive_bytes = archive.len();
+    manifest.archive_sha256 = sha256_hex(&archive);
+    manifest.target_entry = format!("detected-format:{}", detection_format_name(expected));
+    manifest.target_payload_bytes = target_payload.len();
+    manifest.target_payload_sha256 = sha256_hex(&target_payload);
+    Ok(Corpus {
+        manifest,
+        archive,
+        target_name: "detected-format".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+impl DetectionMode {
+    const fn payload_kind(self) -> &'static str {
+        match self {
+            Self::Bytes => "canonical-odf",
+            Self::Reader => "canonical-odf-reader",
+            Self::Polyglot => "ooxml-odf-polyglot",
+            Self::CatalogAlias => "ooxml-odf-catalog-alias",
+        }
+    }
+}
+
+fn detection_polyglot_archive(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    detection_merge_ooxml_members(family, odf_archive, true)
+}
+
+fn detection_catalog_alias_archive(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    // A leading slash is a ZIP/OPC alias. The conservative ODF catalog probe
+    // must classify this layout as unknown so the OOXML fallback gets a turn.
+    detection_merge_ooxml_members(family, odf_archive, false)
+}
+
+fn detection_merge_ooxml_members(
+    family: DetectionOdfFamily,
+    odf_archive: &[u8],
+    include_catalog: bool,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let odf = ArchiveReader::new(odf_archive)?;
+    let ooxml_archive = detection_ooxml_archive(family)?;
+    let ooxml = ArchiveReader::new(&ooxml_archive)?;
+    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    writer.set_mimetype(family.odf_mimetype())?;
+    for path in odf.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
+            continue;
+        }
+        writer.add_file(path, &odf.read(path)?)?;
+    }
+    for path in ooxml.file_names() {
+        if matches!(path, "mimetype" | "META-INF/manifest.xml")
+            || path.ends_with('/')
+            || (!include_catalog && path == "[Content_Types].xml")
+        {
+            continue;
+        }
+        writer.add_file(path, &ooxml.read(path)?)?;
+    }
+    let merged = writer.finish_to_bytes()?;
+    if include_catalog {
+        Ok(merged)
+    } else {
+        let catalog = ooxml.read("[Content_Types].xml")?;
+        append_stored_zip_member(&merged, "/[Content_Types].xml", &catalog)
+    }
+}
+
+fn detection_ooxml_archive(family: DetectionOdfFamily) -> Result<Vec<u8>, Box<dyn Error>> {
+    let part_name = family.ooxml_part();
+    let mut package = OpcPackage::new();
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new(format!("/{part_name}"))?,
+        family.ooxml_content_type().to_owned(),
+        family.ooxml_payload().to_vec(),
+    )))?;
+    package.rels_mut().try_add_relationship(
+        relationship_type::OFFICE_DOCUMENT.to_owned(),
+        part_name.to_owned(),
+        "rIdDetectionMain".to_owned(),
+        TargetMode::Internal,
+    )?;
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn append_stored_zip_member(
+    source: &[u8],
+    name: &str,
+    data: &[u8],
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    const EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
+    const LOCAL_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x03, 0x04];
+    const CENTRAL_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
+    const EOCD_BYTES: usize = 22;
+    const LOCAL_FIXED_BYTES: usize = 30;
+    const CENTRAL_FIXED_BYTES: usize = 46;
+
+    if source.len() < EOCD_BYTES {
+        return Err("ZIP alias source has no end-of-central-directory record".into());
+    }
+    let minimum_eocd = source.len().saturating_sub(EOCD_BYTES + u16::MAX as usize);
+    let last_candidate = source.len() - EOCD_BYTES;
+    let eocd_offset = (minimum_eocd..=last_candidate)
+        .rev()
+        .find(|offset| {
+            source.get(*offset..*offset + 4) == Some(EOCD_SIGNATURE.as_slice())
+                && read_zip_u16(source, *offset + 20).is_some_and(|comment| {
+                    *offset + EOCD_BYTES + usize::from(comment) == source.len()
+                })
+        })
+        .ok_or("ZIP alias source has no bounded end-of-central-directory record")?;
+    let central_size = usize::try_from(
+        read_zip_u32(source, eocd_offset + 12).ok_or("ZIP alias central size is truncated")?,
+    )?;
+    let central_offset = usize::try_from(
+        read_zip_u32(source, eocd_offset + 16).ok_or("ZIP alias central offset is truncated")?,
+    )?;
+    let entry_count =
+        read_zip_u16(source, eocd_offset + 10).ok_or("ZIP alias entry count is truncated")?;
+    if central_offset.checked_add(central_size) != Some(eocd_offset)
+        || entry_count == u16::MAX
+        || central_offset > u32::MAX as usize
+    {
+        return Err("ZIP alias source is not a classic single-disk archive".into());
+    }
+    let name_bytes = name.as_bytes();
+    let name_len = u16::try_from(name_bytes.len())?;
+    let data_len = u32::try_from(data.len())?;
+    let crc = soapberry_zip::crc32(data);
+    let local_len = LOCAL_FIXED_BYTES
+        .checked_add(name_bytes.len())
+        .and_then(|length| length.checked_add(data.len()))
+        .ok_or("ZIP alias local entry length overflows usize")?;
+    let central_len = CENTRAL_FIXED_BYTES
+        .checked_add(name_bytes.len())
+        .ok_or("ZIP alias central entry length overflows usize")?;
+
+    let mut local = Vec::with_capacity(local_len);
+    local.extend_from_slice(&LOCAL_SIGNATURE);
+    push_zip_u16(&mut local, 20);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u16(&mut local, 0);
+    push_zip_u32(&mut local, crc);
+    push_zip_u32(&mut local, data_len);
+    push_zip_u32(&mut local, data_len);
+    push_zip_u16(&mut local, name_len);
+    push_zip_u16(&mut local, 0);
+    local.extend_from_slice(name_bytes);
+    local.extend_from_slice(data);
+
+    let mut central = Vec::with_capacity(central_len);
+    central.extend_from_slice(&CENTRAL_SIGNATURE);
+    push_zip_u16(&mut central, 20);
+    push_zip_u16(&mut central, 20);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u32(&mut central, crc);
+    push_zip_u32(&mut central, data_len);
+    push_zip_u32(&mut central, data_len);
+    push_zip_u16(&mut central, name_len);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u16(&mut central, 0);
+    push_zip_u32(&mut central, 0);
+    push_zip_u32(&mut central, u32::try_from(central_offset)?);
+    central.extend_from_slice(name_bytes);
+
+    let new_central_offset = central_offset
+        .checked_add(local.len())
+        .ok_or("ZIP alias central offset overflows usize")?;
+    let new_central_size = central_size
+        .checked_add(central.len())
+        .ok_or("ZIP alias central size overflows usize")?;
+    let mut eocd = source[eocd_offset..].to_vec();
+    let next_entry_count = entry_count + 1;
+    write_zip_u16(&mut eocd, 8, next_entry_count)?;
+    write_zip_u16(&mut eocd, 10, next_entry_count)?;
+    write_zip_u32(&mut eocd, 12, u32::try_from(new_central_size)?)?;
+    write_zip_u32(&mut eocd, 16, u32::try_from(new_central_offset)?)?;
+
+    let output_len = source
+        .len()
+        .checked_add(local.len())
+        .and_then(|length| length.checked_add(central.len()))
+        .ok_or("ZIP alias output length overflows usize")?;
+    let mut output = Vec::with_capacity(output_len);
+    output.extend_from_slice(&source[..central_offset]);
+    output.extend_from_slice(&local);
+    output.extend_from_slice(&source[central_offset..eocd_offset]);
+    output.extend_from_slice(&central);
+    output.extend_from_slice(&eocd);
+    Ok(output)
+}
+
+fn read_zip_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+    let bytes = bytes.get(offset..offset.checked_add(2)?)?;
+    Some(u16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn read_zip_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    let bytes = bytes.get(offset..offset.checked_add(4)?)?;
+    Some(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn push_zip_u16(bytes: &mut Vec<u8>, value: u16) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn push_zip_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_zip_u16(bytes: &mut [u8], offset: usize, value: u16) -> Result<(), Box<dyn Error>> {
+    let target = bytes
+        .get_mut(offset..offset.checked_add(2).ok_or("ZIP field offset overflow")?)
+        .ok_or("ZIP field is truncated")?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_zip_u32(bytes: &mut [u8], offset: usize, value: u32) -> Result<(), Box<dyn Error>> {
+    let target = bytes
+        .get_mut(offset..offset.checked_add(4).ok_or("ZIP field offset overflow")?)
+        .ok_or("ZIP field is truncated")?;
+    target.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
 fn build_odp_media_corpus() -> Result<Corpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let archive = odp_media_archive()?;
@@ -16168,6 +16771,610 @@ fn payload_bytes(kind: PayloadKind, index: usize, length: usize) -> Vec<u8> {
     }
     bytes
 }
+fn oracle_omml_name(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    if name.local_name().as_ref() != b"oMath" {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == OOXML_TRACKER_OMML_NAMESPACE || *value == OOXML_TRACKER_STRICT_OMML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => prefix.as_slice() == b"m",
+        ResolveResult::Unbound => false,
+    }
+}
+
+fn oracle_drawingml_name(
+    namespace: &ResolveResult<'_>,
+    name: QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> bool {
+    if name.local_name().as_ref() != local_name {
+        return false;
+    }
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == OOXML_TRACKER_DRAWINGML_NAMESPACE
+                || *value == OOXML_TRACKER_STRICT_DRAWINGML_NAMESPACE
+        },
+        ResolveResult::Unknown(prefix) => {
+            prefix.as_slice() == b"a"
+                || fragment_prefix
+                    .as_ref()
+                    .and_then(|prefix| prefix.as_deref())
+                    == Some(prefix.as_slice())
+        },
+        ResolveResult::Unbound => fragment_prefix == &Some(None),
+    }
+}
+
+fn oracle_range(start: usize, end: usize, label: &str) -> Result<(u32, u32), Box<dyn Error>> {
+    let length = end
+        .checked_sub(start)
+        .ok_or_else(|| io::Error::other(format!("{label} range underflows")))?;
+    Ok((
+        u32::try_from(start)
+            .map_err(|error| io::Error::other(format!("{label} offset exceeds u32: {error}")))?,
+        u32::try_from(length)
+            .map_err(|error| io::Error::other(format!("{label} length exceeds u32: {error}")))?,
+    ))
+}
+
+fn oracle_omml_ranges(xml: &[u8]) -> Result<Vec<(u32, u32)>, Box<dyn Error>> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut capture: Option<(usize, usize)> = None;
+    let mut ranges = Vec::new();
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element) if oracle_omml_name(&namespace, element.name()) => {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none() && oracle_omml_name(&namespace, element.name()) =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position())?;
+        match event {
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(io::Error::other("OMML oracle lost its captured formula").into());
+                };
+                *captured_depth = captured_depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("OMML oracle depth overflows"))?;
+            },
+            ScanEvent::Empty => ranges.push(oracle_range(event_start, event_end, "OMML")?),
+            ScanEvent::End => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(io::Error::other("OMML oracle ended without a formula").into());
+                };
+                *captured_depth = captured_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("OMML oracle depth underflows"))?;
+                if *captured_depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        return Err(io::Error::other("OMML oracle lost its formula range").into());
+                    };
+                    ranges.push(oracle_range(start, event_end, "OMML")?);
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(io::Error::other("OMML oracle saw an unterminated formula").into());
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(ranges)
+}
+
+fn oracle_omml_formulas(xml: &[u8]) -> Result<Vec<String>, Box<dyn Error>> {
+    let ranges = oracle_omml_ranges(xml)?;
+    let mut formulas = Vec::with_capacity(ranges.len());
+    for (start, length) in ranges {
+        let start = usize::try_from(start)?;
+        let length = usize::try_from(length)?;
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| io::Error::other("OMML oracle formula range overflows"))?;
+        let formula = xml
+            .get(start..end)
+            .ok_or_else(|| io::Error::other("OMML oracle formula range is invalid"))?;
+        formulas.push(
+            std::str::from_utf8(formula)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+                .to_owned(),
+        );
+    }
+    Ok(formulas)
+}
+
+fn oracle_decode_reference(reference: &BytesRef<'_>) -> Result<String, Box<dyn Error>> {
+    if let Some(character) = reference
+        .resolve_char_ref()
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+    {
+        return Ok(character.to_string());
+    }
+    let name = reference
+        .decode()
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+    match name.as_ref() {
+        "amp" => Ok("&".to_owned()),
+        "lt" => Ok("<".to_owned()),
+        "gt" => Ok(">".to_owned()),
+        "quot" => Ok("\"".to_owned()),
+        "apos" => Ok("'".to_owned()),
+        _ => Err(io::Error::other(format!("unsupported XML entity '&{name};'")).into()),
+    }
+}
+
+fn oracle_drawingml_text(
+    xml: &[u8],
+    paragraph_separator: Option<char>,
+) -> Result<String, Box<dyn Error>> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut result = String::with_capacity(xml.len() / 8);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut text_depth = None;
+    let mut seen_paragraph = false;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+        if fragment_prefix.is_none()
+            && let Event::Start(element) = &event
+            && !matches!(namespace, ResolveResult::Bound(_))
+        {
+            fragment_prefix = Some(
+                element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().to_vec()),
+            );
+        }
+        match event {
+            Event::Start(element) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth overflows"))?;
+                if oracle_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if text_depth.is_none()
+                    && oracle_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = Some(depth);
+                } else if oracle_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
+                {
+                    result.push('\n');
+                } else if oracle_drawingml_name(
+                    &namespace,
+                    element.name(),
+                    b"tab",
+                    &fragment_prefix,
+                ) {
+                    result.push('\t');
+                }
+            },
+            Event::Empty(element) => {
+                if oracle_drawingml_name(&namespace, element.name(), b"p", &fragment_prefix) {
+                    if seen_paragraph
+                        && !result.is_empty()
+                        && let Some(separator) = paragraph_separator
+                        && !result.ends_with(separator)
+                    {
+                        result.push(separator);
+                    }
+                    seen_paragraph = true;
+                } else if oracle_drawingml_name(&namespace, element.name(), b"br", &fragment_prefix)
+                {
+                    result.push('\n');
+                } else if oracle_drawingml_name(
+                    &namespace,
+                    element.name(),
+                    b"tab",
+                    &fragment_prefix,
+                ) {
+                    result.push('\t');
+                }
+            },
+            Event::Text(text) if text_depth.is_some() => {
+                let decoded = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?;
+                result.push_str(&quick_xml::escape::unescape(&decoded).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?);
+            },
+            Event::CData(text) if text_depth.is_some() => {
+                result.push_str(&text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
+                    io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+                })?);
+            },
+            Event::GeneralRef(reference) if text_depth.is_some() => {
+                result.push_str(&oracle_decode_reference(&reference)?);
+            },
+            Event::End(element) => {
+                if text_depth == Some(depth)
+                    && oracle_drawingml_name(&namespace, element.name(), b"t", &fragment_prefix)
+                {
+                    text_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth underflows"))?;
+            },
+            Event::Eof if depth != 0 || text_depth.is_some() => {
+                return Err(io::Error::other("DrawingML oracle saw unterminated XML").into());
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(result)
+}
+
+fn oracle_drawingml_ranges(xml: &[u8], target: &[u8]) -> Result<Vec<(u32, u32)>, Box<dyn Error>> {
+    enum ScanEvent {
+        Start,
+        NestedStart,
+        Empty,
+        End,
+        Eof,
+        Other,
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut capture: Option<(usize, usize)> = None;
+    let mut ranges = Vec::new();
+    loop {
+        let event_start = usize::try_from(reader.buffer_position())?;
+        let event = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+            if fragment_prefix.is_none()
+                && let Event::Start(element) = &event
+                && !matches!(namespace, ResolveResult::Bound(_))
+            {
+                fragment_prefix = Some(
+                    element
+                        .name()
+                        .prefix()
+                        .map(|prefix| prefix.into_inner().to_vec()),
+                );
+            }
+            match event {
+                Event::Start(_) if capture.is_some() => ScanEvent::NestedStart,
+                Event::Start(element)
+                    if oracle_drawingml_name(
+                        &namespace,
+                        element.name(),
+                        target,
+                        &fragment_prefix,
+                    ) =>
+                {
+                    ScanEvent::Start
+                },
+                Event::Empty(element)
+                    if capture.is_none()
+                        && oracle_drawingml_name(
+                            &namespace,
+                            element.name(),
+                            target,
+                            &fragment_prefix,
+                        ) =>
+                {
+                    ScanEvent::Empty
+                },
+                Event::End(_) if capture.is_some() => ScanEvent::End,
+                Event::Eof => ScanEvent::Eof,
+                _ => ScanEvent::Other,
+            }
+        };
+        let event_end = usize::try_from(reader.buffer_position())?;
+        match event {
+            ScanEvent::Start => capture = Some((event_start, 1)),
+            ScanEvent::NestedStart => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(
+                        io::Error::other("DrawingML oracle lost its captured element").into(),
+                    );
+                };
+                *captured_depth = captured_depth
+                    .checked_add(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth overflows"))?;
+            },
+            ScanEvent::Empty => ranges.push(oracle_range(event_start, event_end, "DrawingML")?),
+            ScanEvent::End => {
+                let Some((_, captured_depth)) = capture.as_mut() else {
+                    return Err(
+                        io::Error::other("DrawingML oracle ended without an element").into(),
+                    );
+                };
+                *captured_depth = captured_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| io::Error::other("DrawingML oracle depth underflows"))?;
+                if *captured_depth == 0 {
+                    let Some((start, _)) = capture.take() else {
+                        return Err(
+                            io::Error::other("DrawingML oracle lost its element range").into()
+                        );
+                    };
+                    ranges.push(oracle_range(start, event_end, "DrawingML")?);
+                }
+            },
+            ScanEvent::Eof if capture.is_some() => {
+                return Err(
+                    io::Error::other("DrawingML oracle saw an unterminated element").into(),
+                );
+            },
+            ScanEvent::Eof => break,
+            ScanEvent::Other => {},
+        }
+    }
+    Ok(ranges)
+}
+
+fn build_ooxml_tracker_corpus() -> Result<OoxmlTrackerCorpus, Box<dyn Error>> {
+    let mut omml = format!(
+        r#"<root xmlns:m="{}" xmlns:s="{}" xmlns:q="urn:outer"><!-- fixed tracker corpus -->"#,
+        OMML_NAMESPACE_URI, OOXML_TRACKER_STRICT_OMML_NAMESPACE_URI,
+    );
+    for index in 0..OOXML_TRACKER_OMML_FORMULA_COUNT {
+        if index % 32 == 0 {
+            omml.push_str(r#"<q:holder xmlns:q="urn:inner"><m:oMath/></q:holder>"#);
+        }
+        if index % 64 == 0 {
+            omml.push_str(r#"<scope xmlns:m="urn:foreign"><m:oMath/></scope>"#);
+        }
+        omml.push_str(&format!(
+            r#"<m:oMath><m:r><m:t>x{index}</m:t></m:r></m:oMath><s:oMath><s:r/></s:oMath>"#
+        ));
+    }
+    omml.push_str("</root>");
+
+    let mut drawingml = format!(
+        r#"<root xmlns:a="{}" xmlns:q="urn:outer"><!-- fixed tracker corpus -->"#,
+        std::str::from_utf8(OOXML_TRACKER_DRAWINGML_NAMESPACE)?
+    );
+    for index in 0..OOXML_TRACKER_DRAWINGML_PARAGRAPH_COUNT {
+        if index % 32 == 0 {
+            drawingml.push_str(
+                r#"<q:holder xmlns:q="urn:inner"><a:p><a:t>ignored</a:t></a:p></q:holder>"#,
+            );
+        }
+        drawingml.push_str(&format!(
+            r#"<a:p><a:r><a:t>text-{index} &amp; value</a:t><a:tab/><a:br/></a:r></a:p>"#
+        ));
+    }
+    drawingml.push_str("</root>");
+
+    let omml = omml.into_bytes();
+    let drawingml = drawingml.into_bytes();
+    let expected_omml_ranges = oracle_omml_ranges(&omml)?;
+    let expected_omml_formulas = oracle_omml_formulas(&omml)?;
+    let expected_drawingml_text = oracle_drawingml_text(&drawingml, Some('\n'))?;
+    let expected_drawingml_ranges = oracle_drawingml_ranges(&drawingml, b"p")?;
+
+    let mut actual_omml_ranges = Vec::new();
+    scan_omml_formula_ranges::<litchi_ooxml_common::XmlError>(&omml, |start, length| {
+        actual_omml_ranges.push((start, length));
+        Ok(())
+    })?;
+    if actual_omml_ranges != expected_omml_ranges {
+        return Err(io::Error::other("OMML tracker setup disagrees with NsReader oracle").into());
+    }
+    let actual_omml_formulas = extract_omml_formulas(&omml)?;
+    if actual_omml_formulas != expected_omml_formulas {
+        return Err(io::Error::other(
+            "OMML formula extractor setup disagrees with NsReader oracle",
+        )
+        .into());
+    }
+    let actual_drawingml_text = extract_drawingml_text(&drawingml, Some('\n'))?;
+    if actual_drawingml_text != expected_drawingml_text {
+        return Err(
+            io::Error::other("DrawingML extractor setup disagrees with NsReader oracle").into(),
+        );
+    }
+    let mut actual_drawingml_ranges = Vec::new();
+    scan_drawingml_ranges(&drawingml, b"p", |start, length| {
+        actual_drawingml_ranges.push((start, length));
+        Ok(())
+    })?;
+    if actual_drawingml_ranges != expected_drawingml_ranges {
+        return Err(
+            io::Error::other("DrawingML range setup disagrees with NsReader oracle").into(),
+        );
+    }
+
+    let mut identity = Vec::with_capacity(
+        16usize
+            .checked_add(omml.len())
+            .and_then(|value| value.checked_add(drawingml.len()))
+            .ok_or_else(|| io::Error::other("OOXML tracker corpus size overflows"))?,
+    );
+    identity.extend_from_slice(&u64::try_from(omml.len())?.to_le_bytes());
+    identity.extend_from_slice(&omml);
+    identity.extend_from_slice(&u64::try_from(drawingml.len())?.to_le_bytes());
+    identity.extend_from_slice(&drawingml);
+    let entry_bytes = omml
+        .len()
+        .checked_add(drawingml.len())
+        .ok_or_else(|| io::Error::other("OOXML tracker entry size overflows"))?;
+    let manifest = CorpusManifest {
+        name: "ooxml-namespace-tracker-fixed".to_owned(),
+        generator: OOXML_TRACKER_CORPUS_GENERATOR,
+        package_format: "OOXML XML fragments",
+        shape: "fixed",
+        payload_kind: "namespace-tracker-adversarial",
+        compression: "none",
+        entry_count: 2,
+        archive_member_count: 2,
+        entry_bytes,
+        uncompressed_payload_bytes: entry_bytes,
+        archive_bytes: identity.len(),
+        archive_sha256: sha256_hex(&identity),
+        target_entry: "omml.xml+presentation.xml".to_owned(),
+        target_payload_bytes: identity.len(),
+        target_payload_sha256: sha256_hex(&identity),
+        rtf_variant: None,
+        xlsx: None,
+    };
+    Ok(OoxmlTrackerCorpus {
+        manifest,
+        omml,
+        drawingml,
+        expected_omml_ranges,
+        expected_omml_formulas,
+        expected_drawingml_text,
+        expected_drawingml_ranges,
+    })
+}
+
+enum OoxmlTrackerProjection {
+    Formulas(Vec<String>),
+    Text(String),
+    Ranges(Vec<(u32, u32)>),
+}
+
+fn ooxml_tracker_range_digest(ranges: &[(u32, u32)]) -> String {
+    let mut bytes = Vec::with_capacity(ranges.len().saturating_mul(8));
+    for &(start, length) in ranges {
+        bytes.extend_from_slice(&start.to_le_bytes());
+        bytes.extend_from_slice(&length.to_le_bytes());
+    }
+    sha256_hex(&bytes)
+}
+
+fn ooxml_tracker_formula_digest(formulas: &[String]) -> Result<String, Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    for formula in formulas {
+        bytes.extend_from_slice(&u64::try_from(formula.len())?.to_le_bytes());
+        bytes.extend_from_slice(formula.as_bytes());
+    }
+    Ok(sha256_hex(&bytes))
+}
+
+fn run_ooxml_tracker_case(
+    case: Case,
+    corpus: &OoxmlTrackerCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let expected_digest = match case {
+        Case::OmmlFormulaRangeScan => ooxml_tracker_range_digest(&corpus.expected_omml_ranges),
+        Case::OmmlFormulaExtract => ooxml_tracker_formula_digest(&corpus.expected_omml_formulas)?,
+        Case::PptxDrawingmlExtract => sha256_hex(corpus.expected_drawingml_text.as_bytes()),
+        Case::PptxDrawingmlRangeScan => {
+            ooxml_tracker_range_digest(&corpus.expected_drawingml_ranges)
+        },
+        _ => return Err("non-OOXML tracker case passed to its dedicated runner".into()),
+    };
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let started = Instant::now();
+        let projection = match case {
+            Case::OmmlFormulaRangeScan => {
+                let mut ranges = Vec::with_capacity(corpus.expected_omml_ranges.len());
+                scan_omml_formula_ranges::<litchi_ooxml_common::XmlError>(
+                    &corpus.omml,
+                    |start, length| {
+                        ranges.push((start, length));
+                        Ok(())
+                    },
+                )?;
+                OoxmlTrackerProjection::Ranges(ranges)
+            },
+            Case::OmmlFormulaExtract => {
+                OoxmlTrackerProjection::Formulas(extract_omml_formulas(&corpus.omml)?)
+            },
+            Case::PptxDrawingmlExtract => {
+                OoxmlTrackerProjection::Text(extract_drawingml_text(&corpus.drawingml, Some('\n'))?)
+            },
+            Case::PptxDrawingmlRangeScan => {
+                let mut ranges = Vec::with_capacity(corpus.expected_drawingml_ranges.len());
+                scan_drawingml_ranges(&corpus.drawingml, b"p", |start, length| {
+                    ranges.push((start, length));
+                    Ok(())
+                })?;
+                OoxmlTrackerProjection::Ranges(ranges)
+            },
+            _ => return Err("non-OOXML tracker case passed to its timed loop".into()),
+        };
+        std::hint::black_box(&projection);
+        let duration = started.elapsed();
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+
+        let matches_oracle = match (&projection, case) {
+            (OoxmlTrackerProjection::Ranges(actual), Case::OmmlFormulaRangeScan) => {
+                actual == &corpus.expected_omml_ranges
+            },
+            (OoxmlTrackerProjection::Formulas(actual), Case::OmmlFormulaExtract) => {
+                actual == &corpus.expected_omml_formulas
+            },
+            (OoxmlTrackerProjection::Text(actual), Case::PptxDrawingmlExtract) => {
+                actual == &corpus.expected_drawingml_text
+            },
+            (OoxmlTrackerProjection::Ranges(actual), Case::PptxDrawingmlRangeScan) => {
+                actual == &corpus.expected_drawingml_ranges
+            },
+            _ => false,
+        };
+        if !matches_oracle {
+            return Err(io::Error::other(format!(
+                "{} disagrees with its NsReader oracle",
+                case.name()
+            ))
+            .into());
+        }
+    }
+
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: statistics(elapsed),
+        sink: None,
+        source: None,
+        execution: None,
+        output_sha256: Some(expected_digest),
+        operation_metrics: None,
+    })
+}
 
 #[cfg(test)]
 fn run_case(
@@ -16263,6 +17470,12 @@ fn run_case_with_config(
         },
         Case::PptxSourceBackedOneEditSave => {
             run_pptx_source_backed_one_edit_save(corpus, warmup_iterations, samples)
+        },
+        Case::OmmlFormulaRangeScan
+        | Case::OmmlFormulaExtract
+        | Case::PptxDrawingmlExtract
+        | Case::PptxDrawingmlRangeScan => {
+            Err("OOXML namespace-tracker cases use their dedicated fixed corpus runner".into())
         },
         Case::PptxEagerBatchEditSave | Case::PptxSourceBackedBatchEditSave => {
             run_pptx_batch_edit_save(case, corpus, warmup_iterations, samples)
@@ -16636,6 +17849,20 @@ fn run_case_with_config(
         Case::OdfValidationReport => run_odf_validation_report(corpus, warmup_iterations, samples),
         Case::OdfMimetypeRepairPlan => {
             run_odf_mimetype_repair_plan(corpus, warmup_iterations, samples)
+        },
+        Case::DetectOdtBytes
+        | Case::DetectOdtReader
+        | Case::DetectOdtPolyglot
+        | Case::DetectOdtCatalogAlias
+        | Case::DetectOdsBytes
+        | Case::DetectOdsReader
+        | Case::DetectOdsPolyglot
+        | Case::DetectOdsCatalogAlias
+        | Case::DetectOdpBytes
+        | Case::DetectOdpReader
+        | Case::DetectOdpPolyglot
+        | Case::DetectOdpCatalogAlias => {
+            run_detection_case(case, corpus, warmup_iterations, samples)
         },
         Case::OdtMediaParagraphEditSave => {
             run_odt_media_paragraph_edit_save(corpus, warmup_iterations, samples)
@@ -33824,6 +35051,78 @@ fn run_zip_index(
     ))
 }
 
+fn run_detection_case(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let (family, mode) = case
+        .detection_spec()
+        .ok_or("non-detection case passed to detection runner")?;
+    let expected = mode.expected_format(family);
+    let preflight = litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+    if preflight != Some(expected) {
+        return Err(format!(
+            "{} detection preflight differs from expected {}: {:?}",
+            case.name(),
+            detection_format_name(expected),
+            preflight,
+        )
+        .into());
+    }
+
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Corpus setup, the exact-format oracle, and reader-contract checks are
+        // deliberately outside the timed detector call. This keeps optional
+        // test-only probe instrumentation from becoming benchmark work.
+        let (observed, duration, cursor_position) = match mode {
+            DetectionMode::Reader => {
+                let original_position = 7_u64;
+                let mut reader = Cursor::new(corpus.archive.as_slice());
+                reader.set_position(original_position);
+                let started = Instant::now();
+                let observed = litchi::common::detection::detect_format_from_reader(&mut reader);
+                let duration = started.elapsed();
+                (
+                    observed,
+                    duration,
+                    Some((reader.position(), original_position)),
+                )
+            },
+            DetectionMode::Bytes | DetectionMode::Polyglot | DetectionMode::CatalogAlias => {
+                let started = Instant::now();
+                let observed =
+                    litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+                let duration = started.elapsed();
+                (observed, duration, None)
+            },
+        };
+        if observed != Some(expected) {
+            return Err(format!(
+                "{} detection sample differs from expected {}: {:?}",
+                case.name(),
+                detection_format_name(expected),
+                observed,
+            )
+            .into());
+        }
+        if let Some((observed_position, original_position)) = cursor_position
+            && observed_position != original_position
+        {
+            return Err(format!(
+                "{} detection changed reader cursor from {original_position} to {observed_position}",
+                case.name(),
+            )
+            .into());
+        }
+        std::hint::black_box(observed);
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+    Ok(result(case, corpus, elapsed, None))
+}
+
 fn run_zip_read_one(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -43491,20 +44790,22 @@ mod tests {
         Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
         CountingSeekSink, CountingSink, HashingDiscardSink, InstrumentedSource,
         ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT,
-        ODT_RESOURCE_BATCH_COUNT, OpcCacheMode, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT,
-        PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT,
-        PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
-        SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR, OpcCacheMode, PPT_PICTURE_BYTES,
+        PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
+        PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
+        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink, Workbook,
+        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
         XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
-        build_docx_source_edit_corpus, build_odf_repair_corpus, build_odp_media_corpus,
-        build_odp_text_box_batch_corpus, build_ods_media_corpus, build_odt_media_corpus,
-        build_odt_repeated_text_corpus, build_odt_resource_batch_corpus, build_ole_common_corpus,
-        build_opc_corpus, build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
+        build_detection_corpus, build_docx_source_edit_corpus, build_odf_repair_corpus,
+        build_odp_media_corpus, build_odp_text_box_batch_corpus, build_ods_media_corpus,
+        build_odt_media_corpus, build_odt_repeated_text_corpus, build_odt_resource_batch_corpus,
+        build_ole_common_corpus, build_ooxml_tracker_corpus, build_opc_corpus,
+        build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
         build_pptx_slide_name_index_corpus, build_pptx_source_backed_cross_copy_corpus,
         build_pptx_source_edit_corpus, build_rtf_lifecycle_corpus, build_rtf_picture_corpus,
         build_semantic_docx_corpus, build_semantic_odp_corpus, build_semantic_ods_corpus,
@@ -43524,7 +44825,8 @@ mod tests {
         pptx_named_slide_name, resolve_execution_workers, run_case, run_case_with_config,
         run_cfb_open_stream, run_cfb_open_stream_simulated, run_cfb_selective_read,
         run_cfb_selective_simulated_read, run_docx_source_backed_one_edit_save,
-        run_odf_content_cow, run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        run_odf_content_cow, run_ooxml_tracker_case, run_opc_source_cache_budget_boundary,
+        run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -43540,6 +44842,46 @@ mod tests {
     };
 
     #[test]
+    fn detection_selectors_are_opt_in_with_exact_oracles() {
+        let cases = [
+            Case::DetectOdtBytes,
+            Case::DetectOdtReader,
+            Case::DetectOdtPolyglot,
+            Case::DetectOdtCatalogAlias,
+            Case::DetectOdsBytes,
+            Case::DetectOdsReader,
+            Case::DetectOdsPolyglot,
+            Case::DetectOdsCatalogAlias,
+            Case::DetectOdpBytes,
+            Case::DetectOdpReader,
+            Case::DetectOdpPolyglot,
+            Case::DetectOdpCatalogAlias,
+        ];
+        for case in cases {
+            assert!(!Case::DEFAULT.contains(&case));
+            assert_eq!(parse_case(case.name()), Some(case));
+            let (family, mode) = case
+                .detection_spec()
+                .expect("detection selector has a family and mode");
+            let expected = mode.expected_format(family);
+            let corpus = build_detection_corpus(case, SemanticShape::Tiny)
+                .expect("detection corpus has a deterministic oracle");
+            assert_eq!(
+                litchi::common::detection::detect_file_format_from_bytes(&corpus.archive),
+                Some(expected)
+            );
+            if mode == super::DetectionMode::Reader {
+                let mut reader = std::io::Cursor::new(corpus.archive.as_slice());
+                reader.set_position(7);
+                assert_eq!(
+                    litchi::common::detection::detect_format_from_reader(&mut reader),
+                    Some(expected)
+                );
+                assert_eq!(reader.position(), 7);
+            }
+        }
+    }
+
     fn ppt_picture_selectors_preserve_semantics_and_phase_read_evidence() {
         let first = build_ppt_pictures_corpus().unwrap();
         let second = build_ppt_pictures_corpus().unwrap();
@@ -43970,7 +45312,29 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 362);
+        assert_eq!(selectable_count, 378);
+        assert_eq!(Case::DEFAULT.len(), 36);
+    }
+
+    #[test]
+    fn ooxml_tracker_selectors_are_opt_in_and_nsreader_verified() {
+        let cases = [
+            Case::OmmlFormulaRangeScan,
+            Case::OmmlFormulaExtract,
+            Case::PptxDrawingmlExtract,
+            Case::PptxDrawingmlRangeScan,
+        ];
+        let corpus = build_ooxml_tracker_corpus().unwrap();
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(case.is_ooxml_tracker_scan());
+            assert!(!Case::DEFAULT.contains(&case));
+            let result = run_ooxml_tracker_case(case, &corpus, 0, 1).unwrap();
+            assert_eq!(result.case, case.name());
+            assert_eq!(result.elapsed_ns.samples.len(), 1);
+            assert_eq!(result.corpus.generator, OOXML_TRACKER_CORPUS_GENERATOR);
+            assert!(result.output_sha256.is_some());
+        }
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

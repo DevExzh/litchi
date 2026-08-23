@@ -74,11 +74,11 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         )
 
     def test_xlsb_crud_target_is_opt_in_and_consumes_timed_outcomes(self):
-        self.assertIn('xlsb-crud = ["dep:litchi-xlsb", "litchi/xlsb"]', self.manifest)
+        self.assertIn('xlsb-crud = ["litchi/xlsb"]', self.manifest)
         self.assertIn('path = "src/bin/xlsb_crud.rs"', self.manifest)
         self.assertIn('required-features = ["xlsb-crud"]', self.manifest)
         self.assertIn(
-            'litchi-xlsb = { path = "../../crates/litchi-xlsb", optional = true }',
+            'litchi-xlsb = { path = "../../crates/litchi-xlsb" }',
             self.manifest,
         )
         self.assertNotRegex(
