@@ -1,9 +1,12 @@
 //! Semantic workbook snapshot and worksheet models.
 
+use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::io::{Read, Write};
+use std::mem::size_of;
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use super::edit::{Commit, Edit, Patch};
 use super::worksheet;
@@ -110,6 +113,8 @@ pub(super) struct SheetData {
     pub(super) part_uri: PackURI,
     pub(super) cells: OnceLock<Store>,
     pub(super) web_bindings: OnceCell<crate::web::Bindings>,
+    /// Exact-source page-break projection identity and bounded cache handle.
+    pub(super) page_breaks: Arc<PageBreakProjection>,
     #[allow(
         dead_code,
         reason = "the cached column index supports internal workbook edit planning"
@@ -118,11 +123,257 @@ pub(super) struct SheetData {
     pub(super) relationship_id: String,
 }
 
+const PAGE_BREAK_CACHE_MAX_ENTRIES: usize = 64;
+const PAGE_BREAK_CACHE_MAX_WEIGHT: usize = 2 * 1024 * 1024;
+
+#[derive(Debug)]
+struct PageBreakCacheEntry {
+    source: Arc<Vec<u8>>,
+    value: Arc<crate::page_breaks::PageBreaks>,
+    weight: usize,
+}
+
+#[derive(Debug, Default)]
+struct PageBreakCacheState {
+    entries: VecDeque<PageBreakCacheEntry>,
+    weight: usize,
+    hits: usize,
+    misses: usize,
+}
+
+/// Finite weighted cache for successful worksheet page-break projections.
+///
+/// The cache is shared by immutable descendants of one workbook lineage, but
+/// never grows with the number of snapshots. Exact worksheet blob allocation
+/// identity is the invalidation key: publication of changed bytes cannot hit
+/// an earlier projection even when the part URI is unchanged.
+#[derive(Debug, Default)]
+pub(super) struct PageBreakProjectionCache {
+    state: Mutex<PageBreakCacheState>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(
+    dead_code,
+    reason = "cache statistics are consumed by focused projection tests"
+)]
+pub(super) struct PageBreakCacheStats {
+    pub(super) entries: usize,
+    pub(super) weight: usize,
+    pub(super) hits: usize,
+    pub(super) misses: usize,
+}
+
+impl PageBreakProjectionCache {
+    fn lock(&self) -> std::sync::MutexGuard<'_, PageBreakCacheState> {
+        match self.state.lock() {
+            Ok(state) => state,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    fn cached(&self, source: &Arc<Vec<u8>>) -> Option<Arc<crate::page_breaks::PageBreaks>> {
+        let mut state = self.lock();
+        let index = state
+            .entries
+            .iter()
+            .position(|entry| Arc::ptr_eq(&entry.source, source))?;
+        let entry = state.entries.remove(index)?;
+        let value = Arc::clone(&entry.value);
+        state.entries.push_back(entry);
+        Some(value)
+    }
+
+    pub(super) fn get_or_try_init(
+        &self,
+        source: Arc<Vec<u8>>,
+        parse: impl FnOnce(&[u8]) -> Result<crate::page_breaks::PageBreaks>,
+    ) -> Result<Arc<crate::page_breaks::PageBreaks>> {
+        if let Some(value) = self.cached(&source) {
+            let mut state = self.lock();
+            state.hits = state.hits.saturating_add(1);
+            return Ok(value);
+        }
+
+        let value = Arc::new(parse(source.as_slice())?);
+        let weight = page_break_projection_weight(source.capacity(), &value);
+        {
+            let mut state = self.lock();
+            state.misses = state.misses.saturating_add(1);
+            // Another reader may have parsed and published the same source
+            // while this reader was outside the mutex. Prefer that canonical
+            // value so concurrent misses cannot accumulate duplicate entries
+            // for one exact worksheet blob.
+            if let Some(index) = state
+                .entries
+                .iter()
+                .position(|entry| Arc::ptr_eq(&entry.source, &source))
+            {
+                if let Some(entry) = state.entries.remove(index) {
+                    let existing = Arc::clone(&entry.value);
+                    state.entries.push_back(entry);
+                    state.hits = state.hits.saturating_add(1);
+                    return Ok(existing);
+                }
+            }
+            if weight <= PAGE_BREAK_CACHE_MAX_WEIGHT {
+                while state.entries.len() >= PAGE_BREAK_CACHE_MAX_ENTRIES
+                    || state.weight.saturating_add(weight) > PAGE_BREAK_CACHE_MAX_WEIGHT
+                {
+                    let Some(evicted) = state.entries.pop_front() else {
+                        break;
+                    };
+                    state.weight = state.weight.saturating_sub(evicted.weight);
+                }
+                state.weight = state.weight.saturating_add(weight);
+                state.entries.push_back(PageBreakCacheEntry {
+                    source,
+                    value: Arc::clone(&value),
+                    weight,
+                });
+            }
+        }
+        Ok(value)
+    }
+
+    #[allow(
+        dead_code,
+        reason = "cache statistics are consumed by focused projection tests"
+    )]
+    pub(super) fn stats(&self) -> PageBreakCacheStats {
+        let state = self.lock();
+        PageBreakCacheStats {
+            entries: state.entries.len(),
+            weight: state.weight,
+            hits: state.hits,
+            misses: state.misses,
+        }
+    }
+}
+
+fn page_break_projection_weight(
+    source_capacity: usize,
+    value: &crate::page_breaks::PageBreaks,
+) -> usize {
+    let breaks = value
+        .horizontal()
+        .into_iter()
+        .chain(value.vertical())
+        .map(crate::page_breaks::Collection::len)
+        .sum::<usize>();
+    let collections = value.horizontal().into_iter().count() + value.vertical().into_iter().count();
+    source_capacity
+        .saturating_add(size_of::<Vec<u8>>())
+        .saturating_add(size_of::<crate::page_breaks::PageBreaks>())
+        .saturating_add(collections.saturating_mul(size_of::<crate::page_breaks::Collection>()))
+        .saturating_add(breaks.saturating_mul(size_of::<crate::page_breaks::Break>()))
+        .saturating_add(size_of::<PageBreakCacheEntry>())
+}
+
+/// Source identity plus the bounded projection cache used by one worksheet
+/// handle. This small handle is copied across unchanged snapshots; the
+/// parsed value itself lives only in the finite weighted cache above.
+#[derive(Debug)]
+pub(super) struct PageBreakProjection {
+    cache: Arc<PageBreakProjectionCache>,
+    #[allow(
+        dead_code,
+        reason = "source identity is inspected by focused cache invalidation tests"
+    )]
+    source: Arc<Vec<u8>>,
+}
+
+impl PageBreakProjection {
+    fn new(cache: Arc<PageBreakProjectionCache>, source: Arc<Vec<u8>>) -> Self {
+        Self { cache, source }
+    }
+
+    #[allow(
+        dead_code,
+        reason = "cached values are inspected by focused projection tests"
+    )]
+    pub(super) fn get(&self) -> Option<Arc<crate::page_breaks::PageBreaks>> {
+        let mut state = self.cache.lock();
+        let index = state
+            .entries
+            .iter()
+            .position(|entry| Arc::ptr_eq(&entry.source, &self.source))?;
+        let entry = state.entries.remove(index)?;
+        let value = Arc::clone(&entry.value);
+        state.entries.push_back(entry);
+        Some(value)
+    }
+
+    pub(super) fn get_or_try_init(
+        &self,
+        source: Arc<Vec<u8>>,
+        parse: impl FnOnce(&[u8]) -> Result<crate::page_breaks::PageBreaks>,
+    ) -> Result<Arc<crate::page_breaks::PageBreaks>> {
+        self.cache.get_or_try_init(source, parse)
+    }
+}
+
 /// A commit-validated worksheet store tied to the exact published part bytes.
 pub(super) struct ValidatedWorksheetStore {
     pub(super) uri: PackURI,
     pub(super) content: Arc<Vec<u8>>,
     pub(super) store: Store,
+}
+
+struct SourcePageBreakProjection {
+    blob: Arc<Vec<u8>>,
+    projection: Arc<PageBreakProjection>,
+}
+
+/// Build the source cache index once per descendant snapshot. Keeping the
+/// lookup keyed by part URI avoids scanning every source sheet for each
+/// target sheet during publication.
+fn page_break_caches(source: Option<&Workbook>) -> HashMap<PackURI, SourcePageBreakProjection> {
+    let Some(source) = source else {
+        return HashMap::new();
+    };
+    let mut caches = HashMap::with_capacity(source.inner.sheets.len());
+    for sheet in source.inner.sheets.iter() {
+        let Ok(part) = source.inner.package.get_part(&sheet.part_uri) else {
+            continue;
+        };
+        caches.insert(
+            sheet.part_uri.clone(),
+            SourcePageBreakProjection {
+                blob: part.blob_arc(),
+                projection: Arc::clone(&sheet.page_breaks),
+            },
+        );
+    }
+    caches
+}
+
+/// Reuse a successful worksheet projection only when the target snapshot
+/// retains the exact source payload allocation. A publication that replaces
+/// the worksheet bytes receives a fresh cache, so no edit can observe a
+/// projection from an earlier generation.
+fn page_break_cache(
+    source_caches: &HashMap<PackURI, SourcePageBreakProjection>,
+    package: &OpcPackage,
+    part_uri: &PackURI,
+    cache: &Arc<PageBreakProjectionCache>,
+) -> Result<Arc<PageBreakProjection>> {
+    let target_part = package.get_part(part_uri)?;
+    let target_blob = target_part.blob_arc();
+    let Some(source) = source_caches.get(part_uri) else {
+        return Ok(Arc::new(PageBreakProjection::new(
+            Arc::clone(cache),
+            target_blob,
+        )));
+    };
+    if Arc::ptr_eq(&source.blob, &target_blob) {
+        Ok(Arc::clone(&source.projection))
+    } else {
+        Ok(Arc::new(PageBreakProjection::new(
+            Arc::clone(&source.projection.cache),
+            target_blob,
+        )))
+    }
 }
 
 #[derive(Debug)]
@@ -148,6 +399,7 @@ pub(crate) struct Inner {
     pub(super) defined_names: Box<[raw::DefinedName]>,
     pub(super) pivot_caches: Box<[raw::PivotCache]>,
     pub(super) external_reference_ids: Box<[String]>,
+    pub(super) page_break_cache: Arc<PageBreakProjectionCache>,
 }
 
 /// Immutable, cheap-to-share XLSX workbook snapshot.
@@ -386,6 +638,11 @@ impl Workbook {
             },
             Some(_) | None => Arc::new(SharedStringLineage),
         };
+        let lineage_page_break_cache = source.map_or_else(
+            || Arc::new(PageBreakProjectionCache::default()),
+            |source| Arc::clone(&source.inner.page_break_cache),
+        );
+        let source_page_break_caches = page_break_caches(source);
         let sheets = catalog
             .sheets
             .into_iter()
@@ -393,20 +650,28 @@ impl Workbook {
             .enumerate()
             .map(|(position, (sheet, part))| {
                 let name_key = crate::sheet::key(&sheet.name);
-                Arc::new(SheetData {
+                let part_uri = part.uri;
+                let page_breaks = page_break_cache(
+                    &source_page_break_caches,
+                    &package,
+                    &part_uri,
+                    &lineage_page_break_cache,
+                )?;
+                Ok(Arc::new(SheetData {
                     position,
                     name: sheet.name,
                     name_key,
                     kind: part.kind,
                     visibility: codec::visibility(sheet.visibility),
-                    part_uri: part.uri,
+                    part_uri,
                     cells: OnceLock::new(),
                     web_bindings: OnceCell::new(),
+                    page_breaks,
                     native_id: sheet.sheet_id,
                     relationship_id: sheet.relationship_id,
-                })
+                }))
             })
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>>>()?
             .into_boxed_slice();
 
         Ok(Self {
@@ -432,6 +697,7 @@ impl Workbook {
                 defined_names: catalog.defined_names.into_boxed_slice(),
                 pivot_caches: catalog.pivot_caches.into_boxed_slice(),
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
+                page_break_cache: lineage_page_break_cache,
             }),
             #[cfg(feature = "encryption")]
             encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),
