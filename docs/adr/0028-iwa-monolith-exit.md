@@ -3620,3 +3620,34 @@ The historical 64 workspace packages, 239 internal dependency declarations,
 and 13-entry ordered migration ledger are unchanged. None of these bounded
 changes satisfies the deletion gate, retires a host edge, or authorizes
 monolith deletion; no Cargo/native/complete-monolith result is claimed.
+
+## 2026-08-23 amendment: detached bounded ingress and surface hardening
+
+The detached commits `a4e7066ea`, `e834a6ced`, `5be5af395`, and `fa2ad9cf2`,
+together with corrective commit `b72e7e50f`, are recorded here only as
+bounded hardening inputs to the existing migration work. Their exact source
+paths are, respectively,
+`crates/litchi-numbers/src/package/extractor.rs`,
+`crates/litchi-iwa/src/pages/editor/footnotes.rs`,
+`crates/litchi-iwa-protos/build.rs`, and
+`crates/litchi-iwa/src/identity.rs` plus `crates/litchi-iwa/src/lib.rs`.
+
+The Numbers visitor now bounds reply identity collection, rejects a direct
+self-reference and duplicate reply IDs, and verifies visitor cardinality
+against the codec report before publishing a compatibility candidate. Pages
+footnote cleanup bounds body collections, uses checked counts and fallible
+reservations for removed graph identifiers, and retains staged publication
+with identity-based deletion. Corrective commit `b72e7e50f` changes the
+cleanup helper to `Result<[u64; 3]>`; the `e834a6ced` body change alone is not
+presented as compilable. The Pages provenance guard inventories the
+additional live route consumers, requires private or crate-visible numeric
+declarations, checks production decode/remap/write markers, and extends the
+canonical document-field ratchet. The IWA document identity type and its
+generation/access/regeneration methods are crate-private and no longer
+re-exported from `litchi-iwa`.
+
+These changes tighten malformed-graph handling, allocation bounds, route
+provenance, and public-surface privacy; they do not move format ownership or
+mutation responsibility. No Cargo/build command or native application run
+was performed or admitted. This amendment makes no host-edge, ordered-debt,
+or monolith-exit claim and does not alter the deletion gate.

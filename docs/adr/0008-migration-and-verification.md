@@ -11246,3 +11246,48 @@ No historical verification count or ordered debt is revised: the recorded
 64-package/239-declaration baseline and 13-entry migration ledger remain in
 force. No Cargo gate, native gate, dependency-edge retirement, or monolith
 deletion claim follows; the monolith remains a migration host.
+
+## 2026-08-23 amendment: detached bounded ingress and surface hardening
+
+The four requested detached commits `a4e7066ea`, `e834a6ced`, `5be5af395`,
+and `fa2ad9cf2`, together with corrective commit `b72e7e50f`, are recorded as
+source-level, narrowly bounded hardening. The Numbers comment-reply change
+is in `crates/litchi-numbers/src/package/extractor.rs`; the Pages cleanup
+pair is in `crates/litchi-iwa/src/pages/editor/footnotes.rs`; the Pages route
+guard is in `crates/litchi-iwa-protos/build.rs`; and the document-identity
+visibility change is in
+`crates/litchi-iwa/src/identity.rs` and `crates/litchi-iwa/src/lib.rs`. No
+Cargo or build command was run for this amendment, and no test or native
+result is admitted.
+
+Numbers comment-reply ingress now seeds its visitor with the owning storage
+identity, tracks reply identities in a fallibly reserved set, rejects direct
+self-edges and duplicate replies, and compares the collected IDs with the
+codec's reported reply cardinality before publishing a candidate. Allocation
+or cardinality failures remain typed malformed/limit paths; this does not
+claim a broader comment-graph or formula projection.
+
+Legacy Pages footnote cleanup now caps collection and set reservations at
+`MAX_BODY_FOOTNOTES = 4096`, checks removed and derived identifier counts,
+uses fallible reservations, and returns fixed-size identifier triples from
+graph cleanup. The follow-up `b72e7e50f` corrects the helper signature to
+`Result<[u64; 3]>`; the preceding `e834a6ced` body change is therefore a
+source-level precursor, not a standalone compilable commit. Existing staged
+publication and identity-based deletion are the bounded semantics; no focused
+or native mutation result is recorded.
+
+The Pages route guard expands its source inventory and private or
+crate-visible route checks to audio, creation, legacy editor, and focused
+footnote consumers. It also checks exact production decode/remap/write
+markers and the additional canonical `DocumentArchive` fields. This records
+the provenance-ratchet source change only, not a generated-schema or build
+outcome.
+
+The IWA document-identity helper is now crate-private: its type, generator,
+getters, and regeneration method are `pub(crate)`, while `lib.rs` keeps the
+module private and removes the public re-export. This narrows the public
+surface without assigning a replacement owner or adding an API.
+
+This amendment is limited to the four named detached diffs and the corrective
+`b72e7e50f` follow-up. It makes no Cargo/build, native, host-edge, ordered-debt,
+or monolith-exit claim.
