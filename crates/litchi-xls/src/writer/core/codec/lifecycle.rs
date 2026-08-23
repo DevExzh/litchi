@@ -148,7 +148,12 @@ impl Writer {
         }
 
         // Check for duplicate names
-        if self.worksheets.iter().any(|ws| ws.name == name) {
+        let normalized_name = name.to_lowercase();
+        if self
+            .worksheets
+            .iter()
+            .any(|ws| ws.name.to_lowercase() == normalized_name)
+        {
             return Err(Error::InvalidData(format!(
                 "Worksheet '{name}' already exists"
             )));

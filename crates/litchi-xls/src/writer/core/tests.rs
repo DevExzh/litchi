@@ -59,6 +59,14 @@ fn test_add_worksheet_duplicate_name() {
 }
 
 #[test]
+fn test_add_worksheet_duplicate_name_is_case_insensitive() {
+    let mut writer = Writer::new();
+    writer.add_worksheet("Sheet1").unwrap();
+    let result = writer.add_worksheet("sheet1");
+    assert!(result.is_err());
+}
+
+#[test]
 fn test_write_string() {
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
