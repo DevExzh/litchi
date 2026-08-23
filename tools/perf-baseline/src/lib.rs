@@ -14,6 +14,7 @@ mod docx_story_hyperlink_publication;
 mod filesystem;
 mod operation_metrics;
 mod parallel_metrics;
+mod pptx_slide_boundaries;
 mod process_metrics;
 #[cfg(test)]
 mod security_corpus;
@@ -910,6 +911,8 @@ enum Case {
     PptxCrossCopyPlain,
     PptxCrossCopyMediaRich,
     PptxSourceBackedCrossCopyPlain,
+    PptxSlideRemoveBoundarySave,
+    PptxSlideMoveBoundarySave,
     XlsxEagerCalculationMetadataEditSave,
     XlsxSourceBackedCalculationMetadataEditSave,
     XlsxEagerDefinedNamesEditSave,
@@ -1355,6 +1358,8 @@ impl Case {
             Self::PptxCrossCopyPlain => "pptx_cross_copy_plain",
             Self::PptxCrossCopyMediaRich => "pptx_cross_copy_media_rich",
             Self::PptxSourceBackedCrossCopyPlain => "pptx_source_backed_cross_copy_plain",
+            Self::PptxSlideRemoveBoundarySave => "pptx_slide_remove_boundary_save",
+            Self::PptxSlideMoveBoundarySave => "pptx_slide_move_boundary_save",
             Self::XlsxEagerCalculationMetadataEditSave => {
                 "xlsx_eager_calculation_metadata_edit_save"
             },
@@ -2640,6 +2645,13 @@ impl Case {
         matches!(self, Self::PptxSourceBackedCrossCopyPlain)
     }
 
+    const fn is_pptx_slide_boundary(self) -> bool {
+        matches!(
+            self,
+            Self::PptxSlideRemoveBoundarySave | Self::PptxSlideMoveBoundarySave
+        )
+    }
+
     const fn is_xlsx_calculation_metadata_edit_save(self) -> bool {
         matches!(
             self,
@@ -3548,6 +3560,8 @@ struct SourceSummary {
     pptx_cross_copy: Option<PptxCrossCopySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_backed_cross_copy: Option<PptxSourceBackedCrossCopySummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_slide_boundaries: Option<pptx_slide_boundaries::PptxSlideBoundarySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_media: Option<OdpMediaSourceSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -7381,6 +7395,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_pptx_source_edit_save()
                     && !case.is_pptx_cross_copy()
                     && !case.is_pptx_source_backed_cross_copy()
+                    && !case.is_pptx_slide_boundary()
                     && !case.is_xlsx_calculation_metadata_edit_save()
                     && !case.is_xlsx_defined_names_edit_save()
                     && !case.is_xlsx_page_break_edit_save()
@@ -7914,6 +7929,23 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         {
             let corpus = build_pptx_source_backed_cross_copy_corpus(case)?;
             results.push(run_pptx_source_backed_cross_copy(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options.cases.iter().any(|case| case.is_pptx_slide_boundary()) {
+        let corpus = pptx_slide_boundaries::build_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_pptx_slide_boundary())
+        {
+            results.push(pptx_slide_boundaries::run(
                 case,
                 &corpus,
                 options.warmup_iterations,
@@ -9373,6 +9405,8 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_cross_copy_plain" => Some(Case::PptxCrossCopyPlain),
         "pptx_cross_copy_media_rich" => Some(Case::PptxCrossCopyMediaRich),
         "pptx_source_backed_cross_copy_plain" => Some(Case::PptxSourceBackedCrossCopyPlain),
+        "pptx_slide_remove_boundary_save" => Some(Case::PptxSlideRemoveBoundarySave),
+        "pptx_slide_move_boundary_save" => Some(Case::PptxSlideMoveBoundarySave),
         "xlsx_eager_calculation_metadata_edit_save" => {
             Some(Case::XlsxEagerCalculationMetadataEditSave)
         },
@@ -9874,6 +9908,8 @@ fn usage_text() -> String {
                                        pptx_source_backed_multi_slide_batch_edit_save,\n\
                                        pptx_cross_copy_plain,pptx_cross_copy_media_rich,\n\
                                        pptx_source_backed_cross_copy_plain,\n\
+                                       pptx_slide_remove_boundary_save,\n\
+                                       pptx_slide_move_boundary_save,\n\
                                        xlsx_eager_calculation_metadata_edit_save,\n\
                                        xlsx_source_backed_calculation_metadata_edit_save,\n\
                                        xlsx_eager_defined_names_edit_save,\n\
@@ -18074,6 +18110,9 @@ fn run_case_with_config(
         | Case::PptxCrossCopyMediaRich
         | Case::PptxSourceBackedCrossCopyPlain => {
             Err("PPTX cross-copy cases use their dedicated corpus runner".into())
+        },
+        Case::PptxSlideRemoveBoundarySave | Case::PptxSlideMoveBoundarySave => {
+            Err("PPTX slide-boundary cases use their dedicated corpus runner".into())
         },
         Case::XlsxEagerCalculationMetadataEditSave
         | Case::XlsxSourceBackedCalculationMetadataEditSave => {
