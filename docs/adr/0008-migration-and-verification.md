@@ -11573,12 +11573,12 @@ monolith-deletion gate.
 
 Commit `2219b53b4` changes only
 `crates/litchi-pages/src/package/table_lock.rs`. Body-table discovery now
-proves the rooted body’s complete field-9 (`TABLE_BODY_FIELD`) attachment
-inventory once, before the per-table attachment/drawable/model walks. The
-coalesced proof requires the selected aggregate reference to occur exactly
-once, each field-9 declaration to be exact, and the declaration set to match
-the parsed body-table entries; each selected table still checks its own
-physical attachment, drawable, model, and message slots.
+performs one coalesced proof of the rooted body’s complete field-9
+(`TABLE_BODY_FIELD`) attachment inventory before the per-table
+attachment/drawable/model walks. That proof requires the selected aggregate
+reference to occur exactly once, each field-9 declaration to be exact, and the
+declaration set to match the parsed body-table entries; each selected table
+still checks its own physical attachment, drawable, model, and message slots.
 
 The field-9 prefix validator computes checked declaration capacity from the
 aggregate and field-local object references, charges that work, and uses
@@ -11587,20 +11587,117 @@ counter. The body inventory separately computes checked capacity for every
 field-9 declaration and reserves it before rejecting duplicate or missing
 entries. Aggregate and field-local references, declaration/entry checks, and
 the duplicate-prefix comparisons are charged explicitly, including the
-compared prefix length; malformed data paths, aliases, duplicate declarations,
-and unaccounted aggregate references fail closed.
+compared prefix length. A wrong path, alias, duplicate declaration,
+data-reference substitution, or unaccounted reference on the selected table
+edge fails closed. Unrelated aggregate references on intentionally accepted
+non-table paths remain valid only when their own exact FieldInfo declaration
+accounts for that occurrence; this is not a package-wide alias proof.
 
 The retained TableInfo proof remains strict: the selected TableInfo
 payload/metadata must carry the exact model reference and nested body-parent
 path, with strict selected message/header metadata and the terminal model
-archive slot and message type rechecked. The edit and patch now carry the
-complete resolved target proof rather than only a table position. Commit and
+archive slot and message type rechecked. The edit and changed patch
+publication carry the complete resolved `BodyTableTarget` proof rather than
+only a table position. For changed publication, commit/rewrite and
 patch-apply paths check the exact source bytes and fingerprints, revalidate
-the proof and pre-state, reopen the separate candidate, and verify its
-post-state before returning the immutable result; the inverse preserves the
-same proof.
+that retained `BodyTableTarget` proof and the before-state, reopen the separate
+candidate, and verify the retained target’s after-state before returning the
+immutable result; the inverse preserves the same proof. No-op commit/apply
+paths intentionally retain unchanged-source behavior and do not claim a
+changed-candidate reopen or a repeat of the full body aggregate proof.
 
 This records Pages table-lock ownership and bounded work hardening only. It
 makes no full-transaction accounting or performance claim, and admits no
 Cargo/build/test or native result. It retires no dependency edge or ordered
 debt and makes no migration-host, host-exit, or monolith-deletion claim.
+
+No native Pages open/save result is admitted by this amendment. The earlier
+recorded Pages table-lock fixture was rejected by Pages as damaged, so it
+remains a native-open gap rather than a pass; package-level transaction tests
+and candidate reopens are not native application evidence.
+
+## 2026-08-23 amendment: checked Keynote chart-title extension counting
+
+Commit `0dcb85b9a` changes only
+`crates/litchi-keynote/src/package/slide_chart_title.rs`. In
+`read_chart_title`, the occurrence count for the generated chart non-style
+extension field now uses checked addition; a counter overflow returns
+`ChartTitleError::InvalidSource` before the selected extension is decoded.
+The existing exactly-one occurrence, length-delimited wire-type, canonical
+framing, and bounded visible-title decode checks remain in force.
+
+This is source-level checked counting for one chart-title extension scan. It
+does not broaden chart-title parsing, graph ownership, or mutation semantics.
+No Cargo/build/test or native result is admitted, and no performance,
+allocation, dependency, debt, host, or monolith result follows.
+
+## 2026-08-23 amendment: checked Numbers formula-category work product
+
+Commit `28a90aa77` changes only
+`crates/litchi-numbers/src/package/extractor.rs`. The formula-category
+payload preflight now obtains its source-length product for
+`MAX_FORMULA_CATEGORY_DEPTH.saturating_add(1)` passes through
+`checked_formula_work_product` before clamping the result to the wire
+input-byte limit. Multiplication overflow maps to the active
+`SemanticLimitKind::FormulaWork` ceiling rather than being silently saturated
+before the wire clamp; the existing category depth/field scan and retained
+entry/text publication behavior are unchanged.
+
+This is source-level arithmetic hardening for that formula-category preflight
+only. No Cargo/build/test or native result is admitted, and no performance,
+allocation, dependency, debt, host, or monolith result follows.
+
+## 2026-08-23 amendment: Keynote transition router provenance declarations
+
+Commit `6c7dd60dc` changes only `crates/litchi-iwa-protos/build.rs`. The
+Keynote slide-transition provenance guard now requires the production codec to
+contain exactly one declaration of each router field constant:
+`SLIDE_TRANSITION_FIELD = 4`, `TRANSITION_ATTRIBUTES_FIELD = 2`, and
+`ATTRIBUTES_ANIMATION_FIELD = 8`. These checks ratchet the handwritten router
+declarations alongside the canonical slide/transition/animation schema and
+projection-message checks already enforced by the guard.
+
+This is build-time source-provenance coverage only. It does not change runtime
+transition parsing, ownership, or mutation behavior. No Cargo/build/test or
+native result is admitted, and no performance, allocation, dependency, debt,
+host, or monolith result follows.
+
+## 2026-08-23 amendment: Pages table-lock data-reference charges
+
+Commit `6e1c22974` changes only
+`crates/litchi-pages/src/package/table_lock.rs`. Both selected-reference
+helpers now charge aggregate and field-local `data_references` counts against
+the bounded `PayloadReferences` budget before inspecting semantic ownership:
+`message_declares_reference` charges the message and each field, and
+`message_declares_reference_prefix` does the same for the coalesced body
+proof. The selected table-edge rules and the intentionally accepted unrelated
+non-table paths remain unchanged; this closes an accounting gap rather than
+broadening ownership.
+
+The commit adds the bounded
+`data_reference_scans_are_bounded_before_semantic_checks` cases for
+message-level and field-level data references in both helpers, asserting the
+typed `PayloadReferences` limit before semantic checks. These are source-level
+budget tests; no test execution or native result is admitted, and no
+dependency edge, ordered debt, host, or monolith result follows.
+
+## 2026-08-23 amendment: neutral Numbers table-name projection
+
+Commit `ace1d1f3a` changes only `crates/litchi-iwa/src/protobuf.rs`. The
+neutral type-6001 `TableModelArchive` decoder now uses the strict
+`numbers_names_codec::decode_table_names` projection with source-derived byte,
+field, work, and nesting ceilings instead of the generated
+`TableModelArchive::decode` route. Codec resource failures map to the
+existing typed input-byte, field, rewrite-work, or nesting errors; malformed
+wire, invalid UTF-8, and duplicate singular names remain invalid-format
+failures.
+
+Only the validated table-name text is fallibly copied into an owned
+`String` with `try_reserve_exact`; the original archive bytes remain the
+preservation authority, and the neutral wrapper no longer reconstructs a
+generated table model or publishes cell data. Focused cases cover Unicode
+text, tolerated unknown fields, malformed/truncated payloads, invalid UTF-8,
+duplicate names, and the absence of a production generated decode call.
+This is bounded neutral-projection hardening only: no Cargo/build/test or
+native result is admitted, and no format-owner edge, ordered debt, host-exit,
+or monolith result follows.
