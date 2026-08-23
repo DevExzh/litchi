@@ -7,7 +7,9 @@
 //! Unsupported source layouts are refused before the first sink write.  The
 //! method does not materialize an owning package and has no logical fallback.
 
-use super::package::{SourceBackedPackage, SourceChangedIo, SourceExecutionIo, SourceReadIo};
+use super::package::{
+    SourceBackedPackage, SourceChangedIo, SourceExecutionIo, SourceReadIo, is_signature_owner_path,
+};
 use crate::constants;
 use litchi_core::{
     CancellationToken, Error, ExecutionContext, ExecutionError, Resource, Result, SourceVersion,
@@ -950,7 +952,7 @@ fn preflight_changed_publication(
     }
     debug_assert!(!manifest.has_encrypted_entries());
     for path in package.publication_file_names() {
-        if path.starts_with("META-INF/") && path.ends_with("signatures.xml") {
+        if is_signature_owner_path(path) {
             return Err(unsupported(
                 "signed ODF packages require an explicit signature policy",
             ));

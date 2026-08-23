@@ -395,6 +395,8 @@ impl Snapshot {
             media_bytes: 0,
             resource_bytes: self.resource_bytes,
             source_resource_bytes: self.resource_bytes,
+            non_media_changed: false,
+            media_changed: false,
             slide_order_changed: false,
             dependency_free_slide_copy_changed: false,
             dependency_free_slide_removal_changed: false,
@@ -465,6 +467,8 @@ pub struct Transaction {
     media_bytes: usize,
     resource_bytes: usize,
     source_resource_bytes: usize,
+    non_media_changed: bool,
+    media_changed: bool,
     slide_order_changed: bool,
     dependency_free_slide_copy_changed: bool,
     dependency_free_slide_removal_changed: bool,
@@ -675,7 +679,7 @@ impl Transaction {
         self.draft
             .insert_slide(self.draft.slides().len(), title, text)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(())
     }
 
@@ -701,7 +705,7 @@ impl Transaction {
         let candidate = self.resource_candidate(0, text_resource(title, text)?)?;
         self.draft.insert_slide(index, title, text)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -731,7 +735,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed, text_resource(title, text)?)?;
         self.draft.update_slide(index, title, text)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -753,7 +757,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed_bytes, 0)?;
         let removed = self.draft.remove_slide(index)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(removed))
     }
 
@@ -809,7 +813,7 @@ impl Transaction {
         self.draft.check_slide_move_supported()?;
         self.draft.move_slide(from, to)?;
         self.slide_order_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -864,7 +868,7 @@ impl Transaction {
         let copied_index = self.draft.apply_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(copied_index))
     }
 
@@ -977,7 +981,7 @@ impl Transaction {
             .apply_foreign_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(copied_index))
     }
 
@@ -1036,7 +1040,7 @@ impl Transaction {
             .apply_dependency_free_blank_slide_removal(removal);
         self.resource_bytes = candidate;
         self.dependency_free_slide_removal_changed = true;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(removed))
     }
 
@@ -1064,7 +1068,7 @@ impl Transaction {
         )?;
         self.draft.add_shape(index, shape)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -1089,7 +1093,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed_bytes, 0)?;
         let removed = self.draft.remove_shape(slide_index, shape_index)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(removed))
     }
 
@@ -1115,7 +1119,7 @@ impl Transaction {
         let candidate = self.resource_candidate(removed, 0)?;
         self.draft.clear_slide(index)?;
         self.resource_bytes = candidate;
-        self.changed = true;
+        self.mark_non_media_changed();
         Ok(Some(()))
     }
 
@@ -1147,7 +1151,7 @@ impl Transaction {
             try_owned_str(media_type, "ODP media type")?,
         )?;
         self.media_bytes = media_bytes;
-        self.changed = true;
+        self.mark_media_changed();
         Ok(reference)
     }
 
@@ -1171,42 +1175,12 @@ impl Transaction {
                 "ODP media change batch exceeds {MAX_MEDIA_CHANGES} operations"
             ));
         }
-        let added = changes.iter().try_fold(0usize, |total, change| {
-            let bytes = match change {
-                MediaChange::Add {
-                    path,
-                    payload,
-                    media_type,
-                }
-                | MediaChange::Replace {
-                    path,
-                    payload,
-                    media_type,
-                } => path
-                    .len()
-                    .checked_add(media_type.len())
-                    .and_then(|value| value.checked_add(payload.len()))
-                    .ok_or_else(|| invalid_error("ODP media change size overflow"))?,
-                MediaChange::Remove { .. } => 0,
-            };
-            total
-                .checked_add(bytes)
-                .ok_or_else(|| invalid_error("ODP media change aggregate size overflow"))
-        })?;
-        if added > 0 {
-            let projected_media = self
-                .media_bytes
-                .checked_add(added)
-                .ok_or_else(|| invalid_error("ODP media change projected size overflow"))?;
-            self.check_projected(self.resource_bytes, projected_media)?;
-        }
-        let changed = self.draft.apply_media_changes(changes)?;
-        if changed == 0 {
-            return Ok(0);
-        }
+        let plan = self.draft.prepare_media_changes(changes)?;
+        self.check_projected(self.resource_bytes, plan.staged_media_bytes)?;
+        let changed = plan.changed;
+        self.draft.apply_media_plan(plan);
         self.media_bytes = self.draft.staged_media_bytes()?;
-        self.check_projected(self.resource_bytes, self.media_bytes)?;
-        self.changed = true;
+        self.refresh_media_changed();
         Ok(changed)
     }
 
@@ -2868,6 +2842,21 @@ impl Transaction {
         )?;
         Ok(())
     }
+
+    fn mark_non_media_changed(&mut self) {
+        self.non_media_changed = true;
+        self.changed = true;
+    }
+
+    fn mark_media_changed(&mut self) {
+        self.media_changed = true;
+        self.changed = true;
+    }
+
+    fn refresh_media_changed(&mut self) {
+        self.media_changed = self.draft.has_staged_media_changes();
+        self.changed = self.non_media_changed || self.media_changed;
+    }
 }
 
 /// A validated publication result containing a snapshot and reversible patch.
@@ -3489,9 +3478,12 @@ fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
 
 fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
     let archive = package.package()?;
-    let encrypted = archive.manifest().has_encrypted_entries();
-    let signed = archive.has_file("META-INF/documentsignatures.xml")
-        || archive.has_file("META-INF/macrosignatures.xml");
+    let encrypted =
+        archive.manifest().has_encrypted_entries() || package.has_zip_encrypted_entries();
+    let signed = archive
+        .files()?
+        .iter()
+        .any(|path| crate::core::is_signature_owner_path(path));
     Ok(match (signed, encrypted) {
         (false, false) => SecurityPolicy::Editable,
         (false, true) => SecurityPolicy::EncryptedReadOnly,

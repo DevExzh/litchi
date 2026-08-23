@@ -95,7 +95,9 @@ pub use metadata::{
     UserDefinedMetadata, UserDefinedValueType,
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
-pub use package::{OwnedPackage, SourceBackedPackage, SourcePackageLimits};
+pub use package::{
+    OwnedPackage, SourceBackedPackage, SourcePackageLimits, is_signature_owner_path,
+};
 pub use source_publication::{
     SourceContentPublicationError, SourceContentPublicationOptions,
     SourceContentPublicationProgress, SourceContentPublicationReport, write_content_xml_to_stream,
