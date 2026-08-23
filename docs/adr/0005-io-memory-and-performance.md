@@ -532,3 +532,36 @@ This is bounded error classification and checked-arithmetic evidence only.
 It does not claim package-wide accounting, allocation or performance
 measurements, native round-trip behavior, migration-debt retirement, host
 exit, or `litchi-iwa` monolith deletion.
+
+## 2026-08-23 amendment: current HEAD bounded follow-up
+
+The prior dated evidence and scope notes remain historical as written. At
+committed HEAD `4f2c14484` (parent `609d44049`), the post-`b208dbd77` changes
+are bounded source, test, deprecation, and fuzz-harness hardening:
+
+- `d131176b4`, `94b07ffc5`, `03cee9a79`, and `7a497d1ef` retain and ratchet the archive
+  production Buffa lazy-view boundary by rejecting generated eager helpers;
+- `6b705d39b`, `f8060a43f`, and `447cb3ec3` keep duplicate unselected/shared
+  Keynote slide owners rejected before read or staging and add focused
+  coverage;
+- `33656a7f0` and `8254df4e9` preserve typed Pages footnote wire and
+  semantic/rewrite limit categories;
+- `cd2dc0ca5` deprecates only the legacy raw-ID Pages section-clear API;
+- `d3b1bd571` and `5abf10bb4` add mixed reorder/replacement cache-publication
+  coverage;
+- `95356f2a8` rejects case-insensitive worksheet-name duplicates;
+- `543f74a37` makes Numbers table-header growth fallible per iterator item;
+- `cca10f240` redacts native reference identifiers from diagnostic formatting;
+- `7effedb57` adds a deprecation boundary to legacy raw-ID Numbers
+  cell-comment APIs while retaining compatibility and migration-host paths;
+- `609d44049` fixes BIFF8 supplementary-character length accounting and adds
+  validation-string round-trip coverage;
+- `4f2c14484` charges nested table-lock references before declaration-map
+  reservation and adds a low-ceiling budget case;
+- `b5a9d5994` bounds CFB fuzz input to 4 MiB, while `1446dc8e7` bounds RTF
+  fuzz inputs to 1 MiB and parser/opaque work; both supply campaign recipes
+  only.
+
+No test/build/Cargo execution, sanitizer campaign, native application
+result, performance/allocation measurement, dependency-edge or ordered-debt
+change, host-exit, or monolith-deletion result is admitted by this amendment.
