@@ -6,6 +6,11 @@
 //! - `Metadata/`: Document metadata and properties
 //! - Preview images at root level
 
+#![allow(
+    dead_code,
+    reason = "The private aggregate extraction seam is staged before neutral decoder cutover."
+)]
+
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::fs;
@@ -187,6 +192,342 @@ impl Default for BundleLimits {
             max_iwa_stream_bytes: Self::MAX_IWA_STREAM_BYTES,
             iwa_archive_limits: IwaArchiveLimits::default(),
         }
+    }
+}
+
+/// Hard ceilings used by the private aggregate text-projection seam.
+///
+/// The existing neutral decoders account each message independently.  A
+/// bundle-level projection must carry one cumulative allowance across every
+/// archive before it can safely publish a combined result.  This context is
+/// intentionally private until all neutral decoder routes can provide exact
+/// reports; in particular, it does not widen the current 6005/6201/6011
+/// compatibility routes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BundleExtractionLimits {
+    max_fields: usize,
+    max_work: usize,
+    max_text: usize,
+    max_output: usize,
+}
+
+impl BundleExtractionLimits {
+    /// Build checked aggregate projection ceilings.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "The four dimensions are deliberately explicit at this private boundary."
+    )]
+    fn new(max_fields: usize, max_work: usize, max_text: usize, max_output: usize) -> Result<Self> {
+        Ok(Self {
+            max_fields: checked_bundle_extraction_limit(
+                "bundle aggregate fields",
+                max_fields,
+                litchi_iwa_common::WireLimits::MAX_FIELDS,
+            )?,
+            max_work: checked_bundle_extraction_limit(
+                "bundle aggregate work",
+                max_work,
+                litchi_iwa_common::WireLimits::MAX_REWRITE_WORK,
+            )?,
+            max_text: checked_bundle_extraction_limit(
+                "bundle aggregate text",
+                max_text,
+                litchi_iwa_text_wire::Limits::MAX_TEXT_BYTES,
+            )?,
+            max_output: checked_bundle_extraction_limit(
+                "bundle aggregate output",
+                max_output,
+                litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES,
+            )?,
+        })
+    }
+}
+
+impl Default for BundleExtractionLimits {
+    fn default() -> Self {
+        Self {
+            max_fields: litchi_iwa_common::WireLimits::MAX_FIELDS,
+            max_work: litchi_iwa_common::WireLimits::MAX_REWRITE_WORK,
+            max_text: litchi_iwa_text_wire::Limits::MAX_TEXT_BYTES,
+            max_output: litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES,
+        }
+    }
+}
+
+fn checked_bundle_extraction_limit(
+    field: &'static str,
+    value: usize,
+    maximum: usize,
+) -> Result<usize> {
+    if value == 0 || value > maximum {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::InvalidLimit {
+            field,
+            value,
+            maximum,
+        }));
+    }
+    Ok(value)
+}
+
+/// Cumulative usage admitted by one private bundle projection context.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct BundleExtractionUsage {
+    fields: usize,
+    work: usize,
+    text: usize,
+    output: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BundleExtractionBudget {
+    limits: BundleExtractionLimits,
+    usage: BundleExtractionUsage,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BundleExtractionResource {
+    Fields,
+    Work,
+    Text,
+    Output,
+}
+
+impl BundleExtractionBudget {
+    fn new(limits: BundleExtractionLimits) -> Self {
+        Self {
+            limits,
+            usage: BundleExtractionUsage::default(),
+        }
+    }
+
+    fn charge(&mut self, fields: usize, work: usize, text: usize, output: usize) -> Result<()> {
+        // Validate every dimension on a copy.  A later dimension refusing a
+        // candidate must not leave earlier dimensions charged.
+        let mut next = *self;
+        next.charge_one(
+            BundleExtractionResource::Fields,
+            fields,
+            |usage| &mut usage.fields,
+            next.limits.max_fields,
+        )?;
+        next.charge_one(
+            BundleExtractionResource::Work,
+            work,
+            |usage| &mut usage.work,
+            next.limits.max_work,
+        )?;
+        next.charge_one(
+            BundleExtractionResource::Text,
+            text,
+            |usage| &mut usage.text,
+            next.limits.max_text,
+        )?;
+        next.charge_one(
+            BundleExtractionResource::Output,
+            output,
+            |usage| &mut usage.output,
+            next.limits.max_output,
+        )?;
+        *self = next;
+        Ok(())
+    }
+
+    fn charge_fields(&mut self, amount: usize) -> Result<()> {
+        self.charge(amount, 0, 0, 0)
+    }
+
+    fn charge_work(&mut self, amount: usize) -> Result<()> {
+        self.charge(0, amount, 0, 0)
+    }
+
+    fn charge_text(&mut self, amount: usize) -> Result<()> {
+        self.charge(0, 0, amount, 0)
+    }
+
+    fn charge_output(&mut self, amount: usize) -> Result<()> {
+        self.charge(0, 0, 0, amount)
+    }
+
+    fn charge_one<F>(
+        &mut self,
+        resource: BundleExtractionResource,
+        amount: usize,
+        current: F,
+        maximum: usize,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut BundleExtractionUsage) -> &mut usize,
+    {
+        let counter = current(&mut self.usage);
+        let observed = counter
+            .checked_add(amount)
+            .ok_or_else(|| bundle_extraction_limit_error(resource, usize::MAX, maximum))?;
+        if observed > maximum {
+            return Err(bundle_extraction_limit_error(resource, observed, maximum));
+        }
+        *counter = observed;
+        Ok(())
+    }
+}
+
+fn bundle_extraction_limit_error(
+    resource: BundleExtractionResource,
+    observed: usize,
+    limit: usize,
+) -> Error {
+    match resource {
+        BundleExtractionResource::Fields => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit,
+            })
+        },
+        BundleExtractionResource::Work => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed,
+                limit,
+            })
+        },
+        BundleExtractionResource::Text => Error::InvalidFormat(format!(
+            "iWork bundle aggregate text limit exceeded: observed {observed}, limit {limit}"
+        )),
+        BundleExtractionResource::Output => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::OutputBytes,
+                observed,
+                limit,
+            })
+        },
+    }
+}
+
+/// Private cumulative context for one bundle text projection.
+///
+/// A transaction stages both its counters and owned text fragments.  The
+/// parent context is unchanged until [`Self::publish`] succeeds, so a strict
+/// decoder or a later allocation failure cannot expose a charged prefix.
+#[derive(Debug)]
+struct BundleExtractionContext {
+    budget: BundleExtractionBudget,
+    output: Vec<String>,
+    revision: u64,
+}
+
+/// One unpublished bundle projection candidate.
+#[derive(Debug)]
+struct BundleExtractionTransaction {
+    budget: BundleExtractionBudget,
+    output: Vec<String>,
+    revision: u64,
+}
+
+impl BundleExtractionContext {
+    fn new(limits: BundleExtractionLimits) -> Self {
+        Self {
+            budget: BundleExtractionBudget::new(limits),
+            output: Vec::new(),
+            revision: 0,
+        }
+    }
+
+    fn begin(&self) -> BundleExtractionTransaction {
+        BundleExtractionTransaction {
+            budget: self.budget,
+            output: Vec::new(),
+            revision: self.revision,
+        }
+    }
+
+    fn publish(&mut self, transaction: BundleExtractionTransaction) -> Result<()> {
+        if transaction.revision != self.revision {
+            return Err(Error::InvalidFormat(
+                "stale iWork bundle aggregate extraction transaction".to_owned(),
+            ));
+        }
+        let next_revision = self.revision.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("iWork bundle aggregate extraction revision overflow".to_owned())
+        })?;
+        // The staged strings already own their bytes.  Reserve the destination
+        // vector before changing either the output or the cumulative budget;
+        // try_reserve is the last fallible step in publication.
+        self.output
+            .try_reserve(transaction.output.len())
+            .map_err(|_| {
+                Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                    resource: "iWork bundle aggregate text fragments",
+                    amount: transaction.output.len(),
+                })
+            })?;
+        let BundleExtractionTransaction { budget, mut output } = transaction;
+        self.output.append(&mut output);
+        self.budget = budget;
+        self.revision = next_revision;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn usage(&self) -> BundleExtractionUsage {
+        self.budget.usage
+    }
+
+    #[cfg(test)]
+    fn output(&self) -> &[String] {
+        &self.output
+    }
+}
+
+impl BundleExtractionTransaction {
+    fn charge(&mut self, fields: usize, work: usize, text: usize, output: usize) -> Result<()> {
+        self.budget.charge(fields, work, text, output)
+    }
+
+    fn charge_fields(&mut self, amount: usize) -> Result<()> {
+        self.budget.charge_fields(amount)
+    }
+
+    fn charge_work(&mut self, amount: usize) -> Result<()> {
+        self.budget.charge_work(amount)
+    }
+
+    fn charge_text(&mut self, amount: usize) -> Result<()> {
+        self.budget.charge_text(amount)
+    }
+
+    fn charge_output(&mut self, amount: usize) -> Result<()> {
+        self.budget.charge_output(amount)
+    }
+
+    fn push_text(&mut self, text: &str) -> Result<()> {
+        let output_bytes = text.len();
+        // Keep charges local until all checks and fallible allocations for
+        // this staged fragment have succeeded.
+        let mut next = self.budget;
+        next.charge_text(text.len())?;
+        next.charge_output(output_bytes)?;
+        self.output.try_reserve(1).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "iWork bundle aggregate text fragments",
+                amount: self.output.len().saturating_add(1),
+            })
+        })?;
+        let mut owned = String::new();
+        owned.try_reserve_exact(text.len()).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "iWork bundle aggregate text",
+                amount: text.len(),
+            })
+        })?;
+        owned.push_str(text);
+        self.output.push(owned);
+        self.budget = next;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn usage(&self) -> BundleExtractionUsage {
+        self.budget.usage
     }
 }
 
@@ -1533,6 +1874,118 @@ mod tests {
         fs::write(file.path(), &bytes)?;
         let error = Bundle::open_with_limits(file.path(), tight_input).unwrap_err();
         assert!(error.to_string().contains("iWork bundle is"));
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_extraction_budget_accepts_exact_cumulative_boundaries() -> crate::Result<()> {
+        let limits = BundleExtractionLimits::new(3, 5, 7, 11)?;
+        let mut context = BundleExtractionContext::new(limits);
+        let mut transaction = context.begin();
+
+        transaction.charge_fields(1)?;
+        transaction.charge_work(2)?;
+        transaction.charge_text(3)?;
+        transaction.charge_output(4)?;
+        transaction.charge(2, 3, 4, 7)?;
+        assert_eq!(
+            transaction.usage(),
+            BundleExtractionUsage {
+                fields: 3,
+                work: 5,
+                text: 7,
+                output: 11,
+            }
+        );
+
+        context.publish(transaction)?;
+        assert_eq!(
+            context.usage(),
+            BundleExtractionUsage {
+                fields: 3,
+                work: 5,
+                text: 7,
+                output: 11,
+            }
+        );
+        assert!(context.output().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_extraction_budget_rejects_one_over_without_partial_charge() -> crate::Result<()> {
+        let limits = BundleExtractionLimits::new(3, 3, 3, 3)?;
+        let mut context = BundleExtractionContext::new(limits);
+        let mut transaction = context.begin();
+        transaction.charge(2, 2, 2, 2)?;
+        let before = transaction.usage();
+
+        // The output dimension fails after the other three candidate charges;
+        // all four must still roll back on the staged transaction.
+        assert!(transaction.charge(1, 1, 1, 2).is_err());
+        assert_eq!(transaction.usage(), before);
+        assert_eq!(context.usage(), BundleExtractionUsage::default());
+        assert!(context.output().is_empty());
+
+        // A rejected candidate never becomes visible, while an independent
+        // exact candidate can still publish afterwards.
+        let mut accepted = context.begin();
+        accepted.charge(3, 3, 3, 3)?;
+        context.publish(accepted)?;
+        assert_eq!(
+            context.usage(),
+            BundleExtractionUsage {
+                fields: 3,
+                work: 3,
+                text: 3,
+                output: 3,
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_extraction_text_publication_is_atomic() -> crate::Result<()> {
+        let text = "ok";
+        let output_bytes = text.len();
+        let limits = BundleExtractionLimits::new(1, 1, text.len(), output_bytes)?;
+        let mut context = BundleExtractionContext::new(limits);
+        let mut transaction = context.begin();
+        transaction.push_text(text)?;
+
+        assert_eq!(transaction.usage().text, text.len());
+        assert_eq!(transaction.usage().output, output_bytes);
+        assert!(context.output().is_empty());
+
+        context.publish(transaction)?;
+        assert_eq!(context.output(), [text]);
+        assert_eq!(context.usage().text, text.len());
+        assert_eq!(context.usage().output, output_bytes);
+
+        // The next candidate is refused before publication, leaving both the
+        // previously published text and all cumulative counters unchanged.
+        let before = context.usage();
+        let before_output = context.output().to_owned();
+        let mut rejected = context.begin();
+        assert!(rejected.push_text("too much").is_err());
+        assert_eq!(context.usage(), before);
+        assert_eq!(context.output(), before_output.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn aggregate_extraction_rejects_stale_publication() -> crate::Result<()> {
+        let limits = BundleExtractionLimits::new(2, 2, 2, 2)?;
+        let mut context = BundleExtractionContext::new(limits);
+        let stale = context.begin();
+        let mut current = context.begin();
+        current.charge(1, 1, 1, 1)?;
+        context.publish(current)?;
+
+        let before = context.usage();
+        assert!(context.publish(stale).is_err());
+        assert_eq!(context.usage(), before);
+        assert!(context.output().is_empty());
         Ok(())
     }
 
