@@ -9,7 +9,7 @@ use super::{
     Case, CaseResult, Corpus, CorpusManifest, CountingSink, InstrumentedSource, PayloadKind,
     SourceSnapshot, SourceSummary, sha256_hex,
 };
-use litchi_cfb::{OleFile, OleWriter, PublishReport};
+use litchi_cfb::{OleFile, OleWriter, OverlayOperationShape, PublishReport};
 use litchi_core::ReadAt;
 use serde::Serialize;
 use std::io::{self, Cursor, Write};
@@ -19,6 +19,10 @@ const CORPUS_GENERATOR: &str = "litchi-xls-rk-mulrk-publication-v1";
 const OPAQUE_STREAM_COUNT: usize = 2;
 const OPAQUE_STREAM_BYTES: usize = 96 * 1024;
 const MAX_WRITE: u64 = 64 * 1024;
+const XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE: &str = "owned-source-ingress-only";
+const XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE: &str =
+    "owned-source-ingress-only; xls-overlay-operation-evidence-v1";
+const XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA: &str = "xls_numeric.operation_evidence.v1";
 const REAL_PRODUCER: &[u8] =
     include_bytes!("../../../test-data/poi/test-data/spreadsheet/54016.xls");
 
@@ -62,6 +66,66 @@ fn clone_record(record: &RawRecord, label: &str) -> Result<RawRecord, Box<dyn st
     })
 }
 
+/// Content-free logical shape copied from the source-backed CFB diagnostics.
+///
+/// The phase counters describe the validated overlay contract for the
+/// complete operation. They are not runtime, allocator, or syscall samples;
+/// candidate-sensitive phase values are projected explicitly by the ABBA
+/// summarizer while semantic, corpus, output, buffer, and durability-contract
+/// fields remain identity evidence.
+#[derive(Clone, Copy, Debug, Serialize)]
+pub(crate) struct XlsNumericOperationEvidence {
+    pub(crate) counter_scope: &'static str,
+    pub(crate) source_mode: &'static str,
+    pub(crate) source_bytes: u64,
+    pub(crate) fingerprint_chunk_bytes: u64,
+    pub(crate) publication_chunk_bytes: u64,
+    pub(crate) fingerprint_buffer_bytes: u64,
+    pub(crate) publication_buffer_bytes: u64,
+    pub(crate) planning_fingerprint_scans: u64,
+    pub(crate) planning_fingerprint_bytes: u64,
+    pub(crate) planning_fingerprint_chunks: u64,
+    pub(crate) composed_source_preflight_scans: u64,
+    pub(crate) composed_source_preflight_bytes: u64,
+    pub(crate) composed_source_preflight_chunks: u64,
+    pub(crate) target_materialization_write_pre_scans: u64,
+    pub(crate) target_materialization_write_pre_bytes: u64,
+    pub(crate) target_materialization_write_pre_chunks: u64,
+    pub(crate) target_materialization_emission_scans: u64,
+    pub(crate) target_materialization_emission_bytes: u64,
+    pub(crate) target_materialization_emission_chunks: u64,
+    pub(crate) target_materialization_write_post_scans: u64,
+    pub(crate) target_materialization_write_post_bytes: u64,
+    pub(crate) target_materialization_write_post_chunks: u64,
+    pub(crate) direct_write_pre_scans: u64,
+    pub(crate) direct_write_pre_bytes: u64,
+    pub(crate) direct_write_pre_chunks: u64,
+    pub(crate) direct_emission_scans: u64,
+    pub(crate) direct_emission_bytes: u64,
+    pub(crate) direct_emission_chunks: u64,
+    pub(crate) direct_write_post_scans: u64,
+    pub(crate) direct_write_post_bytes: u64,
+    pub(crate) direct_write_post_chunks: u64,
+    pub(crate) atomic_save_pre_temp_scans: u64,
+    pub(crate) atomic_save_pre_temp_bytes: u64,
+    pub(crate) atomic_save_pre_temp_chunks: u64,
+    pub(crate) atomic_save_emission_scans: u64,
+    pub(crate) atomic_save_emission_bytes: u64,
+    pub(crate) atomic_save_emission_chunks: u64,
+    pub(crate) atomic_save_pre_rename_scans: u64,
+    pub(crate) atomic_save_pre_rename_bytes: u64,
+    pub(crate) atomic_save_pre_rename_chunks: u64,
+    pub(crate) candidate_reopen_logical_artifact_bytes: u64,
+    pub(crate) selected_stream_logical_bytes: u64,
+    pub(crate) splice_count: usize,
+    pub(crate) changed_span_count: usize,
+    pub(crate) replacement_bytes: u64,
+    pub(crate) target_materialization_vec_bytes: u64,
+    pub(crate) target_materialization_clone_bytes: u64,
+    pub(crate) publication_write_calls: u64,
+    pub(crate) atomic_save_event_scope: &'static str,
+}
+
 /// Per-case native XLS numeric publication evidence. Eager and ordinary
 /// source-backed commits report their retained complete target artifacts;
 /// plan-only commits explicitly report zero retained/materialized target bytes
@@ -93,6 +157,10 @@ pub(crate) struct XlsNumericSourceSummary {
     pub(crate) sink_capacity_bytes: u64,
     pub(crate) expected_output_sha256: String,
     pub(crate) owned_input_scope: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) operation_evidence_schema: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) operation_evidence: Option<Vec<XlsNumericOperationEvidence>>,
     pub(crate) edit_ns: Vec<u64>,
     pub(crate) set_ns: Vec<u64>,
     pub(crate) commit_ns: Vec<u64>,
@@ -195,6 +263,9 @@ fn reserve_summary(
     }
     if let Some(values) = summary.target_fingerprints.as_mut() {
         reserve_exact(values, samples, "XLS numeric target-fingerprint evidence")?;
+    }
+    if let Some(values) = summary.operation_evidence.as_mut() {
+        reserve_exact(values, samples, "XLS numeric operation-shape evidence")?;
     }
     Ok(())
 }
@@ -701,6 +772,14 @@ impl Publication {
                 source_workbook_bytes,
                 target_workbook_bytes: u64::try_from(commit.snapshot().workbook_stream().len())
                     .unwrap_or(0),
+                operation_shape: None,
+                candidate_reopen_logical_artifact_bytes: 0,
+                selected_stream_logical_bytes: u64::try_from(
+                    commit.snapshot().workbook_stream().len(),
+                )
+                .unwrap_or(0),
+                target_materialization_vec_bytes: 0,
+                target_materialization_clone_bytes: 0,
                 splice_count: None,
                 replacement_bytes: None,
                 changed_spans: None,
@@ -709,10 +788,22 @@ impl Publication {
             },
             Self::SourceBacked(commit) => {
                 let diagnostics = commit.diagnostics();
+                let target_bytes =
+                    u64::try_from(commit.snapshot().bytes().len()).unwrap_or(0);
+                let target_materialized = !commit.is_noop();
                 NumericDiagnostics {
                     source_bytes: diagnostics.source_bytes(),
                     source_workbook_bytes: diagnostics.source_workbook_bytes(),
                     target_workbook_bytes: diagnostics.target_workbook_bytes(),
+                    operation_shape: Some(diagnostics.operation_shape()),
+                    candidate_reopen_logical_artifact_bytes: target_bytes,
+                    selected_stream_logical_bytes: diagnostics.target_workbook_bytes(),
+                    target_materialization_vec_bytes: target_materialized
+                        .then_some(target_bytes)
+                        .unwrap_or(0),
+                    target_materialization_clone_bytes: target_materialized
+                        .then_some(target_bytes)
+                        .unwrap_or(0),
                     splice_count: Some(diagnostics.splice_count()),
                     replacement_bytes: Some(diagnostics.replacement_bytes()),
                     changed_spans: Some(diagnostics.changed_spans()),
@@ -730,6 +821,11 @@ impl Publication {
                     source_bytes: diagnostics.source_bytes(),
                     source_workbook_bytes: diagnostics.source_workbook_bytes(),
                     target_workbook_bytes: diagnostics.target_workbook_bytes(),
+                    operation_shape: Some(diagnostics.operation_shape()),
+                    candidate_reopen_logical_artifact_bytes: diagnostics.source_bytes(),
+                    selected_stream_logical_bytes: diagnostics.target_workbook_bytes(),
+                    target_materialization_vec_bytes: 0,
+                    target_materialization_clone_bytes: 0,
                     splice_count: Some(diagnostics.splice_count()),
                     replacement_bytes: Some(diagnostics.replacement_bytes()),
                     changed_spans: Some(diagnostics.changed_spans()),
@@ -762,16 +858,82 @@ impl Publication {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default)]
 struct NumericDiagnostics {
     source_bytes: u64,
     source_workbook_bytes: u64,
     target_workbook_bytes: u64,
+    operation_shape: Option<OverlayOperationShape>,
+    candidate_reopen_logical_artifact_bytes: u64,
+    selected_stream_logical_bytes: u64,
+    target_materialization_vec_bytes: u64,
+    target_materialization_clone_bytes: u64,
     splice_count: Option<usize>,
     replacement_bytes: Option<u64>,
     changed_spans: Option<usize>,
     source_fingerprint: Option<String>,
     target_fingerprint: Option<String>,
+}
+
+fn operation_evidence_from_diagnostics(
+    diagnostics: &NumericDiagnostics,
+    publication_write_calls: u64,
+) -> Result<XlsNumericOperationEvidence, Box<dyn std::error::Error>> {
+    let shape = diagnostics
+        .operation_shape
+        .ok_or("XLS numeric operation evidence requires source-backed diagnostics")?;
+    Ok(XlsNumericOperationEvidence {
+        counter_scope: shape.counter_scope,
+        source_mode: shape.source_mode.as_str(),
+        source_bytes: shape.source_bytes,
+        fingerprint_chunk_bytes: shape.fingerprint_chunk_bytes,
+        publication_chunk_bytes: shape.publication_chunk_bytes,
+        fingerprint_buffer_bytes: shape.fingerprint_buffer_bytes,
+        publication_buffer_bytes: shape.publication_buffer_bytes,
+        planning_fingerprint_scans: shape.planning_fingerprint_scans,
+        planning_fingerprint_bytes: shape.planning_fingerprint_bytes,
+        planning_fingerprint_chunks: shape.planning_fingerprint_chunks,
+        composed_source_preflight_scans: shape.composed_source_preflight_scans,
+        composed_source_preflight_bytes: shape.composed_source_preflight_bytes,
+        composed_source_preflight_chunks: shape.composed_source_preflight_chunks,
+        target_materialization_write_pre_scans: shape.target_materialization_write_pre_scans,
+        target_materialization_write_pre_bytes: shape.target_materialization_write_pre_bytes,
+        target_materialization_write_pre_chunks: shape.target_materialization_write_pre_chunks,
+        target_materialization_emission_scans: shape.target_materialization_emission_scans,
+        target_materialization_emission_bytes: shape.target_materialization_emission_bytes,
+        target_materialization_emission_chunks: shape.target_materialization_emission_chunks,
+        target_materialization_write_post_scans: shape.target_materialization_write_post_scans,
+        target_materialization_write_post_bytes: shape.target_materialization_write_post_bytes,
+        target_materialization_write_post_chunks: shape.target_materialization_write_post_chunks,
+        direct_write_pre_scans: shape.direct_write_pre_scans,
+        direct_write_pre_bytes: shape.direct_write_pre_bytes,
+        direct_write_pre_chunks: shape.direct_write_pre_chunks,
+        direct_emission_scans: shape.direct_emission_scans,
+        direct_emission_bytes: shape.direct_emission_bytes,
+        direct_emission_chunks: shape.direct_emission_chunks,
+        direct_write_post_scans: shape.direct_write_post_scans,
+        direct_write_post_bytes: shape.direct_write_post_bytes,
+        direct_write_post_chunks: shape.direct_write_post_chunks,
+        atomic_save_pre_temp_scans: shape.atomic_save_pre_temp_scans,
+        atomic_save_pre_temp_bytes: shape.atomic_save_pre_temp_bytes,
+        atomic_save_pre_temp_chunks: shape.atomic_save_pre_temp_chunks,
+        atomic_save_emission_scans: shape.atomic_save_emission_scans,
+        atomic_save_emission_bytes: shape.atomic_save_emission_bytes,
+        atomic_save_emission_chunks: shape.atomic_save_emission_chunks,
+        atomic_save_pre_rename_scans: shape.atomic_save_pre_rename_scans,
+        atomic_save_pre_rename_bytes: shape.atomic_save_pre_rename_bytes,
+        atomic_save_pre_rename_chunks: shape.atomic_save_pre_rename_chunks,
+        candidate_reopen_logical_artifact_bytes: diagnostics
+            .candidate_reopen_logical_artifact_bytes,
+        selected_stream_logical_bytes: diagnostics.selected_stream_logical_bytes,
+        splice_count: diagnostics.splice_count.unwrap_or_default(),
+        changed_span_count: diagnostics.changed_spans.unwrap_or_default(),
+        replacement_bytes: diagnostics.replacement_bytes.unwrap_or_default(),
+        target_materialization_vec_bytes: diagnostics.target_materialization_vec_bytes,
+        target_materialization_clone_bytes: diagnostics.target_materialization_clone_bytes,
+        publication_write_calls,
+        atomic_save_event_scope: shape.atomic_save_event_scope,
+    })
 }
 
 fn prepare(
@@ -1441,7 +1603,11 @@ pub(crate) fn run(
         "XLS numeric source read-byte evidence",
     )?;
     let mut source_summary = XlsNumericSourceSummary {
-        source_counter_scope: "owned-source-ingress-only",
+        source_counter_scope: if source_backed {
+            XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE
+        } else {
+            XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE
+        },
         implementation: if source_backed {
             if implementation == Implementation::PlanOnly {
                 "plan_only"
@@ -1467,6 +1633,8 @@ pub(crate) fn run(
         sink_capacity_bytes: maximum,
         expected_output_sha256: expected.output_digest.clone(),
         owned_input_scope: "complete in-memory CFB bytes; no positional/physical I/O",
+        operation_evidence_schema: None,
+        operation_evidence: source_backed.then(Vec::new),
         splice_count: source_backed.then(Vec::new),
         replacement_bytes: source_backed.then(Vec::new),
         changed_spans: source_backed.then(Vec::new),
@@ -1518,6 +1686,24 @@ pub(crate) fn run(
         let metrics = source_metrics;
         let diagnostics = publication.diagnostics(source_workbook_bytes);
 
+        if diagnostics.operation_shape.is_some() != source_backed {
+            return Err("XLS numeric operation-shape diagnostics presence differs from implementation".into());
+        }
+        if let Some(shape) = diagnostics.operation_shape {
+            match source_summary.operation_evidence_schema {
+                None => source_summary.operation_evidence_schema = Some(XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA),
+                Some(schema) if schema != XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA => {
+                    return Err("XLS numeric operation evidence schema changed between samples".into());
+                },
+                Some(_) => {},
+            }
+            if shape.source_bytes != diagnostics.source_bytes
+                || shape.source_bytes != u64::try_from(corpus.archive.len())?
+            {
+                return Err("XLS numeric operation shape source length differs from diagnostics".into());
+            }
+        }
+
         if metrics.read_calls == 0
             || metrics.read_bytes != u64::try_from(corpus.archive.len())?
             || sink.bytes != expected.output_bytes
@@ -1564,6 +1750,22 @@ pub(crate) fn run(
         }
 
         if iteration >= warmup_iterations {
+            if diagnostics.operation_shape.is_some() {
+                let evidence = operation_evidence_from_diagnostics(
+                    &diagnostics,
+                    sink.summary().write_calls,
+                )?;
+                let values = source_summary
+                    .operation_evidence
+                    .as_mut()
+                    .ok_or("XLS numeric eager path produced operation-shape evidence")?;
+                push_bounded(
+                    values,
+                    evidence,
+                    samples,
+                    "XLS numeric operation-shape evidence",
+                )?;
+            }
             let commit_elapsed = super::elapsed_ns(commit_duration)?;
             let publication_elapsed = super::elapsed_ns(publication_duration)?;
             let edit_elapsed = super::elapsed_ns(edit_duration)?;
@@ -1752,11 +1954,15 @@ pub(crate) fn run(
         source_summary.changed_spans.as_ref().map(Vec::len),
         source_summary.source_fingerprints.as_ref().map(Vec::len),
         source_summary.target_fingerprints.as_ref().map(Vec::len),
+        source_summary.operation_evidence.as_ref().map(Vec::len),
     ];
     if optional_lengths.iter().any(|length| {
         length.is_some() != source_backed || length.is_some_and(|length| length != samples)
     }) {
         return Err("XLS numeric optional evidence vectors are incomplete".into());
+    }
+    if source_summary.operation_evidence_schema.is_some() != source_backed {
+        return Err("XLS numeric operation evidence schema presence is incomplete".into());
     }
     source_summary.sample_count = samples;
     let sink = super::deterministic_sink_summary(&sink_summaries, "XLS numeric publication")?;
@@ -1783,6 +1989,11 @@ pub(crate) fn run(
 mod tests {
     use super::{Family, build_rk_mulrk_corpus, family_for, run};
     use crate::{Case, build_xls_comments_edit_corpus, parse_case};
+
+    const XLS_NUMERIC_OPERATION_COUNTER_SCOPE: &str =
+        "validated overlay logical pass shape; no runtime, allocator, or syscall counters";
+    const XLS_NUMERIC_OPERATION_ATOMIC_SCOPE: &str =
+        "public save durability contract; temporary-file, flush, fsync, rename, and parent-sync stage counters are not observable";
 
     #[test]
     fn selectors_are_opt_in_and_have_stable_families() {
@@ -1820,6 +2031,7 @@ mod tests {
         ];
         for (name, case, expected) in cases {
             assert_eq!(parse_case(name), Some(case));
+            assert_eq!(parse_case(&format!("{name}_renamed")), None);
             assert_eq!(family_for(case).unwrap(), expected);
             assert!(!Case::DEFAULT.contains(&case));
         }
@@ -1836,6 +2048,26 @@ mod tests {
         );
         assert_eq!(first.manifest.generator, super::CORPUS_GENERATOR);
         let number = build_xls_comments_edit_corpus().unwrap();
+        assert_eq!(number.manifest.archive_bytes, 16_995_840);
+        assert_eq!(
+            number.manifest.archive_sha256,
+            "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53"
+        );
+        assert_eq!(number.manifest.target_payload_bytes, 80_946);
+        assert_eq!(
+            number.manifest.target_payload_sha256,
+            "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041"
+        );
+        assert_eq!(first.manifest.archive_bytes, 202_752);
+        assert_eq!(
+            first.manifest.archive_sha256,
+            "61a649b081c24821b02aa5e69b6ad1dc53b0232019d3668dd3776f402989c594"
+        );
+        assert_eq!(first.manifest.target_payload_bytes, 1_665);
+        assert_eq!(
+            first.manifest.target_payload_sha256,
+            "1b57f77d776cc8d0ed0f5154f7f7db2abca7f5fa7e23ecc69dd316c1c0b65967"
+        );
         let mut number_digest = None;
         let mut rk_mulrk_digest = None;
         for case in [
@@ -1849,8 +2081,41 @@ mod tests {
             let result = run(case, &number, &first, 0, 1).unwrap();
             assert_eq!(result.elapsed_ns.samples.len(), 1);
             let digest = result.output_sha256.clone().unwrap();
-            let evidence = result.source.unwrap().xls_numeric.unwrap();
+            let sink_write_calls = result.sink.as_ref().unwrap().write_calls;
+            let corpus_bytes = u64::try_from(result.corpus.archive_bytes).unwrap();
+            let source = result.source.unwrap();
+            let source_read_calls = source.read_calls;
+            let source_read_bytes = source.read_bytes;
+            let evidence = source.xls_numeric.unwrap();
+            let (expected_output, expected_workbook, expected_replacement, expected_spans, expected_writes) =
+                match family_for(case).unwrap().1 {
+                    Family::Number => (
+                        "f8f37064dc842550445b674385c196640c07681465de558b74dd2480b040fc03",
+                        80_946,
+                        8,
+                        1,
+                        260,
+                    ),
+                    Family::RkMulrk => (
+                        "ddf5d5b81d677f9056e5b48815c134e36d6674647f4e5f8c9946f989f39cf260",
+                        1_665,
+                        12,
+                        3,
+                        4,
+                    ),
+            };
             assert_eq!(evidence.sample_count, 1);
+            assert_eq!(evidence.input_cfb_bytes, corpus_bytes);
+            assert_eq!(evidence.output_cfb_bytes, corpus_bytes);
+            assert_eq!(source_read_calls, vec![expected_writes]);
+            assert_eq!(source_read_bytes, vec![corpus_bytes]);
+            assert_eq!(evidence.expected_output_sha256, expected_output);
+            assert_eq!(evidence.source_workbook_bytes, expected_workbook);
+            assert_eq!(evidence.target_workbook_bytes, expected_workbook);
+            assert_eq!(evidence.sink_write_calls, vec![expected_writes]);
+            assert_eq!(evidence.sink_digests, vec![expected_output.to_owned()]);
+            assert_eq!(evidence.expected_output_sha256, digest);
+            assert_eq!(sink_write_calls, expected_writes);
             assert_eq!(evidence.complete_target_materialized_bytes.len(), 1);
             assert_eq!(evidence.sink_digests.len(), 1);
             assert_eq!(
@@ -1874,9 +2139,101 @@ mod tests {
                 !matches!(
                     case,
                     Case::XlsNumericPlanOnlyNumberEditSave
-                        | Case::XlsNumericPlanOnlyRkMulrkEditSave
+                    | Case::XlsNumericPlanOnlyRkMulrkEditSave
                 )
             );
+            if !matches!(
+                case,
+                Case::XlsNumericEagerNumberEditSave
+                    | Case::XlsNumericEagerRkMulrkEditSave
+            ) {
+                assert_eq!(evidence.splice_count, Some(vec![expected_spans]));
+                assert_eq!(evidence.replacement_bytes, Some(vec![expected_replacement]));
+                assert_eq!(evidence.changed_spans, Some(vec![expected_spans]));
+                assert_eq!(
+                    evidence.source_fingerprints,
+                    Some(vec![result.corpus.archive_sha256.clone()])
+                );
+                assert_eq!(
+                    evidence.target_fingerprints,
+                    Some(vec![expected_output.to_owned()])
+                );
+                assert_eq!(
+                    evidence.source_counter_scope,
+                    super::XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE
+                );
+                assert_eq!(
+                    evidence.operation_evidence_schema,
+                    Some("xls_numeric.operation_evidence.v1")
+                );
+                let operation = evidence
+                    .operation_evidence
+                    .as_ref()
+                    .and_then(|values| values.first())
+                    .expect("source-backed one-sample operation evidence");
+                assert!(matches!(
+                    operation.source_mode,
+                    "generic_read_at" | "owned_immutable_arc"
+                ));
+                let fenced_scans = u64::from(operation.source_mode == "generic_read_at");
+                assert_eq!(operation.planning_fingerprint_scans, 1 + fenced_scans);
+                assert_eq!(operation.composed_source_preflight_scans, 1);
+                assert_eq!(operation.target_materialization_write_pre_scans, fenced_scans);
+                assert_eq!(operation.target_materialization_emission_scans, 1);
+                assert_eq!(operation.target_materialization_write_post_scans, fenced_scans);
+                assert_eq!(operation.direct_write_pre_scans, fenced_scans);
+                assert_eq!(operation.direct_emission_scans, 1);
+                assert_eq!(operation.direct_write_post_scans, fenced_scans);
+                assert_eq!(operation.atomic_save_pre_temp_scans, fenced_scans);
+                assert_eq!(operation.atomic_save_emission_scans, 1);
+                assert_eq!(operation.atomic_save_pre_rename_scans, fenced_scans);
+                assert_eq!(operation.source_bytes, evidence.input_cfb_bytes);
+                assert_eq!(
+                    operation.candidate_reopen_logical_artifact_bytes,
+                    if evidence.target_artifact_materialized_at_commit {
+                        evidence.output_cfb_bytes
+                    } else {
+                        evidence.input_cfb_bytes
+                    }
+                );
+                assert_eq!(
+                    operation.selected_stream_logical_bytes,
+                    evidence.target_workbook_bytes
+                );
+                assert_eq!(operation.publication_write_calls, evidence.sink_write_calls[0]);
+                assert_eq!(
+                    operation.splice_count,
+                    evidence.splice_count.as_ref().unwrap()[0]
+                );
+                assert_eq!(
+                    operation.changed_span_count,
+                    evidence.changed_spans.as_ref().unwrap()[0]
+                );
+                assert_eq!(
+                    operation.replacement_bytes,
+                    evidence.replacement_bytes.as_ref().unwrap()[0]
+                );
+                assert_eq!(
+                    operation.target_materialization_vec_bytes,
+                    evidence.complete_target_materialized_bytes[0]
+                );
+                assert_eq!(
+                    operation.target_materialization_clone_bytes,
+                    evidence.complete_target_materialized_bytes[0]
+                );
+                assert_eq!(operation.counter_scope, XLS_NUMERIC_OPERATION_COUNTER_SCOPE);
+                assert_eq!(
+                    operation.atomic_save_event_scope,
+                    XLS_NUMERIC_OPERATION_ATOMIC_SCOPE
+                );
+            } else {
+                assert_eq!(
+                    evidence.source_counter_scope,
+                    super::XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE
+                );
+                assert!(evidence.operation_evidence_schema.is_none());
+                assert!(evidence.operation_evidence.is_none());
+            }
             if matches!(
                 case,
                 Case::XlsNumericPlanOnlyNumberEditSave | Case::XlsNumericPlanOnlyRkMulrkEditSave

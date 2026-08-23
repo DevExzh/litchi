@@ -5,7 +5,7 @@
 )]
 
 use super::*;
-use litchi_cfb::{OleFile, OleWriter, SharedOleFile};
+use litchi_cfb::{OleFile, OleWriter, OverlaySourceMode, SharedOleFile};
 use std::io::Write;
 
 fn package() -> Vec<u8> {
@@ -482,6 +482,53 @@ fn source_backed_numeric_plan_validates_without_retaining_target_snapshot() {
         assert_eq!(cell.value(), &Value::Number(replacement));
         assert_eq!(cell.storage(), storage);
     }
+}
+
+#[test]
+fn source_backed_numeric_diagnostics_report_generic_and_owned_shapes() {
+    let reference = Reference::new(3, 2).unwrap();
+
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let mut ordinary_edit = source.edit();
+    ordinary_edit
+        .set_number("Sheet1".into(), reference, 9.25)
+        .unwrap();
+    let ordinary = ordinary_edit.commit_source_backed().unwrap();
+    let generic = ordinary.diagnostics().operation_shape();
+    assert_eq!(generic.source_mode, OverlaySourceMode::GenericReadAt);
+    assert_eq!(generic.source_bytes, source.bytes().len() as u64);
+    assert_eq!(generic.planning_fingerprint_scans, 2);
+    assert_eq!(generic.composed_source_preflight_scans, 1);
+    assert_eq!(generic.target_materialization_write_pre_scans, 1);
+    assert_eq!(generic.target_materialization_emission_scans, 1);
+    assert_eq!(generic.target_materialization_write_post_scans, 1);
+    assert_eq!(generic.direct_write_pre_scans, 1);
+    assert_eq!(generic.direct_emission_scans, 1);
+    assert_eq!(generic.direct_write_post_scans, 1);
+    assert_eq!(generic.atomic_save_pre_temp_scans, 1);
+    assert_eq!(generic.atomic_save_emission_scans, 1);
+    assert_eq!(generic.atomic_save_pre_rename_scans, 1);
+
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let mut plan_edit = source.edit();
+    plan_edit
+        .set_number("Sheet1".into(), reference, 9.25)
+        .unwrap();
+    let plan = plan_edit.commit_source_backed_plan().unwrap();
+    let owned = plan.diagnostics().operation_shape();
+    assert_eq!(owned.source_mode, OverlaySourceMode::OwnedImmutableArc);
+    assert_eq!(owned.source_bytes, source.bytes().len() as u64);
+    assert_eq!(owned.planning_fingerprint_scans, 1);
+    assert_eq!(owned.composed_source_preflight_scans, 1);
+    assert_eq!(owned.target_materialization_write_pre_scans, 0);
+    assert_eq!(owned.target_materialization_emission_scans, 1);
+    assert_eq!(owned.target_materialization_write_post_scans, 0);
+    assert_eq!(owned.direct_write_pre_scans, 0);
+    assert_eq!(owned.direct_emission_scans, 1);
+    assert_eq!(owned.direct_write_post_scans, 0);
+    assert_eq!(owned.atomic_save_pre_temp_scans, 0);
+    assert_eq!(owned.atomic_save_emission_scans, 1);
+    assert_eq!(owned.atomic_save_pre_rename_scans, 0);
 }
 
 #[test]

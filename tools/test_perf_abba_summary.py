@@ -212,6 +212,253 @@ def four_legs():
     ]
 
 
+def xls_operation_item(
+    mode="generic_read_at",
+    source_bytes=131072,
+    implementation="source_backed",
+    family="Number",
+):
+    corpus_contract = perf_abba_summary.XLS_NUMERIC_CORPUS_CONTRACTS[family]
+    output_contract = perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[family]
+    fingerprint_chunks = (source_bytes + 1_048_576 - 1) // 1_048_576
+    publication_chunks = (source_bytes + 65_536 - 1) // 65_536
+    fingerprint_bytes = source_bytes * 2
+    fenced = 1 if mode == "generic_read_at" else 0
+
+    def phase(scans, emission=False):
+        return {
+            "scans": scans,
+            "bytes": fingerprint_bytes * scans,
+            "chunks": (publication_chunks if emission else fingerprint_chunks) * scans,
+        }
+
+    materialized = implementation != "plan_only"
+    update_count = 1 if family == "Number" else 3
+    replacement_bytes = output_contract["replacement_bytes"]
+    operation = {
+        "counter_scope": perf_abba_summary.XLS_NUMERIC_OPERATION_COUNTER_SCOPE,
+        "source_mode": mode,
+        "source_bytes": source_bytes,
+        "fingerprint_chunk_bytes": 1_048_576,
+        "publication_chunk_bytes": 65_536,
+        "fingerprint_buffer_bytes": min(source_bytes, 1_048_576),
+        "publication_buffer_bytes": 65_536,
+        "planning_fingerprint_scans": 1 + fenced,
+        "planning_fingerprint_bytes": fingerprint_bytes * (1 + fenced),
+        "planning_fingerprint_chunks": fingerprint_chunks * (1 + fenced),
+        "composed_source_preflight_scans": 1,
+        "composed_source_preflight_bytes": fingerprint_bytes,
+        "composed_source_preflight_chunks": fingerprint_chunks,
+        "candidate_reopen_logical_artifact_bytes": source_bytes if not materialized else source_bytes,
+        "selected_stream_logical_bytes": corpus_contract["target_payload_bytes"],
+        "splice_count": update_count,
+        "changed_span_count": output_contract["changed_spans"],
+        "replacement_bytes": replacement_bytes,
+        "target_materialization_vec_bytes": source_bytes if materialized else 0,
+        "target_materialization_clone_bytes": source_bytes if materialized else 0,
+        "publication_write_calls": output_contract["sink_write_calls"],
+        "atomic_save_event_scope": perf_abba_summary.XLS_NUMERIC_OPERATION_ATOMIC_SCOPE,
+    }
+    for prefix in (
+        "target_materialization_write_pre",
+        "target_materialization_write_post",
+        "direct_write_pre",
+        "direct_write_post",
+        "atomic_save_pre_temp",
+        "atomic_save_pre_rename",
+    ):
+        values = phase(fenced)
+        operation.update({f"{prefix}_{key}": value for key, value in values.items()})
+    for prefix in (
+        "target_materialization_emission",
+        "direct_emission",
+        "atomic_save_emission",
+    ):
+        values = phase(1, emission=True)
+        operation.update({f"{prefix}_{key}": value for key, value in values.items()})
+    return operation
+
+
+def xls_numeric_source(
+    mode="generic_read_at",
+    implementation="source_backed",
+    timing_offset=0,
+    include_operation=True,
+    family="Number",
+):
+    corpus_contract = perf_abba_summary.XLS_NUMERIC_CORPUS_CONTRACTS[family]
+    workbook_sizes = perf_abba_summary.XLS_NUMERIC_WORKBOOK_SIZE_CONTRACTS[family]
+    output_contract = perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[family]
+    source_bytes = corpus_contract["archive_bytes"]
+    sink_write_calls = output_contract["sink_write_calls"]
+    source_read_calls = output_contract["source_read_calls"]
+    source_read_bytes = output_contract["source_read_bytes"]
+    materialized = implementation != "plan_only"
+    update_count = 1 if family == "Number" else 3
+    numeric = {
+        "source_counter_scope": (
+            perf_abba_summary.XLS_NUMERIC_CURRENT_SOURCE_COUNTER_SCOPE
+            if implementation != "eager"
+            else perf_abba_summary.XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE
+        ),
+        "implementation": implementation,
+        "family": family,
+        "source_backed": implementation != "eager",
+        "target_artifact_retained_at_commit": materialized,
+        "target_artifact_materialized_at_commit": materialized,
+        "patch_or_inverse_supported": materialized,
+        "update_count": update_count,
+        "sample_count": 15,
+        "input_cfb_bytes": source_bytes,
+        "output_cfb_bytes": source_bytes,
+        "source_workbook_bytes": workbook_sizes["source_workbook_bytes"],
+        "target_workbook_bytes": workbook_sizes["target_workbook_bytes"],
+        "sink_capacity_bytes": source_bytes,
+        "expected_output_sha256": output_contract["output_sha256"],
+        "owned_input_scope": "complete in-memory CFB bytes; no positional/physical I/O",
+        "edit_ns": [100 + timing_offset + index for index in range(15)],
+        "set_ns": [200 + timing_offset + index for index in range(15)],
+        "commit_ns": [300 + timing_offset + index for index in range(15)],
+        "publication_ns": [400 + timing_offset + index for index in range(15)],
+        "total_ns": [1000 + 4 * timing_offset + 4 * index for index in range(15)],
+        "complete_target_materialized_bytes": [source_bytes] * 15,
+        "sink_bytes": [source_bytes] * 15,
+        "sink_write_calls": [sink_write_calls] * 15,
+        "sink_digests": [output_contract["target_fingerprint_sha256"]] * 15,
+        "source_bytes": [source_bytes] * 15,
+        "source_workbook_bytes_per_sample": [
+            workbook_sizes["source_workbook_bytes"]
+        ]
+        * 15,
+        "target_workbook_bytes_per_sample": [
+            workbook_sizes["target_workbook_bytes"]
+        ]
+        * 15,
+        "splice_count": [update_count] * 15,
+        "replacement_bytes": [output_contract["replacement_bytes"]] * 15,
+        "changed_spans": [output_contract["changed_spans"]] * 15,
+        "source_fingerprints": [output_contract["source_fingerprint_sha256"]] * 15,
+        "target_fingerprints": [output_contract["target_fingerprint_sha256"]] * 15,
+    }
+    if not materialized:
+        numeric["complete_target_materialized_bytes"] = [0] * 15
+    if implementation == "eager":
+        for field in (
+            "splice_count",
+            "replacement_bytes",
+            "changed_spans",
+            "source_fingerprints",
+            "target_fingerprints",
+        ):
+            numeric.pop(field)
+    elif include_operation:
+        operation = xls_operation_item(mode, source_bytes, implementation, family)
+        numeric["operation_evidence_schema"] = perf_abba_summary.XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA
+        numeric["operation_evidence"] = [copy.deepcopy(operation) for _ in range(15)]
+    return {
+        "read_calls": [source_read_calls] * 15,
+        "read_bytes": [source_read_bytes] * 15,
+        "xls_numeric": numeric,
+    }
+
+
+def xls_numeric_legs(
+    case="xls_numeric_source_backed_number_edit_save",
+    implementation="source_backed",
+    family="Number",
+):
+    legs = four_legs()
+    modes = (
+        ("owned_immutable_arc",) * 4
+        if implementation == "plan_only"
+        else ("generic_read_at", "owned_immutable_arc", "owned_immutable_arc", "generic_read_at")
+    )
+    for index, (leg, mode) in enumerate(zip(legs, modes)):
+        leg["results"] = [leg["results"][0]]
+        leg["configuration"]["cases"] = [case]
+        for result in leg["results"]:
+            result["case"] = case
+        result = leg["results"][0]
+        result["corpus"] = copy.deepcopy(
+            perf_abba_summary.XLS_NUMERIC_CORPUS_CONTRACTS[family]
+        )
+        leg["configuration"]["corpus_shapes"] = [
+            "tiny",
+            "many-small",
+            "few-large",
+            "wide-root",
+        ]
+        result["output_sha256"] = perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[family][
+            "output_sha256"
+        ]
+        result["sink"] = {
+            "accepted_bytes": result["corpus"]["archive_bytes"],
+            "write_calls": perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[family][
+                "sink_write_calls"
+            ],
+        }
+        result["source"] = xls_numeric_source(
+            mode,
+            implementation=implementation,
+            timing_offset=index,
+            family=family,
+        )
+        result["elapsed_ns"] = elapsed(
+            result["source"]["xls_numeric"]["total_ns"]
+        )
+        result["elapsed_ns"]["sample_order"] = list(range(15))
+    return legs
+
+
+def xls_numeric_all_selector_legs():
+    selectors = tuple(perf_abba_summary.XLS_NUMERIC_CASE_CONTRACTS.items())
+    legs = four_legs()
+    modes = (
+        "generic_read_at",
+        "owned_immutable_arc",
+        "owned_immutable_arc",
+        "generic_read_at",
+    )
+    for leg, mode, leg_index in zip(legs, modes, range(4)):
+        results = []
+        for case, (implementation, family, _update_count) in selectors:
+            result = copy.deepcopy(leg["results"][0])
+            result["case"] = case
+            result["corpus"] = copy.deepcopy(
+                perf_abba_summary.XLS_NUMERIC_CORPUS_CONTRACTS[family]
+            )
+            result["output_sha256"] = perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[
+                family
+            ]["output_sha256"]
+            result["sink"] = {
+                "accepted_bytes": result["corpus"]["archive_bytes"],
+                "write_calls": perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[family][
+                    "sink_write_calls"
+                ],
+            }
+            source_mode = "owned_immutable_arc" if implementation == "plan_only" else mode
+            result["source"] = xls_numeric_source(
+                source_mode,
+                implementation=implementation,
+                timing_offset=leg_index,
+                family=family,
+            )
+            result["elapsed_ns"] = elapsed(
+                result["source"]["xls_numeric"]["total_ns"]
+            )
+            result["elapsed_ns"]["sample_order"] = list(range(15))
+            results.append(result)
+        leg["results"] = results
+        leg["configuration"]["cases"] = [case for case, _ in selectors]
+        leg["configuration"]["corpus_shapes"] = [
+            "tiny",
+            "many-small",
+            "few-large",
+            "wide-root",
+        ]
+    return legs
+
+
 def with_parallel_metrics(reports):
     reports = copy.deepcopy(reports)
     for report_value in reports:
@@ -2017,6 +2264,465 @@ class PerfAbbaSummaryTests(unittest.TestCase):
         ):
             perf_abba_summary.summarize_reports(legs)
 
+    def test_xls_numeric_operation_shape_projection_is_narrow_and_exact(self):
+        legs = xls_numeric_legs()
+        summary = perf_abba_summary.summarize_reports(legs)
+        numeric_result = next(
+            result for result in summary["results"] if "xls_numeric" in result["source"]
+        )
+        projected = numeric_result["source"]["xls_numeric"][
+            "operation_evidence"
+        ][0]
+        self.assertNotIn("source_mode", projected)
+        for field in perf_abba_summary.XLS_NUMERIC_TIMING_VECTOR_FIELDS:
+            self.assertNotIn(field, numeric_result["source"]["xls_numeric"])
+        for field in perf_abba_summary.XLS_NUMERIC_OPERATION_MEASUREMENT_FIELDS:
+            self.assertNotIn(field, projected)
+        for field in (
+            "counter_scope",
+            "source_bytes",
+            "fingerprint_chunk_bytes",
+            "publication_chunk_bytes",
+            "fingerprint_buffer_bytes",
+            "publication_buffer_bytes",
+            "candidate_reopen_logical_artifact_bytes",
+            "selected_stream_logical_bytes",
+            "splice_count",
+            "changed_span_count",
+            "replacement_bytes",
+            "target_materialization_vec_bytes",
+            "target_materialization_clone_bytes",
+            "publication_write_calls",
+            "atomic_save_event_scope",
+        ):
+            self.assertIn(field, projected)
+        raw_hashes = {
+            perf_abba_summary._canonical_sha256(leg, "xls") for leg in legs
+        }
+        self.assertGreater(len(raw_hashes), 1)
+
+        malformed = copy.deepcopy(legs)
+        malformed[0]["results"][0]["source"]["xls_numeric"][
+            "operation_evidence"
+        ][0]["planning_fingerprint_scans"] = 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "source-mode policy"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = copy.deepcopy(legs)
+        malformed[0]["results"][0]["source"]["xls_numeric"][
+            "operation_evidence"
+        ][0].pop("splice_count")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "keys mismatch"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = copy.deepcopy(legs)
+        malformed[2]["results"][0]["source"]["xls_numeric"][
+            "operation_evidence"
+        ][0]["counter_scope"] = "forged scope"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "validated CFB scope"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = copy.deepcopy(legs)
+        malformed[1]["results"][0]["source"]["xls_numeric"][
+            "operation_evidence"
+        ].pop()
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "cardinality"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+    def test_xls_numeric_current_evidence_discriminator_is_fail_closed(self):
+        missing_current = xls_numeric_legs()
+        numeric = missing_current[0]["results"][0]["source"]["xls_numeric"]
+        numeric.pop("operation_evidence")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "requires operation_evidence"
+        ):
+            perf_abba_summary.summarize_reports(missing_current)
+
+        scope_downgrade = xls_numeric_legs()
+        for leg in scope_downgrade:
+            numeric = leg["results"][0]["source"]["xls_numeric"]
+            numeric.pop("operation_evidence")
+            numeric.pop("operation_evidence_schema")
+            numeric[
+                "source_counter_scope"
+            ] = perf_abba_summary.XLS_NUMERIC_LEGACY_SOURCE_COUNTER_SCOPE
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "current operation-evidence discriminator"
+        ):
+            perf_abba_summary.summarize_reports(scope_downgrade)
+
+        missing_schema = xls_numeric_legs()
+        for leg in missing_schema:
+            numeric = leg["results"][0]["source"]["xls_numeric"]
+            numeric.pop("operation_evidence_schema")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "requires operation_evidence_schema"
+        ):
+            perf_abba_summary.summarize_reports(missing_schema)
+
+        eager = xls_numeric_legs(
+            case="xls_numeric_eager_number_edit_save", implementation="eager"
+        )
+        numeric = eager[0]["results"][0]["source"]["xls_numeric"]
+        numeric["operation_evidence_schema"] = (
+            perf_abba_summary.XLS_NUMERIC_OPERATION_EVIDENCE_SCHEMA
+        )
+        numeric["operation_evidence"] = []
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "eager implementation"
+        ):
+            perf_abba_summary.summarize_reports(eager)
+
+        plan = xls_numeric_legs(
+            case="xls_numeric_plan_only_number_edit_save", implementation="plan_only"
+        )
+        plan_numeric = plan[0]["results"][0]["source"]["xls_numeric"]
+        plan_numeric["target_artifact_materialized_at_commit"] = True
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "implementation"
+        ):
+            perf_abba_summary.summarize_reports(plan)
+
+    def test_xls_numeric_timing_vectors_bind_to_phases_and_elapsed_order(self):
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["source"]["xls_numeric"]["total_ns"][0] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "per-sample phase sum"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["elapsed_ns"]["sample_order"] = [0] * 15
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "complete permutation"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["elapsed_ns"]["sample_order"][:2] = [1, 0]
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "bind to elapsed_ns.samples"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+    def test_xls_numeric_source_mode_roles_are_bound_to_abba_leg(self):
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["source"]["xls_numeric"][
+            "operation_evidence"
+        ][0]["source_mode"] = "owned_immutable_arc"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "ABBA implementation-role"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[2]["results"][0]["source"]["xls_numeric"][
+            "operation_evidence"
+        ][0]["source_mode"] = "generic_read_at"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "ABBA implementation-role"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+    def test_xls_numeric_top_level_contract_tampering_is_rejected(self):
+        for field, value, message in (
+            ("family", "other", "family"),
+            ("update_count", 0, "update_count"),
+            ("sink_capacity_bytes", 1, "sink_capacity_bytes"),
+            ("expected_output_sha256", "bad", "lowercase"),
+            ("sample_count", 14, "sample_count|elapsed_ns.samples"),
+        ):
+            malformed = xls_numeric_legs()
+            malformed[0]["results"][0]["source"]["xls_numeric"][field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["source"]["xls_numeric"]["sink_digests"][0] = "e" * 64
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "sink_digests"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["source"]["xls_numeric"]["unexpected"] = True
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "unknown keys"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        for field, value, message in (
+            ("archive_bytes", 131073, "corpus.archive_bytes"),
+            ("archive_bytes", perf_abba_summary.XLS_NUMERIC_CFB_MAX_BYTES + 1, "2 GiB"),
+        ):
+            malformed = xls_numeric_legs()
+            malformed[0]["results"][0]["corpus"][field] = value
+            with self.subTest(field=field, value=value), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError,
+                f"{message}|native corpus manifest",
+            ):
+                perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["source"]["xls_numeric"]["output_cfb_bytes"] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "output_cfb_bytes"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["output_sha256"] = "e" * 64
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "expected_output_sha256|output_sha256"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["sink"]["write_calls"] = 3
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "sink.write_calls"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+    def test_xls_numeric_native_source_presence_and_identity_are_required(self):
+        for mutation in ("null", "omitted", "numeric_omitted"):
+            malformed = xls_numeric_legs()
+            source = malformed[0]["results"][0]["source"]
+            if mutation == "null":
+                malformed[0]["results"][0]["source"] = None
+            elif mutation == "omitted":
+                malformed[0]["results"][0].pop("source")
+            else:
+                source.pop("xls_numeric")
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError,
+                "source(?:\\.xls_numeric)? is required",
+            ):
+                perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_numeric_legs()
+        malformed[1]["results"][0]["source"]["read_calls"][0] += 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "source identity"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+    def test_xls_numeric_native_source_ingress_vectors_are_exact_raw_and_projected(self):
+        mutations = (
+            ("calls_omitted", lambda source, _contract: source.pop("read_calls"), "source.read_calls"),
+            ("bytes_omitted", lambda source, _contract: source.pop("read_bytes"), "source.read_bytes"),
+            ("calls_type", lambda source, _contract: source.update(read_calls={}), "source.read_calls"),
+            ("bytes_type", lambda source, _contract: source.update(read_bytes="not-a-vector"), "source.read_bytes"),
+            ("calls_cardinality", lambda source, contract: source.update(read_calls=[contract["source_read_calls"]] * 14), "source.read_calls"),
+            ("bytes_cardinality", lambda source, contract: source.update(read_bytes=[contract["source_read_bytes"]] * 14), "source.read_bytes"),
+            ("calls_zero", lambda source, contract: source.update(read_calls=[0] * 15), "source.read_calls must be positive"),
+            ("calls_wrong", lambda source, contract: source.update(read_calls=[contract["source_read_calls"] + 1] * 15), "source.read_calls differs"),
+            ("bytes_wrong", lambda source, contract: source.update(read_bytes=[contract["source_read_bytes"] + 1] * 15), "source.read_bytes"),
+        )
+        for case, (implementation, family, _updates) in perf_abba_summary.XLS_NUMERIC_CASE_CONTRACTS.items():
+            contract = perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[family]
+            valid = xls_numeric_legs(case, implementation, family)
+            projections = {
+                label: perf_abba_summary._project_report(
+                    leg,
+                    label,
+                    profile=perf_abba_summary.detect_report_profile(leg, label),
+                )
+                for label, leg in zip(perf_abba_summary.LEG_ORDER, valid)
+            }
+            projected_summary = perf_abba_summary._summarize_projected_reports(projections)
+            self.assertTrue(projected_summary["verification"]["source_identity_verified"])
+            for mutation, mutate, message in mutations:
+                malformed = copy.deepcopy(valid)
+                for leg in malformed:
+                    mutate(leg["results"][0]["source"], contract)
+                with self.subTest(case=case, mutation=mutation, path="raw"), self.assertRaisesRegex(
+                    perf_abba_summary.AbbaSummaryInputError, message
+                ):
+                    perf_abba_summary.summarize_reports(malformed)
+                with self.subTest(case=case, mutation=mutation, path="projected"), self.assertRaisesRegex(
+                    perf_abba_summary.AbbaSummaryInputError, message
+                ):
+                    malformed_projections = {
+                        label: perf_abba_summary._project_report(
+                            leg,
+                            label,
+                            profile=perf_abba_summary.detect_report_profile(leg, label),
+                        )
+                        for label, leg in zip(perf_abba_summary.LEG_ORDER, malformed)
+                    }
+                    perf_abba_summary._summarize_projected_reports(malformed_projections)
+
+    def test_xls_numeric_owned_input_scope_and_corpus_manifest_are_exact(self):
+        malformed = xls_numeric_legs()
+        malformed[0]["results"][0]["source"]["xls_numeric"][
+            "owned_input_scope"
+        ] = "forged complete-bytes claim"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "owned_input_scope"
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+        for field, expected in perf_abba_summary.XLS_NUMERIC_CORPUS_CONTRACTS[
+            "Number"
+        ].items():
+            malformed = xls_numeric_legs()
+            value = malformed[0]["results"][0]["corpus"][field]
+            if isinstance(value, bool):
+                replacement = not value
+            elif isinstance(value, int):
+                replacement = value + 1
+            elif value is None:
+                replacement = {}
+            else:
+                replacement = f"forged-{value}"
+            malformed[0]["results"][0]["corpus"][field] = replacement
+            with self.subTest(field=field), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, "native corpus manifest"
+            ):
+                perf_abba_summary.summarize_reports(malformed)
+
+        renamed = xls_numeric_legs()
+        for leg in renamed:
+            leg["configuration"]["cases"] = [
+                "xls_numeric_source_backed_rk_mulrk_edit_save"
+            ]
+            leg["results"][0]["case"] = (
+                "xls_numeric_source_backed_rk_mulrk_edit_save"
+            )
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "family|selector|native corpus manifest",
+        ):
+            perf_abba_summary.summarize_reports(renamed)
+
+        downgraded = xls_numeric_legs()
+        for leg in downgraded:
+            leg["configuration"]["cases"] = ["synthetic_case"]
+            leg["results"][0]["case"] = "synthetic_case"
+            leg["results"][0].pop("source")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "native XLS numeric corpus"
+        ):
+            perf_abba_summary.summarize_reports(downgraded)
+
+    def test_xls_numeric_case_contracts_cover_all_six_selectors(self):
+        for case, (implementation, family, _updates) in (
+            perf_abba_summary.XLS_NUMERIC_CASE_CONTRACTS.items()
+        ):
+            with self.subTest(case=case):
+                summary = perf_abba_summary.summarize_reports(
+                    xls_numeric_legs(case, implementation, family)
+                )
+                self.assertIs(summary["verification"]["source_identity_verified"], True)
+
+    def test_xls_numeric_emitted_six_selector_reports_summarize_directly(self):
+        reports = xls_numeric_all_selector_legs()
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(
+            {result["case"] for result in summary["results"]},
+            set(perf_abba_summary.XLS_NUMERIC_CASE_CONTRACTS),
+        )
+        self.assertTrue(summary["verification"]["source_identity_verified"])
+        self.assertEqual(
+            summary["verification"]["result_count"],
+            len(perf_abba_summary.XLS_NUMERIC_CASE_CONTRACTS),
+        )
+        report_hashes = {
+            item["canonical_sha256"]
+            for item in summary["report_identity"].values()
+        }
+        self.assertEqual(len(report_hashes), 4)
+        self.assertEqual(
+            set(summary["report_identity"]),
+            set(perf_abba_summary.LEG_ORDER),
+        )
+        self.assertTrue(summary["verification"]["case_corpus_identity_verified"])
+        self.assertTrue(summary["verification"]["output_sha256_identity_verified"])
+        self.assertNotEqual(
+            summary["implementation_identity"]["control"]["binary_sha256"],
+            summary["implementation_identity"]["candidate"]["binary_sha256"],
+        )
+        for implementation in ("control", "candidate"):
+            self.assertIn("binary_identity", summary["implementation_identity"][implementation])
+
+    def test_xls_numeric_family_contracts_reject_synchronized_forgery(self):
+        for family, case in (
+            ("Number", "xls_numeric_source_backed_number_edit_save"),
+            ("RK+MulRK", "xls_numeric_source_backed_rk_mulrk_edit_save"),
+        ):
+            with self.subTest(family=family):
+                contract = perf_abba_summary.XLS_NUMERIC_OUTPUT_CONTRACTS[family]
+                malformed = xls_numeric_legs(case, "source_backed", family)
+                forged_output = "0" * 64
+                for leg in malformed:
+                    result = leg["results"][0]
+                    numeric = result["source"]["xls_numeric"]
+                    numeric["expected_output_sha256"] = forged_output
+                    numeric["replacement_bytes"] = [
+                        contract["replacement_bytes"] + 1
+                    ] * 15
+                    numeric["changed_spans"] = [contract["changed_spans"] + 1] * 15
+                    numeric["source_fingerprints"] = [forged_output] * 15
+                    numeric["target_fingerprints"] = [forged_output] * 15
+                    numeric["sink_write_calls"] = [
+                        contract["sink_write_calls"] + 1
+                    ] * 15
+                    numeric["sink_digests"] = [forged_output] * 15
+                    result["output_sha256"] = forged_output
+                    result["sink"]["write_calls"] = contract["sink_write_calls"] + 1
+                    result["source"]["read_calls"] = [
+                        contract["sink_write_calls"] + 1
+                    ] * 15
+                    for operation in numeric["operation_evidence"]:
+                        operation["replacement_bytes"] = (
+                            contract["replacement_bytes"] + 1
+                        )
+                        operation["changed_span_count"] = contract["changed_spans"] + 1
+                        operation["publication_write_calls"] = (
+                            contract["sink_write_calls"] + 1
+                        )
+                with self.assertRaisesRegex(
+                    perf_abba_summary.AbbaSummaryInputError,
+                    "exact|native",
+                ):
+                    perf_abba_summary.summarize_reports(malformed)
+
+    def test_xls_numeric_selector_rename_changes_raw_identity_and_is_rejected(self):
+        reports = xls_numeric_all_selector_legs()
+        original_hashes = [
+            perf_abba_summary._canonical_sha256(report, "native")
+            for report in reports
+        ]
+        renamed = copy.deepcopy(reports)
+        renamed_case = "xls_numeric_source_backed_number_edit_save_renamed"
+        for report in renamed:
+            report["configuration"]["cases"] = [renamed_case] + [
+                case
+                for case in report["configuration"]["cases"][1:]
+            ]
+            report["results"][0]["case"] = renamed_case
+        renamed_hashes = [
+            perf_abba_summary._canonical_sha256(report, "renamed")
+            for report in renamed
+        ]
+        self.assertNotEqual(original_hashes, renamed_hashes)
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "native XLS numeric corpus|selector",
+        ):
+            perf_abba_summary.summarize_reports(renamed)
+
     def test_tool_configuration_and_result_identity_mismatches_fail_closed(self):
         for mutation, message in (
             (lambda legs: legs[1]["tool"].update(version="other"), "tool identity"),
@@ -2142,6 +2848,12 @@ class ProjectedReportSummaryTests(unittest.TestCase):
         projected = perf_abba_summary._summarize_projected_reports(self.projected(legs))
         self.assertEqual(projected, direct)
         self.assertTrue(projected["verification"]["binary_identity_verified"])
+
+    def test_xls_numeric_projected_summary_matches_direct_summary(self):
+        legs = xls_numeric_legs()
+        direct = perf_abba_summary.summarize_reports(legs)
+        projected = perf_abba_summary._summarize_projected_reports(self.projected(legs))
+        self.assertEqual(projected, direct)
 
     def test_mixed_profile_is_rejected_from_all_raw_legs(self):
         legs = self.legacy_legs()

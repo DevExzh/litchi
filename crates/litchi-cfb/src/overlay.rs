@@ -154,6 +154,190 @@ pub struct PublishReport {
     target_fingerprint: ArtifactFingerprint,
 }
 
+/// Provenance retained by a validated overlay source.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OverlaySourceMode {
+    /// A caller-provided positional `ReadAt` source whose bytes may change.
+    GenericReadAt,
+    /// An immutable `Arc<[u8]>` source sealed by [`SharedOleFile::open_owned`].
+    OwnedImmutableArc,
+}
+
+impl OverlaySourceMode {
+    /// Stable content-free label for diagnostics and reports.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::GenericReadAt => "generic_read_at",
+            Self::OwnedImmutableArc => "owned_immutable_arc",
+        }
+    }
+}
+
+/// Content-free shape of the complete validated overlay operation.
+///
+/// Counts and logical bytes are derived from the sealed source mode, source
+/// length, and the fixed CFB fingerprint/publication policies. They describe
+/// pass contracts rather than runtime observations, allocator activity, or
+/// operating-system syscall counts. A fingerprint pass hashes both source and
+/// composed-target bytes, so its logical byte count is twice the source length.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OverlayOperationShape {
+    /// Stable explanation of the logical-counter boundary.
+    pub counter_scope: &'static str,
+    /// Source ownership/provenance used by the plan.
+    pub source_mode: OverlaySourceMode,
+    /// Complete source artifact length used by every pass scope.
+    pub source_bytes: u64,
+    /// Logical chunk size for complete fingerprint passes.
+    pub fingerprint_chunk_bytes: u64,
+    /// Logical chunk size for publication/emission passes.
+    pub publication_chunk_bytes: u64,
+    /// Allocation scope of the complete fingerprint buffer.
+    pub fingerprint_buffer_bytes: u64,
+    /// Allocation scope of the publication buffer.
+    pub publication_buffer_bytes: u64,
+    /// Complete planning fingerprint pass count.
+    pub planning_fingerprint_scans: u64,
+    /// Logical bytes hashed by planning fingerprint passes.
+    pub planning_fingerprint_bytes: u64,
+    /// Chunks traversed by planning fingerprint passes.
+    pub planning_fingerprint_chunks: u64,
+    /// Complete composed-source preflight pass count.
+    pub composed_source_preflight_scans: u64,
+    /// Logical bytes hashed by composed-source preflight passes.
+    pub composed_source_preflight_bytes: u64,
+    /// Chunks traversed by composed-source preflight passes.
+    pub composed_source_preflight_chunks: u64,
+    /// Target-materialization write preflight pass count.
+    pub target_materialization_write_pre_scans: u64,
+    /// Logical bytes hashed by target-materialization write preflights.
+    pub target_materialization_write_pre_bytes: u64,
+    /// Chunks traversed by target-materialization write preflights.
+    pub target_materialization_write_pre_chunks: u64,
+    /// Target-materialization emission pass count.
+    pub target_materialization_emission_scans: u64,
+    /// Logical bytes hashed by target-materialization emissions.
+    pub target_materialization_emission_bytes: u64,
+    /// Chunks traversed by target-materialization emissions.
+    pub target_materialization_emission_chunks: u64,
+    /// Target-materialization write postflight pass count.
+    pub target_materialization_write_post_scans: u64,
+    /// Logical bytes hashed by target-materialization write postflights.
+    pub target_materialization_write_post_bytes: u64,
+    /// Chunks traversed by target-materialization write postflights.
+    pub target_materialization_write_post_chunks: u64,
+    /// Direct write preflight pass count.
+    pub direct_write_pre_scans: u64,
+    /// Logical bytes hashed by direct write preflights.
+    pub direct_write_pre_bytes: u64,
+    /// Chunks traversed by direct write preflights.
+    pub direct_write_pre_chunks: u64,
+    /// Direct emission pass count.
+    pub direct_emission_scans: u64,
+    /// Logical bytes hashed by direct emissions.
+    pub direct_emission_bytes: u64,
+    /// Chunks traversed by direct emissions.
+    pub direct_emission_chunks: u64,
+    /// Direct write postflight pass count.
+    pub direct_write_post_scans: u64,
+    /// Logical bytes hashed by direct write postflights.
+    pub direct_write_post_bytes: u64,
+    /// Chunks traversed by direct write postflights.
+    pub direct_write_post_chunks: u64,
+    /// Atomic-save pre-temporary-file preflight pass count.
+    pub atomic_save_pre_temp_scans: u64,
+    /// Logical bytes hashed before atomic temporary-file creation.
+    pub atomic_save_pre_temp_bytes: u64,
+    /// Chunks traversed before atomic temporary-file creation.
+    pub atomic_save_pre_temp_chunks: u64,
+    /// Atomic-save emission pass count.
+    pub atomic_save_emission_scans: u64,
+    /// Logical bytes hashed by atomic-save emission.
+    pub atomic_save_emission_bytes: u64,
+    /// Chunks traversed by atomic-save emission.
+    pub atomic_save_emission_chunks: u64,
+    /// Atomic-save pre-rename preflight pass count.
+    pub atomic_save_pre_rename_scans: u64,
+    /// Logical bytes hashed before atomic rename.
+    pub atomic_save_pre_rename_bytes: u64,
+    /// Chunks traversed before atomic rename.
+    pub atomic_save_pre_rename_chunks: u64,
+    /// Public-save durability contract; individual syscall stage counters are
+    /// intentionally outside this low-level abstraction.
+    pub atomic_save_event_scope: &'static str,
+}
+
+impl OverlayOperationShape {
+    fn new(source_mode: OverlaySourceMode, source_bytes: u64) -> Self {
+        let planning_fingerprint_scans = match source_mode {
+            OverlaySourceMode::GenericReadAt => 2,
+            OverlaySourceMode::OwnedImmutableArc => 1,
+        };
+        let fenced_write_scans = match source_mode {
+            OverlaySourceMode::GenericReadAt => 1,
+            OverlaySourceMode::OwnedImmutableArc => 0,
+        };
+        let fingerprint_chunks = source_bytes.div_ceil(FINGERPRINT_CHUNK_BYTES_U64);
+        let publication_chunks = source_bytes.div_ceil(PUBLICATION_CHUNK_BYTES as u64);
+        let fingerprint_bytes = source_bytes.saturating_mul(2);
+        let pass_bytes = |scans: u64| fingerprint_bytes.saturating_mul(scans);
+        let pass_chunks = |scans: u64, chunks: u64| chunks.saturating_mul(scans);
+        Self {
+            counter_scope: "validated overlay logical pass shape; no runtime, allocator, or syscall counters",
+            source_mode,
+            source_bytes,
+            fingerprint_chunk_bytes: FINGERPRINT_CHUNK_BYTES_U64,
+            publication_chunk_bytes: PUBLICATION_CHUNK_BYTES as u64,
+            fingerprint_buffer_bytes: source_bytes.min(FINGERPRINT_CHUNK_BYTES_U64),
+            publication_buffer_bytes: PUBLICATION_CHUNK_BYTES as u64,
+            planning_fingerprint_scans,
+            planning_fingerprint_bytes: pass_bytes(planning_fingerprint_scans),
+            planning_fingerprint_chunks: pass_chunks(
+                planning_fingerprint_scans,
+                fingerprint_chunks,
+            ),
+            composed_source_preflight_scans: 1,
+            composed_source_preflight_bytes: fingerprint_bytes,
+            composed_source_preflight_chunks: fingerprint_chunks,
+            target_materialization_write_pre_scans: fenced_write_scans,
+            target_materialization_write_pre_bytes: pass_bytes(fenced_write_scans),
+            target_materialization_write_pre_chunks: pass_chunks(
+                fenced_write_scans,
+                fingerprint_chunks,
+            ),
+            target_materialization_emission_scans: 1,
+            target_materialization_emission_bytes: fingerprint_bytes,
+            target_materialization_emission_chunks: publication_chunks,
+            target_materialization_write_post_scans: fenced_write_scans,
+            target_materialization_write_post_bytes: pass_bytes(fenced_write_scans),
+            target_materialization_write_post_chunks: pass_chunks(
+                fenced_write_scans,
+                fingerprint_chunks,
+            ),
+            direct_write_pre_scans: fenced_write_scans,
+            direct_write_pre_bytes: pass_bytes(fenced_write_scans),
+            direct_write_pre_chunks: pass_chunks(fenced_write_scans, fingerprint_chunks),
+            direct_emission_scans: 1,
+            direct_emission_bytes: fingerprint_bytes,
+            direct_emission_chunks: publication_chunks,
+            direct_write_post_scans: fenced_write_scans,
+            direct_write_post_bytes: pass_bytes(fenced_write_scans),
+            direct_write_post_chunks: pass_chunks(fenced_write_scans, fingerprint_chunks),
+            atomic_save_pre_temp_scans: fenced_write_scans,
+            atomic_save_pre_temp_bytes: pass_bytes(fenced_write_scans),
+            atomic_save_pre_temp_chunks: pass_chunks(fenced_write_scans, fingerprint_chunks),
+            atomic_save_emission_scans: 1,
+            atomic_save_emission_bytes: fingerprint_bytes,
+            atomic_save_emission_chunks: publication_chunks,
+            atomic_save_pre_rename_scans: fenced_write_scans,
+            atomic_save_pre_rename_bytes: pass_bytes(fenced_write_scans),
+            atomic_save_pre_rename_chunks: pass_chunks(fenced_write_scans, fingerprint_chunks),
+            atomic_save_event_scope: "public save durability contract; temporary-file, flush, fsync, rename, and parent-sync stage counters are not observable",
+        }
+    }
+}
+
 impl PublishReport {
     /// Complete published artifact length.
     #[must_use]
@@ -591,6 +775,20 @@ impl SharedOleFile {
 }
 
 impl ValidatedOverlayPlan {
+    /// Returns the content-free pass shape implied by this plan's sealed
+    /// source mode and complete artifact length.
+    #[must_use]
+    pub fn operation_shape(&self) -> OverlayOperationShape {
+        OverlayOperationShape::new(
+            if self.source.source_is_owned_immutable {
+                OverlaySourceMode::OwnedImmutableArc
+            } else {
+                OverlaySourceMode::GenericReadAt
+            },
+            self.source.length,
+        )
+    }
+
     /// Whether every supplied replacement was an exact byte no-op.
     #[must_use]
     pub fn is_noop(&self) -> bool {
