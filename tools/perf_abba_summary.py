@@ -38,6 +38,9 @@ TOOL_NAME = "litchi-perf-abba-summary"
 TOOL_VERSION = "0.1.0"
 LEG_ORDER = ("a1", "b1", "b2", "a2")
 STATISTICS = ("p50", "mean", "p95", "p99")
+REPORT_PROFILE_LEGACY = "legacy-v1"
+REPORT_PROFILE_CURRENT = "current-v1"
+REPORT_PROFILES = frozenset((REPORT_PROFILE_LEGACY, REPORT_PROFILE_CURRENT))
 U64_MAX = (1 << 64) - 1
 MIN_RETAINED_SAMPLES = 15
 ENVIRONMENT_VARIANTS = frozenset(("git_revision",))
@@ -399,6 +402,45 @@ def _canonical_json(value: Any, location: str) -> str:
         raise AbbaSummaryInputError(f"{location} is not canonical JSON: {error}") from error
 
 
+def _canonical_sha256(value: Any, location: str) -> str:
+    """Hash canonical JSON without materializing a second report-sized string."""
+
+    _validate_json_tree(value, location)
+    digest = hashlib.sha256()
+
+    def emit(item: Any) -> None:
+        if isinstance(item, dict):
+            digest.update(b"{")
+            for index, key in enumerate(sorted(item)):
+                if index:
+                    digest.update(b",")
+                digest.update(
+                    json.dumps(key, separators=(",", ":"), allow_nan=False).encode(
+                        "utf-8"
+                    )
+                )
+                digest.update(b":")
+                emit(item[key])
+            digest.update(b"}")
+            return
+        if isinstance(item, list):
+            digest.update(b"[")
+            for index, child in enumerate(item):
+                if index:
+                    digest.update(b",")
+                emit(child)
+            digest.update(b"]")
+            return
+        digest.update(
+            json.dumps(item, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
+                "utf-8"
+            )
+        )
+
+    emit(value)
+    return digest.hexdigest()
+
+
 def _require_object(value: Any, location: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise AbbaSummaryInputError(f"{location} must be an object")
@@ -633,21 +675,67 @@ def _required_string_list(value: Any, location: str, field: str) -> list[str]:
     return value
 
 
-def _validate_tool(tool: dict[str, Any], label: str) -> None:
-    for field in REQUIRED_TOOL_FIELDS:
+def detect_report_profile(report: Any, label: str = "report") -> str:
+    """Detect the report profile from raw report metadata only.
+
+    The historical schema-1 harness reports predate executable identity.  A
+    report carrying either additive current tool field (or the root binary
+    identity object) is current; otherwise it must carry the complete legacy
+    tool identity.  Callers comparing ABBA legs must run this for every raw
+    report and reject a mixed set before consulting a summary.
+    """
+
+    root = _require_object(report, label)
+    tool = _require_object(root.get("tool"), f"{label}.tool")
+    if "binary" in tool or "instrumentation" in tool or "binary_identity" in root:
+        return REPORT_PROFILE_CURRENT
+    legacy_fields = {"name", "version", "profile", "target_os", "target_arch"}
+    if legacy_fields <= set(tool):
+        return REPORT_PROFILE_LEGACY
+    raise AbbaSummaryInputError(
+        f"{label} does not match a supported ABBA report profile"
+    )
+
+
+def detect_reports_profile(
+    reports: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+) -> str:
+    """Detect one common profile across all four raw reports."""
+
+    report_values = _coerce_reports(reports, None, None, None)
+    profiles = {
+        detect_report_profile(report, label) for label, report in zip(LEG_ORDER, report_values)
+    }
+    if len(profiles) != 1:
+        raise AbbaSummaryInputError("mixed legacy-v1/current-v1 ABBA report profiles")
+    return next(iter(profiles))
+
+
+def _validate_tool(
+    tool: dict[str, Any], label: str, profile: str = REPORT_PROFILE_CURRENT
+) -> None:
+    if profile not in REPORT_PROFILES:
+        raise AbbaSummaryInputError(f"unsupported ABBA report profile {profile!r}")
+    required_fields = (
+        REQUIRED_TOOL_FIELDS
+        if profile == REPORT_PROFILE_CURRENT
+        else ("name", "version", "profile", "target_os", "target_arch")
+    )
+    for field in required_fields:
         _required_nonempty_string(tool.get(field), f"{label}.tool", field)
     if tool["name"] != HARNESS_TOOL_NAME:
         raise AbbaSummaryInputError(
             f"{label}.tool.name must be {HARNESS_TOOL_NAME!r}"
         )
-    if tool["binary"] != HARNESS_TOOL_NAME:
-        raise AbbaSummaryInputError(
-            f"{label}.tool.binary must be {HARNESS_TOOL_NAME!r} for latency ABBA"
-        )
-    if tool["instrumentation"] != "none":
-        raise AbbaSummaryInputError(
-            f"{label}.tool.instrumentation must be 'none' for latency ABBA"
-        )
+    if profile == REPORT_PROFILE_CURRENT:
+        if tool["binary"] != HARNESS_TOOL_NAME:
+            raise AbbaSummaryInputError(
+                f"{label}.tool.binary must be {HARNESS_TOOL_NAME!r} for latency ABBA"
+            )
+        if tool["instrumentation"] != "none":
+            raise AbbaSummaryInputError(
+                f"{label}.tool.instrumentation must be 'none' for latency ABBA"
+            )
 
 
 def _validate_binary_identity(
@@ -942,8 +1030,17 @@ def _validate_legacy_operation_metrics(
 
 
 def _operation_metrics_identity(
-    row: dict[str, Any], location: str, report_schema: int
+    row: dict[str, Any], location: str, report_schema: int, *, projected: bool = False
 ) -> str | None:
+    if projected and "_operation_metrics_identity" in row:
+        value = row["_operation_metrics_identity"]
+        if value is not None and (
+            not isinstance(value, str) or not value
+        ):
+            raise AbbaSummaryInputError(
+                f"{location}._operation_metrics_identity must be a string or null"
+            )
+        return value
     if "operation_metrics" not in row:
         return None
     operation_metrics = row["operation_metrics"]
@@ -979,11 +1076,15 @@ def _operation_metrics_identity(
 
 
 def _compare_operation_metrics_identity(
-    rows: Mapping[str, dict[str, Any]], location: str, report_schema: int
+    rows: Mapping[str, dict[str, Any]],
+    location: str,
+    report_schema: int,
+    *,
+    projected: bool = False,
 ) -> tuple[str, str | None]:
     identities = {
         label: _operation_metrics_identity(
-            rows[label], f"{label}.{location}", report_schema
+            rows[label], f"{label}.{location}", report_schema, projected=projected
         )
         for label in LEG_ORDER
     }
@@ -1436,7 +1537,11 @@ def validate_parallel_metrics(report: Any, label: str = "report") -> None:
 
 
 def _validate_report(
-    report: Any, label: str
+    report: Any,
+    label: str,
+    *,
+    profile: str | None = None,
+    raw_canonical_sha256: str | None = None,
 ) -> tuple[
     int,
     dict[str, Any],
@@ -1447,11 +1552,20 @@ def _validate_report(
     frozenset[str],
     bool,
     dict[tuple[str, str], str],
-    dict[str, Any],
+    dict[str, Any] | None,
 ]:
     root = _require_object(report, label)
-    canonical_report = _canonical_json(root, f"{label}.report")
-    report_sha256 = hashlib.sha256(canonical_report.encode("utf-8")).hexdigest()
+    detected_profile = detect_report_profile(root, label)
+    if profile is not None and profile != detected_profile:
+        raise AbbaSummaryInputError(
+            f"{label} report profile {detected_profile!r} does not match {profile!r}"
+        )
+    selected_profile = profile or detected_profile
+    if selected_profile not in REPORT_PROFILES:
+        raise AbbaSummaryInputError(f"unsupported ABBA report profile {selected_profile!r}")
+    if raw_canonical_sha256 is not None and SHA256_RE.fullmatch(raw_canonical_sha256) is None:
+        raise AbbaSummaryInputError(f"{label}.report canonical SHA-256 is invalid")
+    report_sha256 = raw_canonical_sha256 or _canonical_sha256(root, f"{label}.report")
     schema_version = root.get("schema_version")
     if isinstance(schema_version, bool) or not isinstance(schema_version, int):
         raise AbbaSummaryInputError(f"{label}.schema_version must be an integer")
@@ -1463,8 +1577,12 @@ def _validate_report(
     tool = _require_object(root.get("tool"), f"{label}.tool")
     if not tool:
         raise AbbaSummaryInputError(f"{label}.tool must not be empty")
-    _validate_tool(tool, label)
-    binary_identity = _validate_binary_identity(root.get("binary_identity"), label, tool)
+    _validate_tool(tool, label, selected_profile)
+    binary_identity = (
+        _validate_binary_identity(root.get("binary_identity"), label, tool)
+        if selected_profile == REPORT_PROFILE_CURRENT
+        else None
+    )
     environment = _require_object(root.get("environment"), f"{label}.environment")
     if not environment:
         raise AbbaSummaryInputError(f"{label}.environment must not be empty")
@@ -1505,6 +1623,7 @@ def _validate_configuration_rows(
     label: str,
     *,
     filesystem_shapes: Iterable[str] = (),
+    projected: bool = False,
 ) -> None:
     """Check optional harness cardinality/selector declarations when present."""
 
@@ -1548,6 +1667,15 @@ def _validate_configuration_rows(
     samples_per_case = configuration.get("samples_per_case")
     for key, row in indexed.items():
         case = key[0]
+        if projected and "_elapsed_statistics" in row:
+            elapsed_statistics = _require_object(
+                row["_elapsed_statistics"], f"{label}.{case}._elapsed_statistics"
+            )
+            if elapsed_statistics.get("sample_count") != samples_per_case:
+                raise AbbaSummaryInputError(
+                    f"{label}.{case}.elapsed_ns sample count does not match samples_per_case"
+                )
+            continue
         elapsed = _require_object(row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns")
         samples = elapsed.get("samples")
         if not isinstance(samples, list) or len(samples) != samples_per_case:
@@ -1717,6 +1845,286 @@ def _coerce_reports(
     return a1, b1, b2, a2
 
 
+def _projection_integrity(value: Any) -> str:
+    """Return an integrity digest for an internal validated projection.
+
+    Projection rows contain tuple keys, so they are not directly JSON
+    serializable.  The tagged normalization below is deterministic for the
+    bounded projection tree and deliberately ignores only the checker-added
+    top-level ``_canonical_sha256`` transport key.  It detects accidental or
+    adversarial mutation of the recomputed statistic markers before the
+    private projected-summary path consumes them.
+    """
+
+    def normalize(item: Any, *, root: bool = False) -> Any:
+        if isinstance(item, dict):
+            pairs = []
+            for key, child in item.items():
+                if root and key == "_canonical_sha256":
+                    continue
+                pairs.append((normalize(key), normalize(child)))
+            pairs.sort(
+                key=lambda pair: json.dumps(
+                    pair[0], sort_keys=True, separators=(",", ":"), allow_nan=False
+                )
+            )
+            return {"__dict__": pairs}
+        if isinstance(item, tuple):
+            return {"__tuple__": [normalize(child) for child in item]}
+        if isinstance(item, list):
+            return [normalize(child) for child in item]
+        if isinstance(item, frozenset):
+            normalized = [normalize(child) for child in item]
+            normalized.sort(
+                key=lambda child: json.dumps(
+                    child, sort_keys=True, separators=(",", ":"), allow_nan=False
+                )
+            )
+            return {"__frozenset__": normalized}
+        if item is None or isinstance(item, (bool, int, float, str)):
+            return item
+        raise AbbaSummaryInputError(
+            f"projection contains unsupported provenance value {type(item).__name__}"
+        )
+
+    try:
+        payload = json.dumps(
+            normalize(value, root=True),
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, OverflowError) as error:
+        raise AbbaSummaryInputError(
+            f"cannot fingerprint validated projection: {error}"
+        ) from error
+    return hashlib.sha256(payload).hexdigest()
+
+
+class _ValidatedProjection(dict[str, Any]):
+    """Private dict carrier for a projection validated in this module.
+
+    The class is intentionally not part of the module's public API.  The
+    projected summarizer accepts only instances created by ``_project_report``
+    and checks the integrity digest before consuming their private markers.
+    This keeps a caller from fabricating a normal mapping containing trusted
+    ``_elapsed_statistics`` values.
+    """
+
+    __slots__ = ("_integrity",)
+
+    def __init__(self, value: dict[str, Any]) -> None:
+        super().__init__(value)
+        self._integrity = _projection_integrity(self)
+
+    def verify_integrity(self) -> None:
+        if _projection_integrity(self) != self._integrity:
+            raise AbbaSummaryInputError(
+                "validated projection was mutated after raw validation"
+            )
+
+
+def _project_report(
+    report: Mapping[str, Any],
+    label: str = "report",
+    *,
+    profile: str | None = None,
+    expected_revision: str | None = None,
+    minimum_samples: int = MIN_RETAINED_SAMPLES,
+    raw_canonical_sha256: str | None = None,
+) -> dict[str, Any]:
+    """Validate one raw report and retain only summary identity channels.
+
+    The returned mapping intentionally contains no elapsed sample values and
+    no filesystem measurement payloads.  It is suitable for retaining one
+    leg while the next compressed report is decoded.  The private markers are
+    consumed only by :func:`_summarize_projected_reports`; raw reports always
+    take the full sample-validation path.
+    """
+
+    if isinstance(minimum_samples, bool) or not isinstance(minimum_samples, int):
+        raise AbbaSummaryInputError("minimum_samples must be an integer")
+    if minimum_samples < MIN_RETAINED_SAMPLES:
+        raise AbbaSummaryInputError(
+            f"minimum_samples must be at least {MIN_RETAINED_SAMPLES}"
+        )
+    validated = _validate_report(
+        report,
+        label,
+        profile=profile,
+        raw_canonical_sha256=raw_canonical_sha256,
+    )
+    report_schema, tool, environment, configuration, indexed, report_sha256 = validated[:6]
+    filesystem_shapes = validated[6]
+    filesystem_present = validated[7]
+    filesystem_identity = validated[8]
+    binary_identity = validated[9]
+    if expected_revision is not None:
+        if not isinstance(expected_revision, str) or not expected_revision:
+            raise AbbaSummaryInputError("expected_revision must be a non-empty string")
+        if environment["git_revision"] != expected_revision:
+            raise AbbaSummaryInputError(
+                f"{label}.environment.git_revision does not match expected revision"
+            )
+    _validate_configuration_rows(
+        configuration,
+        indexed,
+        label,
+        filesystem_shapes=filesystem_shapes,
+    )
+    projected_index: dict[tuple[str, str], dict[str, Any]] = {}
+    for key, row in indexed.items():
+        case, corpus_identity = key
+        elapsed = recompute_statistics(
+            row.get("elapsed_ns"), f"{label}.{case}.elapsed_ns"
+        )
+        if elapsed["sample_count"] < minimum_samples:
+            raise AbbaSummaryInputError(
+                f"{label}.{case}.elapsed_ns has fewer than {minimum_samples} samples"
+            )
+        for field in ("source", "sink", "output_sha256"):
+            if field in row and row[field] is not None:
+                if field == "output_sha256":
+                    _validate_output_sha256(
+                        row[field], f"{label}.{case}.{field}"
+                    )
+                else:
+                    _canonical_json(row[field], f"{label}.{case}.{field}")
+        operation_metrics_identity = _operation_metrics_identity(
+            row, f"{label}.{case}", report_schema
+        )
+        projected_row: dict[str, Any] = {
+            "case": case,
+            "corpus": json.loads(corpus_identity),
+            "_elapsed_statistics": elapsed,
+            "_operation_metrics_identity": operation_metrics_identity,
+        }
+        for field in ("source", "sink", "output_sha256"):
+            if field in row:
+                value = row[field]
+                projected_row[field] = (
+                    _source_identity_projection(value) if field == "source" else value
+                )
+            present, identity = _identity_value(
+                row, field, f"{label}.{case}[{corpus_identity}]"
+            )
+            projected_row[f"_{field}_present"] = present
+            projected_row[f"_{field}_identity"] = identity
+        projected_index[key] = projected_row
+    report_profile = detect_report_profile(report, label)
+    return _ValidatedProjection({
+        "_profile": report_profile,
+        "schema_version": report_schema,
+        "tool": tool,
+        "environment": environment,
+        "configuration": configuration,
+        "results": projected_index,
+        "report_sha256": report_sha256,
+        "filesystem_shapes": tuple(sorted(filesystem_shapes)),
+        "filesystem_present": filesystem_present,
+        "filesystem_identity": filesystem_identity,
+        "binary_identity": binary_identity,
+    })
+
+
+def _summarize_projected_reports(
+    reports: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+    *,
+    drift_ceilings: Mapping[str, Any] | None = None,
+    cases: Iterable[str] | None = None,
+    shapes: Iterable[str] | None = None,
+    ceilings: Mapping[str, Any] | None = None,
+    profile: str | None = None,
+) -> dict[str, Any]:
+    """Summarize four sequentially validated report projections."""
+
+    if not isinstance(reports, (Mapping, Sequence)) or isinstance(reports, (str, bytes)):
+        raise AbbaSummaryInputError("projected reports must be four report mappings")
+    projected_values = _coerce_reports(reports, None, None, None)
+    profiles: set[str] = set()
+    validated: dict[str, tuple[Any, ...]] = {}
+    for label, projected in zip(LEG_ORDER, projected_values):
+        if not isinstance(projected, _ValidatedProjection):
+            raise AbbaSummaryInputError(
+                f"{label} projected report lacks private validation provenance"
+            )
+        projected.verify_integrity()
+        detected = projected.get("_profile")
+        if detected not in REPORT_PROFILES:
+            raise AbbaSummaryInputError(f"{label} projected report has an invalid profile")
+        profiles.add(detected)
+        indexed = projected.get("results")
+        if not isinstance(indexed, Mapping) or not indexed:
+            raise AbbaSummaryInputError(f"{label} projected report results must be non-empty")
+        normalized_index: dict[tuple[str, str], dict[str, Any]] = {}
+        for key, row in indexed.items():
+            if (
+                not isinstance(key, tuple)
+                or len(key) != 2
+                or not isinstance(key[0], str)
+                or not isinstance(key[1], str)
+                or not isinstance(row, dict)
+            ):
+                raise AbbaSummaryInputError(f"{label} projected report has an invalid result key")
+            if "_elapsed_statistics" not in row:
+                raise AbbaSummaryInputError(
+                    f"{label} projected result is missing recomputed elapsed statistics"
+                )
+            normalized_index[key] = row
+        schema_version = projected.get("schema_version")
+        tool = projected.get("tool")
+        environment = projected.get("environment")
+        configuration = projected.get("configuration")
+        report_sha256 = projected.get("report_sha256")
+        if not isinstance(schema_version, int) or not isinstance(tool, dict):
+            raise AbbaSummaryInputError(f"{label} projected report root identity is invalid")
+        if not isinstance(environment, dict) or not isinstance(configuration, dict):
+            raise AbbaSummaryInputError(f"{label} projected report metadata is invalid")
+        if not isinstance(report_sha256, str) or SHA256_RE.fullmatch(report_sha256) is None:
+            raise AbbaSummaryInputError(f"{label} projected report SHA-256 is invalid")
+        filesystem_shapes = projected.get("filesystem_shapes")
+        if not isinstance(filesystem_shapes, (tuple, list)):
+            raise AbbaSummaryInputError(f"{label} projected filesystem shapes are invalid")
+        filesystem_identity = projected.get("filesystem_identity")
+        if not isinstance(filesystem_identity, dict):
+            raise AbbaSummaryInputError(f"{label} projected filesystem identity is invalid")
+        filesystem_present = projected.get("filesystem_present")
+        if not isinstance(filesystem_present, bool):
+            raise AbbaSummaryInputError(f"{label} projected filesystem presence is invalid")
+        binary_identity = projected.get("binary_identity")
+        if detected == REPORT_PROFILE_CURRENT and not isinstance(binary_identity, dict):
+            raise AbbaSummaryInputError(f"{label} current projection lacks binary identity")
+        if detected == REPORT_PROFILE_LEGACY and binary_identity is not None:
+            raise AbbaSummaryInputError(f"{label} legacy projection carries binary identity")
+        validated[label] = (
+            schema_version,
+            tool,
+            environment,
+            configuration,
+            normalized_index,
+            report_sha256,
+            frozenset(filesystem_shapes),
+            filesystem_present,
+            filesystem_identity,
+            binary_identity,
+        )
+    if len(profiles) != 1:
+        raise AbbaSummaryInputError("mixed legacy-v1/current-v1 ABBA report profiles")
+    report_profile = next(iter(profiles))
+    if profile is not None and profile != report_profile:
+        raise AbbaSummaryInputError(
+            f"projected report profile {report_profile!r} does not match {profile!r}"
+        )
+    return _summarize_reports_impl(
+        drift_ceilings=drift_ceilings,
+        cases=cases,
+        shapes=shapes,
+        ceilings=ceilings,
+        profile=report_profile,
+        _validated=(report_profile, validated),
+    )
+
+
 def _parse_selectors(values: Iterable[str] | None) -> set[str] | None:
     if values is None:
         return None
@@ -1760,6 +2168,7 @@ def _result_summary(
     corpus_identity: str,
     drift_ceilings: Mapping[str, float],
     report_schema: int,
+    projected: bool = False,
 ) -> dict[str, Any]:
     source_status, source_present, source_identity, source_value = _compare_row_identity(
         rows, "source", f"{case}[{corpus_identity}]"
@@ -1777,15 +2186,21 @@ def _result_summary(
     )
     operation_metrics_status, operation_metrics_identity = (
         _compare_operation_metrics_identity(
-            rows, f"{case}[{corpus_identity}]", report_schema
+            rows, f"{case}[{corpus_identity}]", report_schema, projected=projected
         )
     )
 
     elapsed: dict[str, dict[str, Any]] = {}
     for label in LEG_ORDER:
-        elapsed[label] = recompute_statistics(
-            rows[label].get("elapsed_ns"), f"{label}.{case}.elapsed_ns"
-        )
+        if projected and "_elapsed_statistics" in rows[label]:
+            elapsed[label] = _require_object(
+                rows[label]["_elapsed_statistics"],
+                f"{label}.{case}._elapsed_statistics",
+            )
+        else:
+            elapsed[label] = recompute_statistics(
+                rows[label].get("elapsed_ns"), f"{label}.{case}.elapsed_ns"
+            )
     sample_counts = {elapsed[label]["sample_count"] for label in LEG_ORDER}
     if len(sample_counts) != 1:
         raise AbbaSummaryInputError(
@@ -1893,6 +2308,41 @@ def summarize_reports(
     shapes: Iterable[str] | None = None,
     reports: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
     ceilings: Mapping[str, Any] | None = None,
+    profile: str | None = None,
+) -> dict[str, Any]:
+    """Validate four raw reports and return a deterministic summary.
+
+    Projection-only validated state is intentionally unavailable through this
+    public entry point; it is consumed by the private streaming boundary.
+    """
+
+    return _summarize_reports_impl(
+        a1,
+        b1,
+        b2,
+        a2,
+        drift_ceilings=drift_ceilings,
+        cases=cases,
+        shapes=shapes,
+        reports=reports,
+        ceilings=ceilings,
+        profile=profile,
+    )
+
+
+def _summarize_reports_impl(
+    a1: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
+    b1: Mapping[str, Any] | None = None,
+    b2: Mapping[str, Any] | None = None,
+    a2: Mapping[str, Any] | None = None,
+    *,
+    drift_ceilings: Mapping[str, Any] | None = None,
+    cases: Iterable[str] | None = None,
+    shapes: Iterable[str] | None = None,
+    reports: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
+    ceilings: Mapping[str, Any] | None = None,
+    profile: str | None = None,
+    _validated: tuple[str, Mapping[str, tuple[Any, ...]]] | None = None,
 ) -> dict[str, Any]:
     """Validate four reports and return a deterministic machine-readable summary.
 
@@ -1901,22 +2351,48 @@ def summarize_reports(
     passed as positional arguments.
     """
 
-    if reports is not None:
+    if _validated is not None and any(
+        value is not None for value in (a1, b1, b2, a2, reports)
+    ):
+        raise AbbaSummaryInputError("_validated cannot be combined with raw reports")
+    if _validated is not None:
+        report_profile, validated = _validated
+        if profile is not None and profile != report_profile:
+            raise AbbaSummaryInputError(
+                f"validated report profile {report_profile!r} does not match {profile!r}"
+            )
+        profile = report_profile
+    elif reports is not None:
         if a1 is not None or b1 is not None or b2 is not None or a2 is not None:
             raise AbbaSummaryInputError("reports cannot be combined with positional ABBA reports")
         a1 = reports
-    if a1 is None:
+    if _validated is None and a1 is None:
         raise AbbaSummaryInputError("four ABBA reports are required")
     if drift_ceilings is not None and ceilings is not None:
         raise AbbaSummaryInputError("use drift_ceilings or ceilings, not both")
     ceiling_values = _validate_drift_ceilings(
         drift_ceilings if drift_ceilings is not None else ceilings
     )
-    report_values = _coerce_reports(a1, b1, b2, a2)
-    validated = {
-        label: _validate_report(report, label)
-        for label, report in zip(LEG_ORDER, report_values)
-    }
+    if _validated is None:
+        report_values = _coerce_reports(a1, b1, b2, a2)
+        detected_profiles = {
+            detect_report_profile(report, label)
+            for label, report in zip(LEG_ORDER, report_values)
+        }
+        if len(detected_profiles) != 1:
+            raise AbbaSummaryInputError("mixed legacy-v1/current-v1 ABBA report profiles")
+        detected_profile = next(iter(detected_profiles))
+        if profile is not None and profile != detected_profile:
+            raise AbbaSummaryInputError(
+                f"raw report profile {detected_profile!r} does not match {profile!r}"
+            )
+        profile = detected_profile
+        validated = {
+            label: _validate_report(report, label, profile=profile)
+            for label, report in zip(LEG_ORDER, report_values)
+        }
+    elif profile not in REPORT_PROFILES:
+        raise AbbaSummaryInputError(f"unsupported ABBA report profile {profile!r}")
     schema_versions = {item[0] for item in validated.values()}
     if len(schema_versions) != 1:
         raise AbbaSummaryInputError("harness schema_version differs between ABBA legs")
@@ -1954,24 +2430,27 @@ def summarize_reports(
     if len(configurations) != 1:
         raise AbbaSummaryInputError("harness configuration differs between ABBA legs")
 
-    binary_identities = {
-        label: _canonical_json(item[9], f"{label}.binary_identity")
-        for label, item in validated.items()
-    }
-    if binary_identities["a1"] != binary_identities["a2"]:
-        raise AbbaSummaryInputError("control binary identity differs between A1 and A2")
-    if binary_identities["b1"] != binary_identities["b2"]:
-        raise AbbaSummaryInputError("candidate binary identity differs between B1 and B2")
-    binary_identity_values = {
+    binary_identity_values: dict[str, dict[str, Any] | None] = {
         label: item[9] for label, item in validated.items()
     }
-    if (
-        binary_identity_values["a1"]["binary_sha256"]
-        == binary_identity_values["b1"]["binary_sha256"]
-    ):
-        raise AbbaSummaryInputError(
-            "control and candidate executable SHA-256 hashes must differ"
-        )
+    if profile == REPORT_PROFILE_CURRENT:
+        binary_identities = {
+            label: _canonical_json(item[9], f"{label}.binary_identity")
+            for label, item in validated.items()
+        }
+        if binary_identities["a1"] != binary_identities["a2"]:
+            raise AbbaSummaryInputError("control binary identity differs between A1 and A2")
+        if binary_identities["b1"] != binary_identities["b2"]:
+            raise AbbaSummaryInputError("candidate binary identity differs between B1 and B2")
+        if (
+            binary_identity_values["a1"] is None
+            or binary_identity_values["b1"] is None
+            or binary_identity_values["a1"]["binary_sha256"]
+            == binary_identity_values["b1"]["binary_sha256"]
+        ):
+            raise AbbaSummaryInputError(
+                "control and candidate executable SHA-256 hashes must differ"
+            )
 
     for label, (
         _,
@@ -1990,6 +2469,7 @@ def summarize_reports(
             indexed,
             label,
             filesystem_shapes=filesystem_shapes,
+            projected=_validated is not None,
         )
 
     filesystem_presence = {item[7] for item in validated.values()}
@@ -2047,6 +2527,7 @@ def summarize_reports(
             corpus_identity=corpus_identity,
             drift_ceilings=ceiling_values,
             report_schema=next(iter(schema_versions)),
+            projected=_validated is not None,
         )
 
     results = [all_summaries[key] for key in selected_keys]
@@ -2082,6 +2563,56 @@ def summarize_reports(
         )
         for status in ("verified_equal", "consistently_absent")
     }
+    implementation_identity: dict[str, Any] = {
+        "control": {
+            "git_revision": control_revision,
+            "legs": ["a1", "a2"],
+        },
+        "candidate": {
+            "git_revision": candidate_revision,
+            "legs": ["b1", "b2"],
+        },
+        "distinct": True,
+    }
+    verification: dict[str, Any] = {
+        "result_count": len(results),
+        "tool_identity_verified": True,
+        "configuration_identity_verified": True,
+        "environment_stable_identity_verified": True,
+        "environment_legs_recorded": True,
+        "source_identity": status_counts["source"],
+        "sink_identity": status_counts["sink"],
+        "output_sha256_identity": output_status_counts,
+        "operation_metrics_identity": operation_metrics_status_counts,
+        "source_identity_verified": status_counts["source"]["verified_equal"] == len(results),
+        "sink_identity_verified": status_counts["sink"]["verified_equal"] == len(results),
+        "output_sha256_identity_verified": output_status_counts["verified_equal"]
+        == len(results),
+        "case_corpus_identity_verified": True,
+        "filesystem_evidence_identity_verified": True,
+        "statistics_recomputed_from_samples": True,
+    }
+    if profile == REPORT_PROFILE_CURRENT:
+        assert binary_identity_values["a1"] is not None
+        assert binary_identity_values["b1"] is not None
+        implementation_identity["control"].update(
+            {
+                "binary_sha256": binary_identity_values["a1"]["binary_sha256"],
+                "binary_identity": binary_identity_values["a1"],
+            }
+        )
+        implementation_identity["candidate"].update(
+            {
+                "binary_sha256": binary_identity_values["b1"]["binary_sha256"],
+                "binary_identity": binary_identity_values["b1"],
+            }
+        )
+        verification.update(
+            {
+                "binary_identity_verified": True,
+                "binary_hashes_distinct": True,
+            }
+        )
     return {
         "schema_version": SCHEMA_VERSION,
         "tool": {"name": TOOL_NAME, "version": TOOL_VERSION},
@@ -2107,43 +2638,10 @@ def summarize_reports(
             "stable": stable_environment,
             "legs": environments,
         },
-        "implementation_identity": {
-            "control": {
-                "git_revision": control_revision,
-                "binary_sha256": binary_identity_values["a1"]["binary_sha256"],
-                "binary_identity": binary_identity_values["a1"],
-                "legs": ["a1", "a2"],
-            },
-            "candidate": {
-                "git_revision": candidate_revision,
-                "binary_sha256": binary_identity_values["b1"]["binary_sha256"],
-                "binary_identity": binary_identity_values["b1"],
-                "legs": ["b1", "b2"],
-            },
-            "distinct": True,
-        },
+        "implementation_identity": implementation_identity,
         "report_identity": report_identities,
         "results": results,
-        "verification": {
-            "result_count": len(results),
-            "tool_identity_verified": True,
-            "binary_identity_verified": True,
-            "binary_hashes_distinct": True,
-            "configuration_identity_verified": True,
-            "environment_stable_identity_verified": True,
-            "environment_legs_recorded": True,
-            "source_identity": status_counts["source"],
-            "sink_identity": status_counts["sink"],
-            "output_sha256_identity": output_status_counts,
-            "operation_metrics_identity": operation_metrics_status_counts,
-            "source_identity_verified": status_counts["source"]["verified_equal"] == len(results),
-            "sink_identity_verified": status_counts["sink"]["verified_equal"] == len(results),
-            "output_sha256_identity_verified": output_status_counts["verified_equal"]
-            == len(results),
-            "case_corpus_identity_verified": True,
-            "filesystem_evidence_identity_verified": True,
-            "statistics_recomputed_from_samples": True,
-        },
+        "verification": verification,
     }
 
 
