@@ -4681,6 +4681,11 @@ fn enforce_keynote_slide_transition_projection_provenance(
 ) -> Result<(), Box<dyn Error>> {
     const CANONICAL_SLIDE: &str = "required .KN.TransitionArchive transition = 4;";
     const CANONICAL_TRANSITION: &str = "required .KN.TransitionAttributesArchive attributes = 2;";
+    const ROUTER_DECLARATIONS: [&str; 3] = [
+        "const SLIDE_TRANSITION_FIELD: u32 = 4;",
+        "const TRANSITION_ATTRIBUTES_FIELD: u32 = 2;",
+        "const ATTRIBUTES_ANIMATION_FIELD: u32 = 8;",
+    ];
     const CANONICAL_ANIMATION: [&str; 16] = [
         "optional string animation_type = 1;",
         "optional string effect = 2;",
@@ -4775,6 +4780,9 @@ fn enforce_keynote_slide_transition_projection_provenance(
             .iter()
             .all(|declaration| attributes_block.matches(declaration).count() == 1)
         || keynote.matches(CANONICAL_SLIDE_NODE).count() != 1
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
         || !PROJECTION_MESSAGES
             .iter()
             .all(|declaration| projection.matches(declaration).count() == 1)
